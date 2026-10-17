@@ -1,3 +1,4 @@
+#include <ShapeFix_Face.hxx>
 // Construction: vertices, edges and wires from 2D sketch data and 3D data,
 // planar faces, primitives.
 #include "internal.hpp"
@@ -321,6 +322,19 @@ std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& 
   if (!mk.IsDone())
     fail_op("could not build face with holes");
   TopoDS_Face f = mk.Face();
+  if (!holes.items.empty())
+  {
+    // Per-hole orientation checks can be fooled by multi-edge loops; let
+    // ShapeFix make every inner wire a proper hole (positive face area).
+    Handle(ShapeFix_Face) sff = new ShapeFix_Face(f);
+    sff->FixOrientationMode() = 1;
+    sff->FixWireMode()        = 0;
+    sff->FixSplitFaceMode()   = 0;
+    sff->FixOrientation();
+    f = sff->Face();
+    if (signed_area(f) < 0)
+      f.Reverse();
+  }
   BRepLib::BuildCurves3d(f);
   return wrap(f);
 }

@@ -549,7 +549,7 @@ impl Renderer {
                     (inst.color_mode == ColorMode::PerPrimitive) as u32,
                     inst.ignore_clip as u32,
                     inst.pickable as u32,
-                    0,
+                    inst.pick_base,
                 ],
                 _pad: [0.0; 24],
             };
@@ -651,6 +651,9 @@ impl Renderer {
                 for &i in list {
                     let inst = &instances[i];
                     if pick && !inst.pickable && !matches!(inst.drawable, Drawable::Mesh(_)) {
+                        continue;
+                    }
+                    if !pick && inst.pick_only {
                         continue;
                     }
                     pass.set_bind_group(1, bind_inst, &[(i as u64 * INST_STRIDE) as u32]);

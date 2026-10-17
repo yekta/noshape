@@ -149,6 +149,11 @@ pub struct Instance {
     pub ignore_clip: bool,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
+    /// Only rendered into the pick buffer (invisible but selectable), e.g.
+    /// B-rep vertices and sketch regions; highlights are drawn separately.
+    pub pick_only: bool,
+    /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
+    pub pick_base: u32,
 }
 
 impl Instance {
@@ -161,7 +166,17 @@ impl Instance {
             pickable: true,
             ignore_clip: false,
             layer: 0,
+            pick_only: false,
+            pick_base: 0,
         }
+    }
+    pub fn pick_base(mut self, base: u32) -> Self {
+        self.pick_base = base;
+        self
+    }
+    pub fn pick_only(mut self) -> Self {
+        self.pick_only = true;
+        self
     }
     pub fn with_color(mut self, c: [f32; 4]) -> Self {
         self.color = c;

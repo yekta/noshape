@@ -1,0 +1,16 @@
+coincident
+concentric
+parallel
+tangent
+horizontal
+vertical
+midpoint
+normal
+pierce
+perpendicular
+equal
+symmetric
+fix
+curvature
+collinear
+driven-dimension

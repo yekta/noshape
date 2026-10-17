@@ -221,6 +221,7 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
     }
 }
 
+#[allow(clippy::needless_range_loop)]
 fn spline_point_eval(curve: &Nurbs, comp: usize, x: &[f64], grad: Option<&mut [f64]>) -> f64 {
     let p = [x[0], x[1]];
     let t = x[2];

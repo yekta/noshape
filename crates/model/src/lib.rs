@@ -7,6 +7,7 @@
 
 pub mod assembly;
 pub mod configuration;
+pub mod display;
 pub mod document;
 pub mod drawing;
 pub mod features;
@@ -15,6 +16,7 @@ pub mod naming;
 pub mod params;
 pub mod partstudio;
 pub mod reference;
+pub mod regen;
 pub mod sketch_feature;
 pub mod variables;
 

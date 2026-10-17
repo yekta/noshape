@@ -24,3 +24,6 @@ parking_lot.workspace = true
 ahash.workspace = true
 image = { version = "0.25", default-features = false }
 async-channel = "2"
+rust-embed = "8"
+rfd = "0.15"
+dirs = "6"

@@ -7,7 +7,8 @@ license.workspace = true
 [dependencies]
 noshape-units.workspace = true
 noshape-sketch.workspace = true
-# noshape-kernel.workspace = true  (enabled once the kernel lands)
+noshape-kernel.workspace = true
+earcutr = "0.5"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

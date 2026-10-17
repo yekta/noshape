@@ -1,6 +1,8 @@
 //! Minimal NURBS curve toolkit (evaluation, derivatives, knot insertion,
 //! splitting, reversal, global interpolation and conics).
 
+#![allow(clippy::needless_range_loop)]
+
 use glam::DVec2;
 use serde::{Deserialize, Serialize};
 
@@ -300,16 +302,14 @@ impl Nurbs {
     pub fn sub_curve(&self, u0: f64, u1: f64) -> Nurbs {
         let (a, b) = self.domain();
         let mut c = self.clone();
-        if u0 > a {
-            if let Some((_, r)) = c.split(u0) {
+        if u0 > a
+            && let Some((_, r)) = c.split(u0) {
                 c = r;
             }
-        }
-        if u1 < b {
-            if let Some((l, _)) = c.split(u1) {
+        if u1 < b
+            && let Some((l, _)) = c.split(u1) {
                 c = l;
             }
-        }
         c
     }
 

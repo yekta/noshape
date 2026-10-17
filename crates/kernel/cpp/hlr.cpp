@@ -275,14 +275,15 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     gp_XY a2(a.X(), a.Y()), b2(b.X(), b.Y()), d = b2 - a2;
     if (d.Modulus() <= 1e-10)
       continue;
+    // Segments of real edges keep their source; silhouettes have none.
+    int     src = source_index(srcEdges, S);
     uint8_t cls = CLS_SHARP;
-    if (outl)
-      cls = CLS_OUTLINE;
-    else if (regn)
+    if (src < 0)
+      cls = outl ? CLS_OUTLINE : CLS_SHARP;
+    else if (regn && !outl)
       cls = CLS_SEAM;
-    else if (reg1)
+    else if (reg1 && !outl)
       cls = CLS_SMOOTH;
-    int                  src = cls == CLS_OUTLINE ? -1 : source_index(srcEdges, S);
     HLRAlgo_EdgeIterator it;
     double               sta, end;
     float                ts, te;

@@ -468,13 +468,11 @@ impl Sketch {
                 let (ka, kb) = (self.kind_of(*a), self.kind_of(*b));
                 let (p, c) = if ka == Some(EntityKind::Point) { (*a, *b) } else { (*b, *a) };
                 let kc = if ka == Some(EntityKind::Point) { kb } else { ka };
-                if let Some(kc) = kc {
-                    if kc.is_spline() {
-                        if let (Some(pp), Some(cv)) = (self.point(p), self.curve(c)) {
+                if let Some(kc) = kc
+                    && kc.is_spline()
+                        && let (Some(pp), Some(cv)) = (self.point(p), self.curve(c)) {
                             aux.push(cv.closest(pp).0);
                         }
-                    }
-                }
             }
             K::Tangent { a, b } | K::Curvature { a, b } => {
                 let (Some(ka), Some(kb)) = (self.kind_of(*a), self.kind_of(*b)) else { return (h, aux) };
@@ -493,8 +491,8 @@ impl Sketch {
                         h.internal = (d - (r1 - r2).abs()).abs() < (d - (r1 + r2)).abs();
                         h.sign2 = sgn(r1 - r2);
                     }
-                } else if ka == EntityKind::Line && kb.is_elliptical() {
-                    if let (Some((p, q)), Some(Curve2::Ellipse { center, major, minor } | Curve2::EllipticalArc { center, major, minor, .. })) =
+                } else if ka == EntityKind::Line && kb.is_elliptical()
+                    && let (Some((p, q)), Some(Curve2::Ellipse { center, major, minor } | Curve2::EllipticalArc { center, major, minor, .. })) =
                         (self.line_pts(a), self.curve(b))
                     {
                         let d = q - p;
@@ -505,7 +503,6 @@ impl Sketch {
                         let t = if pick(t0) <= pick(t0 + PI) { t0 } else { t0 + PI };
                         aux.push(t);
                     }
-                }
             }
             K::Normal { line, curve } => {
                 h.end_b = self.nearest_end(*curve, *line);
@@ -513,13 +510,11 @@ impl Sketch {
             K::Symmetric { a, b, axis } => {
                 if let (Some(EntityKind::Line), Some(EntityKind::Line), Some((p, q))) =
                     (self.kind_of(*a), self.kind_of(*b), self.line_pts(*axis))
-                {
-                    if let (Some((a0, a1)), Some((b0, _b1))) = (self.line_pts(*a), self.line_pts(*b)) {
+                    && let (Some((a0, a1)), Some((b0, _b1))) = (self.line_pts(*a), self.line_pts(*b)) {
                         let m0 = reflect(a0, p, q);
                         let m1 = reflect(a1, p, q);
                         h.reverse = (m1 - b0).length() < (m0 - b0).length();
                     }
-                }
             }
             K::Fix { entity } => {
                 for item in fix_items(self, *entity) {

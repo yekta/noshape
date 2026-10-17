@@ -26,9 +26,7 @@ pub fn boolean() -> FeatureType {
         ParamSpec::bool("reFillet", "Reapply fillet", false).visible(off),
         ParamSpec::bool("keepTools", "Keep tools", false).hints(Hints::REMEMBER_PREVIOUS_VALUE),
     ];
-    FeatureType::new("booleanBodies", "Boolean", Category::Solid, p)
-        .icon("boolean")
-        .describe("Union, subtract or intersect parts and surfaces")
+    FeatureType::new("booleanBodies", "Boolean", Category::Solid, p).icon("boolean").describe("Union, subtract or intersect parts and surfaces")
 }
 
 pub fn split() -> FeatureType {
@@ -53,8 +51,7 @@ pub fn split() -> FeatureType {
             QueryFilter::ANY_EDGE | QueryFilter::SHEET_BODY | QueryFilter::WIRE_BODY | QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR,
         )
         .visible(face),
-        ParamSpec::enum_("projectionType", "Projection direction type", &[("DIRECTION", "Direction"), ("NORMAL_TO_TARGET", "Normal to target")])
-            .visible(face),
+        ParamSpec::enum_("projectionType", "Projection direction type", &[("DIRECTION", "Direction"), ("NORMAL_TO_TARGET", "Normal to target")]).visible(face),
         ParamSpec::bool("useSketchPlaneDirection", "Use sketch plane direction", true).visible(dir),
         ParamSpec::query1("directionQuery", "Direction", QueryFilter::DIRECTION).visible(move |v| dir(v) && !v.bool("useSketchPlaneDirection")),
         ParamSpec::bool("keepToolSurfaces", "Keep tool surfaces and curves", true).visible(face),
@@ -73,8 +70,7 @@ pub fn delete_part() -> FeatureType {
         ParamSpec::query("entities", "Entities to delete", QueryFilter::BODY | QueryFilter::WIRE_BODY | QueryFilter::POINT_BODY)
             .hints(Hints::INITIAL_FOCUS)
             .visible(move |v| !ignore(v)),
-        ParamSpec::query("nonCompositeEntities", "Entities to delete", QueryFilter::BODY | QueryFilter::WIRE_BODY | QueryFilter::POINT_BODY)
-            .visible(ignore),
+        ParamSpec::query("nonCompositeEntities", "Entities to delete", QueryFilter::BODY | QueryFilter::WIRE_BODY | QueryFilter::POINT_BODY).visible(ignore),
     ];
     FeatureType::new("deleteBodies", "Delete part", Category::Solid, p).icon("deletePart").describe("Delete parts, surfaces, curves or composite parts")
 }

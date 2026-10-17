@@ -393,6 +393,7 @@ fn arc_segments(r: f64, sweep: f64, tol: f64) -> usize {
     ((sweep.abs() / max_step).ceil() as usize).clamp(2, 4096)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn refine(c: &Curve2, ta: f64, pa: DVec2, tb: f64, pb: DVec2, tol: f64, depth: u32, out: &mut Vec<(f64, DVec2)>) {
     let tm = 0.5 * (ta + tb);
     let pm = c.point(tm);

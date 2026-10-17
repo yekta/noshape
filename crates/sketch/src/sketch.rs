@@ -439,22 +439,20 @@ impl Sketch {
                 return Err(SketchError::UnknownEntity(e));
             }
         }
-        if let ConstraintKind::Pierce { target, .. } = &kind {
-            if !self.entity(*target).is_some_and(|e| e.external) {
+        if let ConstraintKind::Pierce { target, .. } = &kind
+            && !self.entity(*target).is_some_and(|e| e.external) {
                 return Err(SketchError::InvalidConstraint("pierce target must be external geometry".into()));
             }
-        }
         let (hints, aux) = self.compute_hints(&kind);
         let driving = driving || !kind.is_dimension();
         let mut c = Constraint { id: ConstraintId(u32::MAX), kind, driving, hints, aux };
         crate::equations::validate(self, &c).map_err(SketchError::InvalidConstraint)?;
         let id = self.alloc_constraint();
         c.id = id;
-        if !c.driving {
-            if let Some(v) = self.measure_kind(&c.kind, &c.hints) {
+        if !c.driving
+            && let Some(v) = self.measure_kind(&c.kind, &c.hints) {
                 c.kind.set_value(v);
             }
-        }
         self.constraints.insert(id, c);
         self.touch();
         Ok(id)

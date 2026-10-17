@@ -245,8 +245,8 @@ mod tests {
     #[test]
     fn split_face_gets_ordered_ordinals_and_kept_faces_keep_names() {
         // Input body: 2 faces A, B. Output: A unchanged, B split in two.
-        let a = face(1, Role::CapStart);
-        let b = face(1, Role::CapEnd);
+        let a = face(1, Role::CapStart(None));
+        let b = face(1, Role::CapEnd(None));
         let input = ShapeNames { faces: vec![a.clone(), b.clone()], ..Default::default() };
         let args = [&input];
         let records = [
@@ -273,21 +273,21 @@ mod tests {
         let records = [HistRecord { arg: 0, in_kind: Kind::Edge, in_index: 0, relation: Relation::Generated, out_kind: Kind::Face, out_index: 1 }];
         let keys = [[0.0; 4], [1.0, 0.0, 0.0, 0.0], [5.0, 0.0, 0.0, 0.0]];
         let mut roles = BTreeMap::new();
-        roles.insert(0, Role::CapStart);
+        roles.insert(0, Role::CapStart(None));
         let side = |n: &Name| match &**n {
             TopoName::Wire { source, .. } => Role::Side(source.clone()),
             _ => Role::Generated(n.clone()),
         };
         let names = name_faces(&FaceNamingInput { feature: FeatureId(3), args: &args, records: &records, out_face_keys: &keys, roles: &roles, generated_role: Some(&side) });
-        assert_eq!(*names[0], TopoName::face(FeatureId(3), Role::CapStart));
+        assert_eq!(*names[0], TopoName::face(FeatureId(3), Role::CapStart(None)));
         assert_eq!(*names[1], TopoName::face(FeatureId(3), Role::Side(side_src(5))));
         assert_eq!(*names[2], TopoName::face(FeatureId(3), Role::New(0)));
     }
 
     #[test]
     fn edges_named_by_face_pairs_with_ordinals() {
-        let a = face(1, Role::CapStart);
-        let b = face(1, Role::CapEnd);
+        let a = face(1, Role::CapStart(None));
+        let b = face(1, Role::CapEnd(None));
         let faces = vec![a.clone(), b.clone()];
         let edge_faces = vec![vec![0, 1], vec![1, 0], vec![0]];
         let keys = [[1.0, 0.0, 0.0, 0.0], [0.0; 4], [0.0; 4]];

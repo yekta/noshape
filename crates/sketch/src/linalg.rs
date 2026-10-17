@@ -78,10 +78,11 @@ impl EnvelopeSolver {
         (0..self.n).map(|i| self.data[self.diag_index(i)]).sum()
     }
 
-    pub fn add_diag(&mut self, v: f64) {
+    /// Marquardt damping: `d_i <- d_i (1 + lambda) + floor`.
+    pub fn damp_diag(&mut self, lambda: f64, floor: f64) {
         for i in 0..self.n {
             let k = self.diag_index(i);
-            self.data[k] += v;
+            self.data[k] = self.data[k] * (1.0 + lambda) + floor;
         }
     }
 
@@ -236,6 +237,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::needless_range_loop)]
     fn envelope_cholesky_matches_dense() {
         // random sparse SPD: A = B B^T + I with B sparse
         let n = 30;

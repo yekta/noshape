@@ -118,18 +118,18 @@ pub fn fillet() -> FeatureType {
         ParamSpec::enum_("crossSection", "Cross section", &[("CIRCULAR", "Circular"), ("CONIC", "Conic"), ("CURVATURE", "Curvature")])
             .hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::SHOW_LABEL)
             .visible(|v| v.is("filletType", "EDGE")),
-        ParamSpec::enum_("filletMeasurement", "Measurement", &[("RADIUS", "Radius"), ("WIDTH", "Width")])
+        ParamSpec::enum_("blendControlType", "Measurement", &[("RADIUS", "Radius"), ("WIDTH", "Width")])
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE)
             .visible(|v| v.is("filletType", "EDGE")),
         ParamSpec::num("radius", "Radius", NumSpec::positive_length(5.0, 0.2))
             .hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::CAN_BE_TOLERANT)
-            .visible(|v| v.is("filletType", "EDGE") && v.is("filletMeasurement", "RADIUS")),
+            .visible(|v| v.is("filletType", "EDGE") && v.is("blendControlType", "RADIUS")),
         ParamSpec::num("width", "Width", NumSpec::positive_length(5.0, 0.2))
-            .visible(|v| v.is("filletType", "EDGE") && v.is("filletMeasurement", "WIDTH")),
-        ParamSpec::bool("asymmetric", "Asymmetric", false).visible(|v| v.is("filletType", "EDGE") && v.is("crossSection", "CIRCULAR")),
+            .visible(|v| v.is("filletType", "EDGE") && v.is("blendControlType", "WIDTH")),
+        ParamSpec::bool("isAsymmetric", "Asymmetric", false).visible(|v| v.is("filletType", "EDGE") && v.is("crossSection", "CIRCULAR")),
         ParamSpec::num("otherRadius", "Second radius", NumSpec::positive_length(5.0, 0.2))
-            .visible(|v| v.is("filletType", "EDGE") && v.bool("asymmetric")),
-        ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(|v| v.is("filletType", "EDGE") && v.bool("asymmetric")),
+            .visible(|v| v.is("filletType", "EDGE") && v.bool("isAsymmetric")),
+        ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(|v| v.is("filletType", "EDGE") && v.bool("isAsymmetric")),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.9999)).visible(|v| v.is("filletType", "EDGE") && v.is("crossSection", "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.9999))
             .visible(|v| v.is("filletType", "EDGE") && v.is("crossSection", "CURVATURE")),
@@ -167,20 +167,20 @@ pub fn plane() -> FeatureType {
             .hints(Hints::INITIAL_FOCUS),
         ParamSpec::enum_("cplaneType", "Plane type", TYPES).hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::SHOW_LABEL),
         ParamSpec::length("offset", "Offset distance", 25.0, 1.0).visible(|v| v.is("cplaneType", "OFFSET")),
-        ParamSpec::angle("angle", "Angle", 30.0).visible(|v| v.is("cplaneType", "LINE_ANGLE")),
+        ParamSpec::angle("angle", "Angle", 0.0).visible(|v| v.is("cplaneType", "LINE_ANGLE")),
         ParamSpec::flip("oppositeDirection", "Flip alignment").visible(|v| v.is("cplaneType", "OFFSET") || v.is("cplaneType", "LINE_ANGLE")),
         ParamSpec::bool("flipAlignment", "Flip normal", false),
-        ParamSpec::length("width", "Display width", 150.0, 6.0).hints(Hints::UNCONFIGURABLE),
-        ParamSpec::length("height", "Display height", 150.0, 6.0).hints(Hints::UNCONFIGURABLE),
+        ParamSpec::length("width", "Display width", 150.0, 6.0).hints(Hints::UNCONFIGURABLE | Hints::ALWAYS_HIDDEN),
+        ParamSpec::length("height", "Display height", 150.0, 6.0).hints(Hints::UNCONFIGURABLE | Hints::ALWAYS_HIDDEN),
     ];
-    FeatureType::new("cPlane", "Plane", Category::Reference, p).shortcut("p").icon("plane").describe("Create a construction plane")
+    FeatureType::new("cPlane", "Plane", Category::Reference, p).icon("plane").describe("Create a construction plane")
 }
 
 pub fn variable() -> FeatureType {
     const KINDS: &[(&str, &str)] = &[("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any")];
     let p = vec![
         ParamSpec::enum_("variableType", "Variable type", KINDS).hints(Hints::HORIZONTAL_ENUM),
-        ParamSpec::text("name", "Name", "x"),
+        ParamSpec::text("name", "Name", ""),
         ParamSpec::length("lengthValue", "Value", 25.0, 1.0).visible(|v| v.is("variableType", "LENGTH")),
         ParamSpec::angle("angleValue", "Value", 0.0).visible(|v| v.is("variableType", "ANGLE")),
         ParamSpec::num("numberValue", "Value", NumSpec::real(0.0, -1e9, 1e9)).visible(|v| v.is("variableType", "NUMBER")),

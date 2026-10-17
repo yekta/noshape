@@ -209,11 +209,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 if let (Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }, Some(cid)) = (&c, e.center()) {
                     for k in 0..4 {
                         let a = k as f64 * PI / 2.0;
-                        if let Curve2::Arc { start_angle, end_angle, .. } = &c {
-                            if angle_in_range(a, *start_angle, end_angle - start_angle, 1e-12).is_none() {
+                        if let Curve2::Arc { start_angle, end_angle, .. } = &c
+                            && angle_in_range(a, *start_angle, end_angle - start_angle, 1e-12).is_none() {
                                 continue;
                             }
-                        }
                         let q = *center + DVec2::from_angle(a) * *radius;
                         if (q - cursor).length() <= r {
                             let align = if k % 2 == 0 { AutoConstraint::HorizontalWith(cid) } else { AutoConstraint::VerticalWith(cid) };

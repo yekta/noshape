@@ -40,8 +40,8 @@ const GL8: [(f64, f64); 8] = [
     (-0.960_289_856_497_536_3, 0.101_228_536_290_376_26),
     (-0.796_666_477_413_626_7, 0.222_381_034_453_374_47),
     (-0.525_532_409_916_329, 0.313_706_645_877_887_3),
-    (-0.183_434_642_495_649_8, 0.362_683_783_378_362_0),
-    (0.183_434_642_495_649_8, 0.362_683_783_378_362_0),
+    (-0.183_434_642_495_649_8, 0.362_683_783_378_362),
+    (0.183_434_642_495_649_8, 0.362_683_783_378_362),
     (0.525_532_409_916_329, 0.313_706_645_877_887_3),
     (0.796_666_477_413_626_7, 0.222_381_034_453_374_47),
     (0.960_289_856_497_536_3, 0.101_228_536_290_376_26),
@@ -125,8 +125,8 @@ impl ProfileSegment {
         match self {
             ProfileSegment::Line { a, b } => vec![*a, *b],
             ProfileSegment::Spline { .. } => {
-                let pts = Curve2::Nurbs(self.nurbs().unwrap()).tessellate(tol);
-                pts
+                
+                Curve2::Nurbs(self.nurbs().unwrap()).tessellate(tol)
             }
             ProfileSegment::Arc { radius, start_angle, end_angle, .. } => {
                 let n = segs(*radius, (end_angle - start_angle).abs(), tol);
@@ -472,11 +472,10 @@ fn build_edges(curves: &[(EntityId, Curve2)], tol: f64) -> (Vec<Edge>, Vec<DVec2
         ps.sort_by(f64::total_cmp);
         let mut uniq: Vec<f64> = Vec::new();
         for t in ps {
-            if let Some(&last) = uniq.last() {
-                if (c.point(t) - c.point(last)).length() <= tol && (t - last).abs() < 0.5 * (b - a) {
+            if let Some(&last) = uniq.last()
+                && (c.point(t) - c.point(last)).length() <= tol && (t - last).abs() < 0.5 * (b - a) {
                     continue;
                 }
-            }
             uniq.push(t);
         }
         if periodic {
@@ -522,19 +521,20 @@ fn build_edges(curves: &[(EntityId, Curve2)], tol: f64) -> (Vec<Edge>, Vec<DVec2
     }
     let (cl, pos) = merge_points(&pts, tol * 4.0);
     let mut edges: Vec<Edge> = Vec::new();
+    // vertex pair -> midpoints of edges already present (duplicate removal)
+    let mut by_pair: std::collections::HashMap<(usize, usize), Vec<DVec2>> = std::collections::HashMap::new();
     for (k, &(i, t0, t1)) in raw2.iter().enumerate() {
         let (v0, v1) = (cl[2 * k], cl[2 * k + 1]);
         if v0 == v1 {
             continue;
         }
         let mid = curves[i].1.point(0.5 * (t0 + t1));
-        let dup = edges.iter().any(|e| {
-            ((e.v0 == v0 && e.v1 == v1) || (e.v0 == v1 && e.v1 == v0))
-                && (curves[e.curve].1.point(0.5 * (e.t0 + e.t1)) - mid).length() <= tol * 100.0
-        });
-        if !dup {
-            edges.push(Edge { curve: i, t0, t1, v0, v1 });
+        let mids = by_pair.entry((v0.min(v1), v0.max(v1))).or_default();
+        if mids.iter().any(|m| (*m - mid).length() <= tol * 100.0) {
+            continue;
         }
+        mids.push(mid);
+        edges.push(Edge { curve: i, t0, t1, v0, v1 });
     }
     (edges, pos)
 }
@@ -556,13 +556,13 @@ impl Arrangement {
     /// Half-edge h = 2*e (forward) or 2*e+1 (reversed): origin, target.
     fn he_verts(&self, h: usize) -> (usize, usize) {
         let e = &self.edges[h / 2];
-        if h % 2 == 0 { (e.v0, e.v1) } else { (e.v1, e.v0) }
+        if h.is_multiple_of(2) { (e.v0, e.v1) } else { (e.v1, e.v0) }
     }
 
     fn he_segment(&self, h: usize) -> (ProfileSegment, SegmentSource) {
         let e = &self.edges[h / 2];
         let (id, c) = &self.curves[e.curve];
-        let fwd = h % 2 == 0;
+        let fwd = h.is_multiple_of(2);
         (segment_of(c, e.t0, e.t1, fwd), SegmentSource { entity: *id, forward: fwd })
     }
 
@@ -570,11 +570,11 @@ impl Arrangement {
     fn he_dir(&self, h: usize) -> (f64, f64) {
         let e = &self.edges[h / 2];
         let c = &self.curves[e.curve].1;
-        let (t, sign) = if h % 2 == 0 { (e.t0, 1.0) } else { (e.t1, -1.0) };
+        let (t, sign) = if h.is_multiple_of(2) { (e.t0, 1.0) } else { (e.t1, -1.0) };
         let d = c.ders(t);
         let mut dir = d[1] * sign;
         if dir.length() < 1e-12 * c.size().max(1e-12) {
-            let tt = if h % 2 == 0 { e.t0 + 1e-6 * (e.t1 - e.t0) } else { e.t1 - 1e-6 * (e.t1 - e.t0) };
+            let tt = if h.is_multiple_of(2) { e.t0 + 1e-6 * (e.t1 - e.t0) } else { e.t1 - 1e-6 * (e.t1 - e.t0) };
             dir = c.point(tt) - d[0];
         }
         (dir.y.atan2(dir.x), c.curvature(t) * sign)
@@ -793,12 +793,11 @@ fn wires(sk: &Sketch) -> Vec<Wire> {
         let closed = v == start_v && segs.len() > 1;
         Wire { segments: segs, sources: srcs, closed }
     };
-    for v in 0..pos.len() {
-        if inc[v].len() == 2 {
+    for (v, list) in inc.iter().enumerate() {
+        if list.len() == 2 {
             continue;
         }
-        for idx in 0..inc[v].len() {
-            let (k, s) = inc[v][idx];
+        for &(k, s) in list {
             if !used[k] {
                 out.push(walk(v, (k, s), &mut used));
             }

@@ -8,6 +8,9 @@
 #include <BRep_Builder.hxx>
 #include <BinTools.hxx>
 #include <IFSelect_ReturnStatus.hxx>
+#include <Message.hxx>
+#include <Message_Messenger.hxx>
+#include <Message_PrinterOStream.hxx>
 #include <IGESControl_Reader.hxx>
 #include <IGESControl_Writer.hxx>
 #include <Quantity_Color.hxx>
@@ -37,6 +40,18 @@ std::mutex& xde_mutex()
 {
   static std::mutex m;
   return m;
+}
+
+// OCCT data exchange prints progress/statistics to stdout through the default
+// messenger; a library must not write to stdout, so remove its printers once.
+void quiet_messenger()
+{
+  static std::once_flag once;
+  std::call_once(once, []() {
+    const occ::handle<Message_Messenger>& m = Message::DefaultMessenger();
+    if (!m.IsNull())
+      m->RemovePrinters(STANDARD_TYPE(Message_PrinterOStream));
+  });
 }
 
 std::string path_str(rust::Str p) { return std::string(p.data(), p.size()); }
@@ -205,6 +220,7 @@ std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes)
 StepImport read_step(rust::Str path)
 {
   std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
   const std::string           p = path_str(path);
   StepImport                  out;
   out.shapes = std::make_unique<OcShapeList>();
@@ -277,6 +293,7 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
                 rust::Str path)
 {
   std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
   const std::string           p = path_str(path);
   if (shapes.items.empty())
     fail_invalid("nothing to export");
@@ -319,6 +336,7 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
 std::unique_ptr<OcShape> read_iges(rust::Str path)
 {
   std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
   const std::string           p = path_str(path);
   IGESControl_Reader          r;
   if (r.ReadFile(p.c_str()) != IFSelect_RetDone)
@@ -333,6 +351,7 @@ std::unique_ptr<OcShape> read_iges(rust::Str path)
 void write_iges(const OcShapeList& shapes, rust::Str path)
 {
   std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
   const std::string           p = path_str(path);
   if (shapes.items.empty())
     fail_invalid("nothing to export");

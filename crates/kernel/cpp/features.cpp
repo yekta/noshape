@@ -3,6 +3,7 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
@@ -180,6 +181,43 @@ TopoDS_Wire rotate_wire_start(const TopoDS_Wire& w, const gp_Pnt& p)
   return r;
 }
 
+std::vector<TopoDS_Shape> images_vec(const HHist& h, const TopoDS_Shape& s)
+{
+  std::vector<TopoDS_Shape> v;
+  ShapeList                 l = images_of(h, s);
+  for (ShapeList::Iterator it(l); it.More(); it.Next())
+    v.push_back(it.Value());
+  return v;
+}
+
+// History of a BRepTools_Modifier-based algorithm (DraftAngle, GTransform):
+// every input sub-shape maps to ModifiedShape(s).
+template <class Algo>
+HHist modifier_history(const TopoDS_Shape& input, Algo& algo)
+{
+  HHist h = new BRepTools_History();
+  for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+  {
+    ShapeIMap m;
+    TopExp::MapShapes(input, k, m);
+    for (int i = 1; i <= m.Extent(); ++i)
+    {
+      TopoDS_Shape r;
+      try
+      {
+        r = algo.ModifiedShape(m(i));
+      }
+      catch (const Standard_Failure&)
+      {
+        continue;
+      }
+      if (!r.IsNull() && !r.IsSame(m(i)) && r.ShapeType() == k)
+        h->AddModified(m(i), r);
+    }
+  }
+  return h;
+}
+
 ShapeList single(const TopoDS_Shape& s)
 {
   ShapeList l;
@@ -246,7 +284,7 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
     draft.Build();
     if (!draft.IsDone())
       fail_op("draft extrude failed");
-    post = history_of({result}, draft);
+    post = modifier_history(result, draft);
     merge_into(hist, post);
     result = draft.Shape();
   }
@@ -257,10 +295,7 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
     return tr ? tr->ModifiedShape(s) : s;
   };
   hb.add_mapped(0, REL_FIRST, [&](const TopoDS_Shape& s) {
-    ShapeList r;
-    for (ShapeList::Iterator it(images_of(post, prism.FirstShape(moved(s)))); it.More(); it.Next())
-      r.Append(it.Value());
-    return r;
+    return images_of(post, prism.FirstShape(moved(s)));
   });
   hb.add_mapped(0, REL_LAST, [&](const TopoDS_Shape& s) {
     return images_of(post, prism.LastShape(moved(s)));
@@ -307,14 +342,14 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
 
   ShapeIMap startFaces, endFaces, targetFaces;
   for (TopExp_Explorer e(prism.FirstShape(), TopAbs_FACE); e.More(); e.Next())
-    for (ShapeList::Iterator it(images_of(spH, e.Current())); it.More(); it.Next())
-      startFaces.Add(it.Value());
+    for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+      startFaces.Add(img);
   for (TopExp_Explorer e(prism.LastShape(), TopAbs_FACE); e.More(); e.Next())
-    for (ShapeList::Iterator it(images_of(spH, e.Current())); it.More(); it.Next())
-      endFaces.Add(it.Value());
+    for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+      endFaces.Add(img);
   for (TopExp_Explorer e(until.shape, TopAbs_FACE); e.More(); e.Next())
-    for (ShapeList::Iterator it(images_of(spH, e.Current())); it.More(); it.Next())
-      targetFaces.Add(it.Value());
+    for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+      targetFaces.Add(img);
 
   std::vector<TopoDS_Shape> keep;
   bool                      reachesEnd = false;
@@ -648,13 +683,38 @@ OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness,
   if (!(std::abs(thickness) > 1e-9))
     fail_invalid("shell thickness must be non-zero");
   check_faces_in(solid.shape, faces.items);
+  const GeomAbs_JoinType    jt = join == 1 ? GeomAbs_Intersection : GeomAbs_Arc;
+  std::vector<TopoDS_Shape> args{solid.shape};
+  if (faces.items.empty())
+  {
+    // Closed hollow solid: offset the whole boundary, then subtract.
+    BRepOffsetAPI_MakeOffsetShape off;
+    off.PerformByJoin(solid.shape, thickness, 1e-6, BRepOffset_Skin, false, false, jt);
+    if (!off.IsDone())
+      fail_op("shell failed (thickness too large?)");
+    TopoDS_Shape offs = off.Shape();
+    for (TopExp_Explorer e(offs, TopAbs_SOLID); e.More(); e.Next())
+    {
+      TopoDS_Solid so = TopoDS::Solid(e.Current());
+      BRepLib::OrientClosedSolid(so);
+      offs = so;
+      break;
+    }
+    HHist                hist = history_of(args, off);
+    const TopoDS_Shape&  outer = thickness < 0 ? solid.shape : offs;
+    const TopoDS_Shape&  inner = thickness < 0 ? offs : solid.shape;
+    BRepAlgoAPI_Cut      cut(outer, inner);
+    if (cut.HasErrors() || !cut.IsDone())
+      fail_op("shell failed: " + algo_errors(cut));
+    hist->Merge(history_of({outer, inner}, cut));
+    return make_result(args, cut.Shape(), hist.get());
+  }
   BRepOffsetAPI_MakeThickSolid mk;
   mk.MakeThickSolidByJoin(solid.shape, to_list(faces.items), thickness, 1e-6, BRepOffset_Skin,
-                          false, false, join == 1 ? GeomAbs_Intersection : GeomAbs_Arc);
+                          false, false, jt);
   if (!mk.IsDone())
     fail_op("shell failed (thickness too large?)");
-  std::vector<TopoDS_Shape> args{solid.shape};
-  HHist                     h = history_of(args, mk);
+  HHist h = history_of(args, mk);
   return make_result(args, mk.Shape(), h.get());
 }
 
@@ -782,7 +842,7 @@ OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF&
   if (!mk.IsDone())
     fail_op("draft failed");
   std::vector<TopoDS_Shape> args{s.shape};
-  HHist                     h = history_of(args, mk);
+  HHist                     h = modifier_history(s.shape, mk);
   return make_result(args, mk.Shape(), h.get());
 }
 

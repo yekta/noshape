@@ -30,8 +30,12 @@ pub fn move_face() -> FeatureType {
     let p = vec![
         hidden(ParamSpec::enum_("outputType", "Creation type", &[("MOVE", "Move"), ("CREATE", "Create")])),
         ParamSpec::query("moveFaces", "Faces to move", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS).visible(mv),
-        ParamSpec::query("surfacesAndFaces", "Faces, surfaces, and sketch regions to offset", QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY)
-            .visible(move |v| !mv(v)),
+        ParamSpec::query(
+            "surfacesAndFaces",
+            "Faces, surfaces, and sketch regions to offset",
+            QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY,
+        )
+        .visible(move |v| !mv(v)),
         ParamSpec::enum_("moveFaceType", "Move face type", &[("OFFSET", "Offset"), ("TRANSLATE", "Translate"), ("ROTATE", "Rotate")]),
         ParamSpec::query1("direction", "Direction", QueryFilter::DIRECTION).visible(move |v| ty(v, "TRANSLATE")),
         ParamSpec::query1("axis", "Axis", QueryFilter::AXIS | QueryFilter::CIRCULAR_EDGE).visible(move |v| ty(v, "ROTATE")),

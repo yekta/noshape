@@ -4,6 +4,9 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <IMeshTools_Parameters.hxx>
+#include <Precision.hxx>
+
 #include <BRep_Tool.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
 #include <Poly_Polygon3D.hxx>
@@ -51,7 +54,15 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
   TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
   {
     std::lock_guard<std::mutex> lock(mesh_mutex());
-    BRepMesh_IncrementalMesh    mesher(s.shape, lin, relative, ang, parallel);
+    IMeshTools_Parameters prm;
+    prm.Deflection               = lin;
+    prm.Angle                    = ang;
+    prm.Relative                 = relative;
+    prm.InParallel               = parallel;
+    prm.MinSize                  = Precision::Confusion();
+    // Faces whose stored triangulation already satisfies the deflection are
+    // skipped by BRepMesh (triangulations are reused).
+    BRepMesh_IncrementalMesh mesher(s.shape, prm);
     (void)mesher;
     for (int i = 1; i <= m->faces.Extent(); ++i)
     {

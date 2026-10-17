@@ -23,13 +23,8 @@ pub fn register(out: &mut Vec<FeatureType>) {
 }
 
 /// Revolve end types (extrude end types without Through all).
-const REVOLVE_BOUND: &[(&str, &str)] = &[
-    ("BLIND", "Blind"),
-    ("UP_TO_NEXT", "Up to next"),
-    ("UP_TO_SURFACE", "Up to face"),
-    ("UP_TO_BODY", "Up to part"),
-    ("UP_TO_VERTEX", "Up to vertex"),
-];
+const REVOLVE_BOUND: &[(&str, &str)] =
+    &[("BLIND", "Blind"), ("UP_TO_NEXT", "Up to next"), ("UP_TO_SURFACE", "Up to face"), ("UP_TO_BODY", "Up to part"), ("UP_TO_VERTEX", "Up to vertex")];
 
 const UP_TO_FACE_FILTER: QueryFilter = QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::MATE_CONNECTOR.0);
 
@@ -81,7 +76,9 @@ pub fn revolve() -> FeatureType {
     let s_upto = move |v: &ParamValues| second(v) && !v.is("startBound", "BLIND");
     p.push(ParamSpec::bool("startOppositeDirection", "Opposite direction", false).hints(Hints::OPPOSITE_DIRECTION_CIRCULAR).visible(s_upto));
     p.push(ParamSpec::query1("startBoundEntityFace", "Up to face", UP_TO_FACE_FILTER).visible(move |v| second(v) && v.is("startBound", "UP_TO_SURFACE")));
-    p.push(ParamSpec::query1("startBoundEntityBody", "Up to surface or part", QueryFilter::BODY).visible(move |v| second(v) && v.is("startBound", "UP_TO_BODY")));
+    p.push(
+        ParamSpec::query1("startBoundEntityBody", "Up to surface or part", QueryFilter::BODY).visible(move |v| second(v) && v.is("startBound", "UP_TO_BODY")),
+    );
     p.push(
         ParamSpec::query1("startBoundEntityVertex", "Up to vertex or mate connector", QueryFilter::POINT_LIKE)
             .visible(move |v| second(v) && v.is("startBound", "UP_TO_VERTEX")),
@@ -116,8 +113,12 @@ pub fn sweep() -> FeatureType {
             .visible(|v| v.is("bodyType", "SURFACE")),
     );
     p.push(
-        ParamSpec::query("wallShape", "Faces and sketch regions to sweep", QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::WIRE_BODY)
-            .visible(|v| v.is("bodyType", "THIN")),
+        ParamSpec::query(
+            "wallShape",
+            "Faces and sketch regions to sweep",
+            QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::WIRE_BODY,
+        )
+        .visible(|v| v.is("bodyType", "THIN")),
     );
     p.extend(without_hint(thin_block(), Hints::CAN_BE_TOLERANT));
     p.push(ParamSpec::query("path", "Sweep path", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY));
@@ -177,7 +178,11 @@ pub fn loft() -> FeatureType {
             "sheetProfilesArray",
             "Profiles",
             "Profile",
-            vec![ParamSpec::query("sheetProfileEntities", "Faces and sketch regions", QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY | QueryFilter::VERTEX)],
+            vec![ParamSpec::query(
+                "sheetProfileEntities",
+                "Faces and sketch regions",
+                QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
+            )],
         )
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS)
         .visible(|v| v.is("bodyType", "SOLID")),
@@ -338,15 +343,11 @@ pub fn hole() -> FeatureType {
         ParamSpec::lookup("ansiHoleTableEx", "Standard", hole_tables::TABLE_ANSI_HOLE_EX)
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(move |v| inch(v) && simple(v)),
-        ParamSpec::lookup("ansiHoleTable", "Standard", hole_tables::TABLE_ANSI_HOLE)
-            .hints(rem | Hints::UNCONFIGURABLE)
-            .visible(move |v| inch(v) && !simple(v)),
+        ParamSpec::lookup("ansiHoleTable", "Standard", hole_tables::TABLE_ANSI_HOLE).hints(rem | Hints::UNCONFIGURABLE).visible(move |v| inch(v) && !simple(v)),
         ParamSpec::lookup("isoHoleTableEx", "Standard", hole_tables::TABLE_ISO_HOLE_EX)
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(move |v| !inch(v) && simple(v)),
-        ParamSpec::lookup("isoHoleTable", "Standard", hole_tables::TABLE_ISO_HOLE)
-            .hints(rem | Hints::UNCONFIGURABLE)
-            .visible(move |v| !inch(v) && !simple(v)),
+        ParamSpec::lookup("isoHoleTable", "Standard", hole_tables::TABLE_ISO_HOLE).hints(rem | Hints::UNCONFIGURABLE).visible(move |v| !inch(v) && !simple(v)),
         ParamSpec::bool("showThreadClassV2", "Thread class", false).hints(rem | Hints::GROUP_HEADER).visible(|v| !v.is("threadStandard", "UNSET")),
         ParamSpec::lookup("ansiThreadClassV2", "Thread class", hole_tables::TABLE_ANSI_THREAD_CLASS)
             .hints(rem | Hints::UNCONFIGURABLE)
@@ -364,8 +365,12 @@ pub fn hole() -> FeatureType {
             &[("PART", "Start from part"), ("SKETCH", "Start from sketch plane"), ("PLANE", "Start from selected plane")],
         )
         .hints(rem | Hints::SHOW_LABEL),
-        ParamSpec::query1("startBoundEntity", "Hole start plane or mate connector", QueryFilter::PLANAR_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
-            .visible(|v| v.is("startStyle", "PLANE")),
+        ParamSpec::query1(
+            "startBoundEntity",
+            "Hole start plane or mate connector",
+            QueryFilter::PLANAR_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR,
+        )
+        .visible(|v| v.is("startStyle", "PLANE")),
         ParamSpec::enum_(
             "endStyleV2",
             "Termination",
@@ -410,8 +415,7 @@ pub fn hole() -> FeatureType {
             .hints(rem)
             .visible(move |v| threaded(v) && v.is("endStyleV2", "BLIND")),
     ];
-    FeatureType::new("hole", "Hole", Category::Solid, p)
-        .describe("Create standard or custom simple, counterbore and countersink holes at sketch points")
+    FeatureType::new("hole", "Hole", Category::Solid, p).describe("Create standard or custom simple, counterbore and countersink holes at sketch points")
 }
 
 pub fn external_thread() -> FeatureType {
@@ -420,9 +424,7 @@ pub fn external_thread() -> FeatureType {
         ParamSpec::query("entities", "Cylinder edges", QueryFilter::CIRCULAR_EDGE).hints(Hints::INITIAL_FOCUS | Hints::UNCONFIGURABLE),
         ParamSpec::lookup("branchOfStandard", "Standard", hole_tables::TABLE_EXTERNAL_THREAD).hints(rem | Hints::UNCONFIGURABLE),
         ParamSpec::enum_("depthType", "End type", &[("Blind", "Blind"), ("UpToNext", "Up to next")]).hints(rem),
-        ParamSpec::num("threadDepth", "Length", NumSpec::positive_length(10.0, 0.5).bounded(1e-4, 200.0))
-            .hints(rem)
-            .visible(|v| v.is("depthType", "Blind")),
+        ParamSpec::num("threadDepth", "Length", NumSpec::positive_length(10.0, 0.5).bounded(1e-4, 200.0)).hints(rem).visible(|v| v.is("depthType", "Blind")),
         ParamSpec::bool("addChamfer", "Add chamfer", false).hints(Hints::GROUP_HEADER),
         ParamSpec::num("chamferWidth", "Length", BLEND_BOUNDS).hints(rem).visible(|v| v.bool("addChamfer")),
         ParamSpec::num("chamferAngle", "Angle", NumSpec::angle(30.0, 0.1, 89.0)).hints(rem).visible(|v| v.bool("addChamfer")),
@@ -431,8 +433,7 @@ pub fn external_thread() -> FeatureType {
         ParamSpec::num("undercutLength", "Length", NONNEGATIVE_LENGTH).hints(rem).visible(|v| v.bool("addUndercut")),
         ParamSpec::bool("splitFace", "Split face", true).hints(rem).visible(|v| !v.bool("addUndercut") && v.is("depthType", "Blind")),
     ];
-    FeatureType::new("externalThread", "External thread", Category::Solid, p)
-        .describe("Add a cosmetic ANSI or ISO thread to a cylindrical face")
+    FeatureType::new("externalThread", "External thread", Category::Solid, p).describe("Add a cosmetic ANSI or ISO thread to a cylindrical face")
 }
 
 /// FeatureScript-only primitive (not in the Onshape toolbar).

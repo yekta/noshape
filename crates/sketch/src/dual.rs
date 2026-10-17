@@ -5,6 +5,8 @@
 //! evaluated either with plain `f64` (residual only) or with [`Dual<N>`]
 //! (residual + exact gradient w.r.t. its `N` local inputs).
 
+#![allow(clippy::needless_range_loop)]
+
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 pub(crate) trait Num:

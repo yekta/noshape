@@ -20,7 +20,7 @@ struct Inst {
     model: mat4x4<f32>,
     normal_m: mat4x4<f32>,
     color: vec4<f32>,
-    params: vec4<u32>,       // x = per-primitive color, y = ignore clip, z = pickable
+    params: vec4<u32>,       // x = per-primitive color, y = ignore clip, z = pickable, w = pick base
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
@@ -38,6 +38,12 @@ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     let lo = c / 12.92;
     let hi = pow((c + vec3(0.055)) / 1.055, vec3(2.4));
     return select(hi, lo, c <= vec3(0.04045));
+}
+
+// Vertex pick ids are local (1-based); the instance adds its pick base.
+fn global_pick(local: u32) -> u32 {
+    if (local == 0u) { return 0u; }
+    return local + inst.params.w;
 }
 
 fn state_of(id: u32) -> u32 {
@@ -104,7 +110,7 @@ fn vs_mesh(v: MeshIn) -> MeshOut {
     o.world = w.xyz;
     o.pos = g.view_proj * w;
     o.normal = (inst.normal_m * vec4(v.normal, 0.0)).xyz;
-    o.pick = v.pick;
+    o.pick = global_pick(v.pick);
     return o;
 }
 
@@ -203,7 +209,8 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
     if (len < 1e-5) { d = vec2(1.0, 0.0); } else { d = d / len; }
     let nrm = vec2(-d.y, d.x);
 
-    let st = state_of(l.pick);
+    let pick = global_pick(l.pick);
+    let st = state_of(pick);
     var width = l.width + g.viewport.w;
     if ((st & (HOVER | SELECTED)) != 0u) { width = width * 1.8 + 1.0; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
@@ -227,7 +234,7 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
     if (inst.params.x != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
     o.color = vec4(highlight(base, st), alpha);
-    o.pick = l.pick;
+    o.pick = pick;
     o.along = t * len;
     o.world = mix(wa, wb, t);
     o.style = l.style;
@@ -275,7 +282,8 @@ fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
     let uv = corners[vi];
     let w = (inst.model * vec4(p.p, 1.0)).xyz;
     var c = g.view_proj * vec4(w, 1.0);
-    let st = state_of(p.pick);
+    let pick = global_pick(p.pick);
+    let st = state_of(pick);
     var size = p.size + g.viewport.w;
     if ((st & (HOVER | SELECTED)) != 0u) { size = size * 1.5 + 1.0; }
     let half = size * g.viewport.z * 0.5;
@@ -287,7 +295,7 @@ fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
     var alpha: f32;
     if (inst.params.x != 0u) { base = srgb_to_linear(p.color.rgb); alpha = p.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     o.color = vec4(highlight(base, st), alpha);
-    o.pick = p.pick;
+    o.pick = pick;
     o.uv = uv;
     o.world = w;
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }

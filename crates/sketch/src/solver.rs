@@ -559,13 +559,15 @@ impl System {
                 }
             }
             solver.snapshot(&mut base);
+            // Marquardt-scaled damping (relative to each diagonal entry) so
+            // badly scaled rows do not over-damp the others.
             let diag_mean = (solver.trace() / size as f64).max(1e-300);
-            let lam_min = 1e-12 * diag_mean;
+            let lam_min = 1e-12;
             lambda = lambda.max(lam_min);
             let mut accepted = false;
             for _attempt in 0..40 {
                 solver.restore(&base);
-                solver.add_diag(lambda);
+                solver.damp_diag(lambda, lambda * 1e-9 * diag_mean + 1e-300);
                 if !solver.factor() {
                     lambda *= 10.0;
                     continue;
@@ -634,7 +636,7 @@ impl System {
                     self.p.values[pv as usize] = x[k];
                 }
                 lambda *= 10.0;
-                if lambda > 1e10 * diag_mean {
+                if lambda > 1e10 {
                     break;
                 }
             }
@@ -661,18 +663,16 @@ impl System {
             let v = self.p.values[r];
             match self.p.owner[i] {
                 Owner::Ent(id, slot) => {
-                    if let Some(e) = sk.entity_mut_silent(id) {
-                        if !e.external {
+                    if let Some(e) = sk.entity_mut_silent(id)
+                        && !e.external {
                             e.set_own_param(slot as usize, v);
                         }
-                    }
                 }
                 Owner::Aux(cid, slot) => {
-                    if let Some(c) = sk.constraint_mut_silent(cid) {
-                        if let Some(a) = c.aux.get_mut(slot as usize) {
+                    if let Some(c) = sk.constraint_mut_silent(cid)
+                        && let Some(a) = c.aux.get_mut(slot as usize) {
                             *a = v;
                         }
-                    }
                 }
             }
         }
@@ -785,12 +785,11 @@ impl System {
                 let snap: Vec<f64> = comp.vars.iter().map(|&pv| self.p.values[pv as usize]).collect();
                 let mut moved = false;
                 for &pv in &comp.vars {
-                    if let Some(&t) = self.drag_target.get(&pv) {
-                        if (self.p.values[pv as usize] - t).abs() > 1e-13 * (1.0 + t.abs()) {
+                    if let Some(&t) = self.drag_target.get(&pv)
+                        && (self.p.values[pv as usize] - t).abs() > 1e-13 * (1.0 + t.abs()) {
                             self.p.values[pv as usize] = t;
                             moved = true;
                         }
-                    }
                 }
                 if !moved {
                     break;
@@ -811,13 +810,11 @@ impl System {
                 let thr = (10.0 * opts.tolerance).max(1e-4 * maxr);
                 let mut set = Vec::new();
                 for (ri, &ei) in comp.eqs.iter().enumerate() {
-                    if res.residual[ri].abs() > thr {
-                        if let Src::Constraint(c) = self.src[ei as usize] {
-                            if !set.contains(&c) {
+                    if res.residual[ri].abs() > thr
+                        && let Src::Constraint(c) = self.src[ei as usize]
+                            && !set.contains(&c) {
                                 set.push(c);
                             }
-                        }
-                    }
                 }
                 if !set.is_empty() {
                     out.comp_conflicts.push(set);
@@ -840,13 +837,18 @@ fn dedup_sorted(mut v: Vec<ConstraintId>) -> Vec<ConstraintId> {
 
 /// Runs the solver on a sketch.
 pub(crate) fn run(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget]) -> SolveReport {
+    run_ext(sk, opts, drag, true)
+}
+
+pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow_exclusion: bool) -> SolveReport {
     let mut excluded: HashSet<ConstraintId> = HashSet::new();
     let mut conflicting: Vec<ConstraintId> = Vec::new();
     let mut attempt = 0;
     loop {
         let mut sys = System::build(sk, &excluded, drag);
         let out = sys.solve(opts);
-        let retry = !out.all_converged && !out.comp_conflicts.is_empty() && attempt < 8;
+        // Drags never drop constraints: a failed drag keeps the last good state.
+        let retry = allow_exclusion && drag.is_empty() && !out.all_converged && !out.comp_conflicts.is_empty() && attempt < 8;
         if retry {
             // Report the whole conflicting set, but only ignore the most
             // recently added constraint of each set so the rest still solves.
@@ -888,13 +890,12 @@ pub(crate) fn run(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget]) -> 
             report.dof = Some(a.dof);
             report.entity_states = a.states;
             report.redundant = a.redundant;
-        } else if let Some((rev, a)) = &sk.cache.analysis {
-            if *rev == sk.cache.revision {
+        } else if let Some((rev, a)) = &sk.cache.analysis
+            && *rev == sk.cache.revision {
                 report.dof = Some(a.dof);
                 report.entity_states = a.states.clone();
                 report.redundant = a.redundant.clone();
             }
-        }
         return report;
     }
 }
@@ -979,6 +980,52 @@ impl Sketch {
     }
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {
+        let snapshot = self.clone();
+        let rep = run_ext(self, opts, &[], false);
+        if !matches!(rep.status, SolveStatus::Failed { .. }) {
+            return rep;
+        }
+        // Homotopy: large dimension changes can leave Newton's basin of
+        // convergence. Walk the driving dimensions from their currently
+        // measured values to the targets in sub-steps.
+        let quick = SolveOptions { analyze: false, ..opts.clone() };
+        for steps in [4usize, 16, 64] {
+            *self = snapshot.clone();
+            let dims: Vec<(ConstraintId, f64, f64)> = self
+                .constraints()
+                .filter(|c| c.driving && c.kind.is_dimension())
+                .filter_map(|c| {
+                    let target = c.value()?;
+                    let mut start = self.measure_kind(&c.kind, &c.hints)?;
+                    if matches!(c.kind, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. }) {
+                        let d = (target - start + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+                        start = target - d;
+                    }
+                    Some((c.id, start, target))
+                })
+                .collect();
+            if dims.is_empty() {
+                break;
+            }
+            let mut ok = true;
+            for k in 1..=steps {
+                let f = k as f64 / steps as f64;
+                for (id, a, b) in &dims {
+                    if let Some(c) = self.constraint_mut_silent(*id) {
+                        c.kind.set_value(if k == steps { *b } else { a + (b - a) * f });
+                    }
+                }
+                let r = run_ext(self, &quick, &[], false);
+                if matches!(r.status, SolveStatus::Failed { .. }) {
+                    ok = false;
+                    break;
+                }
+            }
+            if ok {
+                return run(self, opts, &[]);
+            }
+        }
+        *self = snapshot;
         run(self, opts, &[])
     }
 
@@ -987,9 +1034,49 @@ impl Sketch {
     /// On failure the geometry is left unchanged. Constraint states come from
     /// the last analysis if the sketch structure has not changed since.
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
-        let targets = self.drag_targets(handles);
         let opts = SolveOptions { analyze: false, max_iterations: 50, ..SolveOptions::default() };
-        run(self, &opts, &targets)
+        let targets = self.drag_targets(handles);
+        let report = run(self, &opts, &targets);
+        if report.is_solved() {
+            return report;
+        }
+        // Large jumps can leave the convergence basin: approach the target in
+        // smaller steps (each step warm-starts the next).
+        for substeps in [2usize, 4, 8] {
+            let start = self.clone();
+            let mut ok = true;
+            let mut last = report.clone();
+            for k in 1..=substeps {
+                let f = k as f64 / substeps as f64;
+                let partial: Vec<(DragHandle, DVec2)> = handles
+                    .iter()
+                    .map(|(h, t)| {
+                        let from = match *h {
+                            DragHandle::Point(id) => start.point(id).unwrap_or(*t),
+                            DragHandle::Entity { grab, .. } => grab,
+                        };
+                        let target = from + (*t - from) * f;
+                        // entity handles: the grab point moves with the previous sub-step
+                        let h2 = match *h {
+                            DragHandle::Entity { id, grab } => DragHandle::Entity { id, grab: grab + (*t - grab) * ((k - 1) as f64 / substeps as f64) },
+                            p => p,
+                        };
+                        (h2, target)
+                    })
+                    .collect();
+                let targets = self.drag_targets(&partial);
+                last = run(self, &opts, &targets);
+                if !last.is_solved() {
+                    ok = false;
+                    break;
+                }
+            }
+            if ok {
+                return last;
+            }
+            *self = start;
+        }
+        report
     }
 
     fn drag_targets(&self, handles: &[(DragHandle, DVec2)]) -> Vec<DragTarget> {

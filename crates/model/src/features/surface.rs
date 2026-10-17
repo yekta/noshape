@@ -22,8 +22,12 @@ const CURVES: QueryFilter = QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::W
 
 pub fn offset_surface() -> FeatureType {
     let p = vec![
-        ParamSpec::query("surfacesAndFaces", "Faces, surfaces, and sketch regions to offset", QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY)
-            .hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query(
+            "surfacesAndFaces",
+            "Faces, surfaces, and sketch regions to offset",
+            QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY,
+        )
+        .hints(Hints::INITIAL_FOCUS),
         ParamSpec::num("offset", "Offset", ZERO_INCLUSIVE_OFFSET).hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::flip("oppositeDirection", "Opposite offset direction"),
     ];
@@ -71,16 +75,15 @@ pub fn move_boundary() -> FeatureType {
         ParamSpec::flip("oppositeDirection", "Opposite direction").visible(move |v| cond(v, "BLIND")),
         ParamSpec::length("extendDistance", "Distance", 25.0, 1.0).visible(move |v| cond(v, "BLIND")),
         ParamSpec::query1("targetPart", "Target", QueryFilter::BODY).visible(move |v| cond(v, "UP_TO_BODY")),
-        ParamSpec::query1("targetFace", "Target", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR).visible(move |v| cond(v, "UP_TO_FACE")),
+        ParamSpec::query1("targetFace", "Target", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
+            .visible(move |v| cond(v, "UP_TO_FACE")),
         ParamSpec::query1("targetVertex", "Target", QueryFilter::POINT_LIKE).visible(move |v| cond(v, "UP_TO_VERTEX")),
         ParamSpec::bool("hasOffset", "Offset distance", false).hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(up_to),
         ParamSpec::length("offset", "Offset distance", 25.0, 1.0).hints(Hints::DISPLAY_SHORT).visible(move |v| up_to(v) && v.bool("hasOffset")),
         ParamSpec::flip("offsetOppositeDirection", "Opposite direction").visible(move |v| up_to(v) && v.bool("hasOffset")),
         ParamSpec::bool("maintainCurvature", "Maintain curvature", false),
     ];
-    FeatureType::new("extendSurface", "Move boundary", Category::Surface, p)
-        .icon("moveBoundary")
-        .describe("Extend or trim surface boundary edges")
+    FeatureType::new("extendSurface", "Move boundary", Category::Surface, p).icon("moveBoundary").describe("Extend or trim surface boundary edges")
 }
 
 /// One U or V profile row of Boundary surface (fields prefixed `u` / `v`).
@@ -104,7 +107,8 @@ fn bsurf_profiles(id: &'static str, label: &'static str, ids: [&'static str; 5])
 pub fn boundary_surface() -> FeatureType {
     let mut p = vec![
         surface_operation_type(),
-        bsurf_profiles("uProfilesArray", "U profiles", ["uProfileEntities", "uCondition", "uMagnitude", "uReference", "uDirection"]).hints(Hints::INITIAL_FOCUS),
+        bsurf_profiles("uProfilesArray", "U profiles", ["uProfileEntities", "uCondition", "uMagnitude", "uReference", "uDirection"])
+            .hints(Hints::INITIAL_FOCUS),
         bsurf_profiles("vProfilesArray", "V profiles", ["vProfileEntities", "vCondition", "vMagnitude", "vReference", "vDirection"]),
         ParamSpec::bool("showIsocurves", "Show isocurves", false),
         ParamSpec::num("curveCount", "Count", ISO_GRID).visible(|v| v.bool("showIsocurves")),

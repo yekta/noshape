@@ -25,12 +25,10 @@ pub fn chamfer_options(gate: impl Fn(&ParamValues) -> bool + Clone + Send + Sync
     vec![
         ParamSpec::enum_("chamferMethod", "Measurement", CHAMFER_METHOD).hints(Hints::SHOW_LABEL | rem).visible(gate.clone()),
         ParamSpec::enum_("chamferType", "Chamfer type", CHAMFER_TYPE).hints(Hints::SHOW_LABEL | rem).visible(gate),
-        ParamSpec::num("width", "Distance", BLEND_BOUNDS)
-            .hints(rem | Hints::CAN_BE_TOLERANT)
-            .visible({
-                let ty = ty.clone();
-                move |v| ty(v, "EQUAL_OFFSETS") || ty(v, "OFFSET_ANGLE")
-            }),
+        ParamSpec::num("width", "Distance", BLEND_BOUNDS).hints(rem | Hints::CAN_BE_TOLERANT).visible({
+            let ty = ty.clone();
+            move |v| ty(v, "EQUAL_OFFSETS") || ty(v, "OFFSET_ANGLE")
+        }),
         ParamSpec::num("width1", "Distance 1", BLEND_BOUNDS).hints(Hints::CAN_BE_TOLERANT).visible({
             let ty = ty.clone();
             move |v| ty(v, "TWO_OFFSETS")
@@ -82,12 +80,8 @@ pub fn face_blend() -> FeatureType {
         ParamSpec::num("secondRadius", "Second radius", BLEND_BOUNDS).hints(rem).visible(move |v| v.bool("asymmetric") && radius(v)),
         ParamSpec::num("widthRatio", "Ratio", NumSpec::real(1.0, 1e-4, 1e4)).hints(rem).visible(move |v| v.bool("asymmetric") && !radius(v)),
         ParamSpec::flip("switchAsymmetric", "Switch side").visible(|v| v.bool("asymmetric")),
-        ParamSpec::enum_(
-            "crossSectionShape",
-            "Control",
-            &[("CIRCULAR", "Circular"), ("CONIC", "Conic"), ("CURVATURE", "Curvature"), ("CHAMFER", "Chamfer")],
-        )
-        .hints(Hints::SHOW_LABEL | rem),
+        ParamSpec::enum_("crossSectionShape", "Control", &[("CIRCULAR", "Circular"), ("CONIC", "Conic"), ("CURVATURE", "Curvature"), ("CHAMFER", "Chamfer")])
+            .hints(Hints::SHOW_LABEL | rem),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CURVATURE")),
         // Group "Constraints and limits" (collapsed by default).
@@ -154,8 +148,7 @@ pub fn draft() -> FeatureType {
         hidden(ParamSpec::query("hintFaces", "Hint faces", QueryFilter::ANY_FACE)),
         ParamSpec::query1("pullDirectionEntity", "Pull direction", QueryFilter::DIRECTION).visible(parting),
         ParamSpec::query("partingEdges", "Parting edges", QueryFilter::EDGE).visible(parting),
-        ParamSpec::enum_("partingLineSides", "Sides", &[("ONE_SIDED", "One sided"), ("SYMMETRIC", "Symmetric"), ("TWO_SIDED", "Two sided")])
-            .visible(parting),
+        ParamSpec::enum_("partingLineSides", "Sides", &[("ONE_SIDED", "One sided"), ("SYMMETRIC", "Symmetric"), ("TWO_SIDED", "Two sided")]).visible(parting),
         default_true(ParamSpec::flip("alongPull", "Switch face")).visible(move |v| parting(v) && v.is("partingLineSides", "ONE_SIDED")),
         ParamSpec::num("angle", "Draft angle", NumSpec::angle(3.0, 0.0, 89.9)).hints(rem),
         ParamSpec::bool("pullDirection", "Opposite direction", false).hints(Hints::OPPOSITE_DIRECTION_CIRCULAR),
@@ -182,8 +175,12 @@ pub fn body_draft() -> FeatureType {
         ParamSpec::bool("draftOnSelf", "Draft on self", false),
         ParamSpec::query1("pullDirection", "Pull direction", QueryFilter::DIRECTION),
         ParamSpec::flip("flipPullDirection", "Flip pull direction"),
-        ParamSpec::query1("partingObject", "Parting entity", QueryFilter::SHEET_BODY | QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
-            .visible(|v| !v.bool("draftOnSelf")),
+        ParamSpec::query1(
+            "partingObject",
+            "Parting entity",
+            QueryFilter::SHEET_BODY | QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR,
+        )
+        .visible(|v| !v.bool("draftOnSelf")),
         ParamSpec::num("angle", "Angle", NumSpec::angle(3.0, 0.0, 89.9)),
         ParamSpec::bool("bothSides", "Symmetric", false),
         ParamSpec::query("bottomEdges", "Bottom edges", QueryFilter::EDGE).visible(move |v| v.bool("bothSides") && scope(v, "EDGES")),

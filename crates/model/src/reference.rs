@@ -50,6 +50,9 @@ pub enum Source {
     Sketch { sketch: FeatureId, entity: u32, segment: u16 },
     /// An existing named face/edge/vertex used as profile (e.g. extruding a face).
     Topo(Arc<TopoName>),
+    /// A sketch region used as a profile (encoded region key, see
+    /// [`Reference::SketchRegion`]).
+    Region { sketch: FeatureId, key: Vec<u32> },
     /// Fallback when nothing better is known; ordered geometrically.
     Index(u32),
 }
@@ -59,9 +62,9 @@ pub enum Source {
 pub enum Role {
     /// Face swept from a profile edge (extrude/revolve/sweep/loft sides).
     Side(Source),
-    /// Start cap (the profile itself) and end cap.
-    CapStart,
-    CapEnd,
+    /// Start cap (the profile itself) and end cap, keyed by the profile.
+    CapStart(Option<Source>),
+    CapEnd(Option<Source>),
     /// Face of the profile region itself (sketch region / planar face profile).
     Profile(Source),
     /// Fillet/chamfer face created from an edge or vertex.
@@ -185,7 +188,8 @@ pub enum Reference {
     Body(BodyId),
     /// A sketch entity (curve or point) of a sketch feature.
     SketchEntity { sketch: FeatureId, entity: u32 },
-    /// A closed region of a sketch, keyed by the sorted ids of its bounding entities.
+    /// A closed region of a sketch. `key` encodes the sketch solver's
+    /// region id: `[ordinal, (entity << 1) | forward, ...]`.
     SketchRegion { sketch: FeatureId, key: Vec<u32> },
     /// A whole sketch.
     Sketch(FeatureId),
@@ -242,15 +246,15 @@ mod tests {
     #[test]
     fn edge_names_are_order_independent() {
         let f = FeatureId(1);
-        let a = Arc::new(TopoName::face(f, Role::CapStart));
-        let b = Arc::new(TopoName::face(f, Role::CapEnd));
+        let a = Arc::new(TopoName::face(f, Role::CapStart(None)));
+        let b = Arc::new(TopoName::face(f, Role::CapEnd(None)));
         assert_eq!(TopoName::edge(a.clone(), b.clone(), 0), TopoName::edge(b, a, 0));
     }
 
     #[test]
     fn split_descends_from_parent() {
         let f = FeatureId(1);
-        let a = Arc::new(TopoName::face(f, Role::CapStart));
+        let a = Arc::new(TopoName::face(f, Role::CapStart(None)));
         let s = TopoName::Split { parent: a.clone(), by: FeatureId(2), ordinal: 1 };
         assert!(s.descends_from(&a));
         assert_eq!(s.root(), &*a);
@@ -262,7 +266,7 @@ mod tests {
         let f = FeatureId(7);
         let r = Reference::Edge(TopoName::edge(
             Arc::new(TopoName::face(f, Role::Side(Source::Sketch { sketch: FeatureId(3), entity: 4, segment: 0 }))),
-            Arc::new(TopoName::face(f, Role::CapEnd)),
+            Arc::new(TopoName::face(f, Role::CapEnd(None))),
             0,
         ));
         let s = serde_json::to_string(&r).unwrap();

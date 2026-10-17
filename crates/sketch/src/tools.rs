@@ -61,6 +61,9 @@ impl Transform {
     }
 }
 
+/// (point map, entity map) produced when copying entities.
+type CopyMaps = (BTreeMap<EntityId, EntityId>, Vec<(EntityId, EntityId)>);
+
 #[derive(Clone, Copy, Debug)]
 struct Cut {
     t: f64,
@@ -113,11 +116,10 @@ impl Sketch {
         out.sort_by(|a, b| a.t.total_cmp(&b.t));
         let mut dedup: Vec<Cut> = Vec::new();
         for x in out {
-            if let Some(last) = dedup.last() {
-                if (last.p - x.p).length() <= 4.0 * tol {
+            if let Some(last) = dedup.last()
+                && (last.p - x.p).length() <= 4.0 * tol {
                     continue;
                 }
-            }
             dedup.push(x);
         }
         dedup
@@ -348,14 +350,13 @@ impl Sketch {
                 }
                 let Some(oc) = sk.curve(other) else { continue };
                 for x in intersect(probe, &oc, tol) {
-                    if let Some(sc) = score(x.t1, x.point) {
-                        if best.is_none_or(|b| sc < b.0) {
+                    if let Some(sc) = score(x.t1, x.point)
+                        && best.is_none_or(|b| sc < b.0) {
                             let at_point = sk.endpoints(other).and_then(|(a, b)| {
                                 [a, b].into_iter().find(|p| sk.point(*p).is_some_and(|q| (q - x.point).length() <= 4.0 * tol))
                             });
                             best = Some((sc, x.point, other, at_point));
                         }
-                    }
                 }
             }
         };
@@ -519,7 +520,7 @@ impl Sketch {
         reverse_arcs: bool,
         keep_point: &dyn Fn(DVec2) -> bool,
         res: &mut EditResult,
-    ) -> Result<(BTreeMap<EntityId, EntityId>, Vec<(EntityId, EntityId)>)> {
+    ) -> Result<CopyMaps> {
         let mut pmap: BTreeMap<EntityId, EntityId> = BTreeMap::new();
         let mut emap: Vec<(EntityId, EntityId)> = Vec::new();
         let mut map_pt = |sk: &mut Sketch, p: EntityId, res: &mut EditResult| -> EntityId {

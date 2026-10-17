@@ -207,7 +207,18 @@ OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m)
   if (!tr.IsDone())
     fail_op("general transform failed");
   std::vector<TopoDS_Shape> args{s.shape};
-  HHist                     hist = new BRepTools_History(to_list(args), tr);
+  HHist                     hist = new BRepTools_History();
+  for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+  {
+    ShapeIMap m;
+    TopExp::MapShapes(s.shape, k, m);
+    for (int i = 1; i <= m.Extent(); ++i)
+    {
+      TopoDS_Shape r = tr.ModifiedShape(m(i));
+      if (!r.IsNull() && !r.IsSame(m(i)) && r.ShapeType() == k)
+        hist->AddModified(m(i), r);
+    }
+  }
   return make_result(args, tr.Shape(), hist.get());
 }
 

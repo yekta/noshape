@@ -19,8 +19,7 @@ pub const PATTERN_TYPE: &[(&str, &str)] = &[("PART", "Part pattern"), ("FEATURE"
 pub const MIRROR_TYPE: &[(&str, &str)] = &[("PART", "Part mirror"), ("FEATURE", "Feature mirror"), ("FACE", "Face mirror")];
 
 /// Bodies (and explicit mate connectors) a part pattern / transform accepts.
-const PATTERN_BODIES: QueryFilter =
-    QueryFilter(QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::POINT_BODY.0 | QueryFilter::MATE_CONNECTOR.0);
+const PATTERN_BODIES: QueryFilter = QueryFilter(QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::POINT_BODY.0 | QueryFilter::MATE_CONNECTOR.0);
 
 fn is_part(v: &ParamValues) -> bool {
     v.is("patternType", "PART")

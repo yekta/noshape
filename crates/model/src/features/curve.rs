@@ -23,7 +23,9 @@ pub fn register(out: &mut Vec<FeatureType>) {
 
 const CURVES: QueryFilter = QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::WIRE_BODY.0);
 const FACES_OR_BODIES: QueryFilter = QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::BODY.0);
-const UP_TO_ANY: QueryFilter = QueryFilter(QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::ANY_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0);
+const UP_TO_ANY: QueryFilter = QueryFilter(
+    QueryFilter::BODY.0 | QueryFilter::WIRE_BODY.0 | QueryFilter::ANY_FACE.0 | QueryFilter::PLANE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0,
+);
 
 pub fn helix() -> FeatureType {
     let axis_ty = |v: &ParamValues, t: &str| v.is("axisType", t);
@@ -84,7 +86,13 @@ pub fn fit_spline() -> FeatureType {
         ParamSpec::bool("closed", "Closed spline", false).visible(verts),
     ];
     for (dir, mag, flip, curv, labels) in [
-        ("startDirection", "startMagnitude", "oppositeDirectionStart", "matchStartCurvature", ["Start direction", "Start magnitude", "Match curvature at start"]),
+        (
+            "startDirection",
+            "startMagnitude",
+            "oppositeDirectionStart",
+            "matchStartCurvature",
+            ["Start direction", "Start magnitude", "Match curvature at start"],
+        ),
         ("endDirection", "endMagnitude", "oppositeDirectionEnd", "matchEndCurvature", ["End direction", "End magnitude", "Match curvature at end"]),
     ] {
         p.push(ParamSpec::query1(dir, labels[0], QueryFilter::DIRECTION | QueryFilter::EDGE).visible(open));
@@ -149,9 +157,7 @@ pub fn bridging_curve() -> FeatureType {
             .default_enum("CONTROL_POINTS")
             .hints(rem)
             .visible(move |v| any_non_pos(v) && !any_g3(v)),
-        ParamSpec::bool("editControlPoints", "Edit control points", false)
-            .hints(rem | Hints::GROUP_HEADER)
-            .visible(move |v| cp_method(v) && any_non_pos(v)),
+        ParamSpec::bool("editControlPoints", "Edit control points", false).hints(rem | Hints::GROUP_HEADER).visible(move |v| cp_method(v) && any_non_pos(v)),
     ];
     for (side, mag, curv_off, g3, labels) in [
         ("match1", "side1Magnitude", "side1CurvatureOffset", "side1G3Offset", ["Start magnitude", "Start curvature offset", "Start flow offset"]),
@@ -163,15 +169,12 @@ pub fn bridging_curve() -> FeatureType {
     }
     p.extend([
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(1.0, 0.0, 1e5)).visible(move |v| !cp_method(v) && any_non_pos(v)),
-        ParamSpec::num("bias", "Bias", NumSpec::real(0.5, 1e-4, 0.9999))
-            .visible(move |v| !cp_method(v) && non_pos(v, "match1") && non_pos(v, "match2")),
+        ParamSpec::num("bias", "Bias", NumSpec::real(0.5, 1e-4, 0.9999)).visible(move |v| !cp_method(v) && non_pos(v, "match1") && non_pos(v, "match2")),
         ParamSpec::bool("editEdgePositions", "Edit edge positions", false)
             .hints(rem | Hints::GROUP_HEADER)
             .visible(|v| !v.bool("side1HasVertex") || !v.bool("side2HasVertex")),
-        ParamSpec::num("startEdgeParameter", "Start edge position", EDGE_PARAMETER)
-            .visible(|v| v.bool("editEdgePositions") && !v.bool("side1HasVertex")),
-        ParamSpec::num("endEdgeParameter", "End edge position", EDGE_PARAMETER)
-            .visible(|v| v.bool("editEdgePositions") && !v.bool("side2HasVertex")),
+        ParamSpec::num("startEdgeParameter", "Start edge position", EDGE_PARAMETER).visible(|v| v.bool("editEdgePositions") && !v.bool("side1HasVertex")),
+        ParamSpec::num("endEdgeParameter", "End edge position", EDGE_PARAMETER).visible(|v| v.bool("editEdgePositions") && !v.bool("side2HasVertex")),
         ParamSpec::bool("editTangencyAngles", "Edit tangency angles", false)
             .hints(rem | Hints::GROUP_HEADER)
             .visible(move |v| (v.bool("side1HasFace") || v.bool("side2HasFace")) && any_non_pos(v)),
@@ -190,10 +193,8 @@ pub fn composite_curve() -> FeatureType {
 }
 
 pub fn intersection_curve() -> FeatureType {
-    let mut p = vec![
-        ParamSpec::query("group1", "Group 1", FACES_OR_BODIES).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::query("group2", "Group 2", FACES_OR_BODIES),
-    ];
+    let mut p =
+        vec![ParamSpec::query("group1", "Group 1", FACES_OR_BODIES).hints(Hints::INITIAL_FOCUS), ParamSpec::query("group2", "Group 2", FACES_OR_BODIES)];
     p.extend(curve_approximation(always));
     FeatureType::new("intersectionCurve", "Intersection curve", Category::Curve, p).describe("Create curves where two groups of faces or bodies intersect")
 }
@@ -247,9 +248,7 @@ pub fn offset_curve() -> FeatureType {
         ParamSpec::query("targets", "Targets", QueryFilter::ANY_FACE),
     ];
     p.extend(curve_approximation(|v: &ParamValues| !v.is("scope", "OFFSET_EXTEND_SPLIT")));
-    FeatureType::new("offsetCurveOnFace", "Offset curve", Category::Curve, p)
-        .icon("offsetCurve")
-        .describe("Create curves on faces offset from edges")
+    FeatureType::new("offsetCurveOnFace", "Offset curve", Category::Curve, p).icon("offsetCurve").describe("Create curves on faces offset from edges")
 }
 
 pub fn isoparametric_curve() -> FeatureType {
@@ -298,12 +297,8 @@ pub fn edit_curve() -> FeatureType {
             .visible(|v| v.bool("planarize") && v.is("planeReference", "CUSTOM")),
         ParamSpec::bool("lockEnds", "Lock ends", false).visible(|v| v.bool("planarize") && v.is("planeReference", "BEST")),
         ParamSpec::bool("editControlPoints", "Edit control points", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::enum_(
-            "editPointMode",
-            "Edit mode",
-            &[("XYZ", "XYZ"), ("UVN_TANGENT", "UVN (Tangent)"), ("UVN_POLYGON", "UVN (Control polygon)")],
-        )
-        .visible(cps),
+        ParamSpec::enum_("editPointMode", "Edit mode", &[("XYZ", "XYZ"), ("UVN_TANGENT", "UVN (Tangent)"), ("UVN_POLYGON", "UVN (Control polygon)")])
+            .visible(cps),
         ParamSpec::array(
             "selectedIndices",
             "Control point indices",
@@ -328,7 +323,9 @@ pub fn edit_curve() -> FeatureType {
         .hints(Hints::COLLAPSE_ARRAY_ITEMS)
         .visible(cps),
         ParamSpec::bool("showDetails", "Show details", true),
-        ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000)).hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE).visible(|v| v.bool("showDetails")),
+        ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000))
+            .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
+            .visible(|v| v.bool("showDetails")),
         ParamSpec::num("curveNumCPs", "Control points", NumSpec::integer(4, 0, 100_000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
@@ -343,14 +340,8 @@ pub fn edit_curve() -> FeatureType {
     FeatureType::new("editCurve", "Edit curve", Category::Curve, p).describe("Approximate, elevate, planarize or edit control points of a curve")
 }
 
-pub const LENGTH_UNIT_NAMES: &[(&str, &str)] = &[
-    ("Meter", "Meter"),
-    ("Centimeter", "Centimeter"),
-    ("Millimeter", "Millimeter"),
-    ("Inch", "Inch"),
-    ("Foot", "Foot"),
-    ("Yard", "Yard"),
-];
+pub const LENGTH_UNIT_NAMES: &[(&str, &str)] =
+    &[("Meter", "Meter"), ("Centimeter", "Centimeter"), ("Millimeter", "Millimeter"), ("Inch", "Inch"), ("Foot", "Foot"), ("Yard", "Yard")];
 
 pub fn routing_curve() -> FeatureType {
     let spline = |v: &ParamValues| v.is("curveType", "INTERPOLATED_SPLINE");
@@ -427,7 +418,8 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::num("numPointsToAdd", "Number of points to add", NumSpec::integer(1, 0, 10_000))
             .visible(move |v| segments(v) && v.is("segmentEditType", "ADD_POINTS")),
         ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).visible(ortho),
-        ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE).visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),
+        ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE)
+            .visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),
         hidden(ParamSpec::num("solutionIndex", "Solution index", NumSpec::integer(0, 0, 5))),
     ];
     FeatureType::new("routingCurve", "Routing curve", Category::Curve, p).describe("Build a 3D spline or polyline path from placed points")

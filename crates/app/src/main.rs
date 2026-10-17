@@ -1,42 +1,100 @@
+//! noshape: a fast, fully local, parametric CAD application.
+
+mod actions;
+mod assets;
+mod doc_model;
+mod feature_dialog;
 mod gpu;
+mod part_studio;
+mod scene_builder;
 mod session;
+mod theme;
 mod viewport;
+mod workspace;
 
+use gpui_kit::component::{Theme, ThemeMode, TitleBar};
 use gpui_kit::*;
-use noshape_render::{primitives, Drawable, Instance, Scene};
-use std::sync::Arc;
-use viewport::Viewport;
+use std::path::PathBuf;
 
-struct Demo {
-    viewport: Entity<Viewport>,
+/// Where new documents go by default.
+fn documents_dir() -> PathBuf {
+    let base = dirs::document_dir().or_else(dirs::home_dir).unwrap_or_else(|| PathBuf::from("."));
+    let dir = base.join("noshape");
+    let _ = std::fs::create_dir_all(&dir);
+    dir
 }
 
-impl Render for Demo {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().child(self.viewport.clone())
+fn new_document_path() -> PathBuf {
+    let dir = documents_dir();
+    for n in 1.. {
+        let p = dir.join(format!("Untitled {n}.noshape"));
+        if !p.exists() {
+            return p;
+        }
     }
+    unreachable!()
+}
+
+fn apply_theme(cx: &mut App) {
+    Theme::change(ThemeMode::Dark, None, cx);
+    let pal = theme::p();
+    Theme::update(cx, |t| {
+        t.font_size = px(13.);
+        t.radius = px(5.);
+        t.background = pal.app_bg.into();
+        t.foreground = pal.text.into();
+        t.border = pal.border.into();
+        t.primary = pal.accent.into();
+        t.primary_hover = pal.accent_hover.into();
+        t.popover = pal.panel_raised.into();
+        t.popover_foreground = pal.text.into();
+        t.muted = pal.panel_hover.into();
+        t.muted_foreground = pal.text_muted.into();
+        t.input = pal.border_strong.into();
+        t.ring = pal.accent.into();
+        t.title_bar = pal.panel.into();
+        t.title_bar_border = pal.border.into();
+        t.accent = pal.panel_hover.into();
+        t.accent_foreground = pal.text.into();
+        t.list_hover = pal.panel_hover.into();
+        t.list_active = pal.accent_soft.into();
+        t.selection = theme::with_alpha(pal.accent, 0.35).into();
+    });
 }
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    let gpu = gpu::Gpu::new().expect("no GPU available");
-    gpui_kit::application().run(move |cx| {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
+    let gpu = gpu::Gpu::new().expect("noshape needs a GPU (Vulkan, Metal or DirectX 12)");
+    let path = std::env::args().nth(1).map(PathBuf::from);
+
+    gpui_kit::application().with_assets(assets::AppAssets).run(move |cx| {
         gpui_kit::init(cx);
+        apply_theme(cx);
+        actions::bind_default_keys(cx);
+        cx.on_action(|_: &actions::Quit, cx| cx.quit());
+
+        let session = match &path {
+            Some(p) if p.exists() => session::Session::open(p),
+            Some(p) => session::Session::create(p, noshape_model::Document::new()),
+            None => session::Session::create(new_document_path(), noshape_model::Document::new()),
+        }
+        .expect("could not open document");
+
         let gpu = gpu.clone();
-        gpui_kit::open_window(WindowOptions::default(), cx, move |window, cx| {
-            let viewport = cx.new(|cx| {
-                let mut vp = Viewport::new(gpu.clone(), window, cx);
-                let up = gpu.uploader();
-                let mesh = up.upload_mesh(&primitives::box_mesh([-0.01; 3], [0.01; 3], 1));
-                let edges = up.upload_lines(&primitives::box_edges([-0.01; 3], [0.01; 3], 10, 1.5));
-                let mut scene = Scene::default();
-                scene.instances.push(Instance::new(Drawable::Mesh(mesh)));
-                scene.instances.push(Instance::new(Drawable::Lines(edges)).with_color([0.02, 0.02, 0.03, 1.0]));
-                vp.set_scene(Arc::new(scene), true, cx);
-                vp.camera.fit_sphere(glam::DVec3::ZERO, 0.0175, 1.3);
-                vp
-            });
-            cx.new(|_| Demo { viewport })
+        let options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),
+            window_min_size: Some(size(px(900.), px(560.))),
+            #[cfg(target_os = "linux")]
+            window_decorations: Some(WindowDecorations::Client),
+            app_id: Some("dev.noshape.noshape".into()),
+            ..TitleBar::window_options()
+        };
+        gpui_kit::open_window(options, cx, move |window, cx| {
+            let doc = cx.new(|_| doc_model::DocModel::new(session));
+            let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
+            let fh = ws.read(cx).focus_handle(cx);
+            window.defer(cx, move |window, cx| fh.focus(window, cx));
+            ws
         })
         .expect("failed to open window");
     });

@@ -6,8 +6,23 @@ use crate::params::ParamSpec;
 use indexmap::IndexMap;
 use std::sync::LazyLock;
 
+pub mod boolean;
 pub mod common;
 pub mod core;
+pub mod curve;
+pub mod detail;
+pub mod direct;
+pub mod frames;
+pub mod hole_tables;
+pub mod importing;
+pub mod pattern;
+pub mod refgeom;
+pub mod sheetmetal;
+pub mod solid;
+pub mod surface;
+pub mod wrap;
+#[cfg(test)]
+mod tests_schema;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Category {
@@ -102,9 +117,22 @@ fn find_param<'a>(specs: &'a [ParamSpec], id: &str) -> Option<&'a ParamSpec> {
 static REGISTRY: LazyLock<IndexMap<&'static str, FeatureType>> = LazyLock::new(|| {
     let mut all: Vec<FeatureType> = Vec::new();
     core::register(&mut all);
+    solid::register(&mut all);
+    detail::register(&mut all);
+    boolean::register(&mut all);
+    pattern::register(&mut all);
+    direct::register(&mut all);
+    surface::register(&mut all);
+    curve::register(&mut all);
+    refgeom::register(&mut all);
+    wrap::register(&mut all);
+    sheetmetal::register(&mut all);
+    frames::register(&mut all);
+    importing::register(&mut all);
     let mut map = IndexMap::new();
     for f in all {
-        assert!(map.insert(f.id, f).is_none(), "duplicate feature id");
+        let id = f.id;
+        assert!(map.insert(id, f).is_none(), "duplicate feature id {id}");
     }
     map
 });

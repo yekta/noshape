@@ -81,15 +81,28 @@ fn bench(n_rect: usize, n_arcs: usize, iters: usize) {
     let t2 = Instant::now();
     let r = sk.solve();
     let full = t2.elapsed().as_secs_f64();
+    let t3 = Instant::now();
+    let regions = sk.regions();
+    let treg = t3.elapsed().as_secs_f64();
+    let t4 = Instant::now();
+    let ctx = InferenceContext { tool: SketchTool::Line, snap_radius: 0.05, ..Default::default() };
+    let n_inf = 100;
+    for i in 0..n_inf {
+        let _ = infer(&sk, start + v(0.01 * i as f64, 0.003 * i as f64), &ctx);
+    }
+    let tinf = t4.elapsed().as_secs_f64() / n_inf as f64;
     println!(
-        "{} curves / {} entities / {} constraints: drag {:.3} ms avg ({:.3} ms worst), full solve + DOF analysis {:.3} ms (dof {:?})",
+        "{} curves / {} entities / {} constraints: drag {:.3} ms avg ({:.3} ms worst), full solve + DOF analysis {:.3} ms (dof {:?}), regions {:.2} ms ({} regions), inference {:.3} ms",
         curve_count(&sk),
         sk.entity_count(),
         sk.constraint_count(),
         per * 1e3,
         worst * 1e3,
         full * 1e3,
-        r.dof
+        r.dof,
+        treg * 1e3,
+        regions.len(),
+        tinf * 1e3
     );
 }
 

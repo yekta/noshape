@@ -6,7 +6,7 @@
 //!
 //! Shape-type codes are `TopAbs_ShapeEnum` values (0 = Compound ... 7 = Vertex).
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::module_inception)]
 #[cxx::bridge(namespace = "noshape")]
 pub(crate) mod ffi {
     /// 3D point / vector.
