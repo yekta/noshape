@@ -188,14 +188,6 @@ ShapeList single(const TopoDS_Shape& s)
   return l;
 }
 
-ShapeList faces_of(const TopoDS_Shape& s)
-{
-  ShapeList l;
-  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
-    l.Append(e.Current());
-  return l;
-}
-
 } // namespace
 
 // ---------------------------------------------------------------- prism

@@ -112,8 +112,7 @@ fn main() {
             .flag_if_supported("-Wno-unused-variable")
             .flag_if_supported("-Wno-missing-field-initializers")
             .flag_if_supported("-Wno-deprecated-copy")
-            .flag_if_supported("-Wno-cpp")
-            .flag_if_supported("-Wno-#warnings");
+            .flag_if_supported("-Wno-cpp");
     }
     // The bridge is hot code (tessellation, history); always optimize it.
     build.opt_level(2);

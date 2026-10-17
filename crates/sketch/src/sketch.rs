@@ -514,13 +514,6 @@ impl Sketch {
             }
         }
     }
-
-    pub(crate) fn insert_constraint_raw(&mut self, c: Constraint) -> ConstraintId {
-        let id = self.alloc_constraint();
-        self.constraints.insert(id, Constraint { id, ..c });
-        self.touch();
-        id
-    }
 }
 
 /// Ellipse parameter of (the projection of) point `p`.

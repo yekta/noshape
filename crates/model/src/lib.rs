@@ -11,6 +11,7 @@ pub mod document;
 pub mod drawing;
 pub mod features;
 pub mod merge;
+pub mod naming;
 pub mod params;
 pub mod partstudio;
 pub mod reference;

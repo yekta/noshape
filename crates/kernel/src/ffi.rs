@@ -149,7 +149,7 @@ pub(crate) mod ffi {
 
     struct HlrEdgeF {
         visible: bool,
-        class: u8,
+        kind: u8,
         source: i32,
         start: u32,
         count: u32,

@@ -1,0 +1,1066 @@
+//! Sketch editing tools: trim, extend, split, offset, fillet, mirror, linear
+//! and circular patterns, transform and use/convert (external geometry).
+//!
+//! Tools keep constraints consistent where reasonable: new endpoints created
+//! at intersections are constrained onto the cutting curve (or share the
+//! cutting curve's endpoint), dimensions that no longer make sense on a
+//! trimmed curve (length, arc angle, midpoint, symmetric, fix, equal length)
+//! are removed, and split pieces stay related (collinear / equal radius).
+
+use crate::constraints::{reflect, ConstraintKind};
+use crate::entities::{EntityKind, Geometry};
+use crate::geom::{ccw_sweep, norm_angle, BBox, Curve2};
+use crate::ids::{ConstraintId, EntityId};
+use crate::intersect::intersect;
+use crate::nurbs::Nurbs;
+use crate::sketch::{Result, Sketch, SketchError};
+use glam::DVec2;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::f64::consts::{PI, TAU};
+
+/// What an editing operation changed.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct EditResult {
+    pub created: Vec<EntityId>,
+    pub removed: Vec<EntityId>,
+    pub modified: Vec<EntityId>,
+    pub constraints_added: Vec<ConstraintId>,
+    pub constraints_removed: Vec<ConstraintId>,
+}
+
+/// Rigid / similarity transforms for [`Sketch::transform`].
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Transform {
+    Translate(DVec2),
+    Rotate { center: DVec2, angle: f64 },
+    Scale { center: DVec2, factor: f64 },
+}
+
+impl Transform {
+    pub fn apply(&self, p: DVec2) -> DVec2 {
+        match *self {
+            Transform::Translate(d) => p + d,
+            Transform::Rotate { center, angle } => center + DVec2::from_angle(angle).rotate(p - center),
+            Transform::Scale { center, factor } => center + (p - center) * factor,
+        }
+    }
+    /// Applies the linear part to a vector.
+    pub fn apply_vec(&self, v: DVec2) -> DVec2 {
+        match *self {
+            Transform::Translate(_) => v,
+            Transform::Rotate { angle, .. } => DVec2::from_angle(angle).rotate(v),
+            Transform::Scale { factor, .. } => v * factor,
+        }
+    }
+    fn scale(&self) -> f64 {
+        match *self {
+            Transform::Scale { factor, .. } => factor.abs(),
+            _ => 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Cut {
+    t: f64,
+    p: DVec2,
+    other: EntityId,
+    at_point: Option<EntityId>,
+}
+
+impl EditResult {
+    fn merge_removed(&mut self, ids: Vec<EntityId>) {
+        for id in ids {
+            if !self.removed.contains(&id) {
+                self.removed.push(id);
+            }
+        }
+        self.created.retain(|c| !self.removed.contains(c));
+    }
+}
+
+impl Sketch {
+    fn tool_tol(&self) -> f64 {
+        1e-9 * self.bbox().size().max_element().max(1.0)
+    }
+
+    fn curve_ids(&self) -> Vec<EntityId> {
+        self.entities().filter(|e| e.kind() != EntityKind::Point).map(|e| e.id).collect()
+    }
+
+    /// Intersections of entity `id` with every other curve (sorted by parameter).
+    fn cuts(&self, id: EntityId) -> Vec<Cut> {
+        let tol = self.tool_tol();
+        let Some(c) = self.curve(id) else { return Vec::new() };
+        let bb = c.bbox().expanded(tol);
+        let mut out: Vec<Cut> = Vec::new();
+        for other in self.curve_ids() {
+            if other == id {
+                continue;
+            }
+            let Some(oc) = self.curve(other) else { continue };
+            if !oc.bbox().expanded(tol).intersects(&bb) {
+                continue;
+            }
+            for x in intersect(&c, &oc, tol) {
+                let at_point = self.endpoints(other).and_then(|(s, e)| {
+                    [s, e].into_iter().find(|p| self.point(*p).is_some_and(|q| (q - x.point).length() <= 4.0 * tol))
+                });
+                out.push(Cut { t: x.t1, p: x.point, other, at_point });
+            }
+        }
+        out.sort_by(|a, b| a.t.total_cmp(&b.t));
+        let mut dedup: Vec<Cut> = Vec::new();
+        for x in out {
+            if let Some(last) = dedup.last() {
+                if (last.p - x.p).length() <= 4.0 * tol {
+                    continue;
+                }
+            }
+            dedup.push(x);
+        }
+        dedup
+    }
+
+    fn add_c(&mut self, res: &mut EditResult, k: ConstraintKind) {
+        if let Ok(id) = self.add_constraint(k) {
+            res.constraints_added.push(id);
+        }
+    }
+
+    /// Point entity at a cut: the cutting curve's endpoint if it is there,
+    /// otherwise a new point constrained onto the cutting curve.
+    fn point_at_cut(&mut self, cut: &Cut, res: &mut EditResult) -> EntityId {
+        if let Some(p) = cut.at_point {
+            return p;
+        }
+        let p = self.add_point(cut.p);
+        res.created.push(p);
+        self.add_c(res, ConstraintKind::Coincident { a: p, b: cut.other });
+        p
+    }
+
+    /// Removes constraints that no longer make sense after an entity was
+    /// shortened/extended.
+    fn drop_shape_constraints(&mut self, id: EntityId, res: &mut EditResult) {
+        let is_line = self.kind(id) == Some(EntityKind::Line);
+        let ids: Vec<ConstraintId> = self
+            .constraints()
+            .filter(|c| c.kind.entities().contains(&id))
+            .filter(|c| match c.kind {
+                ConstraintKind::Length { .. }
+                | ConstraintKind::ArcAngle { .. }
+                | ConstraintKind::Midpoint { .. }
+                | ConstraintKind::Symmetric { .. }
+                | ConstraintKind::Fix { .. } => true,
+                ConstraintKind::Equal { .. } => is_line,
+                _ => false,
+            })
+            .map(|c| c.id)
+            .collect();
+        for cid in ids {
+            if self.remove_constraint(cid).is_ok() {
+                res.constraints_removed.push(cid);
+            }
+        }
+    }
+
+    /// Removes the given points if no entity references them anymore.
+    fn remove_orphans(&mut self, pts: &[EntityId], res: &mut EditResult) {
+        for p in pts {
+            if self.kind(*p) == Some(EntityKind::Point) && self.users_of_point(*p).is_empty() {
+                // keep standalone points that the user created on purpose only
+                // if they carry no relation to the removed geometry: a removed
+                // curve endpoint is always dropped here.
+                let before: Vec<ConstraintId> = self.constraints_on(*p);
+                let removed = self.remove_entities(&[*p]);
+                res.constraints_removed.extend(before);
+                res.merge_removed(removed);
+            }
+        }
+    }
+
+    /// Geometry of the part `[t0, t1]` of entity `id` with endpoints `p0`, `p1`.
+    fn piece_geometry(&mut self, id: EntityId, t0: f64, t1: f64, p0: EntityId, p1: EntityId, res: &mut EditResult) -> Result<Geometry> {
+        let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
+        let curve = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+        Ok(match &e.geometry {
+            Geometry::Line { .. } => Geometry::Line { start: p0, end: p1 },
+            Geometry::Arc { center, .. } | Geometry::Circle { center, .. } => Geometry::Arc { center: *center, start: p0, end: p1 },
+            Geometry::Ellipse { center, major, minor } | Geometry::EllipticalArc { center, major, minor, .. } => {
+                Geometry::EllipticalArc { center: *center, major: *major, minor: *minor, start: p0, end: p1 }
+            }
+            Geometry::Conic { .. } => {
+                let Curve2::Nurbs(n) = &curve else { unreachable!() };
+                let sub = n.sub_curve(t0, t1);
+                let w = sub.weights.clone().unwrap_or(vec![1.0; 3]);
+                let wn = w[1] / (w[0] * w[2]).sqrt();
+                let ctrl = self.add_point(sub.ctrl[1]);
+                res.created.push(ctrl);
+                Geometry::Conic { start: p0, control: ctrl, end: p1, rho: wn / (1.0 + wn) }
+            }
+            Geometry::BSpline { .. } | Geometry::FitSpline { .. } => {
+                let Curve2::Nurbs(n) = &curve else { unreachable!() };
+                let sub = n.sub_curve(t0, t1);
+                let m = sub.ctrl.len();
+                let mut control = vec![p0];
+                for q in &sub.ctrl[1..m - 1] {
+                    let pid = self.add_point(*q);
+                    res.created.push(pid);
+                    control.push(pid);
+                }
+                control.push(p1);
+                Geometry::BSpline { control, degree: sub.degree, knots: sub.knots, weights: sub.weights }
+            }
+            Geometry::Point { .. } => return Err(SketchError::InvalidGeometry("points cannot be trimmed".into())),
+        })
+    }
+
+    /// Replaces entity `id` by its part `[t0, t1]`.
+    fn apply_interval(&mut self, id: EntityId, t0: f64, t1: f64, p0: EntityId, p1: EntityId, res: &mut EditResult) -> Result<()> {
+        let old_refs = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.point_refs();
+        let g = self.piece_geometry(id, t0, t1, p0, p1, res)?;
+        self.replace_geometry(id, g);
+        res.modified.push(id);
+        self.drop_shape_constraints(id, res);
+        self.remove_orphans(&old_refs, res);
+        Ok(())
+    }
+
+    /// Creates a new entity for the part `[t0, t1]` of `id`.
+    fn new_piece(&mut self, id: EntityId, t0: f64, t1: f64, p0: EntityId, p1: EntityId, res: &mut EditResult) -> Result<EntityId> {
+        let construction = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.construction;
+        let g = self.piece_geometry(id, t0, t1, p0, p1, res)?;
+        let nid = self.add_entity(g, construction, false)?;
+        res.created.push(nid);
+        Ok(nid)
+    }
+
+    fn relate_pieces(&mut self, a: EntityId, b: EntityId, res: &mut EditResult) {
+        match self.kind(a) {
+            Some(EntityKind::Line) => self.add_c(res, ConstraintKind::Collinear { a, b }),
+            Some(EntityKind::Arc) | Some(EntityKind::EllipticalArc) => self.add_c(res, ConstraintKind::Equal { a, b }),
+            _ => {}
+        }
+    }
+
+    /// Trim: removes the piece of `id` between the intersections around the
+    /// picked point (deletes the whole entity if it has no intersections).
+    pub fn trim(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {
+        let c = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+        let mut res = EditResult::default();
+        let tp = c.closest(pick).0;
+        let cuts = self.cuts(id);
+        let (a, b) = c.domain();
+        if c.is_periodic() {
+            let period = b - a;
+            let mut cs: Vec<Cut> = cuts.into_iter().map(|mut x| {
+                x.t = a + (x.t - a).rem_euclid(period);
+                x
+            }).collect();
+            cs.sort_by(|x, y| x.t.total_cmp(&y.t));
+            if cs.len() < 2 {
+                let removed = self.remove_entities(&[id]);
+                res.merge_removed(removed);
+                return Ok(res);
+            }
+            let lo = cs.iter().rev().find(|x| x.t < tp).copied().unwrap_or(*cs.last().unwrap());
+            let hi = cs.iter().find(|x| x.t > tp).copied().unwrap_or(cs[0]);
+            let p_hi = self.point_at_cut(&hi, &mut res);
+            let p_lo = self.point_at_cut(&lo, &mut res);
+            let t1 = if lo.t > hi.t { lo.t } else { lo.t + period };
+            self.apply_interval(id, hi.t, t1, p_hi, p_lo, &mut res)?;
+            return Ok(res);
+        }
+        let eps = 1e-9 * (b - a);
+        let (s, e) = self.endpoints(id).ok_or_else(|| SketchError::InvalidGeometry("curve has no endpoints".into()))?;
+        let inner: Vec<Cut> = cuts.into_iter().filter(|x| x.t > a + eps && x.t < b - eps).collect();
+        let lo = inner.iter().rev().find(|x| x.t < tp).copied();
+        let hi = inner.iter().find(|x| x.t > tp).copied();
+        match (lo, hi) {
+            (None, None) => {
+                let removed = self.remove_entities(&[id]);
+                res.merge_removed(removed);
+            }
+            (None, Some(h)) => {
+                let p = self.point_at_cut(&h, &mut res);
+                self.apply_interval(id, h.t, b, p, e, &mut res)?;
+            }
+            (Some(l), None) => {
+                let p = self.point_at_cut(&l, &mut res);
+                self.apply_interval(id, a, l.t, s, p, &mut res)?;
+            }
+            (Some(l), Some(h)) => {
+                let pl = self.point_at_cut(&l, &mut res);
+                let ph = self.point_at_cut(&h, &mut res);
+                let nid = self.new_piece(id, h.t, b, ph, e, &mut res)?;
+                self.apply_interval(id, a, l.t, s, pl, &mut res)?;
+                self.relate_pieces(id, nid, &mut res);
+            }
+        }
+        Ok(res)
+    }
+
+    /// Splits an open curve at the point closest to `at`. Both pieces share
+    /// the new point.
+    pub fn split(&mut self, id: EntityId, at: DVec2) -> Result<EditResult> {
+        let c = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+        if c.is_periodic() {
+            return Err(SketchError::OperationFailed("closed curves must be trimmed or split at two points".into()));
+        }
+        let (a, b) = c.domain();
+        let (t, q, _) = c.closest(at);
+        if t <= a + 1e-9 * (b - a) || t >= b - 1e-9 * (b - a) {
+            return Err(SketchError::OperationFailed("split point is at an end of the curve".into()));
+        }
+        let (s, e) = self.endpoints(id).unwrap();
+        let mut res = EditResult::default();
+        let p = self.add_point(q);
+        res.created.push(p);
+        let nid = self.new_piece(id, t, b, p, e, &mut res)?;
+        let old_refs = self.entity(id).unwrap().point_refs();
+        let g = self.piece_geometry(id, a, t, s, p, &mut res)?;
+        self.replace_geometry(id, g);
+        res.modified.push(id);
+        // keep only length-type constraints dropped
+        self.drop_shape_constraints(id, &mut res);
+        self.remove_orphans(&old_refs, &mut res);
+        self.relate_pieces(id, nid, &mut res);
+        Ok(res)
+    }
+
+    /// Extends a line or arc at the end nearest to `pick` up to the next
+    /// intersection with another curve.
+    pub fn extend(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {
+        let tol = self.tool_tol();
+        let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
+        let (s, en) = e.endpoints().ok_or_else(|| SketchError::OperationFailed("cannot extend a closed curve".into()))?;
+        let (ps, pe) = (self.point(s).unwrap(), self.point(en).unwrap());
+        let at_end = (pick - pe).length() <= (pick - ps).length();
+        let moving = if at_end { en } else { s };
+        let extent = self.bbox().size().max_element().max(1.0) * 100.0;
+        let mut best: Option<(f64, DVec2, EntityId, Option<EntityId>)> = None;
+        let mut consider = |sk: &Sketch, probe: &Curve2, score: &dyn Fn(f64, DVec2) -> Option<f64>| {
+            for other in sk.curve_ids() {
+                if other == id {
+                    continue;
+                }
+                let Some(oc) = sk.curve(other) else { continue };
+                for x in intersect(probe, &oc, tol) {
+                    if let Some(sc) = score(x.t1, x.point) {
+                        if best.is_none_or(|b| sc < b.0) {
+                            let at_point = sk.endpoints(other).and_then(|(a, b)| {
+                                [a, b].into_iter().find(|p| sk.point(*p).is_some_and(|q| (q - x.point).length() <= 4.0 * tol))
+                            });
+                            best = Some((sc, x.point, other, at_point));
+                        }
+                    }
+                }
+            }
+        };
+        match &e.geometry {
+            Geometry::Line { .. } => {
+                let (from, dir) = if at_end { (pe, (pe - ps).normalize()) } else { (ps, (ps - pe).normalize()) };
+                let probe = Curve2::Line { a: from, b: from + dir * extent };
+                consider(self, &probe, &|t, _| (t * extent > tol * 10.0).then_some(t));
+            }
+            Geometry::Arc { .. } => {
+                let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = self.curve(id) else { unreachable!() };
+                let probe = Curve2::Circle { center, radius };
+                let eps = 10.0 * tol / radius;
+                consider(self, &probe, &|t, _| {
+                    let d = if at_end { norm_angle(t - end_angle) } else { norm_angle(start_angle - t) };
+                    let max_ext = TAU - (end_angle - start_angle);
+                    (d > eps && d < max_ext - eps).then_some(d)
+                });
+            }
+            _ => return Err(SketchError::OperationFailed("extend supports lines and arcs".into())),
+        }
+        let (_, p, other, at_point) = best.ok_or_else(|| SketchError::OperationFailed("nothing to extend to".into()))?;
+        let mut res = EditResult::default();
+        let cut = Cut { t: 0.0, p, other, at_point };
+        let np = self.point_at_cut(&cut, &mut res);
+        if let Some(ent) = self.entity_mut(id) {
+            ent.replace_point(moving, np);
+        }
+        res.modified.push(id);
+        self.drop_shape_constraints(id, &mut res);
+        self.remove_orphans(&[moving], &mut res);
+        Ok(res)
+    }
+
+    /// Sketch fillet between two lines/arcs that share an endpoint. Both
+    /// curves are trimmed back to the tangent points and a tangent arc with
+    /// a radius dimension is inserted.
+    pub fn fillet(&mut self, a: EntityId, b: EntityId, radius: f64) -> Result<EditResult> {
+        if radius <= 0.0 {
+            return Err(SketchError::OperationFailed("fillet radius must be positive".into()));
+        }
+        let tol = self.tool_tol();
+        let (ea, eb) = (self.endpoints(a), self.endpoints(b));
+        let ((sa, fa), (sb, fb)) = match (ea, eb) {
+            (Some(x), Some(y)) => (x, y),
+            _ => return Err(SketchError::OperationFailed("fillet needs two open curves".into())),
+        };
+        // find the shared corner (same point or coincident positions)
+        let mut corner: Option<(EntityId, EntityId)> = None;
+        for pa in [sa, fa] {
+            for pb in [sb, fb] {
+                let same = pa == pb || (self.point(pa).unwrap() - self.point(pb).unwrap()).length() <= 4.0 * tol;
+                if same && corner.is_none() {
+                    corner = Some((pa, pb));
+                }
+            }
+        }
+        let (ca, cb) = corner.ok_or_else(|| SketchError::OperationFailed("curves do not share an endpoint".into()))?;
+        let v = self.point(ca).unwrap();
+        let (cva, cvb) = (self.curve(a).unwrap(), self.curve(b).unwrap());
+        let offsets = |c: &Curve2| -> Vec<Curve2> {
+            match c {
+                Curve2::Line { a, b } => {
+                    let d = (*b - *a).normalize();
+                    let n = d.perp() * radius;
+                    let far = 1e4 * ((*b - *a).length() + radius);
+                    [n, -n].iter().map(|o| Curve2::Line { a: *a + *o - d * far, b: *b + *o + d * far }).collect()
+                }
+                Curve2::Arc { center, radius: r, .. } => {
+                    let mut v = vec![Curve2::Circle { center: *center, radius: r + radius }];
+                    if *r - radius > 1e-12 {
+                        v.push(Curve2::Circle { center: *center, radius: r - radius });
+                    }
+                    v
+                }
+                _ => Vec::new(),
+            }
+        };
+        let (oa, ob) = (offsets(&cva), offsets(&cvb));
+        if oa.is_empty() || ob.is_empty() {
+            return Err(SketchError::OperationFailed("fillet supports lines and arcs".into()));
+        }
+        let foot = |c: &Curve2, p: DVec2| -> (f64, DVec2, bool) {
+            match c {
+                Curve2::Line { a, b } => {
+                    let d = *b - *a;
+                    let t = (p - *a).dot(d) / d.length_squared();
+                    (t, *a + d * t, (-1e-9..=1.0 + 1e-9).contains(&t))
+                }
+                Curve2::Arc { center, radius: r, start_angle, end_angle } => {
+                    let ang = (p - *center).to_angle();
+                    let q = *center + (p - *center).normalize_or(DVec2::X) * *r;
+                    let inr = crate::geom::angle_in_range(ang, *start_angle, end_angle - start_angle, 1e-9);
+                    (inr.unwrap_or(ang), q, inr.is_some())
+                }
+                _ => (0.0, p, false),
+            }
+        };
+        let mut best: Option<(f64, DVec2, DVec2, DVec2)> = None;
+        for x in &oa {
+            for y in &ob {
+                for ip in intersect(x, y, tol) {
+                    let center = ip.point;
+                    let (_, ta, oka) = foot(&cva, center);
+                    let (_, tb, okb) = foot(&cvb, center);
+                    if !oka || !okb {
+                        continue;
+                    }
+                    let score = (center - v).length();
+                    if best.is_none_or(|bb| score < bb.0) {
+                        best = Some((score, center, ta, tb));
+                    }
+                }
+            }
+        }
+        let (_, center, ta, tb) = best.ok_or_else(|| SketchError::OperationFailed("fillet radius too large".into()))?;
+        let mut res = EditResult::default();
+        let pa = self.add_point(ta);
+        let pb = self.add_point(tb);
+        let pc = self.add_point(center);
+        res.created.extend([pa, pb, pc]);
+        for (id, old, new) in [(a, ca, pa), (b, cb, pb)] {
+            if let Some(ent) = self.entity_mut(id) {
+                ent.replace_point(old, new);
+            }
+            res.modified.push(id);
+            self.drop_shape_constraints(id, &mut res);
+        }
+        // fillet arc on the short side
+        let (aa, ab) = ((ta - center).to_angle(), (tb - center).to_angle());
+        let arc = if ccw_sweep(aa, ab) <= PI { self.add_arc_between(pc, pa, pb)? } else { self.add_arc_between(pc, pb, pa)? };
+        res.created.push(arc);
+        self.add_c(&mut res, ConstraintKind::Tangent { a, b: arc });
+        self.add_c(&mut res, ConstraintKind::Tangent { a: b, b: arc });
+        self.add_c(&mut res, ConstraintKind::Radius { curve: arc, value: radius });
+        let olds: Vec<EntityId> = if ca == cb { vec![ca] } else { vec![ca, cb] };
+        self.remove_orphans(&olds, &mut res);
+        Ok(res)
+    }
+
+    /// Fillet at a corner point shared by exactly two curves.
+    pub fn fillet_corner(&mut self, point: EntityId, radius: f64) -> Result<EditResult> {
+        let users: Vec<EntityId> = self
+            .entities()
+            .filter(|e| e.endpoints().is_some_and(|(s, en)| s == point || en == point))
+            .map(|e| e.id)
+            .collect();
+        if users.len() != 2 {
+            return Err(SketchError::OperationFailed("corner must join exactly two curves".into()));
+        }
+        self.fillet(users[0], users[1], radius)
+    }
+
+    /// Copies entities, mapping every defining point through `f` (shared
+    /// points stay shared). Returns the point map and created entities.
+    fn copy_entities(
+        &mut self,
+        ids: &[EntityId],
+        f: &dyn Fn(DVec2) -> DVec2,
+        vecf: &dyn Fn(DVec2) -> DVec2,
+        reverse_arcs: bool,
+        keep_point: &dyn Fn(DVec2) -> bool,
+        res: &mut EditResult,
+    ) -> Result<(BTreeMap<EntityId, EntityId>, Vec<(EntityId, EntityId)>)> {
+        let mut pmap: BTreeMap<EntityId, EntityId> = BTreeMap::new();
+        let mut emap: Vec<(EntityId, EntityId)> = Vec::new();
+        let mut map_pt = |sk: &mut Sketch, p: EntityId, res: &mut EditResult| -> EntityId {
+            if let Some(q) = pmap.get(&p) {
+                return *q;
+            }
+            let pos = sk.point(p).unwrap();
+            let q = if keep_point(pos) {
+                p
+            } else {
+                let q = sk.add_point(f(pos));
+                res.created.push(q);
+                q
+            };
+            pmap.insert(p, q);
+            q
+        };
+        for &id in ids {
+            let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
+            let g = match &e.geometry {
+                Geometry::Point { .. } => {
+                    let q = map_pt(self, id, res);
+                    emap.push((id, q));
+                    continue;
+                }
+                Geometry::Line { start, end } => Geometry::Line { start: map_pt(self, *start, res), end: map_pt(self, *end, res) },
+                Geometry::Circle { center, radius } => {
+                    let s = vecf(DVec2::new(*radius, 0.0)).length();
+                    Geometry::Circle { center: map_pt(self, *center, res), radius: s }
+                }
+                Geometry::Arc { center, start, end } => {
+                    let c = map_pt(self, *center, res);
+                    let (s, en) = (map_pt(self, *start, res), map_pt(self, *end, res));
+                    if reverse_arcs { Geometry::Arc { center: c, start: en, end: s } } else { Geometry::Arc { center: c, start: s, end: en } }
+                }
+                Geometry::Ellipse { center, major, minor } => {
+                    let m = vecf(*major);
+                    Geometry::Ellipse { center: map_pt(self, *center, res), major: m, minor: minor * m.length() / major.length().max(1e-300) }
+                }
+                Geometry::EllipticalArc { center, major, minor, start, end } => {
+                    let m = vecf(*major);
+                    let c = map_pt(self, *center, res);
+                    let (s, en) = (map_pt(self, *start, res), map_pt(self, *end, res));
+                    let minor = minor * m.length() / major.length().max(1e-300);
+                    if reverse_arcs {
+                        Geometry::EllipticalArc { center: c, major: m, minor, start: en, end: s }
+                    } else {
+                        Geometry::EllipticalArc { center: c, major: m, minor, start: s, end: en }
+                    }
+                }
+                Geometry::BSpline { control, degree, knots, weights } => Geometry::BSpline {
+                    control: control.iter().map(|p| map_pt(self, *p, res)).collect(),
+                    degree: *degree,
+                    knots: knots.clone(),
+                    weights: weights.clone(),
+                },
+                Geometry::FitSpline { points } => Geometry::FitSpline { points: points.iter().map(|p| map_pt(self, *p, res)).collect() },
+                Geometry::Conic { start, control, end, rho } => Geometry::Conic {
+                    start: map_pt(self, *start, res),
+                    control: map_pt(self, *control, res),
+                    end: map_pt(self, *end, res),
+                    rho: *rho,
+                },
+            };
+            let nid = self.add_entity(g, e.construction, false)?;
+            res.created.push(nid);
+            emap.push((id, nid));
+        }
+        Ok((pmap, emap))
+    }
+
+    /// Mirrors entities about line `axis`, adding symmetric constraints
+    /// between corresponding points (and equal constraints for circles and
+    /// ellipses). Points on the axis are reused.
+    pub fn mirror(&mut self, ids: &[EntityId], axis: EntityId) -> Result<EditResult> {
+        let (a, b) = self.line_pts(axis).ok_or_else(|| SketchError::OperationFailed("mirror axis must be a line".into()))?;
+        let tol = self.tool_tol();
+        let d = (b - a).normalize_or_zero();
+        if d == DVec2::ZERO {
+            return Err(SketchError::OperationFailed("degenerate mirror axis".into()));
+        }
+        let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis).collect();
+        let mut res = EditResult::default();
+        let f = move |p: DVec2| reflect(p, a, b);
+        let vf = move |v: DVec2| d * (2.0 * v.dot(d)) - v;
+        let on_axis = move |p: DVec2| (p - a).perp_dot(d).abs() <= 4.0 * tol;
+        let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &on_axis, &mut res)?;
+        for (p, q) in &pmap {
+            if p != q {
+                self.add_c(&mut res, ConstraintKind::Symmetric { a: *p, b: *q, axis });
+            }
+        }
+        for (src, dst) in emap {
+            if matches!(self.kind(src), Some(EntityKind::Circle | EntityKind::Ellipse | EntityKind::EllipticalArc)) {
+                self.add_c(&mut res, ConstraintKind::Equal { a: src, b: dst });
+            }
+        }
+        Ok(res)
+    }
+
+    /// Linear pattern: `count - 1` copies, each offset by `step`.
+    pub fn linear_pattern(&mut self, ids: &[EntityId], step: DVec2, count: usize) -> Result<EditResult> {
+        let mut res = EditResult::default();
+        for k in 1..count {
+            let off = step * k as f64;
+            self.copy_entities(ids, &move |p| p + off, &|v| v, false, &|_| false, &mut res)?;
+        }
+        Ok(res)
+    }
+
+    /// Circular pattern: `count` instances spread over `total_angle` (use 2pi
+    /// for a full circle) around `center`.
+    pub fn circular_pattern(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64) -> Result<EditResult> {
+        let mut res = EditResult::default();
+        if count < 2 {
+            return Ok(res);
+        }
+        let full = (total_angle.abs() - TAU).abs() < 1e-9;
+        let step = if full { total_angle / count as f64 } else { total_angle / (count - 1) as f64 };
+        for k in 1..count {
+            let t = Transform::Rotate { center, angle: step * k as f64 };
+            self.copy_entities(ids, &move |p| t.apply(p), &move |v| t.apply_vec(v), false, &|_| false, &mut res)?;
+        }
+        Ok(res)
+    }
+
+    /// Transforms entities in place (external geometry is not moved). Fix
+    /// anchors of moved entities are updated.
+    pub fn transform(&mut self, ids: &[EntityId], t: Transform) -> Result<EditResult> {
+        let mut res = EditResult::default();
+        let mut pts: Vec<EntityId> = Vec::new();
+        for &id in ids {
+            let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?;
+            if e.kind() == EntityKind::Point {
+                pts.push(id);
+            } else {
+                pts.extend(e.point_refs());
+            }
+        }
+        pts.sort();
+        pts.dedup();
+        for p in &pts {
+            let ext = self.entity(*p).is_some_and(|e| e.external);
+            if !ext {
+                let q = t.apply(self.point(*p).unwrap());
+                self.set_point(*p, q)?;
+                res.modified.push(*p);
+            }
+        }
+        for &id in ids {
+            let Some(e) = self.entity_mut_silent(id) else { continue };
+            if e.external {
+                continue;
+            }
+            match &mut e.geometry {
+                Geometry::Circle { radius, .. } => *radius *= t.scale(),
+                Geometry::Ellipse { major, minor, .. } | Geometry::EllipticalArc { major, minor, .. } => {
+                    *major = t.apply_vec(*major);
+                    *minor *= t.scale();
+                }
+                _ => {}
+            }
+            res.modified.push(id);
+        }
+        let touched: Vec<EntityId> = res.modified.clone();
+        let fixes: Vec<ConstraintId> = self
+            .constraints()
+            .filter(|c| matches!(c.kind, ConstraintKind::Fix { entity } if touched.contains(&entity) || self.entity(entity).is_some_and(|e| e.point_refs().iter().any(|p| touched.contains(p)))))
+            .map(|c| c.id)
+            .collect();
+        for f in fixes {
+            self.recompute_hints(f)?;
+        }
+        self.touch();
+        Ok(res)
+    }
+
+    /// "Use" / "Convert": adds fixed external geometry (e.g. projected model
+    /// edges). The new entities are regular (non-construction) curves so they
+    /// can bound regions.
+    pub fn use_external(&mut self, curve: &Curve2) -> Result<EditResult> {
+        let mut res = EditResult::default();
+        let pt = |sk: &mut Sketch, p: DVec2, res: &mut EditResult| -> EntityId {
+            let id = sk.add_entity(Geometry::Point { pos: p }, false, true).unwrap();
+            res.created.push(id);
+            id
+        };
+        let g = match curve {
+            Curve2::Line { a, b } => Geometry::Line { start: pt(self, *a, &mut res), end: pt(self, *b, &mut res) },
+            Curve2::Circle { center, radius } => Geometry::Circle { center: pt(self, *center, &mut res), radius: *radius },
+            Curve2::Arc { center, radius, start_angle, end_angle } => {
+                let c = pt(self, *center, &mut res);
+                let s = pt(self, *center + DVec2::from_angle(*start_angle) * *radius, &mut res);
+                let e = pt(self, *center + DVec2::from_angle(*end_angle) * *radius, &mut res);
+                Geometry::Arc { center: c, start: s, end: e }
+            }
+            Curve2::Ellipse { center, major, minor } => Geometry::Ellipse { center: pt(self, *center, &mut res), major: *major, minor: *minor },
+            Curve2::EllipticalArc { center, major, minor, start_param, end_param } => {
+                let c = pt(self, *center, &mut res);
+                let s = pt(self, curve.point(*start_param), &mut res);
+                let e = pt(self, curve.point(*end_param), &mut res);
+                Geometry::EllipticalArc { center: c, major: *major, minor: *minor, start: s, end: e }
+            }
+            Curve2::Nurbs(n) => {
+                let control = n.ctrl.iter().map(|p| pt(self, *p, &mut res)).collect();
+                Geometry::BSpline { control, degree: n.degree, knots: n.knots.clone(), weights: n.weights.clone() }
+            }
+        };
+        let id = self.add_entity(g, false, true)?;
+        res.created.push(id);
+        Ok(res)
+    }
+
+    /// Adds a fixed external point (projected vertex).
+    pub fn use_external_point(&mut self, p: DVec2) -> EntityId {
+        self.add_entity(Geometry::Point { pos: p }, false, true).unwrap()
+    }
+
+    /// Offsets curves (chains are detected through shared endpoints) by
+    /// `distance` to the left of each chain's direction (a lone circle or
+    /// ellipse: positive = inward). Outer corners get arcs centered on the
+    /// original vertex; inner corners are trimmed to the intersection.
+    pub fn offset(&mut self, ids: &[EntityId], distance: f64) -> Result<EditResult> {
+        if distance == 0.0 {
+            return Err(SketchError::OperationFailed("offset distance must be non-zero".into()));
+        }
+        let tol = self.tool_tol();
+        let mut res = EditResult::default();
+        for chain in self.chains(ids) {
+            self.offset_chain(&chain.0, chain.1, distance, tol, &mut res)?;
+        }
+        Ok(res)
+    }
+
+    /// Groups curves into chains: (items (id, forward), closed).
+    fn chains(&self, ids: &[EntityId]) -> Vec<(Vec<(EntityId, bool)>, bool)> {
+        let tol = self.tool_tol() * 4.0;
+        let mut out = Vec::new();
+        let mut open: Vec<EntityId> = Vec::new();
+        for &id in ids {
+            match self.curve(id) {
+                Some(c) if c.is_periodic() => out.push((vec![(id, true)], true)),
+                Some(_) => open.push(id),
+                None => {}
+            }
+        }
+        let ends: Vec<(DVec2, DVec2)> = open.iter().map(|id| {
+            let c = self.curve(*id).unwrap();
+            (c.start_point(), c.end_point())
+        }).collect();
+        let mut used = vec![false; open.len()];
+        let find_next = |p: DVec2, used: &[bool]| -> Option<(usize, bool)> {
+            for (k, (s, e)) in ends.iter().enumerate() {
+                if used[k] {
+                    continue;
+                }
+                if (*s - p).length() <= tol {
+                    return Some((k, true));
+                }
+                if (*e - p).length() <= tol {
+                    return Some((k, false));
+                }
+            }
+            None
+        };
+        for start in 0..open.len() {
+            if used[start] {
+                continue;
+            }
+            used[start] = true;
+            let mut items: std::collections::VecDeque<(usize, bool)> = std::collections::VecDeque::new();
+            items.push_back((start, true));
+            // extend forward
+            let mut tail = ends[start].1;
+            while let Some((k, fwd)) = find_next(tail, &used) {
+                used[k] = true;
+                items.push_back((k, fwd));
+                tail = if fwd { ends[k].1 } else { ends[k].0 };
+            }
+            // extend backward
+            let mut head = ends[start].0;
+            while let Some((k, fwd_at_start)) = find_next(head, &used) {
+                used[k] = true;
+                // k's start touches head -> traverse k reversed
+                let fwd = !fwd_at_start;
+                items.push_front((k, fwd));
+                head = if fwd { ends[k].0 } else { ends[k].1 };
+            }
+            let closed = items.len() > 1 && (head - tail).length() <= tol;
+            out.push((items.into_iter().map(|(k, f)| (open[k], f)).collect(), closed));
+        }
+        out
+    }
+
+    fn offset_chain(&mut self, items: &[(EntityId, bool)], closed: bool, d: f64, tol: f64, res: &mut EditResult) -> Result<()> {
+        #[derive(Clone)]
+        enum Off {
+            Line { a: DVec2, b: DVec2 },
+            /// Arc traversed from `s` to `e` around `center` (`ccw` traversal).
+            Arc { center_pt: EntityId, center: DVec2, r: f64, s: DVec2, e: DVec2, ccw: bool },
+            Fit { pts: Vec<DVec2> },
+        }
+        // lone closed curves
+        if items.len() == 1 {
+            let id = items[0].0;
+            let c = self.curve(id).unwrap();
+            if c.is_periodic() {
+                match (&c, &self.entity(id).unwrap().geometry) {
+                    (Curve2::Circle { radius, .. }, Geometry::Circle { center, .. }) => {
+                        let r = radius - d;
+                        if r <= tol {
+                            return Err(SketchError::OperationFailed("offset collapses a circle".into()));
+                        }
+                        let center = *center;
+                        let nid = self.add_circle_at(center, r)?;
+                        res.created.push(nid);
+                    }
+                    _ => {
+                        // ellipse: closed interpolating spline through offset samples
+                        let pts = self.offset_samples(&c, true, d);
+                        let mut ids: Vec<EntityId> = pts.iter().map(|q| self.add_point(*q)).collect();
+                        res.created.extend(ids.iter().copied());
+                        ids.push(ids[0]);
+                        let nid = self.add_entity(Geometry::FitSpline { points: ids }, false, false)?;
+                        res.created.push(nid);
+                    }
+                }
+                return Ok(());
+            }
+        }
+        let mut offs: Vec<(EntityId, Off, DVec2, DVec2)> = Vec::new(); // (src, geometry, start, end)
+        let mut verts: Vec<Option<EntityId>> = Vec::new(); // original vertex point between item k and k+1
+        for (k, &(id, fwd)) in items.iter().enumerate() {
+            let c = self.curve(id).unwrap();
+            let e = self.entity(id).unwrap().clone();
+            let off = match (&c, &e.geometry) {
+                (Curve2::Line { a, b }, _) => {
+                    let (p, q) = if fwd { (*a, *b) } else { (*b, *a) };
+                    let n = (q - p).normalize().perp() * d;
+                    Off::Line { a: p + n, b: q + n }
+                }
+                (Curve2::Arc { center, radius, start_angle, end_angle }, Geometry::Arc { center: cp, .. }) => {
+                    // left of CCW traversal = toward the center
+                    let r = if fwd { radius - d } else { radius + d };
+                    if r <= tol {
+                        return Err(SketchError::OperationFailed("offset collapses an arc".into()));
+                    }
+                    let (a0, a1) = if fwd { (*start_angle, *end_angle) } else { (*end_angle, *start_angle) };
+                    Off::Arc { center_pt: *cp, center: *center, r, s: *center + DVec2::from_angle(a0) * r, e: *center + DVec2::from_angle(a1) * r, ccw: fwd }
+                }
+                _ => Off::Fit { pts: self.offset_samples(&c, fwd, d) },
+            };
+            let (s, en) = match &off {
+                Off::Line { a, b } => (*a, *b),
+                Off::Arc { s, e, .. } => (*s, *e),
+                Off::Fit { pts } => (pts[0], *pts.last().unwrap()),
+            };
+            offs.push((id, off, s, en));
+            // shared original vertex with the next item
+            let next = if k + 1 < items.len() { Some(k + 1) } else if closed { Some(0) } else { None };
+            verts.push(next.and_then(|nk| {
+                let (a_s, a_e) = self.endpoints(id)?;
+                let my_end = if fwd { a_e } else { a_s };
+                let (nid, nfwd) = items[nk];
+                let (b_s, b_e) = self.endpoints(nid)?;
+                let their_start = if nfwd { b_s } else { b_e };
+                let _ = their_start;
+                Some(my_end)
+            }));
+        }
+        let n = offs.len();
+        // junction points between consecutive offset curves
+        let mut start_pt: Vec<Option<EntityId>> = vec![None; n];
+        let mut end_pt: Vec<Option<EntityId>> = vec![None; n];
+        let mut joint_arcs: Vec<(usize, EntityId, EntityId, EntityId)> = Vec::new(); // (after k, center, from, to)
+        let joints = if closed { n } else { n.saturating_sub(1) };
+        for k in 0..joints {
+            let k2 = (k + 1) % n;
+            let (e_k, s_k2) = (offs[k].3, offs[k2].2);
+            if (e_k - s_k2).length() <= 4.0 * tol {
+                let p = self.add_point(e_k);
+                res.created.push(p);
+                end_pt[k] = Some(p);
+                start_pt[k2] = Some(p);
+                continue;
+            }
+            let vpt = verts[k].unwrap();
+            let v = self.point(vpt).unwrap();
+            // inner corner: offsets cross near the vertex
+            let ext = |o: &Off| -> Option<Curve2> {
+                match o {
+                    Off::Line { a, b } => {
+                        let dd = (*b - *a).normalize();
+                        let far = 1e3 * ((*b - *a).length() + d.abs());
+                        Some(Curve2::Line { a: *a - dd * far, b: *b + dd * far })
+                    }
+                    Off::Arc { center, r, .. } => Some(Curve2::Circle { center: *center, radius: *r }),
+                    _ => None,
+                }
+            };
+            let mut inner: Option<DVec2> = None;
+            if let (Some(c1), Some(c2)) = (ext(&offs[k].1), ext(&offs[k2].1)) {
+                let mut best: Option<(f64, DVec2)> = None;
+                for x in intersect(&c1, &c2, tol) {
+                    let dist = (x.point - v).length();
+                    if dist <= 2.0 * d.abs() * (1.0 + 1e-6) + 10.0 * d.abs() && best.is_none_or(|b| dist < b.0) {
+                        best = Some((dist, x.point));
+                    }
+                }
+                // inner corner: the chain turns toward the offset side
+                if let Some((_, x)) = best {
+                    let tan = |sk: &Sketch, (id, fwd): (EntityId, bool), at_end: bool| -> DVec2 {
+                        let c = sk.curve(id).unwrap();
+                        let (a, b) = c.domain();
+                        let t = if at_end == fwd { b } else { a };
+                        let d1 = c.tangent(t);
+                        (if fwd { d1 } else { -d1 }).normalize_or_zero()
+                    };
+                    let t1 = tan(self, items[k], true);
+                    let t2 = tan(self, items[k2], false);
+                    let turn = t1.perp_dot(t2);
+                    if turn * d > 1e-12 {
+                        inner = Some(x);
+                    }
+                }
+            }
+            if let Some(x) = inner {
+                let p = self.add_point(x);
+                res.created.push(p);
+                end_pt[k] = Some(p);
+                start_pt[k2] = Some(p);
+                // update geometry ends
+                offs[k].3 = x;
+                offs[k2].2 = x;
+                if let Off::Line { b, .. } = &mut offs[k].1 {
+                    *b = x;
+                }
+                if let Off::Line { a, .. } = &mut offs[k2].1 {
+                    *a = x;
+                }
+            } else {
+                let p1 = self.add_point(e_k);
+                let p2 = self.add_point(s_k2);
+                res.created.extend([p1, p2]);
+                end_pt[k] = Some(p1);
+                start_pt[k2] = Some(p2);
+                joint_arcs.push((k, vpt, p1, p2));
+            }
+        }
+        // create offset curves
+        let mut new_ids: Vec<EntityId> = Vec::new();
+        for k in 0..n {
+            let sp = match start_pt[k] {
+                Some(p) => p,
+                None => {
+                    let p = self.add_point(offs[k].2);
+                    res.created.push(p);
+                    p
+                }
+            };
+            let ep = match end_pt[k] {
+                Some(p) => p,
+                None => {
+                    let p = self.add_point(offs[k].3);
+                    res.created.push(p);
+                    p
+                }
+            };
+            let (src, off) = (offs[k].0, offs[k].1.clone());
+            let id = match off {
+                Off::Line { .. } => {
+                    let id = self.add_line_between(sp, ep)?;
+                    res.created.push(id);
+                    self.add_c(res, ConstraintKind::Parallel { a: src, b: id });
+                    id
+                }
+                Off::Arc { center_pt, ccw, .. } => {
+                    let id = if ccw { self.add_arc_between(center_pt, sp, ep)? } else { self.add_arc_between(center_pt, ep, sp)? };
+                    res.created.push(id);
+                    id
+                }
+                Off::Fit { pts } => {
+                    let mut ids = vec![sp];
+                    for q in &pts[1..pts.len() - 1] {
+                        let p = self.add_point(*q);
+                        res.created.push(p);
+                        ids.push(p);
+                    }
+                    ids.push(ep);
+                    let id = self.add_entity(Geometry::FitSpline { points: ids }, false, false)?;
+                    res.created.push(id);
+                    id
+                }
+            };
+            new_ids.push(id);
+        }
+        for (k, vpt, p1, p2) in joint_arcs {
+            let v = self.point(vpt).unwrap();
+            let (a1, a2) = ((self.point(p1).unwrap() - v).to_angle(), (self.point(p2).unwrap() - v).to_angle());
+            let arc = if ccw_sweep(a1, a2) <= PI { self.add_arc_between(vpt, p1, p2)? } else { self.add_arc_between(vpt, p2, p1)? };
+            res.created.push(arc);
+            if let Some(&prev) = new_ids.get(k) {
+                self.add_c(res, ConstraintKind::Tangent { a: prev, b: arc });
+            }
+            if let Some(&next) = new_ids.get((k + 1) % n) {
+                self.add_c(res, ConstraintKind::Tangent { a: next, b: arc });
+            }
+        }
+        Ok(())
+    }
+
+    fn offset_samples(&self, c: &Curve2, fwd: bool, d: f64) -> Vec<DVec2> {
+        let (a, b) = c.domain();
+        let n = 24;
+        let mut pts: Vec<DVec2> = (0..=n)
+            .map(|i| {
+                let t = a + (b - a) * i as f64 / n as f64;
+                let der = c.ders(t);
+                let dir = if fwd { der[1] } else { -der[1] };
+                der[0] + dir.normalize_or_zero().perp() * d
+            })
+            .collect();
+        if !fwd {
+            pts.reverse();
+        }
+        if c.is_periodic() {
+            pts.pop();
+        }
+        pts
+    }
+
+    /// Bounding box of a set of entities.
+    pub fn entities_bbox(&self, ids: &[EntityId]) -> BBox {
+        ids.iter().filter_map(|i| self.entity_bbox(*i)).fold(BBox::EMPTY, |a, b| a.union(&b))
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn nurbs_of(&self, id: EntityId) -> Option<Nurbs> {
+        match self.curve(id)? {
+            Curve2::Nurbs(n) => Some(n),
+            _ => None,
+        }
+    }
+}
