@@ -1,0 +1,17 @@
+[package]
+name = "noshape-sketch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+glam.workspace = true
+nalgebra.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+smallvec.workspace = true
+indexmap.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

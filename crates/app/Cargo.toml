@@ -1,0 +1,22 @@
+[package]
+name = "noshape"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A fast, fully local, parametric CAD application."
+
+[[bin]]
+name = "noshape"
+path = "src/main.rs"
+
+[dependencies]
+noshape-render.workspace = true
+gpui-kit.workspace = true
+anyhow.workspace = true
+glam.workspace = true
+log.workspace = true
+env_logger.workspace = true
+parking_lot.workspace = true
+ahash.workspace = true
+image = { version = "0.25", default-features = false }
+async-channel = "2"

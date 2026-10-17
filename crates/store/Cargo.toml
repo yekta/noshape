@@ -1,0 +1,17 @@
+[package]
+name = "noshape-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+zstd.workspace = true
+blake3.workspace = true
+uuid.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
