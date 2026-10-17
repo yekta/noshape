@@ -1,7 +1,10 @@
 //! Part Studio tab: toolbar, feature list (with rollback bar), parts list,
 //! 3D viewport with selection, and feature dialogs with live preview.
 
+mod sketch;
+
 use crate::actions::*;
+use crate::sketch_mode::SketchEditor;
 use crate::assets::icon_path;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::feature_dialog::{DialogEvent, FeatureDialog, RefLabeler};
@@ -117,6 +120,8 @@ pub struct PartStudioView {
     focus: FocusHandle,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
+    sketch: Option<SketchEditor>,
+    dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -163,6 +168,8 @@ impl PartStudioView {
             focus: cx.focus_handle(),
             fitted_once: false,
             message: None,
+            sketch: None,
+            dim_input: None,
             _subs: subs,
         };
         this.schedule_regen(window, cx);
@@ -202,7 +209,7 @@ impl PartStudioView {
         self.regen_seq += 1;
         let seq = self.regen_seq;
         self.regenerating = true;
-        let editing_sketch = None;
+        let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Coalesce bursts of edits (typing in a field).
             cx.background_executor().timer(Duration::from_millis(12)).await;
@@ -238,10 +245,21 @@ impl PartStudioView {
             });
             e.dialog.update(cx, |d, cx| d.set_status(st, cx));
         }
+        self.sync_sketch_editor(cx);
         self.refresh_scene(true, cx);
-        if !self.fitted_once && self.display.bounds().is_some() {
+        if !self.fitted_once {
             self.fitted_once = true;
-            self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(false, cx));
+            if self.display.bounds().is_some() {
+                self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(false, cx));
+            } else {
+                // Empty studio: frame the default planes.
+                self.viewport.update(cx, |vp, cx| {
+                    let size = vp.size();
+                    let aspect = if size.y > 0.0 { size.x / size.y } else { 1.6 };
+                    vp.camera.fit_sphere(glam::DVec3::ZERO, 0.11, aspect);
+                    vp.request_redraw(cx);
+                });
+            }
         }
         let _ = window;
         cx.notify();
@@ -250,14 +268,16 @@ impl PartStudioView {
     /// Rebuild highlight state and push the scene to the viewport.
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
         let Some(built) = &self.built else { return };
-        let (selection, accent) = match &self.edit {
+        let (mut selection, mut accent) = match &self.edit {
             Some(e) => {
                 let d = e.dialog.read(cx);
                 (d.active_refs(), d.selected_refs())
             }
             None => (self.selection.clone(), Vec::new()),
         };
-        let scene = scene_builder::with_highlights(built, &self.display, &selection, self.hover.as_ref(), &accent, self.gpu.uploader());
+        let extra = self.sketch_overlay(&mut selection, &mut accent, cx);
+        let built = self.built.as_ref().expect("built");
+        let scene = scene_builder::with_highlights(built, &self.display, &selection, self.hover.as_ref(), &accent, extra, self.gpu.uploader());
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
     }
 
@@ -290,7 +310,10 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ viewport events
 
-    fn on_viewport_event(&mut self, _: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sketch.is_some() && self.sketch_viewport_event(vp, ev, window, cx) {
+            return;
+        }
         match ev {
             ViewportEvent::Hover(id) => {
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
@@ -351,7 +374,12 @@ impl PartStudioView {
     // ------------------------------------------------------------ editing
 
     pub fn start_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if self.edit.is_some() {
+        // Starting Extrude/Revolve from an open sketch finishes the sketch and
+        // preselects all of its regions (Onshape behavior).
+        if self.sketch.is_some() && type_id != "sketch" {
+            let regions = self.finish_sketch(window, cx);
+            self.selection = regions;
+        } else if self.edit.is_some() {
             self.cancel_edit(window, cx);
         }
         let units = self.doc.read(cx).session.doc.settings.units.clone();
@@ -398,6 +426,7 @@ impl PartStudioView {
     }
 
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.leave_sketch(cx);
         let Some(e) = self.edit.take() else { return };
         let feature = e.dialog.read(cx).feature.clone();
         let type_id = feature.type_id.clone();
@@ -425,6 +454,7 @@ impl PartStudioView {
     }
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.leave_sketch(cx);
         if self.edit.take().is_some() {
             window.focus(&self.focus, cx);
             self.schedule_regen(window, cx);
@@ -482,7 +512,11 @@ impl PartStudioView {
         self.viewport.update(cx, |vp, cx| vp.animate_to_view(v, cx));
     }
 
-    fn on_delete(&mut self, _: &DeleteSelection, _: &mut Window, cx: &mut Context<Self>) {
+    fn on_delete(&mut self, _: &DeleteSelection, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sketch.is_some() {
+            self.sketch_delete(window, cx);
+            return;
+        }
         let ids = std::mem::take(&mut self.selected_features);
         self.delete_features(ids, cx);
     }
@@ -536,9 +570,9 @@ impl PartStudioView {
         };
         let id = ty.id;
         let main = Button::new(SharedString::from(format!("tb-{id}")))
-            .icon(Icon::empty().path(feature_icon(id)).text_color(pal.text))
+            .icon(Icon::empty().path(feature_icon(id)).text_color(pal.text).with_size(px(18.)))
             .ghost()
-            .small()
+            .with_size(px(30.))
             .tooltip(tooltip)
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
         if extra.is_empty() {
@@ -988,18 +1022,31 @@ fn world(p: [f32; 3]) -> DVec3 {
 }
 
 impl Render for PartStudioView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        let toolbar = self.render_toolbar(cx);
+        let toolbar = if self.sketch.is_some() { self.render_sketch_toolbar(cx) } else { self.render_toolbar(cx) };
         let list = self.render_feature_list(cx);
-        let overlay = self.render_viewport_overlay(cx);
-        v_flex()
+        let mut overlay = self.render_viewport_overlay(cx);
+        overlay.extend(self.render_sketch_labels(window, cx));
+        let in_sketch = self.sketch.is_some();
+        let root = v_flex()
             .size_full()
-            .key_context("PartStudio")
+            .key_context(if in_sketch { "PartStudio Sketch" } else { "PartStudio" })
             .track_focus(&self.focus)
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                // Keep keyboard shortcuts working after clicking the viewport or lists,
+                // without stealing focus from an input that just took it.
+                if !this.focus.contains_focused(window, cx) {
+                    window.focus(&this.focus, cx);
+                }
+            }))
             .on_action(cx.listener(Self::on_delete))
             .on_action(cx.listener(Self::on_clear_selection))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
+                if this.sketch.is_some() {
+                    this.sketch_cancel(cx);
+                    return;
+                }
                 if this.edit.is_some() {
                     this.cancel_edit(window, cx);
                 } else {
@@ -1084,7 +1131,8 @@ impl Render for PartStudioView {
                     .min_h_0()
                     .child(div().w(px(250.)).h_full().flex_none().child(list))
                     .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay)),
-            )
+            );
+        self.with_sketch_actions(root, cx)
     }
 }
 

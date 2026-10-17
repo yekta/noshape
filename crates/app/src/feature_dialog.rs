@@ -228,6 +228,27 @@ impl FeatureDialog {
         }
     }
 
+    /// Mutable sketch payload of a Sketch feature draft.
+    pub fn sketch_data_mut(&mut self) -> Option<&mut noshape_model::sketch_feature::SketchData> {
+        match self.feature.params.0.get_mut("sketch") {
+            Some(ParamValue::Sketch(d)) => Some(d),
+            _ => None,
+        }
+    }
+
+    pub fn sketch_data(&self) -> Option<&noshape_model::sketch_feature::SketchData> {
+        match self.feature.params.get("sketch") {
+            Some(ParamValue::Sketch(d)) => Some(d),
+            _ => None,
+        }
+    }
+
+    /// Notify listeners that the draft changed (e.g. after sketch edits).
+    pub fn mark_changed(&mut self, cx: &mut Context<Self>) {
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
+    }
+
     pub fn set_status(&mut self, s: Option<(FeatureStatus, String)>, cx: &mut Context<Self>) {
         if self.status != s {
             self.status = s;

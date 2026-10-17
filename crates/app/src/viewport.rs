@@ -26,7 +26,7 @@ pub enum ViewportEvent {
     /// Box selection finished; ids are unique.
     BoxSelect { ids: Vec<u32>, crossing: bool, modifiers: Modifiers },
     /// Left-button press/drag/release while a tool captured the pointer.
-    ToolDown { position: DVec2, modifiers: Modifiers },
+    ToolDown { position: DVec2, modifiers: Modifiers, click_count: usize },
     ToolDrag { position: DVec2, modifiers: Modifiers },
     ToolUp { position: DVec2, modifiers: Modifiers },
     /// Pointer moved (viewport-local logical pixels), for tool previews.
@@ -365,7 +365,7 @@ impl Viewport {
         match e.button {
             MouseButton::Left if self.tool_captures_left => {
                 self.drag = Drag::Tool;
-                cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers });
+                cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
             }
             MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
                 self.drag = Drag::Pending(e.button);

@@ -158,6 +158,7 @@ impl Regenerator {
         self.entries.retain(|id, _| live.contains(id));
         let mut display = display::build(&ctx, studio, opts, &mut self.meshes);
         display.features = states;
+        display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
         RegenResult { display, context: ctx }
     }

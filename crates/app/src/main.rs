@@ -5,9 +5,11 @@ mod assets;
 mod doc_model;
 mod feature_dialog;
 mod gpu;
+mod history_panel;
 mod part_studio;
 mod scene_builder;
 mod session;
+mod sketch_mode;
 mod theme;
 mod viewport;
 mod workspace;
@@ -65,7 +67,9 @@ fn apply_theme(cx: &mut App) {
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     let gpu = gpu::Gpu::new().expect("noshape needs a GPU (Vulkan, Metal or DirectX 12)");
-    let path = std::env::args().nth(1).map(PathBuf::from);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let demo = args.iter().any(|a| a == "--demo");
+    let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
 
     gpui_kit::application().with_assets(assets::AppAssets).run(move |cx| {
         gpui_kit::init(cx);
@@ -75,8 +79,8 @@ fn main() {
 
         let session = match &path {
             Some(p) if p.exists() => session::Session::open(p),
-            Some(p) => session::Session::create(p, noshape_model::Document::new()),
-            None => session::Session::create(new_document_path(), noshape_model::Document::new()),
+            Some(p) => session::Session::create(p, if demo { noshape_model::demo::demo_document() } else { noshape_model::Document::new() }),
+            None => session::Session::create(new_document_path(), if demo { noshape_model::demo::demo_document() } else { noshape_model::Document::new() }),
         }
         .expect("could not open document");
 

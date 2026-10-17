@@ -19,6 +19,9 @@ pub struct SketchData {
     /// Sketch text and image entities are stored outside the solver sketch.
     #[serde(default)]
     pub texts: Vec<SketchText>,
+    /// Dimension label positions in sketch-plane coordinates, by constraint id.
+    #[serde(default)]
+    pub dimension_labels: BTreeMap<u32, [f64; 2]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -39,6 +42,7 @@ impl PartialEq for SketchData {
         self.dimension_exprs == other.dimension_exprs
             && self.external_refs == other.external_refs
             && self.texts == other.texts
+            && self.dimension_labels == other.dimension_labels
             && serde_json::to_value(&self.sketch).ok() == serde_json::to_value(&other.sketch).ok()
     }
 }

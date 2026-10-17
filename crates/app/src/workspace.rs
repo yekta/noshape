@@ -4,6 +4,7 @@ use crate::actions::*;
 use crate::assets::icon_path;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
+use crate::history_panel::HistoryPanel;
 use crate::part_studio::PartStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -29,6 +30,7 @@ pub struct Workspace {
     active: Option<TabId>,
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
+    history: Option<Entity<HistoryPanel>>,
     _subs: Vec<Subscription>,
 }
 
@@ -48,8 +50,12 @@ impl Workspace {
             _ => cx.notify(),
         })];
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), _subs: subs };
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, _subs: subs };
         this.sync_tabs(window, cx);
+        // Focus the active tab view so its shortcuts work immediately.
+        if let Some(a) = this.active {
+            cx.defer_in(window, move |this: &mut Self, window, cx| this.activate(a, window, cx));
+        }
         this
     }
 
@@ -176,9 +182,24 @@ impl Workspace {
                         .tooltip(redo_tip)
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.doc.update(cx, |d, cx| d.redo(cx)))),
                 )
-                .child(Button::new("history").icon(Icon::empty().path(icon_path("version-graph"))).ghost().small().tooltip("Versions and history")),
+                .child(
+                    Button::new("history")
+                        .icon(Icon::empty().path(icon_path("version-graph")))
+                        .ghost()
+                        .small()
+                        .tooltip("Versions and history (Alt+H)")
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
+                ),
         )
         .into_any_element()
+    }
+
+    fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.history.take().is_none() {
+            let doc = self.doc.clone();
+            self.history = Some(cx.new(|cx| HistoryPanel::new(doc, window, cx)));
+        }
+        cx.notify();
     }
 
     fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -267,8 +288,15 @@ impl Render for Workspace {
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
+            .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
             .child(title)
-            .child(div().flex_1().min_h_0().child(content))
+            .child(
+                h_flex()
+                    .flex_1()
+                    .min_h_0()
+                    .child(div().flex_1().h_full().min_w_0().child(content))
+                    .children(self.history.clone().map(|h| div().w(px(300.)).h_full().flex_none().child(h))),
+            )
             .child(tabs)
     }
 }

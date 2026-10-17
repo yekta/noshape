@@ -15,6 +15,7 @@ noshape-model.workspace = true
 noshape-store.workspace = true
 noshape-units.workspace = true
 noshape-sketch.workspace = true
+noshape-kernel.workspace = true
 gpui-kit.workspace = true
 anyhow.workspace = true
 glam.workspace = true

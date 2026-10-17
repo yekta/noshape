@@ -7,6 +7,7 @@
 
 pub mod assembly;
 pub mod configuration;
+pub mod demo;
 pub mod display;
 pub mod document;
 pub mod drawing;

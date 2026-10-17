@@ -197,6 +197,8 @@ pub struct StudioDisplay {
     pub show_origin: bool,
     /// Total regeneration time.
     pub regen_ms: f32,
+    /// Variables defined by the evaluated features (for expression entry).
+    pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
 }
 
 impl StudioDisplay {

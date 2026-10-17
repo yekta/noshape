@@ -173,8 +173,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             loop_pts.push(corners[0]);
             border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 1.0, 0);
             let tint = theme::lin(0x8b7cff);
-            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([tint[0], tint[1], tint[2], 0.10]).ignore_clip().layer(5));
-            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([tint[0], tint[1], tint[2], 0.9]).ignore_clip().layer(5));
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([tint[0], tint[1], tint[2], 0.045]).ignore_clip().layer(5));
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([tint[0], tint[1], tint[2], 0.55]).ignore_clip().layer(5));
         }
     }
 
@@ -290,7 +290,7 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
 
 /// Apply hover/selection state and rebuild highlight overlays for pick-only
 /// elements. Returns a new scene sharing all static GPU buffers.
-pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], up: &Uploader) -> Scene {
+pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, up: &Uploader) -> Scene {
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
@@ -338,6 +338,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for (m, c) in overlay_regions {
         scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(8));
     }
+    scene.instances.extend(extra);
     scene
 }
 
