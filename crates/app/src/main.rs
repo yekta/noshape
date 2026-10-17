@@ -1,4 +1,5 @@
 mod gpu;
+mod session;
 mod viewport;
 
 use gpui_kit::*;

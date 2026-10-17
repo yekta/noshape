@@ -8,7 +8,9 @@ use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
 use crate::nurbs::Nurbs;
 use crate::sketch::Sketch;
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
+#[cfg(test)]
+use smallvec::smallvec;
 use std::cell::Cell;
 use std::f64::consts::TAU;
 use std::sync::Arc;
@@ -271,7 +273,7 @@ impl Eq {
             EqKind::FitEndDir { at_end, perp, n } => {
                 let Some(c) = fit_curve(x, *n) else { return 0.0 };
                 let (a, b) = c.domain();
-                let t = if *at_end { -c.tangent(b) } else { c.tangent(a) };
+                let t = if *at_end { -c.eval_ders(b)[1] } else { c.eval_ders(a)[1] };
                 let o = glam::DVec2::new(x[2 * n + 2] - x[2 * n], x[2 * n + 3] - x[2 * n + 1]);
                 let den = t.length() * o.length();
                 if den < 1e-300 {
@@ -337,6 +339,10 @@ pub(crate) trait Lookup {
     fn point(&self, id: EntityId) -> [u32; 2];
     fn own(&self, id: EntityId, slot: usize) -> u32;
     fn aux(&self, k: usize) -> u32;
+    /// Are two point entities the same point (shared or aliased)?
+    fn same(&self, a: EntityId, b: EntityId) -> bool;
+    /// Is point `p` constrained to lie on `curve` by a coincident constraint?
+    fn on_curve(&self, p: EntityId, curve: EntityId) -> bool;
 }
 
 type R = Result<(), String>;
@@ -544,8 +550,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
     fn collinear(&mut self, a: EntityId, b: EntityId) -> R {
         let la = self.line(a)?;
         let lb = self.line(b)?;
-        self.lin(Lin::new().pld(1.0, [lb[0], lb[1]], la));
-        self.lin(Lin::new().pld(1.0, [lb[2], lb[3]], la));
+        let (Some((a0, a1)), Some((b0, b1))) = (self.sk.endpoints(a), self.sk.endpoints(b)) else { unreachable!() };
+        // an endpoint shared with `a` lies on it trivially (zero equation)
+        for (q, qq) in [(b0, [lb[0], lb[1]]), (b1, [lb[2], lb[3]])] {
+            if !self.lk.same(q, a0) && !self.lk.same(q, a1) {
+                self.lin(Lin::new().pld(1.0, qq, la));
+            }
+        }
         Ok(())
     }
 
@@ -619,6 +630,39 @@ impl<'a, L: Lookup> Builder<'a, L> {
         }
     }
 
+    /// A point known to be the contact point between curve `a` and circle/arc
+    /// `b` (shared endpoints, or an endpoint constrained onto the other curve).
+    /// Tangency through a known contact point must be expressed as a direction
+    /// condition: distance-based formulations are degenerate there.
+    fn contact_point(&self, a: EntityId, b: EntityId) -> Option<EntityId> {
+        let ea = self.sk.entity(a)?.endpoints();
+        let eb = self.sk.entity(b)?.endpoints();
+        if let (Some((a0, a1)), Some((b0, b1))) = (ea, eb) {
+            for p in [a0, a1] {
+                for q in [b0, b1] {
+                    if self.lk.same(p, q) {
+                        return Some(p);
+                    }
+                }
+            }
+        }
+        if let Some((a0, a1)) = ea {
+            for p in [a0, a1] {
+                if self.lk.on_curve(p, b) {
+                    return Some(p);
+                }
+            }
+        }
+        if let Some((b0, b1)) = eb {
+            for q in [b0, b1] {
+                if self.lk.on_curve(q, a) {
+                    return Some(q);
+                }
+            }
+        }
+        None
+    }
+
     fn tangent(&mut self, a: EntityId, b: EntityId, c: &Constraint) -> R {
         let (ka, kb) = (self.kind(a)?, self.kind(b)?);
         let (a, b, ka, kb) = if tangent_rank(ka) <= tangent_rank(kb) { (a, b, ka, kb) } else { (b, a, kb, ka) };
@@ -647,12 +691,22 @@ impl<'a, L: Lookup> Builder<'a, L> {
             (EntityKind::Line, k) if k.is_circular() => {
                 let l = self.line(a)?;
                 let cc = self.center(b)?;
+                if let Some(q) = self.contact_point(a, b) {
+                    let qq = self.lk.point(q);
+                    self.push(EqKind::Perpendicular, cat(&[&cc, &qq, &l]));
+                    return Ok(());
+                }
                 let r = self.radius(b)?;
                 self.lin(Lin::new().pld(h.sign, cc, l).rad(-1.0, &r));
                 Ok(())
             }
             (x, y) if x.is_circular() && y.is_circular() => {
                 let (c1, c2) = (self.center(a)?, self.center(b)?);
+                if let Some(q) = self.contact_point(a, b) {
+                    let qq = self.lk.point(q);
+                    self.push(EqKind::Parallel, cat(&[&c1, &qq, &c2, &qq]));
+                    return Ok(());
+                }
                 let (r1, r2) = (self.radius(a)?, self.radius(b)?);
                 if h.internal {
                     self.lin(Lin::new().dist(1.0, c1, c2).rad(-h.sign2, &r1).rad(h.sign2, &r2));
@@ -1048,6 +1102,12 @@ impl Lookup for DummyLookup {
     fn aux(&self, k: usize) -> u32 {
         self.max_aux.set(self.max_aux.get().max(k + 1));
         3
+    }
+    fn same(&self, a: EntityId, b: EntityId) -> bool {
+        a == b
+    }
+    fn on_curve(&self, _: EntityId, _: EntityId) -> bool {
+        false
     }
 }
 

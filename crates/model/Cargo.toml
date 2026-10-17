@@ -5,3 +5,18 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+noshape-units.workspace = true
+noshape-sketch.workspace = true
+# noshape-kernel.workspace = true  (enabled once the kernel lands)
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+indexmap.workspace = true
+glam.workspace = true
+uuid.workspace = true
+log.workspace = true
+rayon.workspace = true
+ahash.workspace = true
+parking_lot.workspace = true
+smallvec.workspace = true
+nalgebra.workspace = true

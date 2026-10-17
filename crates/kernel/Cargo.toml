@@ -3,5 +3,18 @@ name = "noshape-kernel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Safe Rust wrapper over OpenCascade (OCCT) for noshape: shapes, topology, features, history, tessellation, HLR, I/O"
+build = "build.rs"
+links = "noshape_occt"
 
 [dependencies]
+cxx.workspace = true
+glam.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+log.workspace = true
+
+[build-dependencies]
+cxx-build.workspace = true
+
+[dev-dependencies]

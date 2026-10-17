@@ -23,7 +23,133 @@ pub(crate) type SparseRow = SmallVec<[(u32, f64); 8]>;
 const RANK_TOL: f64 = 1e-8;
 const FREE_TOL: f64 = 1e-6;
 
+/// Components with more unknowns than this use the sparse analysis.
+const DENSE_LIMIT: usize = 150;
+
 pub(crate) fn analyze_component(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
+    if n > DENSE_LIMIT {
+        return analyze_sparse(rows, n);
+    }
+    analyze_dense(rows, n)
+}
+
+/// Sparse rank analysis: row-sequential Givens QR with threshold pivoting on
+/// an RCM-ordered column set (R stays banded), then null-space vectors by
+/// back substitution for every non-pivot column.
+pub(crate) fn analyze_sparse(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
+    let m = rows.len();
+    // column ordering (RCM over the variable adjacency graph)
+    let mut edges = Vec::new();
+    for row in rows {
+        for a in 0..row.len() {
+            for b in 0..a {
+                edges.push((row[a].0 as usize, row[b].0 as usize));
+            }
+        }
+    }
+    let order = crate::linalg::rcm_order(n, &edges); // new -> old
+    let mut newcol = vec![0usize; n];
+    for (nw, &old) in order.iter().enumerate() {
+        newcol[old] = nw;
+    }
+    // R rows indexed by pivot column: (start, values) dense segment
+    let mut r: Vec<Option<(usize, Vec<f64>)>> = vec![None; n];
+    let mut redundant_rows = Vec::new();
+    let mut a: Vec<f64> = Vec::new();
+    for (ri, row) in rows.iter().enumerate() {
+        let norm: f64 = row.iter().map(|(_, v)| v * v).sum::<f64>().sqrt();
+        if norm < 1e-14 || row.is_empty() {
+            redundant_rows.push(ri);
+            continue;
+        }
+        let lo = row.iter().map(|e| newcol[e.0 as usize]).min().unwrap();
+        let hi = row.iter().map(|e| newcol[e.0 as usize]).max().unwrap();
+        let mut a_start = lo;
+        a.clear();
+        a.resize(hi - lo + 1, 0.0);
+        for &(c, v) in row {
+            a[newcol[c as usize] - lo] += v / norm;
+        }
+        let mut j = a_start;
+        let mut placed = false;
+        while j < a_start + a.len() {
+            let aj = a[j - a_start];
+            if aj.abs() <= RANK_TOL {
+                a[j - a_start] = 0.0;
+                j += 1;
+                continue;
+            }
+            match &mut r[j] {
+                None => {
+                    // trim leading zeros and store
+                    let off = j - a_start;
+                    let seg: Vec<f64> = a[off..].to_vec();
+                    r[j] = Some((j, seg));
+                    placed = true;
+                    break;
+                }
+                Some((rs, rv)) => {
+                    debug_assert_eq!(*rs, j);
+                    // bring both to the same range [j, end]
+                    let end = (*rs + rv.len()).max(a_start + a.len());
+                    rv.resize(end - *rs, 0.0);
+                    if a_start + a.len() < end {
+                        a.resize(end - a_start, 0.0);
+                    }
+                    let rjj = rv[0];
+                    let rho = rjj.hypot(aj);
+                    let (c, s) = (rjj / rho, aj / rho);
+                    for k in j..end {
+                        let x = rv[k - j];
+                        let y = a[k - a_start];
+                        rv[k - j] = c * x + s * y;
+                        a[k - a_start] = -s * x + c * y;
+                    }
+                    a[j - a_start] = 0.0;
+                    // drop the leading part of `a`
+                    let off = j + 1 - a_start;
+                    a.drain(..off);
+                    a_start = j + 1;
+                    j = a_start;
+                }
+            }
+        }
+        if !placed {
+            redundant_rows.push(ri);
+        }
+    }
+    let rank = r.iter().filter(|x| x.is_some()).count();
+    let mut free_new = vec![false; n];
+    let mut x = vec![0.0; n];
+    for f in 0..n {
+        if r[f].is_some() {
+            continue;
+        }
+        free_new[f] = true;
+        x.iter_mut().for_each(|v| *v = 0.0);
+        x[f] = 1.0;
+        for j in (0..f).rev() {
+            if let Some((_, rv)) = &r[j] {
+                let mut s = 0.0;
+                for (k, v) in rv.iter().enumerate().skip(1) {
+                    s += v * x[j + k];
+                }
+                x[j] = -s / rv[0];
+            }
+        }
+        let mx = x.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+        for (k, v) in x.iter().enumerate().take(f) {
+            if v.abs() > 1e-8 * mx {
+                free_new[k] = true;
+            }
+        }
+    }
+    let free = (0..n).map(|old| free_new[newcol[old]]).collect();
+    let _ = m;
+    ComponentAnalysis { rank, free, redundant_rows }
+}
+
+pub(crate) fn analyze_dense(rows: &[SparseRow], n: usize) -> ComponentAnalysis {
     let m = rows.len();
     if n == 0 {
         return ComponentAnalysis { rank: 0, free: Vec::new(), redundant_rows: (0..m).collect() };
@@ -114,5 +240,23 @@ mod tests {
         assert_eq!(a.rank, 2);
         assert_eq!(a.redundant_rows.len(), 1);
         assert!(a.redundant_rows[0] == 0 || a.redundant_rows[0] == 2);
+    }
+
+    #[test]
+    fn sparse_matches_dense() {
+        let rows: Vec<SparseRow> = vec![
+            smallvec![(0, 1.0), (1, -1.0)],
+            smallvec![(1, 1.0), (2, -1.0)],
+            smallvec![(0, 1.0), (2, -1.0)],
+            smallvec![(3, 1.0), (4, 2.0)],
+            smallvec![(0, 1.0)],
+        ];
+        for n in [5, 6] {
+            let d = analyze_dense(&rows, n);
+            let s = analyze_sparse(&rows, n);
+            assert_eq!(d.rank, s.rank);
+            assert_eq!(d.free, s.free);
+            assert_eq!(d.redundant_rows.len(), s.redundant_rows.len());
+        }
     }
 }

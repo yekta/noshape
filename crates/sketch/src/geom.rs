@@ -238,7 +238,7 @@ impl Curve2 {
                 let q = *a + d * t;
                 (t, q, (p - q).length())
             }
-            Curve2::Circle { center, radius } => {
+            Curve2::Circle { center, .. } => {
                 let v = p - *center;
                 let a = if v.length_squared() > 0.0 { norm_angle(v.to_angle()) } else { 0.0 };
                 let q = self.point(a);

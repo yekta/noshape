@@ -60,6 +60,31 @@ impl EnvelopeSolver {
         self.data.iter_mut().for_each(|v| *v = 0.0);
     }
 
+    pub fn snapshot(&self, out: &mut Vec<f64>) {
+        out.clear();
+        out.extend_from_slice(&self.data);
+    }
+
+    pub fn restore(&mut self, s: &[f64]) {
+        self.data.copy_from_slice(s);
+    }
+
+    #[inline]
+    fn diag_index(&self, i: usize) -> usize {
+        self.start[i] + i - self.first[i]
+    }
+
+    pub fn trace(&self) -> f64 {
+        (0..self.n).map(|i| self.data[self.diag_index(i)]).sum()
+    }
+
+    pub fn add_diag(&mut self, v: f64) {
+        for i in 0..self.n {
+            let k = self.diag_index(i);
+            self.data[k] += v;
+        }
+    }
+
     /// Adds `v` to A[i][j] (old indices). For off-diagonal entries call once
     /// per unordered pair.
     #[inline]
@@ -134,6 +159,22 @@ impl EnvelopeSolver {
             b[self.perm[i]] = y[i];
         }
     }
+}
+
+/// RCM ordering of a graph given by edges. Returns new -> old.
+pub(crate) fn rcm_order(n: usize, edges: &[(usize, usize)]) -> Vec<usize> {
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for &(i, j) in edges {
+        if i != j {
+            adj[i].push(j);
+            adj[j].push(i);
+        }
+    }
+    for a in adj.iter_mut() {
+        a.sort_unstable();
+        a.dedup();
+    }
+    rcm(&adj)
 }
 
 /// Reverse Cuthill-McKee ordering. Returns new -> old.
