@@ -1,6 +1,7 @@
 //! Part Studio tab: toolbar, feature list (with rollback bar), parts list,
 //! 3D viewport with selection, and feature dialogs with live preview.
 
+mod config_panel;
 mod menus;
 mod sketch;
 
@@ -126,6 +127,11 @@ pub struct PartStudioView {
     context_menu: Option<(Point<Pixels>, Entity<gpui_kit::component::menu::PopupMenu>, Subscription)>,
     measure_cache: Option<(Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>)>,
     show_mass: bool,
+    right_panel: Option<config_panel::RightPanel>,
+    panel_inputs: std::collections::HashMap<String, (Entity<gpui_kit::component::input::InputState>, String)>,
+    panel_subs: Vec<Subscription>,
+    config_values: noshape_model::configuration::ConfigValues,
+    needs_regen: bool,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
@@ -178,6 +184,11 @@ impl PartStudioView {
             context_menu: None,
             measure_cache: None,
             show_mass: false,
+            right_panel: None,
+            panel_inputs: Default::default(),
+            panel_subs: Vec::new(),
+            config_values: Default::default(),
+            needs_regen: false,
             dim_input: None,
             _subs: subs,
         };
@@ -213,7 +224,7 @@ impl PartStudioView {
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units.clone();
-        let config = studio.configuration.defaults();
+        let config = self.current_config(&studio);
         let regen = self.regen.clone();
         self.regen_seq += 1;
         let seq = self.regen_seq;
@@ -238,6 +249,17 @@ impl PartStudioView {
             });
         }));
         cx.notify();
+    }
+
+    /// Configuration values to evaluate: defaults overridden by the user's choice.
+    pub(super) fn current_config(&self, studio: &PartStudio) -> noshape_model::configuration::ConfigValues {
+        let mut v = studio.configuration.defaults();
+        for (k, val) in &self.config_values.0 {
+            if v.0.contains_key(k) {
+                v.0.insert(k.clone(), val.clone());
+            }
+        }
+        v
     }
 
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
@@ -1039,7 +1061,13 @@ impl Render for PartStudioView {
         let pal = p();
         let toolbar = if self.sketch.is_some() { self.render_sketch_toolbar(cx) } else { self.render_toolbar(cx) };
         let list = self.render_feature_list(cx);
+        if self.needs_regen {
+            self.needs_regen = false;
+            self.schedule_regen(window, cx);
+        }
+        let right = self.render_right_panel(window, cx);
         let mut overlay = self.render_viewport_overlay(cx);
+        overlay.push(div().absolute().top_3().right(px(52.)).child(self.render_panel_toggles(cx)).into_any_element());
         overlay.extend(self.render_sketch_labels(window, cx));
         overlay.extend(self.render_measure_panel(cx));
         overlay.extend(self.render_context_menu());
@@ -1145,7 +1173,8 @@ impl Render for PartStudioView {
                     .flex_1()
                     .min_h_0()
                     .child(div().w(px(250.)).h_full().flex_none().child(list))
-                    .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay)),
+                    .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay))
+                    .children(right),
             );
         self.with_sketch_actions(root, cx)
     }

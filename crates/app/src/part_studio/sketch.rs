@@ -99,7 +99,7 @@ impl PartStudioView {
     pub(super) fn regen_sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units.clone();
-        let config = studio.configuration.defaults();
+        let config = self.current_config(&studio);
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature);
         self.regen_seq += 1;
         let result = {
