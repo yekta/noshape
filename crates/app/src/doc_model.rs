@@ -104,6 +104,20 @@ impl DocModel {
         cx.notify();
     }
 
+    /// A structural edit Ctrl+Z can't undo (Onshape: deleting a tab; the
+    /// Versions and history panel restores it).
+    pub fn edit_document_not_undoable(&mut self, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut noshape_model::Document)) {
+        if self.session.read_only() {
+            return;
+        }
+        f(&mut self.session.doc);
+        if let Err(e) = self.session.commit_all_not_undoable(description) {
+            cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
+        }
+        cx.emit(DocEvent::TabsChanged);
+        cx.notify();
+    }
+
     pub fn undo(&mut self, cx: &mut Context<Self>) {
         match self.session.undo() {
             Ok(true) => cx.emit(DocEvent::Reloaded),

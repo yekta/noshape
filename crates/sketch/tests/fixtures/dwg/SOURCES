@@ -1,0 +1,16 @@
+DWG/DXF fixtures for tests/dwg.rs, downloaded unmodified from the LibreDWG
+test-data folder: https://github.com/LibreDWG/libredwg/tree/master/test/test-data
+(raw base URL https://raw.githubusercontent.com/LibreDWG/libredwg/master/test/test-data/)
+
+r2000_entities-2d.dwg  AC1015  2000/entities-2d.dwg
+r2000_entities-2d.dxf          2000/entities-2d.dxf
+r2004_ellipse.dwg      AC1018  2004/Ellipse.dwg
+r2004_spline.dwg       AC1018  2004/Spline.dwg
+r2007_donut.dwg        AC1021  2007/Donut.dwg
+r2007_donut.dxf                2007/Donut.dxf
+r2010_polyline.dwg     AC1024  2010/Polyline.dwg
+r2013_arc.dwg          AC1027  2013/Arc.dwg
+r2018_sample.dwg       AC1032  sample_2018.dwg
+r2018_sample.dxf               sample_2018.dxf
+r2018_point.dwg        AC1032  2018/Point.dwg
+r2018_circle.dwg       AC1032  2018/circle.dwg

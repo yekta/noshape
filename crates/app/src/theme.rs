@@ -99,7 +99,7 @@ pub const PALETTE: Palette = Palette {
     rail: rgb_const(0xfafafa),
     focus: rgb_const(0x3e94ff),
     rollback: rgb_const(0xb8b8b8),
-    text_rolled_back: rgb_const(0xcccccc),
+    text_rolled_back: rgb_const(0x999999),
     text_invalid: rgb_const(0xaa252d),
     dialog_bg: rgba_const(0xfffffff2),
     search_fill: rgb_const(0xeeeeee),
@@ -151,9 +151,8 @@ pub mod viewport {
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;
-    /// Construction plane outline (`--os-construction-plane-outline-color`, 35% alpha).
-    pub const PLANE_OUTLINE: u32 = 0x1d60aa;
-    /// The same outline as it renders on white (`#1d60aa` at 35% in sRGB),
+    /// Construction plane outline (`--os-construction-plane-outline-color`
+    /// `#1d60aa` at 35%) as it renders on white,
     /// drawn opaque because the renderer blends in linear light.
     pub const PLANE_OUTLINE_ON_WHITE: u32 = 0xaac3de;
     /// Construction plane label (`--os-construction-plane-text-color`).

@@ -353,3 +353,131 @@ fn section_caps_cover_the_cut() {
     let (dark, light) = (lums[lums.len() / 50], lums[lums.len() / 2]);
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }
+
+/// Sketch images: a textured quad facing the camera shows its texels the
+/// right way up, is depth tested against meshes in front of and behind it
+/// (transparent texels show what is behind), fades with the instance alpha,
+/// follows section clipping unless `ignore_clip`, and is never picked.
+#[test]
+fn image_quad_is_textured_and_depth_tested() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    // 4x4 texels, row 0 on top: top-left quadrant green, bottom-right
+    // quadrant transparent, the rest red.
+    let mut rgba = Vec::new();
+    for row in 0..4 {
+        for col in 0..4 {
+            rgba.extend_from_slice(match (row < 2, col < 2) {
+                (true, true) => &[0u8, 255, 0, 255],
+                (false, false) => &[0u8, 0, 255, 0],
+                _ => &[255u8, 0, 0, 255],
+            });
+        }
+    }
+    let s = 0.01f32;
+    let image = r.upload_image(&ImageData { corners: [[-s, -s, 0.0], [s, -s, 0.0], [s, s, 0.0], [-s, s, 0.0]], width: 4, height: 4, rgba });
+    assert_eq!(image.bounds(), Some((glam::Vec3::new(-s, -s, 0.0), glam::Vec3::new(s, s, 0.0))));
+    let mut scene = Scene::default();
+    // In front of the top-right (red) quadrant.
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([0.002, 0.002, 0.001], [0.009, 0.009, 0.003], 1)))));
+    // Behind the transparent bottom-right quadrant.
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([0.006, -0.009, -0.003], [0.009, -0.006, -0.001], 11)))));
+    scene.instances.push(Instance::new(Drawable::Image(image)).layer(3));
+    let (w, h) = (400u32, 300u32);
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let render = |r: &mut Renderer, scene: &Scene, cam: &Camera, msaa: u32| {
+        let style = Style { msaa, ..Style::default() };
+        r.render(RenderParams { scene, camera: cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: true }).unwrap()
+    };
+    let at = |f: &Frame, cam: &Camera, p: [f64; 3]| {
+        let q = cam.project(glam::DVec3::from(p), vp, 0.02).unwrap();
+        let (x, y) = (q.x as i32, q.y as i32);
+        let px = &f.bgra[((y as u32 * w + x as u32) * 4) as usize..][..3];
+        ((px[2] as i32, px[1] as i32, px[0] as i32), f.pick.as_ref().unwrap().id_at(x, y).unwrap())
+    };
+    let is_red = |(r8, g8, b8): (i32, i32, i32)| r8 > 220 && g8 < 40 && b8 < 40;
+    let is_green = |(r8, g8, b8): (i32, i32, i32)| g8 > 220 && r8 < 40 && b8 < 40;
+    let is_white = |(r8, g8, b8): (i32, i32, i32)| r8 > 245 && g8 > 245 && b8 > 245;
+    let is_gray = |(r8, g8, b8): (i32, i32, i32)| r8.max(g8).max(b8) - r8.min(g8).min(b8) < 40 && r8 < 245;
+    for projection in [Projection::Orthographic, Projection::Perspective] {
+        let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::NEG_Z, glam::DVec3::Y), projection, ..Default::default() };
+        cam.fit_box(glam::DVec3::new(-0.01, -0.01, -0.003), glam::DVec3::new(0.01, 0.01, 0.003), w as f64 / h as f64);
+        for msaa in [1, 4] {
+            let f = render(&mut r, &scene, &cam, msaa);
+            let ctx = format!("{projection:?}, msaa {msaa}");
+            let (c, id) = at(&f, &cam, [-0.005, -0.005, 0.0]);
+            assert!(is_red(c), "{ctx}: bottom-left should be red, got {c:?}");
+            assert_eq!(id, 0, "{ctx}: images are never picked");
+            let (c, _) = at(&f, &cam, [-0.005, 0.005, 0.0]);
+            assert!(is_green(c), "{ctx}: top-left should be green (row 0 on top), got {c:?}");
+            let (c, id) = at(&f, &cam, [0.0055, 0.0055, 0.003]);
+            assert!(is_gray(c), "{ctx}: the box in front should hide the image, got {c:?}");
+            assert_eq!(id, 2, "{ctx}: top face of the box in front");
+            let (c, _) = at(&f, &cam, [0.004, -0.004, 0.0]);
+            assert!(is_white(c), "{ctx}: transparent texels show the background, got {c:?}");
+            let (c, id) = at(&f, &cam, [0.0075, -0.0075, 0.0]);
+            assert!(is_gray(c), "{ctx}: transparent texels show the box behind, got {c:?}");
+            assert_eq!(id, 12, "{ctx}: the box behind transparent texels is pickable");
+            if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
+                let mut rgba = f.bgra.clone();
+                for px in rgba.as_chunks_mut::<4>().0 {
+                    px.swap(0, 2);
+                }
+                image::save_buffer(format!("{dir}/image_{projection:?}_{msaa}.png"), &rgba, w, h, image::ExtendedColorType::Rgba8).unwrap();
+            }
+        }
+        // Faded with the instance alpha: red over white turns pink.
+        let mut faded = scene.clone();
+        faded.instances[2].color[3] = 0.5;
+        let f = render(&mut r, &faded, &cam, 4);
+        let ((r8, g8, b8), _) = at(&f, &cam, [-0.005, -0.005, 0.0]);
+        assert!(r8 > 240 && (150..225).contains(&g8) && (150..225).contains(&b8), "{projection:?}: faded image should be pink, got {:?}", (r8, g8, b8));
+        let (c, _) = at(&f, &cam, [0.0055, 0.0055, 0.003]);
+        assert!(is_gray(c), "{projection:?}: a faded image stays behind the box, got {c:?}");
+        // Section clipping removes y < 0 of the image unless it ignores clipping.
+        let mut cut = scene.clone();
+        cut.clip = Some(ClipPlane { normal: glam::Vec3::NEG_Y, d: 0.0 });
+        let f = render(&mut r, &cut, &cam, 4);
+        let (c, _) = at(&f, &cam, [-0.005, -0.005, 0.0]);
+        assert!(is_white(c), "{projection:?}: the clipped half should be gone, got {c:?}");
+        let (c, _) = at(&f, &cam, [-0.005, 0.005, 0.0]);
+        assert!(is_green(c), "{projection:?}: the kept half stays, got {c:?}");
+        cut.instances[2].ignore_clip = true;
+        let f = render(&mut r, &cut, &cam, 4);
+        let (c, _) = at(&f, &cam, [-0.005, -0.005, 0.0]);
+        assert!(is_red(c), "{projection:?}: ignore_clip keeps the whole image, got {c:?}");
+    }
+}
+
+/// A large image (mip chain on the CPU, odd sizes) uploads and renders.
+#[test]
+fn image_with_odd_size_uploads_mips() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (iw, ih) = (301u32, 97u32);
+    let rgba: Vec<u8> = (0..iw * ih).flat_map(|_| [255u8, 0, 0, 255]).collect();
+    let s = 0.01f32;
+    let img = r.upload_image(&ImageData { corners: [[-s, -s, 0.0], [s, -s, 0.0], [s, s, 0.0], [-s, s, 0.0]], width: iw, height: ih, rgba });
+    // Invalid data must not panic.
+    let bad = r.upload_image(&ImageData { corners: [[0.0; 3]; 4], width: 10, height: 10, rgba: vec![0; 3] });
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Image(img)));
+    scene.instances.push(Instance::new(Drawable::Image(bad)));
+    // Seen obliquely and small (minified: sampled from the mips).
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(0.3, 0.2, -1.0).normalize(), glam::DVec3::Y), projection: Projection::Perspective, ..Default::default() };
+    let (w, h) = (64u32, 48u32);
+    cam.fit_box(glam::DVec3::new(-0.01, -0.01, 0.0), glam::DVec3::new(0.01, 0.01, 0.0), w as f64 / h as f64);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let px = &f.bgra[(((h / 2) * w + w / 2) * 4) as usize..][..3];
+    assert!(px[2] > 220 && px[1] < 40 && px[0] < 40, "center should be red, got {px:?}");
+}

@@ -170,3 +170,57 @@ fn new_hole_follows_document_units_and_table() {
     assert!(ht::sync_hole_standard(&mut f.params));
     assert!(f.params.expr("holeDiameterV3").unwrap().text.ends_with("mm"));
 }
+
+/// QA3: on a block with 3 mm corner fillets, a 5 mm chamfer of a top edge
+/// (tangent propagation runs it around the whole top loop) "succeeded" with
+/// an invalid solid (BRepCheck fails; the app showed holes through missing
+/// faces). Onshape fails the feature: "Failed to chamfer selections.".
+/// Blends now either give a valid solid or fail with Onshape's message.
+#[test]
+fn blend_over_smaller_fillets_is_valid_or_fails() {
+    let mut t = T::new();
+    t.block();
+    let r = t.regen();
+    let body = &r.context.bodies[0];
+    let vertical: Vec<_> = body
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| {
+            let i = e.edge_info().unwrap();
+            (i.start.z - i.end.z).abs() > 1e-6
+        })
+        .map(|(i, _)| Reference::Edge((*body.edges[i]).clone()))
+        .collect();
+    assert_eq!(vertical.len(), 4);
+    let fil = t.add("fillet", &[("entities", q(vertical)), ("radius", e("3 mm"))]);
+    assert_eq!(t.status(fil).0, FeatureStatus::Ok);
+    let r = t.regen();
+    let body = &r.context.bodies[0];
+    let top = body
+        .shape
+        .edges()
+        .iter()
+        .position(|e| {
+            let i = e.edge_info().unwrap();
+            i.start.z > 0.009 && i.end.z > 0.009 && matches!(i.curve, noshape_kernel::Curve::Line { .. }) && i.length > 0.02
+        })
+        .map(|i| Reference::Edge((*body.edges[i]).clone()))
+        .expect("top edge");
+    for (ty, size, ok) in [("chamfer", "1 mm", true), ("chamfer", "5 mm", false), ("chamfer", "8 mm", false), ("fillet", "1 mm", true), ("fillet", "5 mm", false)] {
+        let mut t2 = T { ps: t.ps.clone(), units: t.units.clone(), reg: Regenerator::new() };
+        let size_param = if ty == "chamfer" { "width" } else { "radius" };
+        let f = t2.add(ty, &[("entities", q(vec![top.clone()])), (size_param, e(size)), ("tangentPropagation", ParamValue::Bool(true))]);
+        let (st, msg) = t2.status(f);
+        let r = t2.regen();
+        if ok {
+            assert_eq!(st, FeatureStatus::Ok, "{ty} {size}: {msg:?}");
+        } else {
+            assert_eq!(st, FeatureStatus::Error, "{ty} {size} should fail");
+            let want = if ty == "chamfer" { "Failed to chamfer selections." } else { "Failed to fillet selections." };
+            assert_eq!(msg.as_deref(), Some(want), "{ty} {size}");
+        }
+        assert!(r.context.bodies[0].shape.is_valid(), "{ty} {size}: invalid solid");
+    }
+}

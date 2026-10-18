@@ -58,40 +58,65 @@ pub fn format_number(v: f64, precision: Option<u8>, default_digits: usize) -> St
 
 /// Units a length dimension is shown in.
 pub fn length_units(drawing: &Drawing, f: &DimFormat) -> DimUnits {
-    f.units.unwrap_or(if drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch })
+    f.units.or(drawing.props.units).unwrap_or(if drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch })
+}
+
+/// Drawing properties applied to a formatted number: trailing zeros
+/// (only with a fixed precision), leading zero, decimal separator.
+fn finish(drawing: &Drawing, s: String, fixed: bool, tolerance: bool) -> String {
+    let p = &drawing.props;
+    let (leading, trailing) = if tolerance { (p.tolerance_leading_zeros, p.tolerance_trailing_zeros) } else { (p.leading_zeros, p.trailing_zeros) };
+    let mut s = if fixed && !trailing && s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s };
+    if !leading {
+        if let Some(rest) = s.strip_prefix("0.") {
+            s = format!(".{rest}");
+        } else if let Some(rest) = s.strip_prefix("-0.") {
+            s = format!("-.{rest}");
+        }
+    }
+    if p.decimal_comma { s.replace('.', ",") } else { s }
+}
+
+/// A number with the dimension's precision, else the drawing's.
+fn number(drawing: &Drawing, v: f64, precision: Option<u8>, drawing_precision: Option<u8>, digits: usize, tolerance: bool) -> String {
+    let p = precision.or(drawing_precision);
+    finish(drawing, format_number(v, p, digits), p.is_some(), tolerance)
 }
 
 /// A length (meters) in the dimension's units, without tolerance.
 pub fn format_len(drawing: &Drawing, f: &DimFormat, meters: f64) -> String {
     let u = length_units(drawing, f);
-    let s = format_number(meters / u.meters(), f.precision, default_digits(u));
+    let s = number(drawing, meters / u.meters(), f.precision, drawing.props.precision, default_digits(u), false);
     if f.show_units { format!("{s} {}", u.symbol()) } else { s }
 }
 
 fn signed(s: String) -> String {
-    if s.starts_with('-') || s.chars().all(|c| c == '0' || c == '.') { s } else { format!("+{s}") }
+    if s.starts_with('-') || s.chars().all(|c| c == '0' || c == '.' || c == ',') { s } else { format!("+{s}") }
 }
 
 /// Full text of a dimension measuring `value` (meters, or radians when
 /// `angular`); `symbol` precedes the value (e.g. "Ø", "R").
 pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, symbol: &str) -> DimText {
-    let num = |v: f64| -> String {
+    let p = &drawing.props;
+    let num_with = |v: f64, tol: bool| -> String {
         if angular {
-            format!("{}°", format_number(v.to_degrees(), f.precision, 2))
+            format!("{}°", number(drawing, v.to_degrees(), f.precision, if tol { p.angular_tolerance_precision } else { p.angular_precision }, 2, tol))
         } else {
             let u = length_units(drawing, f);
-            format_number(v / u.meters(), f.precision, default_digits(u))
+            number(drawing, v / u.meters(), f.precision, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, default_digits(u), tol)
         }
     };
+    let num = |v: f64| num_with(v, false);
+    let tol_num = |v: f64| num_with(v, true);
     let units = if f.show_units && !angular { format!(" {}", length_units(drawing, f).symbol()) } else { String::new() };
     let value_text = |v: f64| format!("{}{symbol}{}{units}{}", f.prefix, num(v), f.suffix);
     let mut t = DimText { main: value_text(value), ..Default::default() };
     match &f.tolerance {
         Tolerance::None => {}
-        Tolerance::Symmetric { value: tol } => t.main = format!("{}{symbol}{} ±{}{units}{}", f.prefix, num(value), num(tol.abs()), f.suffix),
+        Tolerance::Symmetric { value: tol } => t.main = format!("{}{symbol}{} ±{}{units}{}", f.prefix, num(value), tol_num(tol.abs()), f.suffix),
         Tolerance::Deviation { upper, lower } => {
-            t.upper = Some(signed(num(*upper)));
-            t.lower = Some(signed(num(*lower)));
+            t.upper = Some(signed(tol_num(*upper)));
+            t.lower = Some(signed(tol_num(*lower)));
         }
         Tolerance::Limits { upper, lower } => {
             t.main = String::new();
@@ -139,6 +164,8 @@ pub const FIELDS: &[(&str, &str)] = &[
 /// Replace `{key}` occurrences using `lookup`; unknown keys are kept as
 /// typed, known but empty values become "----" (like Onshape).
 pub fn expand_fields(text: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+    let codes = text_codes(text);
+    let text = codes.as_str();
     if !text.contains('{') {
         return text.to_string();
     }
@@ -171,6 +198,49 @@ pub fn expand_fields(text: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Str
     out
 }
 
+/// Onshape text codes in notes and dimension text: `%%d` °, `%%c` ⌀,
+/// `%%p` ±, and `\U+00AE`-style unicode characters.
+pub fn text_codes(text: &str) -> String {
+    if !text.contains("%%") && !text.contains("\\U+") && !text.contains("\\u+") {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while !rest.is_empty() {
+        let lower = rest.get(..3).map(str::to_ascii_lowercase);
+        match lower.as_deref() {
+            Some("%%d") => {
+                out.push('°');
+                rest = &rest[3..];
+                continue;
+            }
+            Some("%%c") => {
+                out.push('⌀');
+                rest = &rest[3..];
+                continue;
+            }
+            Some("%%p") => {
+                out.push('±');
+                rest = &rest[3..];
+                continue;
+            }
+            Some("\\u+") => {
+                let hex: String = rest[3..].chars().take_while(|c| c.is_ascii_hexdigit()).take(4).collect();
+                if let Some(ch) = u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32).filter(|_| hex.len() >= 4) {
+                    out.push(ch);
+                    rest = &rest[3 + hex.len()..];
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        let ch = rest.chars().next().expect("not empty");
+        out.push(ch);
+        rest = &rest[ch.len_utf8()..];
+    }
+    out
+}
+
 /// Today's date (UTC) as YYYY-MM-DD.
 pub fn today() -> String {
     let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) as i64;
@@ -194,6 +264,38 @@ pub fn civil_from_days(z: i64) -> (i64, u32, u32) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn drawing_properties_shape_dimension_text() {
+        let mut d = Drawing::default();
+        let f = DimFormat::default();
+        // Defaults: millimeters, trailing zeros trimmed.
+        assert_eq!(format_len(&d, &f, 0.0125), "12.5");
+        // Inches, precision 0.123 with trailing zeros, comma separator, no leading zero.
+        d.props.units = Some(DimUnits::Inch);
+        d.props.precision = Some(3);
+        assert_eq!(format_len(&d, &f, 0.0254 * 0.5), "0.500");
+        d.props.leading_zeros = false;
+        assert_eq!(format_len(&d, &f, 0.0254 * 0.5), ".500");
+        d.props.trailing_zeros = false;
+        assert_eq!(format_len(&d, &f, 0.0254 * 0.5), ".5");
+        d.props.decimal_comma = true;
+        assert_eq!(format_len(&d, &f, 0.0254 * 1.25), "1,25");
+        // Angles use the angular precision.
+        d.props.angular_precision = Some(1);
+        assert_eq!(dim_text(&d, &f, std::f64::consts::FRAC_PI_4, true, "").main, "45°");
+        d.props.trailing_zeros = true;
+        assert_eq!(dim_text(&d, &f, std::f64::consts::FRAC_PI_4, true, "").main, "45,0°");
+    }
+
+    #[test]
+    fn note_text_codes() {
+        assert_eq!(text_codes("90%%d %%C10 %%p0.1"), "90° ⌀10 ±0.1");
+        assert_eq!(text_codes("A\\U+00AEB \\u+2300"), "A®B ⌀");
+        assert_eq!(text_codes("100%"), "100%");
+        assert_eq!(expand_fields("%%c{x}", &|k| (k == "x").then(|| "5".into())), "⌀5");
+    }
+
     use super::*;
 
     #[test]

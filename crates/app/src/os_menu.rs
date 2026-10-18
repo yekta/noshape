@@ -81,6 +81,22 @@ impl OsMenuItem {
         self
     }
 
+    /// A ✓ at the icon position (camera menu choices).
+    pub fn checked(mut self, on: bool) -> Self {
+        if let Self::Item { checked, .. } = &mut self {
+            *checked = on;
+        }
+        self
+    }
+
+    /// Gray and not clickable.
+    pub fn disabled(mut self, on: bool) -> Self {
+        if let Self::Item { disabled, .. } = &mut self {
+            *disabled = on;
+        }
+        self
+    }
+
     pub fn on_click(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
         if let Self::Item { handler, .. } = &mut self {
             *handler = Some(Rc::new(f));
@@ -104,6 +120,9 @@ pub struct OsMenu {
     _subs: Vec<Subscription>,
     /// The menu this one is a submenu of (Left returns to it).
     parent: Option<WeakEntity<OsMenu>>,
+    /// Onshape's icon-less list menus (documents page, Bootstrap
+    /// `list-no-icons`): 13 px text 17 px from the edge.
+    plain: bool,
 }
 
 impl EventEmitter<DismissEvent> for OsMenu {}
@@ -117,7 +136,13 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, plain: false }, window, cx))
+    }
+
+    /// Icon-less list style (13 px text, 17 px inset), as on the documents page.
+    pub fn list_no_icons(mut self) -> Self {
+        self.plain = true;
+        self
     }
 
     pub fn item(mut self, item: impl Into<OsMenuItem>) -> Self {
@@ -133,13 +158,18 @@ impl OsMenu {
         self
     }
 
-    pub fn submenu(mut self, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
+    pub fn submenu(self, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
+        self.submenu_with_icon(None, label, window, cx, f)
+    }
+
+    /// A submenu row with an icon (the camera menu's ✓ rows).
+    pub fn submenu_with_icon(mut self, icon: Option<Icon>, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
         let menu = Self::build(window, cx, f);
         let me = cx.weak_entity();
         menu.update(cx, |m, _| m.parent = Some(me));
         // A click in the submenu closes the whole menu.
         self._subs.push(cx.subscribe(&menu, |_, _, _: &DismissEvent, cx| cx.emit(DismissEvent)));
-        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: None, menu });
+        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|i| MenuIcon::Kit(Box::new(i))), menu });
         self
     }
 
@@ -206,8 +236,9 @@ impl OsMenu {
 }
 
 impl Render for OsMenu {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
         let menu_bounds = bounds.get();
@@ -221,6 +252,7 @@ impl Render for OsMenu {
                 Some(top)
             })
             .collect();
+        let plain = self.plain;
         let rows: Vec<AnyElement> = self
             .items
             .iter()
@@ -230,7 +262,7 @@ impl Render for OsMenu {
                 let icon_el = |icon: &Option<MenuIcon>, cx: &App| -> Option<AnyElement> {
                     icon.as_ref().map(|i| match i {
                         MenuIcon::Named(n) => crate::assets::icon(n, ICON, cx).into_any_element(),
-                        MenuIcon::Kit(k) => (**k).clone().with_size(px(ICON)).text_color(pal.text).into_any_element(),
+                        MenuIcon::Kit(k) => div().size(px(ICON)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
                     })
                 };
                 let row = |id: usize| {
@@ -239,9 +271,9 @@ impl Render for OsMenu {
                         .relative()
                         .h(px(ROW_H))
                         .w_full()
-                        .pl(px(TEXT_X))
+                        .pl(px(if plain { 17. } else { TEXT_X }))
                         .pr(px(12.))
-                        .text_size(px(TEXT))
+                        .text_size(px(if plain { 13. } else { TEXT }))
                         .whitespace_nowrap()
                         .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                             if *h && this.hovered != Some(ix) {
@@ -274,8 +306,14 @@ impl Render for OsMenu {
                         .when(hovered, |d| {
                             // Opens beside the row: its top-left at the menu's right edge,
                             // level with the row (window coordinates from the last paint).
-                            let at = point(menu_bounds.right() - px(2.), menu_bounds.top() + px(row_tops[ix] - 1.));
-                            d.child(deferred(anchored().position(at).snap_to_window_with_margin(px(4.)).child(div().occlude().child(menu.clone()))).with_priority(3))
+                            // Near the window's right edge it opens to the left (live camera menu).
+                            let y = menu_bounds.top() + px(row_tops[ix] - 1.);
+                            let (at, anchor) = if menu_bounds.right() + px(240.) > window_w {
+                                (point(menu_bounds.left() + px(2.), y), Anchor::TopRight)
+                            } else {
+                                (point(menu_bounds.right() - px(2.), y), Anchor::TopLeft)
+                            };
+                            d.child(deferred(anchored().anchor(anchor).position(at).snap_to_window_with_margin(px(4.)).child(div().occlude().child(menu.clone()))).with_priority(3))
                         })
                         .into_any_element(),
                 }
@@ -324,25 +362,31 @@ impl Render for OsMenu {
 
 /// The open right-click menu of a window (see [`render_host`]).
 #[derive(Default)]
-struct OsMenuHost(Option<(Point<Pixels>, Entity<OsMenu>, Subscription)>);
+struct OsMenuHost(Option<(Point<Pixels>, Anchor, Entity<OsMenu>, Subscription)>);
 
 impl Global for OsMenuHost {}
 
 /// Show `menu` at `position` (window coordinates) until it is dismissed.
 pub fn open(position: Point<Pixels>, menu: Entity<OsMenu>, window: &mut Window, cx: &mut App) {
+    open_anchored(position, Anchor::TopLeft, menu, window, cx);
+}
+
+/// Show `menu` with its `anchor` corner at `position` (a dropdown under a
+/// button uses `TopRight` at the button's bottom-right corner).
+pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMenu>, window: &mut Window, cx: &mut App) {
     let sub = cx.subscribe(&menu, |_, _: &DismissEvent, cx| {
         cx.default_global::<OsMenuHost>().0 = None;
         cx.refresh_windows();
     });
     window.focus(&menu.focus_handle(cx), cx);
-    cx.default_global::<OsMenuHost>().0 = Some((position, menu, sub));
+    cx.default_global::<OsMenuHost>().0 = Some((position, anchor, menu, sub));
     window.refresh();
 }
 
 /// The open menu, for the window root to draw on top of everything.
 pub fn render_host(cx: &App) -> Option<AnyElement> {
-    let (pos, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
-    Some(deferred(anchored().position(*pos).snap_to_window_with_margin(px(8.)).child(menu.clone())).with_priority(2).into_any_element())
+    let (pos, anchor, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    Some(deferred(anchored().anchor(*anchor).position(*pos).snap_to_window_with_margin(px(8.)).child(menu.clone())).with_priority(2).into_any_element())
 }
 
 /// Right-click opens an Onshape menu built by `f` at the pointer.

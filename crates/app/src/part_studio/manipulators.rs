@@ -210,14 +210,16 @@ impl PartStudioView {
         };
         let tip = a.base + a.dir * a.length;
         let mut lines = LineData::default();
-        lines.push_polyline(&[f(a.base), f(tip)], color, 0, 2.5, LineSegment::ON_TOP);
+        // Hovered: a blue outline around the arrow (Onshape).
+        let (color, width) = if self.ui.manip_hover { (crate::theme::rgb8(0x3e94ff), 3.5) } else { (color, 2.5) };
+        lines.push_polyline(&[f(a.base), f(tip)], color, 0, width, LineSegment::ON_TOP);
         // Arrowhead: two short barbs in a plane containing the axis.
         let side = a.dir.any_orthonormal_vector();
         let side2 = a.dir.cross(side);
         let head = (a.length.abs() * 0.12).clamp(0.0015, 0.008) * a.length.signum();
         for s in [side, -side, side2, -side2] {
             let barb = tip - a.dir * head + s * head.abs() * 0.45;
-            lines.push_polyline(&[f(tip), f(barb)], color, 0, 2.5, LineSegment::ON_TOP);
+            lines.push_polyline(&[f(tip), f(barb)], color, 0, width, LineSegment::ON_TOP);
         }
         let pts = PointData { points: vec![PointSprite { position: f(tip), color, pick_id: 0, size: 10.0, style: LineSegment::ON_TOP, _pad: 0 }] };
         vec![

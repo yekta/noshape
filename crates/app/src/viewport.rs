@@ -115,6 +115,13 @@ pub struct Viewport {
     drag: Drag,
     press_pos: DVec2,
     last_pos: DVec2,
+    /// Selected entities, drawn as a digit at the pointer (Onshape's
+    /// selection-count cursor: 1-5, "5" for five or more). Set by the owner.
+    pub selection_count: usize,
+    /// The count cursor last set through the platform (`None` = the arrow),
+    /// and whether the platform could (else the digit is drawn).
+    cursor_applied: Option<Option<usize>>,
+    cursor_platform: bool,
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
@@ -246,6 +253,9 @@ impl Viewport {
             drag: Drag::None,
             press_pos: DVec2::ZERO,
             last_pos: DVec2::ZERO,
+            selection_count: 0,
+            cursor_applied: None,
+            cursor_platform: true,
             hover: None,
             tool_captures_left: false,
             zoom_window: false,
@@ -754,6 +764,9 @@ impl Viewport {
         self.pointer_inside = self.bounds.contains(&e.position);
         let delta = p - self.last_pos;
         self.last_pos = p;
+        if self.selection_count > 0 {
+            cx.notify();
+        }
         let height = self.size().y;
         if let Drag::Pending(button) = self.drag
             && p.distance(self.press_pos) > 3.0
@@ -959,6 +972,16 @@ impl Render for Viewport {
         let entity = cx.entity();
         let box_rect = self.box_rect;
         let image = self.image.clone();
+        self.sync_cursor(window, cx);
+        // Where the platform can't set an image cursor (Wayland), the digit
+        // is drawn at the pointer instead.
+        let count_badge = (!self.cursor_platform && self.selection_count > 0 && self.pointer_inside && matches!(self.drag, Drag::None | Drag::Pending(_))).then(|| {
+            let digit: SharedString = self.selection_count.min(5).to_string().into();
+            let (x, y) = (self.last_pos.x as f32 + 10., self.last_pos.y as f32 + 9.);
+            let text = |dx: f32, dy: f32, color: Rgba| div().absolute().left(px(x + dx)).top(px(y + dy)).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(color).child(digit.clone());
+            let halo = [(-1., 0.), (1., 0.), (0., -1.), (0., 1.), (-1., -1.), (1., 1.), (-1., 1.), (1., -1.)];
+            div().absolute().inset_0().children(halo.map(|(dx, dy)| text(dx, dy, rgb(0xffffff)))).child(text(0., 0., rgb(0x000000)))
+        });
         div()
             .id("viewport")
             .size_full()
@@ -1003,6 +1026,7 @@ impl Render for Viewport {
                     .border_color(color)
                     .bg(if crossing { rgb(0xfff3cf) } else { rgb(0xd0dcef) }.opacity(0.5))
             }))
+            .children(count_badge)
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
@@ -1012,6 +1036,31 @@ impl Render for Viewport {
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))
             .on_scroll_wheel(cx.listener(Self::on_scroll))
+    }
+}
+
+impl Viewport {
+    /// Onshape's selection-count cursor over the graphics area (cursor.rs).
+    fn sync_cursor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let want = (self.selection_count > 0 && self.pointer_inside && matches!(self.drag, Drag::None | Drag::Pending(_))).then_some(self.selection_count.min(5));
+        if self.cursor_applied == Some(want) || (want.is_none() && self.cursor_applied.is_none_or(|a| a.is_none())) {
+            return;
+        }
+        self.cursor_platform = crate::cursor::set(window, want, cx);
+        self.cursor_applied = Some(want);
+        if want.is_some() && self.cursor_platform {
+            // GPUI sets its own cursor at the end of a frame in which the
+            // hovered style changed; set ours again once that frame is out.
+            cx.spawn_in(window, async move |this, cx| {
+                cx.background_executor().timer(Duration::from_millis(40)).await;
+                let _ = this.update_in(cx, |this, window, cx| {
+                    if this.cursor_applied == Some(want) {
+                        crate::cursor::set(window, want, cx);
+                    }
+                });
+            })
+            .detach();
+        }
     }
 }
 

@@ -139,6 +139,9 @@ pub struct PartStudio {
     pub folders: Vec<Folder>,
     #[serde(default)]
     pub configuration: Configuration,
+    /// Variable Studio tables in this Part Studio's Variable table.
+    #[serde(default)]
+    pub variable_studios: crate::variables::VariableStudioRefs,
     /// Stored as a list of pairs: JSON map keys must be strings.
     #[serde(default, with = "body_map")]
     pub part_properties: BTreeMap<BodyId, PartProperties>,
@@ -153,6 +156,12 @@ pub struct PartStudio {
     /// Hidden default geometry (Origin, Top, Front, Right planes).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_defaults: Vec<Reference>,
+    /// Renamed default geometry (Onshape: Rename on Origin / Top / Front / Right).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_names: Vec<(Reference, String)>,
+    /// Plane display sizes from "Size to Part Studio": (plane, half width, half height).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plane_sizes: Vec<(Reference, f64, f64)>,
 }
 
 /// A saved camera (renderer-independent).

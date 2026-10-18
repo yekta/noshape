@@ -59,11 +59,12 @@ fn orientation_name(o: ViewOrientation) -> &'static str {
     ORIENTATIONS.iter().find(|(x, _)| *x == o).map(|(_, n)| *n).unwrap_or("Front")
 }
 
-/// Default view name: the orientation of a base view, else the view type.
-pub fn default_view_name(v: &DrawingView) -> String {
+/// Default view name: the orientation of a base view or the standard
+/// orientation a projected view shows ("Right"), else the view type.
+pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
     match &v.kind {
         ViewKind::Base { orientation, .. } => orientation_name(*orientation).to_string(),
-        ViewKind::Projected { .. } => "Projected view".into(),
+        ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, v.id).map(|o| orientation_name(o).to_string()).unwrap_or_else(|| "Projected view".into()),
         ViewKind::Auxiliary { .. } => "Auxiliary view".into(),
         ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => format!("Section {label}-{label}"),
         ViewKind::Detail { label, .. } => format!("Detail {label}"),
@@ -74,6 +75,9 @@ pub fn default_view_name(v: &DrawingView) -> String {
 pub fn view_clipboard(cx: &App) -> Option<clipboard::ViewClipboard> {
     cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::ViewClipboard::from_json(&t))
 }
+
+/// A View properties dropdown choice.
+type PropsAct = std::rc::Rc<dyn Fn(&mut ViewProps)>;
 
 /// View properties dialog state.
 pub struct ViewProps {
@@ -89,6 +93,9 @@ pub struct ViewProps {
     view_label: bool,
     label: Entity<InputState>,
     scale_label: bool,
+    /// View simplification (None: the parent's) and its value field.
+    simplification: Option<Simplification>,
+    simp_value: Entity<InputState>,
 }
 
 impl DrawingEditor {
@@ -173,6 +180,13 @@ impl DrawingEditor {
                 MenuEntry::item("Horizontally", move |t, _, cx| t.start_align_views(id, false, cx)),
             ],
         ));
+        // Suppress alignment with parent (derived views that align with it).
+        if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
+            let un = v.unaligned;
+            out.push(MenuEntry::item(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, move |t, _, cx| {
+                t.edit_view(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, id, cx, |v| v.unaligned = !un)
+            }));
+        }
         // Rotate view vertically / horizontally: pick a straight edge (views
         // without a parent or children, like the rotation angle).
         let free = sheet.parent_of(id).is_none() && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
@@ -325,7 +339,7 @@ impl DrawingEditor {
         self.panel = None;
         let deg = v.rotation.to_degrees();
         let scale_text = v.scale.map(noshape_model::drawing::sheet::format_scale).unwrap_or_default();
-        let name = v.name.clone().unwrap_or_else(|| default_view_name(&v));
+        let name = v.name.clone().unwrap_or_else(|| default_view_name(&self.drawing, self.current_sheet(), &v));
         let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
         let label = match &v.kind {
             ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
@@ -347,6 +361,8 @@ impl DrawingEditor {
             view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
             label: input(label, window, cx),
             scale_label: v.scale_label.unwrap_or(v.label.is_some() && v.scale.is_some()),
+            simplification: v.simplification,
+            simp_value: input(crate::drawing_insert::simplification_text(views::view_simplification(self.current_sheet(), id), self.drawing.units_mm), window, cx),
         });
         cx.notify();
     }
@@ -360,8 +376,9 @@ impl DrawingEditor {
         let name = p.name.read(cx).value().trim().to_string();
         let label = p.label.read(cx).value().trim().to_string();
         let (view_label, scale_label, tangent, orientation) = (p.view_label, p.scale_label, p.tangent, p.orientation);
+        let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
         let Some(old) = self.current_sheet().view(id).cloned() else { return };
-        let default_name = default_view_name(&old);
+        let default_name = default_view_name(&self.drawing, self.current_sheet(), &old);
         let mut d = self.drawing.clone();
         if let Some(v) = d.sheets[self.sheet].view_mut(id) {
             v.scale = scale;
@@ -369,6 +386,7 @@ impl DrawingEditor {
                 v.rotation = r.to_radians();
             }
             tangent.apply(v);
+            v.simplification = simplification;
             v.name = (!name.is_empty() && name != default_name).then_some(name);
             v.scale_label = Some(scale_label);
             match &mut v.kind {
@@ -419,7 +437,7 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().min_h(px(28.)).gap_2().child(div().w(label_w).flex_none().text_color(pal.text).child(label)).child(div().flex_1().min_w_0().child(body)).into_any_element();
         let text = |s: String| div().truncate().child(s).into_any_element();
         let view = cx.entity();
-        let dropdown = |id: &'static str, current: String, items: Vec<(String, bool, std::rc::Rc<dyn Fn(&mut ViewProps)>)>| {
+        let dropdown = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>| {
             let view = view.clone();
             Button::new(id)
                 .label(current)
@@ -454,7 +472,7 @@ impl DrawingEditor {
             let items = ORIENTATIONS
                 .iter()
                 .map(|&(o, n)| {
-                    let f: std::rc::Rc<dyn Fn(&mut ViewProps)> = std::rc::Rc::new(move |p| p.orientation = Some(o));
+                    let f: PropsAct = std::rc::Rc::new(move |p| p.orientation = Some(o));
                     (n.to_string(), o == cur, f)
                 })
                 .collect();
@@ -462,7 +480,7 @@ impl DrawingEditor {
         } else {
             rows.push(row("View orientation", text(match &v.kind {
                 ViewKind::Projected { .. } => "Projected".into(),
-                _ => default_view_name(&v),
+                _ => default_view_name(&self.drawing, sheet, &v),
             })));
         }
         // Scale: "1:2 (Parent)" / "(Sheet)" or a standard scale; typing sets a custom one.
@@ -471,7 +489,7 @@ impl DrawingEditor {
             None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(parent_scale)),
             Some(s) => noshape_model::drawing::sheet::format_scale(s),
         };
-        let mut scale_items: Vec<(String, bool, std::rc::Rc<dyn Fn(&mut ViewProps)>)> = vec![(format!("{inherit} scale"), props.scale.is_none(), std::rc::Rc::new(|p: &mut ViewProps| p.scale = None))];
+        let mut scale_items: Vec<(String, bool, PropsAct)> = vec![(format!("{inherit} scale"), props.scale.is_none(), std::rc::Rc::new(|p: &mut ViewProps| p.scale = None))];
         for s in [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05] {
             scale_items.push((noshape_model::drawing::sheet::format_scale(s), props.scale == Some(s), std::rc::Rc::new(move |p: &mut ViewProps| p.scale = Some(s))));
         }
@@ -485,18 +503,31 @@ impl DrawingEditor {
         let tangent_items = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom]
             .into_iter()
             .map(|m| {
-                let f: std::rc::Rc<dyn Fn(&mut ViewProps)> = std::rc::Rc::new(move |p| p.tangent = m);
+                let f: PropsAct = std::rc::Rc::new(move |p| p.tangent = m);
                 (m.label().to_string(), m == props.tangent, f)
             })
             .collect();
         rows.push(row("Tangent edges", dropdown("vp-tangent", props.tangent.label().into(), tangent_items)));
+        // View simplification (child views follow the parent unless set).
+        let eff = props.simplification.unwrap_or_else(|| sheet.parent_of(props.view).map(|p| views::view_simplification(sheet, p)).unwrap_or(Simplification::Auto));
+        let simp_items = crate::drawing_insert::simplification_choices(eff)
+            .into_iter()
+            .map(|c| {
+                let f: PropsAct = std::rc::Rc::new(move |p| p.simplification = Some(c));
+                (c.name().to_string(), std::mem::discriminant(&c) == std::mem::discriminant(&eff), f)
+            })
+            .collect();
+        rows.push(row("View simplification", dropdown("vp-simp", eff.name().into(), simp_items)));
+        if !crate::drawing_insert::simplification_text(eff, true).is_empty() && props.simplification.is_some() {
+            rows.push(row("", Input::new(&props.simp_value).xsmall().into_any_element()));
+        }
         let sheet_items = self
             .drawing
             .sheets
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                let f: std::rc::Rc<dyn Fn(&mut ViewProps)> = std::rc::Rc::new(move |p| p.sheet = i);
+                let f: PropsAct = std::rc::Rc::new(move |p| p.sheet = i);
                 (s.name.clone(), i == props.sheet, f)
             })
             .collect();

@@ -12,7 +12,7 @@ use glam::DVec3;
 use noshape_model::display::{BodyKind, SketchEntityState, StudioDisplay};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_render::renderer::Uploader;
-use noshape_render::{Drawable, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, state};
+use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, state};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -103,6 +103,8 @@ pub struct GpuCache {
     /// Edges without the tangent ones (and the tangent ones dash-dot) for
     /// the Tangent edges phantom/removed modes, keyed by mesh pointer.
     tangent: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, TangentLines)>,
+    /// Sketch image textures keyed by their (shared) encoded data.
+    images: HashMap<usize, (std::sync::Weak<str>, Option<ImageHandle>)>,
 }
 
 #[derive(Clone)]
@@ -173,8 +175,8 @@ impl DisplayMode {
     pub fn label(self) -> &'static str {
         match self {
             DisplayMode::ShadedWithEdges => "Shaded with edges",
-            DisplayMode::Shaded => "Shaded",
-            DisplayMode::HiddenLine => "Hidden line",
+            DisplayMode::Shaded => "Shaded without edges",
+            DisplayMode::HiddenLine => "Unshaded",
             DisplayMode::Wireframe => "Wireframe",
             DisplayMode::Translucent => "Translucent",
         }
@@ -209,6 +211,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.colored.retain(|_, (w, _)| w.strong_count() > 0);
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         let key = Arc::as_ptr(&b.mesh) as usize;
         let cached = match cache.bodies.get(&key) {
@@ -250,7 +253,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             };
             let mesh = match opts.display_mode {
                 DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color),
-                DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.3)]),
+                // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
+                // which is ~0.48 in the renderer's linear blending.
+                DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
                 // Faces drawn in the background color hide what is behind them.
                 DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)),
                 // Still pickable, but invisible.
@@ -391,6 +396,25 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     lines.segments.push(LineSegment { a: seg[0], b: seg[1], color, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
                 }
             }
+            // Inserted images (Insert image): textured quads in their boxes,
+            // depth tested like the model (Onshape shows them in 3D too).
+            for img in &sk.images {
+                let key = Arc::as_ptr(&img.data_base64) as *const u8 as usize;
+                let handle = match cache.images.get(&key) {
+                    Some((_, h)) => h.clone(),
+                    None => {
+                        let h = decode_image(&img.data_base64).map(|d| up.upload_image(&d));
+                        cache.images.insert(key, (Arc::downgrade(&img.data_base64), h.clone()));
+                        h
+                    }
+                };
+                let Some(handle) = handle else { continue };
+                let [ll, lr, _, ul] = img.corners.map(glam::Vec3::from);
+                let (x, y) = (lr - ll, ul - ll);
+                let z = x.cross(y).normalize_or_zero();
+                let m = glam::Mat4::from_cols(x.extend(0.0), y.extend(0.0), z.extend(0.0), ll.extend(1.0));
+                scene.instances.push(Instance::new(Drawable::Image(handle)).with_transform(m).ignore_clip().layer(8));
+            }
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().layer(10));
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().layer(11));
             // Regions: invisible, pickable; highlight overlay added on hover/selection.
@@ -471,6 +495,15 @@ fn face_pick_ids(m: &noshape_model::display::MeshBuffers) -> Vec<u32> {
         }
     }
     pick_ids
+}
+
+/// A sketch image (base64 PNG / JPEG / GIF / BMP) as a unit-square textured
+/// quad; the instance transform places it in its box.
+fn decode_image(data_base64: &str) -> Option<ImageData> {
+    let bytes = noshape_model::sketch_feature::base64_decode(data_base64)?;
+    let rgba = image::load_from_memory(&bytes).ok()?.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    Some(ImageData { corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], width, height, rgba: rgba.into_raw() })
 }
 
 fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> CachedBody {

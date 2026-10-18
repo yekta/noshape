@@ -130,6 +130,38 @@ impl Configuration {
         (params, suppressed)
     }
 
+    /// A feature as its dialog shows it: configured parameters take the
+    /// active configuration's values (Onshape edits those in the dialog).
+    pub fn for_editing(&self, feature: &Feature, values: &ConfigValues) -> Feature {
+        let mut f = feature.clone();
+        f.params = self.apply(feature, values).0;
+        f
+    }
+
+    /// Accepting a dialog: values of configured parameters go to the active
+    /// configuration's row; the feature keeps its own (unconfigured) value.
+    pub fn store_edit(&mut self, base: &Feature, edited: &mut Feature, values: &ConfigValues) {
+        let keys: Vec<(usize, String)> = self
+            .configured
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.feature == edited.id && c.param != SUPPRESSED_PARAM)
+            .filter_map(|(i, c)| self.value_of(values, &c.input).map(|k| (i, k)))
+            .collect();
+        for (i, key) in keys {
+            let c = &mut self.configured[i];
+            if let Some(v) = edited.params.get(&c.param).cloned() {
+                c.values.insert(key, v);
+            }
+            match base.params.get(&c.param) {
+                Some(b) => edited.params.set(&c.param, b.clone()),
+                None => {
+                    edited.params.0.shift_remove(&c.param);
+                }
+            }
+        }
+    }
+
     /// Configuration variables as expression variables (name -> text).
     pub fn variable_exprs(&self, values: &ConfigValues) -> Vec<(String, VariableKind, String)> {
         self.inputs
@@ -171,5 +203,26 @@ mod describe_tests {
         v.0.insert("c".into(), "true".into());
         v.0.insert("t".into(), "y".into());
         assert_eq!(cfg.describe(&v), "Large, Fillet, Label = y");
+    }
+
+    #[test]
+    fn dialogs_edit_the_active_configuration() {
+        let mut cfg = Configuration {
+            inputs: vec![ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None }],
+            configured: vec![],
+        };
+        let e = |t: &str| ParamValue::Expr(ExprValue::new(t));
+        let mut base = Feature { id: FeatureId(7), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None };
+        base.params.set("depth", e("12 mm"));
+        cfg.configured.push(ConfiguredParam { input: "s".into(), feature: FeatureId(7), param: "depth".into(), values: [("a".to_string(), e("12 mm")), ("b".to_string(), e("30 mm"))].into_iter().collect() });
+        let mut large = cfg.defaults();
+        large.0.insert("s".into(), "b".into());
+        let mut shown = cfg.for_editing(&base, &large);
+        assert_eq!(shown.params.get("depth"), Some(&e("30 mm")));
+        shown.params.set("depth", e("35 mm"));
+        cfg.store_edit(&base, &mut shown, &large);
+        assert_eq!(cfg.configured[0].values.get("b"), Some(&e("35 mm")));
+        assert_eq!(cfg.configured[0].values.get("a"), Some(&e("12 mm")));
+        assert_eq!(shown.params.get("depth"), Some(&e("12 mm")));
     }
 }

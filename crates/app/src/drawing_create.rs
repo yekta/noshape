@@ -375,7 +375,7 @@ impl Render for CreateDrawingDialog {
                 .gap_1()
                 .rounded(px(4.))
                 .text_size(px(12.))
-                .bg(if on { gpui_kit::rgb(0x9ccef0).into() } else { pal.panel_hover })
+                .bg(if on { gpui_kit::rgb(0x9ccef0) } else { pal.panel_hover })
                 .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
                 .when(!enabled, |d| d.opacity(0.5))
                 .child(crate::assets::icon(&crate::assets::icon_path(icon), 40., cx))

@@ -35,6 +35,9 @@ const HIDDEN: u32 = 4u;
 const ACCENT: u32 = 8u;
 const ERROR: u32 = 16u;
 const DIM: u32 = 32u;
+const QUERY: u32 = 64u;
+// Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
+const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     let lo = c / 12.92;
@@ -69,6 +72,7 @@ fn highlight(base: vec3<f32>, st: u32) -> vec3<f32> {
     if ((st & ACCENT) != 0u) { c = mix(c, g.accent.rgb, 0.55); }
     if ((st & SELECTED) != 0u) { c = mix(c, g.select.rgb, 0.7); }
     if ((st & HOVER) != 0u) { c = mix(c, g.hover.rgb, 0.55); }
+    if ((st & QUERY) != 0u) { c = mix(c, QUERY_COLOR, 0.7); }
     return c;
 }
 
@@ -80,12 +84,14 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
     if ((st & ACCENT) != 0u) { c = mix(c, g.accent.rgb, 0.55); }
     if ((st & SELECTED) != 0u) { c = g.select.rgb; }
     if ((st & HOVER) != 0u) { c = g.hover.rgb; }
+    if ((st & QUERY) != 0u) { c = QUERY_COLOR; }
     return c;
 }
 
-// A selected face or part (Onshape, live: the top face of a box reads
-// `#e4b049`): amber with half of the usual light contrast.
-const FACE_SELECTED: vec3<f32> = vec3<f32>(0.80, 0.444, 0.07);
+// A selected face or part, with half of the usual light contrast. Fitted
+// so the top face under a default plane reads `#e4b049` like live
+// (selection/04); alone it is about `#e9a100`.
+const FACE_SELECTED: vec3<f32> = vec3<f32>(0.78, 0.345, 0.0);
 
 // ---------------------------------------------------------------- background
 
@@ -234,7 +240,7 @@ fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut
     if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
     var col = shade(c, normal, true, own);
     // Hatching: thin diagonal lines (Onshape draws the cut in the part color, hatched).
-    let k = (i.pos.x + i.pos.y) / (9.0 * g.viewport.z);
+    let k = (i.pos.x + i.pos.y) / (12.0 * g.viewport.z);
     if (fract(k) < 0.13) { col = col * 0.45; }
     o.color = vec4(col, 1.0);
     return o;
@@ -412,4 +418,66 @@ fn fs_point_pick(i: PointOut) -> @location(0) u32 {
     if (dot(i.uv, i.uv) > 1.0 || clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
+}
+
+// ---------------------------------------------------------------- images
+
+// Textured quads (sketch images). Group 2 is bound only by the image
+// pipelines. Never drawn into the pick buffer.
+@group(2) @binding(0) var image_tex: texture_2d<f32>;
+@group(2) @binding(1) var image_sampler: sampler;
+
+struct ImageIn {
+    @location(0) pos: vec3<f32>,
+    @location(1) uv: vec2<f32>,
+};
+
+struct ImageOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) world: vec3<f32>,
+    @location(1) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_image(v: ImageIn) -> ImageOut {
+    var o: ImageOut;
+    let w = inst.model * vec4(v.pos, 1.0);
+    o.world = w.xyz;
+    o.pos = g.view_proj * w;
+    o.uv = v.uv;
+    return o;
+}
+
+// The texture is sRGB (samples are linear like the instance color) with
+// premultiplied alpha; so is the result (premultiplied blending).
+fn image_color(i: ImageOut) -> vec4<f32> {
+    let t = textureSample(image_tex, image_sampler, i.uv);
+    if (clipped(i.world)) { discard; }
+    let a = inst.color.a;
+    return vec4(t.rgb * inst.color.rgb * a, t.a * a);
+}
+
+// Opaque instances draw twice: mostly opaque texels first, writing depth...
+@fragment
+fn fs_image_opaque(i: ImageOut) -> @location(0) vec4<f32> {
+    let c = image_color(i);
+    if (c.a < 0.5) { discard; }
+    return c;
+}
+
+// ...then the soft (anti-aliased / translucent) texels, blended without
+// writing depth.
+@fragment
+fn fs_image_soft(i: ImageOut) -> @location(0) vec4<f32> {
+    let c = image_color(i);
+    if (c.a >= 0.5 || c.a <= 0.0) { discard; }
+    return c;
+}
+
+// Faded instances (instance alpha < 1): all texels blended, no depth write.
+@fragment
+fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
+    let c = image_color(i);
+    if (c.a <= 0.0) { discard; }
+    return c;
 }

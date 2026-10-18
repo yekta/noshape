@@ -8,6 +8,7 @@ use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -18,12 +19,13 @@ use noshape_model::drawing::views::{self, SourceKey};
 use noshape_model::drawing::*;
 
 /// Insert view panel settings (kept between inserts, like Onshape).
-#[derive(Clone, Debug)]
 pub struct InsertViewState {
     /// View scale (None: the sheet scale).
     pub scale: Option<f64>,
-    /// View simplification (Auto, Absolute, Ratio to studio, Ratio to part).
-    pub simplification: &'static str,
+    /// View simplification of new views and its value field (Absolute /
+    /// Ratio to studio / Ratio to part).
+    pub simplification: Simplification,
+    pub simp_value: Option<(Entity<InputState>, Subscription)>,
     pub sketch_appearances: bool,
     pub model_annotations: bool,
     /// "Select a part or assembly" chooser: open, and its tab (0 Part
@@ -33,15 +35,72 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: "Auto", sketch_appearances: false, model_annotations: true, chooser: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None }
     }
 }
 
+/// The five View simplification choices, with Onshape-like default values.
+pub fn simplification_choices(cur: Simplification) -> [Simplification; 5] {
+    let keep = |d: Simplification| if std::mem::discriminant(&d) == std::mem::discriminant(&cur) { cur } else { d };
+    [Simplification::None, Simplification::Auto, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01))]
+}
+
+/// The value field text of a simplification ("1 mm", "1 %").
+pub fn simplification_text(s: Simplification, mm: bool) -> String {
+    let trim = |v: f64| {
+        let t = format!("{v:.4}");
+        t.trim_end_matches('0').trim_end_matches('.').to_string()
+    };
+    match s {
+        Simplification::Absolute(m) if mm => format!("{} mm", trim(m * 1000.0)),
+        Simplification::Absolute(m) => format!("{} in", trim(m / 0.0254)),
+        Simplification::RatioToStudio(r) | Simplification::RatioToPart(r) => format!("{} %", trim(r * 100.0)),
+        _ => String::new(),
+    }
+}
+
+/// Parse the value field into `kind` (lengths in the drawing units by default).
+pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Option<Simplification> {
+    match kind {
+        Simplification::Absolute(_) => {
+            let prefs = noshape_units::UnitPrefs { length: if mm { noshape_units::LengthUnit::Millimeter } else { noshape_units::LengthUnit::Inch }, ..Default::default() };
+            let q = noshape_units::evaluate_as(text.trim(), noshape_units::Dim::LENGTH, &prefs, &noshape_units::EmptyScope).ok()?;
+            (q.value > 0.0).then_some(Simplification::Absolute(q.value))
+        }
+        Simplification::RatioToStudio(_) | Simplification::RatioToPart(_) => {
+            let v: f64 = text.trim().trim_end_matches('%').trim().parse().ok()?;
+            let r = (v / 100.0).max(0.0);
+            Some(if matches!(kind, Simplification::RatioToStudio(_)) { Simplification::RatioToStudio(r) } else { Simplification::RatioToPart(r) })
+        }
+        other => Some(other),
+    }
+}
+
+type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
+
 const ORIENTATIONS: [ViewOrientation; 7] = [ViewOrientation::Top, ViewOrientation::Left, ViewOrientation::Right, ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Bottom, ViewOrientation::Isometric];
 const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
-const SIMPLIFICATIONS: [&str; 4] = ["Auto", "Absolute", "Ratio to studio", "Ratio to part"];
 
 impl DrawingEditor {
+    /// The Insert view panel's simplification value field (made from render).
+    pub fn sync_insert_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let s = self.insert.simplification;
+        let mm = self.drawing.units_mm;
+        if !matches!(self.tool, Tool::InsertView { .. }) || self.insert.simp_value.is_some() || simplification_text(s, mm).is_empty() {
+            return;
+        }
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(simplification_text(s, mm)));
+        let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
+            if matches!(ev, InputEvent::Change)
+                && let Some(n) = parse_simplification(this.insert.simplification, &st.read(cx).value(), this.drawing.units_mm)
+            {
+                this.insert.simplification = n;
+                this.update_preview(cx);
+            }
+        });
+        self.insert.simp_value = Some((st, sub));
+    }
+
     /// Toolbar Insert view / the panel's Insert button: the chooser.
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
@@ -92,7 +151,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let sheet_scale = self.current_sheet().scale;
         let label = |text: &'static str| div().w(px(105.)).flex_none().text_size(px(12.)).text_color(pal.text).child(text);
-        let select = |id: &'static str, current: String, items: Vec<(String, bool, std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>)>| {
+        let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| {
             let ed = ed.clone();
             Button::new(id)
                 .label(current)
@@ -112,7 +171,6 @@ impl DrawingEditor {
                 })
                 .into_any_element()
         };
-        type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
         // Source dropdown: the whole Part Studio or one of its parts.
         let mut src_items: Vec<(String, bool, Act)> = Vec::new();
         let is_asm = matches!(self.doc.read(cx).session.doc.tab(source).map(|t| &t.content), Some(TabContent::Assembly(_)));
@@ -146,14 +204,15 @@ impl DrawingEditor {
             })
             .collect();
         let simp = self.insert.simplification;
-        let simp_items: Vec<(String, bool, Act)> = SIMPLIFICATIONS
-            .iter()
-            .map(|&s| {
+        let simp_items: Vec<(String, bool, Act)> = simplification_choices(simp)
+            .into_iter()
+            .map(|c| {
                 (
-                    s.to_string(),
-                    s == simp,
+                    c.name().to_string(),
+                    std::mem::discriminant(&c) == std::mem::discriminant(&simp),
                     std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
-                        t.insert.simplification = s;
+                        t.insert.simplification = c;
+                        t.insert.simp_value = None;
                         cx.notify();
                     }) as Act,
                 )
@@ -193,7 +252,8 @@ impl DrawingEditor {
                 )
                 .child(row("View orientation", select("div-orient", format!("{orientation:?}"), orient_items)))
                 .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items)))
-                .child(row("View simplification", select("div-simp", simp.to_string(), simp_items)))
+                .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items)))
+                .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
                 .child(
                     div().px(px(6.)).py(px(3.)).child(Checkbox::new("div-sketch-app").label("Show sketch appearances").small().checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.sketch_appearances = *on;

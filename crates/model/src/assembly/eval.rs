@@ -901,12 +901,44 @@ fn hash_of<T: serde::Serialize>(v: &T) -> u64 {
     h.finish()
 }
 
+thread_local! {
+    /// Variables of the assembly being prepared (its inserted Variable
+    /// Studios; subassemblies push their own), for `#name` in mate values.
+    static ASM_VARS: std::cell::RefCell<Vec<std::collections::BTreeMap<String, noshape_units::Quantity>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Pops the assembly's variables when its preparation ends.
+struct AsmVarsGuard;
+
+impl AsmVarsGuard {
+    fn push(doc: &Document, asm: &Assembly) -> Self {
+        let vars = crate::variables::refs_variables(doc, &asm.variable_studios);
+        ASM_VARS.with(|v| v.borrow_mut().push(vars));
+        AsmVarsGuard
+    }
+}
+
+impl Drop for AsmVarsGuard {
+    fn drop(&mut self) {
+        ASM_VARS.with(|v| {
+            v.borrow_mut().pop();
+        });
+    }
+}
+
+fn eval_in(text: &str, dim: Dim, units: &UnitPrefs) -> Option<noshape_units::Quantity> {
+    ASM_VARS.with(|v| match v.borrow().last() {
+        Some(vars) => noshape_units::evaluate_as(text, dim, units, vars).ok(),
+        None => noshape_units::evaluate_as(text, dim, units, &EmptyScope).ok(),
+    })
+}
+
 fn eval_len(e: &Option<ExprValue>, units: &UnitPrefs) -> f64 {
-    e.as_ref().and_then(|e| noshape_units::evaluate_as(&e.text, Dim::LENGTH, units, &EmptyScope).ok()).map(|q| q.value).unwrap_or(0.0)
+    e.as_ref().and_then(|e| eval_in(&e.text, Dim::LENGTH, units)).map(|q| q.value).unwrap_or(0.0)
 }
 
 fn eval_angle(e: &Option<ExprValue>, units: &UnitPrefs) -> f64 {
-    e.as_ref().and_then(|e| noshape_units::evaluate_as(&e.text, Dim::ANGLE, units, &EmptyScope).ok()).map(|q| q.value).unwrap_or(0.0)
+    e.as_ref().and_then(|e| eval_in(&e.text, Dim::ANGLE, units)).map(|q| q.value).unwrap_or(0.0)
 }
 
 fn eval_opt(e: &Option<ExprValue>, dim: Dim, units: &UnitPrefs) -> Option<f64> {
@@ -914,7 +946,7 @@ fn eval_opt(e: &Option<ExprValue>, dim: Dim, units: &UnitPrefs) -> Option<f64> {
     if e.text.trim().is_empty() {
         return None;
     }
-    noshape_units::evaluate_as(&e.text, dim, units, &EmptyScope).ok().map(|q| q.value)
+    eval_in(&e.text, dim, units).map(|q| q.value)
 }
 
 /// Limit key -> solver free value index.
@@ -1466,6 +1498,8 @@ impl AssemblyEvaluator {
     /// Flatten an assembly into leaves (relative to their top-level
     /// instance), list nodes and the prepared solver problem.
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
+        // `#name` in mate values: this assembly's inserted Variable Studios.
+        let _vars = AsmVarsGuard::push(doc, asm);
         let units = doc.settings.units;
         let mut leaves: Vec<LeafInstance> = Vec::new();
         let mut nodes = Vec::new();

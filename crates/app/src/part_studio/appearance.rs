@@ -7,10 +7,11 @@ use super::PartStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::BodyId;
 use noshape_model::partstudio::{Appearance, AppearanceTarget, FaceAppearance, TessQuality};
@@ -395,10 +396,10 @@ impl PartStudioView {
                             this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
                         }
                     }))
-                    .context_menu(move |m, _, _| {
+                    .os_context_menu(move |m, _, _| {
                         let v = view.clone();
                         let b = b2.clone();
-                        m.item(PopupMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.reset_part_appearance(b.clone(), cx))))
+                        m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.reset_part_appearance(b.clone(), cx))))
                     })
                     .into_any_element(),
             );
@@ -425,9 +426,9 @@ impl PartStudioView {
                             this.edit_appearance(target.clone(), w, cx);
                         }
                     }))
-                    .context_menu(move |m, _, _| {
+                    .os_context_menu(move |m, _, _| {
                         let v = view.clone();
-                        m.item(PopupMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.remove_appearance(i, cx))))
+                        m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.remove_appearance(i, cx))))
                     })
                     .into_any_element(),
             );

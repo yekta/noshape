@@ -182,6 +182,18 @@ pub struct SketchResult {
     pub wires: Vec<noshape_sketch::regions::Wire>,
     /// Dimension label texts by constraint id.
     pub dimension_text: BTreeMap<u32, String>,
+    /// Inserted images (Insert image): drawn in their solved boxes.
+    pub images: Vec<SketchResultImage>,
+}
+
+/// An inserted sketch image: its box corner points and encoded file.
+#[derive(Clone, Debug)]
+pub struct SketchResultImage {
+    pub id: u32,
+    /// Box corner point entities: lower-left, lower-right, upper-right, upper-left.
+    pub box_points: Vec<u32>,
+    /// PNG / JPEG / GIF / BMP bytes, base64 encoded.
+    pub data_base64: Arc<str>,
 }
 
 #[derive(Clone, Debug)]

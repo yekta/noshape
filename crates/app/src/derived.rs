@@ -171,7 +171,7 @@ impl DerivedProvider for DocStudios {
             return None; // circular reference
         }
         let opts = RegenOptions {
-            document_variables: noshape_model::variables::document_variables(&self.doc),
+            document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
             derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
             custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
             ..Default::default()

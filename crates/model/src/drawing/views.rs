@@ -7,7 +7,7 @@
 //! placement maps view coordinates to sheet millimeters (see
 //! [`super::build::ViewPlacement`]); annotations store view coordinates.
 
-use super::{BrokenOut, Crop, Drawing, PointRef, Projection, Sheet, ViewId, ViewKind, ViewOrientation};
+use super::{BrokenOut, Crop, Drawing, PointRef, Projection, Sheet, Simplification, ViewId, ViewKind, ViewOrientation};
 use crate::assembly::eval::{AssemblyEvaluator, AssemblyResult, SolveOptions};
 use crate::configuration::ConfigValues;
 use crate::display::BodyKind;
@@ -461,6 +461,16 @@ pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
 }
 
 /// The frame of any view on a sheet (follows the parent chain).
+/// The standard orthographic orientation a view looks along, if any
+/// (Onshape names projected views "Right", "Top"... by it).
+pub fn standard_orientation(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Option<ViewOrientation> {
+    let f = view_frame(drawing, sheet, id)?;
+    let dir = f.dir.normalize_or_zero();
+    [ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Top, ViewOrientation::Bottom, ViewOrientation::Left, ViewOrientation::Right]
+        .into_iter()
+        .find(|o| orientation_frame(*o).dir.normalize().dot(dir) > 1.0 - 1e-9)
+}
+
 pub fn view_frame(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Option<ViewFrame> {
     view_frame_depth(drawing, sheet, id, 0)
 }
@@ -1034,6 +1044,10 @@ fn bodies_diagonal(bodies: &[&Arc<Body>]) -> f64 {
 /// Resolve a point reference: projected position and, for circle centers,
 /// the radius.
 pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<([f64; 2], Option<f64>)> {
+    if let PointRef::Quadrant { k, .. } = r {
+        let (c, radius) = resolve_point3(ctx, r)?;
+        return Some((quadrant_of(frame.project(c), radius?, *k), None));
+    }
     match r {
         PointRef::Vertex { body, name } => {
             let b = ctx.body(body)?;
@@ -1049,7 +1063,14 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
                 _ => None,
             }
         }
+        PointRef::Midpoint { .. } | PointRef::Quadrant { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
     }
+}
+
+/// A quadrant point of a projected circle (0 right, 1 top, 2 left, 3 bottom).
+fn quadrant_of(c: [f64; 2], radius: f64, k: u8) -> [f64; 2] {
+    let a = f64::from(k % 4) * std::f64::consts::FRAC_PI_2;
+    [c[0] + radius * a.cos(), c[1] + radius * a.sin()]
 }
 
 /// Model position of a point reference (and, for circle centers, the radius).
@@ -1060,13 +1081,21 @@ pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>
             let i = *b.find_vertices(name).first()?;
             Some((b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok()?, None))
         }
-        PointRef::Center { body, name } => {
+        // Quadrants resolve to the circle (center, radius); views offset them.
+        PointRef::Center { body, name } | PointRef::Quadrant { body, name, .. } => {
             let b = ctx.body(body)?;
             let i = *b.find_edges(name).first()?;
             match b.shape.sub_shape(ShapeType::Edge, i).ok()?.edge_curve().ok()? {
                 Curve::Circle { center, radius, .. } => Some((center, Some(radius))),
                 _ => None,
             }
+        }
+        PointRef::Midpoint { body, name } => {
+            let b = ctx.body(body)?;
+            let i = *b.find_edges(name).first()?;
+            let e = b.shape.sub_shape(ShapeType::Edge, i).ok()?;
+            let info = e.edge_info().ok()?;
+            Some((e.point_at((info.first_param + info.last_param) * 0.5).ok()?, None))
         }
     }
 }
@@ -1080,6 +1109,9 @@ pub fn resolve_in_view(ctx: &Context, g: &ViewGeometry, r: &PointRef) -> Option<
         Some(m) => m.map(p),
         None => p,
     };
+    if let PointRef::Quadrant { k, .. } = r {
+        return Some((quadrant_of(frame.project(p), radius?, *k), None));
+    }
     Some((frame.project(p), radius))
 }
 
@@ -1187,6 +1219,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
         _ => 0u8.hash(&mut h),
     }
     v.partial.hash(&mut h);
+    format!("{:?}", view_simplification(sheet, id)).hash(&mut h);
     for b in &v.broken_out {
         b.spline.hash(&mut h);
         fx(b.depth, &mut h);
@@ -1227,7 +1260,8 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     let v = sheet.view(id).expect("view exists (key computed)");
     let frame = view_frame(drawing, sheet, id).expect("frame exists (key computed)");
     let (skey, part) = view_source(sheet, id).expect("source exists (key computed)");
-    let ctx = sources.get(&skey).expect("source exists (key computed)").context.clone();
+    let simplification = view_simplification(sheet, id);
+    let ctx = simplify_context(sources.get(&skey).expect("source exists (key computed)").context.clone(), part.as_ref(), simplification);
     let mut g = match &v.kind {
         ViewKind::Detail { parent, center, radius, .. } => {
             let pg = compute_view(drawing, sheet, *parent, sources, cache, exact);
@@ -1246,6 +1280,9 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
         _ if !v.broken_out.is_empty() => broken_out_geometry(id, &ctx, part.as_ref(), &frame, &v.broken_out, exact),
         _ => projected_geometry(id, &ctx, part.as_ref(), &frame, exact),
     };
+    if !matches!(v.kind, ViewKind::Detail { .. }) {
+        simplify_edges(&mut g, &ctx, part.as_ref(), simplification);
+    }
     if let Some(crop) = &v.crop {
         // Spline crops are clipped as their sampled outline.
         let crop = match crop_polygon(crop) {
@@ -1257,6 +1294,70 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     let g = Arc::new(g);
     cache.put(key, g.clone());
     g
+}
+
+/// A view's simplification: its own, else its parent's (Auto at the root).
+pub fn view_simplification(sheet: &Sheet, id: ViewId) -> Simplification {
+    let mut cur = id;
+    for _ in 0..32 {
+        match sheet.view(cur) {
+            Some(v) if v.simplification.is_some() => return v.simplification.expect("checked"),
+            Some(_) => match sheet.parent_of(cur) {
+                Some(p) => cur = p,
+                None => break,
+            },
+            None => break,
+        }
+    }
+    Simplification::Auto
+}
+
+/// Auto: leave out parts below 0.1% of the source size (dust, tiny
+/// fasteners in big assemblies); detail inside parts is kept.
+const AUTO_PART_RATIO: f64 = 0.001;
+
+fn body_diagonal(b: &Body) -> f64 {
+    b.shape.bounding_box(false).map(|bb| bb.diagonal()).unwrap_or(0.0)
+}
+
+/// Leave out whole parts below the threshold (Absolute, Ratio to studio, Auto).
+fn simplify_context(ctx: Arc<Context>, part: Option<&BodyId>, s: Simplification) -> Arc<Context> {
+    let studio = bodies_diagonal(&view_bodies(&ctx, part));
+    let min = match s {
+        Simplification::Absolute(v) => v,
+        Simplification::RatioToStudio(r) => r * studio,
+        Simplification::Auto => AUTO_PART_RATIO * studio,
+        Simplification::None | Simplification::RatioToPart(_) => return ctx,
+    };
+    if min <= 0.0 || ctx.bodies.iter().all(|b| b.kind != BodyKind::Solid || body_diagonal(b) >= min) {
+        return ctx;
+    }
+    let mut c = (*ctx).clone();
+    c.bodies.retain(|b| b.kind != BodyKind::Solid || body_diagonal(b) >= min);
+    Arc::new(c)
+}
+
+/// Leave out edges (detail) shorter than the threshold: Absolute and Ratio
+/// to studio use one length, Ratio to part a fraction of each part's size.
+fn simplify_edges(g: &mut ViewGeometry, ctx: &Context, part: Option<&BodyId>, s: Simplification) {
+    let studio = bodies_diagonal(&view_bodies(ctx, part));
+    let per_part: HashMap<BodyId, f64> = match s {
+        Simplification::RatioToPart(r) => ctx.bodies.iter().map(|b| (b.id.clone(), r * body_diagonal(b))).collect(),
+        _ => HashMap::new(),
+    };
+    let fixed = match s {
+        Simplification::Absolute(v) => v,
+        Simplification::RatioToStudio(r) => r * studio,
+        Simplification::RatioToPart(_) => 0.0,
+        Simplification::None | Simplification::Auto => return,
+    };
+    let model_edges = &g.model_edges;
+    let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt()).sum::<f64>();
+    g.edges.retain(|e| {
+        let min = e.model.and_then(|m| model_edges.get(m as usize)).and_then(|me| per_part.get(&me.body).copied()).unwrap_or(fixed);
+        min <= 0.0 || len(&e.points) >= min
+    });
+    g.update_bounds();
 }
 
 /// Restrict a view's geometry to a crop boundary.
@@ -1652,7 +1753,7 @@ fn section_segments_of(faces: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]>
     out
 }
 
-fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, exact: bool) -> ViewGeometry {
+fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, _exact: bool) -> ViewGeometry {
     let partial = cut.partial;
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
@@ -1667,7 +1768,10 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
     let plane = Plane::new(p0, sight, along);
     let full = cut.points.len() == 2 && !partial;
     let tol = diag * 1e-7;
-    let mut g = project_bodies(id, &pbs, frame, exact, &|_, p| !full || plane.signed_distance(p) >= -tol);
+    // Cut solids always use the exact HLR: OCCT's polygonal HLR
+    // (HLRBRep_PolyAlgo::InsertOnOutLine) segfaults on some cuts, e.g.
+    // through a cylinder axis. A cut is computed once; dragging only moves it.
+    let mut g = project_bodies(id, &pbs, frame, true, &|_, p| !full || plane.signed_distance(p) >= -tol);
     if g.error.is_none() {
         g.error = error;
     }
@@ -1781,7 +1885,8 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
         let leg = if revolved.get(bi).copied().unwrap_or(false) { -ua } else { ua };
         d.dot(leg) >= -tol && d.dot(n * s) <= tol
     };
-    let mut g = project_bodies(id, &pbs, frame, exact, &keep);
+    // Exact HLR on cut solids (see `section_geometry`).
+    let mut g = project_bodies(id, &pbs, frame, true, &keep);
     if g.error.is_none() {
         g.error = error.or(err2);
     }
@@ -1866,7 +1971,8 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: 
     // Vertices removed by a pocket are no snap points.
     let tol = diag * 1e-7;
     let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor)| p.dot(frame.dir) < floor - tol && point_in_polygon(frame.project(p), poly));
-    let mut g = project_bodies(id, &pbs, frame, exact, &keep);
+    // Exact HLR on cut solids (see `section_geometry`).
+    let mut g = project_bodies(id, &pbs, frame, true, &keep);
     if g.error.is_none() {
         g.error = error.or(err2);
     }

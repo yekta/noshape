@@ -37,7 +37,7 @@ mod tests;
 
 pub use document::{
     BranchInfo, DEFAULT_BRANCH_NAME, Document, DocumentMeta, MergeOutcome, MicroversionInfo,
-    StoreStats, Timestamp, VersionGraph, VersionInfo, local_user_name,
+    StoreStats, Timestamp, VersionGraph, VersionInfo, local_user_name, os_login, os_user_name, set_default_author,
 };
 pub use error::{Result, StoreError};
 pub use ids::{BlobHash, BranchId, MicroversionId, VersionId};

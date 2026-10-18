@@ -627,7 +627,7 @@ impl Render for MateDialog {
                             .h(px(30.))
                             .gap(px(4.))
                             .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", self.flip_primary).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
-                            .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", self.reorient % 4 != 0).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
                                 cx.notify();

@@ -124,6 +124,15 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         };
         d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, hidden });
     }
+    // Renamed default planes and planes sized with "Size to Part Studio".
+    for p in &mut d.planes {
+        if let Some((_, n)) = studio.default_names.iter().find(|(r, _)| *r == p.reference) {
+            p.name = n.clone();
+        }
+        if let Some((_, w, h)) = studio.plane_sizes.iter().find(|(r, ..)| *r == p.reference) {
+            (p.half_width, p.half_height) = (*w, *h);
+        }
+    }
     d.show_origin = !studio.hidden_defaults.contains(&Reference::Origin);
     for c in &ctx.connectors {
         if c.reference.depends_on().and_then(|f| studio.feature(f)).is_some_and(|f| f.hidden) {
@@ -210,5 +219,32 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         });
     }
     let dof = s.report.dof.unwrap_or(0);
-    SketchDisplay { feature: s.feature, name: s.name.clone(), frame, curves, points, regions, dimensions: Vec::new(), glyphs: Vec::new(), hidden: false, dof, color: None }
+    let images = s
+        .images
+        .iter()
+        .filter_map(|i| {
+            let pts: Vec<[f32; 3]> = i.box_points.iter().filter_map(|p| s.sketch.point(noshape_sketch::EntityId(*p))).map(|p| f3(frame.to_world(p))).collect();
+            let corners: [[f32; 3]; 4] = pts.try_into().ok()?;
+            Some(crate::display::SketchImageDisplay { id: i.id, corners, data_base64: i.data_base64.clone() })
+        })
+        .collect();
+    SketchDisplay { feature: s.feature, name: s.name.clone(), frame, curves, points, regions, dimensions: Vec::new(), glyphs: Vec::new(), hidden: false, dof, color: None, images }
+}
+
+#[cfg(test)]
+mod plane_override_tests {
+    use crate::reference::{DatumPlane, Reference};
+    use crate::regen::{RegenOptions, Regenerator};
+
+    #[test]
+    fn renamed_and_resized_default_planes() {
+        let mut ps = crate::partstudio::PartStudio::new();
+        let top = Reference::Plane(DatumPlane::Top);
+        ps.default_names.push((top.clone(), "Base".into()));
+        ps.plane_sizes.push((top.clone(), 0.2, 0.1));
+        let res = Regenerator::new().regenerate(&ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default());
+        let pl = res.display.planes.iter().find(|p| p.reference == top).expect("top plane");
+        assert_eq!(pl.name, "Base");
+        assert_eq!((pl.half_width, pl.half_height), (0.2, 0.1));
+    }
 }

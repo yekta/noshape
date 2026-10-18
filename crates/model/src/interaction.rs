@@ -439,6 +439,36 @@ fn ray_segment(o: DVec3, d: DVec3, a: DVec3, b: DVec3) -> (f64, f64) {
     (p1.distance(p2), s)
 }
 
+/// Name a feature shows in the list and its dialog title: Onshape shows a
+/// Variable as "#name = value" ("#?" until it is named) unless renamed.
+pub fn display_name(f: &Feature) -> String {
+    if f.type_id != "assignVariable" || f.custom_name {
+        return f.name.clone();
+    }
+    let name = f.params.text("name");
+    let value = match f.params.get("variableType") {
+        Some(ParamValue::Enum(k)) if k == "ANGLE" => f.params.expr("angleValue").map(|e| e.text.clone()),
+        Some(ParamValue::Enum(k)) if k == "NUMBER" => f.params.expr("numberValue").map(|e| e.text.clone()),
+        Some(ParamValue::Enum(k)) if k == "ANY" => Some(f.params.text("anyValue").to_string()),
+        _ => f.params.expr("lengthValue").map(|e| e.text.clone()),
+    }
+    .unwrap_or_default();
+    format!("#{} = {}", if name.trim().is_empty() { "?" } else { name.trim() }, value.trim())
+}
+
+/// Features whose selections reference `r` (Show dependencies of a default
+/// plane or the origin).
+pub fn features_using(features: &[Feature], r: &Reference) -> Vec<FeatureId> {
+    fn uses(values: &ParamValues, r: &Reference) -> bool {
+        values.0.values().any(|v| match v {
+            ParamValue::Query(refs) => refs.contains(r),
+            ParamValue::Array(items) => items.iter().any(|i| uses(i, r)),
+            _ => false,
+        })
+    }
+    features.iter().filter(|f| uses(&f.params, r)).map(|f| f.id).collect()
+}
+
 /// The sketch a feature was built from (Onshape's "Edit Sketch 1…" entry
 /// for an extrude, revolve…): the first sketch its selections reference.
 pub fn source_sketch(features: &[Feature], f: &Feature) -> Option<FeatureId> {
@@ -696,5 +726,26 @@ mod tests {
         let ps = studio();
         assert_eq!(source_sketch(&ps.features, &ps.features[2]), Some(FeatureId(1001)));
         assert_eq!(source_sketch(&ps.features, &ps.features[3]), None);
+    }
+
+    #[test]
+    fn features_using_a_plane() {
+        let mut ps = studio();
+        ps.features[0].params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(crate::reference::DatumPlane::Top)]));
+        assert_eq!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Top)), vec![FeatureId(1001)]);
+        assert!(features_using(&ps.features, &Reference::Plane(crate::reference::DatumPlane::Front)).is_empty());
+    }
+
+    #[test]
+    fn variables_show_their_assignment() {
+        let mut ps = studio();
+        assert_eq!(display_name(&ps.features[2]), "Extrude 1");
+        let v = &mut ps.features[1];
+        v.params.set("lengthValue", ParamValue::Expr(noshape_units::ExprValue::new("25 mm")));
+        assert_eq!(display_name(v), "#d = 25 mm");
+        v.params.set("name", ParamValue::Text(String::new()));
+        assert_eq!(display_name(v), "#? = 25 mm");
+        v.custom_name = true;
+        assert_eq!(display_name(v), "Variable 1");
     }
 }

@@ -65,7 +65,7 @@ impl Job {
 
 /// Isometric camera framing the box tightly (projected extents, not the
 /// bounding sphere, so flat parts fill the thumbnail).
-fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
+pub(crate) fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
     let mut camera = Camera::default();
     let (right, up) = (camera.right(), camera.up());
     let center = (lo + hi) * 0.5;
@@ -86,7 +86,7 @@ fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
 }
 
 /// Thumbnail look: Onshape's white document thumbnails.
-fn thumbnail_style() -> Style {
+pub(crate) fn thumbnail_style() -> Style {
     Style {
         background_top: crate::theme::lin(0xffffff),
         background_bottom: crate::theme::lin(0xffffff),
@@ -170,15 +170,15 @@ impl Thumbnailer {
             return None;
         }
         let doc = &session.doc;
-        let studio = doc.ordered_tabs().iter().find_map(|t| match &t.content {
-            TabContent::PartStudio(ps) => Some(ps.clone()),
+        let (tab, studio) = doc.ordered_tabs().iter().find_map(|t| match &t.content {
+            TabContent::PartStudio(ps) => Some((t.id, ps.clone())),
             _ => None,
         })?;
         Some(Job {
             config: studio.configuration.defaults(),
             studio,
             units: doc.settings.units,
-            doc_vars: noshape_model::variables::document_variables(doc),
+            doc_vars: noshape_model::variables::element_variables(doc, tab),
             engine: self.engine.clone(),
             gpu: self.gpu.clone(),
         })

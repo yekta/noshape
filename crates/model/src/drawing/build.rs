@@ -551,9 +551,7 @@ impl AnnotationEnv for Env<'_> {
             let view = a.kind.view()?;
             let (key, _) = views::view_source(self.sheet, view)?;
             let src = self.sources.get(&key)?;
-            let body = a.refs.iter().find(|r| r.slot == 0).map(|r| match &r.point {
-                super::PointRef::Vertex { body, .. } | super::PointRef::Center { body, .. } => body.clone(),
-            })?;
+            let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone())?;
             src.bom_item(&body)
         })();
         item.map(|i| i.to_string()).unwrap_or_else(|| "?".into())

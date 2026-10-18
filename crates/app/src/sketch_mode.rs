@@ -359,6 +359,39 @@ pub struct GlyphInfo {
     pub external: bool,
 }
 
+/// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
+/// not solver constraints but the entity's link in `SketchData::external_refs`.
+const USE_GLYPH_BASE: u32 = 0xC000_0000;
+
+/// The glyph id of an entity's Use link.
+pub fn use_glyph_id(e: EntityId) -> ConstraintId {
+    ConstraintId(USE_GLYPH_BASE | e.0)
+}
+
+/// The used entity of a Use-link glyph id.
+pub fn use_glyph_entity(c: ConstraintId) -> Option<EntityId> {
+    (c.0 & USE_GLYPH_BASE == USE_GLYPH_BASE).then_some(EntityId(c.0 & !USE_GLYPH_BASE))
+}
+
+/// Deleting a Use glyph unlinks the geometry: it stays as regular, free
+/// sketch geometry no longer following the model (Onshape).
+fn unlink_used(data: &mut SketchData, e: EntityId) -> bool {
+    if data.external_refs.remove(&e.0).is_none() {
+        return false;
+    }
+    let mut ids = vec![e];
+    if let Some((a, b)) = data.sketch.endpoints(e) {
+        ids.extend([a, b]);
+    }
+    if let Some(c) = data.sketch.entity(e).and_then(|x| x.center()) {
+        ids.push(c);
+    }
+    for id in ids {
+        let _ = data.sketch.set_external(id, false);
+    }
+    true
+}
+
 /// Key of a moved constraint glyph in [`SketchData::glyph_offsets`].
 pub fn glyph_key(c: ConstraintId, e: EntityId) -> String {
     format!("{}:{}", c.0, e.0)
@@ -538,9 +571,10 @@ fn is_angle_kind(k: &ConstraintKind) -> bool {
     matches!(k, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. })
 }
 
-/// Last Show constraints setting (the Sketch dialog remembers its options;
-/// live Onshape starts with it on, sketch/00).
-static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+/// Last Show constraints setting (the Sketch dialog remembers its options).
+/// Live Onshape starts with it off and then shows no constraint glyphs
+/// (sketch/00, 01, 10).
+static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Inference guide lines and snap markers (`INFERENCE_SNAP_LINE_COLOR`).
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
@@ -633,7 +667,7 @@ fn truncate_chars(t: &str, n: usize) -> String {
 /// Factor between a dimension's stored value and the value shown / typed:
 /// ellipse axes are shown as diameters (Onshape's major / minor diameter).
 pub fn dim_display_scale(k: &ConstraintKind) -> f64 {
-    if matches!(k, ConstraintKind::EllipseRadius { .. }) { 2.0 } else { 1.0 }
+    k.display_scale()
 }
 
 /// Value used by in-place editing, in the same units and scale as its label.
@@ -2222,6 +2256,46 @@ impl SketchEditor {
         }
     }
 
+    /// One-line measurement of the sketch selection for the status area at
+    /// the bottom right (live Onshape: `Length: 1.003 in`, `Diameter: 0.401
+    /// in`, `Angle: 35.538 deg`, `Parallel dist: …`, `Point: X … Y … Z …`).
+    /// Returns (label, value); `None` for an empty or mixed selection.
+    pub fn selection_readout(&self, data: &SketchData, units: &UnitPrefs) -> Option<(String, String)> {
+        let sk = &data.sketch;
+        let len = |v: f64| noshape_units::format_quantity(Quantity::new(v, Dim::LENGTH), units);
+        let sel: Vec<EntityId> = self.selection.iter().copied().filter(|e| sk.entity(*e).is_some()).collect();
+        match sel.as_slice() {
+            [e] => {
+                if let Some(p) = sk.point(*e) {
+                    let w = self.frame.to_world(p);
+                    return Some(("Point".into(), format!("X {}  Y {}  Z {}", len(w.x), len(w.y), len(w.z))));
+                }
+                match sk.curve(*e)? {
+                    Curve2::Line { a, b } => Some(("Length".into(), len((b - a).length()))),
+                    Curve2::Circle { radius, .. } => Some(("Diameter".into(), len(radius * 2.0))),
+                    Curve2::Arc { radius, .. } => Some(("Radius".into(), len(radius))),
+                    c => Some(("Length".into(), len(c.length()))),
+                }
+            }
+            [a, b] => {
+                if let (Some(p), Some(q)) = (sk.point(*a), sk.point(*b)) {
+                    return Some(("Distance".into(), len((q - p).length())));
+                }
+                let (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 })) = (sk.curve(*a), sk.curve(*b)) else { return None };
+                let (u, v) = ((a1 - a0).try_normalize()?, (b1 - b0).try_normalize()?);
+                if u.perp_dot(v).abs() < 1e-9 {
+                    Some(("Parallel dist".into(), len((b0 - a0).perp_dot(u).abs())))
+                } else {
+                    let ang = u.dot(v).clamp(-1.0, 1.0).acos();
+                    let ang = ang.min(PI - ang);
+                    let text = noshape_units::format_quantity(Quantity::new(ang, Dim::ANGLE), units).replace('°', " deg");
+                    Some(("Angle".into(), text))
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Open an existing text in the Text dialog with its content and style.
     pub fn begin_text_edit(&mut self, data: &SketchData, id: u32) -> bool {
         let Some(t) = data.texts.iter().find(|t| t.id == id) else { return false };
@@ -2398,7 +2472,7 @@ impl SketchEditor {
         let text = text.trim().trim_start_matches('=').trim();
         let dim = dim_unit(&f.kind);
         let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
-        let expr = (is_expression(text) && f.scale == 1.0).then_some(text);
+        let expr = is_expression(text).then_some(text);
         self.commit_otf_value(data, o, f, q.value, expr)
     }
 
@@ -3282,12 +3356,8 @@ impl SketchEditor {
         } else {
             data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
             // Plain numbers are stored as literals; expressions keep their text
-            // (the regeneration re-evaluates them, so only unscaled values).
-            if dim_display_scale(&c.kind) == 1.0 {
-                data.dimension_exprs.insert(cid.0, ExprValue::new(text));
-            } else {
-                data.dimension_exprs.remove(&cid.0);
-            }
+            // in the shown scale (regeneration divides by `display_scale`).
+            data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
         let report = data.sketch.solve();
         if !report.is_solved() {
@@ -3360,6 +3430,24 @@ impl SketchEditor {
                 out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e), offset, external });
             }
         }
+        // Use links: the use glyph on the projected entity and at its ends
+        // (live sketch/202).
+        for k in data.external_refs.keys() {
+            let e = EntityId(*k);
+            if sk.entity(e).is_none() || noshape_sketch::text::glyph_text_id(e).is_some() {
+                continue;
+            }
+            let cid = use_glyph_id(e);
+            let mut at: Vec<EntityId> = vec![e];
+            if let Some((a, b)) = sk.endpoints(e).filter(|(a, b)| a != b) {
+                at.extend([a, b]);
+            }
+            for g in at {
+                let Some(anchor) = glyph_anchor(sk, g) else { continue };
+                let offset = data.glyph_offsets.get(&glyph_key(cid, g)).map(|o| DVec2::new(o[0], o[1]));
+                out.push(GlyphInfo { constraint: cid, icon: "use", entity: g, anchor, on_point: is_point(sk, g), offset, external: true });
+            }
+        }
         out
     }
 
@@ -3394,6 +3482,10 @@ impl SketchEditor {
     pub fn delete_selection(&mut self, data: &mut SketchData) -> bool {
         let mut changed = false;
         for c in self.selected_constraints.drain(..) {
+            if let Some(e) = use_glyph_entity(c) {
+                changed |= unlink_used(data, e);
+                continue;
+            }
             if data.sketch.remove_constraint(c).is_ok() {
                 data.dimension_exprs.remove(&c.0);
                 data.dimension_labels.remove(&c.0);
@@ -3428,6 +3520,13 @@ impl SketchEditor {
         self.selected_constraints.retain(|c| *c != cid);
         if self.hover_constraint == Some(cid) {
             self.hover_constraint = None;
+        }
+        if let Some(e) = use_glyph_entity(cid) {
+            if !unlink_used(data, e) {
+                return false;
+            }
+            data.sketch.solve();
+            return true;
         }
         if data.sketch.remove_constraint(cid).is_err() {
             return false;
@@ -4005,7 +4104,9 @@ impl SketchEditor {
         v.extend(self.mirror_axis);
         if let Some(data) = data {
             for cid in self.selected_constraints.iter().chain(self.hover_constraint.iter()) {
-                if let Some(c) = data.sketch.constraint(*cid) {
+                if let Some(e) = use_glyph_entity(*cid) {
+                    v.push(e);
+                } else if let Some(c) = data.sketch.constraint(*cid) {
                     v.extend(c.kind.entities());
                 }
             }
@@ -4473,7 +4574,8 @@ fn arrow(out: &mut Vec<[DVec2; 2]>, tip: DVec2, dir: DVec2, s: f64) {
 
 /// Screen width of a dimension value at 14 px (Roboto, digits ~7.6 px).
 pub fn label_width_px(text: &str) -> f64 {
-    text.chars().count() as f64 * 7.6 + 4.0
+    // 16 px text (Onshape's dimension values).
+    text.chars().count() as f64 * 8.7 + 4.0
 }
 
 /// The parts of a segment outside an axis-aligned box (center, half size).
@@ -5264,6 +5366,50 @@ mod tests {
     }
 
     #[test]
+    fn selection_readout_matches_the_live_status_line() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let u = UnitPrefs::default();
+        let l1 = d.sketch.add_line(v(0.0, 0.0), v(0.02, 0.0));
+        let l2 = d.sketch.add_line(v(0.0, 0.01), v(0.03, 0.01));
+        let l3 = d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.01));
+        let c = d.sketch.add_circle(v(0.05, 0.05), 0.005);
+        let p = d.sketch.add_point(v(0.01, 0.02));
+        let readout = |ed: &SketchEditor, sel: &[EntityId]| {
+            let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
+            ed2.selection = sel.to_vec();
+            ed2.selection_readout(&d, &u).map(|(l, v)| format!("{l}: {v}"))
+        };
+        assert_eq!(readout(&ed, &[l1]).as_deref(), Some("Length: 20 mm"));
+        assert_eq!(readout(&ed, &[c]).as_deref(), Some("Diameter: 10 mm"));
+        assert_eq!(readout(&ed, &[l1, l2]).as_deref(), Some("Parallel dist: 10 mm"));
+        assert!(readout(&ed, &[l1, l3]).is_some_and(|t| t.starts_with("Angle: 45") && t.ends_with(" deg")));
+        assert!(readout(&ed, &[p]).is_some_and(|t| t.starts_with("Point: X 10 mm")), "{:?}", readout(&ed, &[p]));
+        assert_eq!(readout(&ed, &[l1, l2, c]), None, "mixed selection shows nothing");
+        ed.selection.clear();
+        assert_eq!(ed.selection_readout(&d, &u), None);
+        let _ = &mut d;
+    }
+
+    #[test]
+    fn used_geometry_shows_use_glyphs_and_deleting_one_unlinks_it() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let r = d.sketch.use_external(&noshape_sketch::Curve2::Line { a: v(0.0, 0.0), b: v(0.02, 0.0) }).unwrap();
+        let line = *r.created.last().unwrap();
+        d.external_refs.insert(line.0, noshape_model::reference::Reference::Plane(noshape_model::reference::DatumPlane::Top));
+        let glyphs: Vec<GlyphInfo> = ed.constraint_glyphs(&d).into_iter().filter(|g| g.icon == "use").collect();
+        assert_eq!(glyphs.len(), 3, "middle and both ends");
+        assert!(glyphs.iter().all(|g| g.constraint == use_glyph_id(line)));
+        assert!(d.sketch.entity(line).unwrap().external);
+        ed.hover_constraint = Some(use_glyph_id(line));
+        assert!(ed.picked(Some(&d)).contains(&line), "hovering highlights the used entity");
+        ed.selected_constraints.push(use_glyph_id(line));
+        assert!(ed.delete_selection(&mut d));
+        assert!(d.external_refs.is_empty());
+        assert!(!d.sketch.entity(line).unwrap().external, "unlinked: regular sketch geometry");
+        assert!(ed.constraint_glyphs(&d).iter().all(|g| g.icon != "use"));
+    }
+
+    #[test]
     fn escape_preserves_sketch_selection() {
         let (mut ed, mut data) = editor(Tool::Select);
         let line = data.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
@@ -5390,6 +5536,10 @@ mod tests {
         assert!((inch_value.value - 0.02).abs() < 1e-10);
         ed.apply_dimension(&mut data, cid, &text, &units, &noshape_units::EmptyScope).unwrap();
         assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - 0.01).abs() < 1e-12);
+        // An expression typed into an ellipse diameter is kept (shown scale).
+        ed.apply_dimension(&mut data, cid, "2 * 15 mm", &units, &noshape_units::EmptyScope).unwrap();
+        assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - 0.015).abs() < 1e-12, "radius = diameter / 2");
+        assert_eq!(dimension_edit_text(&data, cid, &units).as_deref(), Some("2 * 15 mm"), "expression survives");
         let conic = data.sketch.add_conic(v(0.05, 0.01), v(0.06, 0.02), v(0.07, 0.01), 0.7).unwrap();
         let rho = data.sketch.add_constraint(ConstraintKind::Rho { conic, value: 0.7 }).unwrap();
         let text = dimension_edit_text(&data, rho, &units).unwrap();

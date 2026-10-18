@@ -10,9 +10,10 @@ use crate::part_studio::PartStudioView;
 use crate::variable_studio::VariableStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::assembly::Assembly;
 use noshape_model::document::{TabContent, TabId};
@@ -132,6 +133,8 @@ impl Workspace {
             self.recent.truncate(16);
         }
         self.active = Some(tab);
+        // Ctrl+Z / Ctrl+Y act on this tab's edits (Onshape).
+        self.doc.update(cx, |d, _| d.session.active_tab = Some(tab));
         if let Some((tm, _)) = &self.tab_manager {
             tm.update(cx, |t, cx| t.set_active(Some(tab), cx));
         }
@@ -175,14 +178,62 @@ impl Workspace {
         }
     }
 
-    fn delete_tab(&mut self, tab: TabId, cx: &mut Context<Self>) {
-        self.doc.update(cx, |doc, cx| {
-            let name = doc.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-            if doc.session.doc.tabs.len() > 1 {
-                doc.edit_document(&format!("Delete tab : {name}"), cx, |d| {
+    /// Onshape: deleting a tab has no confirmation and no toast, and Ctrl+Z
+    /// doesn't bring it back (Versions and history > Restore does). Only
+    /// when other tabs use it does a "Delete tabs" warning ask first.
+    fn delete_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let doc = self.doc.read(cx);
+        if doc.session.doc.tabs.len() <= 1 {
+            return;
+        }
+        let name = doc.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let users: Vec<String> = doc.session.doc.tab_users(tab).into_iter().filter_map(|u| doc.session.doc.tab(u).map(|t| t.name.clone())).collect();
+        let model = self.doc.clone();
+        let ws = cx.entity().downgrade();
+        // Afterwards the keyboard goes back to the active tab (Ctrl+Z etc.).
+        let delete = move |window: &mut Window, cx: &mut App| {
+            model.update(cx, |doc, cx| {
+                doc.edit_document_not_undoable(&format!("Delete tab : {name}"), cx, |d| {
                     d.remove_tab(tab);
                 });
+            });
+            let _ = ws.update(cx, |w, cx| {
+                if let Some(a) = w.active.filter(|a| *a != tab) {
+                    w.activate(a, window, cx);
+                }
+            });
+        };
+        if users.is_empty() {
+            let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_document_not_undoable(&format!("Delete tab : {name}"), cx, |d| {
+                    d.remove_tab(tab);
+                });
+            });
+            if let Some(a) = self.active.filter(|a| *a != tab) {
+                self.activate(a, window, cx);
             }
+            return;
+        }
+        use gpui_kit::component::WindowExt as _;
+        let tab_name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let delete = std::rc::Rc::new(delete);
+        window.open_dialog(cx, move |dialog, _, _| {
+            let delete = delete.clone();
+            dialog
+                .title("Delete tabs")
+                .w(px(420.))
+                .child(div().text_sm().child(format!("Deleting \"{tab_name}\" may cause errors in {} that use it: {}.", if users.len() == 1 { "the tab" } else { "the tabs" }, users.join(", "))))
+                .footer(
+                    gpui_kit::component::dialog::DialogFooter::new()
+                        .gap_2()
+                        .child(gpui_kit::component::dialog::DialogClose::new().child(gpui_kit::component::button::Button::new("cancel").label("Cancel").outline()))
+                        .child(gpui_kit::component::dialog::DialogAction::new().child(gpui_kit::component::button::Button::new("ok").label("Delete").primary())),
+                )
+                .on_ok(move |_, window, cx| {
+                    delete(window, cx);
+                    true
+                })
         });
     }
 
@@ -490,15 +541,15 @@ impl Workspace {
                     .child(div().truncate().child(name))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(id, window, cx)))
-                    .context_menu(move |menu, _, _| {
+                    .os_context_menu(move |menu, _, _| {
                         let v1 = view.clone();
                         let v2 = view.clone();
                         let v3 = view.clone();
-                        let menu = menu.item(PopupMenuItem::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))));
+                        let menu = menu.item(crate::os_menu::OsMenuItem::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))));
                         // Onshape: Part Studio and Assembly tabs offer "Create Drawing of <tab>…".
                         let menu = if matches!(kind, "partstudio" | "assembly") {
                             let n = tab_name.clone();
-                            menu.item(PopupMenuItem::new(format!("Create Drawing of {tab_name}…")).on_click(move |_, w, cx| {
+                            menu.item(crate::os_menu::OsMenuItem::new(format!("Create Drawing of {tab_name}…")).on_click(move |_, w, cx| {
                                 let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default() });
                                 let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
                                 v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
@@ -507,7 +558,7 @@ impl Workspace {
                             menu
                         };
                         menu.separator()
-                            .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.delete_tab(id, cx))))
+                            .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
                     }),
             );
         }

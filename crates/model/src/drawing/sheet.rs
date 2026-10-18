@@ -940,7 +940,7 @@ impl AnnotationEnv for PlainEnv<'_> {
         super::format::dim_text(self.drawing, &a.format, value, angular, symbol)
     }
     fn expand(&self, s: &str) -> String {
-        s.to_string()
+        super::format::text_codes(s)
     }
     fn balloon_text(&self, _: &Annotation, text: &str) -> String {
         text.to_string()

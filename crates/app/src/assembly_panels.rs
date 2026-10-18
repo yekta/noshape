@@ -452,7 +452,7 @@ impl AssemblyView {
             .text_color(pal.text_muted)
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(icon_path("datum")).size_3p5().text_color(pal.text_muted))
-            .child(div().flex_1().child("Origin"))
+            .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child("Origin"))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.pick_mode(cx).is_some() {
                     this.deliver_connector(MateConnectorRef::origin(), window, cx);
@@ -460,6 +460,33 @@ impl AssemblyView {
                     cx.notify();
                 }
             }))
+            // Onshape's origin row menu: (Create Part Studio in context… n/a) | Hide | Create empty subassembly.
+            .os_context_menu({
+                let view = cx.entity();
+                let hidden = self.ui.origin_hidden;
+                move |menu, window, cx| {
+                    let entries = vec![
+                        behaviors::MenuEntry::Item {
+                            label: if hidden { "Show".into() } else { "Hide".into() },
+                            icon: Some(if hidden { "eye" } else { "eye-off" }),
+                            disabled: false,
+                            act: std::rc::Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| {
+                                t.ui.origin_hidden = !hidden;
+                                t.refresh_scene(false, cx);
+                                cx.notify();
+                            }),
+                        },
+                        behaviors::MenuEntry::Sep,
+                        behaviors::MenuEntry::Item {
+                            label: "Create empty subassembly".into(),
+                            icon: None,
+                            disabled: false,
+                            act: std::rc::Rc::new(|t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.create_empty_subassembly(cx)),
+                        },
+                    ];
+                    fill_menu(menu, entries, view.clone(), window, cx)
+                }
+            })
             .into_any_element()
     }
 
@@ -518,7 +545,7 @@ impl AssemblyView {
                 cx.notify();
             }));
         let view = cx.entity();
-        row.context_menu(move |menu, window, cx| {
+        row.os_context_menu(move |menu, window, cx| {
             let entries = view.read(cx).connector_menu(id, cx);
             fill_menu(menu, entries, view.clone(), window, cx)
         })
@@ -585,10 +612,10 @@ impl AssemblyView {
                 cx.notify();
             }));
         let view = cx.entity();
-        row.context_menu(move |menu, _, _| {
+        row.os_context_menu(move |menu, _, _| {
             let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
-            menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.edit_mate(id, window, cx))))
-                .item(PopupMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| {
+            menu.item(OsMenuItem::new("Edit…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.edit_mate(id, window, cx))))
+                .item(OsMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| {
                     v2.update(cx, |t, cx| {
                         t.edit("Suppress pattern", cx, |a| {
                             if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
@@ -597,11 +624,11 @@ impl AssemblyView {
                         });
                     })
                 }))
-                .item(PopupMenuItem::new("Dissolve").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
+                .item(OsMenuItem::new("Dissolve").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
                     t.edit("Dissolve pattern", cx, |a| a.dissolve_pattern(id));
                 })))
                 .separator()
-                .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.delete_mate(id, cx))))
+                .item(OsMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.delete_mate(id, cx))))
         })
         .into_any_element()
     }

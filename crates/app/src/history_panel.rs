@@ -8,9 +8,9 @@ use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
-use gpui_kit::component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_store::{BranchId, MicroversionId, VersionGraph};
 use std::collections::{HashMap, HashSet};
@@ -220,25 +220,9 @@ impl HistoryPanel {
 
 }
 
-/// "1:08 PM Today", "3:40 PM Yesterday", "Oct 12" (UTC).
+/// "1:08 PM Today", "3:40 PM Yesterday", "Oct 12" (local time).
 fn history_time(ms: i64) -> String {
-    use noshape_model::drawing::format::civil_from_days;
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(ms);
-    let (day, today) = (ms.div_euclid(86_400_000), now.div_euclid(86_400_000));
-    let mins = ms.rem_euclid(86_400_000) / 60_000;
-    let (h, m) = (mins / 60, mins % 60);
-    let clock = format!("{}:{m:02} {}", if h % 12 == 0 { 12 } else { h % 12 }, if h < 12 { "AM" } else { "PM" });
-    match today - day {
-        0 => format!("{clock} Today"),
-        1 => format!("{clock} Yesterday"),
-        _ => {
-            const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            let (y, mo, d) = civil_from_days(day);
-            let (ny, _, _) = civil_from_days(today);
-            let mon = MONTHS[(mo as usize).saturating_sub(1).min(11)];
-            if y == ny { format!("{mon} {d}") } else { format!("{mon} {d}, {y}") }
-        }
-    }
+    crate::start_library::format_onshape_time(ms)
 }
 
 /// Workspace, version and Start rows, newest first (Onshape's order), each
@@ -284,6 +268,9 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
     rows
 }
 
+/// A dialog's create action (true when it ran and the dialog may close).
+type CreateFn = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
+
 /// Onshape's "Create version from <workspace>" dialog.
 pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let (branch, n) = {
@@ -294,7 +281,7 @@ pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut 
     };
     let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("V{n}")));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
-    let create: Rc<dyn Fn(&mut Window, &mut App) -> bool> = {
+    let create: CreateFn = {
         let (doc, name, desc) = (doc.clone(), name.clone(), desc.clone());
         let done = std::cell::Cell::new(false);
         Rc::new(move |_, cx| {
@@ -351,7 +338,7 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
     let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("B{n}")));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
     let open = Rc::new(std::cell::Cell::new(true));
-    let create: Rc<dyn Fn(&mut Window, &mut App) -> bool> = {
+    let create: CreateFn = {
         let (doc, name, open) = (doc.clone(), name.clone(), open.clone());
         let done = std::cell::Cell::new(false);
         Rc::new(move |_, cx| {
@@ -649,24 +636,24 @@ impl Render for HistoryPanel {
                     )
                     .child(v_flex().pl(px(3.)).flex_1().min_w_0().child(div().truncate().child(r.author.clone())).child(div().truncate().child(history_time(r.time))))
             };
-            let row = row.on_click(open).context_menu(move |m, _, _| {
+            let row = row.on_click(open).os_context_menu(move |m, _, _| {
                 let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v.clone());
                 let (name1, name2, cur1) = (name.clone(), name.clone(), cur.clone());
                 let d1 = d.clone();
                 match kind {
                     RowKind::Workspace(b) => {
-                        let m = m.item(PopupMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
                         if b != current_branch {
-                            m.item(PopupMenuItem::new(format!("Merge into {cur1}…")).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx))))
+                            m.item(crate::os_menu::OsMenuItem::new(format!("Merge into {cur1}…")).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx))))
                         } else {
                             m
                         }
                     }
                     _ => m
-                        .item(PopupMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))))
-                        .item(PopupMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx)))
-                        .item(PopupMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
-                        .item(PopupMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx)))),
+                        .item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx)))
+                        .item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
+                        .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx)))),
                 }
             });
             list.push(row.into_any_element());

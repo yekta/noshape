@@ -209,6 +209,19 @@ pub enum PointRef {
     Vertex { body: BodyId, name: TopoName },
     /// The center of a circular edge (also supplies the radius).
     Center { body: BodyId, name: TopoName },
+    /// The middle of an edge (Shift+Q snaps).
+    Midpoint { body: BodyId, name: TopoName },
+    /// A quadrant point of a circular edge in the view: 0 right, 1 top,
+    /// 2 left, 3 bottom (Shift+Q snaps).
+    Quadrant { body: BodyId, name: TopoName, k: u8 },
+}
+
+impl PointRef {
+    pub fn body(&self) -> &BodyId {
+        match self {
+            PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } => body,
+        }
+    }
 }
 
 /// Binding of one annotation input to model geometry. `slot` meaning per
@@ -277,6 +290,40 @@ pub struct DrawingView {
     /// the view has its own scale).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scale_label: Option<bool>,
+    /// "Suppress alignment with parent": a derived view placed freely (it
+    /// neither slides along its alignment axis nor follows its parent).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unaligned: bool,
+    /// View simplification (None: the parent's, Auto for base views).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simplification: Option<Simplification>,
+}
+
+/// Onshape's View simplification: geometry below a threshold is left out.
+/// Absolute and Ratio to studio also leave out whole parts smaller than it;
+/// Ratio to part keeps every part and simplifies the detail inside it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Simplification {
+    None,
+    Auto,
+    /// Threshold in meters.
+    Absolute(f64),
+    /// Fraction of the Part Studio / assembly size.
+    RatioToStudio(f64),
+    /// Fraction of each part's size.
+    RatioToPart(f64),
+}
+
+impl Simplification {
+    pub fn name(self) -> &'static str {
+        match self {
+            Simplification::None => "None",
+            Simplification::Auto => "Auto",
+            Simplification::Absolute(_) => "Absolute",
+            Simplification::RatioToStudio(_) => "Ratio to studio",
+            Simplification::RatioToPart(_) => "Ratio to part",
+        }
+    }
 }
 
 impl Default for DrawingView {
@@ -300,6 +347,8 @@ impl Default for DrawingView {
             tangent_phantom: false,
             name: None,
             scale_label: None,
+            unaligned: false,
+            simplification: None,
         }
     }
 }
@@ -1068,11 +1117,56 @@ pub struct Drawing {
     pub sheets: Vec<Sheet>,
     pub projection: Projection,
     pub units_mm: bool,
+    /// Drawing properties › Units and precision.
+    #[serde(default)]
+    pub props: DrawingProps,
 }
 
 impl Default for Drawing {
     fn default() -> Self {
-        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true }
+        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default() }
+    }
+}
+
+/// Onshape's Drawing properties › Units and precision (Primary and Leading
+/// and trailing zeros). `None` precisions keep noshape's default (per-unit
+/// digits, trailing zeros trimmed).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DrawingProps {
+    /// Length units (None: millimeters or inches from `units_mm`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<DimUnits>,
+    /// Decimal separator: comma instead of period.
+    #[serde(default)]
+    pub decimal_comma: bool,
+    /// Decimal places of lengths, tolerances, angles, angular tolerances.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance_precision: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angular_precision: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angular_tolerance_precision: Option<u8>,
+    /// Lengths below 1 show "0.5" (true) or ".5".
+    #[serde(default = "yes")]
+    pub leading_zeros: bool,
+    /// With a fixed precision, keep trailing zeros ("2.50").
+    #[serde(default = "yes")]
+    pub trailing_zeros: bool,
+    #[serde(default = "yes")]
+    pub tolerance_leading_zeros: bool,
+    #[serde(default = "yes")]
+    pub tolerance_trailing_zeros: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for DrawingProps {
+    fn default() -> Self {
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true }
     }
 }
 
@@ -1211,32 +1305,24 @@ impl Drawing {
                 *p = remap(*p);
             }
         }
-        let mut next_ann = dst.next_annotation_id();
         let mut anns: Vec<Annotation> = Vec::new();
-        for a in &src.annotations {
-            if a.kind.view().is_some_and(|v| moved.contains(&v)) {
-                let mut a = a.clone();
-                a.id = next_ann;
-                next_ann += 1;
-                if let Some(v) = a.kind.view_mut() {
-                    *v = remap(*v);
-                }
-                anns.push(a);
+        for (id, a) in (dst.next_annotation_id()..).zip(src.annotations.iter().filter(|a| a.kind.view().is_some_and(|v| moved.contains(&v)))) {
+            let mut a = a.clone();
+            a.id = id;
+            if let Some(v) = a.kind.view_mut() {
+                *v = remap(*v);
             }
+            anns.push(a);
         }
-        let mut next_tbl = dst.next_table_id();
         let mut tbls: Vec<Table> = Vec::new();
-        for t in &src.tables {
-            if t.view().is_some_and(|v| moved.contains(&v)) {
-                let mut t = t.clone();
-                t.id = next_tbl;
-                next_tbl += 1;
-                match &mut t.kind {
-                    TableKind::Bom { view } | TableKind::Hole { view, .. } => *view = remap(*view),
-                    TableKind::General { .. } => {}
-                }
-                tbls.push(t);
+        for (id, t) in (dst.next_table_id()..).zip(src.tables.iter().filter(|t| t.view().is_some_and(|v| moved.contains(&v)))) {
+            let mut t = t.clone();
+            t.id = id;
+            match &mut t.kind {
+                TableKind::Bom { view } | TableKind::Hole { view, .. } => *view = remap(*view),
+                TableKind::General { .. } => {}
             }
+            tbls.push(t);
         }
         let src = &mut self.sheets[from];
         src.views.retain(|v| !moved.contains(&v.id));

@@ -13,6 +13,9 @@ smallvec.workspace = true
 indexmap.workspace = true
 log.workspace = true
 ttf-parser = "0.25"
+cadkit-core = "=0.3.3"
+cadkit-dwg = "=0.3.3"
+cadkit-dxf = "=0.3.3"
 
 [dev-dependencies]
 serde_json = { workspace = true, features = ["float_roundtrip"] }

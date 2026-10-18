@@ -975,3 +975,34 @@ fn undo_stack_rebuilt_from_history() {
     // The limit caps the number of steps.
     assert_eq!(UndoStack::from_history(&doc, main, 1).unwrap().undo_len(), 1);
 }
+
+/// Onshape undo is per tab: Ctrl+Z in a tab reverts that tab's newest
+/// edit only; deleting a tab can't be undone, but earlier edits of other
+/// tabs still can; restoring a change from history brings the tab back.
+#[test]
+fn per_tab_undo_and_tab_deletion() {
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let mut undo = UndoStack::new(main);
+    let in_tab = |tab: &'static str| move |names: &[String]| names.iter().any(|n| n == tab);
+    undo.commit(&mut doc, &[set("tab/a", b"1")], "Edit A 1").unwrap();
+    let with_b = undo.commit(&mut doc, &[set("tab/b", b"x")], "Edit B").unwrap();
+    undo.commit(&mut doc, &[set("tab/a", b"2")], "Edit A 2").unwrap();
+    undo.commit_not_undoable(&mut doc, &[del("tab/b")], "Delete tab : B").unwrap();
+    // Undo in tab A reverts A's newest edit; B stays deleted.
+    let u = undo.undo_in(&mut doc, &in_tab("tab/a")).unwrap().unwrap();
+    assert_eq!(doc.read(u, "tab/a").unwrap().as_deref(), Some(&b"1"[..]));
+    assert!(doc.read(u, "tab/b").unwrap().is_none());
+    // Nothing of B can be undone from another tab.
+    assert!(!undo.can_undo_in(&doc, &in_tab("tab/c")));
+    // The rebuilt stack agrees (the deletion is skipped, the undo matched).
+    let re = UndoStack::from_history(&doc, main, 100).unwrap();
+    assert_eq!(re.undo_len(), undo.undo_len());
+    assert_eq!(re.redo_description(), Some("Edit A 2"));
+    // Redo in A.
+    let r = undo.redo_in(&mut doc, &in_tab("tab/a")).unwrap().unwrap();
+    assert_eq!(doc.read(r, "tab/a").unwrap().as_deref(), Some(&b"2"[..]));
+    // Versions and history: restoring the change before the deletion.
+    let r = doc.restore_with_description(main, with_b, "Restore").unwrap();
+    assert!(doc.manifest(r).unwrap().contains_key("tab/b"));
+}

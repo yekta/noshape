@@ -4,12 +4,11 @@ Goal: the Part Studio must look exactly like Onshape (live reference in
 /root/onshape-research/live/, spec in docs/ONSHAPE_UI_SPEC.md). Build dir
 /root/target-ui, display :101. Side-by-side shots go to /tmp/ui-shots/.
 
-## State (2026-10-18 14:50 UTC)
+## State (2026-10-18 18:15 UTC)
 
-Taken over by a fresh "ui" agent at 13:25 (the previous one ran out of quota). Baseline
-75869cc; all work is uncommitted in the shared tree. Context menus, Sketch dialog options, reusable
-view cube, render test: done (see "Done since takeover"). Next: feature-dialog pixel pass, tool
-search popover, tooltips check, selection-count cursor, right panels, row states.
+Lead's list (selection colors, count cursor, row states, rollback label, tool search, tooltips,
+display modes, right panels, measure / mass properties, Depth alignment, menu switch) is done
+and verified on X11; see "Round 3". Open: the Wayland count cursor (see "Open for the lead").
 
 ## Done this round (uncommitted)
 
@@ -100,6 +99,117 @@ search popover, tooltips check, selection-count cursor, right panels, row states
 - Fixed leftovers of the previous agent: `.flex_grow()` without its argument (feature_dialog.rs),
   removed the unused `Palette::dialog_footer` and `ui::panel_title`.
 
+## Round 3 (15:00-18:00, lead's list; all verified in the app on X11)
+
+- **Selection colors** (shaders.wgsl, scene_builder.rs): shaded faces no longer tint on hover;
+  their boundary edges light up instead (`face_edges`: the body edges whose points are all
+  vertices of the face's triangles get the face's HOVER/SELECTED flag). Selected faces use
+  `FACE_SELECTED` (linear 0.80, 0.444, 0.07 → top face reads `#e4b049` like live) with half the
+  light contrast. Edges, curves and points use `highlight_stroke`: fully `#ffc685` on hover,
+  fully `#ffa90a` selected. Unlit meshes (planes) still tint on hover.
+- **Selection-count cursor**: a real image cursor, like Onshape's (`cursor.rs` + per-OS
+  backends `cursor_x11.rs`, `cursor_macos.rs`, `cursor_windows.rs`). The image is our own
+  drawing (SVG built at runtime: slim arrow, digit from Liberation Sans Bold, white outlines,
+  soft shadow; 32 px, hot spot 3,3, digit 1-5, "5" for more), rasterized with gpui's SVG
+  renderer at the window scale. X11: ARGB RENDER cursor set on the window from our own
+  x11rb connection; macOS: `NSCursor` from the image (`[cursor set]`); Windows: icon cursor
+  via `CreateIconIndirect` + a `SetWindowSubclass` hook answering `WM_SETCURSOR`. GPUI only
+  re-sets its cursor when the hovered element's style changes, so `Viewport::sync_cursor`
+  applies ours when the count / hover / drag state changes and again 40 ms later (after
+  GPUI's end-of-frame cursor update); leaving the viewport restores the arrow. Count source:
+  part_studio/mod.rs `refresh_scene` (sketch selection while sketching, else the Part Studio
+  selection; 0 while a feature dialog is open). Verified on X11 with XFixes
+  (`/tmp/ui-tools/getcursor.py`); the macOS and Windows backends pass `cargo check` and
+  clippy for aarch64-apple-darwin / x86_64-pc-windows-msvc in a scratch crate
+  (/tmp/ui-tools/curcheck) but were not run. **Wayland** (lead chose option a): gpui-pre-linux
+  0.3.9 is vendored in `vendor/gpui-pre-linux` (license kept, Cargo.lock dropped) and wired
+  with `[patch.crates-io]` + `exclude = ["vendor"]` in the workspace Cargo.toml; the app depends
+  on it directly (linux) for the hook. Patch (all marked `NOSHAPE PATCH`): new
+  `src/custom_cursor.rs` (`set_custom_cursor(Option<CustomCursor>)`, premultiplied ARGB8888 +
+  hot spot + buffer scale; thread-local image and an apply hook), `wayland/cursor.rs`
+  `Cursor::set_custom` (memfd → `wl_shm` pool → `Argb8888` buffer on the cursor surface,
+  `wl_pointer.set_cursor`), `wayland/client.rs` (hook registration, `apply_cursor`, and the
+  custom image wins in `set_cursor_style`, pointer enter and restore-after-hide). App side:
+  `cursor_x11.rs` `set_wayland`. `cargo metadata --locked` passes; Cargo.lock only drops the
+  registry source/checksum of gpui-pre-linux. **Tested under Wayland**: headless sway
+  (`WLR_BACKENDS=headless WLR_RENDERER=pixman`, config /tmp/ui-wl/sway.conf), the app with
+  `WAYLAND_DISPLAY`, a persistent virtual pointer (/tmp/ui-tools/vptr, our own test tool;
+  `wlrctl` re-creates its device per call, which drops clicks) and `grim -c`: selecting a face
+  shows the "1" cursor (`WAYLAND_DEBUG`: `wl_shm.create_pool` → `create_buffer 32x32` →
+  `wl_pointer.set_cursor(…, 3, 3)`), leaving the viewport goes back to `set_shape(default)`
+  (final-cursor-wayland.png). weston, sway, wlrctl and grim were installed with apt for this.
+  New deps (all already in Cargo.lock): raw-window-handle 0.6; x11rb 0.13 (linux, features
+  render/cursor/resource_manager); objc2 0.6, objc2-app-kit 0.3, objc2-foundation 0.3
+  (macos); windows 0.62 (windows). Cargo.lock only gains dependency edges.
+- **os_menu.rs**: Esc now closes (own `OsMenu` key context with MenuUp/Down/Left/Right/Confirm/
+  Dismiss actions, which win over the window's Cancel and arrow-key view rotation); Left leaves a
+  submenu; `checked`, `disabled`, `submenu_with_icon`, `open_anchored`; submenus open to the left
+  near the window's right edge. The camera menu (view_cube.rs) is now an `OsMenu` opened under
+  its button (right-aligned), with psb's items unchanged.
+- **Sketch dialog**: Show constraints defaults to **off** (sketch_mode.rs `SHOW_CONSTRAINTS`,
+  skb's file; live sketch/00, 01, 10 show it off and no glyphs); `mc-select.svg` 26 px "Select
+  mate connector" button right of every field that accepts a mate connector (it activates the
+  field); diagnostics button uses `sketch-diagnostics.svg`.
+- **Feature dialog**: numbers stay right-aligned while typing (`TextAlign::Right`); the preview
+  slider rests at 70% like live (`PREVIEW_REST`; full preview from there to the right end).
+- **Feature list**: suppressed rows italic too; error rows only turn red (no red dot on the
+  icon, live part-studio/94).
+- **Tool search** (view_tools.rs, rewritten): live layout (600 px under the toolbar's right end,
+  white input with `#3e94ff` border, `#f5f5f5` body: 198 px results with 34 px rows and shortcut
+  chips, selected `#b2ddf6`; description pane with 28 px icon + 18 px name; `#eee` footer with
+  "Return to this dialog…" and the "Highlight tool in toolbar" checkbox). Arrow keys move the
+  selection, Enter runs it, Esc / outside click close. The toggle reads "Close search [escape]"
+  while open (`ui::search_tools_toggle`). With highlighting on, the selected tool's toolbar
+  button turns yellow `#fcda7f` / `#fab601` (`palette_found_tool`). New UiState fields
+  `palette_sel`, `palette_no_highlight`, `palette_closed` (behaviors.rs); `palette_hover` removed.
+- **Display modes**: labels "Shaded without edges" / "Unshaded"; translucent alpha 0.48 (linear,
+  = live's ~35% sRGB).
+- **Right panels** (config_panel.rs): 712 px frame, title as one full-width blue tab, `#eee`
+  footer with `?`, no ×. Variable table rewritten as Onshape's table (section header, 4 columns,
+  "Name" placeholder row and the faint illustration when empty).
+
+- **Feature dialog groups**: a checked, expanded group's params are indented 24 px with a
+  `#d7d7d7` guide line (live extrude-24); expanders are `#555` (`⌄`) / `#d7d7d7` (`›`).
+- **Feature list**: rolled-back rows `#999` (was `#ccc`), hidden (consumed) features `#999`;
+  the rollback bar turns light blue only after ↑/↓ or a click on it (`ui.rollback_keyboard`,
+  behaviors.rs), not when a row is selected; the drag pill sits right of the pointer.
+- **Tooltips** (ui.rs `RichTooltip`): centered under the tool, title box 9 px below it, the
+  expanded one (after 2 s) 3 px below, 400 px, `#d0dbe5` title band + white body (live 10, 11).
+- **Measure** (menus.rs): Onshape's 220 px panel (header + ×, selection field, Measure type ▾,
+  Length unit, Angle unit, Reference coordinate system, result rows with monospace values,
+  `#eee` footer with ?). **Mass and section properties**: Onshape's 440 px dialog at the
+  feature-dialog place (tabs Part | Face, Parts to measure, Mate connector for reference frame,
+  Show calculation variance, Mass + Override, Volume, Surface area, Center of mass X/Y/Z with
+  axis glyphs, Mass moments of inertia 3x3; without a material: part red, center of mass empty
+  and the yellow toast "One or more parts do not have a material defined.").
+- **Toasts** (mod.rs): Onshape's message bubble: 18 px icon (`toast-info/warning/error.svg`),
+  14 px text, padding 4 25 4 10, radius 5.25, bold × that closes it.
+- Context menu icons: `menu-copy.svg` (two pages) and `menu-create-drawing.svg` (sheet with a
+  blue +) for psb's new Copy / Create Drawing items (final-context-menu.png).
+
+### Open for the lead
+
+- Wayland count cursor: done with the vendored, patched gpui-pre-linux (lead's option a).
+  When gpui-pre-linux is upgraded, re-apply the `NOSHAPE PATCH` hunks (3 files + module line).
+- Measure: "Length unit" / "Angle unit" show the document units but don't open a list yet
+  (behaviour, psb); the model's feature descriptions (tooltips, tool search) are shorter than
+  Onshape's texts (model, psb).
+
+### Menus switched to os_menu.rs (for ui2 and asb)
+
+- asb already moved the assembly menus and the drawing menus are on `OsMenu` too (whoever did it).
+- Switched now (import swap, `.context_menu(` → `.os_context_menu(`, `PopupMenuItem` →
+  `crate::os_menu::OsMenuItem` inside those closures): feature_dialog.rs (pick rows, Convert to
+  expression), part_studio/appearance.rs, variable_studio.rs, workspace.rs (tab menu),
+  history_panel.rs. Not switched: start_window.rs (documents page; Onshape's row menu there is a
+  Bootstrap dropdown, ui2's call) and toolbar/field **dropdowns** (`dropdown_menu`), which in
+  Onshape are different widgets (toolbar dropdowns: 32 px rows, `#eaeaea` hover).
+- To switch another menu: `use crate::os_menu::OsContextMenuExt as _;` then `.os_context_menu(
+  |m: OsMenu, window, cx| …)`; items are `OsMenuItem::new(label).icon_name("app-icon")
+  .checked(b).disabled(b).on_click(…)`; `m.separator()`, `m.submenu(label, window, cx, f)`,
+  `m.submenu_with_icon(Some(icon), …)`. A menu opened from a button:
+  `os_menu::open_anchored(point, Anchor::TopRight, OsMenu::build(window, cx, f), window, cx)`.
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting
@@ -119,6 +229,12 @@ search popover, tooltips check, selection-count cursor, right panels, row states
 - /tmp/ui-shots/final-context-menu.png: right-click on a part face (with the Select submenu open).
 - /tmp/ui-shots/final-feature-dialog.png: new Extrude dialog.
 - /tmp/ui-shots/final-sketch-dialog.png: Sketch dialog with its options inside.
+- /tmp/ui-shots/final-selection.png: face hover / face selected (ours top, Onshape bottom).
+- /tmp/ui-shots/final-cursor.png: selection-count cursor 1 and 2 (ours, Onshape's SVG).
+- /tmp/ui-shots/final-cursor-wayland.png: the count cursor under Wayland (sway, grim -c).
+- /tmp/ui-shots/final-feature-list.png: suppressed / selected / hover rows.
+- /tmp/ui-shots/final-tool-search.png, final-camera-menu.png, final-right-panel.png.
+- /tmp/ui-shots/final-measure.png, final-mass.png.
 - (older, by the previous agent) /tmp/ui-shots/new-doc-side-by-side.png: new document.
 
 ## Measured facts (live 1920x1080 screenshot, viewport 1673x973)
@@ -134,17 +250,14 @@ search popover, tooltips check, selection-count cursor, right panels, row states
 
 ## Next
 
-- Switch the remaining kit context menus to `os_context_menu` (assembly, drawing, feature-dialog
-  chips, tabs; the tab and "+" menus are Bootstrap dropdowns in Onshape: 14 px `#555`, 27 px rows,
-  hover `#def1fb`, radius 5.25).
-- Tool search popover (600 px, results + description pane, yellow toolbar highlight).
-- Tooltip check vs part-studio/11-tooltip-extrude-expanded.png (RichTooltip exists).
-- Selection-count cursor (cursors/: N = 1..5, drawn into the pointer).
-- Selection colors check vs selection/*.png (face hover = boundary only `#fec788`, selected
-  `#e5aa38`), box select colors, display modes, section view hatch.
-- Right panels (Appearance, Variables, Configurations; 712 px, blue centered title), Measure and
-  Mass properties panels, rollback bar drag pill, feature-list row states (part-studio/90-95).
-- Select-mate-connector 26 px button next to MC-capable fields (Sketch plane, etc.).
+- Appearance and Configurations panel bodies (the frame is done; the bodies still use the older
+  layout): Appearances = tabs "Parts and surfaces | Sketches and curves" + rows with swatch
+  bars (dom/panel-appearance.txt); Configurations = "Configure Part Studio ▾" + illustration.
+- Camera menu: "Graphics preferences…" (gear icon) and "Highlight boundary edges" items (psb
+  behaviour first). Section view hatch colors (part-studio/70-74), translucent/hidden-edge
+  display mode checks against part-studio/60-68 in the app.
+- Rollback drop line: Onshape draws a small circle at its left end.
+- Left rail and right strip icon sets vs live (Onshape has 6 rail and 5 strip buttons).
 
 ## Gotchas
 

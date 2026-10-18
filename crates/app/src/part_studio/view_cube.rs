@@ -8,7 +8,6 @@ use crate::scene_builder::{DisplayMode, TangentEdges};
 use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
 use noshape_render::{Camera, Projection, StandardView};
@@ -438,14 +437,24 @@ impl PartStudioView {
             .p_0()
             .rounded(px(3.))
             .tooltip("Camera and render options")
-            .dropdown_menu(move |mut m, window, cx| {
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                // Opens under the button, right-aligned with it (live: 222 px,
+                // Onshape's context-menu style). The button's bottom-right
+                // corner, from the cube's painted origin.
+                // The widget's origin is the cube's minus its inset in the widget.
+                let at = this.ui.cube_origin.map(|o| {
+                    let widget = point(o.x - px(WIDGET_PX * 0.5 - CUBE_PX * 0.5), o.y - px(CUBE_CENTER_Y - CUBE_PX * 0.5));
+                    point(widget.x + px(150.), widget.y + px(158.))
+                }).unwrap_or_default();
+                let view = view.clone();
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
                 // Onshape (live, dom/menu-camera-render.txt): views | named and
                 // previous views | zoom | projection, sketch orientation |
                 // display, hidden edges, tangent edges (each a ✓ submenu
                 // showing the current choice) | high quality | section view.
                 let item = |label: &str, f: super::ViewAction| {
                     let v = view.clone();
-                    PopupMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                    crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
                 };
                 for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
                     m = m.item(item(label, Box::new(move |this, _, cx| this.view(sv, cx))));
@@ -461,7 +470,7 @@ impl PartStudioView {
                 }
                 m = m.separator();
                 let v = view.clone();
-                m = m.item(PopupMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
+                m = m.item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
                     v.update(cx, |this, cx| {
                         this.viewport.update(cx, |vp, cx| {
                             let p = if vp.camera.projection == Projection::Perspective { Projection::Orthographic } else { Projection::Perspective };
@@ -470,7 +479,7 @@ impl PartStudioView {
                     })
                 }));
                 let v = view.clone();
-                m = m.item(PopupMenuItem::new("Orient normal to sketch on edit").checked(orient).on_click(move |_, _, cx| {
+                m = m.item(crate::os_menu::OsMenuItem::new("Orient normal to sketch on edit").checked(orient).on_click(move |_, _, cx| {
                     v.update(cx, |this, cx| {
                         this.ui.orient_on_edit = !this.ui.orient_on_edit;
                         cx.notify();
@@ -482,7 +491,7 @@ impl PartStudioView {
                 m = m.submenu_with_icon(check(), display_label(mode), window, cx, move |mut sm, _, _| {
                     for dm in [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Translucent] {
                         let v = v.clone();
-                        sm = sm.item(PopupMenuItem::new(display_label(dm)).checked(dm == mode).on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_display_mode(dm, w, cx))));
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(display_label(dm)).checked(dm == mode).on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_display_mode(dm, w, cx))));
                     }
                     sm
                 });
@@ -490,7 +499,7 @@ impl PartStudioView {
                 m = m.submenu_with_icon(check(), if hidden_edges { "Hidden edges visible" } else { "Hidden edges removed" }, window, cx, move |mut sm, _, _| {
                     for on in [true, false] {
                         let v = v.clone();
-                        sm = sm.item(PopupMenuItem::new(if on { "Hidden edges visible" } else { "Hidden edges removed" }).checked(on == hidden_edges).on_click(move |_, w, cx| {
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(if on { "Hidden edges visible" } else { "Hidden edges removed" }).checked(on == hidden_edges).on_click(move |_, w, cx| {
                             v.update(cx, |this, cx| {
                                 this.opts.hidden_edges_visible = on;
                                 let d = this.display.clone();
@@ -504,7 +513,7 @@ impl PartStudioView {
                 m = m.submenu_with_icon(check(), tangent.label(), window, cx, move |mut sm, _, _| {
                     for t in TangentEdges::ALL {
                         let v = v.clone();
-                        sm = sm.item(PopupMenuItem::new(t.label()).checked(t == tangent).on_click(move |_, w, cx| {
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(t.label()).checked(t == tangent).on_click(move |_, w, cx| {
                             v.update(cx, |this, cx| {
                                 this.opts.tangent_edges = t;
                                 let d = this.display.clone();
@@ -515,13 +524,15 @@ impl PartStudioView {
                     sm
                 });
                 m = m.separator();
-                m = m.item(PopupMenuItem::new("View in high quality").checked(high_quality).on_click({
+                m = m.item(crate::os_menu::OsMenuItem::new("View in high quality").checked(high_quality).on_click({
                     let v = view.clone();
                     move |_, w, cx| v.update(cx, |this, cx| this.toggle_high_quality(w, cx))
                 }));
                 m = m.separator();
                 m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))))
-            })
+                });
+                crate::os_menu::open_anchored(at, Anchor::TopRight, menu, window, cx);
+            }))
             .into_any_element()
     }
 }

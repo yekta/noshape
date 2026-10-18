@@ -7,6 +7,13 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
   work *exactly* like Onshape (colors, fonts, sizes, icons, layout, dialogs, menus, every behaviour and shortcut),
   except for cloud features (sign-in, sharing, notifications). They are very unhappy with anything that "looks
   nothing like Onshape". Must be extremely performant, and work on macOS, Linux and Windows.
+- **No deviations from Onshape. Ever.** Never skip an Onshape behaviour, never mark something a "deliberate
+  difference", "local-only simplification" or "not needed in our model", and never settle for a workaround because
+  GPUI or our data model makes it hard. Change the model or the platform code instead. If something seems
+  impossible, find the closest way to make it look and behave identically (custom platform code, your own
+  rendering, model changes) and keep going. If you really are stuck, message the lead, who decides; the user is
+  never asked, so don't wait. The only exclusions
+  are cloud-only features (sign-in, sharing, comments, notifications, subscriptions) and simulation/render tools.
 - **Read first:** docs/HANDOFF.md, docs/AGENTS.md, docs/ARCHITECTURE.md, docs/ONSHAPE_UI_SPEC.md, plus your own
   docs/handoff/<you>.md and docs/parity/<area>.md if they exist.
 - **Live Onshape reference:** screenshots, DOM dumps and measurements of the real app are in
@@ -18,6 +25,8 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
 - **Build:** `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-<you> nice cargo build -p noshape`. Use only your
   own target dir and your own Xvfb display (given in your prompt). Delete `<target>/debug/incremental` when it
   grows past a few GB. Disk is shared (keep more than 15 GB free).
+- **Disk:** the disk hit 100% once. After each build, if `<target>/debug/incremental` is over 2 GB, delete it.
+  Never delete `debug/deps` while a build might be running.
 - **Never use broad `pkill -f` patterns.** Kill only your own processes (`pkill -f "[t]arget-<you>/debug/noshape"`).
 - **Keep the shared tree compiling.** Make edits in small steps that build. If someone else's file breaks the
   build, wait a few minutes and retry instead of "fixing" their in-progress code. Stay in your area; if you need a

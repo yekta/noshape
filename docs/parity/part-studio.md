@@ -100,7 +100,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.16 | Selecting a feature in the list highlights its geometry | A §5.3 (FEATURE_HIGHLIGHT) | 🔧 |
 | 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | 🔧 |
 | 3.18 | Double-click a sketch in the graphics area edits it | (Onshape behaviour) | 🔧 |
-| 3.19 | Create selection panel and Select ▸ submenu (tangent faces, face loop, tangent edges, parallel edges, equal radius, part faces) | Home__create_selection | ✅ (verified Select ▸ Tangent connected edges, Create selection > Parallel edges; protrusion/pocket/hole criteria ❌) |
+| 3.19 | Create selection panel and Select ▸ submenu (tangent faces, face loop, tangent edges, parallel edges, equal radius, part faces) | Home__create_selection | ✅ (Protrusion, Pocket, Hole, Fillets, Tangent connected, Loop/chain edges, Parallel, Equal radius, All faces; empty-space Select ▸ All parts/surfaces/sketches/planes/mate connectors — the live capture never opened that submenu) |
 
 ## 4. Preselection and tools (A §2.3, PartStudio__feature_basics)
 
@@ -136,7 +136,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.11 | Single-pick fields replace their pick and move focus to the next empty selection field | A §5.4 | ✅ |
 | 5.12 | × on a chip removes that pick | feature_basics | ✅ |
 | 5.13 | Right-click a pick > Clear all (plus Clear missing references when some are missing); × on hover removes one row | live (Fillet dialog) | ✅ |
-| 5.14 | Hovering a pick row highlights its entity in the graphics area, tints the row and shows its name as a tooltip | Home__dialogs; live | 🔧 (tooltip/tint added; highlight colour is the renderer's hover colour, live uses #f2ff80) |
+| 5.14 | Hovering a pick row highlights its entity in the graphics area, tints the row and shows its name as a tooltip | Home__dialogs; live | ✅ (yellow-green #f2ff80 state QUERY in the shader) |
 | 5.15 | Missing references shown red; Clear missing references | feature_basics | ✅ (verified: red rows, accept disabled, Clear missing references) |
 | 5.16 | Reorder picks in order-sensitive fields by dragging a row | feature_basics | 🔧 (the Move up/down menu items were removed: live menus only have Clear all) |
 | 5.17 | Tab moves between fields (inputs and checkboxes) | feature_basics | ✅ |
@@ -149,12 +149,12 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | 🔧 (was always shown) |
 | 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
 | 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |
-| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ⏳ (drag the title to move 🔧; ? shows the description 🔧; resizing ❌) |
+| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ✅ (move by the title, resize by the bottom-right grip; size kept for the session) |
 | 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) |
 | 5.29 | Tolerance options on tolerant quantities (± icon: type, deviation/limits, precision) | Home__tolerance_options | 🔧 (stored as `<param>__tolerance`; fit tolerances ❌) |
 | 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | 🔧 |
 | 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | 🔧 |
-| 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | 🔧 |
+| 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | ✅ (hover outlines the arrow blue) |
 | 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ |
 
 ## 6. Feature list (PartStudio__features_and_parts_lists, A §3)
@@ -187,7 +187,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.24 | Show dimensions (feature/face/sketch menus): the sketch's dimensions in 3D, parts see-through, hover gold on tan, double-click edits the sketch, click elsewhere or Esc hides; Export as DXF/DWG | Home__context_menus; live part-studio/40–42 | ✅ (Create drawing of sketch ❌) |
 | 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | 🔧 |
 | 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
-| 6.27 | Default plane row menu: New sketch…, Offset plane… (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to; origin: Hide | live | ✅ (Rename, Size to Part Studio, Show dependencies ❌) |
+| 6.27 | Default plane row menu (live): Rename | New sketch…, Offset plane…, Size to Part Studio (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to | Show dependencies…; origin: Rename | Hide | Show dependencies… | Hide, Hide other planes, Hide all planes | ✅ |
 | 6.28 | Default planes/origin can be hidden (never deleted) | part_studios | 🔧 |
 | 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | 🔧 |
 
@@ -269,7 +269,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
 | 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
 | 10.7 | Section view dialog (live): Exclude | Include tabs, "Section planes" field (planes, planar faces, mate connectors; × removes) + a view-facing plane button, "Items to exclude/include"; ✓/Enter keeps, ✕/Esc restores; empty-space menu Edit section view… / Turn off section view | live part-studio/70–74 | ✅ |
-| 10.8 | Section by several planes (up to 3), drag arrow on the active plane with an offset box, caps | View__section_view | ⏳ (planes and arrow ✅; hatched caps ❌: needs a stencil pass in the renderer) |
+| 10.8 | Section by several planes (up to 3), drag arrow on the active plane with an offset box, caps | View__section_view | ✅ (caps: the cut solid is capped in the part color with hatching, separate section pipeline; offscreen test `section_caps_cover_the_cut`) |
 
 ## 11. Measure, mass properties, appearance (View__measure_tool, View__mass_properties_tool, PartStudio__customizing_appearances)
 
@@ -305,7 +305,9 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.7 | Rollback bar: no right-click menu; after clicking a feature row ↑/↓ move the bar; focused bar `#a0c7dd`; dragging shows a "Rollback bar" pill and a 2 px blue drop line | live | ✅ |
 | 13.8 | Picking through planes: a part face behind a transparent plane always wins | live (selection/30–31) | ✅ (verified: the face behind the Right plane is picked) |
 | 13.9 | Copy here… opens Transform (Translate by XYZ, Copy part) for the part | live (part-studio/102) | ✅ |
-| 13.11 | Deleting a tab: no confirmation, no toast | live | ✅ (deliberate deviation: Ctrl+Z restores the tab here; Onshape can't undo it but has version history, which noshape doesn't) |
+| 13.11 | Deleting a tab: no confirmation and no toast (a "Delete tabs" warning only when other tabs use it); Ctrl+Z doesn't bring it back; Versions and history > right-click an earlier change > Restore restores it. Undo is per tab: Ctrl+Z reverts the active tab's newest edit only | live; Document__document_tabs; Document__versions_and_history | ✅ (`UndoStack::undo_in`/`redo_in`, `commit_not_undoable`) |
+| 13.12 | A Variable shows as "#name = value" ("#? = …" until named) in the list and its dialog title; its dialog opens with Name focused | live (Variable dialog) | ✅ |
+| 13.13 | Configurations: "+ Configure features", click a feature, then a parameter (outlined in yellow in its dialog) to configure it; a dialog shows and edits the active configuration's values of configured parameters | PartStudio__part_studio_and_assembly_configurations | ✅ (was: the dialog showed and edited the base value, which the table then overrode) |
 | 13.10 | Clicking a face/edge/vertex while a parts field is active (Boolean Tools…) takes its part; hovering highlights the whole part | (Onshape behaviour) | ✅ |
 
 ## Not applicable to a local app

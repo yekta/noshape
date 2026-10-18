@@ -101,6 +101,20 @@ impl Document {
         self.tabs.iter_mut().find(|t| t.id == id)
     }
 
+    /// Other tabs that use `tab` (assembly instances, drawings, derived
+    /// parts): deleting it would break them, so Onshape asks first.
+    /// Tab ids are random 64-bit numbers, so finding one in a tab's data
+    /// (decimal, or the hex form derived features store) is reliable.
+    pub fn tab_users(&self, tab: TabId) -> Vec<TabId> {
+        let (dec, hex) = (tab.0.to_string(), tab.to_string());
+        self.tabs
+            .iter()
+            .filter(|t| t.id != tab)
+            .filter(|t| serde_json::to_string(&t.content).is_ok_and(|j| j.contains(&dec) || j.contains(&hex)))
+            .map(|t| t.id)
+            .collect()
+    }
+
     pub fn remove_tab(&mut self, id: TabId) -> Option<Tab> {
         let i = self.tabs.iter().position(|t| t.id == id)?;
         self.settings.tab_order.retain(|t| *t != id);
@@ -165,5 +179,24 @@ impl Document {
             }
         }
         Ok(Document { settings, tabs })
+    }
+}
+
+#[cfg(test)]
+mod tab_user_tests {
+    use super::*;
+
+    #[test]
+    fn tabs_using_a_part_studio() {
+        let mut doc = Document::default();
+        let src = doc.add_tab("Source", TabContent::PartStudio(PartStudio::new()));
+        let mut user = PartStudio::new();
+        let mut params = crate::params::ParamValues::default();
+        params.set("partStudio", crate::params::ParamValue::Text(src.to_string()));
+        user.features.push(crate::partstudio::Feature { id: crate::reference::FeatureId(1), type_id: "importDerived".into(), name: "Derived 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None });
+        let user = doc.add_tab("User", TabContent::PartStudio(user));
+        let other = doc.add_tab("Other", TabContent::PartStudio(PartStudio::new()));
+        assert_eq!(doc.tab_users(src), vec![user]);
+        assert!(doc.tab_users(other).is_empty());
     }
 }

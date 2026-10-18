@@ -15,6 +15,7 @@ use crate::actions::*;
 use crate::assembly_mate_dialog::{ConnectorLabeler, MateDialog, MateDialogEvent, mate_icon};
 use crate::assembly_scene::{self, AsmBuilt, AsmGpuCache, AsmPickTarget, AsmSceneOptions, Highlights, ManipHandle, OverlayPick, Triad};
 use crate::assets::icon_path;
+use crate::os_menu::{OsContextMenuExt as _, OsMenuItem};
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::scene_builder::PickKind;
@@ -24,7 +25,7 @@ use glam::{DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -123,6 +124,8 @@ pub(crate) use behaviors::*;
 
 #[path = "assembly_standard.rs"]
 mod standard_content;
+#[path = "assembly_thumbs.rs"]
+mod thumbs;
 pub(crate) use standard_content::*;
 
 struct DragState {
@@ -205,6 +208,8 @@ enum SidePanel {
     Interference,
     Explode,
     Positions,
+    /// Onshape's Variable table (docked like the Part Studio's).
+    Variables,
 }
 
 pub struct AssemblyView {
@@ -212,6 +217,8 @@ pub struct AssemblyView {
     doc: Entity<DocModel>,
     gpu: Gpu,
     viewport: Entity<Viewport>,
+    /// Variable Studio tables in the Variable table panel.
+    var_tables: HashMap<TabId, Entity<crate::variable_studio::VariableStudioView>>,
     /// View cube hover cell and last painted origin (`view_cube`).
     cube_hover: Option<crate::part_studio::view_cube::CubeCell>,
     cube_origin: Option<Point<Pixels>>,
@@ -370,6 +377,7 @@ impl AssemblyView {
             doc,
             gpu,
             viewport,
+            var_tables: HashMap::new(),
             cube_hover: None,
             cube_origin: None,
             evaluator: Arc::new(Mutex::new({
@@ -549,6 +557,7 @@ impl AssemblyView {
     fn apply_result(&mut self, result: Arc<AssemblyResult>, _window: &mut Window, cx: &mut Context<Self>) {
         self.result = result;
         self.infer = None;
+        self.refresh_center_of_mass(cx);
         if std::mem::take(&mut self.pattern_resync) && self.mate.is_none() && self.pattern.is_none() {
             self.resync_patterns(cx);
         }
@@ -710,7 +719,7 @@ impl AssemblyView {
         let picking = self.pick_mode(cx).is_some();
         let hovered_overlay = self.hover_overlay;
         // Assembly origin and assembly mate connectors (pickable).
-        h.origin = Some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
+        h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
         let mut overlay_connectors = Vec::new();
         if let Some(asm) = self.assembly(cx) {
             let editing_mc = self.mc.as_ref().map(|m| m.id);
@@ -749,7 +758,7 @@ impl AssemblyView {
                     } else {
                         assembly_scene::MateGlyphState::Ok
                     };
-                    h.mate_glyphs.push((f.origin, hl, st));
+                    h.mate_glyphs.push((f, size * 0.17, hl, st));
                     overlay_mates.push(m.id);
                 }
             }
@@ -2482,6 +2491,7 @@ impl AssemblyView {
                 }
             })))
             .child(btn("rail-animate", "animate", "Animate mate", self.anim.is_some(), cx).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.start_animation(w, cx))))
+            .child(btn("rail-variables", "variable-table", "Variable table", self.panel == Some(SidePanel::Variables), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Variables, cx))))
             .into_any_element()
     }
 
@@ -2666,7 +2676,7 @@ impl AssemblyView {
                 }
             }));
         let view = cx.entity();
-        row.context_menu(move |menu, window, cx| {
+        row.os_context_menu(move |menu, window, cx| {
             let mut entries = view.read(cx).instance_menu(top, false, cx);
             if let Some((ver, key)) = update.clone() {
                 entries.push(MenuEntry::Sep);
@@ -2791,7 +2801,7 @@ impl AssemblyView {
             }));
         let view = cx.entity();
         let main = row
-            .context_menu(move |menu, window, cx| {
+            .os_context_menu(move |menu, window, cx| {
                 let entries = view.read(cx).mate_menu(id, cx);
                 fill_menu(menu, entries, view.clone(), window, cx)
             })
@@ -2858,7 +2868,7 @@ impl AssemblyView {
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
-            .context_menu(move |menu, window, cx| {
+            .os_context_menu(move |menu, window, cx| {
                 let entries = view.read(cx).assembly_menu(cx);
                 fill_menu(menu, entries, view.clone(), window, cx)
             })
@@ -3398,7 +3408,8 @@ impl AssemblyView {
             }
         }
         // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
-        let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, name: String, cx: &App| {
+        self.request_insert_thumbs(cx);
+        let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
             h_flex()
                 .id(id)
                 .flex_none()
@@ -3407,7 +3418,10 @@ impl AssemblyView {
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.row_hover))
                 .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
-                .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(&icon_path(icon), 28., cx)))
+                .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                    Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                    None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
+                }))
                 .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
         };
         let mut body = v_flex().id("insert-body").flex_1().min_h_0().overflow_y_scroll();
@@ -3474,7 +3488,7 @@ impl AssemblyView {
                         }))
                         .into_any_element()
                 });
-                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", s.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
+                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
                 if let Some(el) = self.render_insert_config(s.tab, cx) {
                     body = body.child(div().pl(px(40.)).pr_2().child(el));
                 }
@@ -3483,7 +3497,7 @@ impl AssemblyView {
                         let part2 = part.clone();
                         let tab = s.tab;
                         body = body.child(
-                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if part.3 { "surface-body" } else { "part" }, part.1.clone(), cx)
+                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
                         );
                     }
@@ -3499,7 +3513,7 @@ impl AssemblyView {
             }
             for (tab, name) in list {
                 let n2 = name.clone();
-                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
+                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
             }
         }
         // Footer: inserted count, then the gray "Undo to remove instances" info row.
@@ -3634,6 +3648,97 @@ impl AssemblyView {
         .into_any_element()
     }
 
+    /// One table view per Variable Studio shown in this Assembly.
+    fn sync_var_tables(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let studios: Vec<TabId> = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab).into_iter().filter(|r| r.external.is_none()).map(|r| r.studio).collect();
+        self.var_tables.retain(|k, _| studios.contains(k));
+        for s in studios {
+            if !self.var_tables.contains_key(&s) {
+                let (doc, host) = (self.doc.clone(), self.tab);
+                let view = cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx));
+                self.var_tables.insert(s, view);
+            }
+        }
+    }
+
+    /// Onshape's Assembly Variable table: the same docked panel as the Part
+    /// Studio's (712 px, "Variable table" tab title, `#eee` footer with the
+    /// "Create Variable Studio | ▴" split button and `?`), listing the
+    /// Variable Studio tables inserted here.
+    fn render_variables_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let refs = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab);
+        let target = crate::variable_insert::InsertTarget::Element(self.tab);
+        let tables: Vec<AnyElement> = refs
+            .iter()
+            .enumerate()
+            .filter_map(|(k, r)| match &r.external {
+                // Another document's studio: read-only (Onshape).
+                Some(_) => crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx),
+                None => self.var_tables.get(&r.studio).map(|v| v.clone().into_any_element()),
+            })
+            .map(|t| div().pb(px(10.)).child(t).into_any_element())
+            .collect();
+        let empty = tables.is_empty();
+        v_flex()
+            .id("asm-variables")
+            .occlude()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .right(px(33.))
+            .w(px(712.))
+            .max_w(relative(0.5))
+            .bg(pal.panel)
+            .border_l_1()
+            .border_color(pal.border)
+            .child(
+                div().h(px(30.)).flex_none().pt(px(4.)).child(
+                    div()
+                        .h(px(26.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .border_b_2()
+                        .border_color(pal.accent)
+                        .text_size(px(13.33))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(pal.accent)
+                        .child("Variable table"),
+                ),
+            )
+            .child(
+                v_flex()
+                    .id("asm-variables-body")
+                    .flex_1()
+                    .p(px(5.))
+                    .overflow_y_scroll()
+                    .children(tables)
+                    .when(empty, |d| {
+                        d.child(
+                            v_flex()
+                                .items_center()
+                                .pt(px(120.))
+                                .gap(px(10.))
+                                .child(div().opacity(0.15).child(crate::assets::icon("variable-table", 180., cx)))
+                                .child(div().max_w(px(400.)).text_size(px(13.33)).text_color(pal.text_muted).text_center().child("Add variables to drive features in the Assembly.")),
+                        )
+                    }),
+            )
+            .child(
+                h_flex()
+                    .h(px(40.))
+                    .flex_none()
+                    .px(px(10.))
+                    .bg(gpui_kit::rgb(0xeeeeee))
+                    .border_t_1()
+                    .border_color(gpui_kit::rgb(0xcccccc))
+                    .child(div().flex_1().flex().justify_center().child(crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)))
+                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+            )
+            .into_any_element()
+    }
+
     fn render_side_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
@@ -3737,7 +3842,7 @@ impl AssemblyView {
             }
             Some(SidePanel::Explode) => self.render_explode_panel(cx),
             Some(SidePanel::Positions) => self.render_positions_panel(cx),
-            None => div().into_any_element(),
+            Some(SidePanel::Variables) | None => div().into_any_element(),
         }
     }
 
@@ -3805,7 +3910,9 @@ impl AssemblyView {
         if any_left {
             out.push(left.into_any_element());
         }
-        if self.panel.is_some() {
+        if self.panel == Some(SidePanel::Variables) {
+            out.push(self.render_variables_panel(cx));
+        } else if self.panel.is_some() {
             out.push(div().absolute().top_3().right(px(56.)).child(self.render_side_panel(cx)).into_any_element());
         }
         out.push(self.render_view_controls(cx));
@@ -3855,6 +3962,7 @@ impl AssemblyView {
             out.push(el);
         }
         out.extend(self.render_mate_values(cx));
+        out.extend(self.render_center_of_mass(cx));
         if let Some(el) = self.render_measure(cx) {
             out.push(el);
         }
@@ -3954,6 +4062,9 @@ impl Render for AssemblyView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         self.ensure_filter_input(window, cx);
+        if self.panel == Some(SidePanel::Variables) {
+            self.sync_var_tables(window, cx);
+        }
         let toolbar = self.render_toolbar(cx);
         let list = self.render_list(cx);
         let overlay = self.render_overlay(cx);

@@ -5,6 +5,7 @@
 //!   [`params`]: generic parameter values; [`reference`]: persistent naming.
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
+pub mod analysis;
 pub mod assembly;
 pub mod compare;
 pub mod configuration;

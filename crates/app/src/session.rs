@@ -16,6 +16,8 @@ pub struct Session {
     undo: UndoStack,
     /// When set, the document shows a historical microversion read-only.
     pub viewing: Option<MicroversionId>,
+    /// Tab whose edits Ctrl+Z / Ctrl+Y revert (Onshape: undo is per tab).
+    pub active_tab: Option<TabId>,
 }
 
 impl Session {
@@ -27,7 +29,7 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None })
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -38,7 +40,7 @@ impl Session {
         let doc = Document::from_blobs(&store.read_all(head)?)?;
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        Ok(Self { path, store, doc, branch, undo, viewing: None })
+        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None })
     }
 
     pub fn name(&self) -> String {
@@ -66,6 +68,26 @@ impl Session {
         Ok(self.undo.commit(&mut self.store, &changes, description)?)
     }
 
+    /// Commit the whole document as an edit Ctrl+Z can't undo (deleting a
+    /// tab, as in Onshape; history restores it).
+    pub fn commit_all_not_undoable(&mut self, description: &str) -> Result<MicroversionId> {
+        let changes = self.all_changes()?;
+        Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?)
+    }
+
+    fn all_changes(&self) -> Result<Vec<(String, Option<Vec<u8>>)>> {
+        let head = self.head()?;
+        let existing: Vec<String> = self.store.names(head)?;
+        let blobs = self.doc.to_blobs();
+        let mut changes: Vec<(String, Option<Vec<u8>>)> = blobs.into_iter().map(|(k, v)| (k, Some(v))).collect();
+        for name in existing {
+            if !changes.iter().any(|(k, _)| *k == name) {
+                changes.push((name, None));
+            }
+        }
+        Ok(changes)
+    }
+
     /// Commit the whole document (used after structural changes).
     pub fn commit_all(&mut self, description: &str) -> Result<MicroversionId> {
         let head = self.head()?;
@@ -85,11 +107,24 @@ impl Session {
         Ok(())
     }
 
+    /// Edits undo/redo may revert from the active tab: those that changed
+    /// its data, or only document-level data (no tab).
+    fn tab_scope(&self) -> Option<impl Fn(&[String]) -> bool + use<>> {
+        let blob = Document::blob_name(self.active_tab?);
+        Some(move |names: &[String]| names.iter().any(|n| *n == blob) || names.iter().all(|n| !n.starts_with("tab/")))
+    }
+
     pub fn can_undo(&self) -> bool {
-        self.undo.can_undo()
+        match self.tab_scope() {
+            Some(scope) => self.undo.can_undo_in(&self.store, &scope),
+            None => self.undo.can_undo(),
+        }
     }
     pub fn can_redo(&self) -> bool {
-        self.undo.can_redo()
+        match self.tab_scope() {
+            Some(scope) => self.undo.can_redo_in(&self.store, &scope),
+            None => self.undo.can_redo(),
+        }
     }
     pub fn undo_description(&self) -> Option<String> {
         self.undo.undo_description().map(str::to_string)
@@ -99,7 +134,11 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> Result<bool> {
-        match self.undo.undo(&mut self.store)? {
+        let mv = match self.tab_scope() {
+            Some(scope) => self.undo.undo_in(&mut self.store, &scope)?,
+            None => self.undo.undo(&mut self.store)?,
+        };
+        match mv {
             Some(mv) => {
                 self.reload(mv)?;
                 Ok(true)
@@ -109,7 +148,11 @@ impl Session {
     }
 
     pub fn redo(&mut self) -> Result<bool> {
-        match self.undo.redo(&mut self.store)? {
+        let mv = match self.tab_scope() {
+            Some(scope) => self.undo.redo_in(&mut self.store, &scope)?,
+            None => self.undo.redo(&mut self.store)?,
+        };
+        match mv {
             Some(mv) => {
                 self.reload(mv)?;
                 Ok(true)

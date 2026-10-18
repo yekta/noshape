@@ -108,6 +108,7 @@ impl DrawingEditor {
         let n = self.drawing.sheets.len();
         let mut out = vec![
             MenuEntry::item("Rename…", move |t, w, cx| t.open_sheet_name_panel(i, w, cx)),
+            MenuEntry::item("Properties…", move |t, w, cx| t.open_sheet_props(i, w, cx)),
             MenuEntry::item("Duplicate", move |t, _, cx| {
                 let mut d = t.drawing.clone();
                 if let Some(j) = d.duplicate_sheet(i) {
@@ -195,20 +196,41 @@ impl DrawingEditor {
             depth += 1;
             cur = p;
         }
+        let named = |fallback: String| v.name.clone().unwrap_or(fallback);
         let (label, icon) = match &v.kind {
-            ViewKind::Base { orientation, .. } => (format!("{orientation:?}"), "base-view"),
-            ViewKind::Projected { .. } => ("Projected view".to_string(), "projected-view"),
+            // Onshape lists views by name: "Front", and projected views by the
+            // orientation they show ("Right").
+            ViewKind::Base { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "base-view"),
+            ViewKind::Projected { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "projected-view"),
             ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), "auxiliary-view"),
             ViewKind::Section { label, .. } => (format!("Section {label}"), "section-view"),
             ViewKind::Detail { label, .. } => (format!("Detail {label}"), "detail-view"),
             _ => ("Section view".to_string(), "section-view"),
         };
         let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
+        let id = v.id;
         crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false)
             .pl(px(indent + 20. * depth as f32))
             .text_color(rgb(0x666666))
             .child(crate::ui::tree_icon(icon, false, cx))
             .child(div().flex_1().truncate().child(label))
+            // Onshape's view row menu: Properties…, Delete.
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    let entries = vec![
+                        MenuEntry::item("Properties…", move |t, w, cx| t.open_view_props(id, w, cx)),
+                        MenuEntry::item("Delete", move |t, _, cx| {
+                            t.selection.clear();
+                            t.edit_sheet("Delete view", cx, |s| s.remove_view(id));
+                        }),
+                    ];
+                    let ed = cx.entity();
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    crate::os_menu::open(e.position, menu, window, cx);
+                }),
+            )
             .into_any_element()
     }
 
@@ -220,7 +242,7 @@ impl DrawingEditor {
         let mut tabs = h_flex().absolute().top(px(5.)).left(px(4.)).gap(px(2.));
         // A dialog panel at the top left (Insert view, View properties)
         // covers the sheet tabs, as in Onshape.
-        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some();
+        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some() || self.sheet_props.is_some() || self.section_dlg.is_some();
         for (i, s) in self.drawing.sheets.iter().enumerate().filter(|_| !covered) {
             let active = i == self.sheet;
             tabs = tabs.child(
@@ -336,7 +358,10 @@ impl DrawingEditor {
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
                 .child(crate::ui::tree_icon("part", false, cx))
-                .child(div().flex_1().truncate().child(name.to_string()))
+                .child(div().min_w_0().truncate().child(name.to_string()))
+                // The reference is the live workspace (not a version): Onshape's badge.
+                .child(div().ml(px(8.)).px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"))
+                .child(div().flex_1())
         };
         // (reference, views) groups of a sheet, in first-view order.
         let groups = |this: &Self, s: &Sheet, cx: &App| {

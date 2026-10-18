@@ -10,7 +10,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::partstudio::{Appearance, PartProperties};
@@ -215,6 +215,14 @@ impl PartStudioView {
                         this.set_visibility(std::slice::from_ref(&rh), true, cx);
                         this.hover = None;
                     })));
+                    if k == PickKind::SketchCurve {
+                        let rc = r.clone();
+                        m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
+                            this.selection = vec![rc.clone()];
+                            this.ui.analysis_tool = None;
+                            this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                        })));
+                    }
                     if k == PickKind::SketchRegion {
                         let rs = r.clone();
                         m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))));
@@ -271,7 +279,16 @@ impl PartStudioView {
                             .item(icon_item(&format!("Hide {body_name}"), "eye-off", Box::new(move |this, _, cx| {
                                 this.set_part_hidden(&b1, true, cx);
                                 this.hover = None;
-                            })))
+                            })));
+                        if k == PickKind::Edge {
+                            let re = r.clone();
+                            m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
+                                this.selection = vec![re.clone()];
+                                this.ui.analysis_tool = None;
+                                this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                            })));
+                        }
+                        m = m
                             .item(item("Isolate…", Box::new(move |this, w, cx| {
                                 this.selection = vec![Reference::Body(b2.clone())];
                                 this.hover = None;
@@ -292,12 +309,12 @@ impl PartStudioView {
                         })));
                         // Copy the part (paste derives it in another Part Studio).
                         let bc = b.clone();
-                        m = m.separator().item(icon_item(&format!("Copy {body_name}"), "copy", Box::new(move |this, _, cx| this.copy_part(bc.clone(), cx))));
+                        m = m.separator().item(icon_item(&format!("Copy {body_name}"), "menu-copy", Box::new(move |this, _, cx| this.copy_part(bc.clone(), cx))));
                         // Drawings and export.
                         let (b7, b8, name) = (b.clone(), b.clone(), body_name.to_string());
                         m = m
                             .separator()
-                            .item(icon_item(&format!("Create Drawing of {body_name}…"), "drawing", Box::new(move |this, w, cx| {
+                            .item(icon_item(&format!("Create Drawing of {body_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| {
                                 let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default() });
                                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
                             })));
@@ -352,7 +369,19 @@ impl PartStudioView {
                 }
                 // Empty space.
                 _ => {
-                    m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
+                    m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx)))).separator();
+                    // Select ▸ everything of a kind (the live capture didn't open this submenu).
+                    let vs = v.clone();
+                    m = m.submenu("Select", window, cx, move |mut sm, _, _| {
+                        for (label, kind) in [("All parts", 0u8), ("All surfaces", 1), ("All sketches", 2), ("All planes", 3), ("All mate connectors", 4)] {
+                            let v = vs.clone();
+                            sm = sm.item(OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                                this.close_context_menu(cx);
+                                this.select_all_of(kind, cx);
+                            })));
+                        }
+                        sm
+                    });
                     if has_selection {
                         m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
                             this.selection.clear();
@@ -642,11 +671,14 @@ impl PartStudioView {
                     cx.notify();
                 })),
             )
-            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some(), cx).tooltip("Analysis tools").dropdown_menu(move |m, _, _| {
-                let (v1, v2) = (view.clone(), view.clone());
-                m.item(PopupMenuItem::new("Curvature analysis").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
+            // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
+            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some(), cx).tooltip("Show analysis tools").dropdown_menu(move |m, _, _| {
+                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                m.item(PopupMenuItem::new("Curve/surface analysis").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx))))
+                    .item(PopupMenuItem::new("Dihedral analysis").on_click(move |_, w, cx| v2.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Dihedral, w, cx))))
+                    .item(PopupMenuItem::new("Curvature color map").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
                     .item(PopupMenuItem::new("Draft analysis").on_click(move |_, w, cx| {
-                        v2.update(cx, |this, cx| {
+                        v4.update(cx, |this, cx| {
                             let a = this.draft_analysis();
                             this.toggle_analysis(a, w, cx)
                         })
@@ -656,6 +688,14 @@ impl PartStudioView {
                 btn("eval-mass", "mass-properties", mass_on, cx).tooltip("Mass properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.show_mass = !this.show_mass;
                     this.ui.measure_pinned = false;
+                    // Onshape: a yellow warning under the toolbar when a part
+                    // has no material (live part-studio/80).
+                    if this.show_mass {
+                        let props = this.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
+                        if this.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
+                            this.message = Some((noshape_model::display::FeatureStatus::Warning, "One or more parts do not have a material defined.".into()));
+                        }
+                    }
                     cx.notify();
                 })),
             )
@@ -670,6 +710,8 @@ impl PartStudioView {
         let ctx = self.context.clone().unwrap();
         let mut rows: Vec<(String, String)> = Vec::new();
         let mut title = "Measure";
+        // Part tab of Mass and section properties, laid out like Onshape's dialog.
+        let mut mass_view: Option<MassView> = None;
         if self.show_mass && self.ui.mass_faces {
             // Face tab: area, perimeter and centroid of the selected faces.
             title = "Mass properties (faces)";
@@ -720,23 +762,26 @@ impl PartStudioView {
                 }
                 let len3 = Dim { length: 3, angle: 0 };
                 let len2 = Dim { length: 2, angle: 0 };
-                rows.push(("Volume".into(), self.fmt(Quantity::new(mp.volume, len3), cx)));
-                rows.push(("Surface area".into(), self.fmt(Quantity::new(mp.surface_area, len2), cx)));
-                rows.push(("Mass".into(), mp.mass.map(|m| format!("{m:.4} kg{}", if overrides.is_some() { " (override)" } else { "" })).unwrap_or_else(|| "assign a material".into())));
                 let c = mp.center_of_mass;
                 let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
-                rows.push(("Center of mass".into(), format!("{}, {}, {}", l(c.x), l(c.y), l(c.z))));
                 // Onshape lists the moments of inertia about the center of mass
                 // (needs a material, like the mass).
-                if mp.mass.is_some() {
-                    let units = self.doc.read(cx).session.doc.settings.units;
-                    let f = units.si_factor(Dim::LENGTH).powi(2);
-                    let sym = units.length.symbol();
-                    let i = mp.inertia;
-                    let v = |x: f64| format!("{:.4} kg·{sym}²", x / f);
-                    rows.push(("Ixx / Iyy / Izz".into(), format!("{} / {} / {}", v(i.x_axis.x), v(i.y_axis.y), v(i.z_axis.z))));
-                    rows.push(("Ixy / Ixz / Iyz".into(), format!("{} / {} / {}", v(i.y_axis.x), v(i.z_axis.x), v(i.z_axis.y))));
-                }
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let f = units.si_factor(Dim::LENGTH).powi(2);
+                let sym = units.length.symbol();
+                let i = mp.inertia;
+                let v = |x: f64| format!("{:.4}", x / f);
+                mass_view = Some(MassView {
+                    volume: self.fmt(Quantity::new(mp.volume, len3), cx),
+                    area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
+                    mass: mp.mass.map(|m| format!("{m:.4} kg")),
+                    // Without a material Onshape leaves the center of mass empty.
+                    center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
+                    inertia_unit: format!("{sym}² kg"),
+                    inertia: mp.mass.map(|_| [[v(i.x_axis.x), v(i.y_axis.x), v(i.z_axis.x)], [v(i.x_axis.y), v(i.y_axis.y), v(i.z_axis.y)], [v(i.x_axis.z), v(i.y_axis.z), v(i.z_axis.z)]]),
+                    parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
+                    reference: reference.as_ref().map(|r| r.4.clone()),
+                });
             }
         } else {
             if self.selection.is_empty() && !self.ui.measure_pinned {
@@ -786,8 +831,163 @@ impl PartStudioView {
         }
         let current_type = self.ui.measure_type.unwrap_or("Show all");
         let view = cx.entity();
-        let type_menu = (!self.show_mass).then(|| {
-            Button::new("measure-type").label(current_type).ghost().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let close = move |id: &'static str, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(28.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.panel_hover))
+                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.show_mass = false;
+                    this.ui.measure_pinned = false;
+                    this.selection.clear();
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                }))
+        };
+        let help = || div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
+        // active, the caption small on top once something is listed.
+        // `invalid`: entries in red (live: parts without a material).
+        let field = |label: &str, items: Vec<String>, active: bool, invalid: bool| {
+            let empty = items.is_empty();
+            v_flex()
+                .mx(px(3.))
+                .my(px(2.))
+                .rounded(px(2.))
+                .border_1()
+                .border_color(if active { pal.accent } else { pal.border })
+                .when(active, |d| d.bg(pal.row_hover))
+                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
+                .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { gpui_kit::rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().text_color(pal.text_muted).child("×"))))
+        };
+        // Label and right-aligned read-only value on an underline (12 px `#666` label).
+        let value_row = |label: SharedString, value: String| {
+            h_flex()
+                .h(px(28.))
+                .child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(label))
+                .child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(value))
+        };
+        let selected_names: Vec<String> = {
+            let label = self.labeler(cx);
+            self.selection.iter().map(|r| label(r)).collect()
+        };
+        if self.show_mass {
+            // Onshape (live, dom/dialog-mass-properties.txt): a 440 px dialog in the
+            // feature-dialog place; tabs Part | Face; Parts to measure; Mate
+            // connector for reference frame; Show calculation variance; Mass,
+            // Volume, Surface area, Center of mass, Mass moments of inertia.
+            let tab = |id: &'static str, label: &'static str, faces: bool, cx: &mut Context<Self>| {
+                let on = self.ui.mass_faces == faces;
+                div()
+                    .id(id)
+                    .flex_1()
+                    .h(px(26.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(12.))
+                    .cursor_pointer()
+                    .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                    .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(pal.border))
+                    .child(label)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.ui.mass_faces = faces;
+                        cx.notify();
+                    }))
+            };
+            // Read-only Override (live: a gray `#999` filled box).
+            let disabled_check = |id: &'static str| h_flex().id(id).h(px(27.)).pl(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(pal.text_muted).child(div().size(px(12.)).rounded(px(3.)).bg(gpui_kit::rgb(0x999999))).child("Override");
+            let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).text_size(px(12.)).text_color(gpui_kit::rgb(c)).child(l).child(glyph);
+            let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("mass-tab-part", "Part", false, cx)).child(tab("mass-tab-face", "Face", true, cx)));
+            match mass_view {
+                Some(m) => {
+                    body = body
+                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none()))
+                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false))
+                        .child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false))
+                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(crate::ui::os_checkbox("mass-override", "Override", false)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
+                        .child(value_row("Volume".into(), m.volume.clone()))
+                        .child(value_row("Surface area".into(), m.area.clone()))
+                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
+                        .children([("X", 0xcd0000u32, "↘"), ("Y", 0x009400, "↗"), ("Z", 0x0000d0, "↑")].into_iter().zip(m.center.iter()).map(|((l, c, g), v)| {
+                            h_flex().h(px(26.)).child(axis(l, c, g)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v.clone()))
+                        }))
+                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(disabled_check("moi-override")));
+                    let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
+                    for (r, row_names) in names.iter().enumerate() {
+                        let mut row = h_flex().h(px(26.)).px(px(5.)).gap(px(8.));
+                        for (c, n) in row_names.iter().enumerate() {
+                            let v = m.inertia.as_ref().map(|i| i[r][c].clone()).unwrap_or_default();
+                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v)));
+                        }
+                        body = body.child(row);
+                    }
+                }
+                None => {
+                    body = body.child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, selected_names.clone(), true, false));
+                    for (k, v) in rows {
+                        body = body.child(value_row(k.into(), v));
+                    }
+                }
+            }
+            return vec![
+                v_flex()
+                    .id("mass-dialog")
+                    .occlude()
+                    .absolute()
+                    .top(px(3.))
+                    .left(px(0.))
+                    .w(px(440.))
+                    .bg(pal.dialog_bg)
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                    .text_color(pal.text)
+                    .child(
+                        h_flex()
+                            .h(px(29.))
+                            .pl(px(6.))
+                            .bg(pal.panel)
+                            .border_b_1()
+                            .border_color(pal.border)
+                            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties"))
+                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).child(crate::assets::icon("dialog-ok", 20., cx)))
+                            .child(close("mass-close", cx)),
+                    )
+                    .child(body.px(px(0.)).pb(px(4.)))
+                    .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(help()))
+                    .into_any_element(),
+            ];
+        }
+        // Onshape's Measure panel (live, part-studio/82): 220 px, docked at the
+        // bottom right; "Measure" + ×; the selection field; Measure type,
+        // Length unit, Angle unit; Reference coordinate system; then one row
+        // per result with the value in monospace.
+        let select_row = |label: &'static str, value: SharedString, menu: Option<AnyElement>| {
+            h_flex()
+                .h(px(26.))
+                .px(px(5.))
+                .gap(px(4.))
+                .child(div().text_size(px(12.)).text_color(pal.text).child(label))
+                .child(match menu {
+                    Some(m) => m,
+                    None => h_flex().flex_1().h(px(22.)).px(px(4.)).border_b_1().border_color(pal.border).text_size(px(13.33)).child(div().flex_1().child(value)).child(crate::ui::glyph("ui-caret-down", 10., pal.text)).into_any_element(),
+                })
+        };
+        let type_menu = Button::new("measure-type")
+            .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false))
+            .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).child(current_type)).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
+            .flex_1()
+            .h(px(22.))
+            .px(px(4.))
+            .rounded(px(0.))
+            .border_b_1()
+            .border_color(pal.border)
+            .dropdown_menu(move |mut m, _, _| {
                 for t in ["Show all", "Distance", "Length", "Area", "Angle", "Radius", "Diameter", "Position"] {
                     let v = view.clone();
                     m = m.item(PopupMenuItem::new(t).checked(t == current_type).on_click(move |_, _, cx| {
@@ -799,55 +999,51 @@ impl PartStudioView {
                 }
                 m
             })
-        });
-        let close = Button::new("measure-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.show_mass = false;
-            this.ui.measure_pinned = false;
-            this.selection.clear();
-            this.refresh_scene(false, cx);
-            cx.notify();
-        }));
+            .into_any_element();
+        let length_unit: SharedString = format!("{:?}", units.length).into();
+        let angle_unit: SharedString = format!("{:?}", units.angle).into();
         vec![
             v_flex()
                 .id("measure-panel")
                 .occlude()
                 .absolute()
-                .bottom(px(46.))
-                .right_3()
-                .w(px(280.))
-                .p_2()
-                .gap_1()
-                .rounded_lg()
-                .bg(with_alpha(pal.panel_raised, 0.95))
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(h_flex().justify_between().child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(title.to_uppercase())).child(h_flex().children(type_menu).child(close)))
-                .when(self.show_mass, |d| {
-                    // Part / Face tabs (Onshape mass properties dialog).
-                    let tab = |id: &'static str, label: &'static str, faces: bool, cx: &mut Context<Self>| {
-                        let on = self.ui.mass_faces == faces;
-                        div()
-                            .id(id)
-                            .px_2()
-                            .text_xs()
-                            .cursor_pointer()
-                            .text_color(if on { pal.accent } else { pal.text_muted })
-                            .when(on, |d| d.border_b_1().border_color(pal.accent))
-                            .child(label)
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.ui.mass_faces = faces;
-                                cx.notify();
-                            }))
-                    };
-                    d.child(h_flex().gap_1().child(tab("mass-tab-part", "Part", false, cx)).child(tab("mass-tab-face", "Face", true, cx)))
-                })
-                .children(rows.into_iter().map(|(k, v)| {
-                    h_flex().justify_between().gap_2().child(div().text_xs().text_color(pal.text_muted).child(k)).child(div().text_xs().text_color(pal.text).child(v))
+                .bottom(px(36.))
+                .right(px(40.))
+                .w(px(220.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", cx)))
+                .child(field("Select entities to measure", selected_names, true, false))
+                .child(select_row("Measure type:", current_type.into(), Some(type_menu)))
+                .child(select_row("Length unit:", length_unit, None))
+                .child(select_row("Angle unit:", angle_unit, None))
+                .child(crate::ui::os_checkbox("measure-ref", "Reference coordinate system", false))
+                .children(rows.into_iter().filter(|(k, _)| !k.starts_with("Select")).map(|(k, v)| {
+                    h_flex()
+                        .min_h(px(26.))
+                        .px(px(5.))
+                        .gap(px(4.))
+                        .text_size(px(13.33))
+                        .child(div().text_color(pal.text).child(format!("{k}:")))
+                        .child(div().px(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).border_b_1().border_color(pal.border).font_family("monospace").text_size(px(12.)).child(v))
                 }))
+                .child(h_flex().h(px(22.)).px(px(4.)).justify_end().bg(gpui_kit::rgb(0xeeeeee)).child(help()))
                 .into_any_element(),
         ]
     }
+}
+
+/// The Part tab of Mass and section properties, formatted.
+struct MassView {
+    volume: String,
+    area: String,
+    mass: Option<String>,
+    center: [String; 3],
+    inertia_unit: String,
+    inertia: Option<[[String; 3]; 3]>,
+    parts: Vec<String>,
+    reference: Option<String>,
 }
 
 trait WhenSelected {

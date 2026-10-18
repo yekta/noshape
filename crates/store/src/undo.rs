@@ -2,6 +2,16 @@
 
 use crate::{BranchId, Document, MicroversionId, Result, StoreError};
 
+/// Edits that Ctrl+Z can't revert (Onshape: deleting a tab; it comes back
+/// only by restoring from the Versions and history panel). They are not
+/// recorded; earlier edits of other tabs stay undoable.
+pub const NOT_UNDOABLE_PREFIXES: &[&str] = &["Delete tab"];
+
+/// Whether a change description is one of [`NOT_UNDOABLE_PREFIXES`].
+pub fn is_not_undoable(description: &str) -> bool {
+    NOT_UNDOABLE_PREFIXES.iter().any(|p| description.starts_with(p))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Entry {
     /// State before the edit.
@@ -9,6 +19,8 @@ struct Entry {
     /// State the edit produced.
     after: MicroversionId,
     description: String,
+    /// Names the edit changed (None: not known yet, read from the store).
+    changed: Option<Vec<String>>,
 }
 
 /// Undo/redo for one branch during one editing session.
@@ -74,18 +86,19 @@ impl UndoStack {
                 continue;
             }
             let d = m.description.as_str();
-            if let Some(rest) = d.strip_prefix("Undo ")
-                && stack.undo.last().is_some_and(|e| e.description == rest)
-                && stack.expected_head == Some(parent)
-            {
-                let e = stack.undo.pop().expect("non-empty");
+            if is_not_undoable(d) {
+                stack.expected_head = Some(m.id);
+                continue;
+            }
+            // Scoped undo/redo may revert an entry below the newest one.
+            let undo_at = d.strip_prefix("Undo ").and_then(|rest| stack.undo.iter().rposition(|e| e.description == rest));
+            let redo_at = d.strip_prefix("Redo ").and_then(|rest| stack.redo.iter().rposition(|e| e.description == rest));
+            if let Some(i) = undo_at.filter(|_| stack.expected_head == Some(parent)) {
+                let e = stack.undo.remove(i);
                 stack.redo.push(e);
                 stack.expected_head = Some(m.id);
-            } else if let Some(rest) = d.strip_prefix("Redo ")
-                && stack.redo.last().is_some_and(|e| e.description == rest)
-                && stack.expected_head == Some(parent)
-            {
-                let e = stack.redo.pop().expect("non-empty");
+            } else if let Some(i) = redo_at.filter(|_| stack.expected_head == Some(parent)) {
+                let e = stack.redo.remove(i);
                 stack.undo.push(e);
                 stack.expected_head = Some(m.id);
             } else {
@@ -138,6 +151,92 @@ impl UndoStack {
         self.expected_head = None;
     }
 
+    /// Commits an edit that can't be undone (see [`NOT_UNDOABLE_PREFIXES`]):
+    /// it is not recorded; the redo list is dropped as after any edit.
+    pub fn commit_not_undoable<N: AsRef<str>, B: AsRef<[u8]>>(&mut self, doc: &mut Document, changes: &[(N, Option<B>)], description: &str) -> Result<MicroversionId> {
+        let before = doc.head(self.branch)?;
+        let after = doc.commit(self.branch, changes, description)?;
+        if self.expected_head.is_some_and(|h| h != before) {
+            self.undo.clear();
+        }
+        self.redo.clear();
+        self.expected_head = Some(after);
+        Ok(after)
+    }
+
+    fn changed_names(doc: &Document, e: &Entry) -> Result<Vec<String>> {
+        match &e.changed {
+            Some(c) => Ok(c.clone()),
+            None => Ok(doc.diff(e.before, e.after)?.into_iter().map(|c| c.name).collect()),
+        }
+    }
+
+    /// Whether some edit `in_scope` (given the names it changed) can be undone.
+    pub fn can_undo_in(&self, doc: &Document, in_scope: &dyn Fn(&[String]) -> bool) -> bool {
+        self.undo.iter().any(|e| Self::changed_names(doc, e).is_ok_and(|c| in_scope(&c)))
+    }
+
+    pub fn can_redo_in(&self, doc: &Document, in_scope: &dyn Fn(&[String]) -> bool) -> bool {
+        self.redo.iter().any(|e| Self::changed_names(doc, e).is_ok_and(|c| in_scope(&c)))
+    }
+
+    /// Onshape-style per-tab undo: reverts the newest edit `in_scope`
+    /// (given the names it changed) by restoring just the names it changed
+    /// (names a newer edit changed again are kept), as a new microversion
+    /// "Undo <description>". Edits of other tabs are left as they are.
+    pub fn undo_in(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool) -> Result<Option<MicroversionId>> {
+        self.check_fresh(doc)?;
+        let mut found = None;
+        for i in (0..self.undo.len()).rev() {
+            let c = Self::changed_names(doc, &self.undo[i])?;
+            if in_scope(&c) {
+                found = Some((i, c));
+                break;
+            }
+        }
+        let Some((i, names)) = found else { return Ok(None) };
+        let mut newer: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for e in &self.undo[i + 1..] {
+            newer.extend(Self::changed_names(doc, e)?);
+        }
+        let mut e = self.undo.remove(i);
+        e.changed = Some(names.clone());
+        let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
+        for n in names.into_iter().filter(|n| !newer.contains(n)) {
+            let v = doc.read(e.before, &n)?;
+            changes.push((n, v));
+        }
+        let mv = doc.commit(self.branch, &changes, &format!("Undo {}", e.description))?;
+        self.expected_head = Some(mv);
+        self.redo.push(e);
+        Ok(Some(mv))
+    }
+
+    /// Re-applies the newest undone edit `in_scope` (names it changed set
+    /// back to what the edit produced).
+    pub fn redo_in(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool) -> Result<Option<MicroversionId>> {
+        self.check_fresh(doc)?;
+        let mut found = None;
+        for i in (0..self.redo.len()).rev() {
+            let c = Self::changed_names(doc, &self.redo[i])?;
+            if in_scope(&c) {
+                found = Some((i, c));
+                break;
+            }
+        }
+        let Some((i, names)) = found else { return Ok(None) };
+        let e = self.redo.remove(i);
+        let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
+        for n in names {
+            let v = doc.read(e.after, &n)?;
+            changes.push((n, v));
+        }
+        let mv = doc.commit(self.branch, &changes, &format!("Redo {}", e.description))?;
+        self.expected_head = Some(mv);
+        self.undo.push(e);
+        Ok(Some(mv))
+    }
+
     /// Commits through [`Document::commit`] and records the edit. A commit
     /// that changes nothing is not recorded.
     pub fn commit<N: AsRef<str>, B: AsRef<[u8]>>(
@@ -149,6 +248,9 @@ impl UndoStack {
         let before = doc.head(self.branch)?;
         let after = doc.commit(self.branch, changes, description)?;
         self.record(before, after, description);
+        if let Some(e) = self.undo.last_mut().filter(|e| e.after == after) {
+            e.changed = Some(doc.diff(before, after)?.into_iter().map(|c| c.name).collect());
+        }
         Ok(after)
     }
 
@@ -168,6 +270,7 @@ impl UndoStack {
             before,
             after,
             description: description.to_string(),
+            changed: None,
         });
         if self.undo.len() > self.limit {
             let excess = self.undo.len() - self.limit;

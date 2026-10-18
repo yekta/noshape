@@ -37,12 +37,63 @@ pub(crate) fn now_ms() -> Timestamp {
         .unwrap_or(0)
 }
 
-/// Name of the local OS user, used as the author of microversions.
+/// Author name set by the app (user preference); overrides the OS name.
+static AUTHOR_OVERRIDE: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// Use `name` as the author of new microversions and versions (None: the OS
+/// user's name).
+pub fn set_default_author(name: Option<String>) {
+    if let Ok(mut a) = AUTHOR_OVERRIDE.write() {
+        *a = name.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    }
+}
+
+/// Name of the local user, used as the author of microversions: the app's
+/// override, else the OS account's full name (GECOS on Linux, `id -F` on
+/// macOS, `net user` on Windows), else the login name.
 pub fn local_user_name() -> String {
+    if let Some(n) = AUTHOR_OVERRIDE.read().ok().and_then(|a| a.clone()) {
+        return n;
+    }
+    os_user_name()
+}
+
+/// The OS account's full name, else the login name (cached).
+pub fn os_user_name() -> String {
+    static OS_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    OS_NAME
+        .get_or_init(|| {
+            let login = os_login();
+            os_full_name(&login).unwrap_or(login)
+        })
+        .clone()
+}
+
+/// The OS login name.
+pub fn os_login() -> String {
     ["USER", "USERNAME", "LOGNAME"]
         .iter()
         .find_map(|k| std::env::var(k).ok().filter(|s| !s.is_empty()))
         .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// The account's full name, if the OS has one.
+fn os_full_name(login: &str) -> Option<String> {
+    let clean = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty() && s != login);
+    if cfg!(target_os = "macos") {
+        let out = std::process::Command::new("id").arg("-F").output().ok()?;
+        return clean(&String::from_utf8_lossy(&out.stdout));
+    }
+    if cfg!(windows) {
+        let out = std::process::Command::new("net").args(["user", login]).output().ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let line = text.lines().find(|l| l.starts_with("Full Name"))?;
+        return clean(line.trim_start_matches("Full Name"));
+    }
+    // Unix: the GECOS field (5th) of /etc/passwd, up to the first comma.
+    let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
+    let line = passwd.lines().find(|l| l.split(':').next() == Some(login))?;
+    clean(line.split(':').nth(4)?.split(',').next()?)
 }
 
 /// One committed document state.

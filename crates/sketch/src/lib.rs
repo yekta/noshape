@@ -24,6 +24,8 @@ mod dual;
 pub mod entities;
 mod equations;
 pub mod dxf;
+pub mod cad;
+pub mod dwg;
 pub mod eval;
 pub mod geom;
 pub mod ids;

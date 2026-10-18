@@ -5,7 +5,7 @@ drawing, start window / documents page, Variable Studio, versions panel, tab man
 toasts. The Part Studio chrome and theme.rs belong to agent "ui" (docs/handoff/theme-layout.md).
 Build dir /root/target-ui2, display :105. Side-by-side shots (ours | Onshape) in /tmp/ui2-shots/.
 
-## State (2026-10-18 14:00 UTC)
+## State (2026-10-18 16:50 UTC)
 
 Taken over at 13:25 by a fresh "ui2" (previous one ran out of quota; nothing was half done except the
 sheets-panel patch, which had been applied).
@@ -14,8 +14,16 @@ sheets-panel patch, which had been applied).
   dialog (asb is editing it) and the view cube still to do.
 - Drawing: sheet, frame, text and Sheets panel done (see below). Toolbar contents are asb's.
 - Variable Studio, Versions and history (+ Create version / Create workspace dialogs) and Tab manager: done.
-- Next: generic confirmation dialogs and toasts, assembly leftovers (mate glyphs, triad, Insert dialog, view
-  cube), then the sketch + documents second pass.
+- Toasts: `os_ui::message_bubble` (Onshape's `.osx-message-bubble`), used by the assembly. Assembly now uses
+  ui's shared view cube (+ its own camera menu) instead of the six view buttons.
+- os_menu: **ui2 took the assembly and drawing right-click menus** — both switched (drawing
+  `fill_os_menu`; assembly `assembly_behaviors::fill_menu` now builds an `OsMenu`, rows use
+  `os_context_menu`, graphics-area menus `OsMenu::build` in `ui.ctx_menu`). Kit dropdowns stay.
+- Assembly mate glyphs and triad restyled (see Assembly below). Insert dialog not touched (asb).
+- Verified in the app (16:50 UTC build): drawing, Variable Studio, versions, tab manager, assembly cube /
+  triad / mate glyph / menus, documents times, sketch dimensions. Clippy: nothing from my files.
+- Next (not started): drawing toolbar/annotation polish against drawing/10-15 (dimension hover grips are
+  asb's), the Insert dialog (asb is editing it), Part Studio toast → `os_ui::message_bubble` (ui's file).
 
 ## Done
 
@@ -45,9 +53,12 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 - /tmp/ui2-shots/final-variable-studio.png
 - /tmp/ui2-shots/final-versions.png, final-version-dialogs.png (ours above Onshape)
 - /tmp/ui2-shots/final-tab-manager.png
+- /tmp/ui2-shots/final-assembly-triad-glyph.png (triad top, mate glyph bottom), final-assembly-menu.png
+- /tmp/ui2-shots/final-documents.png (Recently opened, Onshape time stamps)
+- /tmp/ui2-shots/final-sketch.png (16 px dimension values, region fill)
 
 ### Sketch (sketch_mode.rs, part_studio/sketch.rs, scene_builder.rs; surgical)
-- Dimension values: 14 px black text with no box (hover `#d9bfa0`, selected `#d9a566` rounded boxes, driven
+- Dimension values: 16 px black text (live: 12 px digits, black cores; second pass) with no box (hover `#d9bfa0`, selected `#d9a566` rounded boxes, driven
   `#666`), lengths without the document unit (Onshape shows "4", "Ø1"); dimension lines are broken around the
   value (`clip_outside_box`); arrowheads are filled narrow triangles; selected dimension lines 2 px.
   `overlay()` now takes `&UnitPrefs` (one caller in sketch.rs).
@@ -69,6 +80,15 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 - Mate dialog in the feature-dialog frame: 28 px header (title red while invalid, green ✓, red ✗),
   underlined mate-type dropdown, Onshape selection box(es) for the connectors, Onshape checkboxes, underlined
   offset/limit fields, bottom row flip / reorient / animate / Solve / ?.
+- View cube: ui's shared `part_studio::view_cube::view_cube` (hover/origin in `cube_hover`/`cube_origin`),
+  with an assembly camera menu (Isometric/Dimetric/Trimetric, Zoom to fit, Perspective view, Show mates)
+  replacing the six view buttons.
+- Mate glyph (assembly_scene `with_highlights`): Onshape's flat square in the connector plane (half size
+  `triad_size * 0.17`): white piece + `#90cef1` L (gray when inactive), dark outline (red on error, amber
+  when hovered/selected). Filled with dense ON_TOP strokes (meshes can't draw over parts), pickable. `Highlights::mate_glyphs` now carries the frame.
+- Triad: hollow strokes (`#f7f7f8` core, `#969da3` edge), shafts with outlined triangle heads, small
+  rotation rings + ticks at the tips (Ring handles), parallelogram plane handles near the origin (faint
+  pickable fill), ring center; hover `#3e94ff`. Same `ManipHandle` picks as before.
 - Shots: /tmp/ui2-shots/mate-dialog.png, /tmp/ui2-shots/assembly-window.png.
 
 ### Drawing (drawing_view.rs, drawing_scene.rs, drawing_extra.rs, drawing_ui.rs; model drawing/sheet.rs, font.rs)
@@ -91,13 +111,36 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 
 - Sheets panel nests derived views under their parent (20 px per level), like Onshape.
 
-### Variable Studio (variable_studio.rs, rewritten render)
-- Onshape's table: undo/redo toolbar, table 42 px lower, centered 561 px; `#eaeaea` 35 px title row
-  (caret collapses, 16 px/500 tab name, blue `•••` menu with Copy table), `#eaeaea` bold header row, 140 px
-  columns, 34 px rows, `#aaa` rules, borderless inputs (text 7 px in), "Length ▾" type dropdown (Length,
-  Angle, Number, Any). Last row = italic "Name" cell: typing a name adds a Length variable = `0 <doc unit>`.
-  Values with `#refs` show their result until clicked. Row right-click: Delete, Move up, Move down.
-- Not done: "Insert Variable Studio" button and the "Insert into all Part Studios" footer (no model).
+### Variable Studio (variable_studio.rs, variable_insert.rs; model variables.rs) — Onshape's model
+- **Model (crates/model/src/variables.rs, mine for this):** `VariableStudio { variables, insert_into_all
+  (default true, serde default true so old documents keep every studio visible everywhere), inserted:
+  Vec<StudioRef> }`; `StudioRef { studio, variables: Option<Vec<String>> }` (whole table or single
+  variables). Part Studios and Assemblies have `variable_studios: VariableStudioRefs { inserted, removed }`.
+  `element_studios(doc, element)` = auto-inserted (checked studios, doc order, not removed there) + the
+  element's explicit references; `element_variables(doc, element)` = their variables, later tables win;
+  `studio_variables` / `studio_evaluation` evaluate a studio with the tables inserted into it in scope
+  (cycles cut). `insert_studio`, `remove_studio`, `insert_into_studio`. Tests: `studio_scope_tests`.
+  `document_variables` is gone: every regen call site (Part Studio regen, preview, sketch, derived,
+  thumbnails, evaluated-value hints) uses `element_variables(doc, tab)`, so a `#name` from a studio that
+  isn't inserted doesn't resolve (the expression evaluator's unknown-variable error; exact Onshape error
+  text requested in REQUESTS.md).
+- **Variable Studio tab:** Onshape's table (undo/redo toolbar; centered 561 px; `#eaeaea` title and header
+  rows; 140 px columns, 34 px rows, `#aaa` rules; borderless inputs; "Length ▾" types; italic "Name" add
+  row → Length `0 <doc unit>`). Plain values show as typed; expressions show their result until clicked
+  (`is_expression`, `expression_unit`). Row right-click: Delete, Move up, Move down. "…": Copy table,
+  Rename (inline title edit). Inserted studios show as read-only tables above (title, "…": Switch to <studio>,
+  Move up/down, Remove reference). "Insert Variable Studio" opens the dialog. Footer (live DOM): 40 px
+  `#eee` bar, "☑ Insert into all Part Studios and Assemblies" (toggles `insert_into_all`) + `?▾` (explains
+  checked/unchecked; exact menu requested).
+- **Insert Variable Studio dialog (variable_insert.rs):** modal, tabs Current document | Other documents;
+  each studio row inserts/removes the whole table, its caret lists `#variables` to insert singly; checks
+  show the real insertion state of the target (a studio, or a Part Studio / Assembly).
+  **Other documents is not implemented yet** (needs cross-document, versioned references) — next.
+- **Part Studio Variable table panel (config_panel.rs, ui's file; surgical):** after the Part Studio's own
+  table, one editable table per inserted studio (`VariableStudioView::new_in_panel`, kept in
+  `ui.var_tables`), "…": Copy table, Switch to, Move up/down, Remove reference. Footer split button
+  "Create Variable Studio | ▴" (menu: Create / Insert Variable Studio) = `variable_insert::panel_footer`;
+  Create adds a studio tab right after the element. **Assembly Variable table panel: next.**
 
 ### Versions and history (history_panel.rs, rewritten)
 - 380 px panel (`PANEL_W`, workspace uses it): header "Versions and history" + create version / compare /
@@ -112,6 +155,19 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
   Create / Cancel); the rail's Create version button opens it directly. Branch = "Create workspace from
   **V1**" (Name B<n>, ☑ Open new workspace). Both guard against Enter creating twice.
 - New icons compare.svg, auto-version.svg.
+
+### Toasts and menus
+- `os_ui::message_bubble(id, kind, msg, on_close, cx)`: 14 px text, radius 5.25, padding 4/37/4/10,
+  18 px icon (msg-info/-warning/-error.svg; info = `#769fcc` disc with a white i), bold 21 px `#467bb6` ×.
+  Used by the assembly (top center, 9 px down). The Part Studio toast is ui's (`ui::alert`); it could use
+  the same helper.
+- Drawing right-click menus (canvas, sheet rows) open `os_menu` menus (`drawing_view::fill_os_menu`);
+  toolbar/panel dropdowns still use the kit `fill_menu` (they are dropdowns, not context menus).
+
+### Dialogs
+- Assembly Export and the in-app file path prompt (files.rs, used with NOSHAPE_NO_NATIVE_DIALOGS) use the
+  Onshape modal (`os_ui::modal` + body + footer: blue primary, gray Cancel).
+- Documents list Modified column: Onshape's "1:15 PM Today" format.
 
 ### Tab manager (tab_manager.rs, new; workspace.rs wiring)
 - Docked 380 px left panel (shares the slot with Versions and history): "Tabs" header with search / ×,
@@ -138,17 +194,27 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 
 ## Requests to other agents
 
-- ui: the Sketch dialog should not show the "Final"/preview footer; Onshape puts the Show constraints /
-  expressions / errors checkboxes in the dialog itself (we draw them in a panel right below it).
-- ui: the view cube (part_studio/view_cube.rs) is tied to PartStudioView; Onshape shows it in assemblies too.
-  A reusable cube would let the assembly drop its six view buttons.
+- ui: (done) the Sketch dialog checkboxes and the reusable view cube — thanks; the assembly uses the cube.
+- ui: the Part Studio toast could use `os_ui::message_bubble` (Onshape's bubble: icon, 14 px, bold × ).
+- asb: clippy in your files: `drawing_ui.rs:170` redundant pattern matching, unused `TabContent` import in
+  drawing_ui.rs, and `model/src/drawing/clipboard.rs:78/89` loop counters (these stop
+  `clippy -D warnings`).
 
 ## For the lead
 
 - New file `crates/app/src/os_ui.rs`; `main.rs` gets `mod os_ui;` and one `t.overlay` line.
 - theme.rs: one added constant `viewport::SKETCH_REGION`.
+- **Cargo:** crates/app/Cargo.toml adds `chrono = { version = "0.4", default-features = false, features =
+  ["clock", "std"] }` (already in Cargo.lock as a transitive dep; the lock only gains it in noshape's
+  dependency list). Used by `start_library::format_onshape_time` ("1:15 PM Today", local time) for the
+  documents list and the versions panel; the old relative `format_modified` / `capitalize` /
+  `civil_from_days` are gone.
 - New files `tab_manager.rs` (main.rs `mod tab_manager;`); workspace.rs: tab manager panel wiring, history
   panel width, rail Create version opens the dialog, tab-search cell toggles the tab manager.
 - `drawing_ui.rs:12` unused `TabContent` import comes from asb's edit, not mine.
 - model drawing/sheet.rs (border) and drawing/font.rs (`text_fill`, `fill_supported`, a test) are asb's
   files; my edits there are self-contained.
+- New icons (our own artwork): sheet-page, sheet-insert, compare, auto-version, msg-info, msg-warning,
+  msg-error (.svg in crates/app/assets/icons).
+- Verified only in my sandbox worktree `/root/noshape-ui2` (the shared tree had other agents' half-done
+  edits); the shared tree has all my changes. The worktree can be removed when the lead no longer needs it.

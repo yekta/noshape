@@ -184,11 +184,13 @@ pub fn quad(x0: f64, y0: f64, x1: f64, y1: f64, z: f32) -> MeshData {
 pub struct Overlay {
     pub lines: Vec<(Vec<[f64; 2]>, bool)>,
     pub points: Vec<[f64; 2]>,
+    /// Placement inference lines (Onshape: thin red dashed lines).
+    pub infer: Vec<([f64; 2], [f64; 2])>,
 }
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
-        self.lines.is_empty() && self.points.is_empty()
+        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty()
     }
     pub fn circle(&mut self, c: [f64; 2], r: f64, dashed: bool) {
         let pts = (0..=72).map(|i| {
@@ -214,6 +216,9 @@ impl Overlay {
                     style: LineSegment::ON_TOP | if *dashed { LineSegment::DASHED } else { 0 },
                 });
             }
+        }
+        for (a, b) in &self.infer {
+            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.5], b: [b[0] as f32, b[1] as f32, 0.5], color: [230, 40, 40, 255], pick_id: 0, width: 1.0, style: LineSegment::ON_TOP | LineSegment::DASHED });
         }
         let mut p = PointData::default();
         for q in &self.points {

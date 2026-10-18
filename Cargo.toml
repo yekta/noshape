@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# Vendored, patched dependencies (see [patch.crates-io]); not workspace members.
+exclude = ["vendor"]
 default-members = ["crates/app"]
 
 [workspace.package]
@@ -55,3 +57,10 @@ debug = false
 lto = "thin"
 codegen-units = 1
 debug = "line-tables-only"
+
+# NOSHAPE PATCH: gpui's Linux platform with application image cursors on
+# Wayland (Onshape's selection-count cursor). Only the files marked
+# "NOSHAPE PATCH" differ from the published 0.3.9; see
+# vendor/gpui-pre-linux/src/custom_cursor.rs.
+[patch.crates-io]
+gpui-pre-linux = { path = "vendor/gpui-pre-linux" }

@@ -579,6 +579,9 @@ impl InstancePattern {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Assembly {
     pub instances: Vec<Instance>,
+    /// Variable Studio tables in this Assembly's Variable table.
+    #[serde(default)]
+    pub variable_studios: crate::variables::VariableStudioRefs,
     pub mates: Vec<Mate>,
     #[serde(default)]
     pub relations: Vec<Relation>,

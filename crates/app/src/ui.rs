@@ -6,7 +6,7 @@ use crate::assets;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Sizable as _, h_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -118,30 +118,66 @@ pub struct RichTooltip {
     title: SharedString,
     description: SharedString,
     expanded: bool,
+    /// The tool's bounds and where gpui puts the tooltip's top-left (the
+    /// pointer + 1 px, flipped at the window's right edge), to center the
+    /// tooltip under the tool like Onshape.
+    anchor: Bounds<Pixels>,
+    origin: Point<Pixels>,
 }
+
+/// Width of the expanded tooltip (live).
+const RICH_TOOLTIP_W: f32 = 400.;
 
 impl Render for RichTooltip {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        div()
-            .bg(pal.tooltip)
-            .text_color(pal.text)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
-            .px(px(7.))
-            .pt(px(4.))
-            .pb(px(3.))
-            .text_size(px(12.))
-            .when(self.expanded, |d| d.w(px(400.)))
-            .child(div().font_weight(FontWeight::MEDIUM).child(self.title.clone()))
-            .when(self.expanded && !self.description.is_empty(), |d| d.child(div().pt(px(6.)).pb(px(2.)).child(self.description.clone())))
+        // Live (part-studio/10, 11): the title box sits 9 px under the tool,
+        // the expanded one 3 px; both centered on it. The root is a 400 px
+        // transparent strip at gpui's origin; the content is shifted into place.
+        let gap = if self.expanded { 3. } else { 9. };
+        let left = self.anchor.center().x - px(RICH_TOOLTIP_W * 0.5) - self.origin.x;
+        let top = self.anchor.bottom() + px(gap) - self.origin.y;
+        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }];
+        let title = div().px(px(8.)).h(px(if self.expanded { 26. } else { 21. })).flex().items_center().bg(pal.tooltip).font_weight(FontWeight::SEMIBOLD).child(self.title.clone());
+        div().w(px(RICH_TOOLTIP_W)).child(
+            div()
+                .relative()
+                .left(left)
+                .top(top)
+                .w(px(RICH_TOOLTIP_W))
+                .flex()
+                .justify_center()
+                .text_size(px(12.))
+                .text_color(pal.text)
+                .child(if self.expanded {
+                    v_flex()
+                        .w(px(RICH_TOOLTIP_W))
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .shadow(shadow)
+                        .child(title)
+                        .child(div().px(px(8.)).pt(px(7.)).pb(px(8.)).line_height(px(17.5)).child(self.description.clone()))
+                        .into_any_element()
+                } else {
+                    div().shadow(shadow).child(title).into_any_element()
+                }),
+        )
     }
 }
 
-/// Tooltip closure for a toolbar tool (see [`RichTooltip`]).
-pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+/// Tooltip closure for a toolbar tool (see [`RichTooltip`]); `anchor` holds
+/// the tool's last painted bounds.
+pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<SharedString>, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let title: SharedString = title.into();
     let description: SharedString = description.into();
-    move |_, cx| {
+    move |window, cx| {
+        // gpui's placement (window.rs prepaint_tooltip): pointer + 1 px, or to
+        // the pointer's left when the tooltip would leave the window.
+        let mouse = window.mouse_position();
+        let mut origin = mouse + point(px(1.), px(1.));
+        if origin.x + px(RICH_TOOLTIP_W) > window.viewport_size().width {
+            origin.x = (mouse.x - px(RICH_TOOLTIP_W) - px(1.)).max(Pixels::ZERO);
+        }
+        let anchor = anchor.get();
         let view = cx.new(|cx| {
             if !description.is_empty() {
                 cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
@@ -153,7 +189,7 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
                 })
                 .detach();
             }
-            RichTooltip { title: title.clone(), description: description.clone(), expanded: false }
+            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor, origin }
         });
         view.into()
     }
@@ -231,7 +267,16 @@ pub fn with_tooltip(id: impl Into<ElementId>, text: impl Into<SharedString>, el:
 
 /// Wrap a toolbar tool so it shows the title now and the description after 2 s.
 pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, description: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
-    div().id(id).flex_none().tooltip(rich_tooltip(title, description)).child(el).into_any_element()
+    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let a2 = anchor.clone();
+    div()
+        .id(id)
+        .flex_none()
+        .relative()
+        .tooltip(rich_tooltip(title, description, anchor))
+        .child(el)
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().size_full())
+        .into_any_element()
 }
 
 /// The toolbar row: white, 36 px, no bottom border (§3.2).
@@ -245,8 +290,9 @@ pub fn tool_separator() -> Div {
     div().flex_none().w(px(2.)).h(px(26.)).bg(p().border)
 }
 
-/// The "Search tools…" box at the right end of a toolbar (§3.2).
-pub fn search_tools_box(id: impl Into<ElementId>) -> Stateful<Div> {
+/// The "Search tools…" box at the right end of a toolbar (§3.2); while the
+/// search popover is open it reads "Close search [escape]" (Onshape).
+pub fn search_tools_toggle(id: impl Into<ElementId>, open: bool) -> Stateful<Div> {
     let pal = p();
     let chip = |t: &'static str| div().px(px(3.)).h(px(16.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(11.)).text_color(pal.text).child(t);
     h_flex()
@@ -259,8 +305,10 @@ pub fn search_tools_box(id: impl Into<ElementId>) -> Stateful<Div> {
         .bg(pal.search_fill)
         .hover(|d| d.bg(pal.border))
         .cursor_pointer()
-        .child(div().text_size(px(14.)).text_color(pal.text).child("Search tools…"))
-        .child(h_flex().gap(px(2.)).child(chip("alt/⌥")).child(chip("c")))
+        .when(open, |d| d.bg(pal.border))
+        .child(div().text_size(px(14.)).text_color(pal.text).child(if open { "Close search" } else { "Search tools…" }))
+        .when(open, |d| d.child(chip("escape")))
+        .when(!open, |d| d.child(h_flex().gap(px(2.)).child(chip("alt/⌥")).child(chip("c"))))
 }
 
 /// Toolbar undo / redo pair (Onshape puts them first in every toolbar).

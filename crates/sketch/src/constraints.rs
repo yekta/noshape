@@ -93,6 +93,14 @@ impl ConstraintKind {
         self.value().is_some()
     }
 
+    /// Factor between the stored value and the value shown and typed:
+    /// ellipse axes are stored as radii but dimensioned as diameters
+    /// (Onshape's major / minor diameter). Expressions evaluate to the shown
+    /// value, so regeneration divides by this.
+    pub fn display_scale(&self) -> f64 {
+        if matches!(self, ConstraintKind::EllipseRadius { .. }) { 2.0 } else { 1.0 }
+    }
+
     pub fn value(&self) -> Option<f64> {
         use ConstraintKind::*;
         match self {

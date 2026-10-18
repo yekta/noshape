@@ -167,27 +167,55 @@ pub(super) enum PaletteItem {
 
 impl PartStudioView {
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools…"));
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 this.palette_query = st.read(cx).value().to_string();
+                this.ui.palette_sel = 0;
                 cx.notify();
             }
             InputEvent::PressEnter { .. } => {
-                if let Some(item) = this.palette_items(cx).into_iter().next() {
+                let items = this.palette_items(cx);
+                if let Some(item) = items.get(this.ui.palette_sel).or(items.first()).cloned() {
                     this.run_palette(item, window, cx);
                 }
-            }
-            InputEvent::Blur => {
-                this.palette = None;
-                cx.notify();
             }
             _ => {}
         });
         st.update(cx, |s, cx| s.focus(window, cx));
         self.palette_query.clear();
+        self.ui.palette_sel = 0;
         self.palette = Some((st, sub));
         cx.notify();
+    }
+
+    /// The "Search tools" / "Close search" toggle.
+    pub(crate) fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.is_some() {
+            self.close_palette(window, cx);
+        } else if !self.ui.palette_closed.is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(400)) {
+            self.open_palette(window, cx);
+        }
+    }
+
+    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.take().is_some() {
+            self.ui.palette_closed = Some(std::time::Instant::now());
+            window.focus(&self.focus, cx);
+            cx.notify();
+        }
+    }
+
+    /// The feature the tool search has selected, for the yellow toolbar
+    /// highlight ("Highlight tool in toolbar").
+    pub(super) fn palette_found_tool(&self, cx: &App) -> Option<&'static str> {
+        if self.palette.is_none() || self.ui.palette_no_highlight || self.palette_query.trim().is_empty() {
+            return None;
+        }
+        match self.palette_items(cx).get(self.ui.palette_sel) {
+            Some(PaletteItem::Feature(id)) => Some(id),
+            _ => None,
+        }
     }
 
     fn palette_items(&self, _cx: &App) -> Vec<PaletteItem> {
@@ -245,90 +273,125 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// Onshape's tool search (live, menus/tool-search-*.png): a 600 px
+    /// popover under the right end of the toolbar. A white search input
+    /// (focused: 1 px `#3e94ff`), then on `#f5f5f5` the results (198 px,
+    /// 34 px rows, selected `#b2ddf6`) beside the selected tool's icon, name
+    /// and description, and a `#eeeeee` footer.
     pub(super) fn render_palette(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (st, _) = self.palette.as_ref()?;
         let st = st.clone();
         let pal = p();
         let items = self.palette_items(cx);
-        let rows = items.into_iter().map(|item| {
-            let (icon, label, hint): (SharedString, String, String) = match &item {
+        let sel = self.ui.palette_sel.min(items.len().saturating_sub(1));
+        let info = |item: &PaletteItem| -> (SharedString, String, Option<&'static str>, String) {
+            match item {
                 PaletteItem::Feature(id) => {
                     let t = features::get(id);
-                    (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut).map(|s| s.replace("shift-", "Shift+").to_uppercase()).unwrap_or_default())
+                    (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), t.map(|t| t.description.to_string()).unwrap_or_default())
                 }
-                PaletteItem::View(_, n) => (crate::assets::icon_path("iso-view"), n.to_string(), String::new()),
-                PaletteItem::Display(m) => (crate::assets::icon_path(m.icon()), m.label().to_string(), String::new()),
-                PaletteItem::SketchTool(t) => {
-                    let hint = t.label().rsplit_once(" (").map(|(_, k)| k.trim_end_matches(')').to_string()).unwrap_or_default();
-                    (crate::assets::icon_path(t.icon()), sketch_tool_name(*t).to_string(), hint)
-                }
-            };
-            let it = item.clone();
-            let desc = match &item {
-                PaletteItem::Feature(id) => features::get(id).map(|t| t.description.to_string()).unwrap_or_default(),
-                _ => String::new(),
-            };
-            let hover_info = (label.clone(), desc);
-            h_flex()
-                .id(SharedString::from(format!("pal-{label}")))
-                // Onshape shows the hovered tool's description beside the list.
-                .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                    if *h && this.ui.palette_hover.as_ref() != Some(&hover_info) {
-                        this.ui.palette_hover = Some(hover_info.clone());
-                        cx.notify();
-                    }
-                }))
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(svg().path(icon).size_4().text_color(pal.text_muted))
-                .child(div().flex_1().text_sm().text_color(pal.text).child(label))
-                .child(div().text_xs().text_color(pal.text_faint).child(hint))
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| this.run_palette(it.clone(), window, cx)))
+                PaletteItem::View(_, n) => ("iso-view".into(), n.to_string(), None, String::new()),
+                PaletteItem::Display(m) => (m.icon().into(), m.label().to_string(), None, String::new()),
+                PaletteItem::SketchTool(t) => (t.icon().into(), sketch_tool_name(*t).to_string(), None, String::new()),
+            }
+        };
+        let chip = |t: &str| div().px(px(3.)).h(px(18.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).text_size(px(11.)).text_color(pal.text).child(t.to_string());
+        let rows: Vec<AnyElement> = items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let (icon, label, shortcut, _) = info(item);
+                let it = item.clone();
+                h_flex()
+                    .id(SharedString::from(format!("pal-{i}")))
+                    .h(px(34.))
+                    .flex_none()
+                    .px(px(4.))
+                    .gap(px(6.))
+                    .rounded(px(2.))
+                    .cursor_pointer()
+                    .when(i == sel, |d| d.bg(pal.accent_soft))
+                    .when(i != sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        if *h && this.ui.palette_sel != i {
+                            this.ui.palette_sel = i;
+                            cx.notify();
+                        }
+                    }))
+                    .child(crate::assets::icon(&icon, 20., cx))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(label))
+                    .children(shortcut.map(|s| h_flex().children(s.split(['-', '+']).filter(|k| !k.is_empty()).map(|k| chip(&k.to_lowercase())))))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| this.run_palette(it.clone(), window, cx)))
+                    .into_any_element()
+            })
+            .collect();
+        let detail = items.get(sel).map(|item| {
+            let (icon, name, _, desc) = info(item);
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .pl(px(12.))
+                .pt(px(4.))
+                .gap(px(10.))
+                .child(h_flex().gap(px(6.)).child(crate::assets::icon(&icon, 28., cx)).child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name)))
+                .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(desc))
         });
+        let highlight = !self.ui.palette_no_highlight;
         Some(
             div()
+                .id("tool-search")
                 .absolute()
-                .top(px(60.))
-                .left_0()
-                .right_0()
-                .flex()
-                .justify_center()
-                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                    if ev.keystroke.key == "escape" {
-                        this.palette = None;
-                        window.focus(&this.focus, cx);
-                        cx.notify();
+                .top(px(10.))
+                .right(px(0.))
+                .w(px(600.))
+                .occlude()
+                .bg(gpui_kit::rgb(0xf5f5f5))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| this.close_palette(window, cx)))
+                .capture_key_down(cx.listener(move |this, ev: &KeyDownEvent, window, cx| {
+                    let n = this.palette_items(cx).len();
+                    match ev.keystroke.key.as_str() {
+                        "escape" => this.close_palette(window, cx),
+                        "down" if n > 0 => this.ui.palette_sel = (this.ui.palette_sel + 1).min(n - 1),
+                        "up" => this.ui.palette_sel = this.ui.palette_sel.saturating_sub(1),
+                        _ => return,
                     }
+                    cx.stop_propagation();
+                    cx.notify();
                 }))
                 .child(
-                    v_flex()
-                        .w(px(620.))
-                        .p_2()
-                        .gap_1()
-                        .rounded_lg()
-                        .bg(pal.panel_raised)
-                        .border_1()
-                        .border_color(pal.border_strong)
-                        .shadow_lg()
-                        .child(Input::new(&st).prefix(Icon::new(IconName::Search).small()))
-                        .child(
-                            h_flex()
-                                .items_start()
-                                .gap_2()
-                                .child(v_flex().flex_1().gap_1().children(rows))
-                                .children(self.ui.palette_hover.clone().filter(|(_, d)| !d.is_empty()).map(|(name, d)| {
-                                    v_flex()
-                                        .w(px(180.))
-                                        .p_2()
-                                        .gap_1()
-                                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name))
-                                        .child(div().text_xs().text_color(pal.text_muted).child(d))
-                                })),
-                        ),
+                    div()
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .p(px(6.))
+                        .child(div().rounded(px(2.)).border_1().border_color(pal.focus).child(Input::new(&st).appearance(false).cleanable(true).text_size(px(14.)))),
+                )
+                .child(
+                    h_flex()
+                        .items_start()
+                        .px(px(10.))
+                        .py(px(14.))
+                        .child(v_flex().w(px(198.)).flex_none().gap(px(2.)).children(rows))
+                        .child(div().w(px(1.)).ml(px(12.)).h(px(142.)).bg(gpui_kit::rgb(0xcccccc)))
+                        .children(detail),
+                )
+                .child(
+                    h_flex()
+                        .h(px(34.))
+                        .px(px(5.))
+                        .gap(px(2.))
+                        .bg(gpui_kit::rgb(0xeeeeee))
+                        .text_size(px(12.))
+                        .text_color(pal.text_muted)
+                        .child("Return to this dialog at any time by pressing")
+                        .child(div().w(px(3.)))
+                        .child(chip("alt/⌥"))
+                        .child(chip("c"))
+                        .child(div().flex_1())
+                        .child(crate::ui::os_checkbox("pal-highlight", "Highlight tool in toolbar", highlight).text_size(px(12.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.palette_no_highlight = !this.ui.palette_no_highlight;
+                            cx.notify();
+                        })))
+                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
                 )
                 .into_any_element(),
         )

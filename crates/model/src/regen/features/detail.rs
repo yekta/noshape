@@ -57,6 +57,22 @@ fn blend_role(n: &Name) -> Role {
     Role::Blend(n.clone())
 }
 
+/// Onshape's message for a failed fillet/chamfer; the kernel reason goes to the log.
+fn blend_failed(message: &str, e: impl std::fmt::Display) -> crate::regen::eval::FeatureError {
+    log::debug!("{message} ({e})");
+    crate::regen::eval::FeatureError::new(message)
+}
+
+/// OCCT reports success for blends that overrun neighbouring faces (e.g. a
+/// chamfer wider than the corner fillets it runs over) but returns an invalid
+/// solid. Fail those like Onshape, unless the input was invalid already.
+fn require_valid_blend(input: &k::Shape, result: &k::Shape, message: &str) -> FResult<()> {
+    if result.is_valid() || !input.is_valid() {
+        return Ok(());
+    }
+    Err(blend_failed(message, "result is not a valid solid"))
+}
+
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("filletType", "FULL_ROUND") {
         return full_round(ev);
@@ -78,7 +94,8 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let t0 = std::time::Instant::now();
-        let res = k::fillet(&body.shape, &shapes, radius).map_err(|e| crate::regen::eval::FeatureError::new(format!("Fillet failed (radius may be too large): {e}")))?;
+        let res = k::fillet(&body.shape, &shapes, radius).map_err(|e| blend_failed("Failed to fillet selections.", e))?;
+        require_valid_blend(&body.shape, &res.shape, "Failed to fillet selections.")?;
         let t1 = std::time::Instant::now();
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
@@ -110,7 +127,8 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res = k::chamfer(&body.shape, &shapes, spec, &[]).map_err(|e| crate::regen::eval::FeatureError::new(format!("Chamfer failed: {e}")))?;
+        let res = k::chamfer(&body.shape, &shapes, spec, &[]).map_err(|e| blend_failed("Failed to chamfer selections.", e))?;
+        require_valid_blend(&body.shape, &res.shape, "Failed to chamfer selections.")?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         ev.replace_body(bi, res.shape, face_names);

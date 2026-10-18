@@ -808,6 +808,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "cadkit-core"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11f3d0c3ddf87e0a0d1e1fb55c055ee687ea32ba8b8656c48f2bb666da43c717"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "cadkit-dwg"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e850f451732b5d10342ea4018358256b9c9c36c8b8a7dab7599d3e77fe08e06d"
+dependencies = [
+ "cadkit-core",
+ "encoding_rs",
+]
+
+[[package]]
+name = "cadkit-dxf"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf0422bbfdd688aa6a68d7610f88e4a290a235575f7d72011cb711511dd36808"
+dependencies = [
+ "cadkit-core",
+ "encoding_rs",
+]
+
+[[package]]
 name = "calloop"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2628,8 +2659,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-linux"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e28213c3fde6f13e91ba0b74b90cbaadec9373e36a031eda98561d31059870f3"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -4253,10 +4282,12 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-channel",
+ "chrono",
  "dirs 6.0.0",
  "env_logger",
  "glam 0.34.1",
  "gpui-kit",
+ "gpui-pre-linux",
  "image",
  "log",
  "noshape-kernel",
@@ -4265,15 +4296,21 @@ dependencies = [
  "noshape-sketch",
  "noshape-store",
  "noshape-units",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
  "open",
  "parking_lot",
+ "raw-window-handle",
  "rfd",
  "rusqlite",
  "rust-embed",
  "serde",
  "serde_json",
  "trash",
+ "windows 0.62.2",
  "winresource",
+ "x11rb",
 ]
 
 [[package]]
@@ -4330,6 +4367,9 @@ dependencies = [
 name = "noshape-sketch"
 version = "0.1.0"
 dependencies = [
+ "cadkit-core",
+ "cadkit-dwg",
+ "cadkit-dxf",
  "glam 0.34.1",
  "indexmap",
  "log",

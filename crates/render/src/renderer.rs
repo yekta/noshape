@@ -73,6 +73,21 @@ pub(crate) struct GpuPoints {
     count: u32,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
 }
+pub(crate) struct GpuImage {
+    /// Six [`ImageVertex`]es (two triangles).
+    vertices: wgpu::Buffer,
+    /// Texture view and sampler (group 2 of the image pipelines); keeps the
+    /// texture alive.
+    bind_group: wgpu::BindGroup,
+    pub(crate) bounds: Option<(Vec3, Vec3)>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct ImageVertex {
+    pos: [f32; 3],
+    uv: [f32; 2],
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -338,6 +353,10 @@ struct DrawLists {
     /// Pick pass only: invisible pick-only meshes (sketch regions, wireframe
     /// faces). Drawn after the opaque meshes and win depth ties against them.
     pick_priority: Vec<usize>,
+    /// Color pass only: images with an opaque instance color (write depth
+    /// for their mostly opaque texels) and faded ones (blend only).
+    images: Vec<usize>,
+    images_faded: Vec<usize>,
     lines: Vec<usize>,
     points: Vec<usize>,
     culled: usize,
@@ -349,6 +368,8 @@ impl DrawLists {
         self.opaque.clear();
         self.transparent.clear();
         self.pick_priority.clear();
+        self.images.clear();
+        self.images_faded.clear();
         self.lines.clear();
         self.points.clear();
         self.culled = 0;
@@ -358,7 +379,9 @@ impl DrawLists {
         let sprite_margin = margin(24.0);
         for (i, inst) in scene.instances.iter().enumerate() {
             if pick {
-                if !inst.pickable && !matches!(inst.drawable, Drawable::Mesh(_)) {
+                // Images are never picked (their box lines are) and don't
+                // occlude picks either.
+                if matches!(inst.drawable, Drawable::Image(_)) || (!inst.pickable && !matches!(inst.drawable, Drawable::Mesh(_))) {
                     continue;
                 }
             } else if inst.pick_only {
@@ -383,6 +406,7 @@ impl DrawLists {
                     }
                     (p.0.bounds, sprite_margin)
                 }
+                Drawable::Image(img) => (img.0.bounds, mesh_margin),
             };
             if let Some(b) = bounds
                 && outside_frustum(b, &(*view_proj * inst.transform), m)
@@ -394,6 +418,8 @@ impl DrawLists {
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
                 Drawable::Mesh(_) if inst.color[3] >= 0.999 => self.opaque.push(i),
                 Drawable::Mesh(_) => self.transparent.push(i),
+                Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
+                Drawable::Image(_) => self.images_faded.push(i),
                 Drawable::Lines(_) => self.lines.push(i),
                 Drawable::Points(_) => self.points.push(i),
             }
@@ -409,7 +435,7 @@ impl DrawLists {
             }
         }
         let inst = &scene.instances;
-        for v in [&mut self.opaque, &mut self.transparent, &mut self.pick_priority, &mut self.lines, &mut self.points] {
+        for v in [&mut self.opaque, &mut self.transparent, &mut self.pick_priority, &mut self.images, &mut self.images_faded, &mut self.lines, &mut self.points] {
             // Stable by index within a layer (instances are already in index order).
             v.sort_by_key(|&i| inst[i].layer);
         }
@@ -459,6 +485,11 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
                     pass.set_vertex_buffer(0, pt.0.buffer.slice(..));
                     pass.draw(0..6, 0..pt.0.count);
                 }
+                Drawable::Image(img) => {
+                    pass.set_bind_group(2, &img.0.bind_group, &[]);
+                    pass.set_vertex_buffer(0, img.0.vertices.slice(..));
+                    pass.draw(0..6, 0..1);
+                }
             }
         }
     };
@@ -476,6 +507,12 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
         draw(pass, &lists.opaque, if section { &pipelines.mesh_section } else { &pipelines.mesh_opaque });
+        // Images before transparent meshes: their opaque texels write depth,
+        // so datum planes / region fills behind them are hidden and those
+        // in front blend over them.
+        draw(pass, &lists.images, &pipelines.image_opaque);
+        draw(pass, &lists.images, &pipelines.image_soft);
+        draw(pass, &lists.images_faded, &pipelines.image_blend);
         draw(pass, &lists.transparent, &pipelines.mesh_transparent);
         draw(pass, &lists.lines, &pipelines.line);
         draw(pass, &lists.points, &pipelines.point);
@@ -564,6 +601,12 @@ struct Pipelines {
     mesh_pick_priority: wgpu::RenderPipeline,
     line_pick: wgpu::RenderPipeline,
     point_pick: wgpu::RenderPipeline,
+    /// Opaque image texels (alpha >= 0.5), writing depth.
+    image_opaque: wgpu::RenderPipeline,
+    /// Soft image texels (alpha < 0.5) of opaque instances, no depth write.
+    image_soft: wgpu::RenderPipeline,
+    /// Faded image instances, no depth write.
+    image_blend: wgpu::RenderPipeline,
     msaa: u32,
 }
 
@@ -575,6 +618,10 @@ pub struct Renderer {
     globals_layout: wgpu::BindGroupLayout,
     inst_layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
+    /// Texture + sampler of an image (group 2 of the image pipelines).
+    image_layout: wgpu::BindGroupLayout,
+    image_pipeline_layout: wgpu::PipelineLayout,
+    image_sampler: wgpu::Sampler,
     pipelines: Option<Pipelines>,
     globals_color: wgpu::Buffer,
     globals_pick: wgpu::Buffer,
@@ -687,6 +734,44 @@ impl Renderer {
             bind_group_layouts: &[Some(&globals_layout), Some(&inst_layout)],
             immediate_size: 0,
         });
+        let image_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("image"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let image_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("noshape-image-layout"),
+            bind_group_layouts: &[Some(&globals_layout), Some(&inst_layout), Some(&image_layout)],
+            immediate_size: 0,
+        });
+        let image_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("image"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            // Ignored (1) where anisotropic filtering is unsupported.
+            anisotropy_clamp: 8,
+            ..Default::default()
+        });
 
         let mk_uniform = |label| {
             device.create_buffer(&wgpu::BufferDescriptor {
@@ -721,6 +806,9 @@ impl Renderer {
             globals_layout,
             inst_layout,
             pipeline_layout,
+            image_layout,
+            image_pipeline_layout,
+            image_sampler,
             pipelines: None,
             globals_color,
             globals_pick,
@@ -750,7 +838,7 @@ impl Renderer {
 
     /// A cloneable handle for uploading geometry from any thread.
     pub fn uploader(&self) -> Uploader {
-        Uploader { device: self.device.clone() }
+        Uploader { device: self.device.clone(), queue: self.queue.clone(), image_layout: self.image_layout.clone(), image_sampler: self.image_sampler.clone() }
     }
     pub fn upload_mesh(&self, mesh: &MeshData) -> MeshHandle {
         self.uploader().upload_mesh(mesh)
@@ -760,6 +848,9 @@ impl Renderer {
     }
     pub fn upload_points(&self, points: &PointData) -> PointsHandle {
         self.uploader().upload_points(points)
+    }
+    pub fn upload_image(&self, image: &ImageData) -> ImageHandle {
+        self.uploader().upload_image(image)
     }
 
     // ------------------------------------------------------------ setup
@@ -771,6 +862,7 @@ impl Renderer {
         let d = &self.device;
         let sh = &self.shader;
         let layout = &self.pipeline_layout;
+        let image_layout = &self.image_pipeline_layout;
 
         let mesh_buffers = [wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<MeshVertex>() as u64,
@@ -787,6 +879,11 @@ impl Renderer {
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Unorm8x4, 2 => Uint32, 3 => Float32, 4 => Uint32],
         }];
+        let image_buffers = [wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<ImageVertex>() as u64,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2],
+        }];
 
         struct P<'a> {
             label: &'a str,
@@ -799,7 +896,7 @@ impl Renderer {
             bias: wgpu::DepthBiasState,
             samples: u32,
         }
-        let make = |p: P| {
+        let make_in = |layout: &wgpu::PipelineLayout, p: P| {
             d.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(p.label),
                 layout: Some(layout),
@@ -840,15 +937,21 @@ impl Renderer {
                 cache: None,
             })
         };
+        let make = |p: P| make_in(layout, p);
         let ge = wgpu::CompareFunction::GreaterEqual;
         let alpha = Some(wgpu::BlendState::ALPHA_BLENDING);
+        // Image texels are premultiplied.
+        let premul = Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING);
         let none = wgpu::DepthBiasState::default();
         let (face, priority) = (FACE_DEPTH_BIAS, PICK_PRIORITY_DEPTH_BIAS);
         let pipelines = Pipelines {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             mesh_section: make(P { label: "mesh-section", vs: "vs_mesh", fs: "fs_mesh_section", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
-            mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: none, samples: msaa }),
+            // Strictly in front: a transparent plane coplanar with a sketch
+            // image (drawn just before, without bias) doesn't veil it. Opaque
+            // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
+            mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }),
             line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
             point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
             mesh_pick: make(P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
@@ -856,6 +959,9 @@ impl Renderer {
             mesh_pick_priority: make(P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }),
             line_pick: make(P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: &line_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
             point_pick: make(P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: &point_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
+            image_opaque: make_in(image_layout, P { label: "image", vs: "vs_image", fs: "fs_image_opaque", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((true, ge)), bias: none, samples: msaa }),
+            image_soft: make_in(image_layout, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
+            image_blend: make_in(image_layout, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
             msaa,
         };
         self.pipelines = Some(pipelines);
@@ -1348,6 +1454,80 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     Textures { width, height, msaa, color_msaa, resolve, resolve_view, depth, pick, pick_view, pick_depth, padded_row }
 }
 
+const SRGB_STEPS: usize = 4096;
+
+/// sRGB byte -> linear.
+fn srgb_to_linear_lut() -> &'static [f32; 256] {
+    static LUT: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
+    LUT.get_or_init(|| {
+        std::array::from_fn(|i| {
+            let c = i as f32 / 255.0;
+            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        })
+    })
+}
+
+/// Linear (clamped to 0..1) -> sRGB byte.
+fn linear_to_srgb(l: f32) -> u8 {
+    static LUT: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    let lut = LUT.get_or_init(|| {
+        (0..SRGB_STEPS)
+            .map(|i| {
+                let l = i as f32 / (SRGB_STEPS - 1) as f32;
+                let c = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+                (c * 255.0).round().clamp(0.0, 255.0) as u8
+            })
+            .collect()
+    });
+    lut[(l.clamp(0.0, 1.0) * (SRGB_STEPS - 1) as f32).round() as usize]
+}
+
+/// Straight-alpha sRGB RGBA8 -> alpha premultiplied in linear space (still
+/// sRGB encoded), so bilinear filtering and mip averaging don't bleed the
+/// color of transparent texels into the visible ones.
+fn premultiply_rgba(src: &[u8]) -> Vec<u8> {
+    let to_linear = srgb_to_linear_lut();
+    let mut out = src.to_vec();
+    for p in out.as_chunks_mut::<4>().0 {
+        if p[3] != 255 {
+            let a = p[3] as f32 / 255.0;
+            for c in &mut p[..3] {
+                *c = linear_to_srgb(to_linear[*c as usize] * a);
+            }
+        }
+    }
+    out
+}
+
+/// Halve a premultiplied sRGB RGBA8 image (each side to at least 1; for odd
+/// sizes the last row/column joins its neighbours' block), averaging in
+/// linear space.
+fn downsample_rgba(src: &[u8], w: u32, h: u32) -> (Vec<u8>, u32, u32) {
+    let to_linear = srgb_to_linear_lut();
+    let (w, h) = (w as usize, h as usize);
+    let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
+    let mut out = vec![0u8; nw * nh * 4];
+    for (y, row) in out.chunks_exact_mut(nw * 4).enumerate() {
+        let (y0, y1) = (y * h / nh, (y + 1) * h / nh);
+        for (x, o) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let (x0, x1) = (x * w / nw, (x + 1) * w / nw);
+            let mut sum = [0f32; 4];
+            for sy in y0..y1 {
+                for p in src[(sy * w + x0) * 4..(sy * w + x1) * 4].as_chunks::<4>().0 {
+                    for (acc, (c, &v)) in sum.iter_mut().zip(p.iter().enumerate()) {
+                        *acc += if c < 3 { to_linear[v as usize] } else { v as f32 / 255.0 };
+                    }
+                }
+            }
+            let n = ((y1 - y0) * (x1 - x0)) as f32;
+            for (c, (dst, acc)) in o.iter_mut().zip(sum).enumerate() {
+                *dst = if c < 3 { linear_to_srgb(acc / n) } else { (acc / n * 255.0).round() as u8 };
+            }
+        }
+    }
+    (out, nw as u32, nh as u32)
+}
+
 /// Helper to build a transform from a position and rotation (f64 inputs).
 pub fn transform(translation: glam::DVec3, rotation: glam::DQuat) -> Mat4 {
     glam::DMat4::from_rotation_translation(rotation, translation).as_mat4()
@@ -1357,9 +1537,75 @@ pub fn transform(translation: glam::DVec3, rotation: glam::DQuat) -> Mat4 {
 #[derive(Clone)]
 pub struct Uploader {
     device: wgpu::Device,
+    /// For texture uploads (staged by wgpu, executed before the render
+    /// thread's next submission).
+    queue: wgpu::Queue,
+    image_layout: wgpu::BindGroupLayout,
+    image_sampler: wgpu::Sampler,
 }
 
 impl Uploader {
+    /// Upload an image as an sRGB texture (alpha premultiplied in linear
+    /// space) with a full mip chain built on the CPU. Images larger than the
+    /// device's texture limit are downscaled; invalid data (zero size or
+    /// short `rgba`) uploads a transparent texel.
+    pub fn upload_image(&self, image: &ImageData) -> ImageHandle {
+        let (mut w, mut h) = (image.width, image.height);
+        let mut level: std::borrow::Cow<[u8]> = if w == 0 || h == 0 || image.rgba.len() < w as usize * h as usize * 4 {
+            log::warn!("invalid image data: {}x{} with {} bytes", w, h, image.rgba.len());
+            (w, h) = (1, 1);
+            vec![0u8; 4].into()
+        } else {
+            premultiply_rgba(&image.rgba[..w as usize * h as usize * 4]).into()
+        };
+        let max = self.device.limits().max_texture_dimension_2d.max(1);
+        while w > max || h > max {
+            let (next, nw, nh) = downsample_rgba(&level, w, h);
+            (level, w, h) = (next.into(), nw, nh);
+        }
+        let mip_level_count = 32 - w.max(h).leading_zeros();
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("image"),
+            size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            mip_level_count,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        for mip in 0..mip_level_count {
+            if mip > 0 {
+                let (next, nw, nh) = downsample_rgba(&level, w, h);
+                (level, w, h) = (next.into(), nw, nh);
+            }
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo { texture: &texture, mip_level: mip, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+                &level,
+                wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) },
+                wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            );
+        }
+        let view = texture.create_view(&Default::default());
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("image"),
+            layout: &self.image_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.image_sampler) },
+            ],
+        });
+        // Texture rows run top to bottom: v = 0 is the upper edge.
+        let [ll, lr, ur, ul] = image.corners;
+        let v = |pos, uv| ImageVertex { pos, uv };
+        let quad = [v(ll, [0.0, 1.0]), v(lr, [1.0, 1.0]), v(ur, [1.0, 0.0]), v(ll, [0.0, 1.0]), v(ur, [1.0, 0.0]), v(ul, [0.0, 0.0])];
+        let vertices = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("image-quad"),
+            contents: bytemuck::cast_slice(&quad),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        ImageHandle(Arc::new(GpuImage { vertices, bind_group, bounds: image.bounds() }))
+    }
 
     pub fn upload_mesh(&self, mesh: &MeshData) -> MeshHandle {
         self.upload_mesh_parts(&mesh.positions, &mesh.normals, &mesh.pick_ids, &mesh.indices)
@@ -1444,5 +1690,32 @@ impl Uploader {
             (!points.points.is_empty()).then_some((lo, hi))
         };
         PointsHandle(Arc::new(GpuPoints { buffer, count: points.points.len() as u32, bounds }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn premultiply_and_downsample_images() {
+        // Transparent texels lose their color; opaque ones keep it exactly.
+        assert_eq!(premultiply_rgba(&[10, 200, 30, 255, 0, 0, 255, 0]), vec![10, 200, 30, 255, 0, 0, 0, 0]);
+        // Half-covered white -> linear 0.5 -> sRGB 188.
+        assert_eq!(premultiply_rgba(&[255, 255, 255, 128])[..3], [188, 188, 188]);
+        // 3x1 -> 1x1: the odd column joins the block; red averaged with two
+        // transparent texels in linear space.
+        let (px, w, h) = downsample_rgba(&[255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0], 3, 1);
+        assert_eq!((w, h), (1, 1));
+        assert_eq!(px[3], 85);
+        assert_eq!(px[0], linear_to_srgb(1.0 / 3.0));
+        // 5x4 -> 2x2 -> 1x1 -> 1x1, uniform color stays exact.
+        let mut img: Vec<u8> = [90u8, 160, 220, 255].repeat(20);
+        let (mut w, mut h) = (5, 4);
+        for expect in [(2, 2), (1, 1), (1, 1)] {
+            (img, w, h) = downsample_rgba(&img, w, h);
+            assert_eq!((w, h), expect);
+            assert!(img.as_chunks::<4>().0.iter().all(|p| *p == [90, 160, 220, 255]), "{img:?}");
+        }
     }
 }

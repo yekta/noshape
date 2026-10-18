@@ -5,6 +5,9 @@
 //! /root/onshape-research/live/documents/ and docs/ONSHAPE_UI_SPEC.md §4.
 
 use crate::theme::p;
+
+/// A click callback shared between menu rows (`os_menu::OsMenuItem::Item`).
+pub type ClickHandler = std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::dialog::{Dialog, DialogClose};
 use gpui_kit::component::{Icon, h_flex};
@@ -28,6 +31,7 @@ pub const GLYPH_HOME: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBo
 pub const GLYPH_BACK: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>"#;
 pub const GLYPH_SEARCH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8.2" cy="8.2" r="5.6"/><path d="m12.4 12.4 5 5"/></svg>"#;
 pub const GLYPH_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 2.25h8L4 6.25z"/></svg>"#;
+pub const GLYPH_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 5.75h8L4 1.75z"/></svg>"#;
 pub const GLYPH_CHEVRON_DOWN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 7.75 4.5 4.5 4.5-4.5"/></svg>"#;
 pub const GLYPH_CHEVRON_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.75 5.5 4.5 4.5-4.5 4.5"/></svg>"#;
 pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 11 11M15.5 4.5l-11 11"/></svg>"#;

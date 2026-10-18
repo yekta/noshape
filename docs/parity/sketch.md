@@ -21,7 +21,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) |
 | 1.7 | A new empty sketch starts with the Line tool | LE (Onshape default) | ✅ |
 | 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ |
-| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | 🔧 cancel works, no Restore bubble (feature dialog, other agent) |
+| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) |
 | 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) |
 | 1.11 | Extrude (Shift+E) / Revolve (Shift+W) from the sketch toolbar accept the sketch and preselect all regions | H:sketch_tools | ✅ |
 | 1.12 | Ctrl+Z / Ctrl+Y inside the sketch step through sketch edits | LE, B§8.2 | ✅ |
@@ -36,7 +36,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 2.1 | Sketch toolbar replaces the feature toolbar while a sketch is open | H:sketch_tools | ✅ |
-| 2.2 | Order: Undo, Redo, Extrude, Revolve, Line▾, Rectangle▾, Circle▾, Arc▾, Polygon▾, Spline▾, Point, Text, Use▾, Construction, Fillet▾, Trim▾, Offset▾, Mirror, Pattern▾, Dimension, 14 constraints | LE (docs toolbar images) | ✅ (no Insert DXF/image group) |
+| 2.2 | Order: Undo, Redo, Extrude, Revolve, Line▾, Rectangle▾, Circle▾, Arc▾, Polygon▾, Spline▾, Point, Text, Use▾, Construction, Fillet▾, Trim▾, Offset▾, Mirror, Pattern▾, Dimension, 14 constraints | LE (docs toolbar images) | ✅ (groups and dropdown contents match live dom/toolbar-sketch.txt + dropdowns-sketch.json, incl. the Insert DXF or DWG ▾ / Insert image group after Linear pattern) |
 | 2.3 | Groups: Line/Midpoint line; Corner/Center point/Aligned rectangle; Center point/3 point circle/Ellipse; 3 point/Tangent/Center point/Elliptical arc/Conic; Inscribed/Circumscribed polygon; Spline/Bezier/Spline control point; Use/Intersection; Fillet/Chamfer; Trim/Extend/Split; Offset/Slot; Linear/Circular pattern/Transform | LE | ✅ |
 | 2.4 | A group button shows the last tool used from that group | H:sketch_tools | ✅ |
 | 2.5 | The active tool's button is highlighted | UI | ✅ |
@@ -106,7 +106,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) |
 | 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ |
 | 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) |
-| 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | 🔧 DXF (lines, arcs, circles, polylines, ellipses, splines, units, file origin) and images (drawn when the view is normal to the box); no DWG reader |
+| 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | ✅ (DXF ASCII + binary and DWG R13–2018 through cadkit (crates/sketch/src/cad.rs, dwg.rs): block references expanded (placement, scale, rotation, arrays, nesting), mirrored/tilted planes and non-uniform block scales mapped exactly; T:ux dwg.rs fixtures R2000–R2018 + cad.rs tests; GUI :103 m4-dwg.png "Inserted 7 entities from fixture.dwg" incl. the BLOCK1 line. Images: 3D textured quads in any orientation, depth tested, exact colors, visible outside sketch mode (m2-placed / m2-iso / m2-accepted-c.png)) |
 | 4.39 | Preview geometry while placing is drawn in the sketch preview color | B§2.3 | ✅ |
 
 ## 5. On-the-fly dimensions
@@ -243,9 +243,9 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |
 | 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |
 | 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ |
-| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; circular instances not linked to the seed) |
+| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) |
 | 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) |
-| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (any edge: exact or sampled projection; other sketches; linked) |
+| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked) |
 | 11.20 | Use: hover preview of the projection | H:use | ⏳ |
 | 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |
@@ -263,7 +263,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ |
-| 12.9 | Add comment, Configure dimension | H:dimension | 🔧 Configure dimension ✅; Add comment: no comment system in noshape |
+| 12.9 | Add comment, Configure dimension | H:dimension | ✅ Configure dimension. Add comment belongs to Onshape comments, a cloud-only feature excluded by TEAM-RULES |
 
 ## 13. Messages and errors
 
@@ -301,7 +301,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.21 | Spline / Bezier: first Esc commits the curve through the placed points (cursor point dropped) and keeps the tool; second Esc exits | Live sketch/22x-esc-spline, 233 | ✅ (T:sm `first_escape_commits_a_spline_and_the_second_exits`; GUI :103 h123.png) |
 | 14.22 | The sketch's own plane is not pre-highlighted while sketching on it | Live sketch/09, 51 | ✅ (GUI :103 g1/g2.png: no tan plane highlight under the cursor; was highlighted before) |
 | 14.23 | An idle value box shows a bare number like a dimension label (`1.269`), units appear only once typing starts | Live sketch/211–212 | ✅ (T:sm asserts the label; GUI :103 k1-box-c.png shows `18.188`) |
-| 14.24 | Sketch context menu in live order: Confirm \| Use (model edge) \| Copy sketch entities, Transform sketch entities (nothing selected: Copy sketch) \| Show all (nothing selected), Curve/surface analysis…, Section view… \| Clear selection, Select ▸, Select other… \| Zoom to fit, Zoom to selection, View normal to sketch plane \| Delete sketch entity; no "Construction" item | Live sketch/31, 37, 204 | ✅ (GUI :103 k2-menu-line.png in live order; Add comment omitted: no comments in noshape; empty-state Select ▸ items requested from live capture) |
+| 14.24 | Sketch context menu in live order: Confirm \| Use (model edge) \| Copy sketch entities, Transform sketch entities (nothing selected: Copy sketch) \| Show all (nothing selected), Curve/surface analysis…, Section view… \| Clear selection, Select ▸, Select other… \| Zoom to fit, Zoom to selection, View normal to sketch plane \| Delete sketch entity; no "Construction" item | Live sketch/31, 37, 204 | ✅ (GUI :103 k2-menu-line.png in live order; Select ▸ now also has Create selection…; nothing selected: Select ▸ submenu (Part Studio items until live capture lists the sketch ones); Add comment is a cloud-only exclusion) |
 | 14.25 | Select ▸ Tangent connected edges / Equal length/radius edges / Parallel edges grow the sketch selection | Live sketch/32 | ✅ (T:ux `select_related_grows_tangent_chains_equal_sizes_and_parallels`; GUI :103 k2-parallel-c.png: Parallel edges selects the slot sides + centerline) |
 | 14.26 | Default tool sizes follow the document unit: inch docs fillet R0.5, chamfer/offset 0.25, slot Ø0.5, pattern spacing 1 | Live sketch/107–137 | ✅ (live: inch R0.5/0.25/0.25/Ø0.5/1 in; mm R20/5/5/Ø20/25 mm; GUI :103 mm doc slot shows Ø20) |
 | 14.27 | Slot works only on existing curves (empty-space clicks do nothing); the slot is a light-blue preview until the next click / Enter / leaving the tool; the picked centerline stays solid; no value box opens | Live sketch/104–109, 307–311 | ✅ (T:sm `slot_previews_until_the_next_click_and_keeps_its_centerline_solid`, T:ux slot tests updated; GUI :103 k2-slot.png) |
@@ -311,4 +311,6 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.31 | No floating options panel for fillet, polygon, conic (they use the manipulator / spinner / rho box) | Live sketch/87–98, 84–86, 110–115 | ✅ (GUI :103 k3-enter-c.png: no panel) |
 | 14.32 | Circular pattern defaults to 3 instances | Live sketch/138 | ✅ (T:sm) |
 | 14.33 | Circular pattern / Transform still use the floating options panel (live: on-canvas only) | Live sketch/138–139 | ✅ (circular: `3x` label + open-pattern angle value, GUI :103 k5-open-c/k5-90-c.png; transform: triad on the selection, rotation/scale fields appear once dragged, GUI k5-xf-c/k5-rot-c.png; T:sm `transform_triad_follows_the_selection_until_its_center_is_dragged`; no options panels remain for patterns/transform) |
-| 14.34 | Right-click on a model edge in a sketch: Confirm \| Use \| Hide Part, Curve/surface analysis…, Isolate…, Make transparent… \| Clear selection, Select ▸, Select other… \| zoom/view items incl. Align view with vertical axis | Live sketch/204 | 🔧 (Confirm, Use, analysis, selection, zoom/view present; Hide/Isolate/Make transparent/Align view not in the sketch menu) |
+| 14.34 | Right-click on a model edge in a sketch: Confirm \| Use \| Hide Part, Curve/surface analysis…, Isolate…, Make transparent… \| Clear selection, Select ▸, Select other… \| zoom/view items incl. Align view with vertical axis | Live sketch/204 | ⏳ (model-edge layout added: Confirm | Use | Hide <part>, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select other… | ⏳ (model-edge layout: Confirm | Use | Hide <part>, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select ▸ (edge/face criteria + Create selection…), Select other… | ✅ (GUI :103 m7-edge-menu.png matches live 204: Confirm | Use | Hide Part 1, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select ▸ (Tangent connected, Loop/chain, Parallel, Equal radius, Create selection…; m7-sub-c.png), Select other… | Zoom to fit, Zoom to selection, View normal (+ Align view for straight edges); Add comment is a cloud-only exclusion) |
+| 14.35 | Bottom-right one-line readout of the sketch selection: Length / Diameter / Radius / Point X Y Z / Distance / Parallel dist / Angle (deg); nothing for mixed selections | Live behaviours.md §Drawing tools (status bar), sketch/108, 136, 139 | ✅ (T:sm; GUI :103 m5-readout-c.png "Diameter: 50.8 mm") |
+| 14.36 | Typed expressions on ellipse axis (diameter) dimensions are kept and regenerate correctly | H:dimension | ✅ (T:sm + model test `ellipse_diameter_expressions_regenerate_as_radii` pass) |

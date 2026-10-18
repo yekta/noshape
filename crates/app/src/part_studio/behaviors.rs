@@ -71,6 +71,9 @@ pub struct UiState {
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
     pub list_focus: FocusHandle,
+    /// The rollback bar took the keyboard (↑/↓ or a click on it) while these
+    /// features were selected; it reads light blue until the selection changes.
+    pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
     /// "Show dependencies" panel for a feature.
     pub dependencies: Option<FeatureId>,
     pub cube_hover: Option<super::view_cube::CubeCell>,
@@ -80,9 +83,16 @@ pub struct UiState {
     /// Toolbar groups whose face is the last tool picked from the dropdown.
     pub toolbar_faces: std::collections::HashMap<&'static str, &'static str>,
     /// Search tools: name and description of the hovered result.
-    pub palette_hover: Option<(String, String)>,
+    /// Tool search: the highlighted result and "Highlight tool in toolbar".
+    pub palette_sel: usize,
+    pub palette_no_highlight: bool,
+    /// When the tool search last closed (a click on its toggle closes it
+    /// through the outside click; the click itself must not reopen it).
+    pub palette_closed: Option<std::time::Instant>,
     /// Variable hovered in the variable table.
     pub var_hover: Option<String>,
+    /// Variable Studio tables shown in the Variable table panel.
+    pub var_tables: std::collections::HashMap<noshape_model::document::TabId, Entity<crate::variable_studio::VariableStudioView>>,
     /// Section view planes (Shift+X).
     pub section: Vec<super::section::SectionPlane>,
     /// Section view dialog, and the parts excluded (false) or the only ones
@@ -120,6 +130,8 @@ pub struct UiState {
     pub measure_type: Option<&'static str>,
     /// Feature dialog position after the user moved it.
     pub dialog_pos: Option<Point<Pixels>>,
+    /// Feature dialog size after the user resized it.
+    pub dialog_size: Option<Size<Pixels>>,
     /// Toolbar customization (removed tools, group order, S toolbar).
     pub toolbar: super::toolbar_prefs::ToolbarPrefs,
     pub customizing_toolbar: bool,
@@ -155,6 +167,20 @@ pub struct UiState {
     pub menu_target: Option<Reference>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
+    /// Entity of the hovered dialog selection row.
+    pub query_hover: Option<Reference>,
+    /// The pointer is over the manipulator arrow (drawn outlined).
+    pub manip_hover: bool,
+    /// Default geometry row being renamed in place.
+    pub dg_renaming: Option<(Reference, Entity<InputState>, Subscription)>,
+    /// "Show dependencies" of a default plane or the origin.
+    pub plane_dependencies: Option<Reference>,
+    /// "+ Configure features": picking a feature then a parameter for this input.
+    pub configure_pick: Option<String>,
+    /// Open analysis tool dialog (Curve/surface, Dihedral…) and what each
+    /// tool had selected last time.
+    pub analysis_tool: Option<super::analysis_tools::AnalysisTool>,
+    pub tool_memory: super::analysis_tools::ToolMemory,
 }
 
 impl UiState {
@@ -171,13 +197,17 @@ impl UiState {
             anchor: None,
             last_click: None,
             list_focus: cx.focus_handle(),
+            rollback_keyboard: None,
             dependencies: None,
             cube_hover: None,
             cube_origin: None,
             measure_pinned: false,
             toolbar_faces: Default::default(),
-            palette_hover: None,
+            palette_sel: 0,
+            palette_no_highlight: false,
+            palette_closed: None,
             var_hover: None,
+            var_tables: Default::default(),
             section: Vec::new(),
             section_dialog: None,
             section_parts: None,
@@ -198,6 +228,7 @@ impl UiState {
             mass_faces: false,
             measure_type: None,
             dialog_pos: None,
+            dialog_size: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
             customizing_toolbar: false,
             preview_opacity: 1.0,
@@ -217,6 +248,13 @@ impl UiState {
             default_geometry_collapsed: false,
             menu_target: None,
             shown_dims: None,
+            query_hover: None,
+            manip_hover: false,
+            dg_renaming: None,
+            plane_dependencies: None,
+            configure_pick: None,
+            analysis_tool: None,
+            tool_memory: Default::default(),
         }
     }
 }
@@ -551,6 +589,95 @@ impl PartStudioView {
                 d.set_value("makeCopy", ParamValue::Bool(true), cx);
             });
         }
+    }
+
+    /// Name of default geometry (renamed or Origin / Top / Front / Right).
+    pub(super) fn default_name(&self, r: &Reference, cx: &App) -> String {
+        if let Some(n) = self.studio(cx).and_then(|s| s.default_names.iter().find(|(x, _)| x == r).map(|(_, n)| n.clone())) {
+            return n;
+        }
+        match r {
+            Reference::Plane(noshape_model::reference::DatumPlane::Top) => "Top",
+            Reference::Plane(noshape_model::reference::DatumPlane::Front) => "Front",
+            Reference::Plane(noshape_model::reference::DatumPlane::Right) => "Right",
+            _ => "Origin",
+        }
+        .to_string()
+    }
+
+    /// Rename on a default geometry row: an input in place (Enter or
+    /// leaving it commits, Esc cancels).
+    pub(super) fn start_default_rename(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
+        let name = self.default_name(&r, cx);
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let r2 = r.clone();
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
+            InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                let text = st.read(cx).value().trim().to_string();
+                this.ui.dg_renaming = None;
+                if !text.is_empty() {
+                    let r = r2.clone();
+                    this.doc.update(cx, |doc, cx| {
+                        doc.edit_studio(this.tab, &format!("Rename : {text}"), cx, |ps| {
+                            ps.default_names.retain(|(x, _)| *x != r);
+                            ps.default_names.push((r.clone(), text.clone()));
+                        });
+                    });
+                }
+                cx.notify();
+            }
+            _ => {}
+        });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.dg_renaming = Some((r, st, sub));
+        cx.notify();
+    }
+
+    /// Plane menu "Size to Part Studio": the plane grows to frame the parts.
+    pub(super) fn size_plane_to_studio(&mut self, r: Reference, cx: &mut Context<Self>) {
+        let Some(pl) = self.display.planes.iter().find(|p| p.reference == r) else { return };
+        let f = pl.frame;
+        let (mut hw, mut hh) = (0.0f64, 0.0f64);
+        for (lo, hi) in self.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds) {
+            for k in 0..8 {
+                let c = glam::DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z }) - f.origin;
+                hw = hw.max(c.dot(f.x).abs());
+                hh = hh.max(c.dot(f.y).abs());
+            }
+        }
+        if hw <= 0.0 || hh <= 0.0 {
+            return;
+        }
+        let (hw, hh) = (hw * 1.1, hh * 1.1);
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, "Size to Part Studio", cx, |ps| {
+                ps.plane_sizes.retain(|(x, ..)| *x != r);
+                ps.plane_sizes.push((r.clone(), hw, hh));
+            });
+        });
+    }
+
+    /// Empty-space Select ▸: every visible part (0), surface (1), sketch
+    /// (2), plane (3) or mate connector (4).
+    pub(super) fn select_all_of(&mut self, kind: u8, cx: &mut Context<Self>) {
+        use noshape_model::display::BodyKind;
+        let d = &self.display;
+        let refs: Vec<Reference> = match kind {
+            0 | 1 => d.bodies.iter().filter(|b| !b.hidden && (b.kind == BodyKind::Surface) == (kind == 1)).map(|b| Reference::Body(b.id.clone())).collect(),
+            2 => d.sketches.iter().filter(|s| !s.hidden).map(|s| Reference::Sketch(s.feature)).collect(),
+            3 => d.planes.iter().filter(|p| !p.hidden).map(|p| p.reference.clone()).collect(),
+            _ => d.connectors.iter().map(|c| c.reference.clone()).collect(),
+        };
+        for r in refs {
+            if !self.selection.contains(&r) {
+                self.selection.push(r);
+            }
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
     }
 
     /// Whether the clipboard holds a sketch from "Copy sketch" (the menus
@@ -1182,7 +1309,7 @@ impl PartStudioView {
         let Some(index) = self.edit.as_ref().map(|e| e.index) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
-        let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+        let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
         let regen = self.regen.clone();
@@ -1934,6 +2061,9 @@ impl PartStudioView {
 
     /// "Show dependencies": parents above the arrow, children below.
     pub(super) fn render_dependencies(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if let Some(r) = self.ui.plane_dependencies.clone() {
+            return self.render_plane_dependencies(&r, cx);
+        }
         let id = self.ui.dependencies?;
         let studio = self.studio(cx)?;
         let idx = studio.index_of(id)?;
@@ -2016,6 +2146,62 @@ impl PartStudioView {
                 .child(me)
                 .child(separator("dep-down", false, format!("Features using {name}")))
                 .children(child_rows)
+                .into_any_element(),
+        )
+    }
+
+    /// "Dependencies of Top": the feature rows that use a default plane or the origin.
+    fn render_plane_dependencies(&mut self, r: &Reference, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let name = self.default_name(r, cx);
+        let studio = self.studio(cx)?;
+        let users: Vec<(FeatureId, String, String)> = interaction::features_using(&studio.features, r).into_iter().filter_map(|i| studio.feature(i).map(|f| (i, f.name.clone(), f.type_id.clone()))).collect();
+        let pal = p();
+        let rows: Vec<AnyElement> = users
+            .into_iter()
+            .map(|(fid, n, ty)| {
+                h_flex()
+                    .id(SharedString::from(format!("pdep-{fid}")))
+                    .h(px(26.))
+                    .bg(with_alpha(gpui_kit::rgb(0x000000), 0.02))
+                    .hover(|d| d.bg(pal.row_hover))
+                    .child(div().w(px(25.)).flex().justify_center().child(svg().path(feature_icon(&ty)).size(px(15.)).text_color(pal.text).opacity(0.8)))
+                    .child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(n))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        this.ui.list_hover = h.then_some(fid);
+                        this.refresh_scene(false, cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        let me = h_flex().h(px(26.)).child(div().w(px(25.)).flex().justify_center().child(crate::assets::icon(if matches!(r, Reference::Origin) { "origin" } else { "plane" }, 15., cx))).child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(name.clone()));
+        Some(
+            v_flex()
+                .id("plane-dependencies")
+                .occlude()
+                .absolute()
+                .top(px(0.))
+                .left(px(0.))
+                .w(px(300.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .px(px(6.))
+                        .justify_between()
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(format!("Dependencies of {name}")))
+                        .child(div().id("pdep-close").px_1().cursor_pointer().child(Icon::new(IconName::Close).small().text_color(pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.plane_dependencies = None;
+                            this.ui.list_hover = None;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        }))),
+                )
+                .child(me)
+                .child(div().h(px(23.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xeeeeee)).border_t_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).text_size(px(10.)).text_color(with_alpha(pal.text, 0.5)).child("▼"))
+                .children(rows)
                 .into_any_element(),
         )
     }

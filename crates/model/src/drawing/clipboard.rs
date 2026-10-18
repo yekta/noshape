@@ -38,7 +38,7 @@ impl Drawing {
     /// annotations and tables).
     pub fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
-        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm };
+        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone() };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
         Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1) })
     }
@@ -53,17 +53,7 @@ impl Sheet {
             Some(p) => [p[0] - c[0], p[1] - c[1]],
             None => [10.0, -10.0],
         };
-        let mut next = self.next_view_id().0;
-        let map: Vec<(ViewId, ViewId)> = clip
-            .sheet
-            .views
-            .iter()
-            .map(|v| {
-                let n = ViewId(next);
-                next += 1;
-                (v.id, n)
-            })
-            .collect();
+        let map: Vec<(ViewId, ViewId)> = clip.sheet.views.iter().zip(self.next_view_id().0..).map(|(v, n)| (v.id, ViewId(n))).collect();
         let remap = |id: ViewId| map.iter().find(|(o, _)| *o == id).map(|(_, n)| *n).unwrap_or(id);
         let mut out: Vec<DrawingView> = clip.sheet.views.clone();
         for v in &mut out {
@@ -74,22 +64,18 @@ impl Sheet {
             // Derived views follow their parent; only roots move freely.
             v.position = [v.position[0] + d[0], v.position[1] + d[1]];
         }
-        let mut next_ann = self.next_annotation_id();
-        for a in &clip.sheet.annotations {
+        for (id, a) in (self.next_annotation_id()..).zip(&clip.sheet.annotations) {
             let mut a = a.clone();
-            a.id = next_ann;
-            next_ann += 1;
+            a.id = id;
             if let Some(v) = a.kind.view_mut() {
                 *v = remap(*v);
             }
             a.position = [a.position[0] + d[0], a.position[1] + d[1]];
             self.annotations.push(a);
         }
-        let mut next_tbl = self.next_table_id();
-        for t in &clip.sheet.tables {
+        for (id, t) in (self.next_table_id()..).zip(&clip.sheet.tables) {
             let mut t = t.clone();
-            t.id = next_tbl;
-            next_tbl += 1;
+            t.id = id;
             match &mut t.kind {
                 TableKind::Bom { view } | TableKind::Hole { view, .. } => *view = remap(*view),
                 TableKind::General { .. } => {}

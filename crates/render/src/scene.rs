@@ -1,7 +1,7 @@
 //! CPU-side scene description handed to the renderer.
 //!
 //! Geometry is uploaded once into GPU buffers (`MeshHandle`, `LinesHandle`,
-//! `PointsHandle`) and referenced by lightweight per-frame `Instance`s. Every
+//! `PointsHandle`, `ImageHandle`) and referenced by lightweight per-frame `Instance`s. Every
 //! primitive carries a `pick_id`: a dense `u32` chosen by the application
 //! (0 = not pickable). Hover/selection/visibility are per-pick-id flags stored
 //! in a GPU storage buffer, so changing highlight state never re-uploads
@@ -85,6 +85,27 @@ pub struct PointSprite {
     pub _pad: u32,
 }
 
+/// A textured quad (e.g. an image inserted in a sketch), drawn depth-tested
+/// like other geometry and never pickable.
+#[derive(Clone, Debug, Default)]
+pub struct ImageData {
+    /// Lower-left, lower-right, upper-right, upper-left corner in local
+    /// space. The quad is split into two triangles along the lower-left /
+    /// upper-right diagonal, so the mapping is exact for parallelograms.
+    pub corners: [[f32; 3]; 4],
+    pub width: u32,
+    pub height: u32,
+    /// sRGB RGBA8 (straight alpha), `width * height * 4` bytes, row 0 = top
+    /// row of the image.
+    pub rgba: Vec<u8>,
+}
+
+impl ImageData {
+    pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
+        bounds_of(self.corners.iter().copied())
+    }
+}
+
 pub(crate) fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
     let mut min = Vec3::splat(f32::INFINITY);
     let mut max = Vec3::splat(f32::NEG_INFINITY);
@@ -106,6 +127,9 @@ pub struct MeshHandle(pub(crate) Arc<crate::renderer::GpuMesh>);
 pub struct LinesHandle(pub(crate) Arc<crate::renderer::GpuLines>);
 #[derive(Clone)]
 pub struct PointsHandle(pub(crate) Arc<crate::renderer::GpuPoints>);
+/// Texture and quad of an uploaded [`ImageData`].
+#[derive(Clone)]
+pub struct ImageHandle(pub(crate) Arc<crate::renderer::GpuImage>);
 
 impl MeshHandle {
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
@@ -118,6 +142,11 @@ impl LinesHandle {
     }
 }
 impl PointsHandle {
+    pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
+        self.0.bounds
+    }
+}
+impl ImageHandle {
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
         self.0.bounds
     }
@@ -136,6 +165,9 @@ pub enum Drawable {
     Mesh(MeshHandle),
     Lines(LinesHandle),
     Points(PointsHandle),
+    /// Textured quad, multiplied by the instance color (alpha fades it).
+    /// Never pickable; drawn after opaque meshes, before transparent ones.
+    Image(ImageHandle),
 }
 
 #[derive(Clone)]
@@ -161,13 +193,16 @@ pub struct Instance {
 }
 
 impl Instance {
+    /// Images start white (true texture colors) and unpickable; everything
+    /// else starts light gray and pickable.
     pub fn new(drawable: Drawable) -> Self {
+        let image = matches!(drawable, Drawable::Image(_));
         Self {
             drawable,
             transform: Mat4::IDENTITY,
-            color: [0.7, 0.72, 0.76, 1.0],
+            color: if image { [1.0; 4] } else { [0.7, 0.72, 0.76, 1.0] },
             color_mode: ColorMode::Instance,
-            pickable: true,
+            pickable: !image,
             ignore_clip: false,
             unlit: false,
             layer: 0,
@@ -226,6 +261,8 @@ pub mod state {
     pub const ERROR: u32 = 16;
     /// Dimmed (e.g. other parts while editing in context / rollback).
     pub const DIM: u32 = 32;
+    /// Entity of a hovered dialog selection row (yellow-green).
+    pub const QUERY: u32 = 64;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -322,6 +359,7 @@ impl Scene {
                     (Drawable::Mesh(x), Drawable::Mesh(y)) => Arc::ptr_eq(&x.0, &y.0),
                     (Drawable::Lines(x), Drawable::Lines(y)) => Arc::ptr_eq(&x.0, &y.0),
                     (Drawable::Points(x), Drawable::Points(y)) => Arc::ptr_eq(&x.0, &y.0),
+                    (Drawable::Image(x), Drawable::Image(y)) => Arc::ptr_eq(&x.0, &y.0),
                     _ => false,
                 };
                 same_drawable
@@ -345,6 +383,7 @@ impl Scene {
                 Drawable::Mesh(m) => m.bounds(),
                 Drawable::Lines(l) => l.bounds(),
                 Drawable::Points(p) => p.bounds(),
+                Drawable::Image(i) => i.bounds(),
             };
             if let Some((lo, hi)) = b {
                 for i in 0..8 {

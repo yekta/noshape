@@ -209,6 +209,17 @@ pub struct SketchDisplay {
     pub dof: usize,
     /// Custom sketch appearance (linear RGBA) when not being edited.
     pub color: Option<[f32; 4]>,
+    /// Inserted images in their boxes (world corners: lower-left,
+    /// lower-right, upper-right, upper-left).
+    pub images: Vec<SketchImageDisplay>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SketchImageDisplay {
+    pub id: u32,
+    pub corners: [[f32; 3]; 4],
+    /// PNG / JPEG / GIF / BMP bytes, base64 encoded.
+    pub data_base64: std::sync::Arc<str>,
 }
 
 #[derive(Clone, Debug)]

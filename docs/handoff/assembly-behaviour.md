@@ -114,14 +114,18 @@ Checklist section 13 (LA1–LA21) lists every live-capture difference and its st
 ## Remaining (priority order, with notes)
 1. Finish section 13: Insert thumbnails (render each part offscreen, `gpu.render_thumbnail`),
    Show center of mass, Properties… / Instance properties…, origin row menu (LA16), triad look
-   (ui2), "Simulation connection" n/a.
+   (ui2); "Simulation connection" is n/a (simulation).
 2. Standard content: Insert closest / furthest (stacking on washers and nuts), washer under a
    mated bolt head, thread type, part number / description.
 3. App checks still to do: Realign fields, rigid icon (needs a subassembly with one fixed part and
    0 DOF), surfaces filter.
 4. Insert dialog: thumbnails, inserted count (I16); Generate for configurations (I13).
 5. Isolate: Select transparent geometry; sliders instead of −/+ (ui2 owns the visuals).
-6. Not planned: in-context modelling, PDM / release, comments (C25, A6, G13, T9).
+6. In scope (lead, 2026-10-18: nothing may be skipped except cloud-only, multi-user or simulation):
+   in-context modelling (Edit in context, Create Part Studio in context: T9, G13), release / revision
+   (Release…, Revision history), Change to version, Dynamic suppression, Use best available
+   tessellation, Properties… / Instance properties…, sketch instances (Sketches filter), sliders in the
+   Isolate panel. Only comments / tasks to other users and "Simulation connection" are n/a.
 
 ## How to test
 - Model: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-asb cargo test -p noshape-model --lib assembly::`

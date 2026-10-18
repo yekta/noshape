@@ -66,19 +66,21 @@ impl DrawingEditor {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_chooser(cx)));
         let dim_kind = if let Tool::Dimension { kind, .. } = t { Some(kind) } else { None };
         let ed2 = ed.clone();
+        // Onshape's Dimension dropdown (live, in order). The 2 point, point to
+        // line and line to line tools use the smart linear dimension's picks.
         let dims_menu = vec![
             MenuEntry::item("Dimension (d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
             MenuEntry::item("Chamfer dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)),
             MenuEntry::item("Maximum or minimum dimension (ctrl+m)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)),
-            MenuEntry::Separator,
+            MenuEntry::item("2 point linear dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
+            MenuEntry::item("Point to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
+            MenuEntry::item("Line to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
+            MenuEntry::item("Line to line angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx)),
+            MenuEntry::item("3 point angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle3, picks: vec![] }, cx)),
+            MenuEntry::item("Arc length dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
             MenuEntry::item("Radial dimension (shift+r)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx)),
             MenuEntry::item("Diameter dimension (shift+d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx)),
-            MenuEntry::item("Angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx)),
-            MenuEntry::item("Aligned", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Aligned, picks: vec![] }, cx)),
-            MenuEntry::item("Horizontal", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Horizontal, picks: vec![] }, cx)),
-            MenuEntry::item("Vertical", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Vertical, picks: vec![] }, cx)),
-            MenuEntry::item("Arc length dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
-            MenuEntry::item("Foreshortened diameter (shift+h)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)),
+            MenuEntry::item("Foreshorten dimension (shift+h)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)),
         ];
         let ed5 = ed.clone();
         let views_menu = vec![
@@ -166,7 +168,7 @@ impl DrawingEditor {
             .child(sep())
             .child(crate::ui::tool_group(
                 "drg-dim",
-                crate::ui::split_tool_button("dr-dim", "linear-dim", matches!(dim_kind, Some(_)), cx).tooltip("Dimension (d)").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                crate::ui::split_tool_button("dr-dim", "linear-dim", dim_kind.is_some(), cx).tooltip("Dimension (d)").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                     window.focus(&this.focus, cx);
                     this.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)
                 })),

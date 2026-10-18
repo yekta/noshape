@@ -134,9 +134,11 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             ConstraintKind::Rho { .. } => Dim::UNITLESS,
             _ => Dim::LENGTH,
         };
+        // Ellipse axes are typed as diameters but stored as radii.
+        let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
             Ok(q) => {
-                let _ = sk.set_dimension_value(id, q.value);
+                let _ = sk.set_dimension_value(id, q.value / scale);
             }
             Err(e) => problems.push(e.message),
         }
@@ -152,9 +154,11 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             ConstraintKind::Rho { .. } => Dim::UNITLESS,
             _ => Dim::LENGTH,
         };
+        // Ellipse axes are typed as diameters but stored as radii.
+        let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
             Ok(q) => {
-                let _ = sk.set_dimension_value(id, q.value);
+                let _ = sk.set_dimension_value(id, q.value / scale);
             }
             Err(e) => problems.push(e.message),
         }
@@ -210,7 +214,12 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     let name = ev.name.to_string();
     ev.ctx.sketches.retain(|s| s.feature != ev.feature);
-    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, wires, dimension_text }));
+    let images = data
+        .images
+        .iter()
+        .map(|i| crate::regen::context::SketchResultImage { id: i.id, box_points: i.box_points.clone(), data_base64: i.data_base64.clone() })
+        .collect();
+    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, wires, dimension_text, images }));
     Ok(())
 }
 
@@ -665,6 +674,31 @@ mod text_expression_tests {
         assert_eq!(split_top("roundToPrecision(#l / in, 3)", ','), vec!["roundToPrecision(#l / in, 3)"]);
         assert_eq!(trim_number(2.500, 6), "2.5");
         assert_eq!(trim_number(3.0, 6), "3");
+    }
+
+    #[test]
+    fn ellipse_diameter_expressions_regenerate_as_radii() {
+        use crate::configuration::ConfigValues;
+        use crate::partstudio::PartStudio;
+        use crate::reference::{DatumPlane, Reference};
+        use crate::regen::{RegenOptions, Regenerator};
+        use crate::sketch_feature::SketchData;
+        let units = noshape_units::UnitPrefs::default();
+        let mut sk = noshape_sketch::Sketch::new();
+        let e = sk.add_ellipse(glam::DVec2::ZERO, glam::DVec2::new(0.01, 0.0), 0.005);
+        let cid = sk.add_constraint(ConstraintKind::EllipseRadius { ellipse: e, major: true, value: 0.01 }).unwrap();
+        let mut data = SketchData { sketch: sk, ..Default::default() };
+        // Typed as a diameter (Onshape shows ellipse axes as diameters).
+        data.dimension_exprs.insert(cid.0, noshape_units::ExprValue::new("2 * 15 mm"));
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        f.params.set("sketch", ParamValue::Sketch(Box::new(data)));
+        ps.features.push(f);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+        let solved = &r.context.sketches[0].sketch;
+        let v = solved.constraint(cid).unwrap().kind.value().unwrap();
+        assert!((v - 0.015).abs() < 1e-12, "stored radius = typed diameter / 2, got {v}");
     }
 
     #[test]

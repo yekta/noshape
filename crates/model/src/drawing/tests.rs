@@ -894,3 +894,31 @@ fn templates_and_title_blocks() {
     assert!(!texts(&built).iter().any(|x| x == "TOLERANCES"));
     assert_eq!(drawing.sheets[0].title_style, TitleBlockStyle::Ansi);
 }
+
+#[test]
+fn view_simplification_drops_small_detail_and_parts() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let top = ViewId(2);
+    let circles = |d: &Drawing| compute_view(d, &d.sheets[0], top, &sources, &cache, false).circles().len();
+    assert_eq!(circles(&drawing), 6, "Auto keeps the plate's detail");
+    // Absolute 40 mm: circles shorter than that (the small bores) are left out.
+    drawing.sheets[0].view_mut(top).unwrap().simplification = Some(Simplification::Absolute(0.04));
+    let n = circles(&drawing);
+    assert!(n > 0 && n < 6, "{n}");
+    // Ratio to part keeps the part.
+    drawing.sheets[0].view_mut(top).unwrap().simplification = Some(Simplification::RatioToPart(0.3));
+    let g = compute_view(&drawing, &drawing.sheets[0], top, &sources, &cache, false);
+    assert!(!g.edges.is_empty() && g.circles().len() < 6, "edges {} circles {}", g.edges.len(), g.circles().len());
+    // A threshold larger than the plate leaves it out entirely.
+    drawing.sheets[0].view_mut(top).unwrap().simplification = Some(Simplification::Absolute(1.0));
+    assert!(compute_view(&drawing, &drawing.sheets[0], top, &sources, &cache, false).edges.is_empty());
+    // Children inherit the parent's setting.
+    drawing.sheets[0].view_mut(top).unwrap().simplification = None;
+    let child = drawing.sheets[0].views.iter().find(|v| drawing.sheets[0].parent_of(v.id) == Some(ViewId(1))).map(|v| v.id);
+    if let Some(c) = child {
+        drawing.sheets[0].view_mut(ViewId(1)).unwrap().simplification = Some(Simplification::RatioToStudio(0.5));
+        assert_eq!(views::view_simplification(&drawing.sheets[0], c), Simplification::RatioToStudio(0.5));
+    }
+}

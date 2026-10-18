@@ -738,6 +738,7 @@ fn transformed_sketch(s: &SketchResult, m: &DMat4) -> SketchResult {
         regions: s.regions.clone(),
         wires: s.wires.clone(),
         dimension_text: s.dimension_text.clone(),
+        images: s.images.clone(),
     }
 }
 

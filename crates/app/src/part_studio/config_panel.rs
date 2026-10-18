@@ -5,10 +5,10 @@ use super::PartStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption, VariableKind};
 use noshape_model::params::{ParamKind, ParamValue};
@@ -102,85 +102,186 @@ impl PartStudioView {
         let pal = p();
         let body = match panel {
             RightPanel::Appearance => self.render_appearance_panel(cx),
-            RightPanel::Variables => self.render_variables(cx),
+            RightPanel::Variables => self.render_variables(window, cx),
             RightPanel::Configurations => self.render_configurations(window, cx),
             RightPanel::SheetMetal => self.render_sheet_metal_panel(cx),
             RightPanel::CutList => self.render_cut_list_panel(cx),
         };
+        let title = match panel {
+            RightPanel::Appearance => "Appearances",
+            RightPanel::Variables => "Variable table",
+            RightPanel::Configurations => "Configurations",
+            RightPanel::SheetMetal => "Sheet metal",
+            RightPanel::CutList => "Cut list",
+        };
+        // Onshape (live, dom/panel-appearance.txt): 712 px, white; a 30 px
+        // header whose title is one full-width active tab (13.33 px / 500
+        // blue, 2 px blue underline); a 40 px `#eee` footer with `?`. The
+        // panel closes from its strip button (no ×).
         Some(
             v_flex()
-                .w(px(320.))
+                .w(px(712.))
+                .max_w(relative(0.5))
                 .h_full()
                 .flex_none()
                 .bg(pal.panel)
                 .border_l_1()
-                .border_t_1()
                 .border_color(pal.border)
                 .child(
-                    h_flex()
-                        .h(px(30.))
-                        .px_3()
-                        .justify_between()
-                        .border_b_1()
-                        .border_color(pal.border)
-                        .child(div().text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match panel {
-                            RightPanel::Appearance => "Appearances",
-                            RightPanel::Variables => "Variable table",
-                            RightPanel::Configurations => "Configurations",
-                            RightPanel::SheetMetal => "Sheet metal",
-                            RightPanel::CutList => "Cut list",
-                        }))
-                        .child(Button::new("panel-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.right_panel = None;
-                            cx.notify();
-                        }))),
+                    div().h(px(30.)).flex_none().pt(px(4.)).child(
+                        div()
+                            .h(px(26.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .border_b_2()
+                            .border_color(pal.accent)
+                            .text_size(px(13.33))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(pal.accent)
+                            .child(title),
+                    ),
                 )
-                .child(v_flex().id("right-panel-body").flex_1().p_2().gap_2().overflow_y_scroll().child(body))
+                .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().child(body))
+                .child(
+                    h_flex()
+                        .h(px(40.))
+                        .flex_none()
+                        .px(px(10.))
+                        .justify_end()
+                        .bg(gpui_kit::rgb(0xeeeeee))
+                        .border_t_1()
+                        .border_color(gpui_kit::rgb(0xcccccc))
+                        .child(div().flex_1().flex().justify_center().children((panel == RightPanel::Variables).then(|| self.variable_panel_footer(cx))))
+                        .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                )
                 .into_any_element(),
         )
     }
 
-    fn render_variables(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    /// Onshape's Variable table (live, part-studio/77): a gray "⌄ Part
+    /// Studio 1 ⋯" section header, then a table Name | Variable type | Value
+    /// | Description (98 px columns, bold headers, `#aaa` grid); with no
+    /// variables, a large faint illustration and a hint.
+    fn render_variables(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let units = self.doc.read(cx).session.doc.settings.units;
         let vars: Vec<(String, Quantity)> = self.display.variables.iter().map(|(k, v)| (k.clone(), *v)).collect();
-        if vars.is_empty() {
-            return div()
-                .text_xs()
-                .text_color(pal.text_faint)
-                .child("No variables yet. Add a Variable feature (toolbar → Variable) and use it in any field as #name.")
-                .into_any_element();
+        let tab_name = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id == self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let grid = gpui_kit::rgb(0xaaaaaa);
+        // Live (part-studio/77): 140 px columns, 34 px rows, like a Variable
+        // Studio table.
+        let cell = |text: SharedString, bold: bool| {
+            div()
+                .w(px(140.))
+                .h(px(34.))
+                .flex_none()
+                .flex()
+                .items_center()
+                .px(px(5.))
+                .border_r_1()
+                .border_b_1()
+                .border_color(grid)
+                .text_size(px(13.33))
+                .text_color(pal.text)
+                .when(bold, |d| d.justify_center().font_weight(FontWeight::BOLD))
+                .truncate()
+                .child(text)
+        };
+        let header = h_flex()
+            .h(px(35.))
+            .px(px(6.))
+            .gap(px(3.))
+            .bg(gpui_kit::rgb(0xeaeaea))
+            .border_1()
+            .border_color(grid)
+            .child(crate::ui::glyph("ui-chevron-down", 11., pal.text))
+            .child(div().flex_1().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(tab_name))
+            .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"));
+        let columns = h_flex().border_l_1().border_color(grid).bg(gpui_kit::rgb(0xeaeaea)).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.))));
+        let rows = vars.into_iter().map(|(name, q)| {
+            let (n1, n2) = (name.clone(), name.clone());
+            let view = cx.entity();
+            let kind = if q.dim == noshape_units::Dim::LENGTH {
+                "Length"
+            } else if q.dim == noshape_units::Dim::ANGLE {
+                "Angle"
+            } else if q.is_unitless() {
+                "Number"
+            } else {
+                "Any"
+            };
+            h_flex()
+                .id(SharedString::from(format!("var-row-{name}")))
+                .border_l_1()
+                .border_color(grid)
+                // Onshape: hovering a variable highlights the features that use it.
+                .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                    let new = h.then(|| n1.clone());
+                    if this.ui.var_hover != new {
+                        this.ui.var_hover = new;
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }
+                }))
+                .hover(|d| d.bg(pal.row_hover))
+                .child(cell(name.clone().into(), false))
+                .child(cell(kind.into(), false))
+                .child(cell(noshape_units::format_quantity(q, &units).into(), false))
+                .child(cell(SharedString::default(), false))
+                .os_context_menu(move |menu, _, _| {
+                    let v = view.clone();
+                    let n = n2.clone();
+                    menu.item(crate::os_menu::OsMenuItem::new("Filter feature list").on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_filter(&format!(":variable {n}"), w, cx))))
+                })
+        });
+        let rows: Vec<_> = rows.collect();
+        // Variable Studio tables inserted here (Onshape: below the Part
+        // Studio's own table; same-document ones are editable).
+        let refs = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab);
+        let studios: Vec<noshape_model::document::TabId> = refs.iter().map(|r| r.studio).collect();
+        self.ui.var_tables.retain(|k, _| studios.contains(k));
+        let mut tables: Vec<AnyElement> = Vec::new();
+        for (k, r) in refs.iter().enumerate() {
+            // Another document's studio: read-only (Onshape).
+            if r.external.is_some() {
+                let target = crate::variable_insert::InsertTarget::Element(self.tab);
+                tables.extend(crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx).map(|t| div().pt(px(10.)).child(t).into_any_element()));
+                continue;
+            }
+            let (doc, host, s) = (self.doc.clone(), self.tab, r.studio);
+            if !self.ui.var_tables.contains_key(&s) {
+                let view = cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx));
+                self.ui.var_tables.insert(s, view);
+            }
+            if let Some(view) = self.ui.var_tables.get(&s) {
+                tables.push(div().pt(px(10.)).child(view.clone()).into_any_element());
+            }
         }
+        let empty = self.display.variables.is_empty() && studios.is_empty();
         v_flex()
-            .gap_px()
-            .children(vars.into_iter().map(|(name, q)| {
-                let (n1, n2) = (name.clone(), name.clone());
-                let view = cx.entity();
-                h_flex()
-                    .id(SharedString::from(format!("var-row-{name}")))
-                    // Onshape: hovering a variable highlights the features that use it.
-                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                        let new = h.then(|| n1.clone());
-                        if this.ui.var_hover != new {
-                            this.ui.var_hover = new;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        }
-                    }))
-                    .justify_between()
-                    .px_2()
-                    .py_1()
-                    .rounded_sm()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().text_sm().text_color(pal.accent_hover).child(format!("#{name}")))
-                    .child(div().text_sm().text_color(pal.text).child(noshape_units::format_quantity(q, &units)))
-                    .context_menu(move |menu, _, _| {
-                        let v = view.clone();
-                        let n = n2.clone();
-                        menu.item(PopupMenuItem::new("Filter feature list").on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_filter(&format!(":variable {n}"), w, cx))))
-                    })
-            }))
+            .child(header)
+            .child(columns)
+            .children(rows)
+            .children(tables)
+            .when(empty, |d| {
+                d.child(h_flex().border_l_1().border_color(grid).child(cell(SharedString::default(), false).child(div().text_color(pal.text_faint).italic().child("Name"))))
+                    .child(
+                        v_flex()
+                            .items_center()
+                            .pt(px(60.))
+                            .gap(px(10.))
+                            .child(div().opacity(0.15).child(crate::assets::icon("variable-table", 180., cx)))
+                            .child(div().max_w(px(400.)).text_size(px(13.33)).text_color(pal.text_muted).text_center().child("Add variables to drive sketch and feature parameters in the Part Studio.")),
+                    )
+            })
             .into_any_element()
+    }
+
+    /// The Variable table footer (live, part-studio/77): a split button
+    /// "Create Variable Studio | ▴" whose menu also has Insert Variable Studio.
+    fn variable_panel_footer(&self, cx: &mut Context<Self>) -> AnyElement {
+        crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)
     }
 
     fn render_configurations(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -449,6 +550,21 @@ impl PartStudioView {
             // With several inputs, first choose the one that drives the
             // parameter (Onshape configures a parameter per input).
             let inputs: Vec<(String, String)> = list_inputs.iter().map(|i| (i.id.clone(), i.name.clone())).collect();
+            // Onshape: "+ Configure features", then click a feature in the
+            // list and the parameter in its dialog.
+            let picking = self.ui.configure_pick.is_some();
+            let first_input = inputs.first().map(|(id, _)| id.clone());
+            col = col.child(
+                Button::new("configure-features")
+                    .label(if picking { "Click a feature, then a parameter (Esc ends)" } else { "Configure features" })
+                    .icon(IconName::Plus)
+                    .outline()
+                    .xsmall()
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.ui.configure_pick = if this.ui.configure_pick.is_some() { None } else { first_input.clone() };
+                        cx.notify();
+                    })),
+            );
             col = col.child(
                 Button::new("add-configured").label("Configure a parameter").icon(IconName::Plus).outline().xsmall().dropdown_menu(move |mut m, window, cx| {
                     let (feats, view) = (feats.clone(), view.clone());

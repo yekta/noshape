@@ -281,6 +281,73 @@ fn settle(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Rename a (closed) document: file name and stored document name.
+/// Move a (closed) document and its sidecar files into `dir`.
+pub fn move_document(path: &Path, dir: &Path) -> anyhow::Result<PathBuf> {
+    let name = path.file_name().context("document has no file name")?;
+    let dest = dir.join(name);
+    if dest == path {
+        return Ok(dest);
+    }
+    if dest.exists() {
+        bail!("A document named \"{}\" already exists in this folder", name.to_string_lossy());
+    }
+    let _ = settle(path);
+    if std::fs::rename(path, &dest).is_err() {
+        // Across file systems: copy, then remove the original.
+        std::fs::copy(path, &dest)?;
+        std::fs::remove_file(path)?;
+    }
+    for (old, new) in sidecars(path).into_iter().zip(sidecars(&dest)) {
+        if old.exists() {
+            let _ = std::fs::rename(old, new);
+        }
+    }
+    Ok(dest)
+}
+
+/// What the documents page's Details and Versions panels show about a
+/// document (read from its store).
+#[derive(Clone, Debug, Default)]
+pub struct DocDetails {
+    pub name: String,
+    pub description: String,
+    pub created_by: String,
+    pub created: i64,
+    pub modified_by: String,
+    pub modified: i64,
+    /// Workspaces and versions, newest first: (name, is_workspace, author, time).
+    pub history: Vec<(String, bool, String, i64)>,
+}
+
+pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
+    let store = noshape_store::Document::open_read_only(path)?;
+    let meta = store.meta()?;
+    let graph = store.graph()?;
+    let first = graph.microversions.iter().min_by_key(|m| m.seq);
+    let last = graph.microversions.iter().max_by_key(|m| m.seq);
+    let mut history: Vec<(String, bool, String, i64)> = Vec::new();
+    for b in graph.branches.iter().filter(|b| !b.deleted) {
+        let head = graph.microversions.iter().find(|m| m.id == b.head);
+        history.push((b.name.clone(), true, head.map(|m| m.author.clone()).unwrap_or_default(), head.map(|m| m.created).unwrap_or(b.created).max(b.created)));
+    }
+    for v in &graph.versions {
+        history.push((v.name.clone(), false, v.author.clone(), v.created));
+    }
+    if let Some(f) = first {
+        history.push(("Start".into(), false, f.author.clone(), f.created));
+    }
+    history.sort_by(|a, b| b.3.cmp(&a.3).then(b.1.cmp(&a.1)));
+    Ok(DocDetails {
+        name: if meta.name.is_empty() { path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default() } else { meta.name },
+        description: meta.description,
+        created_by: first.map(|m| m.author.clone()).unwrap_or_default(),
+        created: first.map(|m| m.created).unwrap_or(meta.created),
+        modified_by: last.map(|m| m.author.clone()).unwrap_or_default(),
+        modified: last.map(|m| m.created).unwrap_or(meta.modified),
+        history,
+    })
+}
+
 pub fn rename_document(path: &Path, new_name: &str) -> anyhow::Result<PathBuf> {
     let clean = sanitize_name(new_name);
     if clean.is_empty() {
@@ -334,46 +401,19 @@ pub fn trash_document(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// "just now", "5 min ago", "yesterday", "Mar 4", "Mar 4, 2024".
-pub fn format_modified(ms: i64) -> String {
-    if ms <= 0 {
-        return "—".into();
+/// Onshape's time stamps (live documents list and versions panel): "1:15 PM
+/// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
+pub fn format_onshape_time(ms: i64) -> String {
+    use chrono::{Datelike as _, Local, TimeZone as _};
+    let Some(t) = Local.timestamp_millis_opt(ms).single() else { return "—".into() };
+    let today = Local::now().date_naive();
+    let clock = t.format("%-I:%M %p").to_string();
+    match (today - t.date_naive()).num_days() {
+        0 => format!("{clock} Today"),
+        1 => format!("{clock} Yesterday"),
+        _ if t.year() == today.year() => t.format("%b %-d").to_string(),
+        _ => t.format("%b %-d, %Y").to_string(),
     }
-    let now = to_ms(SystemTime::now());
-    let s = ((now - ms) / 1000).max(0);
-    match s {
-        0..=59 => return "just now".into(),
-        60..=3599 => return format!("{} min ago", s / 60),
-        3600..=86399 => return format!("{} h ago", s / 3600),
-        86400..=172799 => return "yesterday".into(),
-        172800..=604799 => return format!("{} days ago", s / 86400),
-        _ => {}
-    }
-    let (y, m, d) = civil_from_days(ms.div_euclid(86_400_000));
-    let (ny, _, _) = civil_from_days(now.div_euclid(86_400_000));
-    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let mon = MONTHS[(m as usize).saturating_sub(1).min(11)];
-    if y == ny { format!("{mon} {d}") } else { format!("{mon} {d}, {y}") }
-}
-
-/// Days since 1970-01-01 to (year, month, day) (Howard Hinnant's algorithm).
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
-    let z = z + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
-/// Upper-case the first letter (for column cells).
-pub fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }
 
 pub fn format_size(bytes: u64) -> String {
@@ -389,9 +429,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dates() {
-        assert_eq!(civil_from_days(0), (1970, 1, 1));
-        assert_eq!(civil_from_days(20_000), (2024, 10, 4));
+    fn names_and_times() {
         assert_eq!(sanitize_name(" a/b:c "), "a-b-c");
+        let now = to_ms(SystemTime::now());
+        assert!(format_onshape_time(now).ends_with(" Today"));
+        assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
     }
 }

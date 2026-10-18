@@ -8,9 +8,10 @@
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
 use noshape_model::features::FeatureType;
@@ -33,6 +34,8 @@ pub enum DialogEvent {
     HoverRef(Option<Reference>),
     /// Preview slider: 0 = the model before the feature, 1 = after.
     PreviewOpacity(f32),
+    /// "Configure features" mode: the user picked this parameter.
+    ConfigureParam(String),
 }
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
@@ -97,8 +100,11 @@ pub struct FeatureDialog {
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
     baselines: HashMap<String, String>,
-    /// Enter applied a field value; the same keystroke's Accept is dropped.
-    enter_applied: bool,
+    /// Size after the user dragged the corner grip (Onshape dialogs resize).
+    pub size: Option<Size<Pixels>>,
+    /// "Configure features" mode: configurable parameters are outlined
+    /// and clicking one configures it (Onshape: broken yellow outline).
+    pub configure_mode: bool,
     /// Rows the owner adds under the parameters and a footer element left
     /// of `?` (the Sketch dialog's display options and diagnostics button).
     pub extra: Option<DialogExtra>,
@@ -139,7 +145,8 @@ impl FeatureDialog {
             units,
             inputs: HashMap::new(),
             baselines: HashMap::new(),
-            enter_applied: false,
+            size: None,
+            configure_mode: false,
             active_query: None,
             subs: Vec::new(),
             parse_errors: HashMap::new(),
@@ -158,7 +165,7 @@ impl FeatureDialog {
             final_available: true,
             flash: None,
             show_help: false,
-            preview: 1.0,
+            preview: PREVIEW_REST,
             preview_track: Default::default(),
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
@@ -275,6 +282,28 @@ impl FeatureDialog {
         }
         self.parse_errors.remove(path);
         self.set_value(path, ParamValue::Expr(noshape_units::ExprValue::new(text)), cx);
+    }
+
+    /// A dialog without selection fields starts typing in its first text or
+    /// number field (Onshape: the Variable dialog opens with Name focused).
+    pub fn focus_first_field(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let params = &self.feature.params;
+        let mut first: Option<(&'static str, String)> = None;
+        for s in self.ty.params.iter().filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN)) {
+            match &s.kind {
+                ParamKind::Query { .. } => return false,
+                ParamKind::Text { .. } if first.is_none() => first = Some((s.id, params.text(s.id).to_string())),
+                ParamKind::Num(_) if first.is_none() => first = Some((s.id, params.expr(s.id).map(|e| e.text.clone()).unwrap_or_default())),
+                _ => {}
+            }
+        }
+        let Some((id, text)) = first else { return false };
+        let st = self.ensure_input(id, &text, window, cx);
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        true
     }
 
     /// Focus a field with its text selected (after a manipulator drag, as
@@ -513,13 +542,9 @@ impl FeatureDialog {
             InputEvent::PressEnter { shift, .. } => {
                 // Onshape: Enter in a changed field applies the value (the
                 // text stays selected); the next Enter commits the feature.
-                // The Accept action of the same keystroke may come before
-                // or after this event; `enter_applied` drops the second.
                 if *shift {
                     cx.emit(DialogEvent::Accept { repeat: true });
-                } else if this.apply_on_enter(&path_s, state, window, cx) {
-                    this.enter_applied = true;
-                } else if !std::mem::take(&mut this.enter_applied) {
+                } else if !this.apply_on_enter(&path_s, state, window, cx) {
                     cx.emit(DialogEvent::Accept { repeat: false });
                 }
             }
@@ -638,6 +663,8 @@ impl FeatureDialog {
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut i = 0;
         let mut hidden_by_group: Option<&'static str> = None;
+        // An expanded, checked group header: its params are indented.
+        let mut open_group: Option<&'static str> = None;
         while i < specs.len() {
             let s = &specs[i];
             i += 1;
@@ -652,6 +679,15 @@ impl FeatureDialog {
             // header is checked). The first param that doesn't depend on the
             // header ends the group (Extrude's Symmetric and Draft follow the
             // Starting offset group).
+            let depends_on = |header: &str| {
+                let mut off = values.clone();
+                off.set(header, ParamValue::Bool(false));
+                !s.is_visible(&off)
+            };
+            let in_group = !s.hints.has(Hints::GROUP_HEADER) && open_group.is_some_and(depends_on);
+            if !in_group {
+                open_group = None;
+            }
             if s.hints.has(Hints::GROUP_HEADER) {
                 hidden_by_group = None;
             } else if let Some(header) = hidden_by_group {
@@ -685,9 +721,36 @@ impl FeatureDialog {
                 }
             }
             let row = self.render_param(s, &path, &values, companion, &trailing, prefix, window, cx);
+            // Configure features mode: top-level numbers, checkboxes and
+            // choices are outlined and pick the parameter on click.
+            let configurable = self.configure_mode && prefix.is_none() && matches!(s.kind, ParamKind::Num(_) | ParamKind::Bool { .. } | ParamKind::Enum { .. }) && !s.hints.has(Hints::UNCONFIGURABLE);
+            let row = row.map(|r| {
+                if !configurable {
+                    return r;
+                }
+                let pid = s.id.to_string();
+                div()
+                    .id(SharedString::from(format!("cfg-{pid}")))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xfab601))
+                    .rounded(px(2.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(gpui_kit::rgb(0xfff3cf)))
+                    .child(r)
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |_, _: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        cx.emit(DialogEvent::ConfigureParam(pid.clone()));
+                    }))
+                    .into_any_element()
+            });
             if s.hints.has(Hints::GROUP_HEADER) && (!values.bool(s.id) || self.collapsed_groups.contains(&path)) {
                 hidden_by_group = Some(s.id);
+            } else if s.hints.has(Hints::GROUP_HEADER) {
+                open_group = Some(s.id);
             }
+            // Onshape (dialogs/extrude-24): a group's params are indented 24 px
+            // with a 1 px `#d7d7d7` guide line under the expander.
+            let row = row.map(|r| if in_group { div().relative().pl(px(24.)).child(div().absolute().left(px(15.)).top_0().bottom_0().w(px(1.)).bg(p().border)).child(r).into_any_element() } else { r });
             if let Some(row) = row {
                 rows.push(row);
             }
@@ -752,10 +815,10 @@ impl FeatureDialog {
                     .w_full()
                     .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(s.label))
                     .child(div().flex_1().child(e))
-                    .context_menu(move |m, _, _| {
+                    .os_context_menu(move |m, _, _| {
                         let v = view.clone();
                         let p = p2.clone();
-                        m.item(gpui_kit::component::menu::PopupMenuItem::new("Convert to checkbox").on_click(move |_, _, cx| {
+                        m.item(crate::os_menu::OsMenuItem::new("Convert to checkbox").on_click(move |_, _, cx| {
                             v.update(cx, |this, cx| {
                                 this.inputs.remove(&p);
                                 this.parse_errors.remove(&p);
@@ -781,7 +844,7 @@ impl FeatureDialog {
                         .flex()
                         .justify_center()
                         .cursor_pointer()
-                        .child(crate::ui::glyph(if on && !collapsed { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if on { gpui_kit::rgb(0xa0522d) } else { pal.border }))
+                        .child(crate::ui::glyph(if on && !collapsed { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if on { gpui_kit::rgb(0x555555) } else { pal.border }))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.collapsed_groups.remove(&path_c) {
                                 this.collapsed_groups.insert(path_c.clone());
@@ -802,10 +865,10 @@ impl FeatureDialog {
                             .id(SharedString::from(format!("cbw-{path}")))
                             .child(crate::ui::os_checkbox(SharedString::from(format!("cb-{path}")), s.label, on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Bool(!on), cx))))
                             // Right-click > Convert to expression (e.g. `#Length > 3`).
-                            .context_menu(move |m, _, _| {
+                            .os_context_menu(move |m, _, _| {
                                 let v = view.clone();
                                 let p = p2.clone();
-                                m.item(gpui_kit::component::menu::PopupMenuItem::new("Convert to expression").on_click(move |_, window, cx| {
+                                m.item(crate::os_menu::OsMenuItem::new("Convert to expression").on_click(move |_, window, cx| {
                                     v.update(cx, |this, cx| {
                                         let text = if matches!(this.get_value(&p), Some(ParamValue::Bool(true))) { "true" } else { "false" };
                                         this.inputs.remove(&p);
@@ -929,7 +992,7 @@ impl FeatureDialog {
                 // rest of the first column.
                 let expander = tolerant.then(|| {
                     let open = tol.is_some();
-                    div().w(px(20.)).h(px(26.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if open { gpui_kit::rgb(0xa0522d) } else { pal.border }))
+                    div().w(px(20.)).h(px(26.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if open { gpui_kit::rgb(0x555555) } else { pal.border }))
                 });
                 let row = h_flex()
                     .w_full()
@@ -947,7 +1010,8 @@ impl FeatureDialog {
                     None => row.into_any_element(),
                 }
             }
-            ParamKind::Query { max_picks, .. } => {
+            ParamKind::Query { max_picks, filter } => {
+                let takes_mc = filter.intersects(QueryFilter::MATE_CONNECTOR);
                 let refs = values.query(s.id).to_vec();
                 let active = self.active_query.as_deref() == Some(path);
                 let flashing = self.flash.as_deref() == Some(path);
@@ -1034,7 +1098,7 @@ impl FeatureDialog {
                                         }
                                     }))
                             })
-                            .context_menu({
+                            .os_context_menu({
                                 // Onshape: right-click a pick > Clear all (and
                                 // Clear missing references when some are).
                                 let view = cx.entity();
@@ -1042,7 +1106,7 @@ impl FeatureDialog {
                                 move |menu, _, _| {
                                     let v2 = view.clone();
                                     let pb = p3.clone();
-                                    let mut m = menu.item(gpui_kit::component::menu::PopupMenuItem::new("Clear all").on_click(move |_, _, cx| {
+                                    let mut m = menu.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, _, cx| {
                                         v2.update(cx, |this, cx| {
                                             this.set_value(&pb, ParamValue::Query(Vec::new()), cx);
                                             cx.emit(DialogEvent::HoverRef(None));
@@ -1051,7 +1115,7 @@ impl FeatureDialog {
                                     if any_missing {
                                         let v = view.clone();
                                         let pc = p3.clone();
-                                        m = m.item(gpui_kit::component::menu::PopupMenuItem::new("Clear missing references").on_click(move |_, _, cx| {
+                                        m = m.item(crate::os_menu::OsMenuItem::new("Clear missing references").on_click(move |_, _, cx| {
                                             v.update(cx, |this, cx| {
                                                 let missing = this.missing.clone();
                                                 if let Some((vals, id)) = this.values_for_path_mut(&pc) {
@@ -1112,6 +1176,31 @@ impl FeatureDialog {
                         // Right-click > Clear all lives on the pick rows (a
                         // field-level menu would open a second menu).
                     )
+                    // Onshape: fields that accept a mate connector have a 26 px
+                    // "Select mate connector" button at their right.
+                    .when(takes_mc, |d| {
+                        let p_mc = path.to_string();
+                        d.child(
+                            div()
+                                .id(SharedString::from(format!("mc-{path}")))
+                                .size(px(26.))
+                                .flex_none()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(3.))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .child(crate::assets::icon("mc-select", 20., cx))
+                                .tooltip(crate::ui::tooltip("Select mate connector"))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    this.active_query = Some(p_mc.clone());
+                                    window.focus(&this.focus, cx);
+                                    cx.emit(DialogEvent::QueryFocused);
+                                    cx.notify();
+                                })),
+                        )
+                    })
                     .children(flips)
                     .into_any_element()
             }
@@ -1472,9 +1561,6 @@ impl FeatureDialog {
         let (p_ent, st_ent) = (path.to_string(), state.clone());
         let field = field.capture_action(cx.listener(move |this, _: &crate::actions::Accept, window, cx| {
             if this.apply_on_enter(&p_ent, &st_ent, window, cx) {
-                this.enter_applied = true;
-                cx.stop_propagation();
-            } else if std::mem::take(&mut this.enter_applied) {
                 cx.stop_propagation();
             }
         }));
@@ -1502,7 +1588,7 @@ impl FeatureDialog {
                         // The input stays in the tree (so clicks and Tab can
                         // focus it); unfocused, the converted value covers it.
                         .relative()
-                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(13.33))))
+                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(13.33)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
                         .when_some(converted, |d, c| {
                             d.child(
                                 div()
@@ -1607,7 +1693,7 @@ impl Render for FeatureDialog {
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error).map(|s| format!("{} did not regenerate properly: {}", self.feature.name, s.1));
-        let name = self.feature.name.clone();
+        let name = noshape_model::interaction::display_name(&self.feature);
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
@@ -1617,7 +1703,9 @@ impl Render for FeatureDialog {
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no
             // border or radius, shadow 0 5px 10px rgba(0,0,0,.2).
-            .w(px(220.))
+            .relative()
+            .w(self.size.map(|s| s.width).unwrap_or(px(220.)))
+            .when_some(self.size, |d, s| d.h(s.height))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -1728,7 +1816,9 @@ impl Render for FeatureDialog {
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Cancel))),
                     ),
             )
-            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().children(rows))
+            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().when(self.size.is_some(), |d| d.flex_1().min_h_0()).children(rows))
+            // Resize grip at the bottom-right corner.
+            .child(div().id("dialog-grip").absolute().right_0().bottom_0().size(px(10.)).cursor(CursorStyle::ResizeUpLeftDownRight).on_drag(DialogResize, |d, _, _, cx| cx.new(|_| d.clone())))
             .child(
                 // Footer (live): no band; a 112 px preview slider at the
                 // left and the round ? help button at the right.
@@ -1795,6 +1885,10 @@ impl Render for FeatureDialog {
     }
 }
 
+/// Where Onshape's preview slider handle rests (live: 69% of the track).
+/// From there to the right end the feature shows fully; to the left it fades.
+const PREVIEW_REST: f32 = 0.7;
+
 impl FeatureDialog {
     /// Onshape's preview slider (noUi, live): a 112 px, 2 px `#777` track
     /// and an 11 px white handle with a 1 px `#888` ring and a soft shadow.
@@ -1808,7 +1902,7 @@ impl FeatureDialog {
             let v = (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
             if (v - this.preview).abs() > f32::EPSILON {
                 this.preview = v;
-                cx.emit(DialogEvent::PreviewOpacity(v));
+                cx.emit(DialogEvent::PreviewOpacity((v / PREVIEW_REST).min(1.)));
                 cx.notify();
             }
         };
@@ -1875,6 +1969,16 @@ impl Render for PickDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         div().px_2().py_0p5().rounded_sm().bg(pal.panel_raised).border_1().border_color(pal.accent).text_xs().text_color(pal.text).child(self.label.clone())
+    }
+}
+
+/// The dialog's resize grip being dragged.
+#[derive(Clone)]
+pub struct DialogResize;
+
+impl Render for DialogResize {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
     }
 }
 

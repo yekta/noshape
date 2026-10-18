@@ -11,6 +11,7 @@ mod manipulators;
 mod menus;
 mod section;
 mod sketch;
+mod analysis_tools;
 mod shown_dims;
 mod toolbar_prefs;
 pub mod view_cube;
@@ -198,6 +199,9 @@ pub struct PartStudioView {
     focus: FocusHandle,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
+    /// A sketch cancelled with ✕: its draft, index and whether it was new,
+    /// for the toast's Restore link (live sketch/68), with the toast text.
+    canceled_edit: Option<(Feature, usize, bool, String)>,
     sketch: Option<SketchEditor>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
@@ -292,6 +296,7 @@ impl PartStudioView {
             focus: cx.focus_handle(),
             fitted_once: false,
             message: None,
+            canceled_edit: None,
             sketch: None,
             context: None,
             context_menu: None,
@@ -338,6 +343,9 @@ impl PartStudioView {
                 let at = e.index.min(ps.features.len());
                 ps.features.insert(at, draft);
             } else if let Some(slot) = ps.features.get_mut(e.index) {
+                // Configured parameters preview through the active configuration.
+                let mut draft = draft;
+                ps.configuration.store_edit(slot, &mut draft, &self.config_values);
                 *slot = draft;
             }
             // While editing, show the model rolled to just after this feature
@@ -358,7 +366,7 @@ impl PartStudioView {
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
-        let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+        let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let derived2 = derived.clone();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
@@ -505,12 +513,33 @@ impl PartStudioView {
         extra.extend(self.measure_overlay());
         extra.extend(self.midpoint_overlay());
         extra.extend(self.shown_dims_overlay(cx));
+        extra.extend(self.analysis_tool_overlay());
         self.sync_manipulator(cx);
         let built = self.built.as_ref().expect("built");
-        let scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, self.gpu.uploader());
+        if let Some(q) = &self.ui.query_hover {
+            let refs = match q {
+                Reference::Body(b) => self.body_geometry(b),
+                Reference::Sketch(f) | Reference::Feature(f) => self.feature_geometry(*f),
+                r => vec![r.clone()],
+            };
+            for r in &refs {
+                for &id in built.picks.ids_for(r) {
+                    scene.add_flag(id, noshape_render::state::QUERY);
+                }
+            }
+        }
         let (fit_bounds, fit_inset) = (self.fit_bounds(), self.fit_inset_left());
+        // The selection-count cursor: sketch entities while sketching,
+        // otherwise the Part Studio selection (not a dialog's picks).
+        let count = match (&self.sketch, &self.edit) {
+            (Some(ed), _) => ed.selection.len(),
+            (None, None) => self.selection.len(),
+            _ => 0,
+        };
         self.viewport.update(cx, |vp, cx| {
             (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
+            vp.selection_count = count;
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -521,8 +550,12 @@ impl PartStudioView {
         let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, f.name.clone())).collect()).unwrap_or_default();
         let bodies: Vec<(noshape_model::BodyId, String)> = self.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect();
         let entity_kinds = sketch_entity_kinds(self.studio(cx), &self.display);
+        let renamed: Vec<(Reference, String)> = self.studio(cx).map(|s| s.default_names.clone()).unwrap_or_default();
         Arc::new(move |r: &Reference| {
             let fname = |id: FeatureId| names.iter().find(|(i, _)| *i == id).map(|(_, n)| n.clone()).unwrap_or_else(|| "deleted feature".into());
+            if let Some((_, n)) = renamed.iter().find(|(x, _)| x == r) {
+                return n.clone();
+            }
             match r {
                 Reference::Origin => "Origin".into(),
                 Reference::Plane(DatumPlane::Top) => "Top plane".into(),
@@ -668,6 +701,12 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
+                // Hovering a manipulator arrow outlines it (Onshape).
+                let on_manip = vp.read(cx).manipulator_at(*position);
+                if on_manip != self.ui.manip_hover {
+                    self.ui.manip_hover = on_manip;
+                    self.refresh_scene(false, cx);
+                }
                 // The selection-count badge follows the cursor; re-render at
                 // most ~30 times a second and only while something is selected.
                 if !self.selection.is_empty() || !self.selected_features.is_empty() {
@@ -707,6 +746,12 @@ impl PartStudioView {
             // Shown dimensions: a click elsewhere hides them (Onshape).
             ViewportEvent::Click { .. } if self.ui.shown_dims.is_some() => {
                 self.hide_dimensions(window, cx);
+            }
+            // An analysis tool's dialog takes the picks.
+            ViewportEvent::Click { pick, .. } if self.ui.analysis_tool.is_some() && self.edit.is_none() => {
+                if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()) {
+                    self.analysis_pick(&t.reference, cx);
+                }
             }
             // Section view dialog: picks fill its fields.
             ViewportEvent::Click { pick, .. } if self.ui.section_dialog.is_some() => {
@@ -807,7 +852,8 @@ impl PartStudioView {
         }
         let Some(studio) = self.studio(cx) else { return };
         let Some(index) = studio.index_of(id) else { return };
-        let feature = studio.features[index].clone();
+        // Configured parameters show the active configuration's values.
+        let feature = studio.configuration.for_editing(&studio.features[index], &self.config_values);
         if feature.feature_type().is_none() {
             self.message = Some((FeatureStatus::Error, format!("\"{}\" can't be edited: its feature type is not defined (was its Feature Studio deleted?)", feature.name)));
             cx.notify();
@@ -852,16 +898,28 @@ impl PartStudioView {
                 let d = this.display.clone();
                 this.apply_display(d, window, cx);
             }
+            DialogEvent::ConfigureParam(param) => {
+                if let Some(input) = this.ui.configure_pick.take() {
+                    let fid = this.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+                    this.cancel_edit(window, cx);
+                    if let Some(fid) = fid {
+                        this.add_configured(fid, param, &input, cx);
+                    }
+                    this.right_panel = Some(config_panel::RightPanel::Configurations);
+                    cx.notify();
+                }
+            }
+            // Hovering a selection row lights its entity yellow-green (Onshape).
             DialogEvent::HoverRef(r) => {
-                if this.hover != *r {
-                    this.hover = r.clone();
+                if this.ui.query_hover != *r {
+                    this.ui.query_hover = r.clone();
                     this.refresh_scene(false, cx);
                 }
             }
         });
         // Variables for evaluated-value hints; "Final" only when later
         // features exist (Onshape).
-        let mut vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+        let mut vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         vars.extend(self.display.variables.iter().map(|(k, v)| (k.clone(), *v)));
         // Only variables that exist where this feature evaluates (Onshape).
         if let Some(s) = self.studio(cx) {
@@ -876,6 +934,7 @@ impl PartStudioView {
             Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f)),
             r => r.depends_on().is_some_and(|f| !live.contains(&f)),
         });
+        let dialog_size = self.ui.dialog_size;
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let studio_view = cx.entity().downgrade();
         dialog.update(cx, |d, cx| {
@@ -884,9 +943,11 @@ impl PartStudioView {
             }
             d.missing = missing;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
+            d.size = dialog_size;
             d.variables = vars;
             d.final_available = later;
-            window.focus(&d.focus_handle(cx), cx)
+            window.focus(&d.focus_handle(cx), cx);
+            d.focus_first_field(window, cx);
         });
         let history = DraftHistory::new(&dialog.read(cx).feature);
         self.ui.orient_pending = self.ui.orient_on_edit && dialog.read(cx).feature.type_id == "sketch";
@@ -907,12 +968,14 @@ impl PartStudioView {
         self.leave_sketch(cx);
         self.restore_after_sketch(cx);
         let Some(e) = self.edit.take() else { return };
+        self.ui.query_hover = None;
         self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
         let type_id = feature.type_id.clone();
         let name = feature.name.clone();
         let (index, is_new) = (e.index, e.is_new);
         self.remember_values(&feature);
+        let config_values = self.config_values.clone();
         self.doc.update(cx, |doc, cx| {
             let desc = if is_new { format!("Insert feature : {name}") } else { format!("Edit : {name}") };
             doc.edit_studio(self.tab, &desc, cx, |ps| {
@@ -929,6 +992,9 @@ impl PartStudioView {
                         ps.rollback = Some(r + 1);
                     }
                 } else if let Some(slot) = ps.features.get_mut(index) {
+                    // Configured parameters go to the active configuration's row.
+                    let mut feature = feature;
+                    ps.configuration.store_edit(slot, &mut feature, &config_values);
                     *slot = feature;
                 }
             });
@@ -941,14 +1007,45 @@ impl PartStudioView {
     }
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Live Onshape: cancelling a sketch shows "Sketch N has been
+        // canceled. Restore" (sketch/68); Restore reopens the draft.
+        if self.sketch.is_some()
+            && let Some(e) = &self.edit
+        {
+            let feature = e.dialog.read(cx).feature.clone();
+            let text = format!("{} has been canceled.", feature.name);
+            self.message = Some((FeatureStatus::Info, text.clone()));
+            self.canceled_edit = Some((feature, e.index, e.is_new, text));
+        }
         self.leave_sketch(cx);
         self.restore_after_sketch(cx);
+        self.ui.query_hover = None;
         if self.edit.take().is_some() {
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
             self.schedule_regen(window, cx);
             cx.notify();
         }
+    }
+
+    /// Restore link of the "has been canceled" toast: reopen the draft.
+    fn restore_canceled_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((feature, index, is_new, _)) = self.canceled_edit.take() else { return };
+        self.message = None;
+        if self.edit.is_some() {
+            self.cancel_edit(window, cx);
+            self.message = None;
+            self.canceled_edit = None;
+        }
+        let Some(studio) = self.studio(cx) else { return };
+        let index = if is_new { index.min(studio.features.len()) } else {
+            match studio.index_of(feature.id) {
+                Some(i) => i,
+                None => return,
+            }
+        };
+        self.open_dialog(feature, index, is_new, window, cx);
+        cx.notify();
     }
 
     fn delete_features(&mut self, ids: Vec<FeatureId>, cx: &mut Context<Self>) {
@@ -1198,7 +1295,7 @@ impl PartStudioView {
                 }))
             })
             .child(bar)
-            .child(crate::ui::search_tools_box("tb-search").ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_palette(window, cx))))
+            .child(crate::ui::search_tools_toggle("tb-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
             .into_any_element()
     }
 
@@ -1235,6 +1332,10 @@ impl PartStudioView {
         } else {
             crate::ui::tool_button(SharedString::from(format!("tb-{id}")), &icon_name, active, cx)
         };
+        // Tool search with "Highlight tool in toolbar": the selected result's
+        // button (or its group) turns yellow (live: `#fcda7f`, border `#fab601`).
+        let found = self.palette_found_tool(cx).is_some_and(|f| f == id || group.contains(&f));
+        let main = main.when(found, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_1().border_color(gpui_kit::rgb(0xfab601)));
         let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 // Clicking the active tool again closes it (Onshape).
                 let active_new = this.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == id);
@@ -1326,13 +1427,18 @@ impl PartStudioView {
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
             let view = cx.entity();
+            let name = self.default_name(&r, cx);
+            let renaming = self.ui.dg_renaming.as_ref().filter(|(x, ..)| *x == r).map(|(_, st, _)| st.clone());
             dg_rows.push(
                 crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected)
                     .group("dg-row")
                     // Onshape: hidden default geometry is listed in gray.
                     .when(hidden, |d| d.text_color(pal.text_faint))
                     .child(crate::ui::tree_icon(icon, hidden, cx))
-                    .child(div().flex_1().truncate().child(label))
+                    .child(match renaming {
+                        Some(st) => div().flex_1().child(gpui_kit::component::input::Input::new(&st).xsmall()).into_any_element(),
+                        None => div().flex_1().truncate().child(name).into_any_element(),
+                    })
                     .child(div().invisible().group_hover("dg-row", |d| d.visible()).child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = if *h { Some(r2.clone()) } else { None };
@@ -1346,15 +1452,19 @@ impl PartStudioView {
                         this.pick(t, cx);
                     }))
                     .os_context_menu(move |menu, _, cx| {
-                        // Onshape (live): plane rows: New sketch…, Offset plane… |
-                        // Hide, Hide other planes, Hide all planes | Zoom to
-                        // selection, View normal to; the origin: Hide.
+                        // Onshape (live): plane rows: Rename | New sketch…,
+                        // Offset plane…, Size to Part Studio | Hide, Hide other
+                        // planes, Hide all planes | Zoom to selection, View
+                        // normal to | Show dependencies…; the origin: Rename |
+                        // Hide | Show dependencies….
                         let r = r.clone();
                         let is_plane = matches!(r, Reference::Plane(_));
                         let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
                         let (r1, r2, r3, r4) = (r.clone(), r.clone(), r.clone(), r.clone());
-                        let mut m = menu;
+                        let (vn, rn) = (view.clone(), r.clone());
+                        let mut m = menu.item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, w, cx| vn.update(cx, |this, cx| this.start_default_rename(rn.clone(), w, cx)))).separator();
                         if is_plane {
+                            let (vs, rs) = (view.clone(), r.clone());
                             m = m
                                 .item(crate::os_menu::OsMenuItem::new("New sketch…").icon(Icon::empty().path(icon_path("sketch"))).on_click(move |_, w, cx| {
                                     v1.update(cx, |this, cx| {
@@ -1367,7 +1477,8 @@ impl PartStudioView {
                                         this.selection = vec![r4.clone()];
                                         this.start_feature("cPlane", w, cx);
                                     })
-                                }));
+                                }))
+                                .item(crate::os_menu::OsMenuItem::new("Size to Part Studio").on_click(move |_, _, cx| vs.update(cx, |this, cx| this.size_plane_to_studio(rs.clone(), cx))));
                             if PartStudioView::clipboard_has_sketch(cx) {
                                 let (vp, rp) = (view.clone(), r.clone());
                                 m = m.item(crate::os_menu::OsMenuItem::new("Paste sketch").on_click(move |_, _, cx| vp.update(cx, |this, cx| this.paste_sketch_onto(rp.clone(), cx))));
@@ -1395,6 +1506,14 @@ impl PartStudioView {
                                     })
                                 }));
                         }
+                        let (vd, rd) = (view.clone(), r.clone());
+                        m = m.separator().item(crate::os_menu::OsMenuItem::new("Show dependencies…").on_click(move |_, _, cx| {
+                            vd.update(cx, |this, cx| {
+                                this.ui.dependencies = None;
+                                this.ui.plane_dependencies = Some(rd.clone());
+                                cx.notify();
+                            })
+                        }));
                         m
                     })
                     .into_any_element(),
@@ -1843,8 +1962,9 @@ impl PartStudioView {
 
     fn render_rollback_bar(&self, index: usize, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        // Light blue while the list has the keyboard (↑/↓ move it); no menu (live).
-        let focused = self.ui.list_focus.is_focused(window);
+        // Light blue once ↑/↓ (or a click) gave it the keyboard, until the
+        // selection changes; selecting a row alone leaves it gray (live 31, 32).
+        let focused = self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features);
         div()
             .id(SharedString::from(format!("rollback-{index}")))
             .h(px(crate::ui::ROW_H))
@@ -1855,10 +1975,11 @@ impl PartStudioView {
             .cursor(CursorStyle::ResizeUpDown)
             .group("rollback")
             .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(pal.row_hover)))
-            .on_drag(RollbackDrag, |_, _, _, cx| cx.new(|_| RollbackDrag))
+            .on_drag(RollbackDrag, |_, grab, _, cx| cx.new(|_| RollbackDragPill(grab)))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 // Selecting the bar lets ↑/↓ step it (Onshape).
                 window.focus(&this.ui.list_focus, cx);
+                this.ui.rollback_keyboard = Some(this.selected_features.clone());
                 cx.notify();
             }))
             .into_any_element()
@@ -1874,9 +1995,10 @@ impl PartStudioView {
         // Suppressed directly, or by a configuration / expression (the
         // regenerated state says so).
         let suppressed = f.suppressed || (!rolled_back && status == FeatureStatus::Suppressed);
+        // Hidden features (a sketch consumed by a feature) read gray too (live part-studio/92).
         let color = if rolled_back {
             pal.text_rolled_back
-        } else if suppressed {
+        } else if suppressed || f.hidden {
             pal.text_faint
         } else {
             match status {
@@ -1906,21 +2028,22 @@ impl PartStudioView {
         let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
             .group("feature-row")
             .text_color(color)
-            .when(rolled_back, |d| d.italic())
+            // Onshape (part-studio/31, 92): rolled back and suppressed rows are italic.
+            .when(rolled_back || suppressed, |d| d.italic())
             .when(related && !selected && !editing, |d| d.bg(gpui_kit::rgb(0xecf0f4)))
             .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
             .child(
                 crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx)
                     .relative()
-                    // Onshape list badges: error (red) and under-defined sketch (blue), 12 px at the icon's bottom-right.
-                    .when(status == FeatureStatus::Error && !rolled_back, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).size(px(8.)).rounded_full().bg(pal.error).border_1().border_color(pal.panel)))
+                    // Onshape list badges: under-defined sketch (blue) at the icon's
+                    // bottom-right. An error only turns the name red (part-studio/94).
                     // Missing selections / warnings: Onshape's yellow triangle.
                     .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
                     .when(underdefined, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).w(px(8.)).h(px(4.)).bg(pal.accent))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
-                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(f.name.clone()).into_any_element(),
+                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(noshape_model::interaction::display_name(f)).into_any_element(),
             })
             // Onshape's expression icon on dynamically suppressed features.
             .when_some(dyn_expr.clone(), |d, e| {
@@ -1962,6 +2085,18 @@ impl PartStudioView {
                 }
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                // Configure features: the clicked feature opens with its
+                // configurable parameters outlined.
+                if this.ui.configure_pick.is_some() {
+                    this.edit_feature(id, window, cx);
+                    if let Some(e) = &this.edit {
+                        e.dialog.update(cx, |d, cx| {
+                            d.configure_mode = true;
+                            cx.notify();
+                        });
+                    }
+                    return;
+                }
                 if ev.click_count() >= 2 {
                     this.edit_feature(id, window, cx);
                     return;
@@ -2200,19 +2335,60 @@ impl PartStudioView {
                     .flex()
                     .justify_center()
                     .child(
+                        // Onshape's message bubble (live dom/toast-*.txt): 18 px icon,
+                        // 14 px text, padding 4 25 4 10, radius 5.25, a bold × at the right.
                         crate::ui::alert(kind)
+                            .relative()
                             .max_w(px(560.))
-                            .child(msg)
+                            .pl(px(10.))
+                            .pr(px(25.))
+                            .py(px(4.))
+                            .rounded(px(5.25))
+                            .text_size(px(14.))
+                            .child(crate::assets::icon(
+                                match kind {
+                                    crate::ui::AlertKind::Info => "toast-info",
+                                    crate::ui::AlertKind::Warning => "toast-warning",
+                                    crate::ui::AlertKind::Error => "toast-error",
+                                },
+                                18.,
+                                cx,
+                            ))
                             .child(
                                 div()
-                                    .id("toast-x")
+                                    .id("toast-close")
+                                    .absolute()
+                                    .right(px(7.))
+                                    .top_0()
+                                    .bottom_0()
+                                    .flex()
+                                    .items_center()
+                                    .text_size(px(21.))
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(match kind {
+                                        crate::ui::AlertKind::Info => gpui_kit::rgb(0x467bb6),
+                                        crate::ui::AlertKind::Warning => gpui_kit::rgb(0x987107),
+                                        crate::ui::AlertKind::Error => gpui_kit::rgb(0xbd3039),
+                                    })
                                     .cursor_pointer()
-                                    .child(crate::ui::glyph("close", 12., crate::ui::alert_colors(kind).2))
+                                    .child("×")
                                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                         this.message = None;
+                                        this.canceled_edit = None;
                                         cx.notify();
                                     })),
-                            ),
+                            )
+                            .child(msg.clone())
+                            .when(self.canceled_edit.as_ref().is_some_and(|c| c.3 == msg), |d| {
+                                d.child(
+                                    div()
+                                        .id("toast-restore")
+                                        .cursor_pointer()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .child("Restore")
+                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.restore_canceled_edit(window, cx))),
+                                )
+                            })
                     )
                     .into_any_element(),
             );
@@ -2270,10 +2446,27 @@ impl Render for SeparatorDrag {
 #[derive(Clone)]
 struct RollbackDrag;
 
-impl Render for RollbackDrag {
+/// The rollback bar's drag preview; `0` is where the bar was grabbed (the
+/// preview is drawn at the pointer minus it).
+struct RollbackDragPill(Point<Pixels>);
+
+impl Render for RollbackDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        // Onshape (live): a dark-blue pill "Rollback bar" follows the cursor.
-        div().px(px(10.)).py(px(3.)).rounded_full().bg(p().accent).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("Rollback bar")
+        // Onshape (live, part-studio/30): a dark-blue pill "Rollback bar" just
+        // right of the pointer, level with it.
+        // (Margins on a drag preview's root are ignored; offset a child.)
+        div().child(div()
+            .relative()
+            .left(self.0.x + px(12.))
+            .top(self.0.y - px(12.))
+            .px(px(10.))
+            .py(px(3.))
+            .rounded_full()
+            .bg(p().accent)
+            .text_size(px(13.))
+            .font_weight(FontWeight::BOLD)
+            .text_color(gpui_kit::rgb(0xffffff))
+            .child("Rollback bar"))
     }
 }
 
@@ -2366,7 +2559,8 @@ impl Render for PartStudioView {
         let right = self.render_right_panel(window, cx);
         let mut overlay = self.render_viewport_overlay(cx);
         overlay.push(div().absolute().top_0().bottom_0().right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
-        overlay.push(div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element());
+        // Under everything else, so a feature dialog covers it.
+        overlay.insert(0, div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element());
         overlay.extend(self.render_sketch_labels(window, cx));
         overlay.extend(self.render_measure_panel(cx));
         if self.edit.is_none() {
@@ -2385,6 +2579,7 @@ impl Render for PartStudioView {
         overlay.extend(self.render_analysis_panel(cx));
         overlay.extend(self.render_dependencies(cx));
         overlay.extend(self.render_shown_dims(cx));
+        overlay.extend(self.render_analysis_tool(cx));
         overlay.extend(self.render_select_other(cx));
         overlay.extend(self.render_mini_toolbar(cx));
         overlay.extend(self.render_selection_badge(cx));
@@ -2396,11 +2591,8 @@ impl Render for PartStudioView {
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
-                if this.palette.take().is_some() {
-                    // Clicking anywhere closes the tool search (items still get the click).
-                    window.focus(&this.focus, cx);
-                    cx.notify();
-                } else if !this.focus.contains_focused(window, cx) {
+                // (The tool search closes itself on clicks outside it.)
+                if this.palette.is_none() && !this.focus.contains_focused(window, cx) {
                     window.focus(&this.focus, cx);
                 }
             }))
@@ -2445,7 +2637,10 @@ impl Render for PartStudioView {
                     this.close_section_dialog(false, window, cx);
                     return;
                 }
-                if this.ui.mini_toolbar.take().is_some() || this.ui.select_other.take().is_some() || this.ui.dependencies.take().is_some() {
+                if this.close_analysis_tool(cx) {
+                    return;
+                }
+                if this.ui.mini_toolbar.take().is_some() || this.ui.select_other.take().is_some() || this.ui.dependencies.take().is_some() || this.ui.plane_dependencies.take().is_some() || this.ui.configure_pick.take().is_some() {
                     this.hover = None;
                     this.refresh_scene(false, cx);
                     cx.notify();
@@ -2512,11 +2707,9 @@ impl Render for PartStudioView {
             }))
             .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.start_feature("mateConnector", window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMateConnectors, _, cx| this.toggle_mate_connectors(cx)))
-            .on_action(cx.listener(|this, _: &CurvatureAnalysis, window, cx| this.toggle_analysis(analysis::Analysis::Curvature, window, cx)))
-            .on_action(cx.listener(|this, _: &DraftAnalysis, window, cx| {
-                let a = this.draft_analysis();
-                this.toggle_analysis(a, window, cx)
-            }))
+            // Onshape: Shift+C Curve/surface analysis, Shift+D Dihedral analysis.
+            .on_action(cx.listener(|this, _: &CurveSurfaceAnalysis, window, cx| this.toggle_analysis_tool(analysis_tools::ToolKind::CurveSurface, window, cx)))
+            .on_action(cx.listener(|this, _: &DihedralAnalysis, window, cx| this.toggle_analysis_tool(analysis_tools::ToolKind::Dihedral, window, cx)))
             .on_action(cx.listener(|this, _: &ViewHighQuality, window, cx| this.toggle_high_quality(window, cx)))
             .on_action(cx.listener(|this, _: &PanLeft, _, cx| this.pan_by(-150.0, 0.0, cx)))
             .on_action(cx.listener(|this, _: &PanRight, _, cx| this.pan_by(150.0, 0.0, cx)))
@@ -2590,12 +2783,14 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, a: &RotateUp90, _, cx| this.rotate_by(a, 0.0, -90.0, cx)))
             .on_action(cx.listener(|this, a: &RotateDown90, _, cx| this.rotate_by(a, 0.0, 90.0, cx)))
             .on_action(cx.listener(|this, _: &RollbackUp, _, cx| {
+                this.ui.rollback_keyboard = Some(this.selected_features.clone());
                 let r = this.studio(cx).map(|s| s.rollback_index()).unwrap_or(0);
                 if r > 0 {
                     this.set_rollback(Some(r - 1), cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &RollbackDown, _, cx| {
+                this.ui.rollback_keyboard = Some(this.selected_features.clone());
                 let (r, n) = this.studio(cx).map(|s| (s.rollback_index(), s.features.len())).unwrap_or((0, 0));
                 if r < n {
                     this.set_rollback(if r + 1 >= n { None } else { Some(r + 1) }, cx);
@@ -2634,6 +2829,20 @@ impl Render for PartStudioView {
                             .relative()
                             .overflow_hidden()
                             .bg(pal.app_bg)
+                            // Resizing the dialog by its corner grip (min 220 x 120).
+                            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogResize>, _, cx| {
+                                let origin = this.ui.dialog_pos.unwrap_or(point(px(0.), px(3.)));
+                                let p = e.event.position - e.bounds.origin - origin;
+                                let size = size(p.x.max(px(220.)), p.y.max(px(120.)));
+                                this.ui.dialog_size = Some(size);
+                                if let Some(ed) = &this.edit {
+                                    ed.dialog.update(cx, |d, cx| {
+                                        d.size = Some(size);
+                                        cx.notify();
+                                    });
+                                }
+                                cx.notify();
+                            }))
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogMove>, _, cx| {
                                 let grab = *e.drag(cx).0.lock();
                                 let p = e.event.position - e.bounds.origin - grab;

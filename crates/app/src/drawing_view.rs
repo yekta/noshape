@@ -38,12 +38,11 @@ use std::sync::Arc;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DimTool {
     Linear,
-    Aligned,
-    Horizontal,
-    Vertical,
     Radius,
     Diameter,
     Angle,
+    /// 3 point angular: the vertex, then a point on each leg.
+    Angle3,
     Chamfer,
     ArcLength,
     /// Maximum / minimum (arc condition) dimension.
@@ -56,12 +55,10 @@ impl DimTool {
     pub fn name(self) -> &'static str {
         match self {
             DimTool::Linear => "Linear dimension",
-            DimTool::Aligned => "Aligned dimension",
-            DimTool::Horizontal => "Horizontal dimension",
-            DimTool::Vertical => "Vertical dimension",
             DimTool::Radius => "Radial dimension",
             DimTool::Diameter => "Diameter dimension",
             DimTool::Angle => "Angular dimension",
+            DimTool::Angle3 => "3 point angular dimension",
             DimTool::Chamfer => "Chamfer dimension",
             DimTool::ArcLength => "Arc length dimension",
             DimTool::MaxMin => "Maximum / minimum dimension",
@@ -271,7 +268,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
             MenuEntry::Item { label, checked, act } => {
                 let ed = ed.clone();
                 let act = act.clone();
-                let handler: Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)> = Rc::new(move |_, window, cx| {
+                let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
                     ed.update(cx, |t, cx| act(t, window, cx));
                 });
@@ -356,6 +353,18 @@ pub struct DrawingEditor {
     /// Rotate view vertically / horizontally: (view, vertical) until the
     /// next click picks the straight edge to line up.
     pub rotate_to_edge: Option<(ViewId, bool)>,
+    /// Zoom window (`w`): armed, then the dragged box (canvas pixels).
+    pub zoom_window: Option<Option<([f64; 2], [f64; 2])>>,
+    /// Sheet properties panel (see `drawing_sheetprops`).
+    pub sheet_props: Option<crate::drawing_sheetprops::SheetPropsState>,
+    /// Drawing properties panel (see `drawing_drawprops`).
+    pub drawing_props: crate::drawing_drawprops::DrawingPropsUi,
+    /// Section view dialog (see `drawing_section`).
+    pub section_dlg: Option<crate::drawing_section::SectionDlg>,
+    /// Shift+Q: midpoints and quadrant points snap for the current dimension command.
+    pub snap_mid_quad: bool,
+    /// Placement inference lines (sheet mm) while placing or dragging annotations.
+    pub infer_lines: Vec<([f64; 2], [f64; 2])>,
     pub status: Option<SharedString>,
     pub _subs: Vec<Subscription>,
 }
@@ -445,6 +454,12 @@ impl DrawingEditor {
             insert: Default::default(),
             align_views: None,
             rotate_to_edge: None,
+            zoom_window: None,
+            sheet_props: None,
+            drawing_props: Default::default(),
+            section_dlg: None,
+            snap_mid_quad: false,
+            infer_lines: Vec::new(),
             status: None,
             _subs: subs,
         };
@@ -952,6 +967,8 @@ impl DrawingEditor {
 
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.sync_section_dlg(window, cx);
+        self.sync_insert_inputs(window, cx);
         if !self.fitted && self.size_px()[0] > 10.0 {
             self.zoom_to_fit(cx);
         }
@@ -997,6 +1014,10 @@ impl Render for DrawingEditor {
             .child(status)
             .children(panel)
             .children(self.render_view_props(cx))
+            .children(self.render_zoom_window())
+            .children(self.render_sheet_props(cx))
+            .children(self.render_drawing_props(cx))
+            .children(self.render_section_dlg(cx))
             .children(self.render_insert_view_panel(cx))
             .children(self.render_insert_chooser(cx))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
@@ -1015,6 +1036,8 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &Cancel, _, cx| this.cancel(cx)))
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
             .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_views(None, cx)))
+            .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.start_zoom_window(cx)))
+            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
             .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_views(cx)))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {

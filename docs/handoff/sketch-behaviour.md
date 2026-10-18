@@ -127,8 +127,9 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
   `cargo clippy -p noshape-sketch -p noshape --no-deps --all-targets -- -D warnings`.
 * A new sketch starts with the Line tool active: pressing `l` then toggles it off.
 * `SketchData` fields are compared in its manual `PartialEq`: add new fields there.
-* Ellipse axes are stored as radii but shown/typed as diameters (`dim_display_scale`);
-  their expressions aren't stored (regen would re-evaluate them as radii).
+* Ellipse axes are stored as radii but shown/typed as diameters
+  (`ConstraintKind::display_scale`); expressions are stored in the shown scale and
+  regen divides by the scale.
 
 ## skb continuation — 2026-10-18
 
@@ -338,3 +339,41 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   `pattern_value_dim` in sketch.rs; the Transform triad follows the selection
   (`follow_transform_selection`, `xf_center_pinned`). Text is the only tool with option
   rows left (OptKind is now Length/Text). App tests: 47 pass.
+* Text: no side panel for a selected text any more; double-click a text reopens the Text
+  dialog (`begin_text_edit`, `editing_text`, `text_dialog_open`), ✓ applies via
+  `accept_text`, ×/Esc keeps the text; Convert to expression lives in the dialog
+  (`text_expression`). Style buttons only change the dialog's copy.
+* Model-edge right-click in a sketch uses the live sketch/204 layout (14.34).
+* Sketch selection readout at the bottom right (`selection_readout`, 14.35).
+* target-skb was wiped by someone around 14:30 UTC; full rebuild needed (~30+ min -j3).
+
+## No-deviation pass (TEAM-RULES "No deviations from Onshape")
+* Stale notes fixed: 2.2 (Insert group exists), 11.17 (circular instances linked), 11.19.
+* 12.9 / 14.24 / 14.34 "Add comment": comments are a cloud-only exclusion per TEAM-RULES.
+* In progress: DWG import via `cadkit-dwg` (MIT/Apache; adds a crates.io dependency to
+  crates/sketch → Cargo.lock change for the lead), renderer textured image quads
+  (`Drawable::Image` in crates/render) so sketch images draw in any orientation,
+  Restore toast after ✕ (mod.rs, surgical), Select ▸ submenus (Create selection…,
+  empty-space and model-edge variants), ellipse expressions.
+* Import: `crates/sketch/src/cad.rs` is the single DXF/DWG pipeline (cadkit-dxf /
+  cadkit-dwg → `Document::walk` with blocks expanded → exact conic mapping onto XY,
+  dimensions left out). `dxf::parse_dxf` and `dwg::parse_dwg` are thin wrappers;
+  the app calls `dwg::parse_cad` (bytes). New deps in crates/sketch: cadkit-core,
+  cadkit-dwg, cadkit-dxf (=0.3.3, MIT/Apache) → Cargo.lock changed.
+* DWG fixtures in crates/sketch/tests/fixtures/dwg come from LibreDWG test-data (GPLv3
+  project, files unlicensed): the lead must decide whether they may ship (see SOURCES).
+* Images: `SketchImage.data_base64` is now `Arc<str>` (serde rc); `SketchResult.images`
+  → `SketchDisplay.images` (world corners) → scene_builder uploads one texture per image
+  data (cache keyed by the Arc pointer) and draws a unit quad placed by the instance
+  transform (`Drawable::Image`, renderer textured quads in crates/render). The GPUI
+  overlay image path in sketch.rs is gone.
+* Verified in GUI :103 (evidence /tmp/skb/m*.png): image in 3D with exact colors after
+  the transparent-mesh depth compare became strict `Greater` (crates/render renderer.rs,
+  so a coplanar datum plane no longer veils images), iso view, visible after confirming;
+  Restore toast reopens the cancelled sketch; DWG insert (7 entities incl. block line);
+  selection readout; model-edge menu + its Select ▸.
+* Toast in mod.rs: ui2 restyled it with its own ×; my old extra × was removed and the
+  new × also clears `canceled_edit`.
+* Remaining ⏳: 3.13 (shortcut prefs GUI), 6.14 (model vertex/edge snaps), 8.8 (pierce),
+  11.20 (Use hover preview), 14.3, 14.4, 14.10 — all implemented with tests, need GUI.
+  Empty-space Select ▸ items in a sketch still await live capture (REQUESTS.md).

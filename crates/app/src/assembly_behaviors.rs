@@ -8,7 +8,7 @@
 use super::*;
 use gpui_kit::component::input::InputEvent;
 use gpui_kit::component::Disableable as _;
-use gpui_kit::component::menu::PopupMenu;
+use crate::os_menu::{OsMenu, OsMenuItem};
 use noshape_model::assembly::ops::{FilterCommand, InstanceClipboard, ListFilter, RowInfo, RowKind};
 use std::rc::Rc;
 
@@ -31,7 +31,8 @@ fn icon_item(label: impl Into<String>, icon: &'static str, act: impl Fn(&mut Ass
 }
 
 /// Fill a popup menu with entries; separators at the ends or doubled are dropped.
-pub(crate) fn fill_menu(mut m: PopupMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<PopupMenu>) -> PopupMenu {
+/// Onshape's right-click menu ([`OsMenu`]: 12 px, 22 px rows).
+pub(crate) fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
     let mut cleaned: Vec<MenuEntry> = Vec::new();
     for e in entries {
         if matches!(e, MenuEntry::Sep) && cleaned.last().is_none_or(|l| matches!(l, MenuEntry::Sep)) {
@@ -47,7 +48,7 @@ pub(crate) fn fill_menu(mut m: PopupMenu, entries: Vec<MenuEntry>, view: Entity<
             MenuEntry::Sep => m = m.separator(),
             MenuEntry::Item { label, icon, disabled, act } => {
                 let v = view.clone();
-                let mut it = PopupMenuItem::new(label).disabled(disabled).on_click(move |_, window, cx| {
+                let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
                     v.update(cx, |this, cx| {
                         this.ui.ctx_menu = None;
@@ -55,8 +56,9 @@ pub(crate) fn fill_menu(mut m: PopupMenu, entries: Vec<MenuEntry>, view: Entity<
                         cx.notify();
                     })
                 });
+                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler) };
                 if let Some(i) = icon {
-                    it = it.icon(Icon::empty().path(icon_path(i)));
+                    it = it.icon_name(i);
                 }
                 m = m.item(it);
             }
@@ -137,7 +139,7 @@ pub(crate) struct AsmUi {
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
     /// Graphics area context menu.
-    pub ctx_menu: Option<(Point<Pixels>, Entity<PopupMenu>, Subscription)>,
+    pub ctx_menu: Option<(Point<Pixels>, Entity<OsMenu>, Subscription)>,
     /// Inline rename (Shift+N / Rename).
     pub rename: Option<(RenameRow, Entity<InputState>, Subscription)>,
     /// Instance list scrolling (selection in the graphics scrolls to the row).
@@ -164,6 +166,12 @@ pub(crate) struct AsmUi {
     pub manip_selected: Option<ManipHandle>,
     /// Grab offset while the floating mate toolbar is dragged.
     pub hud_grab: Arc<Mutex<Point<Pixels>>>,
+    /// Insert dialog thumbnails.
+    pub thumbs: super::thumbs::InsertThumbs,
+    /// Show center of mass: (instances, empty = whole assembly; world point).
+    pub com: Option<(Vec<InstanceId>, DVec3)>,
+    /// Origin row › Hide: the assembly origin triad is not drawn (still pickable from the row).
+    pub origin_hidden: bool,
     /// Snap-insert: (source connector on the inserted instance, target), and
     /// which of the instance's explicit mate connectors is the source.
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
@@ -648,6 +656,9 @@ impl AssemblyView {
         m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
         m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
+        let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
+        m.push(item(if com_on { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
+        let tg = targets.clone();
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
         let tg = targets.clone();
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
@@ -956,7 +967,7 @@ impl AssemblyView {
                 }
                 cx.notify();
             }))
-            .context_menu(move |menu, window, cx| {
+            .os_context_menu(move |menu, window, cx| {
                 let entries = view.read(cx).folder_menu(id, cx);
                 fill_menu(menu, entries, view.clone(), window, cx)
             })
@@ -1248,6 +1259,7 @@ impl AssemblyView {
         let any_fixed = self.assembly(cx).is_some_and(|a| a.instances.iter().any(|i| i.fixed));
         let mut m = vec![
             icon_item("Rename", "rename", |t, w, cx| t.rename_tab(w, cx)),
+            item(if self.ui.com.as_ref().is_some_and(|(c, _)| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
             icon_item("Check interference…", "interference", |t, _, cx| {
                 t.selected.clear();
                 t.run_interference(cx);
@@ -1420,7 +1432,7 @@ impl AssemblyView {
             return;
         }
         let view = cx.entity();
-        let menu = PopupMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries.clone(), view.clone(), window, cx));
+        let menu = OsMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries.clone(), view.clone(), window, cx));
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| {
             this.ui.ctx_menu = None;
             cx.notify();
@@ -1434,7 +1446,7 @@ impl AssemblyView {
     pub(super) fn open_mate_menu(&mut self, id: MateId, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let entries = self.mate_menu(id, cx);
         let view = cx.entity();
-        let menu = PopupMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries.clone(), view.clone(), window, cx));
+        let menu = OsMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries.clone(), view.clone(), window, cx));
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| {
             this.ui.ctx_menu = None;
             cx.notify();
@@ -1851,8 +1863,13 @@ impl AssemblyView {
             _ => "z",
         };
         let fmt = |v: f64| {
-            let q = if dof == 0 { noshape_units::Quantity::radians(v) } else { noshape_units::Quantity::meters(v) };
-            noshape_units::format_quantity(q, &units)
+            if dof == 0 {
+                // Onshape's angle fields read "360 deg".
+                let d = format!("{:.3}", v.to_degrees());
+                format!("{} deg", d.trim_end_matches('0').trim_end_matches('.'))
+            } else {
+                noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units)
+            }
         };
         // Start / End default to the mate's limits (Onshape), else a full turn / a span.
         if let Some(l) = m.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone())
@@ -1885,10 +1902,10 @@ impl AssemblyView {
         let mk = |t: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).default_value(t));
         let start = mk(a, window, cx);
         let end = mk(b, window, cx);
-        let steps = mk("60".into(), window, cx);
+        let steps = mk("300".into(), window, cx);
         let current = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         self.selected_mate = Some(m.id);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Single, busy: false, current, task: None, preview: false });
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false });
         cx.notify();
     }
 
@@ -2035,52 +2052,107 @@ impl AssemblyView {
         let current = noshape_units::format_quantity(q, &units);
         let (playing, pb, dof, reversed) = (a.playing, a.playback, a.dof, a.dir < 0.0);
         let dofs = noshape_model::assembly::eval::mate_dofs(m.mate_type);
-        let row = |label: &'static str, el: AnyElement| h_flex().gap_2().child(div().w(px(96.)).text_xs().text_color(pal.text_muted).child(label)).child(div().flex_1().child(el));
-        let mut body = v_flex().p_3().gap_2();
+        // Onshape's "Animate mate" dialog: the DOF chip box, right-aligned
+        // fields, Playback type ▾ + reverse, Current value, ▶ ■ and ?.
+        use crate::os_ui as os;
+        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.))).into_any_element();
+        let axis_of = |ix: usize| match ix {
+            0 => ("⟳", "z"),
+            1 => ("↔", "x"),
+            2 => ("↔", "y"),
+            _ => ("↔", "z"),
+        };
+        let chip = |ix: usize| {
+            let (g, ax) = axis_of(ix);
+            format!("{g} - {ax} - {}", m.name)
+        };
+        let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(div().id("anim-dof-x").child(Icon::new(IconName::Close).with_size(px(12.)).text_color(pal.text_muted))).into_any_element();
+        let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).gap(px(4.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row]));
         if dofs.len() > 1 {
-            let mut sel = h_flex().gap_1().flex_wrap();
-            for (ix, label) in dofs {
+            // Several degrees of freedom: pick the one to animate.
+            let mut sel = h_flex().gap_1().flex_wrap().px(px(3.));
+            for (ix, _) in dofs {
                 let ix = *ix;
-                sel = sel.child(Button::new(SharedString::from(format!("anim-dof-{ix}"))).label(*label).ghost().xsmall().selected(dof == ix).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_anim_dof(ix, window, cx))));
+                sel = sel.child(Button::new(SharedString::from(format!("anim-dof-{ix}"))).label(chip(ix)).ghost().xsmall().selected(dof == ix).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_anim_dof(ix, window, cx))));
             }
-            body = body.child(div().text_xs().text_color(pal.text_muted).child("Select degree of freedom")).child(sel);
+            body = body.child(sel);
         }
-        let pb_btn = |id: &'static str, label: &'static str, v: Playback, cx: &mut Context<Self>| {
-            Button::new(id).label(label).ghost().xsmall().selected(pb == v).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                if let Some(a) = &mut this.anim {
-                    a.playback = v;
+        let view = cx.entity();
+        let pb_label = match pb {
+            Playback::Single => "Single",
+            Playback::Reciprocate => "Reciprocate",
+            Playback::Loop => "Loop",
+        };
+        let playback = Button::new("anim-playback")
+            .label(pb_label)
+            .ghost()
+            .small()
+            .w(px(110.))
+            .dropdown_caret(true)
+            .dropdown_menu(move |mut menu, _, _| {
+                for (label, v) in [("Single", Playback::Single), ("Reciprocate", Playback::Reciprocate), ("Loop", Playback::Loop)] {
+                    let view = view.clone();
+                    menu = menu.item(PopupMenuItem::new(label).checked(v == pb).on_click(move |_, _, cx| {
+                        view.update(cx, |this, cx| {
+                            if let Some(a) = &mut this.anim {
+                                a.playback = v;
+                            }
+                            cx.notify();
+                        })
+                    }));
                 }
-                cx.notify();
-            }))
+                menu
+            });
+        let icon_btn = |id: &'static str, icon: &'static str, tip: &'static str, on: bool| {
+            div()
+                .id(id)
+                .size(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.panel_hover))
+                .when(on, |d| d.bg(pal.panel_active))
+                .tooltip(crate::ui::tooltip(tip))
+                .child(crate::ui::glyph(icon, 16., pal.text))
         };
         body = body
-            .child(row("Start value", Input::new(&a.start).xsmall().into_any_element()))
-            .child(row("End value", Input::new(&a.end).xsmall().into_any_element()))
-            .child(row("Steps", Input::new(&a.steps).xsmall().into_any_element()))
-            .child(row(
-                "Playback type",
-                h_flex().gap_1().child(pb_btn("anim-single", "Single", Playback::Single, cx)).child(pb_btn("anim-recip", "Reciprocate", Playback::Reciprocate, cx)).child(pb_btn("anim-loop", "Loop", Playback::Loop, cx)).into_any_element(),
-            ))
-            .child(row("Current value", div().text_sm().child(current).into_any_element()))
+            .child(field("Start value", &a.start))
+            .child(field("End value", &a.end))
+            .child(field("Steps", &a.steps))
             .child(
                 h_flex()
-                    .gap_1()
-                    .child(Button::new("anim-reverse").icon(if reversed { IconName::ArrowLeft } else { IconName::ArrowRight }).ghost().small().selected(reversed).tooltip("Reverse").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .h(px(30.))
+                    .pl(px(5.))
+                    .gap(px(4.))
+                    .child(div().flex_none().whitespace_nowrap().text_size(px(13.33)).text_color(pal.text_muted).child("Playback type"))
+                    .child(div().flex_1().child(playback))
+                    .child(icon_btn("anim-reverse", "anim-reverse", "Reverse", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(a) = &mut this.anim {
                             a.dir = -a.dir;
                         }
                         cx.notify();
-                    })))
-                    .child(div().flex_1())
-                    .child(Button::new("anim-play").icon(if playing { IconName::Pause } else { IconName::Play }).small().primary().label(if playing { "Stop" } else { "Play" }).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if playing {
-                            this.stop_animation(window, cx);
-                        } else {
+                    }))),
+            )
+            .child(os::param_row("Current value", div().h(px(25.)).flex().items_center().justify_end().text_size(px(13.33)).text_color(pal.text_muted).child(current)))
+            .child(
+                h_flex()
+                    .h(px(30.))
+                    .gap(px(4.))
+                    .child(icon_btn("anim-play", "anim-play", "Play", playing).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if !this.anim.as_ref().is_some_and(|a| a.playing) {
                             this.play_animation(cx);
                         }
-                    }))),
+                    })))
+                    .child(icon_btn("anim-stop", "anim-stop", "Stop", false).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        if this.anim.as_ref().is_some_and(|a| a.playing) {
+                            this.stop_animation(window, cx);
+                        }
+                    })))
+                    .child(div().flex_1())
+                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
             );
-        Self::panel_frame(&format!("Animate {}", m.name), body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close").into_any_element()
+        Self::panel_frame("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close").into_any_element()
     }
 }
 
@@ -2838,15 +2910,13 @@ impl AssemblyView {
     pub(super) fn open_asm_export(&mut self, ids: Option<Vec<InstanceId>>, window: &mut Window, cx: &mut Context<Self>) {
         use crate::part_studio::ExportFormat;
         use gpui_kit::component::WindowExt as _;
-        use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
         let view = cx.entity();
         let chosen = Arc::new(Mutex::new(ExportFormat::Step));
         let base = match ids.as_deref() {
             Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
             _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
         };
-        let pal = p();
-        window.open_dialog(cx, move |dialog, _, _| {
+        window.open_dialog(cx, move |dialog, _, cx| {
             let current = *chosen.lock();
             let formats = ExportFormat::ALL.iter().map(|f| {
                 let (f, c) = (*f, chosen.clone());
@@ -2856,15 +2926,13 @@ impl AssemblyView {
                 })
             });
             let (v, c, ids, base) = (view.clone(), chosen.clone(), ids.clone(), base.clone());
-            dialog
-                .title("Export")
-                .w(px(420.))
-                .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
+            // Onshape modal: title bar, body, blue Export then gray Cancel.
+            crate::os_ui::modal(dialog, "Export", 460.)
+                .child(crate::os_ui::modal_body().child(crate::os_ui::field_label("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
                 .footer(
-                    DialogFooter::new()
-                        .gap_2()
-                        .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
-                        .child(DialogAction::new().child(Button::new("ok").label("Export").primary())),
+                    crate::os_ui::modal_footer()
+                        .child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export")))
+                        .child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))),
                 )
                 .on_ok(move |_, window, cx| {
                     let format = *c.lock();
@@ -2922,5 +2990,57 @@ impl AssemblyView {
             }
         }
         Ok(n)
+    }
+}
+
+// ---------------------------------------------------------------- center of mass
+
+impl AssemblyView {
+    /// Show / Hide center of mass (instance menus: those instances; top-level
+    /// row: the whole assembly). Parts are weighted by their density
+    /// (volume when a part has no material).
+    pub(super) fn toggle_center_of_mass(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
+        if self.ui.com.as_ref().is_some_and(|(cur, _)| *cur == ids) {
+            self.ui.com = None;
+            cx.notify();
+            return;
+        }
+        match self.center_of_mass(&ids, cx) {
+            Some(p) => self.ui.com = Some((ids, p)),
+            None => self.message = Some((false, "No solid parts to compute a center of mass for.".into())),
+        }
+        cx.notify();
+    }
+
+    /// Keep the shown center of mass at the solved positions.
+    pub(super) fn refresh_center_of_mass(&mut self, cx: &App) {
+        if let Some((ids, _)) = self.ui.com.clone() {
+            self.ui.com = self.center_of_mass(&ids, cx).map(|p| (ids, p));
+        }
+    }
+
+    fn center_of_mass(&self, ids: &[InstanceId], cx: &App) -> Option<DVec3> {
+        let doc = &self.doc.read(cx).session.doc;
+        let mut mass = 0.0;
+        let mut moment = DVec3::ZERO;
+        for o in self.result.occurrences.iter().filter(|o| !o.hidden && (ids.is_empty() || ids.contains(&o.top()))) {
+            let density = |b: &BodyId| match doc.tab(o.studio).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => ps.part_properties.get(b).and_then(|p| p.density),
+                _ => None,
+            };
+            let Some(mp) = noshape_model::regen::measure::mass_properties(&o.context, std::slice::from_ref(&o.body), &density) else { continue };
+            let m = mp.mass.unwrap_or(mp.volume);
+            mass += m;
+            moment += o.transform.transform_point3(mp.center_of_mass) * m;
+        }
+        (mass > 0.0).then(|| moment / mass)
+    }
+
+    /// The center of mass indicator (Onshape's quartered circle).
+    pub(super) fn render_center_of_mass(&self, cx: &App) -> Option<AnyElement> {
+        let (_, at) = self.ui.com.as_ref()?;
+        let vp = self.viewport.read(cx);
+        let p = vp.project(*at)?;
+        Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&icon_path("com-indicator"), 18., cx)).into_any_element())
     }
 }

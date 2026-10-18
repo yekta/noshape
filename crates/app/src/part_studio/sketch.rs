@@ -116,8 +116,6 @@ pub(super) struct SketchUi {
     offset_input: Option<(Entity<InputState>, Subscription)>,
     /// Open pattern glyph menu: pattern id and viewport position.
     pattern_menu: Option<(u32, f32, f32)>,
-    /// Decoded sketch images by (image id, data size).
-    images: HashMap<(u32, usize), Arc<RenderImage>>,
     /// Keystroke interceptor applying the user's sketch shortcuts.
     shortcut_interceptor: Option<Subscription>,
     /// Sketch shortcut preferences, edited without leaving the sketch.
@@ -368,7 +366,7 @@ impl PartStudioView {
         self.regen_seq += 1;
         let result = {
             let mut regen = self.regen.lock();
-            let document_variables = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+            let document_variables = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
             let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
             regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, derived: Some(derived), ..Default::default() })
         };
@@ -1478,7 +1476,7 @@ impl PartStudioView {
             ];
             // 22 px outline button, 1 px `#aaa`, radius 3.5 (live).
             let diagnostics = Button::new("sk-diagnostics")
-                .child(icon_px("under-defined", 16.0, pal.text))
+                .child(crate::assets::icon("sketch-diagnostics", 18., cx))
                 .outline()
                 .w(px(22.))
                 .h(px(22.))
@@ -2025,15 +2023,14 @@ impl PartStudioView {
                     cx.notify();
                 }))
                 .into_any_element(),
-            Button::new("sk-dxf-file").label("Choose a DXF file…").icon(icon_px("import", 13.0, pal.text)).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.choose_dxf(window, cx))).into_any_element(),
-            div().text_xs().text_color(pal.text_faint).child("DWG files: save them as DXF first.").into_any_element(),
+            Button::new("sk-dxf-file").label("Choose a DXF or DWG file…").icon(icon_px("import", 13.0, pal.text)).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.choose_dxf(window, cx))).into_any_element(),
         ]
     }
 
     fn choose_dxf(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
         let win = window.window_handle();
-        crate::files::request_open_path("Insert DXF or DWG", "DXF drawing", &["dxf", "DXF"], window, cx, move |path, cx| {
+        crate::files::request_open_path("Insert DXF or DWG", "DXF or DWG drawing", &["dxf", "DXF", "dwg", "DWG"], window, cx, move |path, cx| {
             // The fallback chooser confirms inside a window update. Defer so
             // the same window is available when regeneration needs it.
             cx.defer(move |cx| {
@@ -2043,7 +2040,7 @@ impl PartStudioView {
     }
 
     pub(super) fn insert_dxf_file(&mut self, path: &std::path::Path, window: &mut Window, cx: &mut Context<Self>) {
-        let parsed = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| noshape_sketch::dxf::parse_dxf(&String::from_utf8_lossy(&b)).map_err(|e| e.to_string()));
+        let parsed = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| noshape_sketch::dwg::parse_cad(&b).map_err(|e| e.to_string()));
         let drawing = match parsed {
             Ok(d) => d,
             Err(e) => {
@@ -2105,22 +2102,6 @@ impl PartStudioView {
     }
 
     /// Decoded image of a sketch image (cached).
-    fn sketch_image(&mut self, img: &noshape_model::sketch_feature::SketchImage) -> Option<Arc<RenderImage>> {
-        let key = (img.id, img.data_base64.len());
-        if let Some(r) = self.ui_ref().and_then(|u| u.images.get(&key).cloned()) {
-            return Some(r);
-        }
-        let bytes = noshape_model::sketch_feature::base64_decode(&img.data_base64)?;
-        let mut rgba = image::load_from_memory(&bytes).ok()?.to_rgba8();
-        // GPUI render images are BGRA.
-        for px in rgba.as_chunks_mut::<4>().0 {
-            px.swap(0, 2);
-        }
-        let r = Arc::new(RenderImage::new(vec![image::Frame::new(rgba)]));
-        self.ui_mut()?.images.insert(key, r.clone());
-        Some(r)
-    }
-
     // ------------------------------------------------------------ bezier degree
 
     fn open_degree_edit(&mut self, id: noshape_sketch::EntityId, deg: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -2449,32 +2430,6 @@ impl PartStudioView {
             }
         }
 
-        // Inserted images, drawn in their (projected) boxes behind the labels.
-        let image_boxes: Vec<(noshape_model::sketch_feature::SketchImage, Vec<DVec2>)> = data
-            .images
-            .iter()
-            .map(|i| (i.clone(), i.box_points.iter().filter_map(|p| data.sketch.point(noshape_sketch::EntityId(*p))).collect::<Vec<DVec2>>()))
-            .filter(|(_, pts)| pts.len() == 4)
-            .collect();
-        for (img, pts) in image_boxes {
-            let Some(render) = self.sketch_image(&img) else { continue };
-            let Some(ed) = self.sketch.as_ref() else { break };
-            let frame = ed.frame;
-            let vp = self.viewport.read(cx);
-            let scr: Vec<(f32, f32)> = pts.iter().filter_map(|q| vp.project(frame.to_world(*q)).map(|s| (s.x as f32, s.y as f32))).collect();
-            if scr.len() != 4 {
-                continue;
-            }
-            // GPUI draws axis-aligned images: show it when the box is upright on
-            // screen (sketch seen normal, box not rotated), else only its outline.
-            let upright = (scr[0].1 - scr[1].1).abs() < 2.0 && (scr[0].0 - scr[3].0).abs() < 2.0 && scr[1].0 > scr[0].0 && scr[3].1 < scr[0].1;
-            if !upright {
-                continue;
-            }
-            let (x0, y0, x1, y1) = (scr[0].0, scr[3].1, scr[1].0, scr[0].1);
-            out.push(div().absolute().left(px(x0)).top(px(y0)).w(px(x1 - x0)).h(px(y1 - y0)).opacity(0.85).child(gpui_kit::img(render).size_full()).into_any_element());
-        }
-
         // Tolerance / precision panel of the dimension being edited.
         let tol_panel = self.dimension_tolerance_panel(&data, window, cx);
         let mut tol_panel = tol_panel;
@@ -2560,6 +2515,26 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_count_edit(h, init.clone(), window, cx)))
                     .child(text)
+                    .into_any_element(),
+            );
+        }
+
+        // ---- one-line measurement of the selection, left of the evaluation
+        // tools at the bottom right (live: `Length: 1.003 in`, monospace value)
+        if let Some((label, value)) = ed.selection_readout(&data, &units) {
+            out.push(
+                h_flex()
+                    .absolute()
+                    .bottom_0()
+                    .right(px(120.))
+                    .h(px(30.))
+                    .gap_1()
+                    .items_center()
+                    .text_size(px(13.))
+                    .text_color(rgb(0x333333))
+                    .whitespace_nowrap()
+                    .child(format!("{label}:"))
+                    .child(div().font_family("monospace").child(value))
                     .into_any_element(),
             );
         }
@@ -2709,7 +2684,7 @@ impl PartStudioView {
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);
             let conflict = ed.show_errors && ed.conflicting.contains(&cid);
-            // Onshape: 14 px black value with no box at rest (the dimension
+            // Onshape: 16 px black value with no box at rest (the dimension
             // line is broken around it); hover / selected get a rounded
             // `#d9bfa0` / `#d9a566` box; driven values are `#666`.
             let est_w = crate::sketch_mode::label_width_px(&text) as f32 + 8.0;
@@ -2727,8 +2702,8 @@ impl PartStudioView {
                     .id(SharedString::from(format!("dim-{}", cid.0)))
                     .absolute()
                     .left(px(x - est_w * 0.5))
-                    .top(px(y - 10.0))
-                    .h(px(20.))
+                    .top(px(y - 11.0))
+                    .h(px(22.))
                     .px(px(4.))
                     .flex()
                     .items_center()
@@ -2736,7 +2711,7 @@ impl PartStudioView {
                     .when_some(bg, |d, bg| d.bg(bg))
                     // Configured dimensions have a gold outline (Onshape).
                     .when(is_configured, |d| d.border_1().border_color(rgb(0xffc20e)))
-                    .text_size(px(14.))
+                    .text_size(px(16.))
                     .text_color(fg)
                     .cursor_pointer()
                     .whitespace_nowrap()
@@ -3214,7 +3189,7 @@ impl PartStudioView {
         // green check (or Enter) closes the sketch.
         crate::ui::toolbar()
             .child(bar)
-            .child(crate::ui::search_tools_box("sk-search").ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_palette(window, cx))))
+            .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
             .into_any_element()
     }
 
@@ -3359,6 +3334,29 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 })));
+                if let Some(r) = model_ref.clone() {
+                    let criteria: &[noshape_model::select::Criterion] = if matches!(r, Reference::Face(_)) { &noshape_model::select::Criterion::FACE } else { &noshape_model::select::Criterion::EDGE };
+                    let vs = v.clone();
+                    m = m.submenu("Select", window, cx, move |mut sm, _, _| {
+                        for c in criteria {
+                            let (v, r, c) = (vs.clone(), r.clone(), *c);
+                            sm = sm.item(crate::os_menu::OsMenuItem::new(c.label()).on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                                this.close_context_menu(cx);
+                                this.select_related(&r, c, cx);
+                            })));
+                        }
+                        let (v, r) = (vs.clone(), r.clone());
+                        sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            if !this.selection.contains(&r) {
+                                this.selection.push(r.clone());
+                            }
+                            this.ui.create_selection = true;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })))
+                    });
+                }
                 m = m.item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))));
                 m = m.separator();
                 m = m.item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))));
@@ -3435,6 +3433,29 @@ impl PartStudioView {
                             }
                             this.refresh_scene(false, cx);
                             cx.notify();
+                        })));
+                    }
+                    let v = vs.clone();
+                    sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        if let Some(ed) = &this.sketch {
+                            this.selection = ed.selection.iter().map(|e| Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).collect();
+                        }
+                        this.ui.create_selection = true;
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    })))
+                });
+            } else {
+                // Nothing selected: the Part Studio's "select everything of
+                // a kind" submenu (live sketch/37 shows Select ▸ here too).
+                let vs = v.clone();
+                m = m.submenu("Select", window, cx, move |mut sm, _, _| {
+                    for (label, kind) in [("All parts", 0u8), ("All surfaces", 1), ("All sketches", 2), ("All planes", 3), ("All mate connectors", 4)] {
+                        let v = vs.clone();
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            this.select_all_of(kind, cx);
                         })));
                     }
                     sm

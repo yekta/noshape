@@ -104,8 +104,9 @@ fn one_pattern_row() -> usize { 1 }
 pub struct SketchImage {
     pub id: u32,
     pub name: String,
-    /// PNG / JPEG / GIF / BMP bytes, base64 encoded.
-    pub data_base64: String,
+    /// PNG / JPEG / GIF / BMP bytes, base64 encoded (shared, so the
+    /// regenerated display and the GPU texture cache can key on it).
+    pub data_base64: std::sync::Arc<str>,
     pub box_points: Vec<u32>,
     pub box_lines: Vec<u32>,
     /// Aspect-ratio constraint keeping the image proportions.
@@ -273,7 +274,7 @@ impl SketchData {
         self.images.push(SketchImage {
             id,
             name: name.to_string(),
-            data_base64: base64_encode(bytes),
+            data_base64: base64_encode(bytes).into(),
             box_points: tb.points.iter().map(|p| p.0).collect(),
             box_lines: tb.lines.iter().map(|l| l.0).collect(),
             ratio_constraint: tb.ratio.map(|c| c.0),

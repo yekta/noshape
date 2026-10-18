@@ -24,11 +24,22 @@ pub enum Criterion {
     EqualRadius,
     /// Every face of the seed's part.
     PartFaces,
+    /// Faces reached from the seed across convex (or tangent) edges.
+    Protrusion,
+    /// Faces reached from the seed across concave (or tangent) edges.
+    Pocket,
+    /// The faces of the round hole the seed face belongs to.
+    Hole,
+    /// The constant-radius fillet faces the seed belongs to.
+    Fillets,
+    /// The edges of the seed edge's loop on its face.
+    EdgeLoop,
 }
 
 impl Criterion {
-    pub const FACE: [Criterion; 4] = [Criterion::TangentFaces, Criterion::FaceLoop, Criterion::EqualRadius, Criterion::PartFaces];
-    pub const EDGE: [Criterion; 3] = [Criterion::TangentEdges, Criterion::ParallelEdges, Criterion::EqualRadius];
+    /// Onshape's Create selection face criteria (Help: Create selection).
+    pub const FACE: [Criterion; 8] = [Criterion::Protrusion, Criterion::Pocket, Criterion::Hole, Criterion::Fillets, Criterion::TangentFaces, Criterion::FaceLoop, Criterion::EqualRadius, Criterion::PartFaces];
+    pub const EDGE: [Criterion; 4] = [Criterion::TangentEdges, Criterion::EdgeLoop, Criterion::ParallelEdges, Criterion::EqualRadius];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -38,6 +49,11 @@ impl Criterion {
             Criterion::ParallelEdges => "Parallel edges",
             Criterion::EqualRadius => "Equal radius",
             Criterion::PartFaces => "All faces of part",
+            Criterion::Protrusion => "Protrusion",
+            Criterion::Pocket => "Pocket",
+            Criterion::Hole => "Hole",
+            Criterion::Fillets => "Fillets",
+            Criterion::EdgeLoop => "Loop/chain connected edges",
         }
     }
 }
@@ -98,6 +114,62 @@ fn smooth_edge(b: &Body, e: usize, fa: usize, fb: usize) -> bool {
     }
 }
 
+/// How faces `fa` and `fb` meet along edge `e`: +1 convex, -1 concave,
+/// 0 tangent (or unknown).
+fn edge_convexity(b: &Body, e: usize, fa: usize, fb: usize) -> i32 {
+    if smooth_edge(b, e, fa, fb) {
+        return 0;
+    }
+    let Some(m) = edge_mid(b, e) else { return 0 };
+    let Ok(sa) = b.shape.sub_shape(ShapeType::Face, fa) else { return 0 };
+    let Ok(sb) = b.shape.sub_shape(ShapeType::Face, fb) else { return 0 };
+    let (Ok(na), Ok(cb)) = (sa.normal_at_point(m), sb.centroid()) else { return 0 };
+    // A point of face b a little away from the edge.
+    let q = sb.project_point(m + (cb - m) * 0.1).map(|x| x.point).unwrap_or(cb);
+    let d = na.normalize_or_zero().dot(q - m);
+    let eps = 1e-9_f64.max(q.distance(m) * 1e-4);
+    if d < -eps {
+        1
+    } else if d > eps {
+        -1
+    } else {
+        0
+    }
+}
+
+/// Flood fill over faces from `seed` across edges accepted by `cross`.
+fn grow_faces(edge_faces: &[Vec<u32>], seed: usize, cross: impl Fn(usize, usize, usize) -> bool) -> BTreeSet<usize> {
+    let mut out = BTreeSet::from([seed]);
+    let mut queue = VecDeque::from([seed]);
+    while let Some(f) = queue.pop_front() {
+        for (e, fs) in edge_faces.iter().enumerate() {
+            if fs.len() != 2 || !fs.contains(&(f as u32)) {
+                continue;
+            }
+            let other = if fs[0] as usize == f { fs[1] as usize } else { fs[0] as usize };
+            if !out.contains(&other) && cross(e, f, other) {
+                out.insert(other);
+                queue.push_back(other);
+            }
+        }
+    }
+    out
+}
+
+/// Axis (point, direction) of a cylindrical/conical/toroidal face.
+fn face_axis(b: &Body, f: usize) -> Option<(DVec3, DVec3, f64)> {
+    match b.shape.sub_shape(ShapeType::Face, f).ok()?.face_surface().ok()? {
+        Surface::Cylinder { origin, axis, radius, .. } => Some((origin, axis.normalize_or_zero(), radius)),
+        Surface::Cone { origin, axis, ref_radius, .. } => Some((origin, axis.normalize_or_zero(), ref_radius)),
+        Surface::Torus { center, axis, minor_radius, .. } => Some((center, axis.normalize_or_zero(), minor_radius)),
+        _ => None,
+    }
+}
+
+fn on_axis(p: DVec3, o: DVec3, a: DVec3, tol: f64) -> bool {
+    (p - o).cross(a).length() <= tol
+}
+
 /// Entities related to `seed` by `criterion` (including the seed).
 pub fn select_related(ctx: &Context, seed: &Reference, criterion: Criterion) -> Vec<Reference> {
     let Some((b, kind, i)) = body_of(ctx, seed) else { return Vec::new() };
@@ -122,6 +194,53 @@ pub fn select_related(ctx: &Context, seed: &Reference, criterion: Criterion) -> 
                 }
             }
             faces(out)
+        }
+        (Criterion::Protrusion | Criterion::Pocket, ShapeType::Face) => {
+            let want = if criterion == Criterion::Protrusion { 1 } else { -1 };
+            faces(grow_faces(&edge_faces, i, |e, f, o| {
+                let c = edge_convexity(b, e, f, o);
+                c == want || c == 0
+            }))
+        }
+        (Criterion::Hole, ShapeType::Face) => {
+            // Faces around the seed's axis: cylinders/cones on it, and flat
+            // rings (counterbore floors) whose edges are circles on it.
+            let Some((o, a, _)) = face_axis(b, i) else { return vec![seed.clone()] };
+            let tol = 1e-6_f64.max(b.shape.bounding_box(false).map(|x| x.diagonal() * 1e-6).unwrap_or(1e-6));
+            let round = |f: usize| -> bool {
+                if let Some((o2, a2, _)) = face_axis(b, f) {
+                    return a2.cross(a).length() < 1e-4 && on_axis(o2, o, a, tol);
+                }
+                let es: Vec<usize> = edge_faces.iter().enumerate().filter(|(_, fs)| fs.contains(&(f as u32))).map(|(e, _)| e).collect();
+                !es.is_empty()
+                    && es.iter().all(|e| matches!(b.shape.sub_shape(ShapeType::Edge, *e).ok().and_then(|s| s.edge_curve().ok()), Some(Curve::Circle { center, axis, .. }) if axis.cross(a).length() < 1e-4 && on_axis(center, o, a, tol)))
+            };
+            faces(grow_faces(&edge_faces, i, |_, _, other| round(other)))
+        }
+        (Criterion::Fillets, ShapeType::Face) => {
+            // Tangent-connected curved faces with the seed's radius.
+            let Some((_, _, r)) = face_axis(b, i) else { return vec![seed.clone()] };
+            let same = |f: usize| face_axis(b, f).is_some_and(|(_, _, q)| (q - r).abs() <= 1e-7_f64.max(r * 1e-6));
+            faces(grow_faces(&edge_faces, i, |e, f, o| same(o) && smooth_edge(b, e, f, o)))
+        }
+        (Criterion::EdgeLoop, ShapeType::Edge) => {
+            // Edges of the seed's first face chained to the seed through shared vertices.
+            let Some(face) = edge_faces.get(i).and_then(|fs| fs.first()).copied() else { return vec![seed.clone()] };
+            let on_face: BTreeSet<usize> = edge_faces.iter().enumerate().filter(|(_, fs)| fs.contains(&face)).map(|(e, _)| e).collect();
+            let vertex_edges = b.shape.vertex_edges().unwrap_or_default();
+            let mut out = BTreeSet::from([i]);
+            let mut queue = VecDeque::from([i]);
+            while let Some(e) = queue.pop_front() {
+                for es in vertex_edges.iter().filter(|es| es.contains(&(e as u32))) {
+                    for &o in es {
+                        let o = o as usize;
+                        if on_face.contains(&o) && out.insert(o) {
+                            queue.push_back(o);
+                        }
+                    }
+                }
+            }
+            edges(out)
         }
         (Criterion::FaceLoop, ShapeType::Face) => edges(edge_faces.iter().enumerate().filter(|(_, fs)| fs.contains(&(i as u32))).map(|(e, _)| e).collect()),
         (Criterion::PartFaces, _) => faces((0..b.faces.len()).collect()),
@@ -237,6 +356,17 @@ mod tests {
         let line = (0..b.edges.len()).find(|e| line_dir(b, *e).is_some()).expect("linear edge");
         let par = select_related(&ctx, &edge_ref(b, line).unwrap(), Criterion::ParallelEdges);
         assert!(par.len() >= 2, "{}", par.len());
+        // The plate's top face is a protrusion region: growing across convex
+        // edges reaches the sides; a hole wall's Hole set stays small.
+        let prot = select_related(&ctx, &seed, Criterion::Protrusion);
+        assert!(prot.len() > 1 && prot.len() <= b.faces.len(), "{}", prot.len());
+        if let Some(cyl) = (0..b.faces.len()).find(|f| matches!(b.shape.sub_shape(ShapeType::Face, *f).ok().and_then(|s| s.face_surface().ok()), Some(Surface::Cylinder { .. }))) {
+            let hole = select_related(&ctx, &face_ref(b, cyl).unwrap(), Criterion::Hole);
+            assert!(!hole.is_empty() && hole.len() < b.faces.len(), "{}", hole.len());
+        }
+        // A straight edge's loop is the closed chain around its face.
+        let lp = select_related(&ctx, &edge_ref(b, line).unwrap(), Criterion::EdgeLoop);
+        assert!(lp.len() >= 4, "{}", lp.len());
         // A circular hole edge: equal-radius siblings include it.
         if let Some(c) = (0..b.edges.len()).find(|e| radius(b, ShapeType::Edge, *e).is_some()) {
             let eq = select_related(&ctx, &edge_ref(b, c).unwrap(), Criterion::EqualRadius);

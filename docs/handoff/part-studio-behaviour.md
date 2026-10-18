@@ -51,12 +51,34 @@ the help docs.
   studio, Transform copy in the same), Export as DXF/DWG (`export_face`, `MeshBuffers::face_edges`).
 - Parts fields take the part of a clicked face/edge/vertex (`part_for_field`).
 
-## Next (priority order)
+## Done in pass 4 (lead's list + first-hour sweep)
 
-1. Section caps (hatched cut faces): needs a stencil pass in the renderer.
-2. Pick-row hover highlight `#f2ff80` in the viewport; depth-arrow hover outline (blue).
-3. 5.27 dialog resizing; 3.19 remaining Select ▸ criteria; Select ▸ in the empty-space menu.
-4. Plane menu: Rename, Size to Part Studio, Show dependencies; face Export as DXF/DWG.
+- Section caps: separate `mesh_section` pipeline (`fs_mesh_section` writes the cap depth on
+  back faces, part color hatched); offscreen test `section_caps_cover_the_cut`.
+- Dialog row hover = state `QUERY` (#f2ff80) via `ui.query_hover`; arrow hover outline
+  (`ui.manip_hover`); dialog resize grip (`DialogResize`, `ui.dialog_size`).
+- Default planes: Rename in place (`default_names`), Size to Part Studio (`plane_sizes`),
+  Show dependencies (`features_using`, `ui.plane_dependencies`).
+- Select ▸ criteria Protrusion/Pocket/Hole/Fillets/Loop (select.rs) and empty-space Select ▸.
+- First-hour fixes: Variable rows/titles "#name = value" + Name focused
+  (`interaction::display_name`, `focus_first_field`); "+ Configure features" pick flow
+  (`ui.configure_pick`, dialog `configure_mode`); dialogs show/edit the active configuration's
+  values (`Configuration::for_editing` / `store_edit`, also in the preview).
+- Tabs exactly like Onshape: delete with no prompt unless other tabs use it ("Delete tabs"
+  warning, `Document::tab_users`), not undoable; undo is per tab (`UndoStack::undo_in` /
+  `redo_in`, `Session.active_tab`); Versions and history > Restore to Main brings it back.
+  Verified in the app.
+
+## Next (priority order) — no deviations from Onshape are accepted
+
+1. Analysis tools menu with Onshape's 11 tools; Shift+C = Curve/surface analysis (combs),
+   Shift+D = Dihedral analysis (today Shift+C/Shift+D are curvature map/draft: wrong).
+2. Remaining ❌ rows in the checklist (Highlight boundary edges, Graphics preferences…, region
+   New sketch/Offset plane, multi-feature Section view…, Create Drawing of Sketch,
+   sketch-curve midpoints, :partnumber/:revision filters, FeatureScript search, fit tolerances).
+3. Tell the lead: the tab context menu doesn't match live (Delete | Open in new browser tab,
+   Rename, Properties…, Show code | Duplicate, Copy to clipboard | Select as document
+   thumbnail | Move to document…, Export…).
 
 ## How to test
 
