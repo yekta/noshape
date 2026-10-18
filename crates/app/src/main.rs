@@ -4,6 +4,7 @@ mod actions;
 mod assets;
 mod doc_model;
 mod feature_dialog;
+mod files;
 mod gpu;
 mod history_panel;
 mod part_studio;
@@ -14,28 +15,9 @@ mod theme;
 mod viewport;
 mod workspace;
 
-use gpui_kit::component::{Theme, ThemeMode, TitleBar};
+use gpui_kit::component::{Theme, ThemeMode};
 use gpui_kit::*;
 use std::path::PathBuf;
-
-/// Where new documents go by default.
-fn documents_dir() -> PathBuf {
-    let base = dirs::document_dir().or_else(dirs::home_dir).unwrap_or_else(|| PathBuf::from("."));
-    let dir = base.join("noshape");
-    let _ = std::fs::create_dir_all(&dir);
-    dir
-}
-
-fn new_document_path() -> PathBuf {
-    let dir = documents_dir();
-    for n in 1.. {
-        let p = dir.join(format!("Untitled {n}.noshape"));
-        if !p.exists() {
-            return p;
-        }
-    }
-    unreachable!()
-}
 
 fn apply_theme(cx: &mut App) {
     Theme::change(ThemeMode::Dark, None, cx);
@@ -75,31 +57,25 @@ fn main() {
         gpui_kit::init(cx);
         apply_theme(cx);
         actions::bind_default_keys(cx);
+        cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 
-        let session = match &path {
-            Some(p) if p.exists() => session::Session::open(p),
-            Some(p) => session::Session::create(p, if demo { noshape_model::demo::demo_document() } else { noshape_model::Document::new() }),
-            None => session::Session::create(new_document_path(), if demo { noshape_model::demo::demo_document() } else { noshape_model::Document::new() }),
-        }
-        .expect("could not open document");
-
-        let gpu = gpu.clone();
-        let options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),
-            window_min_size: Some(size(px(900.), px(560.))),
-            #[cfg(target_os = "linux")]
-            window_decorations: Some(WindowDecorations::Client),
-            app_id: Some("dev.noshape.noshape".into()),
-            ..TitleBar::window_options()
-        };
-        gpui_kit::open_window(options, cx, move |window, cx| {
-            let doc = cx.new(|_| doc_model::DocModel::new(session));
-            let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
-            let fh = ws.read(cx).focus_handle(cx);
-            window.defer(cx, move |window, cx| fh.focus(window, cx));
-            ws
+        let path = path.clone().unwrap_or_else(files::new_document_path);
+        let initial = if demo { Some(noshape_model::demo::demo_document()) } else { None };
+        files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
+        let g2 = gpu.clone();
+        cx.on_action(move |_: &actions::NewDocument, cx| {
+            if let Err(e) = files::open_document_window(files::new_document_path(), None, g2.clone(), cx) {
+                log::error!("new document failed: {e:#}");
+            }
+        });
+        let g3 = gpu.clone();
+        cx.on_action(move |_: &actions::OpenDocument, cx| files::prompt_open(g3.clone(), cx));
+        cx.on_window_closed(|cx, _| {
+            if cx.windows().is_empty() {
+                cx.quit();
+            }
         })
-        .expect("failed to open window");
+        .detach();
     });
 }

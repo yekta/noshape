@@ -208,13 +208,13 @@ pub fn demo_document_with_drawing() -> Document {
     let lin = |view: u64, a: [f64; 2], b: [f64; 2], offset: f64, orientation: DimOrientation| AnnotationKind::LinearDimension { view: ViewId(view), a, b, offset, orientation, override_text: None };
     // Top view: overall width and depth.
     add(sheet, lin(2, [-0.05, 0.03], [0.05, 0.03], 8.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, 0.03, 0.0))), (1, v(DVec3::new(0.05, 0.03, 0.0)))]);
-    add(sheet, lin(2, [-0.05, -0.03], [-0.05, 0.03], 8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(-0.05, 0.03, 0.0)))]);
+    add(sheet, lin(2, [-0.05, -0.03], [-0.05, 0.03], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(-0.05, 0.03, 0.0)))]);
     // Hole sizes.
     add(sheet, AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 2.4 }, [0.0; 2], vec![(0, c(DVec3::ZERO, false))]);
     add(sheet, AnnotationKind::RadialDimension { view: ViewId(6), center: [0.038, 0.018], radius: 0.0048, diameter: false, angle: 0.9 }, [0.0; 2], vec![(0, c(DVec3::new(0.038, 0.018, 0.0), false))]);
     // Front view: width and thickness.
     add(sheet, lin(1, [-0.05, 0.0], [0.05, 0.0], -10.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(0.05, -0.03, 0.0)))]);
-    add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], 8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);
+    add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);
     add(sheet, AnnotationKind::Balloon { view: ViewId(4), anchor: [0.0, 0.0], text: "1".into() }, [385.0, 255.0], vec![(0, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, AnnotationKind::Note { text: "NOTES:\n1. BREAK ALL SHARP EDGES.\n2. DIMENSIONS IN MILLIMETERS.".into(), height_mm: 3.5 }, [25.0, 75.0], vec![]);
     let _ = d.add_tab("Drawing 1", TabContent::Drawing(drawing));

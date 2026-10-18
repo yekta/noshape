@@ -309,7 +309,6 @@ impl Render for MateDialog {
                 );
             }
         }
-        let can_accept = self.a.is_some() && self.b.is_some();
         v_flex()
             .id("mate-dialog")
             .key_context("FeatureDialog")
@@ -339,8 +338,7 @@ impl Render for MateDialog {
                             .primary()
                             .xsmall()
                             .tooltip("Accept (Enter)")
-                            .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept)))
-                            .when(!can_accept, |b| b.opacity(0.5)),
+                            .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),
                     )
                     .child(Button::new("mate-cancel").icon(IconName::Close).ghost().xsmall().tooltip("Cancel (Esc)").on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Cancel)))),
             )

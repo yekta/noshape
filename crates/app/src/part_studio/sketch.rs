@@ -108,6 +108,7 @@ impl PartStudioView {
         };
         self.regenerating = false;
         self.regen_task = None;
+        self.context = Some(result.context.clone());
         self.apply_display(Arc::new(result.display), window, cx);
     }
 

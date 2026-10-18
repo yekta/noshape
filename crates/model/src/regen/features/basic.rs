@@ -133,6 +133,7 @@ pub fn plane(ev: &mut EvalCtx) -> FResult<()> {
                 _ => return err("Select a curve and a point"),
             }
         }
+        "TANGENT_CYLINDER" => super::refgeom::tangent_cylinder_frame(ev, refs, ev.bool("oppositeDirection"))?,
         other => return err(format!("Plane type {other} is not supported yet")),
     };
     let frame = if ev.bool("flipAlignment") { PlaneFrame { normal: -frame.normal, y: -frame.y, ..frame } } else { frame };

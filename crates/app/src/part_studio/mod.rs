@@ -121,6 +121,7 @@ pub struct PartStudioView {
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
     sketch: Option<SketchEditor>,
+    context: Option<Arc<noshape_model::regen::context::Context>>,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
@@ -169,6 +170,7 @@ impl PartStudioView {
             fitted_once: false,
             message: None,
             sketch: None,
+            context: None,
             dim_input: None,
             _subs: subs,
         };
@@ -224,6 +226,7 @@ impl PartStudioView {
                     return;
                 }
                 this.regenerating = false;
+                this.context = Some(result.context.clone());
                 this.apply_display(Arc::new(result.display), window, cx);
             });
         }));
@@ -1136,7 +1139,89 @@ impl Render for PartStudioView {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExportFormat {
+    Step,
+    Stl,
+    Obj,
+    Iges,
+    Brep,
+}
+
+impl ExportFormat {
+    pub const ALL: [ExportFormat; 5] = [ExportFormat::Step, ExportFormat::Stl, ExportFormat::Obj, ExportFormat::Iges, ExportFormat::Brep];
+    pub fn ext(self) -> &'static str {
+        match self {
+            ExportFormat::Step => "step",
+            ExportFormat::Stl => "stl",
+            ExportFormat::Obj => "obj",
+            ExportFormat::Iges => "igs",
+            ExportFormat::Brep => "brep",
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            ExportFormat::Step => "STEP (.step)",
+            ExportFormat::Stl => "STL (.stl)",
+            ExportFormat::Obj => "OBJ (.obj)",
+            ExportFormat::Iges => "IGES (.igs)",
+            ExportFormat::Brep => "OpenCascade BREP (.brep)",
+        }
+    }
+}
+
 impl PartStudioView {
+    /// Export the visible parts (or the selected parts, if any).
+    pub fn export(&self, format: ExportFormat, path: &std::path::Path) -> anyhow::Result<()> {
+        use noshape_kernel as k;
+        let ctx = self.context.as_ref().ok_or_else(|| anyhow::anyhow!("Nothing to export yet"))?;
+        let selected: Vec<_> = self.selection.iter().filter_map(|r| match r {
+            Reference::Body(b) => Some(b.clone()),
+            _ => None,
+        }).collect();
+        let bodies: Vec<_> = ctx.bodies.iter().filter(|b| selected.is_empty() || selected.contains(&b.id)).collect();
+        anyhow::ensure!(!bodies.is_empty(), "There are no parts to export");
+        let names: Vec<String> = bodies.iter().map(|b| self.display.body(&b.id).map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone())).collect();
+        match format {
+            ExportFormat::Step => {
+                let shapes: Vec<k::ExportShape> = bodies
+                    .iter()
+                    .zip(&names)
+                    .map(|(b, n)| {
+                        let c = self.display.body(&b.id).map(|d| d.color).unwrap_or([0.7, 0.7, 0.7, 1.0]);
+                        k::ExportShape { shape: b.shape.clone(), name: Some(n.clone()), color: Some([c[0].powf(1.0 / 2.2), c[1].powf(1.0 / 2.2), c[2].powf(1.0 / 2.2)]) }
+                    })
+                    .collect();
+                k::write_step(path, &shapes, k::LengthUnit::Meter)?;
+            }
+            ExportFormat::Iges => {
+                let shapes: Vec<k::Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
+                k::write_iges(path, &shapes, k::LengthUnit::Meter)?;
+            }
+            ExportFormat::Brep => {
+                let c = k::Shape::compound(&bodies.iter().map(|b| b.shape.clone()).collect::<Vec<_>>());
+                k::write_brep(&c, path)?;
+            }
+            ExportFormat::Stl | ExportFormat::Obj => {
+                // Mesh formats are unitless; write millimeters (the common convention).
+                let c = k::Shape::compound(&bodies.iter().map(|b| b.shape.clone()).collect::<Vec<_>>());
+                let mm = c.transformed(&k::Transform::Scale { center: glam::DVec3::ZERO, factor: 1000.0 })?;
+                let diag = mm.bounding_box(false).map(|b| b.diagonal()).unwrap_or(100.0);
+                let defl = (diag * 2e-4).max(1e-3);
+                if format == ExportFormat::Stl {
+                    k::write_stl(&mm, path, defl, k::StlFormat::Binary)?;
+                } else {
+                    k::write_obj(&mm, path, defl)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn studio_name(&self, cx: &App) -> String {
+        self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Part Studio".into())
+    }
+
     fn rotate_by<A>(&mut self, _a: &A, dx_deg: f64, dy_deg: f64, cx: &mut Context<Self>) {
         self.viewport.update(cx, |vp, cx| {
             let mut to = vp.camera;

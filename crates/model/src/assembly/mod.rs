@@ -230,4 +230,82 @@ pub struct Assembly {
     #[serde(default)]
     pub exploded_views: Vec<ExplodedView>,
 }
+pub mod analysis;
+pub mod eval;
 pub mod solver;
+
+impl Assembly {
+    pub fn instance(&self, id: InstanceId) -> Option<&Instance> {
+        self.instances.iter().find(|i| i.id == id)
+    }
+    pub fn instance_mut(&mut self, id: InstanceId) -> Option<&mut Instance> {
+        self.instances.iter_mut().find(|i| i.id == id)
+    }
+    pub fn mate(&self, id: MateId) -> Option<&Mate> {
+        self.mates.iter().find(|m| m.id == id)
+    }
+    /// Fresh id for instances, mates, relations and groups (unique within the assembly).
+    pub fn next_id(&self) -> u64 {
+        let m = self
+            .instances
+            .iter()
+            .map(|i| i.id.0)
+            .chain(self.mates.iter().map(|m| m.id.0))
+            .chain(self.relations.iter().map(|r| r.id.0))
+            .chain(self.groups.iter().map(|g| g.id.0))
+            .max()
+            .unwrap_or(0);
+        m + 1
+    }
+    /// Onshape-style instance name: `Base <n>` with the next free n.
+    pub fn next_instance_name(&self, base: &str) -> String {
+        let mut n = 1;
+        loop {
+            let name = format!("{base} <{n}>");
+            if !self.instances.iter().any(|i| i.name == name) {
+                return name;
+            }
+            n += 1;
+        }
+    }
+    /// Next default feature name ("Fastened 1", "Group 2"...).
+    pub fn next_feature_name(&self, base: &str) -> String {
+        let mut n = 1;
+        loop {
+            let name = format!("{base} {n}");
+            let taken = self.mates.iter().any(|m| m.name == name) || self.relations.iter().any(|r| r.name == name) || self.groups.iter().any(|g| g.name == name);
+            if !taken {
+                return name;
+            }
+            n += 1;
+        }
+    }
+    /// Remove an instance with the mates, relations and group memberships that use it.
+    pub fn remove_instance(&mut self, id: InstanceId) {
+        self.instances.retain(|i| i.id != id);
+        let dead: Vec<MateId> = self.mates.iter().filter(|m| m.a.instance == id || m.b.instance == id).map(|m| m.id).collect();
+        self.mates.retain(|m| !dead.contains(&m.id));
+        self.relations.retain(|r| !r.mates.iter().any(|m| dead.contains(m)));
+        for g in &mut self.groups {
+            g.instances.retain(|i| *i != id);
+        }
+        self.groups.retain(|g| g.instances.len() > 1);
+        for np in &mut self.named_positions {
+            np.placements.retain(|(i, _)| *i != id);
+        }
+        for ev in &mut self.exploded_views {
+            for s in &mut ev.steps {
+                s.instances.retain(|i| *i != id);
+            }
+        }
+    }
+    /// Remove a mate and relations using it.
+    pub fn remove_mate(&mut self, id: MateId) {
+        self.mates.retain(|m| m.id != id);
+        self.relations.retain(|r| r.id != id && !r.mates.contains(&id));
+        self.groups.retain(|g| g.id != id);
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -191,6 +191,19 @@ pub struct Highlights {
     pub triads: Vec<Triad>,
     /// Inference dots (world positions).
     pub dots: Vec<DVec3>,
+    /// Move manipulator (triad with pickable axis arrows) and the hovered axis.
+    pub manipulator: Option<(Frame, f64, Option<usize>)>,
+}
+
+/// Pick id of manipulator axis `k` (0 = X, 1 = Y, 2 = Z).
+pub fn manip_pick_id(built: &AsmBuilt, k: usize) -> u32 {
+    built.picks.len() as u32 + 1 + k as u32
+}
+
+/// Manipulator axis for a pick id, if it is one.
+pub fn manip_axis(built: &AsmBuilt, id: u32) -> Option<usize> {
+    let base = built.picks.len() as u32 + 1;
+    (id >= base && id < base + 3).then(|| (id - base) as usize)
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
@@ -242,6 +255,18 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
+    }
+    if let Some((f, size, hovered)) = &h.manipulator {
+        let mut ml = LineData::default();
+        let o: [f32; 3] = f.origin.as_vec3().into();
+        for (k, (axis, color)) in [(f.x(), [0xff, 0x5c, 0x5c, 255u8]), (f.y(), [0x3e, 0xcf, 0x8e, 255]), (f.z(), [0x5a, 0xa9, 0xff, 255])].into_iter().enumerate() {
+            let tip: [f32; 3] = (f.origin + axis * *size).as_vec3().into();
+            let c = if *hovered == Some(k) { [0xff, 0xe0, 0x66, 255] } else { color };
+            let id = manip_pick_id(built, k);
+            ml.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: id, width: 5.0, style: LineSegment::ON_TOP });
+            scene.set_state(id, 0);
+        }
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ml))).per_primitive_color().ignore_clip().layer(22));
     }
     if !pts.points.is_empty() {
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(21));

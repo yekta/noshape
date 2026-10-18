@@ -28,3 +28,4 @@ async-channel = "2"
 rust-embed = "8"
 rfd = "0.15"
 dirs = "6"
+serde_json.workspace = true

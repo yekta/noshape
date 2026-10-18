@@ -303,6 +303,12 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         result.converged = r.iter().all(|v| v.abs() < 1e-7);
         result.max_residual = r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
         fill_mate_status(&problem, &poses, &mut result);
+        if r.is_empty() {
+            result.dof = n;
+            for &bi in &free {
+                result.body_dof[bi] = 6;
+            }
+        }
         return result;
     }
 
@@ -387,33 +393,45 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     result.iterations = iterations;
     fill_mate_status(&problem, &poses, &mut result);
 
-    // DOF analysis on the constraint Jacobian (without drag rows).
+    // DOF analysis on the constraint Jacobian (without drag rows), evaluated
+    // at the final poses: null space of JᵀJ via a symmetric eigendecomposition.
+    let _ = &jac;
     let rows = mate_r.len();
     if rows > 0 {
-        let sub = jac.rows(0, rows.min(jac.nrows())).into_owned();
-        let svd = sub.svd(false, true);
-        let tol = 1e-6 * svd.singular_values.max().max(1.0);
-        let rank = svd.singular_values.iter().filter(|s| **s > tol).count();
-        result.dof = n - rank;
-        if let Some(vt) = svd.v_t {
-            // Null-space rows: right singular vectors with ~0 singular value.
-            let sv: Vec<f64> = svd.singular_values.iter().copied().collect();
-            for (k, &bi) in free.iter().enumerate() {
-                let mut dof_count = 0;
-                for row in 0..vt.nrows() {
-                    let s = sv.get(row).copied().unwrap_or(0.0);
-                    if s > tol {
-                        continue;
-                    }
-                    let mag: f64 = (0..6).map(|j| vt[(row, k * 6 + j)].powi(2)).sum::<f64>().sqrt();
-                    if mag > 1e-6 {
-                        dof_count += 1;
-                    }
+        let nodrag = Problem { bodies: problem.bodies, mates, relations, drags: &[] };
+        let mut base = Vec::new();
+        residuals(&nodrag, &poses, &mut base);
+        let mut j = DMatrix::<f64>::zeros(base.len(), n);
+        let mut work = poses.clone();
+        for (k, &bi) in free.iter().enumerate() {
+            for c in 0..6 {
+                let mut d = [0.0; 6];
+                d[c] = if c < 3 { eps * scale } else { eps };
+                let saved = work[bi];
+                work[bi] = apply_delta(&saved, &d);
+                residuals(&nodrag, &work, &mut r2);
+                work[bi] = saved;
+                for row in 0..base.len() {
+                    j[(row, k * 6 + c)] = (r2[row] - base[row]) / eps;
                 }
-                // Null vectors beyond the row count are also null.
-                let extra = n.saturating_sub(vt.nrows());
-                result.body_dof[bi] = (dof_count + extra).min(6);
             }
+        }
+        let jtj = j.transpose() * &j;
+        let eig = jtj.symmetric_eigen();
+        let maxv = eig.eigenvalues.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+        let tol = 1e-8 * maxv.max(1.0);
+        let null: Vec<usize> = (0..n).filter(|&i| eig.eigenvalues[i].abs() <= tol).collect();
+        result.dof = null.len();
+        for (k, &bi) in free.iter().enumerate() {
+            // Rank of the null space restricted to this body's 6 columns.
+            let mut m = DMatrix::<f64>::zeros(6, null.len());
+            for (c, &ni) in null.iter().enumerate() {
+                for r in 0..6 {
+                    m[(r, c)] = eig.eigenvectors[(k * 6 + r, ni)];
+                }
+            }
+            let rank = if null.is_empty() { 0 } else { m.svd(false, false).singular_values.iter().filter(|s| **s > 1e-6).count() };
+            result.body_dof[bi] = rank.min(6);
         }
     } else {
         result.dof = n;

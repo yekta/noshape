@@ -154,12 +154,7 @@ impl Workspace {
                 .w_full()
                 .pr_2()
                 .gap_2()
-                .child(
-                    h_flex()
-                        .gap_1p5()
-                        .child(div().size(px(14.)).rounded_sm().bg(pal.accent))
-                        .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(pal.text).child("noshape")),
-                )
+                .child(self.render_doc_menu(cx))
                 .child(div().w(px(1.)).h(px(16.)).bg(pal.border))
                 .child(div().text_sm().text_color(pal.text_muted).child(name))
                 .when(read_only, |d| d.child(div().px_2().rounded_sm().bg(pal.warning).text_xs().text_color(rgb(0x000000)).child("VIEWING HISTORY")))
@@ -192,6 +187,120 @@ impl Workspace {
                 ),
         )
         .into_any_element()
+    }
+
+    fn render_doc_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let ws = cx.entity();
+        let recent = crate::files::recent();
+        let units = self.doc.read(cx).session.doc.settings.units.length;
+        Button::new("doc-menu")
+            .child(
+                h_flex()
+                    .gap_1p5()
+                    .child(div().size(px(14.)).rounded_sm().bg(pal.accent))
+                    .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(pal.text).child("noshape")),
+            )
+            .ghost()
+            .small()
+            .dropdown_caret(true)
+            .dropdown_menu(move |menu, window, cx| {
+                let w = ws.clone();
+                let mut menu = menu
+                    .menu("New document", Box::new(NewDocument))
+                    .menu("Open…", Box::new(OpenDocument))
+                    .submenu("Open recent", window, cx, {
+                        let recent = recent.clone();
+                        move |mut m, _, _| {
+                            if recent.is_empty() {
+                                m = m.label("No recent documents");
+                            }
+                            for r in &recent {
+                                let path = r.clone();
+                                let label = r.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                                m = m.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                                    let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+                                    let _ = crate::files::open_document_window(path.clone(), None, gpu, cx);
+                                }));
+                            }
+                            m
+                        }
+                    })
+                    .separator();
+                let w1 = w.clone();
+                menu = menu.item(PopupMenuItem::new("Save a copy as…").on_click(move |_, window, cx| w1.update(cx, |t, cx| t.save_copy(window, cx))));
+                let w2 = w.clone();
+                menu = menu.submenu("Export active Part Studio", window, cx, move |mut m, _, _| {
+                    for f in crate::part_studio::ExportFormat::ALL {
+                        let w = w2.clone();
+                        m = m.item(PopupMenuItem::new(f.label()).on_click(move |_, window, cx| w.update(cx, |t, cx| t.export(f, window, cx))));
+                    }
+                    m
+                });
+                let w3 = w.clone();
+                menu = menu.separator().submenu("Units", window, cx, move |mut m, _, _| {
+                    for u in noshape_units::LengthUnit::ALL {
+                        let w = w3.clone();
+                        m = m.item(PopupMenuItem::new(format!("{u:?}")).checked(u == units).on_click(move |_, _, cx| w.update(cx, |t, cx| t.set_units(u, cx))));
+                    }
+                    m
+                });
+                menu.separator().menu("Close window", Box::new(CloseWindow))
+            })
+            .into_any_element()
+    }
+
+    fn active_studio(&self) -> Option<Entity<PartStudioView>> {
+        match self.active.and_then(|a| self.views.get(&a)) {
+            Some(TabView::PartStudio(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
+    fn report(&self, msg: String, cx: &mut Context<Self>) {
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
+    }
+
+    fn export(&mut self, format: crate::part_studio::ExportFormat, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(view) = self.active_studio() else {
+            self.report("Open a Part Studio tab to export its parts".into(), cx);
+            return;
+        };
+        let name = view.read(cx).studio_name(cx);
+        let ws = cx.entity();
+        crate::files::request_save_path("Export", format!("{name}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
+            let r = view.read(cx).export(format, &path);
+            let msg = match r {
+                Ok(()) => format!("Exported {}", path.display()),
+                Err(e) => format!("Export failed: {e:#}"),
+            };
+            ws.update(cx, |this, cx| this.report(msg, cx));
+        });
+    }
+
+    fn save_copy(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let name = self.doc.read(cx).name();
+        let ws = cx.entity();
+        crate::files::request_save_path("Save a copy", format!("{name} copy.noshape"), "noshape", window, cx, move |path, cx| {
+            ws.update(cx, |this, cx| {
+                let r = this.doc.read(cx).session.store.backup_to(&path);
+                let msg = match r {
+                    Ok(()) => format!("Saved a copy to {}", path.display()),
+                    Err(e) => format!("Save failed: {e}"),
+                };
+                this.report(msg, cx);
+            });
+        });
+    }
+
+    fn set_units(&mut self, u: noshape_units::LengthUnit, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.session.doc.settings.units.length = u;
+            if let Err(e) = doc.session.commit(&[], true, "Change workspace units") {
+                cx.emit(DocEvent::Error(format!("{e:#}")));
+            }
+            cx.emit(DocEvent::Reloaded);
+        });
     }
 
     fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -289,6 +398,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
+            .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
             .child(title)
             .child(
                 h_flex()

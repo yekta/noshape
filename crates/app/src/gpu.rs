@@ -71,3 +71,7 @@ impl Gpu {
         self.worker.adapter_name()
     }
 }
+
+/// Global handle so any window can open new document windows.
+pub struct GpuGlobal(pub Gpu);
+impl gpui_kit::Global for GpuGlobal {}
