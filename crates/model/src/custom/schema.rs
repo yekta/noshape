@@ -21,7 +21,8 @@ use std::sync::LazyLock;
 
 static STRINGS: LazyLock<Mutex<HashSet<&'static str>>> = LazyLock::new(Default::default);
 type Options = &'static [(&'static str, &'static str)];
-static OPTIONS: LazyLock<Mutex<HashMap<Vec<(String, String)>, Options>>> = LazyLock::new(Default::default);
+type OptionTable = HashMap<Vec<(String, String)>, Options>;
+static OPTIONS: LazyLock<Mutex<OptionTable>> = LazyLock::new(Default::default);
 static SCHEMAS: LazyLock<Mutex<HashMap<String, &'static FeatureType>>> = LazyLock::new(Default::default);
 static ACTIVE: LazyLock<RwLock<HashMap<String, &'static FeatureType>>> = LazyLock::new(Default::default);
 

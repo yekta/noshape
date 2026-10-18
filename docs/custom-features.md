@@ -217,7 +217,8 @@ that downstream features will reference. That key does not depend on order.
 * Compile errors (syntax, invalid declarations) are listed under
   **Problems** below the editor, with line numbers. Click one to jump to it.
   Every Part Studio feature from a studio with errors fails with "Feature
-  Studio has errors: Line N: ...".
+  Studio has errors: Line N: ...". Those features stay editable: their
+  dialogs use the last declarations that compiled.
 * Runtime errors (a `throw`, a failed kernel operation, a wrong argument
   type) become the feature's error message, shown in red in the feature list
   and in the dialog. Downstream features evaluate against the model before

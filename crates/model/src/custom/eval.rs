@@ -64,7 +64,7 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
         feature: ev.feature,
         name: ev.name.to_string(),
         params,
-        units: ev.units.clone(),
+        units: *ev.units,
         outer_vars: ev.outer_vars.clone(),
         ctx: std::mem::take(&mut ev.ctx),
         xform: ev.xform,

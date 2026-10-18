@@ -403,14 +403,8 @@ fn offset_in_parent(sheet: &Sheet, child: ViewId, parent: ViewId) -> Option<[f64
 
 fn side_of(sheet: &Sheet, child: ViewId, parent: ViewId, n: [f64; 2]) -> f64 {
     match offset_in_parent(sheet, child, parent) {
-        Some(d) => {
-            if d[0] * n[0] + d[1] * n[1] < 0.0 {
-                -1.0
-            } else {
-                1.0
-            }
-        }
-        None => 1.0,
+        Some(d) if d[0] * n[0] + d[1] * n[1] < 0.0 => -1.0,
+        _ => 1.0,
     }
 }
 
@@ -1228,7 +1222,8 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
                     t1 = t1.max(t);
                 }
             }
-            if !(t1 > t0) {
+            // Also skips NaN extents.
+            if t1.partial_cmp(&t0) != Some(std::cmp::Ordering::Greater) {
                 continue;
             }
             // Coaxial faces (split cylinders) join one group.

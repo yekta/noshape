@@ -46,8 +46,12 @@ impl DocumentScripts {
         for t in doc.ordered_tabs() {
             if let TabContent::FeatureStudio(fs) = &t.content {
                 let c = compile(t.id, &fs.source);
-                let types: Vec<&'static FeatureType> = c.features.iter().map(|f| f.feature_type).collect();
-                super::schema::activate(t.id, &types);
+                // A studio with errors keeps its last good schemas active, so
+                // features using it stay editable while the source is fixed.
+                if !c.has_errors() {
+                    let types: Vec<&'static FeatureType> = c.features.iter().map(|f| f.feature_type).collect();
+                    super::schema::activate(t.id, &types);
+                }
                 LATEST.write().insert(t.id.to_string(), c.clone());
                 studios.push((t.id, t.name.clone(), c));
             }

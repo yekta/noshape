@@ -393,10 +393,13 @@ fn swept_names(ev: &EvalCtx, p: &Profile, res: &k::OpResult, key: u32, caps: boo
         }
     }
     for r in &res.history.records {
-        if r.arg == 0 && r.input_kind == ShapeType::Edge && r.relation == k::Relation::Generated && r.output_kind == ShapeType::Face {
-            if let Some(src) = p.edge_sources.get(r.input_index as usize) {
-                roles.entry(r.output_index).or_insert_with(|| Role::Side(keyed(key, src.clone())));
-            }
+        if r.arg == 0
+            && r.input_kind == ShapeType::Edge
+            && r.relation == k::Relation::Generated
+            && r.output_kind == ShapeType::Face
+            && let Some(src) = p.edge_sources.get(r.input_index as usize)
+        {
+            roles.entry(r.output_index).or_insert_with(|| Role::Side(keyed(key, src.clone())));
         }
     }
     let empty = ShapeNames::default();

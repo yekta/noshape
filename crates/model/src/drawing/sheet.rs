@@ -417,6 +417,7 @@ impl SheetGeometry {
     /// Place a dimension label at `at` (baseline start/center/end by
     /// `halign` 0/0.5/1 along `angle`; vertically centered when
     /// `vcenter`), with stacked tolerances and a basic-dimension frame.
+    #[allow(clippy::too_many_arguments)]
     pub fn dim_label(&mut self, at: [f64; 2], angle: f64, halign: f64, vcenter: bool, t: &DimText, h: f64, pick: u32) {
         let (sn, cs) = angle.sin_cos();
         let u = [cs, sn];

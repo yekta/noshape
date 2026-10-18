@@ -358,3 +358,13 @@ fn demo_feature_studio_regenerates() {
     let TabContent::PartStudio(plate) = &doc.tabs[0].content else { panic!() };
     assert_ok(&Regenerator::new().regenerate(plate, &ConfigValues::default(), &doc.settings.units, &opts));
 }
+
+#[test]
+fn new_feature_studio_template_works() {
+    let fx = Fixture::new(&FeatureStudio::template().source);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("Rounded block"), &fx.units).unwrap());
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    assert_eq!(r.context.bodies[0].faces.len(), 10, "box + 4 rounded vertical edges");
+}
