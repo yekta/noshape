@@ -2,7 +2,10 @@
 //! automatic exploded views, computed from an evaluated [`AssemblyResult`].
 
 use super::eval::{AssemblyResult, InstancePath, PartOccurrence};
-use super::{ExplodeStep, ExplodedView, InstanceId};
+use super::{Assembly, ExplodeStep, ExplodedView, InstanceId, InstancePattern, MateConnectorRef, PatternKind, Placement};
+use crate::reference::{Inference, Reference, Role, TopoName};
+use noshape_units::UnitPrefs;
+use std::sync::Arc;
 use crate::configuration::ConfigValues;
 use crate::display::BodyKind;
 use crate::document::TabId;
@@ -149,8 +152,235 @@ pub fn auto_exploded_view(result: &AssemblyResult, name: &str, factor: f64) -> E
     for (rank, &i) in order.iter().enumerate() {
         let t = axis * (rank as f64 - (n - 1.0) * 0.5) * size * 0.5 * factor;
         if t.length() > 0.0 {
-            steps.push(ExplodeStep { instances: vec![tops[i].0], translation: t.into(), rotation_axis: None, rotation_angle: 0.0 });
+            steps.push(ExplodeStep::translate(vec![tops[i].0], t.into()));
         }
     }
     ExplodedView { name: name.into(), steps }
+}
+
+// ------------------------------------------------------------ matched patterns
+
+/// Geometric signature used by Replicate to find "identical" geometry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Signature {
+    Plane { area: f64 },
+    Cylinder { radius: f64, length: f64 },
+    Cone { half_angle: f64, ref_radius: f64 },
+    Sphere { radius: f64 },
+    Torus { major: f64, minor: f64 },
+    Circle { radius: f64 },
+    Line { length: f64 },
+}
+
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-7 + 1e-6 * a.abs().max(b.abs())
+}
+
+impl Signature {
+    fn matches(&self, o: &Signature) -> bool {
+        use Signature::*;
+        match (*self, *o) {
+            (Plane { area: a }, Plane { area: b }) => close(a, b),
+            (Cylinder { radius: r1, length: l1 }, Cylinder { radius: r2, length: l2 }) => close(r1, r2) && close(l1, l2),
+            (Cone { half_angle: a1, ref_radius: r1 }, Cone { half_angle: a2, ref_radius: r2 }) => close(a1, a2) && close(r1, r2),
+            (Sphere { radius: a }, Sphere { radius: b }) => close(a, b),
+            (Torus { major: a1, minor: b1 }, Torus { major: a2, minor: b2 }) => close(a1, a2) && close(b1, b2),
+            (Circle { radius: a }, Circle { radius: b }) => close(a, b),
+            (Line { length: a }, Line { length: b }) => close(a, b),
+            _ => false,
+        }
+    }
+}
+
+fn face_signature(face: &k::Shape) -> Option<Signature> {
+    Some(match face.face_surface().ok()? {
+        k::Surface::Plane(_) => Signature::Plane { area: face.area().ok()? },
+        k::Surface::Cylinder { axis, radius, .. } => {
+            let bb = face.bounding_box(true).ok()?;
+            Signature::Cylinder { radius, length: bb.size().dot(axis.normalize().abs()) }
+        }
+        k::Surface::Cone { half_angle, ref_radius, .. } => Signature::Cone { half_angle, ref_radius },
+        k::Surface::Sphere { radius, .. } => Signature::Sphere { radius },
+        k::Surface::Torus { major_radius, minor_radius, .. } => Signature::Torus { major: major_radius, minor: minor_radius },
+        _ => return None,
+    })
+}
+
+fn edge_signature(edge: &k::Shape) -> Option<Signature> {
+    let info = edge.edge_info().ok()?;
+    Some(match info.curve {
+        k::Curve::Circle { radius, .. } => Signature::Circle { radius },
+        k::Curve::Line { .. } => Signature::Line { length: edge.length().ok()? },
+        _ => return None,
+    })
+}
+
+fn split_reference(r: &Reference) -> (Reference, Option<Inference>) {
+    match r {
+        Reference::Implicit { on, inference } => ((**on).clone(), Some(*inference)),
+        other => (other.clone(), None),
+    }
+}
+
+fn join_reference(entity: Reference, inference: Option<Inference>) -> Reference {
+    match inference {
+        Some(i) => Reference::Implicit { on: Box::new(entity), inference: i },
+        None => entity,
+    }
+}
+
+fn stable_code(r: &Reference) -> u32 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    serde_json::to_vec(r).unwrap_or_default().hash(&mut h);
+    (h.finish() & 0x7fff_ffff) as u32
+}
+
+/// Replace every occurrence of face name `from` by `to` inside a name
+/// (edges and vertices are rebuilt so their face lists stay sorted).
+fn substitute(n: &TopoName, from: &TopoName, to: &Arc<TopoName>) -> TopoName {
+    if n == from {
+        return (**to).clone();
+    }
+    match n {
+        TopoName::Split { parent, by, ordinal } => TopoName::Split { parent: Arc::new(substitute(parent, from, to)), by: *by, ordinal: *ordinal },
+        TopoName::Edge { faces, ordinal } => TopoName::edge(Arc::new(substitute(&faces[0], from, to)), Arc::new(substitute(&faces[1], from, to)), *ordinal),
+        TopoName::Vertex { faces, ordinal } => TopoName::vertex(faces.iter().map(|f| Arc::new(substitute(f, from, to))).collect(), *ordinal),
+        TopoName::Boundary { face, ordinal } => TopoName::Boundary { face: Arc::new(substitute(face, from, to)), ordinal: *ordinal },
+        other => other.clone(),
+    }
+}
+
+fn contains_name(n: &TopoName, needle: &TopoName) -> bool {
+    if n == needle {
+        return true;
+    }
+    match n {
+        TopoName::Split { parent, .. } => contains_name(parent, needle),
+        TopoName::Edge { faces, .. } => faces.iter().any(|f| contains_name(f, needle)),
+        TopoName::Vertex { faces, .. } => faces.iter().any(|f| contains_name(f, needle)),
+        TopoName::Boundary { face, .. } => contains_name(face, needle),
+        _ => false,
+    }
+}
+
+fn entity_name(r: &Reference) -> Option<&TopoName> {
+    match r {
+        Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => Some(n),
+        _ => None,
+    }
+}
+
+fn with_name(r: &Reference, n: TopoName) -> Reference {
+    match r {
+        Reference::Face(_) => Reference::Face(n),
+        Reference::Edge(_) => Reference::Edge(n),
+        _ => Reference::Vertex(n),
+    }
+}
+
+/// Targets of a part pattern / replicate: one connector per matching
+/// geometry on the seed mate's target instance (code, target connector,
+/// initial placement for the copy). The seed's own target is excluded.
+pub fn matched_targets(result: &AssemblyResult, asm: &Assembly, pattern: &InstancePattern, units: &UnitPrefs) -> Result<Vec<(u32, MateConnectorRef, Option<Placement>)>, String> {
+    let (mate_id, by_pattern, all_instances) = match pattern.kind {
+        PatternKind::PartPattern { mate } => (mate, true, false),
+        PatternKind::Replicate { mate, all_instances } => (mate, false, all_instances),
+        _ => return Err("Not a matched pattern".into()),
+    };
+    let seed = *pattern.seeds.first().ok_or("Select a seed instance")?;
+    let mate = asm.mate(mate_id).ok_or("The seed mate no longer exists")?;
+    let target = if mate.a.instance == seed {
+        &mate.b
+    } else if mate.b.instance == seed {
+        &mate.a
+    } else {
+        return Err("The mate to be matched must mate the seed instance".into());
+    };
+    if target.connector.is_some() || target.instance == InstanceId::ORIGIN {
+        return Err("The seed mate must reference geometry (not a mate connector) to be matched".into());
+    }
+    let mut path = vec![target.instance];
+    path.extend(target.path.iter().copied());
+    let occ = result.occurrences.iter().find(|o| o.path == path).ok_or("Target instance is not available")?;
+    let body = occ.context.body(&occ.body).ok_or("Target part is not available")?;
+    let (entity, inference) = split_reference(&target.reference);
+    let name = entity_name(&entity).ok_or("The seed mate must reference a face, edge or vertex")?.clone();
+    // (target connector template, code, entity) candidates.
+    let mut candidates: Vec<(MateConnectorRef, u32, Reference)> = Vec::new();
+    if by_pattern {
+        // Faces created by Part Studio patterns as copies of a face the target uses.
+        for f in &body.faces {
+            let TopoName::Face { role: Role::Copy { instance, of }, .. } = &**f else { continue };
+            if !contains_name(&name, of) {
+                continue;
+            }
+            let r = with_name(&entity, substitute(&name, of, f));
+            if !candidates.iter().any(|(_, _, c)| *c == r) {
+                candidates.push((target.clone(), *instance, r));
+            }
+        }
+        if candidates.is_empty() {
+            return Err("The seed mate's target geometry is not patterned in its Part Studio".into());
+        }
+    } else {
+        let sig_in = |b: &crate::regen::context::Body, r: &Reference| -> Option<Signature> {
+            match r {
+                Reference::Face(n) => {
+                    let i = b.faces.iter().position(|f| &**f == n)?;
+                    face_signature(&b.shape.sub_shape(k::ShapeType::Face, i).ok()?)
+                }
+                Reference::Edge(n) => {
+                    let i = b.edges.iter().position(|e| &**e == n)?;
+                    edge_signature(&b.shape.sub_shape(k::ShapeType::Edge, i).ok()?)
+                }
+                _ => None,
+            }
+        };
+        let sig = sig_in(body, &entity).ok_or("Replicate needs a seed mate on a face or edge with analytic geometry")?;
+        // The target occurrence, plus other top-level instances of the same part.
+        let mut occs: Vec<&PartOccurrence> = vec![occ];
+        if all_instances {
+            occs.extend(result.occurrences.iter().filter(|o| o.path != occ.path && o.path.len() == occ.path.len() && o.studio == occ.studio && o.body == occ.body && o.config == occ.config && o.path[0] != seed));
+        }
+        for (k, o) in occs.iter().enumerate() {
+            let Some(b) = o.context.body(&o.body) else { continue };
+            let names: Vec<Reference> = match &entity {
+                Reference::Face(_) => b.faces.iter().map(|f| Reference::Face((**f).clone())).collect(),
+                _ => b.edges.iter().map(|e| Reference::Edge((**e).clone())).collect(),
+            };
+            let mut tmpl = target.clone();
+            tmpl.instance = o.path[0];
+            tmpl.path = o.path[1..].to_vec();
+            for r in names {
+                if k == 0 && r == entity {
+                    continue;
+                }
+                if sig_in(b, &r).is_some_and(|s| s.matches(&sig)) {
+                    // Codes stay unique per (instance, entity).
+                    let code = if k == 0 { stable_code(&r) } else { (stable_code(&r) ^ (o.path[0].0 as u32).wrapping_mul(0x9e37_79b9)) & 0x7fff_ffff };
+                    candidates.push((tmpl.clone(), code, r));
+                }
+            }
+        }
+        if candidates.is_empty() {
+            return Err("No matching geometry found on the target instance".into());
+        }
+    }
+    let seed_place = asm.instance(seed).map(|i| i.placement).unwrap_or_default();
+    let seed_pose = result.solved.placement(seed).unwrap_or(seed_place);
+    let target_world = result.connector_world(target, units);
+    let mut out = Vec::new();
+    for (tmpl, code, r) in candidates {
+        let mut conn = tmpl;
+        conn.reference = join_reference(r, inference);
+        let Some(w) = result.connector_world(&conn, units) else { continue };
+        let placement = target_world.map(|t| {
+            let rel = w.mul(&t.inverse());
+            super::eval::frame_to_placement(&rel.mul(&super::eval::placement_to_frame(&seed_pose)))
+        });
+        out.push((code, conn, placement));
+    }
+    out.sort_by_key(|(c, _, _)| *c);
+    Ok(out)
 }

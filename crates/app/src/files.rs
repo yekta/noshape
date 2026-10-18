@@ -6,7 +6,7 @@ use gpui_kit::component::TitleBar;
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
 
-fn config_dir() -> PathBuf {
+pub(crate) fn config_dir() -> PathBuf {
     let d = dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("noshape");
     let _ = std::fs::create_dir_all(&d);
     d
@@ -41,11 +41,102 @@ pub fn add_recent(p: &Path) {
     list.retain(|x| *x != p);
     list.insert(0, p);
     list.truncate(15);
-    let _ = std::fs::write(config_dir().join("recent.json"), serde_json::to_vec_pretty(&list).unwrap_or_default());
+    write_recent(&list);
 }
 
-/// Open (or create) a document in a new window.
+fn write_recent(list: &[PathBuf]) {
+    let _ = std::fs::write(config_dir().join("recent.json"), serde_json::to_vec_pretty(list).unwrap_or_default());
+}
+
+fn canonical(p: &Path) -> PathBuf {
+    p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// Remove a document from the recent list (start window "Remove from recent").
+pub fn remove_recent(p: &Path) {
+    let p = canonical(p);
+    let mut list = recent();
+    list.retain(|x| *x != p);
+    write_recent(&list);
+}
+
+/// Point a recent entry at a document's new location (after a rename).
+pub fn replace_recent(old: &Path, new: &Path) {
+    let new = canonical(new);
+    let list: Vec<PathBuf> = recent_raw().into_iter().map(|x| if x == old { new.clone() } else { x }).collect();
+    write_recent(&list);
+}
+
+fn recent_raw() -> Vec<PathBuf> {
+    std::fs::read(config_dir().join("recent.json")).ok().and_then(|b| serde_json::from_slice::<Vec<PathBuf>>(&b).ok()).unwrap_or_default()
+}
+
+/// Extra folders the start window lists `.noshape` files from (besides
+/// [`documents_dir`]). Persisted in the config dir.
+pub fn watched_folders() -> Vec<PathBuf> {
+    std::fs::read(config_dir().join("folders.json")).ok().and_then(|b| serde_json::from_slice::<Vec<PathBuf>>(&b).ok()).unwrap_or_default()
+}
+
+pub fn set_watched_folders(list: &[PathBuf]) {
+    let _ = std::fs::write(config_dir().join("folders.json"), serde_json::to_vec_pretty(list).unwrap_or_default());
+}
+
+/// Open document windows by canonical path (so opening twice focuses).
+#[derive(Default)]
+struct OpenDocs(std::collections::HashMap<PathBuf, AnyWindowHandle>);
+impl Global for OpenDocs {}
+
+/// Whether the document at `path` is open in a window.
+pub fn is_document_open(path: &Path, cx: &App) -> bool {
+    cx.try_global::<OpenDocs>().is_some_and(|o| o.0.contains_key(&canonical(path)))
+}
+
+/// App-level window lifecycle: keeps the open-document registry current and
+/// shows the start window when the last document window closes. Quits when
+/// the start window is the last window closed (macOS keeps running and
+/// reopens the start window from the dock).
+pub fn init(cx: &mut App) {
+    cx.set_global(OpenDocs::default());
+    crate::start_window::init(cx);
+    cx.on_window_closed(|cx, id| {
+        cx.global_mut::<OpenDocs>().0.retain(|_, h| h.window_id() != id);
+        let was_start = crate::start_window::forget_if(id, cx);
+        if !cx.windows().is_empty() {
+            crate::start_window::refresh(cx);
+            return;
+        }
+        if cfg!(target_os = "macos") {
+            return;
+        }
+        if was_start {
+            cx.quit();
+        } else {
+            show_start_window(cx);
+        }
+    })
+    .detach();
+}
+
+/// Show (or focus) the documents start window.
+pub fn show_start_window(cx: &mut App) {
+    crate::start_window::show(cx);
+}
+
+/// Open the folder containing `path` in the system file manager.
+pub fn reveal_in_file_manager(path: &Path) -> anyhow::Result<()> {
+    let dir = if path.is_dir() { path.to_path_buf() } else { path.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from(".")) };
+    open::that_detached(&dir)?;
+    Ok(())
+}
+
+/// Open (or create) a document in a new window. If it is already open, its
+/// window is brought to the front instead.
 pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Document>, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) {
+        if h.update(cx, |_, window, _| window.activate_window()).is_ok() {
+            return Ok(());
+        }
+    }
     let session = if path.exists() {
         session::Session::open(&path)?
     } else {
@@ -60,7 +151,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    gpui_kit::open_window(options, cx, move |window, cx| {
+    let (handle, _) = gpui_kit::open_window(options, cx, move |window, cx| {
         window.set_window_title(&format!("{} — noshape", session.name()));
         let doc = cx.new(|_| doc_model::DocModel::new(session));
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
@@ -68,6 +159,9 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         window.defer(cx, move |window, cx| fh.focus(window, cx));
         ws
     })?;
+    if cx.has_global::<OpenDocs>() {
+        cx.global_mut::<OpenDocs>().0.insert(canonical(&path), handle);
+    }
     Ok(())
 }
 
@@ -193,6 +287,23 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
             s.select_all(window, cx);
         })
     });
+}
+
+/// Ask for a folder, then call `then` with it (native dialog when
+/// available, otherwise an in-app path prompt).
+pub fn request_folder_path(title: &'static str, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+    if native_dialogs_available() {
+        cx.spawn(async move |cx| {
+            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).pick_folder().await.map(|f| f.path().to_path_buf());
+            if let Some(p) = picked {
+                let _ = cx.update(|cx| then(p, cx));
+            }
+        })
+        .detach();
+        return;
+    }
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
+    in_app_save_prompt(title, "Add", home, window, cx, then);
 }
 
 /// Async variant used where no window is at hand (native dialog only).

@@ -127,6 +127,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "cutlist" => frames::cutlist,
         "tag" => frames::tag,
         // --- end batch SM dispatch ---
+        t if crate::custom::is_custom(t) => crate::custom::evaluate,
         _ => return None,
     })
 }

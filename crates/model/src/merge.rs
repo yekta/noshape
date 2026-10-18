@@ -92,6 +92,16 @@ pub fn merge_tab_blobs(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<
                 }
                 return serde_json::to_vec(&o).ok();
             }
+            // Feature Studios merge as a whole: take theirs if only they changed.
+            if let (TabContent::FeatureStudio(bf), TabContent::FeatureStudio(of), TabContent::FeatureStudio(tf)) = (&b.content, &o.content, &t.content) {
+                if of == bf && tf != bf {
+                    o.content = TabContent::FeatureStudio(tf.clone());
+                }
+                if o.name == b.name {
+                    o.name = t.name.clone();
+                }
+                return serde_json::to_vec(&o).ok();
+            }
             ours.map(|x| x.to_vec())
         }
         _ => ours.map(|x| x.to_vec()),

@@ -163,3 +163,14 @@ fn paste_features_remaps_internal_references() {
     ps.dissolve_folder(folder);
     assert!(ps.features.iter().all(|f| f.folder.is_none()));
 }
+
+#[test]
+fn part_properties_round_trip_through_json() {
+    use noshape_model::partstudio::PartProperties;
+    let (mut ps, _) = studio_with_block();
+    let id = noshape_model::reference::BodyId { feature: ps.features[1].id, index: 0 };
+    ps.part_properties.insert(id.clone(), PartProperties { name: Some("Plate".into()), ..Default::default() });
+    let json = serde_json::to_string(&ps).expect("serializes");
+    let back: PartStudio = serde_json::from_str(&json).expect("deserializes");
+    assert_eq!(back.part_properties.get(&id).and_then(|p| p.name.clone()).as_deref(), Some("Plate"));
+}

@@ -39,6 +39,8 @@ pub enum Category {
     Frame,
     Variable,
     Import,
+    /// Features defined by a Feature Studio of the document (`custom:` ids).
+    Custom,
 }
 
 impl Category {
@@ -57,6 +59,7 @@ impl Category {
             Category::Frame => "Frames",
             Category::Variable => "Variables",
             Category::Import => "Import",
+            Category::Custom => "Custom features",
         }
     }
 }
@@ -137,8 +140,10 @@ static REGISTRY: LazyLock<IndexMap<&'static str, FeatureType>> = LazyLock::new(|
     map
 });
 
+/// Schema of a feature type: built-in, or a custom feature of a compiled
+/// Feature Studio (`custom:<tab>:<name>`, see [`crate::custom`]).
 pub fn get(id: &str) -> Option<&'static FeatureType> {
-    REGISTRY.get(id)
+    REGISTRY.get(id).or_else(|| crate::custom::lookup(id))
 }
 
 pub fn all() -> impl Iterator<Item = &'static FeatureType> {

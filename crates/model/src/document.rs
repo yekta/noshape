@@ -1,5 +1,5 @@
 //! Document structure: tabs (Part Studios, Assemblies, Drawings, Variable
-//! Studios) and document-level settings. A document serializes to a set of
+//! Studios, Feature Studios) and document-level settings. A document serializes to a set of
 //! named blobs (one per tab plus `document/meta`) that `noshape-store`
 //! versions; see [`Document::to_blobs`].
 
@@ -32,6 +32,8 @@ pub enum TabContent {
     Assembly(Assembly),
     Drawing(Drawing),
     VariableStudio(VariableStudio),
+    /// Script source defining custom features (see [`crate::custom`]).
+    FeatureStudio(crate::custom::FeatureStudio),
 }
 
 impl TabContent {
@@ -41,6 +43,7 @@ impl TabContent {
             TabContent::Assembly(_) => "Assembly",
             TabContent::Drawing(_) => "Drawing",
             TabContent::VariableStudio(_) => "Variable Studio",
+            TabContent::FeatureStudio(_) => "Feature Studio",
         }
     }
 }

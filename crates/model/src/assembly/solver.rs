@@ -99,6 +99,118 @@ pub struct SolverMate {
     pub rotation: f64,
     /// Limits on the free values: (value index, min, max).
     pub limits: Vec<(usize, Option<f64>, Option<f64>)>,
+    /// Additional connectors (body, local frame): Width uses
+    /// `[width 2]` or `[width 2, tab 2]` (`a` = tab 1, `b` = width 1).
+    pub extra: Vec<(usize, Frame)>,
+    /// Tangent: contact geometry on `a` and `b` (body-local coordinates).
+    pub geom: Option<TangentPair>,
+    /// Pattern / mirror follower: `b` (instance frame `b_local`) is placed
+    /// relative to `a` (instance frame `a_local`) by a transform about an axis frame.
+    pub follow: Option<Follow>,
+}
+
+impl Default for SolverMate {
+    fn default() -> Self {
+        Self {
+            kind: MateType::Fastened,
+            a: 0,
+            a_local: Frame::default(),
+            b: 0,
+            b_local: Frame::default(),
+            flip_primary: false,
+            reorient: 0,
+            offset: DVec3::ZERO,
+            rotation: 0.0,
+            limits: vec![],
+            extra: vec![],
+            geom: None,
+            follow: None,
+        }
+    }
+}
+
+impl SolverMate {
+    pub fn new(kind: MateType, a: usize, a_local: Frame, b: usize, b_local: Frame) -> Self {
+        Self { kind, a, a_local, b, b_local, ..Default::default() }
+    }
+}
+
+/// Analytic contact geometry for tangent mates (body-local coordinates).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TangentGeom {
+    /// Plane through `point` with outward `normal`.
+    Plane { point: DVec3, normal: DVec3 },
+    /// Cylinder (radius 0: a line / straight edge).
+    Cylinder { point: DVec3, axis: DVec3, radius: f64 },
+    /// Sphere (radius 0: a point / vertex).
+    Sphere { center: DVec3, radius: f64 },
+}
+
+impl TangentGeom {
+    pub fn transformed(&self, f: &Frame) -> TangentGeom {
+        match *self {
+            TangentGeom::Plane { point, normal } => TangentGeom::Plane { point: f.transform_point(point), normal: f.rotation * normal },
+            TangentGeom::Cylinder { point, axis, radius } => TangentGeom::Cylinder { point: f.transform_point(point), axis: f.rotation * axis, radius },
+            TangentGeom::Sphere { center, radius } => TangentGeom::Sphere { center: f.transform_point(center), radius },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TangentPair {
+    pub a: TangentGeom,
+    pub b: TangentGeom,
+    /// Internal contact (one curved surface inside the other) for
+    /// cylinder/sphere pairs; decided from the initial positions.
+    pub internal: bool,
+}
+
+/// Transform of a pattern / mirror follower relative to its axis frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FollowXform {
+    /// `E = A · X · A⁻¹ · S` (linear: translation along Z; circular: rotation about Z).
+    Rigid(Frame),
+    /// Mirror across the axis frame's XY plane combined with a reflection in
+    /// the seed's local symmetry plane (point, normal in seed instance coordinates),
+    /// which composes to a proper rigid motion.
+    Mirror { local_point: DVec3, local_normal: DVec3 },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Follow {
+    pub axis_body: usize,
+    pub axis_local: Frame,
+    pub xform: FollowXform,
+}
+
+/// Reflection matrix across the plane through `p` with unit normal `n`.
+pub fn reflection(p: DVec3, n: DVec3) -> glam::DMat4 {
+    let n = n.normalize_or_zero();
+    let m3 = glam::DMat3::IDENTITY - 2.0 * glam::DMat3::from_cols(n * n.x, n * n.y, n * n.z);
+    let t = 2.0 * p.dot(n) * n;
+    glam::DMat4::from_cols(m3.x_axis.extend(0.0), m3.y_axis.extend(0.0), m3.z_axis.extend(0.0), t.extend(1.0))
+}
+
+fn frame_mat(f: &Frame) -> glam::DMat4 {
+    glam::DMat4::from_rotation_translation(f.rotation, f.origin)
+}
+
+impl Follow {
+    /// Expected world frame of the follower instance given the seed instance frame.
+    pub fn expected(&self, bodies: &[Frame], seed: &Frame) -> Frame {
+        let a = bodies[self.axis_body].mul(&self.axis_local);
+        match self.xform {
+            FollowXform::Rigid(x) => a.mul(&x).mul(&a.inverse()).mul(seed),
+            FollowXform::Mirror { local_point, local_normal } => {
+                let am = frame_mat(&a);
+                let mw = am * reflection(DVec3::ZERO, DVec3::Z) * am.inverse();
+                let m = mw * frame_mat(seed) * reflection(local_point, local_normal);
+                let (_, r, t) = m.to_scale_rotation_translation();
+                // A reflection pair is a proper rotation; strip any numerical scale sign.
+                Frame::new(t, r.normalize())
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -123,6 +235,10 @@ pub struct SolverRelation {
     /// Free values at the time the relation was established (reference).
     pub base_a: f64,
     pub base_b: f64,
+    /// Which free value of each mate is coupled (see [`mate_values`]:
+    /// 0 = rotation about Z, 1..3 = translation X/Y/Z).
+    pub value_a: usize,
+    pub value_b: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -182,7 +298,78 @@ pub fn mate_values(bodies: &[Frame], m: &SolverMate) -> [f64; 4] {
     [angle, r.origin.x, r.origin.y, r.origin.z]
 }
 
+fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: bool, out: &mut Vec<f64>) {
+    use TangentGeom::*;
+    let sgn = if flip { -1.0 } else { 1.0 };
+    let curved = |r1: f64, r2: f64| if internal { (r1 - r2).abs() } else { r1 + r2 };
+    match (ga, gb) {
+        (Plane { point: pa, normal: na }, Plane { point: pb, normal: nb }) => {
+            // Faces touch: normals opposed (agree when flipped), coplanar.
+            let e = nb + na * sgn;
+            out.extend_from_slice(&[e.x, e.y, e.z, (pb - pa).dot(na)]);
+        }
+        (Plane { point, normal }, Cylinder { point: c, axis, radius }) | (Cylinder { point: c, axis, radius }, Plane { point, normal }) => {
+            out.push(axis.dot(normal));
+            out.push((c - point).dot(normal) - sgn * radius);
+        }
+        (Plane { point, normal }, Sphere { center, radius }) | (Sphere { center, radius }, Plane { point, normal }) => {
+            out.push((center - point).dot(normal) - sgn * radius);
+        }
+        (Cylinder { point: c1, axis: a1, radius: r1 }, Cylinder { point: c2, axis: a2, radius: r2 }) => {
+            let x = a1.cross(a2);
+            let d = c2 - c1;
+            let perp = d - a1 * d.dot(a1);
+            out.extend_from_slice(&[x.x, x.y, x.z, perp.length() - curved(r1, r2)]);
+        }
+        (Cylinder { point: c1, axis, radius: r1 }, Sphere { center, radius: r2 }) | (Sphere { center, radius: r2 }, Cylinder { point: c1, axis, radius: r1 }) => {
+            let d = center - c1;
+            let perp = d - axis * d.dot(axis);
+            out.push(perp.length() - curved(r1, r2));
+        }
+        (Sphere { center: c1, radius: r1 }, Sphere { center: c2, radius: r2 }) => out.push((c2 - c1).length() - curved(r1, r2)),
+    }
+}
+
 fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
+    if let Some(f) = &m.follow {
+        let seed = bodies[m.a].mul(&m.a_local);
+        let e = f.expected(bodies, &seed);
+        let cur = bodies[m.b].mul(&m.b_local);
+        let r = log_rot(e.rotation.inverse() * cur.rotation);
+        let t = cur.origin - e.origin;
+        out.extend_from_slice(&[r.x, r.y, r.z, t.x, t.y, t.z]);
+        return;
+    }
+    if m.kind == MateType::Tangent
+        && let Some(g) = &m.geom
+    {
+        let ga = g.a.transformed(&bodies[m.a]);
+        let gb = g.b.transformed(&bodies[m.b]);
+        tangent_residuals(ga, gb, m.flip_primary, g.internal, out);
+        return;
+    }
+    if m.kind == MateType::Width && !m.extra.is_empty() {
+        // Tab connector(s) centered between the two width connectors' XY planes.
+        let t1 = bodies[m.a].mul(&m.a_local);
+        let w1 = bodies[m.b].mul(&m.b_local);
+        let (wb, wl) = m.extra[0];
+        let w2 = bodies[wb].mul(&wl);
+        let c = (w1.origin + w2.origin) * 0.5;
+        let n = w1.z();
+        let (mid, tabs) = match m.extra.get(1) {
+            Some((tb, tl)) => {
+                let t2 = bodies[*tb].mul(tl);
+                ((t1.origin + t2.origin) * 0.5, vec![t1.z(), t2.z()])
+            }
+            None => (t1.origin, vec![t1.z()]),
+        };
+        out.push((mid - c).dot(n));
+        for z in tabs {
+            let x = z.cross(n);
+            out.extend_from_slice(&[x.x, x.y, x.z]);
+        }
+        return;
+    }
     let r = relative(bodies, m);
     let z = r.rotation * DVec3::Z;
     let t = r.origin - m.offset;
@@ -202,8 +389,8 @@ fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
         MateType::Planar => out.extend_from_slice(&[z.x, z.y, t.z]),
         MateType::Ball => out.extend_from_slice(&[t.x, t.y, t.z]),
         MateType::Parallel => out.extend_from_slice(&[z.x, z.y]),
-        // Tangent/Width are reduced to point-on-plane style constraints by the
-        // caller (connector frames placed at contact); treat as planar contact.
+        // Without contact geometry / width connectors (not resolvable):
+        // point-on-plane fallback between the two connectors.
         MateType::Tangent => out.push(t.z),
         MateType::Width => out.push(t.z),
     }
@@ -241,11 +428,12 @@ fn relation_residual(bodies: &[Frame], mates: &[SolverMate], r: &SolverRelation)
     let va = mate_values(bodies, &mates[r.mate_a]);
     let vb = mate_values(bodies, &mates[r.mate_b]);
     let sign = if r.reverse { -1.0 } else { 1.0 };
+    let delta = |v: &[f64; 4], i: usize, base: f64| if i == 0 { wrap_angle(v[0] - base) } else { v[i.min(3)] - base };
+    let da = delta(&va, r.value_a, r.base_a);
+    let db = delta(&vb, r.value_b, r.base_b);
     match r.kind {
-        RelationKind::Gear => wrap_angle((vb[0] - r.base_b) + sign * r.ratio * wrap_angle(va[0] - r.base_a)),
-        RelationKind::Linear => (vb[3] - r.base_b) - sign * r.ratio * (va[3] - r.base_a),
-        RelationKind::RackAndPinion => (vb[3] - r.base_b) - sign * r.ratio * wrap_angle(va[0] - r.base_a),
-        RelationKind::Screw => (vb[3] - r.base_b) - sign * r.ratio * wrap_angle(vb[0] - r.base_a),
+        RelationKind::Gear => wrap_angle(db + sign * r.ratio * da),
+        RelationKind::Linear | RelationKind::RackAndPinion | RelationKind::Screw => db - sign * r.ratio * da,
     }
 }
 
@@ -282,6 +470,19 @@ fn apply_delta(pose: &Frame, d: &[f64]) -> Frame {
 
 /// Solve in place. Returns convergence info.
 pub fn solve(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget]) -> SolveResult {
+    // Followers (pattern / mirror copies) start at their expected pose.
+    for _ in 0..2 {
+        for m in mates {
+            let Some(f) = &m.follow else { continue };
+            if bodies[m.b].fixed {
+                continue;
+            }
+            let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+            let seed = poses[m.a].mul(&m.a_local);
+            let e = f.expected(&poses, &seed);
+            bodies[m.b].pose = e.mul(&m.b_local.inverse());
+        }
+    }
     if !drags.is_empty() {
         // Phase 1: follow the drag (soft); phase 2: project back onto the
         // constraint manifold exactly, starting from the dragged pose.
@@ -464,6 +665,9 @@ fn characteristic_length(poses: &[Frame], mates: &[SolverMate]) -> f64 {
     }
     for mt in mates {
         m = m.max(mt.a_local.origin.length()).max(mt.b_local.origin.length());
+        for (_, f) in &mt.extra {
+            m = m.max(f.origin.length());
+        }
     }
     m.max(0.01)
 }
@@ -477,7 +681,7 @@ mod tests {
     }
 
     fn mate(kind: MateType, a: usize, la: Frame, b: usize, lb: Frame) -> SolverMate {
-        SolverMate { kind, a, a_local: la, b, b_local: lb, flip_primary: false, reorient: 0, offset: DVec3::ZERO, rotation: 0.0, limits: vec![] }
+        SolverMate::new(kind, a, la, b, lb)
     }
 
     #[test]
@@ -524,6 +728,30 @@ mod tests {
     }
 
     #[test]
+    fn tangent_sphere_on_plane_and_sphere_on_sphere() {
+        // Ball (r = 10 mm) on a fixed plane z = 0 (normal +Z): center at z = 10 mm, 5 DOF left.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.03, 0.01, 0.05), false)];
+        let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
+        m.geom = Some(TangentPair { a: TangentGeom::Plane { point: DVec3::ZERO, normal: DVec3::Z }, b: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, internal: false });
+        let r = solve(&mut bodies, &[m.clone()], &[], &[]);
+        assert!(r.converged, "{r:?}");
+        assert!((bodies[1].pose.origin.z - 0.01).abs() < 1e-8, "{:?}", bodies[1].pose.origin);
+        assert_eq!(r.body_dof[1], 5);
+        // Flip puts the ball below the plane.
+        m.flip_primary = true;
+        let r = solve(&mut bodies, &[m], &[], &[]);
+        assert!(r.converged);
+        assert!((bodies[1].pose.origin.z + 0.01).abs() < 1e-8);
+        // Two balls (10 mm and 5 mm) touching externally: centers 15 mm apart.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.05, 0.0, 0.0), false)];
+        let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
+        m.geom = Some(TangentPair { a: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, b: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.005 }, internal: false });
+        let r = solve(&mut bodies, &[m], &[], &[]);
+        assert!(r.converged);
+        assert!((bodies[1].pose.origin.length() - 0.015).abs() < 1e-8);
+    }
+
+    #[test]
     fn gear_relation_couples_rotations() {
         // Two revolute mates to ground, with a 2:1 gear relation.
         let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false), body(DVec3::new(0.03, 0.0, 0.0), false)];
@@ -534,7 +762,7 @@ mod tests {
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let base_a = mate_values(&poses0, &mates[0])[0];
         let base_b = mate_values(&poses0, &mates[1])[0];
-        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b }];
+        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0 }];
         // Drag body 1 to rotate it by pulling a point.
         let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.01, 0.0) }];
         let r = solve(&mut bodies, &mates, &rel, &drags);

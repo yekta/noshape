@@ -57,6 +57,12 @@ impl PartStudioView {
     fn palette_items(&self, _cx: &App) -> Vec<PaletteItem> {
         let q = self.palette_query.to_lowercase();
         let mut out: Vec<PaletteItem> = Vec::new();
+        // Custom features of this document first (they are few and specific).
+        for t in self.doc.read(_cx).custom_features().feature_types() {
+            if q.is_empty() || t.name.to_lowercase().contains(&q) {
+                out.push(PaletteItem::Feature(t.id));
+            }
+        }
         for t in features::all() {
             if q.is_empty() || t.name.to_lowercase().contains(&q) || t.id.to_lowercase().contains(&q) {
                 out.push(PaletteItem::Feature(t.id));
@@ -95,8 +101,8 @@ impl PartStudioView {
         let rows = items.into_iter().map(|item| {
             let (icon, label, hint): (SharedString, String, String) = match &item {
                 PaletteItem::Feature(id) => {
-                    let t = features::get(id).expect("registered");
-                    (feature_icon(id), t.name.to_string(), t.shortcut.map(|s| s.replace("shift-", "Shift+").to_uppercase()).unwrap_or_default())
+                    let t = features::get(id);
+                    (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut).map(|s| s.replace("shift-", "Shift+").to_uppercase()).unwrap_or_default())
                 }
                 PaletteItem::View(_, n) => (crate::assets::icon_path("iso-view"), n.to_string(), String::new()),
                 PaletteItem::Display(m) => (crate::assets::icon_path(m.icon()), m.label().to_string(), String::new()),

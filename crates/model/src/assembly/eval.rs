@@ -11,8 +11,8 @@
 //!   drag targets or a driven mate value (dragging, animation) and is a pure
 //!   function of its inputs, so it can run on any thread.
 
-use super::solver::{self, DragTarget, Frame, RelationKind, SolverBody, SolverMate, SolverRelation};
-use super::{Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, Placement, RelationType};
+use super::solver::{self, DragTarget, Follow, FollowXform, Frame, RelationKind, SolverBody, SolverMate, SolverRelation, TangentGeom, TangentPair};
+use super::{AsmMateConnector, Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, PatternKind, Placement, Relation, RelationType};
 use crate::configuration::ConfigValues;
 use crate::display::{BodyKind, MeshBuffers};
 use crate::document::{Document, TabContent, TabId};
@@ -143,6 +143,18 @@ pub struct MateStatus {
     pub values: [f64; 4],
 }
 
+/// Assembly mate connector after solving.
+#[derive(Clone, Debug)]
+pub struct ConnectorStatus {
+    pub id: MateId,
+    pub owner: InstanceId,
+    /// Frame in the owner's instance coordinates.
+    pub local: Option<Frame>,
+    /// World frame after solving.
+    pub frame: Option<Frame>,
+    pub message: Option<String>,
+}
+
 #[derive(Clone, Debug)]
 pub struct RelationStatus {
     pub id: MateId,
@@ -163,6 +175,9 @@ pub struct SolveOptions {
     /// Instances held in place for this solve (e.g. the stationary side of a
     /// mate being created).
     pub hold: Vec<InstanceId>,
+    /// Requested placements (triad move / rotate). Unconstrained instances
+    /// take them exactly; constrained ones move toward them within their DOF.
+    pub targets: Vec<(InstanceId, Placement)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -205,10 +220,110 @@ pub struct Prepared {
     reps: Vec<InstanceId>,
     fixed: Vec<bool>,
     mates: Vec<(MateId, MateType, SolverMate)>,
-    relations: Vec<(MateId, RelationKind, MateId, MateId, f64, bool)>,
+    relations: Vec<PreparedRelation>,
     /// Mates that could not be resolved, with messages.
     pub failed_mates: Vec<(MateId, String)>,
     pub inactive_mates: HashSet<MateId>,
+    pub failed_relations: Vec<(MateId, String)>,
+    /// Assembly mate connectors: (id, owner top-level instance or ORIGIN,
+    /// frame in the owner's instance coordinates).
+    pub connectors: Vec<(MateId, InstanceId, Frame)>,
+    pub failed_connectors: Vec<(MateId, String)>,
+    /// Pattern followers (pattern id, failure message).
+    pub failed_patterns: Vec<(MateId, String)>,
+}
+
+#[derive(Clone, Debug)]
+struct PreparedRelation {
+    id: MateId,
+    kind: RelationKind,
+    a: MateId,
+    b: MateId,
+    ratio: f64,
+    reverse: bool,
+    values: (usize, usize),
+    base: Option<[f64; 2]>,
+}
+
+/// Which free value of a mate a relation couples: (rotational, translational).
+fn rotational_value(t: MateType) -> Option<usize> {
+    match t {
+        MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel => Some(0),
+        _ => None,
+    }
+}
+
+fn translational_value(t: MateType) -> Option<usize> {
+    match t {
+        MateType::Slider | MateType::Cylindrical => Some(3),
+        MateType::PinSlot | MateType::Planar => Some(1),
+        MateType::Parallel => Some(3),
+        _ => None,
+    }
+}
+
+/// Free value indices a relation couples on its two mates, or why the
+/// mates do not fit the relation type.
+pub fn relation_values(kind: RelationType, a: MateType, b: MateType) -> Result<(usize, usize), String> {
+    if matches!(a, MateType::Tangent | MateType::Width) || matches!(b, MateType::Tangent | MateType::Width) {
+        return Err("Tangent and width mates cannot be used in relations".into());
+    }
+    match kind {
+        RelationType::Gear => match (rotational_value(a), rotational_value(b)) {
+            (Some(x), Some(y)) => Ok((x, y)),
+            _ => Err("Gear relations require two rotational degrees of freedom".into()),
+        },
+        RelationType::RackAndPinion => match (rotational_value(a), translational_value(b)) {
+            (Some(x), Some(y)) => Ok((x, y)),
+            _ => Err("Rack and pinion relations require one rotational and one translational degree of freedom".into()),
+        },
+        RelationType::Screw => match a {
+            MateType::Cylindrical => Ok((0, 3)),
+            _ => Err("Screw relations require one cylindrical mate".into()),
+        },
+        RelationType::Linear => match (translational_value(a), translational_value(b)) {
+            (Some(x), Some(y)) => Ok((x, y)),
+            _ => Err("Linear relations require two translational degrees of freedom".into()),
+        },
+    }
+}
+
+fn relation_kind(t: RelationType) -> RelationKind {
+    match t {
+        RelationType::Gear => RelationKind::Gear,
+        RelationType::RackAndPinion => RelationKind::RackAndPinion,
+        RelationType::Screw => RelationKind::Screw,
+        RelationType::Linear => RelationKind::Linear,
+    }
+}
+
+/// New placement of an instance so that its connector (`source`, world)
+/// lands face-to-face on `target` (world), as a fastened mate would place it.
+pub fn snap_placement(pose: &Placement, source: &Frame, target: &Frame) -> Placement {
+    let r0 = Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI));
+    let p = placement_to_frame(pose);
+    let np = target.mul(&r0.inverse()).mul(&source.inverse()).mul(&p);
+    frame_to_placement(&np)
+}
+
+/// Assembly mate connector frame relative to its origin entity's frame:
+/// flip, reorient, then move (translation in the connector frame, rotation about a local axis).
+pub fn asm_connector_offset(c: &AsmMateConnector, units: &UnitPrefs) -> Frame {
+    let mut f = Frame::default();
+    if c.flip_primary {
+        f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+    }
+    if !c.reorient.is_multiple_of(4) {
+        f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.reorient)));
+    }
+    let t = DVec3::new(eval_len(&c.translation[0], units), eval_len(&c.translation[1], units), eval_len(&c.translation[2], units));
+    let ang = eval_angle(&c.rotation, units);
+    let axis = match c.rotation_axis {
+        0 => DVec3::X,
+        1 => DVec3::Y,
+        _ => DVec3::Z,
+    };
+    f.mul(&Frame::new(t, DQuat::from_axis_angle(axis, ang)))
 }
 
 fn quarter_rot(k: u8) -> DQuat {
@@ -226,12 +341,13 @@ impl Prepared {
             let p = opts.start.as_ref().and_then(|s| s.get(&id)).unwrap_or(stored);
             placement_to_frame(p)
         };
-        let stored: HashMap<InstanceId, Placement> = self.instances.iter().cloned().collect();
+        let mut stored: HashMap<InstanceId, Placement> = self.instances.iter().cloned().collect();
+        stored.insert(InstanceId::ORIGIN, Placement::default());
         let mut bodies: Vec<SolverBody> = self
             .reps
             .iter()
             .enumerate()
-            .map(|(i, id)| SolverBody { pose: pose_of(*id, &stored[id]), fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
+            .map(|(i, id)| SolverBody { pose: if *id == InstanceId::ORIGIN { Frame::default() } else { pose_of(*id, &stored[id]) }, fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
             .collect();
         let mut mates: Vec<SolverMate> = self.mates.iter().map(|(_, _, m)| m.clone()).collect();
         if let Some((mid, value)) = opts.drive
@@ -260,21 +376,17 @@ impl Prepared {
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();
         let mut rel_ids = Vec::new();
-        for (id, kind, a, b, ratio, reverse) in &self.relations {
-            let (Some(&ia), Some(&ib)) = (mate_index.get(a), mate_index.get(b)) else { continue };
-            let va = solver::mate_values(&poses0, &mates[ia]);
-            let vb = solver::mate_values(&poses0, &mates[ib]);
-            let (base_a, base_b) = match kind {
-                RelationKind::Gear => (va[0], vb[0]),
-                RelationKind::Linear => (va[3], vb[3]),
-                RelationKind::RackAndPinion => (va[0], vb[3]),
-                RelationKind::Screw => (vb[0], vb[3]),
+        for r in &self.relations {
+            let (Some(&ia), Some(&ib)) = (mate_index.get(&r.a), mate_index.get(&r.b)) else { continue };
+            let (base_a, base_b) = match r.base {
+                Some([x, y]) => (x, y),
+                None => (solver::mate_values(&poses0, &mates[ia])[r.values.0], solver::mate_values(&poses0, &mates[ib])[r.values.1]),
             };
-            rels.push(SolverRelation { kind: *kind, mate_a: ia, mate_b: ib, ratio: *ratio, reverse: *reverse, base_a, base_b });
-            rel_ids.push(*id);
+            rels.push(SolverRelation { kind: r.kind, mate_a: ia, mate_b: ib, ratio: r.ratio, reverse: r.reverse, base_a, base_b, value_a: r.values.0, value_b: r.values.1 });
+            rel_ids.push(r.id);
         }
         // Unconstrained bodies follow a drag by pure translation (no solve).
-        let constrained = |b: usize| mates.iter().any(|m| m.a == b || m.b == b);
+        let constrained = |b: usize| mates.iter().any(|m| m.a == b || m.b == b || m.extra.iter().any(|(e, _)| *e == b) || m.follow.is_some_and(|f| f.axis_body == b && m.b != b));
         let mut drags: Vec<DragTarget> = Vec::new();
         for (id, local, target) in &opts.drags {
             let Some((b, off)) = self.body_of.get(id) else { continue };
@@ -287,6 +399,22 @@ impl Prepared {
                 continue;
             }
             drags.push(DragTarget { body: *b, local_point: lp, target: *target });
+        }
+        // Placement targets (triad rotate / typed values).
+        let scale = self.instances.iter().map(|(_, p)| DVec3::from(p.translation).length()).fold(0.01f64, f64::max) * 0.5;
+        for (id, p) in &opts.targets {
+            let Some((b, off)) = self.body_of.get(id) else { continue };
+            if bodies[*b].fixed {
+                continue;
+            }
+            let want = placement_to_frame(p).mul(&off.inverse());
+            if !constrained(*b) {
+                bodies[*b].pose = want;
+                continue;
+            }
+            for lp in [DVec3::ZERO, DVec3::X * scale, DVec3::Y * scale, DVec3::Z * scale] {
+                drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
+            }
         }
         let r = solver::solve(&mut bodies, &mates, &rels, &drags);
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
@@ -322,6 +450,9 @@ pub struct AssemblyResult {
     pub solved: Solved,
     pub mates: Vec<MateStatus>,
     pub relations: Vec<RelationStatus>,
+    pub connectors: Vec<ConnectorStatus>,
+    /// Pattern status messages (failed patterns).
+    pub pattern_errors: Vec<(MateId, String)>,
     pub prepared: Arc<Prepared>,
     pub eval_ms: f32,
 }
@@ -330,24 +461,29 @@ impl AssemblyResult {
     /// Recompute occurrence world transforms from solved placements and an
     /// optional exploded view (display only).
     pub fn apply_placements(&mut self, solved: Solved, explode: Option<&ExplodedView>) {
+        self.apply_placements_progress(solved, explode.map(|e| (e, f64::INFINITY)));
+    }
+
+    /// Like [`apply_placements`](Self::apply_placements) with an exploded view
+    /// played up to `progress` steps (fractional: the last step partially).
+    pub fn apply_placements_progress(&mut self, solved: Solved, explode: Option<(&ExplodedView, f64)>) {
         self.solved = solved;
         let place: HashMap<InstanceId, DMat4> = self.solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         for o in &mut self.occurrences {
             let top = place.get(&o.top()).copied().unwrap_or(DMat4::IDENTITY);
-            let mut t = top * o.inner;
-            if let Some(ev) = explode {
-                for step in &ev.steps {
-                    if step.instances.contains(&o.path[0]) {
-                        let mut m = DMat4::from_translation(step.translation.into());
-                        if let Some(axis) = step.rotation_axis {
-                            let c = (top * o.inner).transform_point3(o.local_bounds.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO));
-                            m = m * DMat4::from_translation(c) * DMat4::from_axis_angle(DVec3::from(axis).normalize_or_zero(), step.rotation_angle) * DMat4::from_translation(-c);
-                        }
-                        t = m * t;
-                    }
+            o.transform = top * o.inner;
+        }
+        if let Some((ev, progress)) = explode {
+            let steps = explode_matrices(self, ev, progress);
+            for o in &mut self.occurrences {
+                if let Some(m) = steps.get(&o.top()) {
+                    o.transform = *m * o.transform;
                 }
             }
-            o.transform = t;
+        }
+        let inst: HashMap<InstanceId, Frame> = self.solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect();
+        for c in &mut self.connectors {
+            c.frame = c.local.map(|l| if c.owner == InstanceId::ORIGIN { l } else { inst.get(&c.owner).copied().unwrap_or_default().mul(&l) });
         }
         for m in &mut self.mates {
             if let Some((a, b)) = self.solved.mate_frames.get(&m.id) {
@@ -394,6 +530,88 @@ impl AssemblyResult {
     pub fn occurrence_transform(&self, path: &[InstanceId]) -> Option<DMat4> {
         self.occurrences.iter().find(|o| o.path == path).map(|o| o.transform)
     }
+
+    /// World frame of an assembly mate connector.
+    pub fn connector_frame(&self, id: MateId) -> Option<Frame> {
+        self.connectors.iter().find(|c| c.id == id).and_then(|c| c.frame)
+    }
+
+    /// World-space bounds of a top-level instance (display transforms).
+    pub fn instance_bounds(&self, id: InstanceId) -> Option<(DVec3, DVec3)> {
+        self.occurrences.iter().filter(|o| o.top() == id).filter_map(|o| o.world_bounds()).fold(None, |acc, (a, b)| Some(acc.map(|(x, y): (DVec3, DVec3)| (x.min(a), y.max(b))).unwrap_or((a, b))))
+    }
+
+    /// World frame of any mate connector reference (occurrence geometry,
+    /// assembly connector or the origin) at the current display transforms.
+    pub fn connector_world(&self, c: &MateConnectorRef, units: &UnitPrefs) -> Option<Frame> {
+        let mut f = if let Some(id) = c.connector {
+            self.connector_frame(id)?
+        } else if c.instance == InstanceId::ORIGIN {
+            Frame::default()
+        } else {
+            let mut path = vec![c.instance];
+            path.extend(c.path.iter().copied());
+            let o = self.occurrences.iter().find(|o| o.path == path)?;
+            let local = resolve_connector_in(&o.context, Some(&o.body), &c.reference, units)?;
+            matrix_frame(&o.transform).mul(&local)
+        };
+        if c.flip {
+            f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+        }
+        if !c.rotate_quarters.is_multiple_of(4) {
+            f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
+        }
+        Some(f)
+    }
+
+    /// Relation reference values (the current free values of its two mates)
+    /// to store in [`Relation::base`] when a relation is created or edited.
+    pub fn relation_base(&self, asm: &Assembly, kind: RelationType, mates: [MateId; 2]) -> Option<[f64; 2]> {
+        let ta = asm.mate(mates[0])?.mate_type;
+        let tb = asm.mate(mates[1])?.mate_type;
+        let (ia, ib) = relation_values(kind, ta, tb).ok()?;
+        let va = self.solved.mate_values.get(&mates[0])?;
+        let vb = self.solved.mate_values.get(&if kind == RelationType::Screw { mates[0] } else { mates[1] })?;
+        Some([va[ia], vb[ib]])
+    }
+}
+
+/// Per-instance display matrices of an exploded view played to `progress`.
+/// Steps compose in order; rotation pivots default to the current bounds
+/// center of the step's instances.
+fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -> HashMap<InstanceId, DMat4> {
+    let mut acc: HashMap<InstanceId, DMat4> = HashMap::new();
+    for (k, step) in ev.steps.iter().enumerate() {
+        let t = (progress - k as f64).clamp(0.0, 1.0);
+        if t <= 0.0 {
+            break;
+        }
+        let mut m = DMat4::from_translation(DVec3::from(step.translation) * t);
+        if let Some(axis) = step.rotation_axis {
+            let pivot = match step.pivot {
+                Some(p) => DVec3::from(p),
+                None => {
+                    let mut bb: Option<(DVec3, DVec3)> = None;
+                    for o in result.occurrences.iter().filter(|o| step.instances.contains(&o.top())) {
+                        let Some((lo, hi)) = o.local_bounds else { continue };
+                        let pre = acc.get(&o.top()).copied().unwrap_or(DMat4::IDENTITY) * o.transform;
+                        for i in 0..8 {
+                            let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+                            let w = pre.transform_point3(c);
+                            bb = Some(bb.map(|(a, b)| (a.min(w), b.max(w))).unwrap_or((w, w)));
+                        }
+                    }
+                    bb.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO)
+                }
+            };
+            m = m * DMat4::from_translation(pivot) * DMat4::from_axis_angle(DVec3::from(axis).normalize_or_zero(), step.rotation_angle * t) * DMat4::from_translation(-pivot);
+        }
+        for id in &step.instances {
+            let e = acc.entry(*id).or_insert(DMat4::IDENTITY);
+            *e = m * *e;
+        }
+    }
+    acc
 }
 
 struct StudioCacheEntry {
@@ -581,8 +799,6 @@ impl AssemblyEvaluator {
         let mut visited = Vec::new();
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         let solved = prepared.solve(opts);
-        let units = doc.settings.units;
-        let _ = units;
         let mut occurrences = Vec::new();
         for leaf in &leaves {
             for b in &leaf.regen.display.bodies {
@@ -635,15 +851,36 @@ impl AssemblyEvaluator {
             .relations
             .iter()
             .map(|r| {
+                if let Some((_, msg)) = prepared.failed_relations.iter().find(|(id, _)| *id == r.id) {
+                    return RelationStatus { id: r.id, ok: false, message: Some(msg.clone()) };
+                }
                 let ok = r.suppressed || solved.relation_ok.get(&r.id).copied().unwrap_or(false);
-                RelationStatus { id: r.id, ok, message: (!ok).then(|| "Relation could not be solved (both mates must be valid and of a compatible type)".into()) }
+                RelationStatus { id: r.id, ok, message: (!ok).then(|| "Relation could not be solved (conflicts with other mates or relations)".into()) }
+            })
+            .collect();
+        let connectors = assembly
+            .connectors
+            .iter()
+            .map(|c| {
+                let resolved = prepared.connectors.iter().find(|(id, _, _)| *id == c.id);
+                let message = prepared.failed_connectors.iter().find(|(id, _)| *id == c.id).map(|(_, m)| m.clone());
+                ConnectorStatus { id: c.id, owner: resolved.map(|r| r.1).unwrap_or(c.on.instance), local: resolved.map(|r| r.2), frame: None, message }
             })
             .collect();
         let mut nodes = nodes;
+        // Copies of linear / circular / mirror patterns follow their seed: no own DOF.
+        let followers: HashSet<InstanceId> = assembly
+            .patterns
+            .iter()
+            .filter(|p| matches!(p.kind, PatternKind::Linear { .. } | PatternKind::Circular { .. } | PatternKind::Mirror { .. }))
+            .flat_map(|p| p.generated.iter().map(|g| g.instance))
+            .collect();
         for n in &mut nodes {
-            n.dof = Some(solved.instance_dof.get(&n.path[0]).copied().unwrap_or(0));
+            let id = n.path[0];
+            n.dof = Some(if followers.contains(&id) { 0 } else { solved.instance_dof.get(&id).copied().unwrap_or(0) });
         }
-        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, prepared: Arc::new(prepared), eval_ms: 0.0 };
+        let pattern_errors = prepared.failed_patterns.clone();
+        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0 };
         let ev = explode.and_then(|i| assembly.exploded_views.get(i));
         result.apply_placements(solved, ev);
         result.eval_ms = t0.elapsed().as_secs_f32() * 1000.0;
@@ -657,14 +894,24 @@ impl AssemblyEvaluator {
         let mut leaves: Vec<LeafInstance> = Vec::new();
         let mut nodes = Vec::new();
         let mut prepared = Prepared::default();
+        // Copies of a suppressed pattern (or of a suppressed seed) are inactive.
+        let mut inactive: HashSet<InstanceId> = asm.instances.iter().filter(|i| i.suppressed).map(|i| i.id).collect();
+        for p in &asm.patterns {
+            for g in &p.generated {
+                if p.suppressed || inactive.contains(&g.seed) {
+                    inactive.insert(g.instance);
+                }
+            }
+        }
         for inst in &asm.instances {
+            let suppressed = inactive.contains(&inst.id);
             let mut node = InstanceNode {
                 path: vec![inst.id],
                 name: inst.name.clone(),
                 kind: NodeKind::Part,
                 fixed: inst.fixed,
                 hidden: inst.hidden,
-                suppressed: inst.suppressed,
+                suppressed,
                 dof: None,
                 error: None,
                 children: Vec::new(),
@@ -675,8 +922,8 @@ impl AssemblyEvaluator {
                     match self.studio(doc, *studio, config) {
                         Some(r) => {
                             if r.context.body(body).is_none() {
-                                node.error = Some("Part no longer exists in its Part Studio".into());
-                            } else if !inst.suppressed {
+                                node.error = Some("Part no longer exists in its Part Studio (or in this configuration)".into());
+                            } else if !suppressed {
                                 leaves.push(LeafInstance {
                                     path: vec![inst.id],
                                     inner: DMat4::IDENTITY,
@@ -696,7 +943,7 @@ impl AssemblyEvaluator {
                     node.kind = NodeKind::PartStudio;
                     match self.studio(doc, *studio, config) {
                         Some(r) => {
-                            if !inst.suppressed {
+                            if !suppressed {
                                 leaves.push(LeafInstance {
                                     path: vec![inst.id],
                                     inner: DMat4::IDENTITY,
@@ -734,7 +981,7 @@ impl AssemblyEvaluator {
                                 path.extend(l.path.iter().copied());
                                 l.path = path;
                                 l.hidden |= inst.hidden;
-                                if !inst.suppressed {
+                                if !suppressed {
                                     leaves.push(l);
                                 }
                             }
@@ -745,7 +992,7 @@ impl AssemblyEvaluator {
                                     n
                                 })
                                 .collect();
-                            if sub_prep.failed_mates.len() > 0 {
+                            if !sub_prep.failed_mates.is_empty() {
                                 node.error = Some("Subassembly contains mate error".into());
                             }
                         }
@@ -756,7 +1003,7 @@ impl AssemblyEvaluator {
         }
 
         // ---------------------------------------------------- solver bodies
-        let active: Vec<&super::Instance> = asm.instances.iter().filter(|i| !i.suppressed).collect();
+        let active: Vec<&super::Instance> = asm.instances.iter().filter(|i| !inactive.contains(&i.id)).collect();
         prepared.instances = active.iter().map(|i| (i.id, i.placement)).collect();
         let mut assigned: HashMap<InstanceId, (usize, Frame)> = HashMap::new();
         for g in asm.groups.iter().filter(|g| !g.suppressed) {
@@ -780,7 +1027,69 @@ impl AssemblyEvaluator {
             prepared.fixed.push(i.fixed);
             assigned.insert(i.id, (bi, Frame::default()));
         }
+        // The assembly origin: a fixed body at the world frame.
+        let ground = prepared.reps.len();
+        prepared.reps.push(InstanceId::ORIGIN);
+        prepared.fixed.push(true);
+        assigned.insert(InstanceId::ORIGIN, (ground, Frame::default()));
         prepared.body_of = assigned;
+        let stored: HashMap<InstanceId, Frame> = active.iter().map(|i| (i.id, placement_to_frame(&i.placement))).collect();
+
+        // ---------------------------------------------------- assembly mate connectors
+        let resolve_entity = |c: &MateConnectorRef| -> Result<(InstanceId, Frame), String> {
+            if c.instance == InstanceId::ORIGIN {
+                // The origin (or a plane / implicit connector on it).
+                let f = match &c.reference {
+                    Reference::Implicit { on, .. } if matches!(**on, Reference::Origin) => Frame::default(),
+                    _ => Frame::default(),
+                };
+                return Ok((InstanceId::ORIGIN, f));
+            }
+            if inactive.contains(&c.instance) {
+                return Err("Instance is suppressed".into());
+            }
+            let mut full = vec![c.instance];
+            full.extend(c.path.iter().copied());
+            let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+            let f = resolve_connector_in(&leaf.regen.context, leaf.body.as_ref(), &c.reference, &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
+            Ok((c.instance, matrix_frame(&leaf.inner).mul(&f)))
+        };
+        for mc in &asm.connectors {
+            if mc.suppressed {
+                continue;
+            }
+            match resolve_entity(&mc.on) {
+                Ok((owner, f)) => {
+                    let mut f = f;
+                    if mc.on.flip {
+                        f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+                    }
+                    prepared.connectors.push((mc.id, owner, f.mul(&asm_connector_offset(mc, &units))));
+                }
+                Err(e) => prepared.failed_connectors.push((mc.id, e)),
+            }
+        }
+        // Any connector reference -> (solver body, frame in body coordinates).
+        let resolve = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
+            let (owner, mut f) = match c.connector {
+                Some(id) => {
+                    if let Some((_, msg)) = prepared.failed_connectors.iter().find(|(x, _)| *x == id) {
+                        return Err(msg.clone());
+                    }
+                    let (_, owner, f) = prepared.connectors.iter().find(|(x, _, _)| *x == id).ok_or("Mate connector was deleted or is suppressed")?;
+                    (*owner, *f)
+                }
+                None => resolve_entity(c)?,
+            };
+            if c.flip {
+                f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+            }
+            if !c.rotate_quarters.is_multiple_of(4) {
+                f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
+            }
+            let (bi, off) = *prepared.body_of.get(&owner).ok_or("Instance no longer exists")?;
+            Ok((bi, off.mul(&f)))
+        };
 
         // ---------------------------------------------------- mates
         for m in &asm.mates {
@@ -788,33 +1097,57 @@ impl AssemblyEvaluator {
                 prepared.inactive_mates.insert(m.id);
                 continue;
             }
-            let susp = |c: &MateConnectorRef| asm.instances.iter().find(|i| i.id == c.instance).is_some_and(|i| i.suppressed);
-            if susp(&m.a) || susp(&m.b) {
+            if m.connectors().any(|c| c.instance != InstanceId::ORIGIN && inactive.contains(&c.instance)) {
                 prepared.inactive_mates.insert(m.id);
                 continue;
             }
-            let resolve = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
-                let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
-                let mut full = vec![c.instance];
-                full.extend(c.path.iter().copied());
-                let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
-                let f = resolve_connector_in(&leaf.regen.context, leaf.body.as_ref(), &c.reference, &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
-                let mut f = matrix_frame(&leaf.inner).mul(&f);
-                if c.flip {
-                    f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+            let mut sm = SolverMate::default();
+            if m.mate_type == MateType::Tangent {
+                match self.tangent_pair(asm, &leaves, &prepared, &stored, m, &units) {
+                    Ok((a, b, pair)) => {
+                        sm.a = a;
+                        sm.b = b;
+                        sm.geom = Some(pair);
+                        // Display frames: the entities' default connectors (if any).
+                        sm.a_local = resolve(&m.a).map(|x| x.1).unwrap_or_default();
+                        sm.b_local = resolve(&m.b).map(|x| x.1).unwrap_or_default();
+                    }
+                    Err(e) => {
+                        prepared.failed_mates.push((m.id, e));
+                        continue;
+                    }
                 }
-                if c.rotate_quarters % 4 != 0 {
-                    f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
+            } else {
+                let (a, b) = match (resolve(&m.a), resolve(&m.b)) {
+                    (Ok(a), Ok(b)) => (a, b),
+                    (Err(e), _) | (_, Err(e)) => {
+                        prepared.failed_mates.push((m.id, e));
+                        continue;
+                    }
+                };
+                (sm.a, sm.a_local, sm.b, sm.b_local) = (a.0, a.1, b.0, b.1);
+                if m.mate_type == MateType::Width {
+                    if m.extra.is_empty() {
+                        prepared.failed_mates.push((m.id, "Width mate needs two width mate connectors".into()));
+                        continue;
+                    }
+                    let mut bad = None;
+                    for c in &m.extra {
+                        match resolve(c) {
+                            Ok(x) => sm.extra.push(x),
+                            Err(e) => bad = Some(e),
+                        }
+                    }
+                    if let Some(e) = bad {
+                        prepared.failed_mates.push((m.id, e));
+                        continue;
+                    }
                 }
-                Ok((bi, off.mul(&f)))
-            };
-            let (a, b) = match (resolve(&m.a), resolve(&m.b)) {
-                (Ok(a), Ok(b)) => (a, b),
-                (Err(e), _) | (_, Err(e)) => {
-                    prepared.failed_mates.push((m.id, e));
-                    continue;
-                }
-            };
+            }
+            if sm.a == sm.b && m.mate_type != MateType::Width {
+                prepared.failed_mates.push((m.id, "Both mate connectors are on the same rigid set".into()));
+                continue;
+            }
             let mut limits = Vec::new();
             for (key, l) in &m.limits {
                 let Some(ix) = limit_index(key) else { continue };
@@ -829,47 +1162,256 @@ impl AssemblyEvaluator {
                 }
             }
             let (ox, oy, oz, orot) = offset_axes(m.mate_type);
-            let offset = DVec3::new(
+            sm.offset = DVec3::new(
                 if ox { eval_len(&m.offset_x, &units) } else { 0.0 },
                 if oy { eval_len(&m.offset_y, &units) } else { 0.0 },
                 if oz { eval_len(&m.offset_z, &units) } else { 0.0 },
             );
-            let rotation = if orot { eval_angle(&m.rotation, &units) } else { 0.0 };
-            prepared.mates.push((
-                m.id,
-                m.mate_type,
-                SolverMate {
-                    kind: m.mate_type,
-                    a: a.0,
-                    a_local: a.1,
-                    b: b.0,
-                    b_local: b.1,
-                    flip_primary: m.flip_primary,
-                    reorient: m.reorient_secondary,
-                    offset,
-                    rotation,
-                    limits,
-                },
-            ));
+            sm.rotation = if orot { eval_angle(&m.rotation, &units) } else { 0.0 };
+            sm.kind = m.mate_type;
+            sm.flip_primary = m.flip_primary;
+            sm.reorient = m.reorient_secondary;
+            sm.limits = limits;
+            prepared.mates.push((m.id, m.mate_type, sm));
         }
+
+        // ---------------------------------------------------- patterns (followers)
+        for p in asm.patterns.iter().filter(|p| !p.suppressed) {
+            let follow_of = |axis_ref: &MateConnectorRef| -> Result<(usize, Frame), String> { resolve(axis_ref).map_err(|e| format!("{}: {e}", p.name)) };
+            let world_of = |b: usize, f: &Frame| -> Frame {
+                let rep = prepared.reps[b];
+                stored.get(&rep).copied().unwrap_or_default().mul(f)
+            };
+            let make: Box<FollowMaker> = match &p.kind {
+                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second } => {
+                    let (ab, al) = match follow_of(direction) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            prepared.failed_patterns.push((p.id, e));
+                            continue;
+                        }
+                    };
+                    let mut d1 = eval_len(&Some(distance.clone()), &units);
+                    if *equal_spacing && *count > 1 {
+                        d1 /= (*count - 1) as f64;
+                    }
+                    if *opposite {
+                        d1 = -d1;
+                    }
+                    let a_world = world_of(ab, &al);
+                    // Second direction expressed in the first direction's frame.
+                    let v2 = match second {
+                        Some(s) => match follow_of(&s.direction) {
+                            Ok((b2, l2)) => {
+                                let z2 = world_of(b2, &l2).z();
+                                let d2 = eval_len(&Some(s.distance.clone()), &units) * if s.opposite { -1.0 } else { 1.0 };
+                                a_world.rotation.inverse() * z2 * d2
+                            }
+                            Err(e) => {
+                                prepared.failed_patterns.push((p.id, e));
+                                continue;
+                            }
+                        },
+                        None => DVec3::ZERO,
+                    };
+                    Box::new(move |index, _| {
+                        let (i, j) = ((index & 0xffff) as f64, (index >> 16) as f64);
+                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j, DQuat::IDENTITY))))
+                    })
+                }
+                PatternKind::Circular { axis, angle, count, opposite, equal_spacing } => {
+                    let (ab, al) = match follow_of(axis) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            prepared.failed_patterns.push((p.id, e));
+                            continue;
+                        }
+                    };
+                    let mut step = eval_angle(&Some(angle.clone()), &units);
+                    if *equal_spacing && *count > 1 {
+                        let full = (step.abs() - std::f64::consts::TAU).abs() < 1e-9;
+                        step /= if full { *count as f64 } else { (*count - 1) as f64 };
+                    }
+                    if *opposite {
+                        step = -step;
+                    }
+                    Box::new(move |index, _| Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * index as f64))))))
+                }
+                PatternKind::Mirror { plane } => {
+                    let (ab, al) = match follow_of(plane) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            prepared.failed_patterns.push((p.id, e));
+                            continue;
+                        }
+                    };
+                    let n_world = world_of(ab, &al).z();
+                    let leaves_ref = &leaves;
+                    let stored_ref = &stored;
+                    Box::new(move |_, seed| {
+                        // Seed's local symmetry plane: the bounds mid-plane whose normal
+                        // is closest to the mirror normal (in the seed's coordinates).
+                        let pose = stored_ref.get(&seed).copied().unwrap_or_default();
+                        let n_local = pose.rotation.inverse() * n_world;
+                        let mut bb: Option<(DVec3, DVec3)> = None;
+                        for l in leaves_ref.iter().filter(|l| l.path[0] == seed) {
+                            for b in l.regen.display.bodies.iter().filter(|b| l.body.as_ref().is_none_or(|id| &b.id == id)) {
+                                let Some((lo, hi)) = b.bounds else { continue };
+                                for k in 0..8 {
+                                    let c = DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z });
+                                    let w = l.inner.transform_point3(c);
+                                    bb = Some(bb.map(|(a, b)| (a.min(w), b.max(w))).unwrap_or((w, w)));
+                                }
+                            }
+                        }
+                        let center = bb.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO);
+                        let a = n_local.abs();
+                        let axis = if a.x >= a.y && a.x >= a.z {
+                            DVec3::X
+                        } else if a.y >= a.z {
+                            DVec3::Y
+                        } else {
+                            DVec3::Z
+                        };
+                        Some((ab, al, FollowXform::Mirror { local_point: center, local_normal: axis }))
+                    })
+                }
+                // Matched patterns are driven by their generated mates.
+                PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => continue,
+            };
+            for g in &p.generated {
+                let (Some(&(sb, soff)), Some(&(gb, goff))) = (prepared.body_of.get(&g.seed), prepared.body_of.get(&g.instance)) else { continue };
+                if sb == gb {
+                    continue;
+                }
+                let Some((axis_body, axis_local, xform)) = make(g.index, g.seed) else { continue };
+                let sm = SolverMate { a: sb, a_local: soff, b: gb, b_local: goff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
+                prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, sm));
+            }
+        }
+
+        // ---------------------------------------------------- relations
         for r in asm.relations.iter().filter(|r| !r.suppressed) {
-            let kind = match r.relation_type {
-                RelationType::Gear => RelationKind::Gear,
-                RelationType::RackAndPinion => RelationKind::RackAndPinion,
-                RelationType::Screw => RelationKind::Screw,
-                RelationType::Linear => RelationKind::Linear,
-            };
-            let dim = match r.relation_type {
-                RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
-                RelationType::RackAndPinion | RelationType::Screw => Dim::LENGTH,
-            };
-            let ratio = noshape_units::evaluate_as(&r.ratio.text, dim, &units, &EmptyScope)
-                .or_else(|_| noshape_units::evaluate_as(&r.ratio.text, Dim::UNITLESS, &units, &EmptyScope))
-                .map(|q| q.value)
-                .unwrap_or(1.0);
-            prepared.relations.push((r.id, kind, r.mates[0], r.mates[1], ratio, r.reverse));
+            match self.prepare_relation(asm, r, &prepared, &units) {
+                Ok(pr) => prepared.relations.push(pr),
+                Err(e) => prepared.failed_relations.push((r.id, e)),
+            }
         }
         (leaves, nodes, prepared)
+    }
+
+    fn prepare_relation(&self, asm: &Assembly, r: &Relation, prepared: &Prepared, units: &UnitPrefs) -> Result<PreparedRelation, String> {
+        let b_id = if r.relation_type == RelationType::Screw { r.mates[0] } else { r.mates[1] };
+        let ma = asm.mate(r.mates[0]).ok_or("Relation mate does not exist")?;
+        let mb = asm.mate(b_id).ok_or("Relation mate does not exist")?;
+        if ma.suppressed || mb.suppressed {
+            return Err("Relation mate is suppressed".into());
+        }
+        if r.relation_type != RelationType::Screw && ma.id == mb.id {
+            return Err("A relation needs two different mates".into());
+        }
+        let values = relation_values(r.relation_type, ma.mate_type, mb.mate_type)?;
+        if !prepared.mates.iter().any(|(id, _, _)| *id == ma.id) || !prepared.mates.iter().any(|(id, _, _)| *id == mb.id) {
+            return Err("Relation mate could not be resolved".into());
+        }
+        let dim = match r.relation_type {
+            RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
+            RelationType::RackAndPinion | RelationType::Screw => Dim::LENGTH,
+        };
+        let mut ratio = noshape_units::evaluate_as(&r.ratio.text, dim, units, &EmptyScope)
+            .or_else(|_| noshape_units::evaluate_as(&r.ratio.text, Dim::UNITLESS, units, &EmptyScope))
+            .map(|q| q.value)
+            .unwrap_or(1.0);
+        // Screw / rack and pinion values are distances per revolution.
+        if matches!(r.relation_type, RelationType::Screw | RelationType::RackAndPinion) {
+            ratio /= std::f64::consts::TAU;
+        }
+        Ok(PreparedRelation { id: r.id, kind: relation_kind(r.relation_type), a: ma.id, b: mb.id, ratio, reverse: r.reverse, values, base: r.base })
+    }
+
+    /// Contact geometry for a tangent mate: (body a, body b, geometry in body coordinates).
+    fn tangent_pair(&self, _asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
+        let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Frame), String> {
+            if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
+                return Err("Tangent mates take faces, edges or vertices (not mate connectors)".into());
+            }
+            let mut full = vec![c.instance];
+            full.extend(c.path.iter().copied());
+            let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+            let entity = match &c.reference {
+                Reference::Implicit { on, .. } => (**on).clone(),
+                r => r.clone(),
+            };
+            let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, spheres, straight edges or vertices)")?;
+            let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
+            let to_body = off.mul(&matrix_frame(&leaf.inner));
+            let world = stored.get(&prepared.reps[bi]).copied().unwrap_or_default().mul(&to_body);
+            Ok((bi, g.transformed(&to_body), world))
+        };
+        let (a, ga, wa) = geom(&m.a)?;
+        let (b, gb, wb) = geom(&m.b)?;
+        if a == b {
+            return Err("Both entities are on the same rigid set".into());
+        }
+        // Internal contact when one curved surface currently encloses the other.
+        let (wga, wgb) = (ga.transformed(&prepared_pose(stored, prepared, a)), gb.transformed(&prepared_pose(stored, prepared, b)));
+        let _ = (wa, wb);
+        let internal = match (wga, wgb) {
+            (TangentGeom::Cylinder { point: c1, axis, radius: r1 }, TangentGeom::Cylinder { point: c2, radius: r2, .. })
+            | (TangentGeom::Cylinder { point: c1, axis, radius: r1 }, TangentGeom::Sphere { center: c2, radius: r2 })
+            | (TangentGeom::Sphere { center: c2, radius: r2 }, TangentGeom::Cylinder { point: c1, axis, radius: r1 }) => {
+                let d = c2 - c1;
+                (d - axis * d.dot(axis)).length() < r1.max(r2)
+            }
+            (TangentGeom::Sphere { center: c1, radius: r1 }, TangentGeom::Sphere { center: c2, radius: r2 }) => (c2 - c1).length() < r1.max(r2),
+            _ => false,
+        };
+        Ok((a, b, TangentPair { a: ga, b: gb, internal }))
+    }
+}
+
+/// Pattern index + seed -> (axis body, axis frame, follower transform).
+type FollowMaker<'a> = dyn Fn(u32, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
+
+fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
+    stored.get(&prepared.reps[body]).copied().unwrap_or_default()
+}
+
+/// Analytic tangent-mate geometry of a face / edge / vertex (studio coordinates).
+pub fn tangent_geometry(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> Option<TangentGeom> {
+    let mut c: Context = (**ctx).clone();
+    if let Some(b) = body {
+        c.bodies.retain(|x| &x.id == b);
+    }
+    let params = ParamValues::default();
+    let vars = BTreeMap::new();
+    let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
+    match entity {
+        Reference::Face(_) => {
+            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(entity)).first()?;
+            let face = ev.face_shape(bi, fi).ok()?;
+            match face.face_surface().ok()? {
+                noshape_kernel::Surface::Plane(_) => {
+                    let p = face.centroid().ok()?;
+                    let n = face.normal_at_point(p).ok()?;
+                    Some(TangentGeom::Plane { point: p, normal: n.normalize() })
+                }
+                noshape_kernel::Surface::Cylinder { origin, axis, radius, .. } => Some(TangentGeom::Cylinder { point: origin, axis: axis.normalize(), radius }),
+                noshape_kernel::Surface::Sphere { center, radius, .. } => Some(TangentGeom::Sphere { center, radius }),
+                _ => None,
+            }
+        }
+        Reference::Edge(_) => {
+            let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(entity)).first()?;
+            let e = ev.edge_shape(bi, ei).ok()?;
+            match e.edge_curve().ok()? {
+                noshape_kernel::Curve::Line { origin, direction } => Some(TangentGeom::Cylinder { point: origin, axis: direction.normalize(), radius: 0.0 }),
+                _ => None,
+            }
+        }
+        Reference::Vertex(_) => ev.resolve_vertex_point(entity).map(|p| TangentGeom::Sphere { center: p, radius: 0.0 }),
+        Reference::Origin => Some(TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.0 }),
+        _ => None,
     }
 }
 

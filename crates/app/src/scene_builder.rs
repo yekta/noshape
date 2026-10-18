@@ -257,7 +257,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     anchor: Some(DVec3::new(p.position[0] as f64, p.position[1] as f64, p.position[2] as f64)),
                 });
                 let color = sketch_color(p.state, false, editing, false);
-                let size = if p.standalone { 7.0 } else if editing { 5.5 } else { 0.0 };
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 3.5 } else { 5.5 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style: 0, _pad: 0 });
             }
             for d in &sk.dimensions {

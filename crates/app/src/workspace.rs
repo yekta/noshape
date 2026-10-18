@@ -26,6 +26,7 @@ enum TabView {
     PartStudio(Entity<PartStudioView>),
     Drawing(Entity<crate::drawing_view::DrawingEditor>),
     Assembly(Entity<AssemblyView>),
+    FeatureStudio(Entity<crate::feature_studio::FeatureStudioView>),
     Placeholder(&'static str),
 }
 
@@ -36,6 +37,7 @@ pub struct Workspace {
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
     history: Option<Entity<HistoryPanel>>,
+    _thumbnailer: Entity<crate::start_thumbnail::Thumbnailer>,
     _subs: Vec<Subscription>,
 }
 
@@ -49,13 +51,17 @@ impl Workspace {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabsChanged | DocEvent::Reloaded => {
+                // Register custom feature schemas of the (new) Feature Studios.
+                let _ = this.doc.read(cx).custom_features();
                 this.sync_tabs(window, cx);
                 cx.notify();
             }
             _ => cx.notify(),
         })];
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, _subs: subs };
+        let _ = doc.read(cx).custom_features();
+        let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, _thumbnailer: thumbnailer, _subs: subs };
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -100,6 +106,10 @@ impl Workspace {
                 let doc = self.doc.clone();
                 TabView::Variables(cx.new(|cx| VariableStudioView::new(doc, tab, window, cx)))
             }
+            Some("featurestudio") => {
+                let doc = self.doc.clone();
+                TabView::FeatureStudio(cx.new(|cx| crate::feature_studio::FeatureStudioView::new(doc, tab, window, cx)))
+            }
             _ => return,
         };
         self.views.insert(tab, view);
@@ -120,6 +130,10 @@ impl Workspace {
             let fh = v.read(cx).focus_handle(cx);
             window.focus(&fh, cx);
         }
+        if let Some(TabView::FeatureStudio(v)) = self.views.get(&tab) {
+            let fh = v.read(cx).editor_focus(cx);
+            window.focus(&fh, cx);
+        }
         cx.notify();
     }
 
@@ -130,6 +144,7 @@ impl Workspace {
                 "partstudio" => ("Part Studio", TabContent::PartStudio(PartStudio::new())),
                 "assembly" => ("Assembly", TabContent::Assembly(Assembly::default())),
                 "drawing" => ("Drawing", TabContent::Drawing(Drawing::default())),
+                "featurestudio" => ("Feature Studio", TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::template())),
                 _ => ("Variable Studio", TabContent::VariableStudio(VariableStudio::default())),
             };
             doc.edit_document(&format!("Insert tab : {base}"), cx, |d| {
@@ -230,6 +245,8 @@ impl Workspace {
             .dropdown_menu(move |menu, window, cx| {
                 let w = ws.clone();
                 let mut menu = menu
+                    .item(PopupMenuItem::new("Documents").icon(IconName::LayoutDashboard).on_click(|_, _, cx| crate::files::show_start_window(cx)))
+                    .separator()
                     .menu("New document", Box::new(NewDocument))
                     .menu("Open…", Box::new(OpenDocument))
                     .submenu("Open recent", window, cx, {
@@ -388,10 +405,12 @@ impl Workspace {
             let v2 = view.clone();
             let v3 = view.clone();
             let v4 = view.clone();
+            let v5 = view.clone();
             menu.item(PopupMenuItem::new("Part Studio").icon(Icon::empty().path(icon_path("part-studio"))).on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
                 .item(PopupMenuItem::new("Assembly").icon(Icon::empty().path(icon_path("assembly"))).on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
                 .item(PopupMenuItem::new("Drawing").icon(Icon::empty().path(icon_path("drawing"))).on_click(move |_, w, cx| v3.update(cx, |t, cx| t.add_tab("drawing", w, cx))))
                 .item(PopupMenuItem::new("Variable Studio").icon(Icon::empty().path(icon_path("variable-studio"))).on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
+                .item(PopupMenuItem::new("Feature Studio").icon(Icon::empty().path(icon_path("feature-studio"))).on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
         });
         let mut bar = h_flex().h(px(32.)).px_1().gap_0p5().bg(pal.panel).border_t_1().border_color(pal.border).child(add);
         for (id, name, kind) in tabs {
@@ -400,6 +419,7 @@ impl Workspace {
                 "partstudio" => "part-studio",
                 "assembly" => "assembly",
                 "drawing" => "drawing",
+                "featurestudio" => "feature-studio",
                 _ => "variable-studio",
             };
             let view = cx.entity();
@@ -437,6 +457,7 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::Assembly(_) => "assembly",
         TabContent::Drawing(_) => "drawing",
         TabContent::VariableStudio(_) => "variables",
+        TabContent::FeatureStudio(_) => "featurestudio",
     }
 }
 
@@ -450,6 +471,7 @@ impl Render for Workspace {
             Some(TabView::Drawing(v)) => v.clone().into_any_element(),
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
             Some(TabView::Assembly(v)) => v.clone().into_any_element(),
+            Some(TabView::FeatureStudio(v)) => v.clone().into_any_element(),
             Some(TabView::Placeholder(kind)) => div()
                 .size_full()
                 .flex()

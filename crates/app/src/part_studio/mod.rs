@@ -2,6 +2,7 @@
 //! 3D viewport with selection, and feature dialogs with live preview.
 
 mod config_panel;
+mod fab_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
@@ -56,6 +57,9 @@ const TOOLBAR: &[&[&[&str]]] = &[
 
 /// Icon file for a feature type id.
 pub fn feature_icon(type_id: &str) -> SharedString {
+    if noshape_model::custom::is_custom(type_id) {
+        return icon_path(features::get(type_id).map(|t| t.icon).unwrap_or("custom-feature"));
+    }
     let name = match type_id {
         "cPlane" => "plane",
         "cPoint" => "point",
@@ -145,6 +149,8 @@ pub struct PartStudioView {
     manip_drag: Option<manipulators::ManipDrag>,
     folder_renaming: Option<(u32, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    flat_cache: Option<fab_panel::FlatCache>,
+    flat_task: Option<(usize, Task<()>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -168,8 +174,14 @@ impl PartStudioView {
                 // A changed Part Studio may be the source of our Derived features.
                 let is_source = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::PartStudio(_)))
                     && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id == "importDerived" && f.params.text("partStudio") == t.to_string()));
-                if is_vars || is_source {
+                // A Feature Studio defining custom features used here.
+                let prefix = noshape_model::custom::type_id(*t, "");
+                let is_fs = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::FeatureStudio(_)));
+                let uses_fs = is_fs && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id.starts_with(&prefix)));
+                if is_vars || is_source || uses_fs {
                     this.schedule_regen(window, cx);
+                } else if is_fs {
+                    cx.notify(); // toolbar lists the studio's features
                 }
             }
             DocEvent::Reloaded => {
@@ -221,6 +233,8 @@ impl PartStudioView {
             manip_drag: None,
             folder_renaming: None,
             named_views: None,
+            flat_cache: None,
+            flat_task: None,
             _subs: subs,
         };
         this.schedule_regen(window, cx);
@@ -262,6 +276,8 @@ impl PartStudioView {
         let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let derived2 = derived.clone();
+        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
+        let custom2 = custom.clone();
         let regen = self.regen.clone();
         let regen2 = self.regen.clone();
         self.regen_seq += 1;
@@ -273,7 +289,7 @@ impl PartStudioView {
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, derived: Some(derived), ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
@@ -293,7 +309,7 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, derived: Some(derived2), ..Default::default() };
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, derived: Some(derived2), custom_features: Some(custom2), ..Default::default() };
                         regen2.lock().regenerate(&studio, &config, &units, &opts)
                     })
                     .await;
@@ -502,6 +518,11 @@ impl PartStudioView {
         let Some(studio) = self.studio(cx) else { return };
         let Some(index) = studio.index_of(id) else { return };
         let feature = studio.features[index].clone();
+        if feature.feature_type().is_none() {
+            self.message = Some((FeatureStatus::Error, format!("\"{}\" can't be edited: its feature type is not defined (was its Feature Studio deleted?)", feature.name)));
+            cx.notify();
+            return;
+        }
         self.open_dialog(feature, index, false, window, cx);
     }
 
@@ -675,6 +696,12 @@ impl PartStudioView {
                 bar = bar.child(self.tool_button(primary, &items[1..], cx));
             }
         }
+        // Custom features of the document's Feature Studios.
+        let custom = self.doc.read(cx).custom_features().feature_types();
+        if !custom.is_empty() {
+            bar = bar.child(div().w(px(1.)).h(px(22.)).mx_1().bg(pal.border));
+            bar = bar.child(self.custom_tools(custom, cx));
+        }
         bar
         .into_any_element()
     }
@@ -711,6 +738,38 @@ impl PartStudioView {
                             let oid: &'static str = t.id;
                             menu = menu.item(PopupMenuItem::new(t.name).icon(Icon::empty().path(feature_icon(oid))).on_click(move |_, window, cx| {
                                 v.update(cx, |this, cx| this.start_feature(oid, window, cx));
+                            }));
+                        }
+                        menu
+                    }),
+            )
+            .into_any_element()
+    }
+
+    /// Toolbar group of custom features: the first few as buttons, all of
+    /// them in a "Custom features" dropdown.
+    fn custom_tools(&mut self, custom: Vec<&'static FeatureType>, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let mut group = h_flex();
+        for ty in custom.iter().take(4) {
+            group = group.child(self.tool_button(ty, &[], cx));
+        }
+        let view = cx.entity();
+        group
+            .child(
+                Button::new("tb-custom-features")
+                    .icon(Icon::empty().path(icon_path("custom-feature")).text_color(pal.text).with_size(px(18.)))
+                    .ghost()
+                    .with_size(px(30.))
+                    .tooltip("Custom features (Feature Studios)")
+                    .dropdown_caret(true)
+                    .dropdown_menu(move |mut menu, _, _| {
+                        menu = menu.label("Custom features");
+                        for t in &custom {
+                            let v = view.clone();
+                            let id: &'static str = t.id;
+                            menu = menu.item(PopupMenuItem::new(t.name).icon(Icon::empty().path(feature_icon(id))).on_click(move |_, window, cx| {
+                                v.update(cx, |this, cx| this.start_feature(id, window, cx));
                             }));
                         }
                         menu

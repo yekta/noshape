@@ -57,7 +57,10 @@ pub struct MateDialog {
     pub mate_type: MateType,
     pub a: Option<MateConnectorRef>,
     pub b: Option<MateConnectorRef>,
-    /// Connector field receiving viewport picks (0 = first, 1 = second).
+    /// Width mates: second width connector (slot 2) and optional second tab connector (slot 3).
+    pub c: Option<MateConnectorRef>,
+    pub d: Option<MateConnectorRef>,
+    /// Connector field receiving viewport picks (0 = a, 1 = b, 2 = c, 3 = d).
     pub active: Option<usize>,
     pub flip_primary: bool,
     pub reorient: u8,
@@ -116,6 +119,7 @@ impl MateDialog {
         let use_offset = [&mate.offset_x, &mate.offset_y, &mate.offset_z, &mate.rotation].iter().any(|e| e.as_ref().is_some_and(|e| !e.text.trim().is_empty()));
         let use_limits = !mate.limits.is_empty();
         let (a, b) = if is_new { (None, None) } else { (Some(mate.a.clone()), Some(mate.b.clone())) };
+        let (c, d) = if is_new { (None, None) } else { (mate.extra.first().cloned(), mate.extra.get(1).cloned()) };
         let active = if a.is_none() { Some(0) } else if b.is_none() { Some(1) } else { None };
         Self {
             id: mate.id,
@@ -124,6 +128,8 @@ impl MateDialog {
             mate_type: mate.mate_type,
             a,
             b,
+            c,
+            d,
             active,
             flip_primary: mate.flip_primary,
             reorient: mate.reorient_secondary,
@@ -143,23 +149,63 @@ impl MateDialog {
         self.active.is_some()
     }
 
+    /// Tangent mates pick bare faces / edges / vertices instead of mate connectors.
+    pub fn picks_entities(&self) -> bool {
+        self.mate_type == MateType::Tangent
+    }
+
+    fn slot(&self, i: usize) -> &Option<MateConnectorRef> {
+        match i {
+            0 => &self.a,
+            1 => &self.b,
+            2 => &self.c,
+            _ => &self.d,
+        }
+    }
+
+    fn slot_mut(&mut self, i: usize) -> &mut Option<MateConnectorRef> {
+        match i {
+            0 => &mut self.a,
+            1 => &mut self.b,
+            2 => &mut self.c,
+            _ => &mut self.d,
+        }
+    }
+
+    /// Filled connectors (for previews).
+    pub fn connectors(&self) -> Vec<&MateConnectorRef> {
+        [&self.a, &self.b, &self.c, &self.d].into_iter().flatten().collect()
+    }
+
+    fn next_active(&self) -> Option<usize> {
+        let required: &[usize] = if self.mate_type == MateType::Width { &[0, 1, 2] } else { &[0, 1] };
+        required.iter().copied().find(|i| self.slot(*i).is_none())
+    }
+
     /// Fill the active connector field; returns true when accepted.
     pub fn set_connector(&mut self, c: MateConnectorRef, cx: &mut Context<Self>) -> bool {
         let Some(field) = self.active else { return false };
-        // Both connectors must be on different instances.
-        let other = if field == 0 { &self.b } else { &self.a };
-        if other.as_ref().is_some_and(|o| o.instance == c.instance && o.path == c.path) {
-            self.status = Some("Select a mate connector on a different instance".into());
-            cx.notify();
-            return false;
-        }
-        if field == 0 {
-            self.a = Some(c);
+        let same = |o: &Option<MateConnectorRef>| o.as_ref().is_some_and(|o| o.instance == c.instance && o.path == c.path);
+        if self.mate_type == MateType::Width {
+            // Tab and width connectors must not share instances.
+            let others: &[usize] = if field == 0 || field == 3 { &[1, 2] } else { &[0, 3] };
+            if others.iter().any(|i| same(self.slot(*i))) {
+                self.status = Some("Tab and width mate connectors must be on different instances".into());
+                cx.notify();
+                return false;
+            }
         } else {
-            self.b = Some(c);
+            // Both connectors must be on different instances.
+            let other = if field == 0 { &self.b } else { &self.a };
+            if same(other) {
+                self.status = Some("Select a mate connector on a different instance".into());
+                cx.notify();
+                return false;
+            }
         }
+        *self.slot_mut(field) = Some(c);
         self.status = None;
-        self.active = if self.a.is_none() { Some(0) } else if self.b.is_none() { Some(1) } else { None };
+        self.active = self.next_active();
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
         true
@@ -173,6 +219,7 @@ impl MateDialog {
     /// The mate as currently defined (None until both connectors are set).
     pub fn to_mate(&self, cx: &App) -> Option<Mate> {
         let (a, b) = (self.a.clone()?, self.b.clone()?);
+        let extra = if self.mate_type == MateType::Width { std::iter::once(self.c.clone()?).chain(self.d.clone()).collect() } else { vec![] };
         let (ox, oy, oz, orot) = offset_axes(self.mate_type);
         let off = |i: usize, allowed: bool| if self.use_offset && allowed { Self::expr(&self.offsets[i], cx) } else { None };
         let mut limits = Vec::new();
@@ -199,6 +246,7 @@ impl MateDialog {
             reorient_secondary: self.reorient,
             limits,
             suppressed: self.suppressed,
+            extra,
         })
     }
 
@@ -215,18 +263,19 @@ impl MateDialog {
                 self.name = format!("{}{}", t.name(), rest);
             }
             self.mate_type = t;
+            self.active = self.next_active();
             cx.emit(MateDialogEvent::Changed);
             cx.notify();
         }
     }
 
-    fn connector_row(&self, field: usize, cx: &mut Context<Self>) -> AnyElement {
+    fn connector_row(&self, field: usize, placeholder: &'static str, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let value = if field == 0 { &self.a } else { &self.b };
+        let value = self.slot(field);
         let active = self.active == Some(field);
         let label: SharedString = match value {
             Some(c) => (self.labeler)(c).into(),
-            None => "Select mate connector".into(),
+            None => placeholder.into(),
         };
         let filled = value.is_some();
         h_flex()
@@ -243,11 +292,7 @@ impl MateDialog {
             .child(div().flex_1().truncate().text_sm().text_color(if filled { pal.text } else { pal.text_faint }).child(label))
             .when(filled, |d| {
                 d.child(Button::new(SharedString::from(format!("mc-clear-{field}"))).icon(IconName::Close).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    if field == 0 {
-                        this.a = None;
-                    } else {
-                        this.b = None;
-                    }
+                    *this.slot_mut(field) = None;
                     this.active = Some(field);
                     cx.emit(MateDialogEvent::Changed);
                     cx.notify();
@@ -349,9 +394,26 @@ impl Render for MateDialog {
                     .gap_2()
                     .child(div().text_xs().text_color(pal.text_muted).child(format!("{} mate", t.name())))
                     .child(grid)
-                    .child(div().text_xs().text_color(pal.text_muted).child("Mate connectors"))
-                    .child(self.connector_row(0, cx))
-                    .child(self.connector_row(1, cx))
+                    .children(match t {
+                        MateType::Tangent => vec![
+                            div().text_xs().text_color(pal.text_muted).child("Entities (faces, edges or vertices)").into_any_element(),
+                            self.connector_row(0, "Select first entity", cx),
+                            self.connector_row(1, "Select second entity", cx),
+                        ],
+                        MateType::Width => vec![
+                            div().text_xs().text_color(pal.text_muted).child("Tab mate connector(s)").into_any_element(),
+                            self.connector_row(0, "Select tab mate connector", cx),
+                            self.connector_row(3, "Second tab mate connector (optional)", cx),
+                            div().text_xs().text_color(pal.text_muted).child("Width mate connectors").into_any_element(),
+                            self.connector_row(1, "Select first width mate connector", cx),
+                            self.connector_row(2, "Select second width mate connector", cx),
+                        ],
+                        _ => vec![
+                            div().text_xs().text_color(pal.text_muted).child("Mate connectors").into_any_element(),
+                            self.connector_row(0, "Select mate connector", cx),
+                            self.connector_row(1, "Select mate connector", cx),
+                        ],
+                    })
                     .child(
                         h_flex()
                             .gap_1()
@@ -397,7 +459,11 @@ impl Render for MateDialog {
                     })
                     .when_some(self.status.clone(), |d, s| d.child(div().text_xs().text_color(pal.warning).child(s)))
                     .when(self.active.is_some(), |d| {
-                        d.child(div().text_xs().text_color(pal.text_faint).child("Hover geometry to see inference points; click to place a mate connector."))
+                        d.child(div().text_xs().text_color(pal.text_faint).child(if t == MateType::Tangent {
+                            "Click a face, edge or vertex on each instance."
+                        } else {
+                            "Hover geometry to see inference points; click to place a mate connector. The origin and assembly mate connectors can be picked too."
+                        }))
                     }),
             )
     }

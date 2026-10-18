@@ -1,8 +1,19 @@
 //! Drawing export: SVG, DXF (AutoCAD R12 ASCII) and PDF (vector, built-in
 //! Helvetica). All take a [`SheetGeometry`] in millimeters.
 
-use super::sheet::{Anchor, LineStyle, SheetGeometry};
+use super::font;
+use super::sheet::{Anchor, LineStyle, SheetGeometry, Text2};
 use std::fmt::Write as _;
+
+/// Texts with characters outside the PDF/DXF base fonts (GD&T and other
+/// drawing symbols) are exported as strokes of the drawing font.
+pub fn needs_strokes(t: &Text2) -> bool {
+    t.text.chars().any(|c| !(c.is_ascii() || "Ø°±×µ²³".contains(c)))
+}
+
+fn stroke_width(t: &Text2) -> f64 {
+    (t.height * 0.09).max(0.18)
+}
 
 fn esc_xml(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
@@ -38,7 +49,14 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         let _ = writeln!(s, r#"<polygon points="{}" fill="black" stroke="none"/>"#, pts.join(" "));
     }
     let _ = writeln!(s, "</g>");
-    for t in &g.texts {
+    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
+        let w = stroke_width(t);
+        for st in font::text_strokes(t) {
+            let pts: Vec<String> = st.iter().map(|p| format!("{:.4},{:.4}", p[0], g.height - p[1])).collect();
+            let _ = writeln!(s, r#"<polyline points="{}" fill="none" stroke="black" stroke-width="{w:.3}" stroke-linecap="round" stroke-linejoin="round"/>"#, pts.join(" "));
+        }
+    }
+    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
         let (x, y) = (t.pos[0], g.height - t.pos[1]);
         let anchor = match t.anchor {
             Anchor::BottomLeft | Anchor::TopLeft => "start",
@@ -157,7 +175,25 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
             }
         }
     }
-    for t in &g.texts {
+    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
+        for st in font::text_strokes(t) {
+            if st.len() < 2 {
+                continue;
+            }
+            pair(&mut s, 0, "POLYLINE");
+            pair(&mut s, 8, "ANNOTATION");
+            pair(&mut s, 66, "1");
+            pair(&mut s, 70, "0");
+            for p in &st {
+                pair(&mut s, 0, "VERTEX");
+                pair(&mut s, 8, "ANNOTATION");
+                pair(&mut s, 10, &format!("{:.6}", p[0]));
+                pair(&mut s, 20, &format!("{:.6}", p[1]));
+            }
+            pair(&mut s, 0, "SEQEND");
+        }
+    }
+    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
         pair(&mut s, 0, "TEXT");
         pair(&mut s, 8, "ANNOTATION");
         pair(&mut s, 10, &format!("{:.6}", t.pos[0]));
@@ -183,8 +219,8 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
     s
 }
 
-/// Single-page vector PDF.
-pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
+/// PDF content stream of one sheet.
+fn pdf_content(g: &SheetGeometry) -> String {
     let pt = 72.0 / 25.4;
     let mut content = String::new();
     content.push_str("1 J 1 j 0 0 0 RG 0 0 0 rg\n");
@@ -212,7 +248,16 @@ pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
         }
         content.push_str("f\n");
     }
-    for t in &g.texts {
+    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
+        let _ = writeln!(content, "{:.3} w", stroke_width(t) * pt);
+        for st in font::text_strokes(t) {
+            for (i, p) in st.iter().enumerate() {
+                let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+            }
+            content.push_str("S\n");
+        }
+    }
+    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
         let size = t.height * 1.4 * pt;
         // Approximate Helvetica advance: 0.5 em per char.
         let width = t.text.chars().count() as f64 * size * 0.5;
@@ -241,15 +286,28 @@ pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
             .collect();
         let _ = writeln!(content, "BT /F1 {size:.3} Tf {c:.5} {s:.5} {:.5} {c:.5} {x:.3} {y:.3} Tm ({text}) Tj ET", -s);
     }
+    content
+}
 
-    let (w, h) = (g.width * pt, g.height * pt);
-    let objects = [
+/// Single-page vector PDF.
+pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
+    to_pdf_pages(std::slice::from_ref(g))
+}
+
+/// Multi-page vector PDF: one page per sheet.
+pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
+    let pt = 72.0 / 25.4;
+    let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"),
-        format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content),
+        format!("<< /Type /Pages /Kids [{}] /Count {} >>", (0..pages.len()).map(|i| format!("{} 0 R", 4 + 2 * i)).collect::<Vec<_>>().join(" "), pages.len()),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_string(),
     ];
+    for (i, g) in pages.iter().enumerate() {
+        let content = pdf_content(g);
+        let (w, h) = (g.width * pt, g.height * pt);
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>", 5 + 2 * i));
+        objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content));
+    }
     let mut out: Vec<u8> = b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n".to_vec();
     let mut offsets = Vec::new();
     for (i, o) in objects.iter().enumerate() {

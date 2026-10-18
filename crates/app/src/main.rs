@@ -7,11 +7,13 @@ mod assembly_view;
 mod assets;
 mod derived;
 mod doc_model;
+mod drawing_extra;
 mod drawing_scene;
 mod drawing_tools;
 mod drawing_ui;
 mod drawing_view;
 mod feature_dialog;
+mod feature_studio;
 mod files;
 mod gpu;
 mod history_panel;
@@ -19,6 +21,9 @@ mod part_studio;
 mod scene_builder;
 mod session;
 mod sketch_mode;
+mod start_library;
+mod start_thumbnail;
+mod start_window;
 mod theme;
 mod variable_studio;
 mod viewport;
@@ -62,16 +67,30 @@ fn main() {
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
 
-    gpui_kit::application().with_assets(assets::AppAssets).run(move |cx| {
+    let app = gpui_kit::application().with_assets(assets::AppAssets);
+    // macOS: clicking the dock icon with no windows open shows the start window.
+    app.on_reopen(|cx| {
+        if cx.windows().is_empty() {
+            files::show_start_window(cx);
+        }
+    });
+    app.run(move |cx| {
         gpui_kit::init(cx);
         apply_theme(cx);
         actions::bind_default_keys(cx);
         cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 
-        let path = path.clone().unwrap_or_else(files::new_document_path);
-        let initial = if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
-        files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
+        files::init(cx);
+        if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
+            let path = path.clone().unwrap_or_else(files::new_document_path);
+            let initial = if args.iter().any(|a| a == "--demo-drawing-full") {
+                Some(noshape_model::drawing::showcase::showcase_document())
+            } else if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
+            files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
+        } else {
+            files::show_start_window(cx);
+        }
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {
             if let Err(e) = files::open_document_window(files::new_document_path(), None, g2.clone(), cx) {
@@ -80,11 +99,5 @@ fn main() {
         });
         let g3 = gpu.clone();
         cx.on_action(move |_: &actions::OpenDocument, cx| files::prompt_open(g3.clone(), cx));
-        cx.on_window_closed(|cx, _| {
-            if cx.windows().is_empty() {
-                cx.quit();
-            }
-        })
-        .detach();
     });
 }

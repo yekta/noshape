@@ -83,7 +83,18 @@ impl DrawingEditor {
         // Tools that start from the selected view.
         let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
         match &mut self.tool {
-            Tool::Projected { parent } | Tool::Section { parent, .. } | Tool::Detail { parent, .. } if parent.is_none() => *parent = sel_view,
+            Tool::Projected { parent }
+            | Tool::Section { parent, .. }
+            | Tool::Detail { parent, .. }
+            | Tool::JoggedSection { parent, .. }
+            | Tool::AlignedSection { parent, .. }
+            | Tool::Crop { parent, .. }
+            | Tool::Break { parent, .. }
+                if parent.is_none() =>
+            {
+                *parent = sel_view
+            }
+            Tool::Table { kind: TableTool::Bom | TableTool::Hole, view, .. } if view.is_none() => *view = sel_view,
             _ => {}
         }
         self.overlay = Overlay::default();
@@ -118,10 +129,22 @@ impl DrawingEditor {
         }
         let sel = std::mem::take(&mut self.selection);
         self.edit_sheet("Delete", cx, |s| {
+            // Breaks first (indices shift when removed).
+            let mut breaks: Vec<(ViewId, usize)> = sel.iter().filter_map(|x| if let Sel::Break(v, i) = x { Some((*v, *i)) } else { None }).collect();
+            breaks.sort_by(|a, b| b.1.cmp(&a.1));
+            for (v, i) in breaks {
+                if let Some(v) = s.view_mut(v)
+                    && i < v.breaks.len()
+                {
+                    v.breaks.remove(i);
+                }
+            }
             for x in &sel {
                 match x {
                     Sel::View(v) => s.remove_view(*v),
                     Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a),
+                    Sel::Table(t) => s.tables.retain(|n| n.id != *t),
+                    Sel::Break(..) => {}
                 }
             }
         });
@@ -142,6 +165,9 @@ impl DrawingEditor {
             Tool::Detail { center: None, .. } => "Click the center of the detail circle",
             Tool::Detail { radius: None, .. } => "Click to set the detail radius",
             Tool::Detail { .. } => "Click to place the detail view",
+            Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.is_empty() => "Select the chamfer edge",
+            Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.len() == 1 => "Select the adjacent edge",
+            Tool::Dimension { kind: DimTool::ArcLength, picks } if picks.is_empty() => "Select an arc",
             Tool::Dimension { kind: DimTool::Radius | DimTool::Diameter, picks } if picks.is_empty() => "Select a circle or arc",
             Tool::Dimension { kind: DimTool::Angle, picks } if picks.len() < 2 => "Select two straight edges",
             Tool::Dimension { picks, .. } if picks.is_empty() => "Select a point or a straight edge",
@@ -151,8 +177,31 @@ impl DrawingEditor {
             Tool::Centermark => "Select a circle or arc",
             Tool::Centerline { first: None } => "Select the first point",
             Tool::Centerline { .. } => "Select the second point",
-            Tool::Balloon { anchor: None } => "Select the point the callout points to",
+            Tool::Balloon { anchor: None } => "Select the point the callout points to (in an assembly view: a part, for its BOM item)",
             Tool::Balloon { .. } => "Click to place the callout",
+            Tool::JoggedSection { parent: None, .. } | Tool::JoggedSection { done: false, .. } => "Click the points of the cutting line (orthogonal jogs); Enter or double-click to finish",
+            Tool::JoggedSection { .. } => "Drag to the side to view from and click to place",
+            Tool::AlignedSection { center: None, .. } => "Click the center of the cutting line (e.g. a hole center)",
+            Tool::AlignedSection { a: None, .. } => "Click a point on the leg the view looks at",
+            Tool::AlignedSection { b: None, .. } => "Click a point on the leg revolved into the view plane",
+            Tool::AlignedSection { .. } => "Drag to the side to view from and click to place",
+            Tool::Crop { first: None, circle: false, .. } => "Click the first corner of the crop rectangle in a view",
+            Tool::Crop { first: None, circle: true, .. } => "Click the center of the crop circle in a view",
+            Tool::Crop { circle: false, .. } => "Click the opposite corner",
+            Tool::Crop { .. } => "Click to set the crop radius",
+            Tool::Break { first: None, .. } => "Click the first break line in a view",
+            Tool::Break { .. } => "Click the second break line",
+            Tool::Ordinate { origin: None, .. } => "Select the datum (zero) point",
+            Tool::Ordinate { horizontal: None, .. } => "Move up/down (x values) or sideways (y values) and click to place the zero",
+            Tool::Ordinate { .. } => "Select points to dimension (Esc to finish)",
+            Tool::Table { kind: TableTool::General, .. } => "Click to place the table (top-right corner)",
+            Tool::Table { view: None, .. } => "Select the view the table is for",
+            Tool::Table { kind: TableTool::Hole, origin: None, .. } => "Select the origin (a vertex or circle center)",
+            Tool::Table { .. } => "Click to place the table (top-right corner)",
+            Tool::Gdt => "Click to place the feature control frame",
+            Tool::Datum { anchor: None } => "Click the edge or point the datum is attached to",
+            Tool::Datum { .. } => "Click to place the datum box",
+            Tool::SurfaceFinish => "Click the edge the symbol sits on",
         })
     }
 
@@ -196,7 +245,7 @@ impl DrawingEditor {
     }
 
     /// The hovered projected edge: (view, model edge).
-    fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {
+    pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {
         let h = self.hover?;
         let PickTarget::Edge { view, edge } = self.built.as_ref()?.picks.get(h as usize)?.clone() else { return None };
         let g = self.geoms.get(&view)?;
@@ -204,7 +253,7 @@ impl DrawingEditor {
         Some((view, g.model_edges.get(m as usize)?.clone()))
     }
 
-    fn line_pick(&self) -> Option<Pick> {
+    pub fn line_pick(&self) -> Option<Pick> {
         let (view, me) = self.hovered_edge()?;
         let EdgeGeom::Line { a, b } = me.geom else { return None };
         let pa = me.ends[0].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: a, r: None });
@@ -215,7 +264,18 @@ impl DrawingEditor {
         Some(Pick::Line { a: pa, b: pb })
     }
 
-    fn circle_pick(&self, s: [f64; 2]) -> Option<Pick> {
+    /// The hovered arc (open circular edge).
+    pub fn arc_pick(&self) -> Option<Pick> {
+        let (view, me) = self.hovered_edge()?;
+        let EdgeGeom::Circle { center, radius, mid, .. } = me.geom else { return None };
+        let (Some((ra, pa)), Some((rb, pb))) = (me.ends[0].clone(), me.ends[1].clone()) else { return None };
+        if len(sub(pa, pb)) < 1e-9 {
+            return None;
+        }
+        Some(Pick::Arc { view, center, radius, a: PickedPoint { view, p: pa, r: Some(ra) }, b: PickedPoint { view, p: pb, r: Some(rb) }, mid, r: me.center_ref() })
+    }
+
+    pub fn circle_pick(&self, s: [f64; 2]) -> Option<Pick> {
         if let Some((view, me)) = self.hovered_edge()
             && let EdgeGeom::Circle { center, radius, .. } = me.geom
         {
@@ -234,7 +294,7 @@ impl DrawingEditor {
     }
 
     /// A point in a view: snap, else the point on a hovered edge, else free.
-    fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
+    pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);
         }
@@ -245,12 +305,12 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ previews
 
-    fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {
+    pub fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {
         Some(self.placement(p.view)?.to_sheet(p.p))
     }
 
     /// The annotation the active dimension tool would create at the cursor.
-    fn pending_annotation(&self) -> Option<Annotation> {
+    pub fn pending_annotation(&self) -> Option<Annotation> {
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
         let ann = |kind, refs: Vec<(u8, Option<PointRef>)>| Annotation {
@@ -258,7 +318,11 @@ impl DrawingEditor {
             kind,
             position: c,
             refs: refs.into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect(),
+            ..Default::default()
         };
+        if let Some(a) = self.extra_pending_annotation(id) {
+            return Some(a);
+        }
         match &self.tool {
             Tool::Dimension { kind: kind @ (DimTool::Linear | DimTool::Aligned | DimTool::Horizontal | DimTool::Vertical), picks } => {
                 let (a, b) = match picks.as_slice() {
@@ -310,15 +374,18 @@ impl DrawingEditor {
                 Some(ann(AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius }, refs))
             }
             Tool::Balloon { anchor: Some(a) } => {
+                // In assembly views a callout on a part shows its BOM item (empty text = linked).
+                let linked = views::view_source(self.current_sheet(), a.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) && a.r.is_some();
                 let n = self.current_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Balloon { .. })).count() + 1;
-                Some(ann(AnnotationKind::Balloon { view: a.view, anchor: a.p, text: n.to_string() }, vec![(0, a.r.clone())]))
+                let text = if linked { String::new() } else { n.to_string() };
+                Some(ann(AnnotationKind::Balloon { view: a.view, anchor: a.p, text }, vec![(0, a.r.clone())]))
             }
             _ => None,
         }
     }
 
     /// The view the active view tool would create at the cursor.
-    fn pending_view(&self) -> Option<DrawingView> {
+    pub fn pending_view(&self) -> Option<DrawingView> {
         let c = self.cursor;
         let sheet = &self.drawing.sheets.get(self.sheet)?;
         let id = sheet.next_view_id();
@@ -331,7 +398,11 @@ impl DrawingEditor {
             show_tangent_edges: parent.map(|p| p.show_tangent_edges).unwrap_or(true),
             show_centerlines: false,
             label: None,
+            ..Default::default()
         };
+        if let Some(v) = self.extra_pending_view(id) {
+            return Some(v);
+        }
         match &self.tool {
             Tool::InsertView { source, orientation, part } => {
                 Some(mk(ViewKind::Base { source: *source, config: Default::default(), orientation: *orientation, part: part.clone() }, c, None))
@@ -342,11 +413,13 @@ impl DrawingEditor {
                 if len(d) < 15.0 {
                     return None;
                 }
-                let dir = views::snap_direction(d);
-                let pos = if dir[1] == 0.0 {
-                    [c[0], parent.position[1]]
-                } else if dir[0] == 0.0 {
-                    [parent.position[0], c[1]]
+                // Direction in the parent's (unrotated) view frame.
+                let rot = views::view_rotation(sheet, *pid);
+                let dir = views::snap_direction(views::rotate2(d, -rot));
+                let pos = if dir[0] == 0.0 || dir[1] == 0.0 {
+                    let axis = views::rotate2(dir, rot);
+                    let t = dot(d, axis);
+                    [parent.position[0] + axis[0] * t, parent.position[1] + axis[1] * t]
                 } else {
                     c
                 };
@@ -393,7 +466,13 @@ impl DrawingEditor {
             | Tool::Centerline { .. }
             | Tool::Balloon { anchor: None }
             | Tool::Section { p0: None, .. }
-            | Tool::Detail { center: None, .. } => self.snap_at(c),
+            | Tool::Detail { center: None, .. }
+            | Tool::JoggedSection { done: false, .. }
+            | Tool::AlignedSection { b: None, .. }
+            | Tool::Ordinate { .. }
+            | Tool::Table { kind: TableTool::Hole, origin: None, .. }
+            | Tool::Datum { anchor: None }
+            | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
         self.hover_snap = snap.as_ref().and_then(|s| self.pick_sheet(s));
@@ -416,7 +495,7 @@ impl DrawingEditor {
                                 overlay.lines.push((vec![sa, sb], false));
                             }
                         }
-                        Pick::Circle { view, center, radius, .. } => {
+                        Pick::Circle { view, center, radius, .. } | Pick::Arc { view, center, radius, .. } => {
                             if let Some(pl) = self.placement(*view) {
                                 overlay.circle(pl.to_sheet(*center), pl.len_to_sheet(*radius), false);
                             }
@@ -442,7 +521,7 @@ impl DrawingEditor {
                     overlay.circle(cs, len(sub(c, cs)), true);
                 }
             }
-            _ => {}
+            _ => self.extra_overlay(&mut overlay),
         }
         if let Some(v) = self.pending_view() {
             let mut d = self.drawing.clone();
@@ -466,7 +545,7 @@ impl DrawingEditor {
     }
 
     /// Snap a second point to horizontal/vertical from `a` when close.
-    fn ortho_point(&self, a: [f64; 2], c: [f64; 2]) -> [f64; 2] {
+    pub fn ortho_point(&self, a: [f64; 2], c: [f64; 2]) -> [f64; 2] {
         let d = sub(c, a);
         let ang = d[1].atan2(d[0]).to_degrees().rem_euclid(180.0);
         if ang < 8.0 || ang > 172.0 {
@@ -482,6 +561,10 @@ impl DrawingEditor {
 
     fn tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let c = self.cursor;
+        if self.extra_tool_click(window, cx) {
+            self.update_preview(cx);
+            return;
+        }
         let tool = self.tool.clone();
         match tool {
             Tool::Select => {}
@@ -575,9 +658,14 @@ impl DrawingEditor {
                                 picks = vec![p];
                             }
                         }
-                        DimTool::Angle => {
+                        DimTool::Angle | DimTool::Chamfer => {
                             if let Some(p) = self.line_pick() {
                                 picks.push(p);
+                            }
+                        }
+                        DimTool::ArcLength => {
+                            if let Some(p) = self.arc_pick() {
+                                picks = vec![p];
                             }
                         }
                         _ => {
@@ -601,7 +689,7 @@ impl DrawingEditor {
                 if let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(c) {
                     let id = self.current_sheet().next_annotation_id();
                     let refs = r.map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default();
-                    self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25 }, position: c, refs }));
+                    self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25 }, position: c, refs, ..Default::default() }));
                 }
             }
             Tool::Centerline { first: None } => {
@@ -613,7 +701,7 @@ impl DrawingEditor {
                 if let Some(b) = self.snap_at(c).filter(|b| b.view == a.view) {
                     let id = self.current_sheet().next_annotation_id();
                     let refs: Vec<AnnotationRef> = [(0u8, a.r.clone()), (1u8, b.r.clone())].into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect();
-                    self.edit_sheet("Centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: a.p, b: b.p }, position: c, refs }));
+                    self.edit_sheet("Centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: a.p, b: b.p }, position: c, refs, ..Default::default() }));
                     self.tool = Tool::Centerline { first: None };
                 }
             }
@@ -645,6 +733,10 @@ impl DrawingEditor {
         }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
             self.double_click(window, cx);
+            return;
+        }
+        if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::JoggedSection { done: false, .. }) {
+            self.confirm(cx);
             return;
         }
         self.update_hover(cx);
@@ -686,6 +778,10 @@ impl DrawingEditor {
                     }
                 }
                 self.set_preview(Some(dr), cx);
+            }
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } => {
+                let drag = self.drag.clone();
+                self.extra_drag_move(&drag, cx);
             }
             Drag::MoveAnnotation { start, orig } => {
                 let a = self.dragged_annotation(&orig, start);
@@ -729,6 +825,17 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } => {
+                let name = match drag {
+                    Drag::MoveTable { .. } => "Move table",
+                    Drag::ResizeTable { .. } => "Resize table",
+                    Drag::MoveSectionLine { .. } => "Move cutting line",
+                    _ => "Move detail circle",
+                };
+                if let Some(p) = self.preview.take() {
+                    self.commit(name, p, cx);
+                }
+            }
             _ => {}
         }
         cx.notify();
@@ -750,6 +857,26 @@ impl DrawingEditor {
         let k = &e.keystroke;
         if k.modifiers.control || k.modifiers.platform || k.modifiers.alt || self.panel.is_some() {
             return;
+        }
+        match k.key.as_str() {
+            "enter" => {
+                self.confirm(cx);
+                cx.stop_propagation();
+                return;
+            }
+            "pagedown" | "pageup" | "home" | "end" => {
+                let n = self.drawing.sheets.len();
+                let i = match k.key.as_str() {
+                    "pagedown" => (self.sheet + 1).min(n - 1),
+                    "pageup" => self.sheet.saturating_sub(1),
+                    "home" => 0,
+                    _ => n - 1,
+                };
+                self.switch_sheet(i, cx);
+                cx.stop_propagation();
+                return;
+            }
+            _ => {}
         }
         let tool = match (k.key.as_str(), k.modifiers.shift) {
             ("d", false) => Tool::Dimension { kind: DimTool::Linear, picks: vec![] },
@@ -781,6 +908,9 @@ impl DrawingEditor {
     }
 
     fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
+        if let Some(d) = self.extra_start_drag(pick, start) {
+            return d;
+        }
         let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
         if !self.selection.contains(&sel) {
             self.selection = vec![sel];
@@ -792,9 +922,10 @@ impl DrawingEditor {
                 // (or section/auxiliary) view slides along its alignment axis.
                 let ids = sheet.descendants(id);
                 let orig = ids.iter().filter_map(|v| sheet.view(*v).map(|x| (*v, x.position))).collect();
+                let prot = sheet.parent_of(id).map(|p| views::view_rotation(sheet, p)).unwrap_or(0.0);
                 let constraint = match &sheet.view(id).map(|v| v.kind.clone()) {
-                    Some(ViewKind::Projected { .. }) => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| (d, d)),
-                    Some(ViewKind::Section { .. }) => views::section_cut(sheet, id).map(|c| (c.toward_view, c.toward_view)),
+                    Some(ViewKind::Projected { .. }) => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| views::rotate2(d, prot)).map(|d| (d, d)),
+                    Some(ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) => views::section_cut(sheet, id).map(|c| views::rotate2(c.toward_view, prot)).map(|d| (d, d)),
                     Some(ViewKind::Auxiliary { edge_dir, .. }) => {
                         let n = norm([-edge_dir[1], edge_dir[0]]);
                         Some((n, n))
@@ -807,6 +938,7 @@ impl DrawingEditor {
                 Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, orig: a },
                 _ => Drag::None,
             },
+            Sel::Table(_) | Sel::Break(..) => Drag::None,
         }
     }
 
@@ -863,10 +995,13 @@ impl DrawingEditor {
             Some(PickTarget::TitleBlock) => self.open_title_panel(window, cx),
             Some(PickTarget::Annotation(id)) => {
                 let note = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
-                if let Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) = note {
-                    self.open_note_panel(Some(id), position, window, cx);
+                match note {
+                    Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => self.open_note_panel(Some(id), position, window, cx),
+                    Some(a) => self.open_annotation_panel(&a, window, cx),
+                    None => {}
                 }
             }
+            Some(PickTarget::Table(id)) => self.open_cell_panel(id, window, cx),
             Some(t) => {
                 if let Some(v) = t.view() {
                     self.open_scale_panel(Some(v), window, cx);
@@ -890,7 +1025,7 @@ impl DrawingEditor {
             self.selection = vec![s];
             self.redraw(cx);
         }
-        let entries = self.context_entries(sel);
+        let entries = self.context_entries(sel, cx);
         let ed = cx.entity();
         let menu = PopupMenu::build(window, cx, move |m, window, cx| fill_menu(m, &entries, &ed, window, cx));
         let sub = cx.subscribe_in(&menu, window, |this: &mut Self, _, _: &DismissEvent, _, cx| {
@@ -902,7 +1037,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn context_entries(&self, sel: Option<Sel>) -> Vec<MenuEntry> {
+    fn context_entries(&self, sel: Option<Sel>, cx: &App) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         match sel {
             Some(Sel::View(id)) => {
@@ -927,6 +1062,7 @@ impl DrawingEditor {
                 scales.push(MenuEntry::item("Custom…", move |t, w, cx| t.open_scale_panel(Some(id), w, cx)));
                 out.push(MenuEntry::Submenu("Scale".into(), scales));
                 out.push(MenuEntry::item("View label…", move |t, w, cx| t.open_label_panel(id, w, cx)));
+                out.extend(self.view_extra_entries(id, cx));
                 out.push(MenuEntry::Separator);
                 out.push(MenuEntry::item("Delete view", move |t, _, cx| {
                     t.selection.clear();
@@ -960,6 +1096,7 @@ impl DrawingEditor {
                             })
                         }));
                     }
+                    out.extend(self.annotation_extra_entries(a));
                     if !a.refs.is_empty() {
                         out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
                             t.edit_sheet("Detach", cx, |s| {
@@ -976,6 +1113,8 @@ impl DrawingEditor {
                     t.edit_sheet("Delete annotation", cx, |s| s.annotations.retain(|x| x.id != id));
                 }));
             }
+            Some(Sel::Table(id)) => out.extend(self.table_entries(id)),
+            Some(Sel::Break(view, index)) => out.extend(self.break_entries(view, index)),
             None => {
                 out.push(MenuEntry::item("Update drawing", |t, _, cx| t.update_drawing(cx)));
                 out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
@@ -984,6 +1123,10 @@ impl DrawingEditor {
                 out.push(MenuEntry::item("Edit title block…", |t, w, cx| t.open_title_panel(w, cx)));
                 out.push(MenuEntry::Submenu("Sheet size".into(), self.sheet_size_entries()));
                 out.push(MenuEntry::item("Sheet scale…", |t, w, cx| t.open_scale_panel(None, w, cx)));
+                out.push(MenuEntry::Separator);
+                out.push(MenuEntry::item("Insert table", |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)));
+                let si = self.sheet;
+                out.push(MenuEntry::item("Add sheet", move |t, _, cx| t.add_sheet_after(si, cx)));
             }
         }
         out

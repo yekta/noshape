@@ -44,11 +44,13 @@ pub struct RegenOptions {
     pub preview_meshes: bool,
     /// Access to other Part Studios of the document (Derived features).
     pub derived: Option<std::sync::Arc<dyn derived::DerivedProvider>>,
+    /// Compiled Feature Studios of the document (custom features).
+    pub custom_features: Option<std::sync::Arc<dyn crate::custom::CustomFeatureProvider>>,
 }
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None }
     }
 }
 
@@ -128,6 +130,11 @@ impl Regenerator {
             {
                 key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
             }
+            // Custom features depend on their Feature Studio's source.
+            if let Some((tab, _)) = crate::custom::parse_type_id(&f.type_id) {
+                let v = opts.custom_features.clone().unwrap_or_else(crate::custom::fallback_provider).version(tab);
+                key = hash_bytes(key, &v.to_le_bytes());
+            }
             live.push(f.id);
             if i >= upto {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0 });
@@ -158,6 +165,8 @@ impl Regenerator {
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = &effective;
                         ev.derived = opts.derived.clone();
+                        ev.custom = opts.custom_features.clone();
+                        ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eval_fn(&mut ev)));
                         match result {
                             Ok(Ok(())) => {

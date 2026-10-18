@@ -37,6 +37,12 @@ impl DocModel {
         crate::derived::DocStudios::new(self.session.doc.clone(), self.studio_cache.clone())
     }
 
+    /// The document's Feature Studios, compiled (cached by source); also
+    /// registers their custom feature schemas.
+    pub fn custom_features(&self) -> std::sync::Arc<noshape_model::custom::DocumentScripts> {
+        noshape_model::custom::DocumentScripts::from_document(&self.session.doc)
+    }
+
     pub fn name(&self) -> String {
         self.session.name()
     }

@@ -17,16 +17,17 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::drawing_scene::{self, Overlay};
 use crate::gpu::{FrameResult, Gpu};
 use crate::theme::p;
-use gpui_kit::component::input::InputState;
+use gpui_kit::component::input::{InputState, TextareaState};
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::v_flex;
 use gpui_kit::*;
 use glam::{DQuat, DVec3};
 use noshape_model::document::{TabContent, TabId};
-use noshape_model::drawing::build::{BuiltSheet, PickTarget, assemble_sheet};
-use noshape_model::drawing::views::{self, SourceModel, Sources, ViewCache, ViewGeometry};
+use noshape_model::assembly::eval::AssemblyEvaluator;
+use noshape_model::drawing::build::{BuiltSheet, PickTarget, SheetInfo, assemble_sheet};
+use noshape_model::drawing::views::{self, SourceKey, Sources, ViewCache, ViewGeometry};
 use noshape_model::drawing::*;
-use noshape_model::regen::{RegenOptions, Regenerator};
+use noshape_model::regen::Regenerator;
 use noshape_render::worker::RenderJob;
 use noshape_render::{Camera, Drawable, Instance, LinesHandle, MeshHandle, PointsHandle, Projection as CamProjection, Scene, Style, srgb, state};
 use parking_lot::Mutex;
@@ -43,6 +44,8 @@ pub enum DimTool {
     Radius,
     Diameter,
     Angle,
+    Chamfer,
+    ArcLength,
 }
 
 impl DimTool {
@@ -55,6 +58,8 @@ impl DimTool {
             DimTool::Radius => "Radial dimension",
             DimTool::Diameter => "Diameter dimension",
             DimTool::Angle => "Angular dimension",
+            DimTool::Chamfer => "Chamfer dimension",
+            DimTool::ArcLength => "Arc length dimension",
         }
     }
 }
@@ -72,6 +77,16 @@ pub enum Pick {
     Point(PickedPoint),
     Line { a: PickedPoint, b: PickedPoint },
     Circle { view: ViewId, center: [f64; 2], radius: f64, r: Option<PointRef> },
+    /// An arc edge: center, radius, end points and a point on the arc.
+    Arc { view: ViewId, center: [f64; 2], radius: f64, a: PickedPoint, b: PickedPoint, mid: [f64; 2], r: Option<PointRef> },
+}
+
+/// Kinds of drawing tables the table tools create.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TableTool {
+    General,
+    Bom,
+    Hole,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +102,21 @@ pub enum Tool {
     Centermark,
     Centerline { first: Option<PickedPoint> },
     Balloon { anchor: Option<PickedPoint> },
+    /// Jogged section: orthogonal cutting line points (parent view coords);
+    /// `done` once the line is finished (Enter / double-click).
+    JoggedSection { parent: Option<ViewId>, points: Vec<[f64; 2]>, done: bool },
+    AlignedSection { parent: Option<ViewId>, center: Option<[f64; 2]>, a: Option<[f64; 2]>, b: Option<[f64; 2]> },
+    /// Crop a view with a rectangle (two corners) or a circle (center, radius).
+    Crop { parent: Option<ViewId>, first: Option<[f64; 2]>, circle: bool },
+    /// Break a view: two clicks give the removed band.
+    Break { parent: Option<ViewId>, first: Option<[f64; 2]>, vertical: bool },
+    /// Ordinate dimensions: datum, then the side/level of the values, then points.
+    Ordinate { origin: Option<PickedPoint>, horizontal: Option<bool>, level: [f64; 2] },
+    /// Place a table: BOM / hole tables need a view (and hole tables an origin).
+    Table { kind: TableTool, view: Option<ViewId>, origin: Option<PickedPoint> },
+    Gdt,
+    Datum { anchor: Option<[f64; 2]> },
+    SurfaceFinish,
 }
 
 impl Tool {
@@ -103,6 +133,17 @@ impl Tool {
             Tool::Centermark => "Centermark",
             Tool::Centerline { .. } => "Centerline",
             Tool::Balloon { .. } => "Callout",
+            Tool::JoggedSection { .. } => "Jogged section view",
+            Tool::AlignedSection { .. } => "Aligned section view",
+            Tool::Crop { .. } => "Crop view",
+            Tool::Break { .. } => "Break view",
+            Tool::Ordinate { .. } => "Ordinate dimension",
+            Tool::Table { kind: TableTool::General, .. } => "Table",
+            Tool::Table { kind: TableTool::Bom, .. } => "BOM table",
+            Tool::Table { kind: TableTool::Hole, .. } => "Hole table",
+            Tool::Gdt => "Geometric tolerance",
+            Tool::Datum { .. } => "Datum",
+            Tool::SurfaceFinish => "Surface finish",
         }
     }
 }
@@ -111,6 +152,9 @@ impl Tool {
 pub enum Sel {
     View(ViewId),
     Annotation(u64),
+    Table(u64),
+    /// Break `1` of view `0`.
+    Break(ViewId, usize),
 }
 
 #[derive(Clone, Debug)]
@@ -120,11 +164,27 @@ pub enum Drag {
     Pan { last_px: [f64; 2] },
     MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])> },
     MoveAnnotation { start: [f64; 2], orig: Annotation },
+    MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
+    /// Resize a table from its free corner (scales column widths and rows).
+    ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
+    /// Move a section view's cutting line (parallel offset).
+    MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
+    /// Move a detail view's circle in its parent.
+    MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
 }
 
 /// Inline property panels shown over the canvas.
 pub enum Panel {
-    Note { input: Entity<InputState>, edit: Option<u64>, pos: [f64; 2] },
+    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2] },
+    /// Dimension properties (precision, units, tolerance, texts).
+    Dimension { id: u64, angular: bool, units: Option<DimUnits>, show_units: bool, tol: usize, precision: Entity<InputState>, upper: Entity<InputState>, lower: Entity<InputState>, hole: Entity<InputState>, shaft: Entity<InputState>, prefix: Entity<InputState>, suffix: Entity<InputState>, text: Option<Entity<InputState>> },
+    Gdt { edit: Option<u64>, pos: [f64; 2], symbol: usize, diameter: bool, modifier: usize, tolerance: Entity<InputState>, datums: [Entity<InputState>; 3] },
+    Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
+    SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
+    Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState> },
+    SheetName { index: usize, input: Entity<InputState> },
+    Rotation { view: ViewId, input: Entity<InputState> },
+    NewTable { pos: [f64; 2], rows: Entity<InputState>, cols: Entity<InputState>, title: Entity<InputState>, header: bool },
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
     Scale { view: Option<ViewId>, input: Entity<InputState> },
     Label { view: ViewId, input: Entity<InputState> },
@@ -184,8 +244,10 @@ pub struct DrawingEditor {
     pub sheet: usize,
 
     pub sources: Sources,
-    regens: HashMap<TabId, Arc<Mutex<Regenerator>>>,
-    regenerating: HashSet<TabId>,
+    regens: HashMap<SourceKey, Arc<Mutex<Regenerator>>>,
+    assemblies: Arc<Mutex<AssemblyEvaluator>>,
+    regenerating: HashSet<SourceKey>,
+    pub info: SheetInfo,
     pub out_of_date: bool,
     pub cache: Arc<ViewCache>,
     pub geoms: HashMap<ViewId, Arc<ViewGeometry>>,
@@ -248,7 +310,8 @@ impl DrawingEditor {
             DocEvent::TabChanged(t) => this.studio_changed(*t, cx),
             DocEvent::Reloaded | DocEvent::TabsChanged => {
                 this.reload(cx);
-                let tabs: Vec<TabId> = this.sources.keys().copied().collect();
+                let mut tabs: Vec<TabId> = this.sources.keys().map(|k| k.tab).collect();
+                tabs.dedup();
                 for t in tabs {
                     this.studio_changed(t, cx);
                 }
@@ -270,7 +333,9 @@ impl DrawingEditor {
             sheet: 0,
             sources: Sources::new(),
             regens: HashMap::new(),
+            assemblies: Arc::new(Mutex::new(AssemblyEvaluator::new())),
             regenerating: HashSet::new(),
+            info: SheetInfo::default(),
             out_of_date: false,
             cache: Arc::new(ViewCache::new()),
             geoms: HashMap::new(),
@@ -321,7 +386,13 @@ impl DrawingEditor {
         &d.sheets[self.sheet.min(d.sheets.len().saturating_sub(1))]
     }
 
+    fn update_info(&mut self, cx: &App) {
+        let d = self.doc.read(cx);
+        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default() };
+    }
+
     fn reload(&mut self, cx: &mut Context<Self>) {
+        self.update_info(cx);
         if let Some(TabContent::Drawing(d)) = self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
             self.drawing = d.clone();
         }
@@ -333,6 +404,8 @@ impl DrawingEditor {
         self.selection.retain(|s| match s {
             Sel::View(v) => sheet.view(*v).is_some(),
             Sel::Annotation(a) => sheet.annotations.iter().any(|x| x.id == *a),
+            Sel::Table(t) => sheet.table(*t).is_some(),
+            Sel::Break(v, i) => sheet.view(*v).is_some_and(|v| *i < v.breaks.len()),
         });
         self.ensure_sources(false, cx);
         self.refresh(cx);
@@ -376,45 +449,48 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ sources
 
+    /// A tab of the document changed: sources built from it (or assemblies,
+    /// which depend on every studio) are out of date.
     fn studio_changed(&mut self, tab: TabId, cx: &mut Context<Self>) {
-        let Some(src) = self.sources.get(&tab) else { return };
-        let config = views::referenced_studios(&self.drawing).into_iter().find(|(t, _)| *t == tab).map(|(_, c)| c).unwrap_or_default();
-        let hash = self.doc.read(cx).studio(tab).map(|s| views::studio_hash(s, &config));
-        if hash != Some(src.hash) && !self.out_of_date {
+        let doc = self.doc.read(cx);
+        let stale = self.sources.iter().any(|(k, src)| {
+            let depends = k.tab == tab || src.assembly;
+            depends && views::source_hash(&doc.session.doc, k) != Some(src.hash)
+        });
+        if stale && !self.out_of_date {
             self.out_of_date = true;
             cx.notify();
         }
     }
 
-    /// Regenerate referenced Part Studios that are missing (or all, for Update).
+    /// Regenerate referenced sources that are missing (or all, for Update).
     pub fn ensure_sources(&mut self, all: bool, cx: &mut Context<Self>) {
-        let mut wanted = views::referenced_studios(self.display());
-        if let Tool::InsertView { source, .. } = &self.tool
-            && !wanted.iter().any(|(t, _)| t == source)
-        {
-            wanted.push((*source, Default::default()));
+        let mut wanted = views::referenced_sources(self.display());
+        if let Tool::InsertView { source, .. } = &self.tool {
+            let k = SourceKey::studio(*source);
+            if !wanted.contains(&k) {
+                wanted.push(k);
+            }
         }
-        for (tab, config) in wanted {
-            if self.regenerating.contains(&tab) || (!all && self.sources.contains_key(&tab)) {
+        for key in wanted {
+            if self.regenerating.contains(&key) || (!all && self.sources.contains_key(&key)) {
                 continue;
             }
-            let (studio, units) = {
-                let doc = self.doc.read(cx);
-                (doc.studio(tab).cloned(), doc.session.doc.settings.units.clone())
-            };
-            let Some(studio) = studio else { continue };
-            let regen = self.regens.entry(tab).or_insert_with(|| Arc::new(Mutex::new(Regenerator::new()))).clone();
-            self.regenerating.insert(tab);
+            let doc = self.doc.read(cx).session.doc.clone();
+            if doc.tab(key.tab).is_none() {
+                continue;
+            }
+            let regen = self.regens.entry(key.clone()).or_insert_with(|| Arc::new(Mutex::new(Regenerator::new()))).clone();
+            let assemblies = self.assemblies.clone();
+            self.regenerating.insert(key.clone());
             cx.spawn(async move |this, cx| {
-                let src = cx
-                    .background_spawn(async move {
-                        let r = regen.lock().regenerate(&studio, &config, &units, &RegenOptions::default());
-                        SourceModel { hash: views::studio_hash(&studio, &config), context: r.context }
-                    })
-                    .await;
+                let k2 = key.clone();
+                let src = cx.background_spawn(async move { views::regenerate_source(&doc, &k2, &mut regen.lock(), &mut assemblies.lock()) }).await;
                 this.update(cx, |this, cx| {
-                    this.regenerating.remove(&tab);
-                    this.sources.insert(tab, src);
+                    this.regenerating.remove(&key);
+                    if let Some(src) = src {
+                        this.sources.insert(key, src);
+                    }
                     if this.regenerating.is_empty() {
                         this.out_of_date = false;
                         if this.status.as_ref().is_some_and(|s| s.starts_with("Updating")) {
@@ -477,7 +553,7 @@ impl DrawingEditor {
         } else if need_exact && !interactive {
             self.schedule_compute(true, cx);
         }
-        let built = assemble_sheet(&d, sheet, &self.geoms, &self.sources);
+        let built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
         self.built = Some(Arc::new(built));
         self.geometry_dirty = true;
         self.update_hover(cx);
@@ -610,6 +686,8 @@ impl DrawingEditor {
             .filter(|(_, t)| match (sel, t) {
                 (Sel::View(v), t) => t.view() == Some(v),
                 (Sel::Annotation(a), PickTarget::Annotation(b)) => a == *b,
+                (Sel::Table(a), PickTarget::Table(b)) => a == *b,
+                (Sel::Break(v, i), PickTarget::BreakLine { view, index }) => v == *view && i == *index,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -621,6 +699,8 @@ impl DrawingEditor {
         match self.built.as_ref()?.picks.get(pick as usize)? {
             PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) => Some(Sel::View(*v)),
             PickTarget::Annotation(a) => Some(Sel::Annotation(*a)),
+            PickTarget::Table(t) => Some(Sel::Table(*t)),
+            PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
             _ => None,
         }
     }
@@ -650,7 +730,7 @@ impl DrawingEditor {
                 }
             }
             if let Some(h) = self.hover {
-                let single = matches!(self.tool, Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. });
+                let single = matches!(self.tool, Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. });
                 let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
                 for p in group {
                     scene.add_flag(p, state::HOVER);
@@ -729,13 +809,24 @@ impl DrawingEditor {
         let hover = self.built.as_ref().and_then(|b| b.hit(self.cursor, tol));
         let hover = match (&self.tool, hover) {
             // Dimension-like tools only care about view edges.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. }, Some(h)) => {
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => {
                 match self.built.as_ref().and_then(|b| b.picks.get(h as usize)) {
                     Some(PickTarget::Edge { .. }) => Some(h),
                     _ => None,
                 }
             }
-            (Tool::Select | Tool::Projected { parent: None } | Tool::Section { parent: None, .. } | Tool::Detail { parent: None, .. }, h) => h,
+            (
+                Tool::Select
+                | Tool::Projected { parent: None }
+                | Tool::Section { parent: None, .. }
+                | Tool::Detail { parent: None, .. }
+                | Tool::JoggedSection { parent: None, .. }
+                | Tool::AlignedSection { parent: None, .. }
+                | Tool::Crop { parent: None, .. }
+                | Tool::Break { parent: None, .. }
+                | Tool::Table { kind: TableTool::Bom | TableTool::Hole, view: None, .. },
+                h,
+            ) => h,
             _ => None,
         };
         // In select mode, hovering anywhere inside a view highlights it.
@@ -788,6 +879,7 @@ impl Render for DrawingEditor {
         let image = self.image.clone();
         let toolbar = self.render_toolbar(window, cx);
         let status = self.render_status(cx);
+        let sheet_bar = self.render_sheet_bar(cx);
         let panel = self.render_panel(cx);
         let menu = self.menu.as_ref().map(|(m, pos, _)| (m.clone(), *pos));
         let canvas_el = div()
@@ -851,6 +943,7 @@ impl Render for DrawingEditor {
             .on_key_down(cx.listener(Self::on_key))
             .child(toolbar)
             .child(canvas_el)
+            .child(sheet_bar)
             .children(menu.map(|(m, pos)| deferred(anchored().position(pos).snap_to_window().child(m)).with_priority(2)))
     }
 }

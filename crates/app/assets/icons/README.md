@@ -1,6 +1,6 @@
 # noshape icons
 
-245 icons.
+247 icons.
 
 Monochrome 24x24 SVG icons for noshape. GPUI renders them as single-color masks tinted with the current text color, so they follow a few rules:
 
@@ -14,7 +14,7 @@ Usage: `assets/icons/<name>.svg`.
 
 ## Part Studio features (70)
 
-`sketch`, `extrude`, `revolve`, `sweep`, `loft`, `thicken`, `enclose`, `fillet`, `chamfer`, `face-blend`, `draft`, `rib`, `shell`, `hole`, `external-thread`, `boolean`, `split`, `delete-part`, `transform`, `linear-pattern`, `circular-pattern`, `curve-pattern`, `mirror`, `delete-face`, `move-face`, `replace-face`, `offset-surface`, `fill`, `move-boundary`, `boundary-surface`, `ruled-surface`, `helix`, `projected-curve`, `bridging-curve`, `composite-curve`, `intersection-curve`, `fit-spline`, `offset-curve`, `plane`, `mate-connector`, `point`, `variable`, `variable-studio`, `import`, `wrap`, `sheet-metal`, `flange`, `hem`, `tab`, `bend-relief`, `corner-break`, `frame`, `gusset`, `end-cap`, `modify-fillet`, `body-draft`, `isocline`, `isoparametric`, `routing-curve`, `edit-curve`, `trim-curve`, `mutual-trim`, `constrained-surface`, `form`, `joint`, `jog`, `frame-trim`, `cut-list`, `configuration`, `feature-folder`
+`sketch`, `extrude`, `revolve`, `sweep`, `loft`, `thicken`, `enclose`, `fillet`, `chamfer`, `face-blend`, `draft`, `rib`, `shell`, `hole`, `external-thread`, `boolean`, `split`, `delete-part`, `transform`, `linear-pattern`, `circular-pattern`, `curve-pattern`, `mirror`, `delete-face`, `move-face`, `replace-face`, `offset-surface`, `fill`, `move-boundary`, `boundary-surface`, `ruled-surface`, `helix`, `projected-curve`, `bridging-curve`, `composite-curve`, `intersection-curve`, `fit-spline`, `offset-curve`, `plane`, `mate-connector`, `point`, `variable`, `variable-studio`, `import`, `wrap`, `sheet-metal`, `flange`, `hem`, `tab`, `bend-relief`, `corner-break`, `frame`, `gusset`, `end-cap`, `modify-fillet`, `body-draft`, `isocline`, `isoparametric`, `routing-curve`, `edit-curve`, `trim-curve`, `mutual-trim`, `constrained-surface`, `form`, `joint`, `jog`, `frame-trim`, `cut-list`, `configuration`, `feature-folder`, `feature-studio`, `custom-feature`
 
 ## Sketch tools (37)
 

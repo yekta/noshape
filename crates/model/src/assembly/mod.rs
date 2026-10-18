@@ -14,6 +14,12 @@ pub struct InstanceId(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MateId(pub u64);
 
+impl InstanceId {
+    /// The assembly origin (ground): a fixed frame at the world origin that
+    /// mates and assembly mate connectors can reference.
+    pub const ORIGIN: InstanceId = InstanceId(0);
+}
+
 /// What an instance refers to.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum InstanceSource {
@@ -133,6 +139,69 @@ pub struct MateConnectorRef {
     pub flip: bool,
     #[serde(default)]
     pub rotate_quarters: u8,
+    /// Assembly-level mate connector (see [`AsmMateConnector`]). When set,
+    /// `reference`/`path` are ignored and `instance` mirrors the connector's
+    /// owner ([`InstanceId::ORIGIN`] for connectors on the assembly origin).
+    #[serde(default)]
+    pub connector: Option<MateId>,
+}
+
+impl MateConnectorRef {
+    /// Connector at the assembly origin (world frame).
+    pub fn origin() -> Self {
+        Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None }
+    }
+    /// Reference to an assembly mate connector owned by `owner`.
+    pub fn assembly_connector(id: MateId, owner: InstanceId) -> Self {
+        Self { instance: owner, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: Some(id) }
+    }
+    /// Entity reference on an occurrence (implicit inference or bare entity).
+    pub fn on(instance: InstanceId, path: Vec<InstanceId>, reference: Reference) -> Self {
+        Self { instance, path, reference, flip: false, rotate_quarters: 0, connector: None }
+    }
+    pub fn is_origin(&self) -> bool {
+        self.instance == InstanceId::ORIGIN && self.connector.is_none()
+    }
+}
+
+/// Mate connector feature created in the assembly. It is owned by one
+/// instance occurrence (or the assembly origin) and moves rigidly with it.
+/// Frame: the connector inferred on `on`, then flip / reorient, then the
+/// local move (translation in the connector frame, rotation about one of its axes).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AsmMateConnector {
+    pub id: MateId,
+    pub name: String,
+    /// Origin entity (`MateConnectorRef::origin()` for the assembly origin).
+    pub on: MateConnectorRef,
+    #[serde(default)]
+    pub flip_primary: bool,
+    #[serde(default)]
+    pub reorient: u8,
+    #[serde(default)]
+    pub translation: [Option<ExprValue>; 3],
+    /// Rotation axis (0 = X, 1 = Y, 2 = Z) and angle.
+    #[serde(default = "default_rot_axis")]
+    pub rotation_axis: u8,
+    #[serde(default)]
+    pub rotation: Option<ExprValue>,
+    #[serde(default)]
+    pub hidden: bool,
+    #[serde(default)]
+    pub suppressed: bool,
+}
+
+fn default_rot_axis() -> u8 {
+    2
+}
+
+impl AsmMateConnector {
+    pub fn new(id: MateId, name: String, on: MateConnectorRef) -> Self {
+        Self { id, name, on, flip_primary: false, reorient: 0, translation: [None, None, None], rotation_axis: 2, rotation: None, hidden: false, suppressed: false }
+    }
+    pub fn owner(&self) -> InstanceId {
+        self.on.instance
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -165,6 +234,48 @@ pub struct Mate {
     pub limits: Vec<(String, Limits)>,
     #[serde(default)]
     pub suppressed: bool,
+    /// Additional connectors. Width: `[width 2]` or `[width 2, tab 2]` with
+    /// `a` = tab 1 and `b` = width 1. Unused by the other mate types.
+    #[serde(default)]
+    pub extra: Vec<MateConnectorRef>,
+}
+
+impl Mate {
+    pub fn new(id: MateId, name: String, mate_type: MateType, a: MateConnectorRef, b: MateConnectorRef) -> Self {
+        Mate {
+            id,
+            name,
+            mate_type,
+            a,
+            b,
+            offset_z: None,
+            offset_x: None,
+            offset_y: None,
+            rotation: None,
+            flip_primary: false,
+            reorient_secondary: 0,
+            limits: vec![],
+            suppressed: false,
+            extra: vec![],
+        }
+    }
+    /// All connectors of the mate.
+    pub fn connectors(&self) -> impl Iterator<Item = &MateConnectorRef> {
+        [&self.a, &self.b].into_iter().chain(self.extra.iter())
+    }
+    /// Top-level instances the mate involves (without the assembly origin).
+    pub fn instances(&self) -> Vec<InstanceId> {
+        let mut v: Vec<InstanceId> = Vec::new();
+        for c in self.connectors() {
+            if c.instance != InstanceId::ORIGIN && !v.contains(&c.instance) {
+                v.push(c.instance);
+            }
+        }
+        v
+    }
+    pub fn uses_instance(&self, id: InstanceId) -> bool {
+        self.connectors().any(|c| c.instance == id)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -186,6 +297,11 @@ pub struct Relation {
     pub reverse: bool,
     #[serde(default)]
     pub suppressed: bool,
+    /// Free values of the two mates when the relation was created or last
+    /// edited (the reference the coupling is measured from). `None` (old
+    /// documents) measures from the positions at each solve.
+    #[serde(default)]
+    pub base: Option<[f64; 2]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -215,6 +331,111 @@ pub struct ExplodeStep {
     pub translation: [f64; 3],
     pub rotation_axis: Option<[f64; 3]>,
     pub rotation_angle: f64,
+    /// Rotation pivot (world, before the step). Default: the bounds center
+    /// of the step's instances.
+    #[serde(default)]
+    pub pivot: Option<[f64; 3]>,
+}
+
+impl ExplodeStep {
+    pub fn translate(instances: Vec<InstanceId>, t: [f64; 3]) -> Self {
+        Self { instances, translation: t, rotation_axis: None, rotation_angle: 0.0, pivot: None }
+    }
+    pub fn rotate(instances: Vec<InstanceId>, axis: [f64; 3], angle: f64, pivot: [f64; 3]) -> Self {
+        Self { instances, translation: [0.0; 3], rotation_axis: Some(axis), rotation_angle: angle, pivot: Some(pivot) }
+    }
+}
+
+/// Instance pattern kinds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum PatternKind {
+    /// Copies along the Z axis of a mate connector (edge direction, face
+    /// normal...), optionally in a second direction.
+    Linear { direction: MateConnectorRef, distance: ExprValue, count: u32, opposite: bool, equal_spacing: bool, second: Option<LinearDirection> },
+    /// Copies about the Z axis of a mate connector (cylinder axis, circular edge...).
+    Circular { axis: MateConnectorRef, angle: ExprValue, count: u32, opposite: bool, equal_spacing: bool },
+    /// Mirror across the XY plane of a mate connector (rigid transform with
+    /// the part's own symmetry plane, so no geometry is mirrored).
+    Mirror { plane: MateConnectorRef },
+    /// Follow a Part Studio pattern: the seed's mate is re-created on every
+    /// patterned copy of its target geometry.
+    PartPattern { mate: MateId },
+    /// Replicate: the seed's mate is re-created on all geometry matching its
+    /// target (e.g. every hole of the same size) on the target instance
+    /// (`all_instances`: also on other instances of the same part).
+    Replicate {
+        mate: MateId,
+        #[serde(default)]
+        all_instances: bool,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LinearDirection {
+    pub direction: MateConnectorRef,
+    pub distance: ExprValue,
+    pub count: u32,
+    pub opposite: bool,
+}
+
+/// One generated instance of a pattern.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PatternInstance {
+    pub seed: InstanceId,
+    /// Stable index (linear: i + j * 65536; circular: i; matched patterns: target code).
+    pub index: u32,
+    pub instance: InstanceId,
+    /// Generated mate (part pattern / replicate).
+    #[serde(default)]
+    pub mate: Option<MateId>,
+    /// Target connector of the generated mate.
+    #[serde(default)]
+    pub target: Option<MateConnectorRef>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InstancePattern {
+    pub id: MateId,
+    pub name: String,
+    pub kind: PatternKind,
+    pub seeds: Vec<InstanceId>,
+    #[serde(default)]
+    pub generated: Vec<PatternInstance>,
+    #[serde(default)]
+    pub suppressed: bool,
+}
+
+impl InstancePattern {
+    pub fn type_name(&self) -> &'static str {
+        match self.kind {
+            PatternKind::Linear { .. } => "Linear pattern",
+            PatternKind::Circular { .. } => "Circular pattern",
+            PatternKind::Mirror { .. } => "Mirror",
+            PatternKind::PartPattern { .. } => "Part pattern",
+            PatternKind::Replicate { .. } => "Replicate",
+        }
+    }
+    /// Indices the pattern should generate per seed (linear/circular only).
+    pub fn grid_indices(&self) -> Vec<u32> {
+        match &self.kind {
+            PatternKind::Linear { count, second, .. } => {
+                let n1 = (*count).max(1);
+                let n2 = second.as_ref().map(|s| s.count.max(1)).unwrap_or(1);
+                let mut v = Vec::new();
+                for j in 0..n2 {
+                    for i in 0..n1 {
+                        if i != 0 || j != 0 {
+                            v.push(i + j * 65536);
+                        }
+                    }
+                }
+                v
+            }
+            PatternKind::Circular { count, .. } => (1..(*count).max(1)).collect(),
+            PatternKind::Mirror { .. } => vec![0],
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -229,6 +450,12 @@ pub struct Assembly {
     pub named_positions: Vec<NamedPosition>,
     #[serde(default)]
     pub exploded_views: Vec<ExplodedView>,
+    /// Assembly mate connector features.
+    #[serde(default)]
+    pub connectors: Vec<AsmMateConnector>,
+    /// Linear / circular patterns, mirrors, part patterns and replicates.
+    #[serde(default)]
+    pub patterns: Vec<InstancePattern>,
 }
 pub mod analysis;
 pub mod eval;
@@ -244,7 +471,22 @@ impl Assembly {
     pub fn mate(&self, id: MateId) -> Option<&Mate> {
         self.mates.iter().find(|m| m.id == id)
     }
-    /// Fresh id for instances, mates, relations and groups (unique within the assembly).
+    pub fn connector(&self, id: MateId) -> Option<&AsmMateConnector> {
+        self.connectors.iter().find(|c| c.id == id)
+    }
+    pub fn pattern(&self, id: MateId) -> Option<&InstancePattern> {
+        self.patterns.iter().find(|p| p.id == id)
+    }
+    /// Pattern that generated an instance.
+    pub fn generated_by(&self, id: InstanceId) -> Option<&InstancePattern> {
+        self.patterns.iter().find(|p| p.generated.iter().any(|g| g.instance == id))
+    }
+    /// Pattern that generated a mate (part pattern / replicate).
+    pub fn mate_generated_by(&self, id: MateId) -> Option<&InstancePattern> {
+        self.patterns.iter().find(|p| p.generated.iter().any(|g| g.mate == Some(id)))
+    }
+    /// Fresh id for instances, mates, relations, groups, connectors and patterns
+    /// (unique within the assembly; never 0, which is the origin).
     pub fn next_id(&self) -> u64 {
         let m = self
             .instances
@@ -253,6 +495,8 @@ impl Assembly {
             .chain(self.mates.iter().map(|m| m.id.0))
             .chain(self.relations.iter().map(|r| r.id.0))
             .chain(self.groups.iter().map(|g| g.id.0))
+            .chain(self.connectors.iter().map(|c| c.id.0))
+            .chain(self.patterns.iter().map(|p| p.id.0))
             .max()
             .unwrap_or(0);
         m + 1
@@ -268,24 +512,76 @@ impl Assembly {
             n += 1;
         }
     }
+    /// Instance name without the ` <n>` suffix.
+    pub fn base_name(name: &str) -> &str {
+        match name.rfind(" <") {
+            Some(i) if name.ends_with('>') => &name[..i],
+            _ => name,
+        }
+    }
     /// Next default feature name ("Fastened 1", "Group 2"...).
     pub fn next_feature_name(&self, base: &str) -> String {
         let mut n = 1;
         loop {
             let name = format!("{base} {n}");
-            let taken = self.mates.iter().any(|m| m.name == name) || self.relations.iter().any(|r| r.name == name) || self.groups.iter().any(|g| g.name == name);
+            let taken = self.mates.iter().any(|m| m.name == name)
+                || self.relations.iter().any(|r| r.name == name)
+                || self.groups.iter().any(|g| g.name == name)
+                || self.connectors.iter().any(|c| c.name == name)
+                || self.patterns.iter().any(|p| p.name == name);
             if !taken {
                 return name;
             }
             n += 1;
         }
     }
-    /// Remove an instance with the mates, relations and group memberships that use it.
+    fn uses_dead_connector(c: &MateConnectorRef, dead: &[MateId]) -> bool {
+        c.connector.is_some_and(|id| dead.contains(&id))
+    }
+    /// Remove an instance with the mates, relations, connectors, pattern
+    /// copies and group memberships that use it.
     pub fn remove_instance(&mut self, id: InstanceId) {
+        if id == InstanceId::ORIGIN {
+            return;
+        }
+        // Patterns seeded by the instance lose their copies of it.
+        let mut dead_instances: Vec<InstanceId> = vec![id];
+        for p in &mut self.patterns {
+            if p.seeds.contains(&id) {
+                p.seeds.retain(|s| *s != id);
+                dead_instances.extend(p.generated.iter().filter(|g| g.seed == id).map(|g| g.instance));
+                p.generated.retain(|g| g.seed != id);
+            }
+            p.generated.retain(|g| g.instance != id);
+        }
+        let dead_patterns: Vec<MateId> = self.patterns.iter().filter(|p| p.seeds.is_empty()).map(|p| p.id).collect();
+        for pid in dead_patterns {
+            self.remove_mate(pid);
+        }
+        for d in dead_instances {
+            self.remove_instance_only(d);
+        }
+    }
+    fn remove_instance_only(&mut self, id: InstanceId) {
         self.instances.retain(|i| i.id != id);
-        let dead: Vec<MateId> = self.mates.iter().filter(|m| m.a.instance == id || m.b.instance == id).map(|m| m.id).collect();
+        let dead_conn: Vec<MateId> = self.connectors.iter().filter(|c| c.on.instance == id).map(|c| c.id).collect();
+        self.connectors.retain(|c| !dead_conn.contains(&c.id));
+        let dead: Vec<MateId> = self.mates.iter().filter(|m| m.uses_instance(id) || m.connectors().any(|c| Self::uses_dead_connector(c, &dead_conn))).map(|m| m.id).collect();
         self.mates.retain(|m| !dead.contains(&m.id));
         self.relations.retain(|r| !r.mates.iter().any(|m| dead.contains(m)));
+        for p in &mut self.patterns {
+            for g in &mut p.generated {
+                if g.mate.is_some_and(|m| dead.contains(&m)) {
+                    g.mate = None;
+                }
+            }
+        }
+        self.patterns.retain(|p| match &p.kind {
+            PatternKind::Linear { direction, second, .. } => !Self::uses_dead_connector(direction, &dead_conn) && direction.instance != id && second.as_ref().is_none_or(|s| s.direction.instance != id),
+            PatternKind::Circular { axis, .. } => !Self::uses_dead_connector(axis, &dead_conn) && axis.instance != id,
+            PatternKind::Mirror { plane } => !Self::uses_dead_connector(plane, &dead_conn) && plane.instance != id,
+            PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => !dead.contains(mate),
+        });
         for g in &mut self.groups {
             g.instances.retain(|i| *i != id);
         }
@@ -299,11 +595,156 @@ impl Assembly {
             }
         }
     }
-    /// Remove a mate and relations using it.
+    /// Remove a mate, relation, group, connector or pattern (patterns take
+    /// their generated instances and mates with them).
     pub fn remove_mate(&mut self, id: MateId) {
+        if let Some(p) = self.patterns.iter().find(|p| p.id == id).cloned() {
+            self.patterns.retain(|x| x.id != id);
+            for g in &p.generated {
+                if let Some(m) = g.mate {
+                    self.remove_mate(m);
+                }
+                self.remove_instance(g.instance);
+            }
+            return;
+        }
+        if self.connectors.iter().any(|c| c.id == id) {
+            self.connectors.retain(|c| c.id != id);
+            let dead: Vec<MateId> = self.mates.iter().filter(|m| m.connectors().any(|c| c.connector == Some(id))).map(|m| m.id).collect();
+            for m in dead {
+                self.remove_mate(m);
+            }
+            let dead = [id];
+            self.patterns.retain(|p| match &p.kind {
+                PatternKind::Linear { direction, .. } => !Self::uses_dead_connector(direction, &dead),
+                PatternKind::Circular { axis, .. } => !Self::uses_dead_connector(axis, &dead),
+                PatternKind::Mirror { plane } => !Self::uses_dead_connector(plane, &dead),
+                _ => true,
+            });
+            return;
+        }
         self.mates.retain(|m| m.id != id);
         self.relations.retain(|r| r.id != id && !r.mates.contains(&id));
         self.groups.retain(|g| g.id != id);
+        // A pattern driven by this mate (part pattern / replicate) goes too.
+        if let Some(pid) = self.patterns.iter().find(|p| matches!(p.kind, PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } if mate == id)).map(|p| p.id) {
+            self.remove_mate(pid);
+        }
+        for p in &mut self.patterns {
+            for g in &mut p.generated {
+                if g.mate == Some(id) {
+                    g.mate = None;
+                }
+            }
+        }
+    }
+    /// Dissolve a pattern: its generated instances and mates become regular ones.
+    pub fn dissolve_pattern(&mut self, id: MateId) {
+        self.patterns.retain(|p| p.id != id);
+    }
+
+    /// Bring a linear / circular / mirror pattern's generated instances in
+    /// line with its definition (count changes, new seeds). Generated
+    /// instances start at the seed's placement; the solver moves them.
+    /// Returns the ids of new instances.
+    pub fn sync_pattern(&mut self, id: MateId) -> Vec<InstanceId> {
+        let Some(p) = self.pattern(id).cloned() else { return vec![] };
+        let wanted: Vec<(InstanceId, u32)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
+        self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect())
+    }
+
+    /// Set a matched pattern's (part pattern / replicate) targets: one
+    /// generated instance per target, mated to it like the seed is mated to
+    /// its own target. `targets` are (code, target connector, initial placement).
+    pub fn sync_matched_pattern(&mut self, id: MateId, targets: Vec<(u32, MateConnectorRef, Option<Placement>)>) -> Vec<InstanceId> {
+        let Some(p) = self.pattern(id).cloned() else { return vec![] };
+        let seed = p.seeds.first().copied();
+        let Some(seed) = seed else { return vec![] };
+        self.apply_generated(id, targets.into_iter().map(|(code, t, pl)| (seed, code, Some(t), pl)).collect())
+    }
+
+    fn apply_generated(&mut self, id: MateId, wanted: Vec<(InstanceId, u32, Option<MateConnectorRef>, Option<Placement>)>) -> Vec<InstanceId> {
+        let Some(p) = self.pattern(id).cloned() else { return vec![] };
+        let seed_mate = match &p.kind {
+            PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => self.mate(*mate).cloned(),
+            _ => None,
+        };
+        // Drop generated instances that are no longer wanted (or whose target changed).
+        let keep = |g: &PatternInstance| wanted.iter().any(|(s, i, t, _)| *s == g.seed && *i == g.index && (t.is_none() || g.target.as_ref() == t.as_ref()));
+        let stale: Vec<PatternInstance> = p.generated.iter().filter(|g| !keep(g)).cloned().collect();
+        for g in &stale {
+            if let Some(m) = g.mate {
+                self.mates.retain(|x| x.id != m);
+                self.relations.retain(|r| !r.mates.contains(&m));
+            }
+            if let Some(pp) = self.patterns.iter_mut().find(|x| x.id == id) {
+                pp.generated.retain(|x| x.instance != g.instance);
+            }
+            self.remove_instance(g.instance);
+        }
+        let mut created = Vec::new();
+        for (seed, index, target, placement) in wanted {
+            let exists = self.pattern(id).is_some_and(|pp| pp.generated.iter().any(|g| g.seed == seed && g.index == index));
+            if exists {
+                continue;
+            }
+            let Some(src) = self.instance(seed).cloned() else { continue };
+            let nid = InstanceId(self.next_id());
+            let name = self.next_instance_name(Self::base_name(&src.name));
+            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false });
+            let mut mate_id = None;
+            if let (Some(sm), Some(t)) = (&seed_mate, &target) {
+                let mid = MateId(self.next_id());
+                let mut m = sm.clone();
+                m.id = mid;
+                m.name = self.next_feature_name(sm.mate_type.name());
+                // The seed side moves to the copy; the target side to the matched geometry.
+                for c in std::iter::once(&mut m.a).chain(std::iter::once(&mut m.b)).chain(m.extra.iter_mut()) {
+                    if c.instance == seed {
+                        c.instance = nid;
+                    } else {
+                        let (flip, rq) = (c.flip, c.rotate_quarters);
+                        *c = t.clone();
+                        c.flip = flip;
+                        c.rotate_quarters = rq;
+                    }
+                }
+                self.mates.push(m);
+                mate_id = Some(mid);
+            }
+            if let Some(pp) = self.patterns.iter_mut().find(|x| x.id == id) {
+                pp.generated.push(PatternInstance { seed, index, instance: nid, mate: mate_id, target });
+            }
+            created.push(nid);
+        }
+        created
+    }
+
+    /// Replace the source of instances (keeping their mates: references keep
+    /// resolving wherever the replacement has geometry with the same names).
+    /// With `all`, every instance with the same source is replaced.
+    pub fn replace_instance(&mut self, id: InstanceId, source: InstanceSource, base_name: &str, all: bool) -> Vec<InstanceId> {
+        let Some(old) = self.instance(id).map(|i| i.source.clone()) else { return vec![] };
+        let ids: Vec<InstanceId> = if all { self.instances.iter().filter(|i| i.source == old).map(|i| i.id).collect() } else { vec![id] };
+        for i in &ids {
+            let name = self.next_instance_name(base_name);
+            if let Some(inst) = self.instance_mut(*i) {
+                inst.source = source.clone();
+                inst.name = name;
+            }
+        }
+        ids
+    }
+
+    /// Change the configuration of a Part / Part Studio instance.
+    pub fn set_instance_config(&mut self, id: InstanceId, cfg: ConfigValues) -> bool {
+        match self.instance_mut(id).map(|i| &mut i.source) {
+            Some(InstanceSource::Part { config, .. }) | Some(InstanceSource::PartStudio { config, .. }) => {
+                *config = cfg;
+                true
+            }
+            _ => false,
+        }
     }
 }
 

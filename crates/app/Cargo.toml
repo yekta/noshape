@@ -23,9 +23,14 @@ log.workspace = true
 env_logger.workspace = true
 parking_lot.workspace = true
 ahash.workspace = true
-image = { version = "0.25", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png"] }
 async-channel = "2"
 rust-embed = "8"
 rfd = "0.15"
 dirs = "6"
 serde_json.workspace = true
+ttf-parser = "0.25"
+serde.workspace = true
+rusqlite.workspace = true
+trash = "5"
+open = "5"

@@ -18,6 +18,8 @@ use noshape_units::{Dim, ExprValue, Quantity};
 pub enum RightPanel {
     Variables,
     Configurations,
+    SheetMetal,
+    CutList,
 }
 
 impl PartStudioView {
@@ -65,6 +67,8 @@ impl PartStudioView {
         let body = match panel {
             RightPanel::Variables => self.render_variables(cx),
             RightPanel::Configurations => self.render_configurations(window, cx),
+            RightPanel::SheetMetal => self.render_sheet_metal_panel(cx),
+            RightPanel::CutList => self.render_cut_list_panel(cx),
         };
         Some(
             v_flex()
@@ -84,6 +88,8 @@ impl PartStudioView {
                         .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(match panel {
                             RightPanel::Variables => "VARIABLES",
                             RightPanel::Configurations => "CONFIGURATIONS",
+                            RightPanel::SheetMetal => "SHEET METAL",
+                            RightPanel::CutList => "CUT LIST",
                         }))
                         .child(Button::new("panel-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.right_panel = None;
@@ -465,7 +471,28 @@ impl PartStudioView {
                     .tooltip("Configurations")
                     .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::Configurations, w, cx))),
             )
-            .when(false, |d| d)
+            .when(self.has_sheet_metal(), |d| {
+                d.child(
+                    Button::new("panel-sm")
+                        .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("sheet-metal")))
+                        .ghost()
+                        .xsmall()
+                        .selected(active == Some(RightPanel::SheetMetal))
+                        .tooltip("Sheet metal: flat pattern and bend table")
+                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::SheetMetal, w, cx))),
+                )
+            })
+            .when(self.has_frames(), |d| {
+                d.child(
+                    Button::new("panel-cut")
+                        .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("cut-list")))
+                        .ghost()
+                        .xsmall()
+                        .selected(active == Some(RightPanel::CutList))
+                        .tooltip("Cut list")
+                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::CutList, w, cx))),
+                )
+            })
             .into_any_element()
     }
 }

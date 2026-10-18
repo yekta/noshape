@@ -58,7 +58,7 @@ impl AsmPickMap {
     }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
         let prio: Vec<i32> = self.targets.iter().map(|t| t.kind.priority()).collect();
-        Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(0) })
+        Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
     }
 }
 
@@ -191,19 +191,72 @@ pub struct Highlights {
     pub triads: Vec<Triad>,
     /// Inference dots (world positions).
     pub dots: Vec<DVec3>,
-    /// Move manipulator (triad with pickable axis arrows) and the hovered axis.
-    pub manipulator: Option<(Frame, f64, Option<usize>)>,
+    /// Move manipulator (triad with pickable axis arrows and rotation rings)
+    /// and the hovered handle.
+    pub manipulator: Option<(Frame, f64, Option<ManipHandle>)>,
+    /// Pickable assembly origin triad (size) and whether it is hovered/selected.
+    pub origin: Option<(f64, bool)>,
+    /// Pickable assembly mate connector triads: (frame, size, highlighted).
+    pub connectors: Vec<(Frame, f64, bool)>,
+    /// Mate glyph lines (between connector origins).
+    pub mate_lines: Vec<(DVec3, DVec3, bool)>,
+    /// Placement preview cross at the cursor (insert).
+    pub cursor_mark: Option<(DVec3, f64)>,
 }
 
-/// Pick id of manipulator axis `k` (0 = X, 1 = Y, 2 = Z).
-pub fn manip_pick_id(built: &AsmBuilt, k: usize) -> u32 {
-    built.picks.len() as u32 + 1 + k as u32
+/// Manipulator handle: translate along axis k or rotate about axis k.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ManipHandle {
+    Axis(usize),
+    Ring(usize),
 }
 
-/// Manipulator axis for a pick id, if it is one.
-pub fn manip_axis(built: &AsmBuilt, id: u32) -> Option<usize> {
-    let base = built.picks.len() as u32 + 1;
-    (id >= base && id < base + 3).then(|| (id - base) as usize)
+/// Pickable overlay items beyond the geometry picks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OverlayPick {
+    Manip(ManipHandle),
+    Origin,
+    Connector(usize),
+}
+
+fn overlay_base(built: &AsmBuilt) -> u32 {
+    built.picks.len() as u32 + 1
+}
+
+/// Pick id of an overlay item.
+pub fn overlay_id(built: &AsmBuilt, o: OverlayPick) -> u32 {
+    let b = overlay_base(built);
+    match o {
+        OverlayPick::Manip(ManipHandle::Axis(k)) => b + k as u32,
+        OverlayPick::Manip(ManipHandle::Ring(k)) => b + 3 + k as u32,
+        OverlayPick::Origin => b + 6,
+        OverlayPick::Connector(i) => b + 7 + i as u32,
+    }
+}
+
+/// Overlay item for a pick id, if it is one.
+pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
+    let b = overlay_base(built);
+    if id < b {
+        return None;
+    }
+    Some(match id - b {
+        k @ 0..=2 => OverlayPick::Manip(ManipHandle::Axis(k as usize)),
+        k @ 3..=5 => OverlayPick::Manip(ManipHandle::Ring(k as usize - 3)),
+        6 => OverlayPick::Origin,
+        k => OverlayPick::Connector(k as usize - 7),
+    })
+}
+
+const AXIS_COLORS: [[u8; 4]; 3] = [[0xff, 0x5c, 0x5c, 255], [0x3e, 0xcf, 0x8e, 255], [0x5a, 0xa9, 0xff, 255]];
+
+fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32, highlight: bool) {
+    let o: [f32; 3] = f.origin.as_vec3().into();
+    for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
+        let tip: [f32; 3] = (f.origin + axis * size).as_vec3().into();
+        let c = if highlight { [0xff, 0xe0, 0x66, 255] } else { AXIS_COLORS[k] };
+        lines.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: pick, width, style: LineSegment::ON_TOP });
+    }
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
@@ -245,28 +298,70 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     let mut lines = LineData::default();
     for t in &h.triads {
-        let o: [f32; 3] = t.frame.origin.as_vec3().into();
         let w = if t.strong { 2.5 } else { 1.5 };
-        for (axis, color) in [(t.frame.x(), [0xff, 0x5c, 0x5c, 255]), (t.frame.y(), [0x3e, 0xcf, 0x8e, 255]), (t.frame.z(), [0x5a, 0xa9, 0xff, 255])] {
-            let tip: [f32; 3] = (t.frame.origin + axis * t.size).as_vec3().into();
-            lines.segments.push(LineSegment { a: o, b: tip, color, pick_id: 0, width: w, style: LineSegment::ON_TOP });
+        push_triad(&mut lines, &t.frame, t.size, w, 0, false);
+        pts.points.push(PointSprite { position: t.frame.origin.as_vec3().into(), color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: if t.strong { 7.0 } else { 5.0 }, style: LineSegment::ON_TOP, _pad: 0 });
+    }
+    for (a, b, strong) in &h.mate_lines {
+        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: [0xff, 0xb0, 0x20, 255], pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP });
+    }
+    if let Some((p, size)) = h.cursor_mark {
+        for axis in [DVec3::X, DVec3::Y, DVec3::Z] {
+            lines.segments.push(LineSegment { a: (p - axis * size).as_vec3().into(), b: (p + axis * size).as_vec3().into(), color: [0x4c, 0xc9, 0xf0, 255], pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
         }
-        pts.points.push(PointSprite { position: o, color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: if t.strong { 7.0 } else { 5.0 }, style: LineSegment::ON_TOP, _pad: 0 });
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
     }
+    // Pickable overlays: origin, assembly mate connectors, manipulator.
+    let mut ol = LineData::default();
+    let mut op = PointData::default();
+    if let Some((size, hl)) = h.origin {
+        let id = overlay_id(built, OverlayPick::Origin);
+        push_triad(&mut ol, &Frame::default(), size, 1.5, id, hl);
+        op.points.push(PointSprite { position: [0.0; 3], color: if hl { [0xff, 0xe0, 0x66, 255] } else { [0xe7, 0xe9, 0xee, 255] }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        scene.set_state(id, 0);
+    }
+    for (i, (f, size, hl)) in h.connectors.iter().enumerate() {
+        let id = overlay_id(built, OverlayPick::Connector(i));
+        push_triad(&mut ol, f, *size, 2.0, id, *hl);
+        op.points.push(PointSprite { position: f.origin.as_vec3().into(), color: if *hl { [0xff, 0xe0, 0x66, 255] } else { [0xff, 0xff, 0xff, 255] }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        scene.set_state(id, 0);
+    }
     if let Some((f, size, hovered)) = &h.manipulator {
-        let mut ml = LineData::default();
         let o: [f32; 3] = f.origin.as_vec3().into();
-        for (k, (axis, color)) in [(f.x(), [0xff, 0x5c, 0x5c, 255u8]), (f.y(), [0x3e, 0xcf, 0x8e, 255]), (f.z(), [0x5a, 0xa9, 0xff, 255])].into_iter().enumerate() {
+        for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
             let tip: [f32; 3] = (f.origin + axis * *size).as_vec3().into();
-            let c = if *hovered == Some(k) { [0xff, 0xe0, 0x66, 255] } else { color };
-            let id = manip_pick_id(built, k);
-            ml.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: id, width: 5.0, style: LineSegment::ON_TOP });
+            let c = if *hovered == Some(ManipHandle::Axis(k)) { [0xff, 0xe0, 0x66, 255] } else { AXIS_COLORS[k] };
+            let id = overlay_id(built, OverlayPick::Manip(ManipHandle::Axis(k)));
+            ol.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: id, width: 5.0, style: LineSegment::ON_TOP });
+            op.points.push(PointSprite { position: tip, color: c, pick_id: id, size: 10.0, style: LineSegment::ON_TOP, _pad: 0 });
             scene.set_state(id, 0);
+            // Rotation ring about axis k (in the plane of the other two axes).
+            let (u, v) = match k {
+                0 => (f.y(), f.z()),
+                1 => (f.z(), f.x()),
+                _ => (f.x(), f.y()),
+            };
+            let rid = overlay_id(built, OverlayPick::Manip(ManipHandle::Ring(k)));
+            let rc = if *hovered == Some(ManipHandle::Ring(k)) { [0xff, 0xe0, 0x66, 255] } else { AXIS_COLORS[k] };
+            let r = *size * 0.72;
+            let n = 48;
+            for i in 0..n {
+                let (a0, a1) = (i as f64 / n as f64 * std::f64::consts::TAU, (i + 1) as f64 / n as f64 * std::f64::consts::TAU);
+                let p0 = f.origin + (u * a0.cos() + v * a0.sin()) * r;
+                let p1 = f.origin + (u * a1.cos() + v * a1.sin()) * r;
+                ol.segments.push(LineSegment { a: p0.as_vec3().into(), b: p1.as_vec3().into(), color: rc, pick_id: rid, width: 3.0, style: LineSegment::ON_TOP });
+            }
+            scene.set_state(rid, 0);
         }
-        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ml))).per_primitive_color().ignore_clip().layer(22));
+        op.points.push(PointSprite { position: o, color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+    }
+    if !ol.segments.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ol))).per_primitive_color().ignore_clip().layer(22));
+    }
+    if !op.points.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&op))).per_primitive_color().ignore_clip().layer(23));
     }
     if !pts.points.is_empty() {
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(21));

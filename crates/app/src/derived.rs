@@ -54,6 +54,7 @@ impl DerivedProvider for DocStudios {
         let opts = RegenOptions {
             document_variables: noshape_model::variables::document_variables(&self.doc),
             derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
+            custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
             ..Default::default()
         };
         let mut reg = self.cache.lock().remove(tab).unwrap_or_default();
@@ -71,6 +72,10 @@ impl DerivedProvider for DocStudios {
             for t in &self.doc.tabs {
                 if let TabContent::VariableStudio(v) = &t.content {
                     serde_json::to_string(v).unwrap_or_default().hash(&mut h);
+                }
+                // Custom features of the source depend on Feature Studios.
+                if let TabContent::FeatureStudio(f) = &t.content {
+                    f.source.hash(&mut h);
                 }
             }
             for f in ps.features.iter().filter(|f| f.type_id == "importDerived") {

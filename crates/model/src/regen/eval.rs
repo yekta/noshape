@@ -82,6 +82,10 @@ pub struct EvalCtx<'a> {
     /// `features::pattern`), and topology lookups (`resolve_faces`,
     /// `resolve_edges`, `resolve_bodies`) are unaffected.
     pub xform: Option<DMat4>,
+    /// Feature Studio scripts of the document (custom features).
+    pub custom: Option<Arc<dyn crate::custom::CustomFeatureProvider>>,
+    /// Type id of the custom feature being evaluated (`custom:<tab>:<name>`).
+    pub custom_type: Option<String>,
 }
 
 /// Map a plane frame by an affine (rigid or mirror) transform. Mirrors give a
@@ -161,7 +165,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None }
     }
 
     // ------------------------------------------------------------ pattern transform

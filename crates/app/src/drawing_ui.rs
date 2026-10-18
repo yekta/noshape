@@ -5,13 +5,13 @@ use crate::assets::icon_path;
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Disableable as _, Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
-use noshape_model::drawing::build::render_sheet;
+use noshape_model::drawing::build::render_sheet_with;
 use noshape_model::drawing::views::{self, ViewCache};
 use noshape_model::drawing::*;
 use std::path::PathBuf;
@@ -64,14 +64,16 @@ impl DrawingEditor {
         let doc = self.doc.read(cx);
         let mut out = Vec::new();
         for t in doc.session.doc.ordered_tabs() {
-            let TabContent::PartStudio(_) = &t.content else { continue };
+            if !matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_)) {
+                continue;
+            }
             let tab = t.id;
             let mut orient = Vec::new();
             for o in [ViewOrientation::Front, ViewOrientation::Top, ViewOrientation::Right, ViewOrientation::Left, ViewOrientation::Back, ViewOrientation::Bottom, ViewOrientation::Isometric] {
                 orient.push(MenuEntry::item(format!("{o:?}"), move |e, _, cx| e.set_tool(Tool::InsertView { source: tab, orientation: o, part: None }, cx)));
             }
             // Single parts (when the studio has been regenerated).
-            if let Some(src) = self.sources.get(&tab) {
+            if let Some(src) = self.sources.get(&views::SourceKey::studio(tab)).filter(|s| !s.assembly) {
                 let parts = views::view_bodies(&src.context, None);
                 if parts.len() > 1 {
                     orient.push(MenuEntry::Separator);
@@ -86,7 +88,7 @@ impl DrawingEditor {
             out.push(MenuEntry::Submenu(t.name.clone().into(), orient));
         }
         if out.is_empty() {
-            out.push(MenuEntry::item("No Part Studios in this document", |_, _, _| {}));
+            out.push(MenuEntry::item("No Part Studios or Assemblies in this document", |_, _, _| {}));
         }
         out
     }
@@ -105,7 +107,7 @@ impl DrawingEditor {
             .small()
             .selected(matches!(t, Tool::InsertView { .. }))
             .dropdown_caret(true)
-            .tooltip("Insert view of a Part Studio")
+            .tooltip("Insert view of a Part Studio or Assembly")
             .dropdown_menu(move |m, w, cx| fill_menu(m, &insert_entries, &ed1, w, cx));
         let dim_kind = if let Tool::Dimension { kind, .. } = t { Some(kind) } else { None };
         let ed2 = ed.clone();
@@ -114,6 +116,26 @@ impl DrawingEditor {
             MenuEntry::item("Aligned", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Aligned, picks: vec![] }, cx)),
             MenuEntry::item("Horizontal", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Horizontal, picks: vec![] }, cx)),
             MenuEntry::item("Vertical", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Vertical, picks: vec![] }, cx)),
+            MenuEntry::Separator,
+            MenuEntry::item("Ordinate", |e, _, cx| e.set_tool(Tool::Ordinate { origin: None, horizontal: None, level: [0.0; 2] }, cx)),
+            MenuEntry::item("Chamfer", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)),
+            MenuEntry::item("Arc length", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
+        ];
+        let ed5 = ed.clone();
+        let views_menu = vec![
+            MenuEntry::item("Jogged section view", |e, _, cx| e.set_tool(Tool::JoggedSection { parent: None, points: vec![], done: false }, cx)),
+            MenuEntry::item("Aligned section view", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
+            MenuEntry::Separator,
+            MenuEntry::item("Crop view (rectangle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: false }, cx)),
+            MenuEntry::item("Crop view (circle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: true }, cx)),
+            MenuEntry::item("Break view (vertical lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
+            MenuEntry::item("Break view (horizontal lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: false }, cx)),
+        ];
+        let ed6 = ed.clone();
+        let table_menu = vec![
+            MenuEntry::item("Table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)),
+            MenuEntry::item("BOM table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx)),
+            MenuEntry::item("Hole table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx)),
         ];
         let ed3 = ed.clone();
         let sheet_menu = {
@@ -155,7 +177,7 @@ impl DrawingEditor {
                     .ghost()
                     .small()
                     .when(self.out_of_date, |b| b.primary())
-                    .disabled(!self.out_of_date && self.sources.len() >= views::referenced_studios(&self.drawing).len())
+                    .disabled(!self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len())
                     .tooltip("Update drawing (Ctrl+Q)")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.update_drawing(cx))),
             )
@@ -165,20 +187,34 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-aux", "auxiliary-view", "Auxiliary view", matches!(t, Tool::Auxiliary { .. }), || Tool::Auxiliary { parent: None }, cx))
             .child(self.tool_btn("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. }), || Tool::Section { parent: None, p0: None, line: None }, cx))
             .child(self.tool_btn("dr-detail", "detail-view", "Detail view", matches!(t, Tool::Detail { .. }), || Tool::Detail { parent: None, center: None, radius: None }, cx))
+            .child(self.tool_btn("dr-crop", "crop-view", "Crop view", matches!(t, Tool::Crop { .. }), || Tool::Crop { parent: None, first: None, circle: false }, cx))
+            .child(self.tool_btn("dr-break", "broken-view", "Break view", matches!(t, Tool::Break { .. }), || Tool::Break { parent: None, first: None, vertical: true }, cx))
+            .child(Button::new("dr-views-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).tooltip("More views").dropdown_menu(move |m, w, cx| fill_menu(m, &views_menu, &ed5, w, cx)))
             .child(sep())
             .child(
                 h_flex()
-                    .child(self.tool_btn("dr-dim", "linear-dim", "Dimension (D)", matches!(dim_kind, Some(DimTool::Linear | DimTool::Aligned | DimTool::Horizontal | DimTool::Vertical)), || Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx))
+                    .child(self.tool_btn("dr-dim", "linear-dim", "Dimension (D)", matches!(dim_kind, Some(DimTool::Linear | DimTool::Aligned | DimTool::Horizontal | DimTool::Vertical | DimTool::Chamfer | DimTool::ArcLength)), || Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx))
                     .child(Button::new("dr-dim-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).dropdown_menu(move |m, w, cx| fill_menu(m, &dims_menu, &ed2, w, cx))),
             )
             .child(self.tool_btn("dr-rad", "radial-dim", "Radial dimension (Shift+R)", dim_kind == Some(DimTool::Radius), || Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx))
             .child(self.tool_btn("dr-dia", "diameter-dim", "Diameter dimension (Shift+D)", dim_kind == Some(DimTool::Diameter), || Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx))
             .child(self.tool_btn("dr-ang", "angular-dim", "Angular dimension", dim_kind == Some(DimTool::Angle), || Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx))
+            .child(self.tool_btn("dr-ord", "ordinate-dim", "Ordinate dimension", matches!(t, Tool::Ordinate { .. }), || Tool::Ordinate { origin: None, horizontal: None, level: [0.0; 2] }, cx))
             .child(sep())
             .child(self.tool_btn("dr-note", "note", "Note (N)", matches!(t, Tool::Note), || Tool::Note, cx))
             .child(self.tool_btn("dr-balloon", "balloon", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }, cx))
             .child(self.tool_btn("dr-cmark", "centermark", "Centermark", matches!(t, Tool::Centermark), || Tool::Centermark, cx))
             .child(self.tool_btn("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }, cx))
+            .child(self.tool_btn("dr-gdt", "gdt", "Geometric tolerance", matches!(t, Tool::Gdt), || Tool::Gdt, cx))
+            .child(self.tool_btn("dr-datum", "datum", "Datum", matches!(t, Tool::Datum { .. }), || Tool::Datum { anchor: None }, cx))
+            .child(self.tool_btn("dr-sf", "surface-finish", "Surface finish", matches!(t, Tool::SurfaceFinish), || Tool::SurfaceFinish, cx))
+            .child(sep())
+            .child(
+                h_flex()
+                    .child(self.tool_btn("dr-table", "bom", "Table", matches!(t, Tool::Table { kind: TableTool::General, .. }), || Tool::Table { kind: TableTool::General, view: None, origin: None }, cx))
+                    .child(self.tool_btn("dr-holetable", "hole-table", "Hole table", matches!(t, Tool::Table { kind: TableTool::Hole, .. }), || Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx))
+                    .child(Button::new("dr-table-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).tooltip("Tables").dropdown_menu(move |m, w, cx| fill_menu(m, &table_menu, &ed6, w, cx))),
+            )
             .child(sep())
             .child(
                 Button::new("dr-title")
@@ -267,12 +303,13 @@ impl DrawingEditor {
             Panel::Note { input, edit, .. } => (
                 if edit.is_some() { "Edit note" } else { "Note" },
                 vec![
-                    div().text_xs().text_color(pal.text_faint).child("Text (use \\n for a new line)").into_any_element(),
-                    Input::new(input).small().w(px(320.)).into_any_element(),
+                    Textarea::new(input).w(px(340.)).into_any_element(),
+                    div().text_xs().text_color(pal.text_faint).child("Fields: {part.name} {part.number} {part.material} {doc.name} {sheet.scale} {sheet.number} {sheet.count} {date}").into_any_element(),
                 ],
             ),
+            Panel::Dimension { .. } | Panel::Gdt { .. } | Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } | Panel::NewTable { .. } => self.extra_panel_rows(cx)?,
             Panel::TitleBlock { inputs } => (
-                "Title block",
+                "Title block (fields like {part.name}, {sheet.scale} allowed)",
                 inputs
                     .iter()
                     .map(|(k, st)| h_flex().gap_2().child(div().w(px(90.)).text_xs().text_color(pal.text_muted).child(k.clone())).child(Input::new(st).xsmall().w(px(220.))).into_any_element())
@@ -320,7 +357,13 @@ impl DrawingEditor {
         )
     }
 
-    fn input(&mut self, value: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+    pub fn textarea(&mut self, value: &str, rows: usize, window: &mut Window, cx: &mut Context<Self>) -> Entity<TextareaState> {
+        let st = cx.new(|cx| TextareaState::new(window, cx).rows(rows).default_value(value.to_string()));
+        st.update(cx, |s, cx| s.focus(window, cx));
+        st
+    }
+
+    pub fn input(&mut self, value: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(value.to_string()));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, _, ev: &InputEvent, _, cx| {
             if let InputEvent::PressEnter { .. } = ev {
@@ -331,7 +374,7 @@ impl DrawingEditor {
         st
     }
 
-    fn focus_input(st: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn focus_input(st: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
@@ -341,10 +384,9 @@ impl DrawingEditor {
     pub fn open_note_panel(&mut self, edit: Option<u64>, pos: [f64; 2], window: &mut Window, cx: &mut Context<Self>) {
         let text = edit
             .and_then(|id| self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id))
-            .and_then(|a| if let AnnotationKind::Note { text, .. } = &a.kind { Some(text.replace('\n', "\\n")) } else { None })
+            .and_then(|a| if let AnnotationKind::Note { text, .. } = &a.kind { Some(text.clone()) } else { None })
             .unwrap_or_default();
-        let input = self.input(&text, window, cx);
-        Self::focus_input(&input, window, cx);
+        let input = self.textarea(&text, 5, window, cx);
         self.panel = Some(Panel::Note { input, edit, pos });
         cx.notify();
     }
@@ -383,7 +425,7 @@ impl DrawingEditor {
         let Some(panel) = self.panel.take() else { return };
         match panel {
             Panel::Note { input, edit, pos } => {
-                let text = input.read(cx).value().to_string().replace("\\n", "\n");
+                let text = input.read(cx).value().to_string();
                 if text.trim().is_empty() {
                     if let Some(id) = edit {
                         self.edit_sheet("Delete note", cx, |s| s.annotations.retain(|a| a.id != id));
@@ -396,7 +438,7 @@ impl DrawingEditor {
                     });
                 } else {
                     let id = self.current_sheet().next_annotation_id();
-                    self.edit_sheet("Note", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm: 3.5 }, position: pos, refs: vec![] }));
+                    self.edit_sheet("Note", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm: 3.5 }, position: pos, ..Default::default() }));
                     self.tool = Tool::Select;
                 }
             }
@@ -418,7 +460,9 @@ impl DrawingEditor {
                 let text = input.read(cx).value().to_string();
                 self.edit_view("View label", view, cx, |v| v.label = (!text.trim().is_empty()).then_some(text));
             }
+            other => self.apply_extra_panel(other, cx),
         }
+        self.update_preview(cx);
         cx.notify();
     }
 
@@ -445,12 +489,13 @@ impl DrawingEditor {
         let si = self.sheet;
         let sources = self.sources.clone();
         let cache: Arc<ViewCache> = self.cache.clone();
+        let info = self.info.clone();
         self.status = Some(format!("Exporting {}…", format.ext().to_uppercase()).into());
         cx.notify();
         cx.spawn(async move |this, cx| {
             let result: Result<PathBuf, String> = cx
                 .background_spawn(async move {
-                    let built = render_sheet(&drawing, si, &sources, &cache, true).ok_or("nothing to export")?;
+                    let built = render_sheet_with(&drawing, si, &sources, &cache, true, &info).ok_or("nothing to export")?;
                     let bytes = match format {
                         ExportFormat::Pdf => export::to_pdf(&built.geometry),
                         ExportFormat::Svg => export::to_svg(&built.geometry).into_bytes(),

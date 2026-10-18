@@ -86,6 +86,46 @@ pub enum ViewKind {
     /// Enlarged circular crop of the parent (`center`/`radius` in the
     /// parent's view coordinates, meters).
     Detail { parent: ViewId, center: [f64; 2], radius: f64, label: String },
+    /// Aligned section: the cutting line runs from `a` to `center` and on
+    /// to `b` (parent view coordinates). The view looks perpendicular to the
+    /// `center`-`a` leg; the `center`-`b` leg (with the material behind
+    /// it) is revolved about the axis through `center` into that plane.
+    AlignedSection { parent: ViewId, center: [f64; 2], a: [f64; 2], b: [f64; 2], label: String },
+}
+
+/// Crop boundary of a view (view coordinates, meters).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Crop {
+    Circle { center: [f64; 2], radius: f64 },
+    /// Closed polygon (e.g. a rectangle).
+    Polygon(Vec<[f64; 2]>),
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BreakStyle {
+    #[default]
+    ZigZag,
+    Straight,
+    Curve,
+}
+
+/// A break (broken view): the band between `a` and `b` (view coordinates,
+/// meters, `a < b`) is removed and the geometry beyond it moved up to a gap
+/// of `gap_mm` on the sheet. `vertical`: the break lines are vertical (the
+/// band is an x interval); otherwise horizontal (a y interval).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ViewBreak {
+    pub vertical: bool,
+    pub a: f64,
+    pub b: f64,
+    #[serde(default = "default_gap")]
+    pub gap_mm: f64,
+    #[serde(default)]
+    pub style: BreakStyle,
+}
+
+fn default_gap() -> f64 {
+    6.0
 }
 
 /// A point of model geometry referenced by an annotation. Resolved against
@@ -131,6 +171,36 @@ pub struct DrawingView {
     pub show_centerlines: bool,
     #[serde(default)]
     pub label: Option<String>,
+    /// Rotation of the view on the sheet (radians, counter-clockwise).
+    #[serde(default)]
+    pub rotation: f64,
+    #[serde(default)]
+    pub crop: Option<Crop>,
+    #[serde(default)]
+    pub breaks: Vec<ViewBreak>,
+    /// Exploded view (index into the assembly's exploded views) shown by a
+    /// base view of an Assembly.
+    #[serde(default)]
+    pub explode: Option<usize>,
+}
+
+impl Default for DrawingView {
+    fn default() -> Self {
+        Self {
+            id: ViewId(0),
+            kind: ViewKind::Projected { parent: ViewId(0), direction: None },
+            position: [0.0, 0.0],
+            scale: None,
+            style: RenderStyle::HiddenLinesRemoved,
+            show_tangent_edges: true,
+            show_centerlines: false,
+            label: None,
+            rotation: 0.0,
+            crop: None,
+            breaks: Vec::new(),
+            explode: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -144,6 +214,197 @@ pub enum AnnotationKind {
     Balloon { view: ViewId, anchor: [f64; 2], text: String },
     SurfaceFinish { anchor: [f64; 2], value: String },
     Gdt { anchor: [f64; 2], frame: Vec<String> },
+    /// One ordinate value: distance of `point` from the group `origin`
+    /// along x (`horizontal`) or y; the text sits at the annotation position.
+    OrdinateDimension { view: ViewId, origin: [f64; 2], point: [f64; 2], horizontal: bool },
+    /// Chamfer `a`-`b` measured against the adjacent edge `c`-`d`
+    /// ("distance x angle").
+    ChamferDimension { view: ViewId, a: [f64; 2], b: [f64; 2], c: [f64; 2], d: [f64; 2] },
+    /// Length of the arc from `a` to `b` about `center` (on the side of
+    /// `mid`); `offset` mm outside the arc.
+    ArcLengthDimension { view: ViewId, center: [f64; 2], radius: f64, a: [f64; 2], b: [f64; 2], mid: [f64; 2], offset: f64 },
+    /// Datum feature symbol: boxed `label` at the annotation position with a
+    /// leader ending in a filled triangle at `anchor` (sheet mm).
+    Datum { anchor: [f64; 2], label: String },
+}
+
+/// Units of a dimension value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DimUnits {
+    Millimeter,
+    Centimeter,
+    Meter,
+    Inch,
+    Foot,
+}
+
+impl DimUnits {
+    pub const ALL: [DimUnits; 5] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::Foot];
+    /// Meters per unit.
+    pub fn meters(self) -> f64 {
+        match self {
+            DimUnits::Millimeter => 0.001,
+            DimUnits::Centimeter => 0.01,
+            DimUnits::Meter => 1.0,
+            DimUnits::Inch => 0.0254,
+            DimUnits::Foot => 0.3048,
+        }
+    }
+    pub fn symbol(self) -> &'static str {
+        match self {
+            DimUnits::Millimeter => "mm",
+            DimUnits::Centimeter => "cm",
+            DimUnits::Meter => "m",
+            DimUnits::Inch => "in",
+            DimUnits::Foot => "ft",
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            DimUnits::Millimeter => "Millimeters",
+            DimUnits::Centimeter => "Centimeters",
+            DimUnits::Meter => "Meters",
+            DimUnits::Inch => "Inches",
+            DimUnits::Foot => "Feet",
+        }
+    }
+}
+
+/// Tolerance of a dimension. Values are SI (meters for lengths, radians
+/// for angles), shown in the dimension's units.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum Tolerance {
+    #[default]
+    None,
+    /// ±value
+    Symmetric { value: f64 },
+    /// Stacked +upper / -lower deviations (lower is usually negative).
+    Deviation { upper: f64, lower: f64 },
+    /// Stacked limit values: nominal + upper over nominal + lower.
+    Limits { upper: f64, lower: f64 },
+    /// Theoretically exact (boxed) dimension.
+    Basic,
+    Min,
+    Max,
+    /// ISO fit: hole class (e.g. "H7") and/or shaft class (e.g. "g6").
+    Fit { hole: String, shaft: String },
+}
+
+impl Tolerance {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Tolerance::None => "None",
+            Tolerance::Symmetric { .. } => "Symmetrical",
+            Tolerance::Deviation { .. } => "Deviation",
+            Tolerance::Limits { .. } => "Limits",
+            Tolerance::Basic => "Basic",
+            Tolerance::Min => "MIN",
+            Tolerance::Max => "MAX",
+            Tolerance::Fit { .. } => "Fit",
+        }
+    }
+}
+
+/// Per-dimension display settings (Onshape's dimension palette).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct DimFormat {
+    /// Decimal places; None = drawing default (trailing zeros trimmed).
+    #[serde(default)]
+    pub precision: Option<u8>,
+    /// None = drawing units.
+    #[serde(default)]
+    pub units: Option<DimUnits>,
+    #[serde(default)]
+    pub show_units: bool,
+    #[serde(default)]
+    pub tolerance: Tolerance,
+    #[serde(default)]
+    pub prefix: String,
+    #[serde(default)]
+    pub suffix: String,
+}
+
+impl DimFormat {
+    pub fn is_default(&self) -> bool {
+        *self == DimFormat::default()
+    }
+}
+
+/// Fixed corner of a table (the corner that stays put when it resizes).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TableCorner {
+    TopLeft,
+    #[default]
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TableKind {
+    /// Free table; the first row is a header when `header`.
+    General {
+        cells: Vec<Vec<String>>,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        header: bool,
+    },
+    /// Bill of materials of the assembly shown by `view`.
+    Bom { view: ViewId },
+    /// Holes (face-on circular bores) of `view`, located from `origin`
+    /// (view coordinates, associative through `origin_ref`).
+    Hole {
+        view: ViewId,
+        origin: [f64; 2],
+        #[serde(default)]
+        origin_ref: Option<PointRef>,
+        #[serde(default)]
+        precision: Option<u8>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Table {
+    pub id: u64,
+    pub kind: TableKind,
+    /// Sheet position (mm) of the fixed corner.
+    pub position: [f64; 2],
+    #[serde(default)]
+    pub corner: TableCorner,
+    /// Column widths in mm (empty or wrong length = fit to content).
+    #[serde(default)]
+    pub col_widths: Vec<f64>,
+    #[serde(default = "default_row_height")]
+    pub row_height: f64,
+    #[serde(default = "default_table_text")]
+    pub text_height: f64,
+}
+
+fn default_row_height() -> f64 {
+    7.0
+}
+fn default_table_text() -> f64 {
+    3.0
+}
+
+impl Table {
+    pub fn new(id: u64, kind: TableKind, position: [f64; 2]) -> Self {
+        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text() }
+    }
+    pub fn type_name(&self) -> &'static str {
+        match self.kind {
+            TableKind::General { .. } => "Table",
+            TableKind::Bom { .. } => "BOM table",
+            TableKind::Hole { .. } => "Hole table",
+        }
+    }
+    pub fn view(&self) -> Option<ViewId> {
+        match self.kind {
+            TableKind::Bom { view } | TableKind::Hole { view, .. } => Some(view),
+            TableKind::General { .. } => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +423,15 @@ pub struct Annotation {
     /// Associative references to model geometry (empty = free annotation).
     #[serde(default)]
     pub refs: Vec<AnnotationRef>,
+    /// Dimension display settings (precision, units, tolerance, text).
+    #[serde(default, skip_serializing_if = "DimFormat::is_default")]
+    pub format: DimFormat,
+}
+
+impl Default for Annotation {
+    fn default() -> Self {
+        Self { id: 0, kind: AnnotationKind::Note { text: String::new(), height_mm: 3.5 }, position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default() }
+    }
 }
 
 impl AnnotationKind {
@@ -173,9 +443,25 @@ impl AnnotationKind {
             | AnnotationKind::AngularDimension { view, .. }
             | AnnotationKind::Centermark { view, .. }
             | AnnotationKind::Centerline { view, .. }
-            | AnnotationKind::Balloon { view, .. } => Some(*view),
+            | AnnotationKind::Balloon { view, .. }
+            | AnnotationKind::OrdinateDimension { view, .. }
+            | AnnotationKind::ChamferDimension { view, .. }
+            | AnnotationKind::ArcLengthDimension { view, .. } => Some(*view),
             _ => None,
         }
+    }
+
+    /// Dimensions (that show a measured value and accept a [`DimFormat`]).
+    pub fn is_dimension(&self) -> bool {
+        matches!(
+            self,
+            AnnotationKind::LinearDimension { .. }
+                | AnnotationKind::RadialDimension { .. }
+                | AnnotationKind::AngularDimension { .. }
+                | AnnotationKind::OrdinateDimension { .. }
+                | AnnotationKind::ArcLengthDimension { .. }
+                | AnnotationKind::ChamferDimension { .. }
+        )
     }
 
     pub fn type_name(&self) -> &'static str {
@@ -190,6 +476,10 @@ impl AnnotationKind {
             AnnotationKind::Balloon { .. } => "Callout",
             AnnotationKind::SurfaceFinish { .. } => "Surface finish",
             AnnotationKind::Gdt { .. } => "Geometric tolerance",
+            AnnotationKind::OrdinateDimension { .. } => "Ordinate dimension",
+            AnnotationKind::ChamferDimension { .. } => "Chamfer dimension",
+            AnnotationKind::ArcLengthDimension { .. } => "Arc length dimension",
+            AnnotationKind::Datum { .. } => "Datum",
         }
     }
 }
@@ -218,6 +508,8 @@ pub struct Sheet {
     pub views: Vec<DrawingView>,
     pub annotations: Vec<Annotation>,
     pub title_block: TitleBlock,
+    #[serde(default)]
+    pub tables: Vec<Table>,
 }
 
 impl Sheet {
@@ -232,7 +524,11 @@ impl Sheet {
     pub fn parent_of(&self, id: ViewId) -> Option<ViewId> {
         match &self.view(id)?.kind {
             ViewKind::Base { .. } => None,
-            ViewKind::Projected { parent, .. } | ViewKind::Auxiliary { parent, .. } | ViewKind::Section { parent, .. } | ViewKind::Detail { parent, .. } => Some(*parent),
+            ViewKind::Projected { parent, .. }
+            | ViewKind::Auxiliary { parent, .. }
+            | ViewKind::Section { parent, .. }
+            | ViewKind::Detail { parent, .. }
+            | ViewKind::AlignedSection { parent, .. } => Some(*parent),
         }
     }
 
@@ -252,11 +548,25 @@ impl Sheet {
         out
     }
 
-    /// Remove a view, its descendants and every annotation attached to them.
+    /// Remove a view, its descendants and every annotation and table
+    /// attached to them.
     pub fn remove_view(&mut self, id: ViewId) {
         let gone = self.descendants(id);
         self.views.retain(|v| !gone.contains(&v.id));
         self.annotations.retain(|a| a.kind.view().is_none_or(|v| !gone.contains(&v)));
+        self.tables.retain(|t| t.view().is_none_or(|v| !gone.contains(&v)));
+    }
+
+    pub fn next_table_id(&self) -> u64 {
+        self.tables.iter().map(|t| t.id).max().unwrap_or(0) + 1
+    }
+
+    pub fn table(&self, id: u64) -> Option<&Table> {
+        self.tables.iter().find(|t| t.id == id)
+    }
+
+    pub fn table_mut(&mut self, id: u64) -> Option<&mut Table> {
+        self.tables.iter_mut().find(|t| t.id == id)
     }
 
     pub fn next_view_id(&self) -> ViewId {
@@ -274,7 +584,7 @@ impl Sheet {
             .views
             .iter()
             .filter_map(|v| match &v.kind {
-                ViewKind::Section { label, .. } | ViewKind::Detail { label, .. } => Some(label.clone()),
+                ViewKind::Section { label, .. } | ViewKind::Detail { label, .. } | ViewKind::AlignedSection { label, .. } => Some(label.clone()),
                 _ => None,
             })
             .collect();
@@ -297,7 +607,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default() }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![] }
     }
 }
 
@@ -314,10 +624,79 @@ impl Default for Drawing {
     }
 }
 
+impl Drawing {
+    /// "SheetN" with the smallest N not used by another sheet.
+    pub fn unique_sheet_name(&self) -> String {
+        (1..).map(|n| format!("Sheet{n}")).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded")
+    }
+
+    /// Insert an empty sheet after `after` (same size, scale and title block
+    /// labels as that sheet); returns its index.
+    pub fn add_sheet(&mut self, after: usize) -> usize {
+        let name = self.unique_sheet_name();
+        let mut sheet = Sheet { name, ..Sheet::default() };
+        if let Some(src) = self.sheets.get(after) {
+            sheet.size = src.size;
+            sheet.scale = src.scale;
+            sheet.title_block = src.title_block.clone();
+        }
+        let at = (after + 1).min(self.sheets.len());
+        self.sheets.insert(at, sheet);
+        at
+    }
+
+    /// Copy sheet `i` (views, annotations, tables) right after it.
+    pub fn duplicate_sheet(&mut self, i: usize) -> Option<usize> {
+        let mut copy = self.sheets.get(i)?.clone();
+        let base = copy.name.clone();
+        copy.name = (1..).map(|n| if n == 1 { format!("{base} copy") } else { format!("{base} copy {n}") }).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
+        self.sheets.insert(i + 1, copy);
+        Some(i + 1)
+    }
+
+    /// Delete sheet `i`; the last remaining sheet cannot be deleted.
+    pub fn delete_sheet(&mut self, i: usize) -> bool {
+        if self.sheets.len() <= 1 || i >= self.sheets.len() {
+            return false;
+        }
+        self.sheets.remove(i);
+        true
+    }
+
+    /// Move sheet `from` to index `to` (clamped).
+    pub fn move_sheet(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.sheets.len() {
+            return false;
+        }
+        let to = to.min(self.sheets.len() - 1);
+        if from == to {
+            return false;
+        }
+        let s = self.sheets.remove(from);
+        self.sheets.insert(to, s);
+        true
+    }
+
+    /// Rename sheet `i`; empty names are rejected.
+    pub fn rename_sheet(&mut self, i: usize, name: &str) -> bool {
+        let name = name.trim();
+        match self.sheets.get_mut(i) {
+            Some(s) if !name.is_empty() => {
+                s.name = name.to_string();
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
 pub mod build;
 pub mod export;
 pub mod font;
+pub mod format;
 pub mod sheet;
+pub mod showcase;
+pub mod tables;
 pub mod views;
 
 #[cfg(test)]

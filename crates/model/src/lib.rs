@@ -8,7 +8,9 @@
 pub mod assembly;
 pub mod compare;
 pub mod configuration;
+pub mod custom;
 pub mod demo;
+pub mod demo_fab;
 pub mod display;
 pub mod document;
 pub mod drawing;

@@ -790,6 +790,8 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
             let mut sub = EvalCtx::new(tmp, &seed.name, params, ev.units, scratch, ev.outer_vars);
             sub.features = features;
             sub.xform = Some(total);
+            sub.custom = ev.custom.clone();
+            sub.custom_type = crate::custom::is_custom(&seed.type_id).then(|| seed.type_id.clone());
             let eval_fn = super::evaluator(&seed.type_id).expect("checked above");
             match eval_fn(&mut sub) {
                 Ok(()) => {

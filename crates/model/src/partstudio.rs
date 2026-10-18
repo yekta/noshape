@@ -68,7 +68,8 @@ pub struct PartStudio {
     pub folders: Vec<Folder>,
     #[serde(default)]
     pub configuration: Configuration,
-    #[serde(default)]
+    /// Stored as a list of pairs: JSON map keys must be strings.
+    #[serde(default, with = "body_map")]
     pub part_properties: BTreeMap<BodyId, PartProperties>,
     #[serde(default)]
     pub next_folder_id: u32,
@@ -268,5 +269,19 @@ fn remap_ids(v: &mut serde_json::Value, map: &std::collections::HashMap<u64, u64
         serde_json::Value::Array(a) => a.iter_mut().for_each(|x| remap_ids(x, map)),
         serde_json::Value::Object(o) => o.values_mut().for_each(|x| remap_ids(x, map)),
         _ => {}
+    }
+}
+
+/// Serde adapter for maps keyed by [`BodyId`] (serialized as `[[id, value], ...]`).
+mod body_map {
+    use super::{BTreeMap, BodyId};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<V: Serialize, S: Serializer>(m: &BTreeMap<BodyId, V>, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_seq(m.iter())
+    }
+
+    pub fn deserialize<'de, V: Deserialize<'de>, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<BodyId, V>, D::Error> {
+        Ok(Vec::<(BodyId, V)>::deserialize(d)?.into_iter().collect())
     }
 }

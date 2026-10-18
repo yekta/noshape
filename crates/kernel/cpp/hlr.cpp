@@ -119,7 +119,8 @@ void draw_edge_data(Emitter& em, HLRBRep_EdgeData& ed, bool visible, uint8_t cls
 }
 
 // Mirrors HLRBRep_HLRToShape::InternalCompound/DrawFace/DrawEdge for the
-// sharp (5), smooth (3) and sewn/seam (4) categories, recording the source.
+// sharp (5), outline (2), smooth (3) and sewn/seam (4) categories, recording
+// the source edge.
 void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool visible)
 {
   const int ne = DS->NbEdges();
@@ -150,7 +151,9 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
       if (edf.Used())
         continue;
       bool todraw;
-      if (typ == 3)
+      if (typ == 2)
+        todraw = itf.Internal(); // silhouettes computed by the outliner
+      else if (typ == 3)
         todraw = edf.Rg1Line() && !edf.RgNLine() && !itf.OutLine();
       else if (typ == 4)
         todraw = edf.RgNLine() && !itf.OutLine();
@@ -158,15 +161,17 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
         todraw = !itf.IsoLine() && !itf.Internal() && (!edf.Rg1Line() || itf.OutLine());
       if (todraw)
       {
-        uint8_t cls = typ == 3 ? CLS_SMOOTH : (typ == 4 ? CLS_SEAM : CLS_SHARP);
-        if (typ == 5 && itf.OutLine())
+        uint8_t cls = typ == 2 ? CLS_OUTLINE : typ == 3 ? CLS_SMOOTH : (typ == 4 ? CLS_SEAM : CLS_SHARP);
+        // Real edges lying on the silhouette (e.g. a cylinder seam seen
+        // from the side) are outlines too but keep their source edge.
+        if (typ == 5 && itf.OutLine() && edf.Rg1Line())
           cls = CLS_OUTLINE;
-        draw_edge_data(em, edf, visible, cls, cls == CLS_OUTLINE ? -1 : src_of(ie));
+        draw_edge_data(em, edf, visible, cls, src_of(ie));
         edf.Used(true);
       }
       else
       {
-        if (typ > 4 && (edf.Rg1Line() && !itf.OutLine()))
+        if ((typ > 4 || typ == 2) && (edf.Rg1Line() && !itf.OutLine()))
         {
           int hc = edf.HideCount();
           if (hc > 0)
@@ -179,6 +184,8 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
       }
     }
   }
+  if (typ < 3)
+    return;
   // Free edges (not on faces).
   for (int ie = 1; ie <= ne; ++ie)
   {
@@ -235,7 +242,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
       return out;
     DS->Projector().Scaled(true);
     for (bool visible : {true, false})
-      for (int typ : {5, 3, 4})
+      for (int typ : {5, 2, 3, 4})
         exact_pass(em, DS, typ, visible);
     DS->Projector().Scaled(false);
     return out;
@@ -267,8 +274,8 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
   for (pa->InitHide(); pa->MoreHide(); pa->NextHide())
   {
     HLRAlgo_BiPoint::PointsT& pts = pa->Hide(status, S, reg1, regn, outl, intl);
-    if (intl)
-      continue;
+    // "Internal" poly lines are the silhouettes of the triangulation
+    // (HLRBRep_PolyHLRToShape::OutLineVCompound).
     gp_XYZ a = pts.Pnt1, b = pts.Pnt2;
     T.Transforms(a);
     T.Transforms(b);
@@ -278,11 +285,18 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     // Segments of real edges keep their source; silhouettes have none.
     int     src = source_index(srcEdges, S);
     uint8_t cls = CLS_SHARP;
-    if (src < 0)
+    if (intl)
+    {
+      cls = CLS_OUTLINE;
+      src = -1;
+    }
+    else if (src < 0)
       cls = outl ? CLS_OUTLINE : CLS_SHARP;
-    else if (regn && !outl)
+    else if (reg1 && outl)
+      cls = CLS_OUTLINE;
+    else if (regn)
       cls = CLS_SEAM;
-    else if (reg1 && !outl)
+    else if (reg1)
       cls = CLS_SMOOTH;
     HLRAlgo_EdgeIterator it;
     double               sta, end;
