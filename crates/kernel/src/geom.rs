@@ -351,7 +351,7 @@ impl Shape {
     /// to rebuild the edge.
     pub fn edge_bspline(&self) -> Result<BSplineCurveData> {
         let b = ck(ffi::edge_bspline(self.raw()))?;
-        let poles = b.poles.chunks_exact(3).map(|c| DVec3::new(c[0], c[1], c[2])).collect();
+        let poles = b.poles.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
         Ok(BSplineCurveData {
             poles,
             weights: if b.weights.is_empty() { None } else { Some(b.weights) },

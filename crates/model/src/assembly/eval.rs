@@ -745,7 +745,7 @@ impl AssemblyEvaluator {
                                     n
                                 })
                                 .collect();
-                            if sub_prep.failed_mates.len() > 0 {
+                            if !sub_prep.failed_mates.is_empty() {
                                 node.error = Some("Subassembly contains mate error".into());
                             }
                         }
@@ -803,7 +803,7 @@ impl AssemblyEvaluator {
                 if c.flip {
                     f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
                 }
-                if c.rotate_quarters % 4 != 0 {
+                if !c.rotate_quarters.is_multiple_of(4) {
                     f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
                 }
                 Ok((bi, off.mul(&f)))

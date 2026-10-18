@@ -687,7 +687,7 @@ impl<'a> EvalCtx<'a> {
             new_bodies.push((ti, bodies));
         }
         // Replace targets (descending index order keeps indices valid).
-        new_bodies.sort_by(|a, b| b.0.cmp(&a.0));
+        new_bodies.sort_by_key(|b| std::cmp::Reverse(b.0));
         for (ti, bodies) in new_bodies {
             self.ctx.bodies.remove(ti);
             for (k2, b) in bodies.into_iter().enumerate() {
@@ -929,11 +929,10 @@ pub fn sweep_names(ev: &EvalCtx, profile: &Profile, res: &k::OpResult, start_cap
     }
     // Edge -> side face roles.
     for r in &res.history.records {
-        if r.arg == 0 && r.input_kind == ShapeType::Edge && r.relation == k::Relation::Generated && r.output_kind == ShapeType::Face {
-            if let Some(src) = profile.edge_sources.get(r.input_index as usize) {
+        if r.arg == 0 && r.input_kind == ShapeType::Edge && r.relation == k::Relation::Generated && r.output_kind == ShapeType::Face
+            && let Some(src) = profile.edge_sources.get(r.input_index as usize) {
                 roles.entry(r.output_index).or_insert_with(|| Role::Side(src.clone()));
             }
-        }
     }
     let empty = ShapeNames::default();
     ev.name_result(&[&empty], &res.history, &res.shape, &roles, None)

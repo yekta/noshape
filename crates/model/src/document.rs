@@ -52,18 +52,12 @@ pub struct Tab {
     pub content: TabContent,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DocumentSettings {
     pub units: UnitPrefs,
     /// Tab order (ids); tabs not listed are appended.
     pub tab_order: Vec<TabId>,
     pub description: String,
-}
-
-impl Default for DocumentSettings {
-    fn default() -> Self {
-        Self { units: UnitPrefs::default(), tab_order: Vec::new(), description: String::new() }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

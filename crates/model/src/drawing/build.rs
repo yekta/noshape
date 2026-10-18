@@ -267,7 +267,7 @@ pub fn hatch(segments: &[[[f64; 2]; 2]], spacing: f64) -> Vec<[[f64; 2]; 2]> {
             }
         }
         ts.sort_by(f64::total_cmp);
-        for pair in ts.chunks_exact(2) {
+        for pair in ts.as_chunks::<2>().0 {
             let to_xy = |tt: f64| [(tt - wl) * s2, (tt + wl) * s2];
             out.push([to_xy(pair[0]), to_xy(pair[1])]);
         }
