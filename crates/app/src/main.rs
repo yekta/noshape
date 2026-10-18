@@ -6,6 +6,10 @@ mod assembly_scene;
 mod assembly_view;
 mod assets;
 mod doc_model;
+mod drawing_scene;
+mod drawing_tools;
+mod drawing_ui;
+mod drawing_view;
 mod feature_dialog;
 mod files;
 mod gpu;
@@ -65,7 +69,7 @@ fn main() {
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 
         let path = path.clone().unwrap_or_else(files::new_document_path);
-        let initial = if demo { Some(noshape_model::demo::demo_document()) } else { None };
+        let initial = if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
         files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {

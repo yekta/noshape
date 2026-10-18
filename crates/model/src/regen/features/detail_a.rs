@@ -136,7 +136,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
-            edges = propagate_tangent_edges(&body.shape, &edges);
+            edges = super::detail::propagate_tangent(&body.shape, &edges);
         }
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let res = if shape_kind == "CHAMFER" {
@@ -153,40 +153,6 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         return err("Face blend between faces that don't share an edge is not supported yet");
     }
     Ok(())
-}
-
-/// Extend an edge set across tangent-continuous neighbors.
-fn propagate_tangent_edges(shape: &Shape, edges: &[usize]) -> Vec<usize> {
-    let all = shape.edges();
-    let Ok(vertex_edges) = shape.vertex_edges() else { return edges.to_vec() };
-    let verts = shape.vertices();
-    let tangent_at = |e: &Shape, p: DVec3| -> Option<DVec3> {
-        let info = e.edge_info().ok()?;
-        let t = if (info.start - p).length() < (info.end - p).length() { info.first_param } else { info.last_param };
-        e.tangent_at(t).ok().map(|v| v.normalize())
-    };
-    let mut set: BTreeSet<usize> = edges.iter().copied().collect();
-    let mut stack = edges.to_vec();
-    while let Some(ei) = stack.pop() {
-        let Some(e) = all.get(ei) else { continue };
-        for v in e.vertices() {
-            let Some(vi) = shape.index_of(&v, ShapeType::Vertex) else { continue };
-            let Ok(p) = verts[vi].vertex_point() else { continue };
-            for &o in vertex_edges.get(vi).map(|x| x.as_slice()).unwrap_or(&[]) {
-                let o = o as usize;
-                if set.contains(&o) {
-                    continue;
-                }
-                if let (Some(t1), Some(t2)) = (tangent_at(e, p), all.get(o).and_then(|x| tangent_at(x, p)))
-                    && t1.dot(t2).abs() > 0.9998
-                {
-                    set.insert(o);
-                    stack.push(o);
-                }
-            }
-        }
-    }
-    set.into_iter().collect()
 }
 
 // ------------------------------------------------------------------ modify fillet

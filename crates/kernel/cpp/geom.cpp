@@ -17,6 +17,8 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_BezierSurface.hxx>
@@ -215,6 +217,58 @@ CurveInfo curve_info(const OcShape& es)
       i.kind = 8;
   }
   return i;
+}
+
+BSplineF edge_bspline(const OcShape& es)
+{
+  const TopoDS_Edge& e = as_edge(es.shape, "shape");
+  if (BRep_Tool::Degenerated(e))
+    fail_invalid("degenerated edge has no curve");
+  TopLoc_Location           loc;
+  double                    f = 0, l = 0;
+  occ::handle<Geom_Curve>   c = BRep_Tool::Curve(e, loc, f, l);
+  if (c.IsNull())
+    fail_invalid("edge has no 3D curve");
+  occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(c);
+  if (!bs.IsNull())
+  {
+    bs = occ::down_cast<Geom_BSplineCurve>(bs->Copy());
+    // Restrict to the edge's range (keeps the curve exact).
+    if (!bs->IsPeriodic() && (f > bs->FirstParameter() + 1e-12 || l < bs->LastParameter() - 1e-12))
+      bs->Segment(f, l);
+  }
+  else
+  {
+    if (c->IsPeriodic() && l - f >= c->Period() - 1e-12)
+      bs = GeomConvert::CurveToBSplineCurve(c);
+    else
+      bs = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(c, f, l));
+  }
+  if (bs.IsNull())
+    fail_op("could not convert the edge curve to a B-spline");
+  if (!loc.IsIdentity())
+    bs->Transform(loc.Transformation());
+  // Follow the edge direction.
+  if (e.Orientation() == TopAbs_REVERSED)
+    bs->Reverse();
+  BSplineF out;
+  out.degree   = bs->Degree();
+  out.periodic = bs->IsPeriodic();
+  for (int i = 1; i <= bs->NbPoles(); ++i)
+  {
+    const gp_Pnt& p = bs->Pole(i);
+    out.poles.push_back(p.X());
+    out.poles.push_back(p.Y());
+    out.poles.push_back(p.Z());
+    if (bs->IsRational())
+      out.weights.push_back(bs->Weight(i));
+  }
+  for (int i = 1; i <= bs->NbKnots(); ++i)
+  {
+    out.knots.push_back(bs->Knot(i));
+    out.mults.push_back(bs->Multiplicity(i));
+  }
+  return out;
 }
 
 P3 face_normal_at_uv(const OcShape& fs, double u, double v)

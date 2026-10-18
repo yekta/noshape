@@ -31,35 +31,27 @@ impl std::fmt::Debug for Body {
     }
 }
 
-/// Geometric ordering keys for faces (centroid + area).
-pub fn face_keys(shape: &Shape) -> Vec<GeoKey> {
-    shape
-        .faces()
-        .iter()
-        .map(|f| {
-            let c = f.centroid().unwrap_or(DVec3::ZERO);
-            let a = f.area().unwrap_or(0.0);
-            [c.x, c.y, c.z, a]
-        })
-        .collect()
+/// Geometric ordering key of one face: bounding-box center and diagonal.
+/// Cheap (no surface integration) and deterministic.
+pub fn face_key(shape: &Shape, i: usize) -> GeoKey {
+    shape.sub_shape(ShapeType::Face, i).ok().and_then(|f| f.bounding_box(false).ok()).map(|b| {
+        let c = b.center();
+        [c.x, c.y, c.z, b.diagonal()]
+    }).unwrap_or([0.0; 4])
 }
 
-pub fn edge_keys(shape: &Shape) -> Vec<GeoKey> {
-    shape
-        .edges()
-        .iter()
-        .map(|e| match e.edge_info() {
-            Ok(i) => {
-                let m = e.point_at((i.first_param + i.last_param) * 0.5).unwrap_or((i.start + i.end) * 0.5);
-                [m.x, m.y, m.z, i.length]
-            }
-            Err(_) => [0.0; 4],
-        })
-        .collect()
+pub fn edge_key(shape: &Shape, i: usize) -> GeoKey {
+    match shape.sub_shape(ShapeType::Edge, i).and_then(|e| e.edge_info().map(|info| (e, info))) {
+        Ok((e, i)) => {
+            let m = e.point_at((i.first_param + i.last_param) * 0.5).unwrap_or((i.start + i.end) * 0.5);
+            [m.x, m.y, m.z, i.length]
+        }
+        Err(_) => [0.0; 4],
+    }
 }
 
-pub fn vertex_keys(shape: &Shape) -> Vec<GeoKey> {
-    shape.vertices().iter().map(|v| v.vertex_point().map(|p| [p.x, p.y, p.z, 0.0]).unwrap_or([0.0; 4])).collect()
+pub fn vertex_key(shape: &Shape, i: usize) -> GeoKey {
+    shape.sub_shape(ShapeType::Vertex, i).ok().and_then(|v| v.vertex_point().ok()).map(|p| [p.x, p.y, p.z, 0.0]).unwrap_or([0.0; 4])
 }
 
 impl Body {
@@ -76,7 +68,7 @@ impl Body {
         } else {
             let ef = shape.edge_faces().unwrap_or_default();
             let vf = shape.vertex_faces().unwrap_or_default();
-            (name_edges(&faces, &ef, &edge_keys(&shape)), name_vertices(&faces, &vf, &vertex_keys(&shape)))
+            (name_edges(&faces, &ef, &|i| edge_key(&shape, i)), name_vertices(&faces, &vf, &|i| vertex_key(&shape, i)))
         };
         Self {
             id,
@@ -225,6 +217,8 @@ pub struct Context {
     pub connectors: Vec<Connector>,
     pub points: Vec<PointEntity>,
     pub variables: BTreeMap<String, Quantity>,
+    /// Query variables by name (Query variable feature), as persistent references.
+    pub query_variables: BTreeMap<String, Vec<Reference>>,
     pub next_part: usize,
     pub next_surface: usize,
     pub next_curve: usize,

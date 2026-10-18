@@ -91,6 +91,18 @@ pub(crate) mod ffi {
         length: f64,
     }
 
+    /// B-spline data of an edge curve (poles flattened xyz; `weights` empty
+    /// when non-rational).
+    #[derive(Debug, Clone)]
+    struct BSplineF {
+        poles: Vec<f64>,
+        weights: Vec<f64>,
+        knots: Vec<f64>,
+        mults: Vec<i32>,
+        degree: i32,
+        periodic: bool,
+    }
+
     /// 2D sketch segment. kind: 0 line (p0..p3 = ax ay bx by),
     /// 1 circular arc (cx cy r a0 a1), 2 full circle (cx cy r),
     /// 3 elliptic arc (cx cy rmaj rmin rot a0 a1), 4 full ellipse (cx cy rmaj rmin rot),
@@ -228,6 +240,7 @@ pub(crate) mod ffi {
         // ---- geometry
         fn surface_info(face: &OcShape) -> Result<SurfaceInfo>;
         fn curve_info(edge: &OcShape) -> Result<CurveInfo>;
+        fn edge_bspline(edge: &OcShape) -> Result<BSplineF>;
         fn face_normal_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_point_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;

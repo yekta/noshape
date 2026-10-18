@@ -4280,6 +4280,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "earcutr",
+ "env_logger",
  "glam 0.34.1",
  "indexmap",
  "log",

@@ -158,6 +158,20 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ picking
 
+    /// The entity under the cursor: the picked geometry/annotation, else the
+    /// view whose rectangle contains the point.
+    pub fn sel_at(&self, pick: Option<u32>, s: [f64; 2]) -> Option<Sel> {
+        if let Some(sel) = pick.and_then(|p| self.sel_of_pick(p)) {
+            return Some(sel);
+        }
+        let b = self.built.as_ref()?;
+        b.placements
+            .iter()
+            .filter(|p| p.contains(s, 1.0))
+            .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
+            .map(|p| Sel::View(p.id))
+    }
+
     /// Snap point (vertex / circle center) of a view near a sheet point.
     pub fn snap_at(&self, s: [f64; 2]) -> Option<PickedPoint> {
         let built = self.built.as_ref()?;
@@ -748,7 +762,7 @@ impl DrawingEditor {
     }
 
     fn select_click(&mut self, pick: Option<u32>, m: Modifiers, cx: &mut Context<Self>) {
-        let sel = pick.and_then(|p| self.sel_of_pick(p));
+        let sel = self.sel_at(pick, self.cursor);
         let additive = m.shift || m.control || m.platform;
         match sel {
             Some(s) if additive => {
@@ -767,7 +781,7 @@ impl DrawingEditor {
     }
 
     fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
-        let Some(sel) = pick.and_then(|p| self.sel_of_pick(p)) else { return Drag::None };
+        let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
         if !self.selection.contains(&sel) {
             self.selection = vec![sel];
         }
@@ -869,7 +883,7 @@ impl DrawingEditor {
             self.cancel(cx);
             return;
         }
-        let sel = pick.and_then(|p| self.sel_of_pick(p));
+        let sel = self.sel_at(pick, self.cursor);
         if let Some(s) = sel
             && !self.selection.contains(&s)
         {

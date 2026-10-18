@@ -2,10 +2,12 @@
 //! through all; start from part, sketch plane or selected plane) and External
 //! thread (cosmetic).
 //!
-//! Dimensions: when a hole-table path is set (the Standard lookup), table
-//! values are used for every dimension whose parameter still holds its
-//! schema default; edited parameters always win. Without a table path the
-//! parameters are used as-is. Tapped holes are cosmetic: the tap drill is
+//! Dimensions: the numeric parameters are used as they are. The Hole dialog
+//! copies the Standard table's values into them when the Standard changes
+//! (`hole_tables::apply_table_to_params`, which also sets the hidden
+//! `tableSynced` flag), so user edits made afterwards win. For holes saved
+//! before that edit logic (a table path but no `tableSynced`), table values
+//! replace every dimension that still holds its schema default. Tapped holes are cosmetic: the tap drill is
 //! cut and no thread geometry is modeled. With a fastener fit and several
 //! parts on a hole's axis, the deepest part gets the tap drill and the
 //! others the clearance diameter (Onshape's multi-part tapped hole).
@@ -120,18 +122,6 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
     Ok(out)
 }
 
-/// Complete a (possibly partial) table path with level defaults.
-fn complete_path(table: &str, path: &[String]) -> Vec<String> {
-    let mut p = path.to_vec();
-    while let Some(d) = ht::table_level_default(table, &p) {
-        p.push(d);
-        if p.len() > 16 {
-            break;
-        }
-    }
-    p
-}
-
 /// Whether a numeric parameter still holds its schema default.
 fn is_default(ev: &EvalCtx, feature: &str, id: &str) -> bool {
     let Some(spec) = crate::features::get(feature).and_then(|t| t.param(id)) else { return false };
@@ -149,39 +139,33 @@ struct HoleDims {
 }
 
 fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
-    let inch = ev.is("unitsSystem", "INCH");
     let style = ev.enum_("styleV2").to_string();
-    let simple = style == "SIMPLE";
-    let (pid, table) = match (inch, simple) {
-        (true, true) => ("ansiHoleTableEx", ht::TABLE_ANSI_HOLE_EX),
-        (true, false) => ("ansiHoleTable", ht::TABLE_ANSI_HOLE),
-        (false, true) => ("isoHoleTableEx", ht::TABLE_ISO_HOLE_EX),
-        (false, false) => ("isoHoleTable", ht::TABLE_ISO_HOLE),
-    };
-    let raw = ev.params.lookup(pid);
-    let spec = if raw.is_empty() { None } else { ht::table_values(table, &complete_path(table, raw)) };
-    let val = |id: &str, tv: Option<f64>| -> FResult<f64> {
-        match tv {
-            Some(v) if is_default(ev, "hole", id) => Ok(v),
-            _ => ev.length(id),
-        }
-    };
-    let ang = |id: &str, tv: Option<f64>| -> FResult<f64> {
-        match tv {
-            Some(v) if is_default(ev, "hole", id) => Ok(v),
-            _ => ev.angle(id),
-        }
-    };
-    let threaded = spec.is_some_and(|s| s.is_threaded());
-    let diameter = val("holeDiameterV3", spec.map(|s| s.hole_diameter))?;
-    let tap_drill = if threaded {
-        let td = spec.and_then(|s| s.tap_drill_diameter);
-        if ev.bool("hasClearance") || is_default(ev, "hole", "tapDrillDiameterV3") { td } else { Some(ev.length("tapDrillDiameterV3")?) }
+    let (pid, _) = ht::hole_table_param(ev.params);
+    // The dialog copies table values into the parameters
+    // (`hole_tables::apply_table_to_params`); those are used as they are.
+    // Holes saved before that edit logic existed take table values for every
+    // dimension that still holds its schema default.
+    let legacy;
+    let vals: &crate::params::ParamValues = if ev.params.bool(ht::TABLE_SYNCED_PARAM) || ev.params.lookup(pid).is_empty() {
+        ev.params
     } else {
-        None
+        let mut v = ev.params.clone();
+        ht::apply_table_to_params(&mut v);
+        for id in ht::HOLE_TABLE_DIMENSIONS {
+            if !is_default(ev, "hole", id)
+                && let Some(orig) = ev.params.get(id)
+            {
+                v.set(id, orig.clone());
+            }
+        }
+        legacy = v;
+        &legacy
     };
-    let cbore = if style == "C_BORE" { Some((val("cBoreDiameterV3", spec.and_then(|s| s.cbore_diameter))?, val("cBoreDepthV3", spec.and_then(|s| s.cbore_depth))?)) } else { None };
-    let csink = if style == "C_SINK" { Some((val("cSinkDiameterV3", spec.and_then(|s| s.csink_diameter))?, ang("cSinkAngleV3", spec.and_then(|s| s.csink_angle))?)) } else { None };
+    let len = |id: &str| ev.eval_num_in(vals, id, crate::params::NumKind::Length);
+    let diameter = len("holeDiameterV3")?;
+    let tap_drill = if vals.bool("showTappedDepth") { Some(len("tapDrillDiameterV3")?) } else { None };
+    let cbore = if style == "C_BORE" { Some((len("cBoreDiameterV3")?, len("cBoreDepthV3")?)) } else { None };
+    let csink = if style == "C_SINK" { Some((len("cSinkDiameterV3")?, ev.eval_num_in(vals, "cSinkAngleV3", crate::params::NumKind::Angle)?)) } else { None };
     if diameter <= 0.0 {
         return err("Hole diameter must be positive");
     }
@@ -444,7 +428,7 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
             return err("Thread edges must bound a cylindrical face");
         }
     }
-    let path = complete_path(ht::TABLE_EXTERNAL_THREAD, ev.params.lookup("branchOfStandard"));
+    let path = ht::complete_path(ht::TABLE_EXTERNAL_THREAD, ev.params.lookup("branchOfStandard"));
     if ht::table_values(ht::TABLE_EXTERNAL_THREAD, &path).is_none() {
         return err("Select a thread standard and size");
     }

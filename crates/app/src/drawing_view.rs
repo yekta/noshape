@@ -417,6 +417,9 @@ impl DrawingEditor {
                     this.sources.insert(tab, src);
                     if this.regenerating.is_empty() {
                         this.out_of_date = false;
+                        if this.status.as_ref().is_some_and(|s| s.starts_with("Updating")) {
+                            this.status = None;
+                        }
                     }
                     this.refresh(cx);
                 })
@@ -734,6 +737,17 @@ impl DrawingEditor {
             }
             (Tool::Select | Tool::Projected { parent: None } | Tool::Section { parent: None, .. } | Tool::Detail { parent: None, .. }, h) => h,
             _ => None,
+        };
+        // In select mode, hovering anywhere inside a view highlights it.
+        let hover = match (hover, &self.tool, self.built.as_ref()) {
+            (None, Tool::Select, Some(b)) => b
+                .placements
+                .iter()
+                .filter(|p| p.contains(self.cursor, 1.0))
+                .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
+                .and_then(|p| b.picks.iter().position(|t| *t == PickTarget::View(p.id)))
+                .map(|i| i as u32),
+            (h, _, _) => h,
         };
         if hover != self.hover {
             self.hover = hover;

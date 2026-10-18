@@ -3,6 +3,8 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
@@ -651,6 +653,33 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
 
 // ---------------------------------------------------------------- thicken / shell
 
+// Reverse solids whose signed volume is negative (inside-out results).
+static TopoDS_Shape orient_solids_outward(const TopoDS_Shape& s)
+{
+  auto signed_volume = [](const TopoDS_Shape& x) {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(x, g);
+    return g.Mass();
+  };
+  if (s.IsNull())
+    return s;
+  if (s.ShapeType() == TopAbs_SOLID)
+    return signed_volume(s) < 0 ? s.Reversed() : s;
+  bool any_negative = false;
+  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+    if (signed_volume(e.Current()) < 0)
+      any_negative = true;
+  if (!any_negative)
+    return s;
+  std::vector<TopoDS_Shape> parts;
+  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+  {
+    const TopoDS_Shape& so = e.Current();
+    parts.push_back(signed_volume(so) < 0 ? so.Reversed() : so);
+  }
+  return parts.size() == 1 ? parts[0] : compound_of(parts);
+}
+
 OpOut op_thicken(const OcShape& s, double t1, double t2)
 {
   require_non_null(s.shape, "shape");
@@ -674,7 +703,11 @@ OpOut op_thicken(const OcShape& s, double t1, double t2)
   if (!mk.IsDone())
     fail_op("thicken failed");
   merge_into(hist, history_of({base}, mk));
-  return make_result(args, mk.Shape(), hist.get());
+  // BRepOffsetAPI_MakeThickSolid may return an inside-out solid (negative
+  // volume) depending on the face orientation and the offset sign: orient
+  // every solid outward. Only orientations change, so sub-shape identities
+  // (and therefore the history) stay valid.
+  return make_result(args, orient_solids_outward(mk.Shape()), hist.get());
 }
 
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join)

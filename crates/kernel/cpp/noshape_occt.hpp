@@ -135,6 +135,7 @@ struct HistRec;
 struct OpOut;
 struct SurfaceInfo;
 struct CurveInfo;
+struct BSplineF;
 struct Seg2d;
 struct PlaneF;
 struct MeshCounts;
@@ -179,6 +180,7 @@ rust::String                 dump_shape(const OcShape& s);
 // ---- geometry queries (geom.cpp)
 SurfaceInfo              surface_info(const OcShape& face);
 CurveInfo                curve_info(const OcShape& edge);
+BSplineF                 edge_bspline(const OcShape& edge);
 P3    face_normal_at_uv(const OcShape& face, double u, double v);
 P3    face_point_at_uv(const OcShape& face, double u, double v);
 ProjPoint                face_project_point(const OcShape& face, P3 p);

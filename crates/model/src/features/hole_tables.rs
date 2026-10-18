@@ -17,6 +17,9 @@
 //!
 //! [`ParamValue::Lookup`]: crate::params::ParamValue::Lookup
 
+use crate::params::{ParamValue, ParamValues};
+use noshape_units::ExprValue;
+
 /// Dimensions resolved from a complete table path. Lengths in meters, angles
 /// in radians.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -706,6 +709,96 @@ pub fn thread_standard(table: &str, path: &[String]) -> &'static str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Hole dialog edit logic
+// ---------------------------------------------------------------------------
+
+/// Numeric Hole parameters driven by the Standard table.
+pub const HOLE_TABLE_DIMENSIONS: &[&str] = &["holeDiameterV3", "tapDrillDiameterV3", "cBoreDiameterV3", "cBoreDepthV3", "cSinkDiameterV3", "cSinkAngleV3"];
+
+/// Hidden Hole parameter set by [`apply_table_to_params`]: the numeric
+/// parameters hold the table values (or the user's later edits) and the
+/// evaluator uses them as they are.
+pub const TABLE_SYNCED_PARAM: &str = "tableSynced";
+
+/// The Standard lookup parameter of a Hole that is visible for its units and
+/// style, as (parameter id, table name).
+pub fn hole_table_param(params: &ParamValues) -> (&'static str, &'static str) {
+    match (params.is("unitsSystem", "INCH"), params.is("styleV2", "SIMPLE")) {
+        (true, true) => ("ansiHoleTableEx", TABLE_ANSI_HOLE_EX),
+        (true, false) => ("ansiHoleTable", TABLE_ANSI_HOLE),
+        (false, true) => ("isoHoleTableEx", TABLE_ISO_HOLE_EX),
+        (false, false) => ("isoHoleTable", TABLE_ISO_HOLE),
+    }
+}
+
+/// Complete a (possibly partial) table path with each level's default.
+pub fn complete_path(table: &str, path: &[String]) -> Vec<String> {
+    let mut p = path.to_vec();
+    while let Some(d) = table_level_default(table, &p) {
+        p.push(d);
+        if p.len() > 16 {
+            break;
+        }
+    }
+    p
+}
+
+fn fmt_num(x: f64, decimals: usize) -> String {
+    let s = format!("{x:.decimals$}");
+    let s = if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s };
+    if s == "-0" { "0".into() } else { s }
+}
+
+/// Hole edit logic (Onshape's behavior when the Standard changes): copy the
+/// table values of the Hole's current Standard path into its numeric
+/// parameters, so the dialog shows them and later edits start from them.
+///
+/// Call it from the Hole dialog whenever the visible Standard lookup
+/// (see [`hole_table_param`]), the units system or the style changes; do not
+/// call it when the user edits a numeric parameter (edits win until the next
+/// Standard change). Sets: `holeDiameterV3`, `tapDrillDiameterV3`,
+/// `cBoreDiameterV3`, `cBoreDepthV3`, `cSinkDiameterV3`, `cSinkAngleV3`
+/// (as literal expressions in mm / in and degrees), the hidden
+/// `majorDiameter`, `threadStandard`, `showTappedDepth`, `hasClearance` and
+/// [`TABLE_SYNCED_PARAM`]. Returns false (and changes nothing) when no
+/// Standard is selected or its path has no values.
+pub fn apply_table_to_params(params: &mut ParamValues) -> bool {
+    let (pid, table) = hole_table_param(params);
+    let raw = params.lookup(pid).to_vec();
+    if raw.is_empty() {
+        return false;
+    }
+    let path = complete_path(table, &raw);
+    let Some(spec) = table_values(table, &path) else { return false };
+    let inch = params.is("unitsSystem", "INCH");
+    let len = |m: f64| ParamValue::Expr(ExprValue::new(if inch { format!("{} in", fmt_num(m / IN, 5)) } else { format!("{} mm", fmt_num(m * 1000.0, 4)) }));
+    params.set("holeDiameterV3", len(spec.hole_diameter));
+    if let Some(td) = spec.tap_drill_diameter {
+        params.set("tapDrillDiameterV3", len(td));
+    }
+    if let Some(v) = spec.cbore_diameter {
+        params.set("cBoreDiameterV3", len(v));
+    }
+    if let Some(v) = spec.cbore_depth {
+        params.set("cBoreDepthV3", len(v));
+    }
+    if let Some(v) = spec.csink_diameter {
+        params.set("cSinkDiameterV3", len(v));
+    }
+    if let Some(a) = spec.csink_angle {
+        params.set("cSinkAngleV3", ParamValue::Expr(ExprValue::new(format!("{} deg", fmt_num(a.to_degrees(), 4)))));
+    }
+    if let Some(v) = spec.major_diameter {
+        params.set("majorDiameter", len(v));
+    }
+    params.set("threadStandard", ParamValue::Enum(thread_standard(table, &path).into()));
+    params.set("showTappedDepth", ParamValue::Bool(spec.is_threaded()));
+    params.set("hasClearance", ParamValue::Bool(spec.tap_drill_diameter.is_some_and(|t| (t - spec.hole_diameter).abs() > 1e-12)));
+    params.set(TABLE_SYNCED_PARAM, ParamValue::Bool(true));
+    true
+}
+
 /// Size whose major diameter matches `diameter` (m) within `tol` (external
 /// thread auto-sizing). Returns the default path for that size.
 pub fn external_thread_for_diameter(standard_id: &str, diameter: f64, tol: f64) -> Option<Vec<String>> {
@@ -756,6 +849,30 @@ mod tests {
             let mut budget = 20_000;
             walk(t, &mut Vec::new(), &mut budget);
         }
+    }
+
+    #[test]
+    fn table_values_copied_into_hole_params() {
+        let mut v = ParamValues::default();
+        v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
+        v.set("styleV2", ParamValue::Enum("C_BORE".into()));
+        assert!(!apply_table_to_params(&mut v), "no standard selected");
+        v.set("isoHoleTable", ParamValue::Lookup(p(&["Tapped", "Straight tap", "M5"])));
+        assert!(apply_table_to_params(&mut v));
+        assert_eq!(v.expr("holeDiameterV3").unwrap().text, "4.2 mm");
+        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "4.2 mm");
+        assert_eq!(v.expr("cBoreDiameterV3").unwrap().text, "10 mm");
+        assert_eq!(v.enum_("threadStandard"), "ISO");
+        assert!(v.bool("showTappedDepth") && !v.bool("hasClearance") && v.bool(TABLE_SYNCED_PARAM));
+        // Inch clearance hole with a fit.
+        let mut v = ParamValues::default();
+        v.set("unitsSystem", ParamValue::Enum("INCH".into()));
+        v.set("styleV2", ParamValue::Enum("SIMPLE".into()));
+        v.set("ansiHoleTableEx", ParamValue::Lookup(p(&["Tapped", "Straight tap", "1/4", "20 tpi", "Close"])));
+        assert!(apply_table_to_params(&mut v));
+        assert_eq!(v.expr("holeDiameterV3").unwrap().text, "0.257 in");
+        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "0.201 in");
+        assert!(v.bool("hasClearance"));
     }
 
     #[test]

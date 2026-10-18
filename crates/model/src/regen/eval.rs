@@ -1,12 +1,12 @@
 //! Feature evaluation context: parameter access, reference resolution,
 //! profile construction, history-based naming and boolean merging.
 
-use super::context::{Body, Context, SketchResult, face_keys};
+use super::context::{Body, Context, SketchResult, face_key};
 use crate::display::{BodyKind, PlaneFrame};
 use crate::naming::{FaceNamingInput, HistRecord, Kind, Name, Relation, ShapeNames, name_faces};
 use crate::params::{NumKind, ParamValue, ParamValues};
 use crate::reference::{BodyId, DatumPlane, FeatureId, Reference, Role, Source, TopoName};
-use glam::{DVec2, DVec3};
+use glam::{DMat4, DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use noshape_units::{Dim, LayeredScope, Quantity, UnitPrefs, VariableScope};
@@ -45,6 +45,19 @@ impl VariableScope for ContextScope<'_> {
     }
 }
 
+/// A feature of the Part Studio as the regenerator evaluates it (parameters
+/// after configuration overrides). Evaluators that re-run other features
+/// (feature patterns with "Reapply features", mirror) read them from
+/// [`EvalCtx::features`].
+#[derive(Clone, Debug)]
+pub struct EffectiveFeature {
+    pub id: FeatureId,
+    pub type_id: String,
+    pub name: String,
+    pub params: ParamValues,
+    pub suppressed: bool,
+}
+
 pub struct EvalCtx<'a> {
     pub feature: FeatureId,
     pub name: &'a str,
@@ -57,9 +70,126 @@ pub struct EvalCtx<'a> {
     pub warnings: Vec<String>,
     /// Sketch being edited (for display of constraint states).
     pub editing_sketch: Option<FeatureId>,
+    /// Every feature of the Part Studio in list order (empty outside a
+    /// Part Studio regeneration).
+    pub features: &'a [EffectiveFeature],
+    /// Pattern instance transform while a feature is re-applied by a feature
+    /// pattern / mirror. Geometry returned by the `resolve_*` helpers
+    /// (points, planes, axes, directions, mate connectors and face profiles)
+    /// is mapped by it; sketches are transformed in the context itself (see
+    /// `features::pattern`), and topology lookups (`resolve_faces`,
+    /// `resolve_edges`, `resolve_bodies`) are unaffected.
+    pub xform: Option<DMat4>,
+}
+
+/// Map a plane frame by an affine (rigid or mirror) transform. Mirrors give a
+/// left-handed frame (`x × y = -normal`), which keeps `to_world` and the
+/// extrude direction consistent; [`kernel_plane`] handles it.
+pub fn transform_frame(f: &PlaneFrame, m: &DMat4) -> PlaneFrame {
+    PlaneFrame {
+        origin: m.transform_point3(f.origin),
+        x: m.transform_vector3(f.x).normalize_or_zero(),
+        y: m.transform_vector3(f.y).normalize_or_zero(),
+        normal: m.transform_vector3(f.normal).normalize_or_zero(),
+    }
+}
+
+/// References whose geometry comes from a sketch (already transformed in the
+/// context during a pattern re-application).
+fn is_sketch_ref(r: &Reference) -> bool {
+    match r {
+        Reference::SketchEntity { .. } | Reference::SketchRegion { .. } | Reference::Sketch(_) => true,
+        Reference::Implicit { on, .. } => is_sketch_ref(on),
+        _ => false,
+    }
+}
+
+/// Copy of `params` with every [`Reference::QueryVariable`] (also inside
+/// arrays) replaced by the variable's references from `ctx`; `None` when
+/// the parameters use no query variable. Unknown variables expand to
+/// nothing (the selection reads as missing).
+pub fn expand_query_variables(params: &ParamValues, ctx: &Context) -> Option<ParamValues> {
+    fn uses(v: &ParamValues) -> bool {
+        v.0.values().any(|p| match p {
+            ParamValue::Query(q) => q.iter().any(|r| matches!(r, Reference::QueryVariable(_))),
+            ParamValue::Array(items) => items.iter().any(uses),
+            _ => false,
+        })
+    }
+    fn expand(v: &ParamValues, ctx: &Context) -> ParamValues {
+        let mut out = v.clone();
+        for p in out.0.values_mut() {
+            match p {
+                ParamValue::Query(q) if q.iter().any(|r| matches!(r, Reference::QueryVariable(_))) => {
+                    let mut e: Vec<Reference> = Vec::with_capacity(q.len());
+                    for r in q.iter() {
+                        match r {
+                            Reference::QueryVariable(name) => {
+                                for x in ctx.query_variables.get(name).map(|v| v.as_slice()).unwrap_or(&[]) {
+                                    if !e.contains(x) {
+                                        e.push(x.clone());
+                                    }
+                                }
+                            }
+                            other => {
+                                if !e.contains(other) {
+                                    e.push(other.clone());
+                                }
+                            }
+                        }
+                    }
+                    *q = e;
+                }
+                ParamValue::Array(items) => {
+                    for it in items.iter_mut() {
+                        if uses(it) {
+                            *it = expand(it, ctx);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+    uses(params).then(|| expand(params, ctx))
 }
 
 impl<'a> EvalCtx<'a> {
+    /// A context for evaluating one feature (no feature list, no pattern
+    /// transform, not editing a sketch).
+    pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, features: &[], xform: None }
+    }
+
+    // ------------------------------------------------------------ pattern transform
+
+    fn xf_point(&self, p: DVec3) -> DVec3 {
+        match &self.xform {
+            Some(m) => m.transform_point3(p),
+            None => p,
+        }
+    }
+    fn xf_vector(&self, v: DVec3) -> DVec3 {
+        match &self.xform {
+            Some(m) => m.transform_vector3(v).normalize_or_zero(),
+            None => v,
+        }
+    }
+
+    /// References of a query variable defined upstream (empty if unknown).
+    pub fn query_variable(&self, name: &str) -> &[Reference] {
+        self.ctx.query_variables.get(name).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// First reference behind a query variable (for single-entity resolvers).
+    fn qv_first(&self, r: &Reference) -> Option<Reference> {
+        match r {
+            Reference::QueryVariable(n) => self.query_variable(n).first().cloned(),
+            _ => None,
+        }
+    }
+
     // ------------------------------------------------------------ params
 
     pub fn bool(&self, id: &str) -> bool {
@@ -115,12 +245,16 @@ impl<'a> EvalCtx<'a> {
     pub fn resolve_faces(&self, refs: &[Reference]) -> Vec<(usize, usize)> {
         let mut out = Vec::new();
         for r in refs {
-            if let Reference::Face(n) = r {
-                for (bi, b) in self.ctx.bodies.iter().enumerate() {
-                    for fi in b.find_faces(n) {
-                        out.push((bi, fi));
+            match r {
+                Reference::Face(n) => {
+                    for (bi, b) in self.ctx.bodies.iter().enumerate() {
+                        for fi in b.find_faces(n) {
+                            out.push((bi, fi));
+                        }
                     }
                 }
+                Reference::QueryVariable(name) => out.extend(self.resolve_faces(self.query_variable(name))),
+                _ => {}
             }
         }
         out.sort_unstable();
@@ -153,6 +287,7 @@ impl<'a> EvalCtx<'a> {
                         }
                     }
                 }
+                Reference::QueryVariable(name) => out.extend(self.resolve_edges(self.query_variable(name))),
                 _ => {}
             }
         }
@@ -161,7 +296,17 @@ impl<'a> EvalCtx<'a> {
         out
     }
 
+    /// Position of a point-like reference (pattern transform applied).
     pub fn resolve_vertex_point(&self, r: &Reference) -> Option<DVec3> {
+        if let Some(q) = self.qv_first(r) {
+            return self.resolve_vertex_point(&q);
+        }
+        let p = self.raw_vertex_point(r)?;
+        Some(if is_sketch_ref(r) { p } else { self.xf_point(p) })
+    }
+
+    /// Like [`Self::resolve_vertex_point`] without the pattern transform.
+    pub fn raw_vertex_point(&self, r: &Reference) -> Option<DVec3> {
         match r {
             Reference::Origin => Some(DVec3::ZERO),
             Reference::Vertex(n) => {
@@ -177,7 +322,8 @@ impl<'a> EvalCtx<'a> {
                 let p = s.sketch.point(noshape_sketch::EntityId(*entity))?;
                 Some(s.frame.to_world(p))
             }
-            Reference::MateConnector { .. } | Reference::Implicit { .. } => self.resolve_connector(r).map(|c| c.origin),
+            Reference::MateConnector { .. } | Reference::Implicit { .. } => self.raw_connector(r).map(|c| c.origin),
+            Reference::QueryVariable(_) => self.raw_vertex_point(&self.qv_first(r)?),
             _ => None,
         }
     }
@@ -197,6 +343,7 @@ impl<'a> EvalCtx<'a> {
                         out.push(bi);
                     }
                 }
+                Reference::QueryVariable(name) => out.extend(self.resolve_bodies(self.query_variable(name))),
                 _ => {}
             }
         }
@@ -212,8 +359,20 @@ impl<'a> EvalCtx<'a> {
         Ok(self.ctx.bodies[bi].shape.sub_shape(ShapeType::Edge, ei)?)
     }
 
-    /// Resolve a plane-like reference to a frame.
+    /// Resolve a plane-like reference to a frame (pattern transform applied).
     pub fn resolve_plane(&self, r: &Reference) -> Option<PlaneFrame> {
+        if let Some(q) = self.qv_first(r) {
+            return self.resolve_plane(&q);
+        }
+        let f = self.raw_plane(r)?;
+        Some(match (&self.xform, is_sketch_ref(r)) {
+            (Some(m), false) => transform_frame(&f, m),
+            _ => f,
+        })
+    }
+
+    /// Like [`Self::resolve_plane`] without the pattern transform.
+    pub fn raw_plane(&self, r: &Reference) -> Option<PlaneFrame> {
         match r {
             Reference::Plane(DatumPlane::Top) => Some(PlaneFrame::TOP),
             Reference::Plane(DatumPlane::Front) => Some(PlaneFrame::FRONT),
@@ -231,23 +390,51 @@ impl<'a> EvalCtx<'a> {
             }
             Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => self.ctx.sketch(*sketch).map(|s| s.frame),
             Reference::MateConnector { .. } | Reference::Implicit { .. } => {
-                let c = self.resolve_connector(r)?;
+                let c = self.raw_connector(r)?;
                 Some(PlaneFrame { origin: c.origin, x: c.x, y: c.z.cross(c.x), normal: c.z })
             }
+            Reference::QueryVariable(_) => self.raw_plane(&self.qv_first(r)?),
             _ => None,
         }
     }
 
+    /// Mate connector (explicit or implicit), pattern transform applied.
     pub fn resolve_connector(&self, r: &Reference) -> Option<super::context::Connector> {
+        if let Some(q) = self.qv_first(r) {
+            return self.resolve_connector(&q);
+        }
+        let mut c = self.raw_connector(r)?;
+        if !is_sketch_ref(r)
+            && let Some(m) = &self.xform
+        {
+            c.origin = m.transform_point3(c.origin);
+            c.x = m.transform_vector3(c.x).normalize_or_zero();
+            c.z = m.transform_vector3(c.z).normalize_or_zero();
+        }
+        Some(c)
+    }
+
+    /// Like [`Self::resolve_connector`] without the pattern transform.
+    pub fn raw_connector(&self, r: &Reference) -> Option<super::context::Connector> {
         match r {
             Reference::MateConnector { .. } => self.ctx.connectors.iter().find(|c| &c.reference == r).cloned(),
             Reference::Implicit { on, inference } => super::implicit::implicit_connector(self, on, *inference),
+            Reference::QueryVariable(_) => self.raw_connector(&self.qv_first(r)?),
             _ => None,
         }
     }
 
-    /// Resolve an axis: (origin, unit direction).
+    /// Resolve an axis: (origin, unit direction), pattern transform applied.
     pub fn resolve_axis(&self, r: &Reference) -> Option<(DVec3, DVec3)> {
+        if let Some(q) = self.qv_first(r) {
+            return self.resolve_axis(&q);
+        }
+        let (o, d) = self.raw_axis(r)?;
+        Some(if is_sketch_ref(r) { (o, d) } else { (self.xf_point(o), self.xf_vector(d)) })
+    }
+
+    /// Like [`Self::resolve_axis`] without the pattern transform.
+    pub fn raw_axis(&self, r: &Reference) -> Option<(DVec3, DVec3)> {
         match r {
             Reference::Edge(_) => {
                 let (bi, ei) = *self.resolve_edges(std::slice::from_ref(r)).first()?;
@@ -285,18 +472,22 @@ impl<'a> EvalCtx<'a> {
                 }
             }
             Reference::Plane(_) | Reference::FeaturePlane(_) => {
-                let f = self.resolve_plane(r)?;
+                let f = self.raw_plane(r)?;
                 Some((f.origin, f.normal))
             }
             Reference::MateConnector { .. } | Reference::Implicit { .. } => {
-                let c = self.resolve_connector(r)?;
+                let c = self.raw_connector(r)?;
                 Some((c.origin, c.z))
             }
+            Reference::QueryVariable(_) => self.raw_axis(&self.qv_first(r)?),
             _ => None,
         }
     }
 
     pub fn resolve_direction(&self, r: &Reference) -> Option<DVec3> {
+        if let Some(q) = self.qv_first(r) {
+            return self.resolve_direction(&q);
+        }
         if let Some(f) = self.resolve_plane(r)
             && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_))
         {
@@ -315,7 +506,9 @@ impl<'a> EvalCtx<'a> {
 
     // ------------------------------------------------------------ profiles
 
-    /// Build profile faces from sketch regions and planar faces.
+    /// Build profile faces from sketch regions and planar faces. Face
+    /// profiles follow the pattern transform (sketch regions are already
+    /// transformed through their sketch's frame).
     pub fn profiles(&self, refs: &[Reference]) -> FResult<Vec<Profile>> {
         let mut out = Vec::new();
         for r in refs {
@@ -334,12 +527,18 @@ impl<'a> EvalCtx<'a> {
                         // Name profile edges by the body's edge names.
                         let edges = face.edges();
                         let names: Vec<Name> = edges.iter().map(|e| b.shape.index_of(e, ShapeType::Edge).and_then(|i| b.edges.get(i).cloned()).unwrap_or_else(|| Arc::new(TopoName::face(self.feature, Role::New(0))))).collect();
-                        let frame = PlaneFrame { origin: pl.origin, x: pl.unit_x(), y: pl.unit_normal().cross(pl.unit_x()), normal: pl.unit_normal() };
-                        let shape = face.clone();
+                        let mut frame = PlaneFrame { origin: pl.origin, x: pl.unit_x(), y: pl.unit_normal().cross(pl.unit_x()), normal: pl.unit_normal() };
+                        let mut shape = face.clone();
+                        if let Some(m) = &self.xform {
+                            // Same sub-shape order after a transform: edge names stay aligned.
+                            shape = k::transform(&shape, &k::Transform::Matrix(*m), true)?.shape;
+                            frame = transform_frame(&frame, m);
+                        }
                         let sources = names.iter().map(|n| Source::Topo(n.clone())).collect();
                         out.push(Profile { shape, frame, edge_sources: sources, key: Source::Topo(Arc::new((*n).clone())), from_face: true });
                     }
                 }
+                Reference::QueryVariable(name) => out.extend(self.profiles(self.query_variable(name))?),
                 _ => {}
             }
         }
@@ -369,8 +568,8 @@ impl<'a> EvalCtx<'a> {
                 Some(HistRecord { arg: r.arg, in_kind: kind(r.input_kind)?, in_index: r.input_index, relation, out_kind: kind(r.output_kind)?, out_index: r.output_index })
             })
             .collect();
-        let keys = face_keys(out);
-        name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_face_keys: &keys, roles, generated_role: generated })
+        let count = out.count(ShapeType::Face);
+        name_faces(&FaceNamingInput { feature: self.feature, args, records: &records, out_count: count, out_face_key: &|i| face_key(out, i), roles, generated_role: generated })
     }
 
     /// Bounding diagonal of everything (for "through all").
@@ -535,8 +734,8 @@ impl NamedShape {
 pub fn names_for(shape: &Shape, faces: Vec<Name>) -> ShapeNames {
     let ef = shape.edge_faces().unwrap_or_default();
     let vf = shape.vertex_faces().unwrap_or_default();
-    let edges = crate::naming::name_edges(&faces, &ef, &super::context::edge_keys(shape));
-    let vertices = crate::naming::name_vertices(&faces, &vf, &super::context::vertex_keys(shape));
+    let edges = crate::naming::name_edges(&faces, &ef, &|i| super::context::edge_key(shape, i));
+    let vertices = crate::naming::name_vertices(&faces, &vf, &|i| super::context::vertex_key(shape, i));
     ShapeNames { faces, edges, vertices }
 }
 
@@ -578,8 +777,13 @@ pub struct Profile {
     pub from_face: bool,
 }
 
+/// Kernel plane whose local 2D coordinates match `f.to_world`. For a
+/// mirrored (left-handed) frame the kernel normal is `x × y`, i.e. opposite
+/// to `f.normal`, so 2D sketch geometry still lands where `to_world` puts it.
 pub fn kernel_plane(f: &PlaneFrame) -> k::Plane {
-    k::Plane::new(f.origin, f.normal, f.x)
+    let n = f.x.cross(f.y);
+    let n = if n.length_squared() > 0.25 && n.dot(f.normal) < 0.0 { n.normalize() } else { f.normal };
+    k::Plane::new(f.origin, n, f.x)
 }
 
 /// Convert a solver profile segment to a kernel segment.

@@ -21,3 +21,6 @@ ahash.workspace = true
 parking_lot.workspace = true
 smallvec.workspace = true
 nalgebra.workspace = true
+
+[dev-dependencies]
+env_logger.workspace = true

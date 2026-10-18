@@ -172,6 +172,19 @@ pub enum Curve {
     Other,
 }
 
+/// Control data of a 3D B-spline curve (see [`Shape::edge_bspline`]).
+/// `knots` are the distinct knot values with their `mults`; `weights` is
+/// `None` for non-rational curves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BSplineCurveData {
+    pub poles: Vec<DVec3>,
+    pub weights: Option<Vec<f64>>,
+    pub knots: Vec<f64>,
+    pub mults: Vec<u32>,
+    pub degree: u32,
+    pub periodic: bool,
+}
+
 /// Summary of an edge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EdgeInfo {
@@ -328,6 +341,24 @@ impl Shape {
             length: i.length,
             closed: i.closed,
             degenerated: i.degenerated,
+        })
+    }
+
+    /// The edge's curve as an exact B-spline restricted to the edge's range
+    /// and following the edge's orientation (lines, conics, Bezier and
+    /// B-spline curves are converted with `GeomConvert`). Pass the result to
+    /// [`crate::make_bspline_edge`] (possibly with edited poles / weights)
+    /// to rebuild the edge.
+    pub fn edge_bspline(&self) -> Result<BSplineCurveData> {
+        let b = ck(ffi::edge_bspline(self.raw()))?;
+        let poles = b.poles.chunks_exact(3).map(|c| DVec3::new(c[0], c[1], c[2])).collect();
+        Ok(BSplineCurveData {
+            poles,
+            weights: if b.weights.is_empty() { None } else { Some(b.weights) },
+            knots: b.knots,
+            mults: b.mults.into_iter().map(|m| m.max(0) as u32).collect(),
+            degree: b.degree.max(0) as u32,
+            periodic: b.periodic,
         })
     }
 

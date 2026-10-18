@@ -40,7 +40,7 @@ pub use boolean::{
 };
 pub use construct::*;
 pub use error::{KernelError, Result};
-pub use geom::{BoundingBox, Curve, EdgeInfo, FaceProjection, Plane, PointClass, Surface};
+pub use geom::{BSplineCurveData, BoundingBox, Curve, EdgeInfo, FaceProjection, Plane, PointClass, Surface};
 pub use history::{History, HistoryRecord, OpResult, Relation};
 pub use hlr::{EdgeClass, ProjectedEdge, Visibility, project_hlr, project_hlr_with};
 pub use io::{

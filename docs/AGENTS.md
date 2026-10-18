@@ -27,6 +27,9 @@ and the Onshape research specs in `research/sections/` (what each feature must d
   call kernel ops, name result faces with `name_result`/`sweep_names` (persistent naming!), and
   merge with `apply_operation` (New/Add/Remove/Intersect) or `replace_body` / `boolean_into`.
   Return `err("message")` for user-facing failures; never panic.
+  Get points/planes/axes/directions/connectors through the `resolve_*` helpers (not raw lookups):
+  feature patterns re-run evaluators with an instance transform (`EvalCtx::xform`) that those
+  helpers apply. Query parameters may contain `Reference::QueryVariable` (expanded before evaluation).
 * Persistent naming (`crates/model/src/naming.rs`, `reference.rs`): every face a feature creates
   must get a deterministic name from (feature id, role, source); edges/vertices derive from faces.
   Choose roles so that names stay stable when unrelated upstream geometry changes.

@@ -100,9 +100,19 @@ impl Regenerator {
         let mut ctx: Arc<Context> = Arc::new(Context::default());
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
+        // Effective features (configuration applied), visible to evaluators
+        // that re-run other features (feature pattern "Reapply features").
+        let effective: Vec<eval::EffectiveFeature> = studio
+            .features
+            .iter()
+            .map(|f| {
+                let (params, suppressed) = studio.configuration.apply(f, config);
+                eval::EffectiveFeature { id: f.id, type_id: f.type_id.clone(), name: f.name.clone(), params, suppressed }
+            })
+            .collect();
         for (i, f) in studio.features.iter().enumerate() {
-            let (params, suppressed) = studio.configuration.apply(f, config);
-            let blob = serde_json::to_vec(&(&f.type_id, &f.name, &params, suppressed)).unwrap_or_default();
+            let (params, suppressed) = (&effective[i].params, effective[i].suppressed);
+            let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
             live.push(f.id);
             if i >= upto {
@@ -127,7 +137,12 @@ impl Regenerator {
                         state.message = Some(format!("{} is not available in this build yet", f.feature_type().map(|t| t.name).unwrap_or(&f.type_id)));
                     }
                     Some(eval_fn) => {
-                        let mut ev = EvalCtx { feature: f.id, name: &f.name, params: &params, units, ctx: (*ctx).clone(), outer_vars: &outer_vars, warnings: Vec::new(), editing_sketch: opts.editing_sketch };
+                        // Query variables (`#name` selections) expand against the upstream context.
+                        let expanded = eval::expand_query_variables(params, &ctx);
+                        let params = expanded.as_ref().unwrap_or(params);
+                        let mut ev = EvalCtx::new(f.id, &f.name, params, units, (*ctx).clone(), &outer_vars);
+                        ev.editing_sketch = opts.editing_sketch;
+                        ev.features = &effective;
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eval_fn(&mut ev)));
                         match result {
                             Ok(Ok(())) => {

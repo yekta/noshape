@@ -17,25 +17,23 @@ enum End {
 
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
-    match body_type.as_str() {
+    let thin = match body_type.as_str() {
         "SURFACE" => return surface(ev),
-        "THIN" => return err("Thin extrude is not supported yet"),
-        _ => {}
-    }
-    let refs = ev.query("entities");
+        "THIN" => true,
+        _ => false,
+    };
+    let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return err("Select sketch regions or planar faces to extrude");
+        return err(if thin { "Select edges or faces to define the path of the thin wall" } else { "Select sketch regions or planar faces to extrude" });
     }
-    let profiles = ev.profiles(refs)?;
+    let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return err("No valid regions to extrude");
     }
     let mut tools = Vec::new();
     for p in &profiles {
-        let dir = direction(ev, p)?;
-        let res = extrude_profile(ev, p, dir)?;
-        let names = sweep_names(ev, p, &res, true, true);
-        tools.push(NamedShape::new(res.shape, names));
+        let dir = direction(ev, p, thin)?;
+        tools.push(extrude_profile(ev, p, dir)?);
     }
     let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
@@ -51,19 +49,21 @@ pub fn scope(ev: &EvalCtx) -> Option<Vec<usize>> {
     }
 }
 
-fn direction(ev: &EvalCtx, p: &Profile) -> FResult<DVec3> {
+fn direction(ev: &EvalCtx, p: &Profile, thin: bool) -> FResult<DVec3> {
     let mut d = p.frame.normal;
-    if ev.bool("hasExtrudeDirection") {
-        if let Some(r) = ev.query("extrudeDirection").first() {
-            match ev.resolve_direction(r) {
-                Some(x) => {
-                    if x.dot(p.frame.normal).abs() < 1e-9 {
-                        return err("Extrude direction can't be parallel to the profile");
-                    }
-                    d = if x.dot(p.frame.normal) < 0.0 { -x } else { x };
+    // A custom direction is not available for Thin (Onshape).
+    if ev.bool("hasExtrudeDirection")
+        && !thin
+        && let Some(r) = ev.query("extrudeDirection").first()
+    {
+        match ev.resolve_direction(r) {
+            Some(x) => {
+                if x.dot(p.frame.normal).abs() < 1e-9 {
+                    return err("Extrude direction can't be parallel to the profile");
                 }
-                None => return err("Select an extrude direction"),
+                d = if x.dot(p.frame.normal) < 0.0 { -x } else { x };
             }
+            None => return err("Select an extrude direction"),
         }
     }
     if ev.bool("oppositeDirection") {
@@ -123,7 +123,24 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &str, body_id: &s
     }
 }
 
-fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<k::OpResult> {
+/// One extrusion of `profile` from its plane along `dir` to `end`.
+fn one_side(profile: &k::Shape, dir: DVec3, end: End, draft: f64) -> FResult<k::OpResult> {
+    Ok(match end {
+        End::Distance(depth) if draft == 0.0 => k::extrude(profile, dir * depth)?,
+        End::Distance(depth) => k::extrude_between(profile, DVec3::ZERO, dir * depth, draft)?,
+        End::UpTo(target) => k::extrude_up_to(profile, dir, &target, 0.0)?,
+        End::UpToPoint(pt) => k::extrude_up_to_point(profile, dir, pt)?,
+    })
+}
+
+/// Extrude one profile with every end condition; returns the named tool.
+///
+/// Two-sided extrusions with two blind ends are one prism. When either end
+/// is an "up to" end (face, part, vertex, next), each side is extruded
+/// separately from the profile plane and the halves are fused (and their
+/// coplanar side faces unified): side 1 keeps `CapEnd`, the second end is
+/// `CapStart`, side faces stay `Side(<profile edge>)`.
+fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape> {
     let bound = ev.enum_("endBound").to_string();
     let end = end_for(ev, &bound, "depth", "endBoundEntityFace", "endBoundEntityBody", "endBoundEntityVertex", "hasOffset", "offsetDistance", "offsetOppositeDirection", dir)?;
     let symmetric = ev.bool("symmetric") && matches!(bound.as_str(), "BLIND" | "THROUGH_ALL");
@@ -147,32 +164,56 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<k::OpResult
         }
     }
     let profile = if start_shift.length() > 0.0 { p.shape.translated(start_shift)? } else { p.shape.clone() };
+    let named = |res: k::OpResult| NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true));
 
-    match end {
-        End::Distance(depth) => {
-            let mut a = DVec3::ZERO;
-            let mut b = dir * depth;
-            if symmetric {
-                a = -dir * depth * 0.5;
-                b = dir * depth * 0.5;
-            } else if ev.bool("hasSecondDirection") {
-                let bound2 = ev.enum_("secondDirectionBound").to_string();
-                let sign = if ev.bool("secondDirectionOppositeDirection") { -1.0 } else { 1.0 };
-                let d2 = dir * sign;
-                match end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)? {
-                    End::Distance(x) => a = d2 * x,
-                    End::UpTo(_) | End::UpToPoint(_) => return err("Up-to second end positions are not supported yet"),
-                }
-            }
-            if a.length() < 1e-12 && draft == 0.0 {
-                Ok(k::extrude(&profile, b)?)
-            } else {
-                Ok(k::extrude_between(&profile, a, b, draft)?)
+    if symmetric {
+        let End::Distance(depth) = end else { unreachable!("symmetric is only offered for blind / through all") };
+        return Ok(named(k::extrude_between(&profile, -dir * depth * 0.5, dir * depth * 0.5, draft)?));
+    }
+    if !ev.bool("hasSecondDirection") {
+        return Ok(named(one_side(&profile, dir, end, draft)?));
+    }
+    let bound2 = ev.enum_("secondDirectionBound").to_string();
+    let sign = if ev.bool("secondDirectionOppositeDirection") { -1.0 } else { 1.0 };
+    let d2 = dir * sign;
+    let end2 = end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)?;
+    let draft2 = if ev.bool("hasSecondDirectionDraft") {
+        let a = ev.angle("secondDirectionDraftAngle")?;
+        if ev.bool("secondDirectionDraftPullDirection") { -a } else { a }
+    } else {
+        draft
+    };
+    if let (End::Distance(x1), End::Distance(x2)) = (&end, &end2)
+        && draft2 == draft
+    {
+        let (a, b) = (d2 * *x2, dir * *x1);
+        return Ok(named(if a.length() < 1e-12 && draft == 0.0 { k::extrude(&profile, b)? } else { k::extrude_between(&profile, a, b, draft)? }));
+    }
+    // Two separately bounded halves, fused.
+    let r1 = one_side(&profile, dir, end, draft)?;
+    let r2 = one_side(&profile, d2, end2, draft2)?;
+    let n1 = names_for(&r1.shape, sweep_names(ev, p, &r1, false, true));
+    let n2 = {
+        let mut roles = std::collections::BTreeMap::new();
+        for f in r2.history.last_faces() {
+            roles.insert(f, crate::reference::Role::CapStart(Some(p.key.clone())));
+        }
+        for r in &r2.history.records {
+            if r.arg == 0 && r.input_kind == k::ShapeType::Edge && r.relation == k::Relation::Generated && r.output_kind == k::ShapeType::Face
+                && let Some(src) = p.edge_sources.get(r.input_index as usize)
+            {
+                roles.entry(r.output_index).or_insert_with(|| crate::reference::Role::Side(src.clone()));
             }
         }
-        End::UpTo(target) => Ok(k::extrude_up_to(&profile, dir, &target, 0.0)?),
-        End::UpToPoint(pt) => Ok(k::extrude_up_to_point(&profile, dir, pt)?),
-    }
+        let empty = crate::naming::ShapeNames::default();
+        names_for(&r2.shape, ev.name_result(&[&empty], &r2.history, &r2.shape, &roles, None))
+    };
+    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&r1.shape), std::slice::from_ref(&r2.shape), &k::BooleanOptions::default())?;
+    let fnames = ev.name_result(&[&n1, &n2], &fused.history, &fused.shape, &std::collections::BTreeMap::new(), None);
+    let unified = k::unify_same_domain(&fused.shape)?;
+    let un = names_for(&fused.shape, fnames);
+    let names = ev.name_result(&[&un], &unified.history, &unified.shape, &std::collections::BTreeMap::new(), None);
+    Ok(NamedShape::new(unified.shape, names))
 }
 
 fn surface(ev: &mut EvalCtx) -> FResult<()> {
@@ -197,7 +238,6 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
             roles.insert(i as u32, crate::reference::Role::Side(crate::reference::Source::Sketch { sketch: *sketch, entity: *entity, segment: i as u16 }));
         }
         let names = ev.name_result(&[&Default::default()], &res.history, &res.shape, &roles, None);
-        let _ = names_for;
         tools.push(NamedShape::new(res.shape, names));
     }
     if tools.is_empty() {

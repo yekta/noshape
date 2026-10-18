@@ -219,6 +219,12 @@ impl SheetGeometry {
                         [v[0] + radius * t.cos(), v[1] + radius * t.sin()]
                     }).collect();
                     self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    if (a1 - a0) * radius > 7.0 {
+                        let e0 = [v[0] + radius * a0.cos(), v[1] + radius * a0.sin()];
+                        let e1 = [v[0] + radius * a1.cos(), v[1] + radius * a1.sin()];
+                        self.arrow(e0, [a0.sin(), -a0.cos()], 3.0);
+                        self.arrow(e1, [-a1.sin(), a1.cos()], 3.0);
+                    }
                     let mid = (a0 + a1) / 2.0;
                     let deg = (a1 - a0).to_degrees();
                     self.texts.push(Text2 { pos: [v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], height: 3.5, text: format!("{deg:.1}°"), angle: 0.0, anchor: Anchor::Center, pick });

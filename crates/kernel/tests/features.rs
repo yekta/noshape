@@ -390,3 +390,101 @@ fn concurrent_tessellation_of_shared_shapes() {
         }
     });
 }
+
+#[test]
+fn thicken_always_gives_positive_volume() {
+    // Every combination of face orientation and thickness sides must give an
+    // outward-oriented solid with volume area * (t1 + t2).
+    let f = rect_face(&Plane::xy(), 4.0, 2.0);
+    for face in [f.clone(), f.reversed().unwrap()] {
+        for (t1, t2) in [(1.0, 0.0), (0.0, 1.0), (0.5, 0.25), (2.0, 1.0)] {
+            let r = thicken(&face, t1, t2).unwrap();
+            let v = r.shape.volume().unwrap();
+            assert!(close(v, 8.0 * (t1 + t2), 1e-6), "t1={t1} t2={t2}: volume {v}");
+            let vp = volume_properties(&r.shape).unwrap().mass;
+            assert!(vp > 0.0, "inside-out solid for t1={t1} t2={t2}");
+        }
+    }
+    // A curved sheet (half cylinder face).
+    let c = make_cylinder(&Plane::xy(), 5.0, 10.0, PI).unwrap();
+    let side = c.faces().into_iter().find(|x| matches!(x.face_surface().unwrap(), Surface::Cylinder { .. })).unwrap();
+    for face in [side.clone(), side.reversed().unwrap()] {
+        let r = thicken(&face, 1.0, 0.0).unwrap();
+        assert!(r.shape.volume().unwrap() > 0.0);
+    }
+}
+
+#[test]
+fn project_curves_accepts_compounds() {
+    let cyl = make_cylinder(&Plane::xy(), 5.0, 10.0, 2.0 * PI).unwrap();
+    // A compound of two separate lines.
+    let l1 = make_line(DVec3::new(-2.0, -10.0, 3.0), DVec3::new(2.0, -10.0, 3.0)).unwrap();
+    let l2 = make_line(DVec3::new(-2.0, -10.0, 7.0), DVec3::new(2.0, -10.0, 7.0)).unwrap();
+    let pr = project_curves(&Shape::compound(&[l1.clone(), l2.clone()]), &cyl, Some(DVec3::Y)).unwrap();
+    assert!(pr.edges().len() >= 2, "{} edges", pr.edges().len());
+    // A compound of faces as the curves (their boundaries are projected) and
+    // a compound of faces as the target.
+    let f = rect_face(&Plane::new(DVec3::new(0.0, -10.0, 5.0), -DVec3::Y, DVec3::X), 2.0, 2.0);
+    let side = cyl.faces().into_iter().find(|x| matches!(x.face_surface().unwrap(), Surface::Cylinder { .. })).unwrap();
+    let target = Shape::compound(std::slice::from_ref(&side));
+    let pr = project_curves(&Shape::compound(&[f]), &target, Some(DVec3::Y)).unwrap();
+    assert!(pr.edges().len() >= 4, "{} edges", pr.edges().len());
+    // Normal projection of a compound.
+    let pn = project_curves(&Shape::compound(&[l1, l2]), &target, None).unwrap();
+    assert!(!pn.edges().is_empty());
+}
+
+#[test]
+fn bspline_data_round_trip_and_edit() {
+    let poles = [DVec3::ZERO, DVec3::new(1.0, 2.0, 0.0), DVec3::new(3.0, 2.0, 1.0), DVec3::new(4.0, 0.0, 0.0)];
+    let e = make_bspline(&poles, None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+    let d = e.edge_bspline().unwrap();
+    assert_eq!(d.degree, 3);
+    assert_eq!(d.poles.len(), 4);
+    assert!(d.weights.is_none());
+    for (a, b) in d.poles.iter().zip(poles.iter()) {
+        assert!((*a - *b).length() < 1e-12);
+    }
+    // Reversed edge: poles follow the edge direction.
+    let r = e.reversed().unwrap().edge_bspline().unwrap();
+    assert!((r.poles[0] - poles[3]).length() < 1e-12);
+    // Edit a control point and a weight, rebuild.
+    let mut d2 = d.clone();
+    d2.poles[1] += DVec3::new(0.0, 0.0, 1.0);
+    d2.weights = Some(vec![1.0, 2.0, 1.0, 1.0]);
+    let e2 = make_bspline_edge(&d2).unwrap();
+    let back = e2.edge_bspline().unwrap();
+    assert!((back.poles[1] - d2.poles[1]).length() < 1e-12);
+    assert!((back.weights.unwrap()[1] - 2.0).abs() < 1e-12);
+    // Lines and arcs convert exactly (same endpoints, same length).
+    let a = make_arc(DVec3::ZERO, DVec3::Z, DVec3::X, 2.0, 0.0, PI / 2.0).unwrap();
+    let ad = a.edge_bspline().unwrap();
+    assert!(ad.weights.is_some());
+    let a2 = make_bspline_edge(&ad).unwrap();
+    assert!(close(a2.length().unwrap(), PI, 1e-6), "{}", a2.length().unwrap());
+    let l = make_line(DVec3::ZERO, DVec3::new(3.0, 4.0, 0.0)).unwrap();
+    let ld = l.edge_bspline().unwrap();
+    assert!((ld.poles[0]).length() < 1e-12 && (ld.poles.last().unwrap() - DVec3::new(3.0, 4.0, 0.0)).length() < 1e-12);
+}
+
+#[test]
+fn interpolated_spline_keeps_tangent_magnitudes() {
+    let pts = [DVec3::ZERO, DVec3::new(5.0, 0.0, 0.0), DVec3::new(10.0, 0.0, 0.0)];
+    let d = DVec3::new(1.0, 1.0, 0.0).normalize();
+    let max_y = |t: f64| {
+        let e = make_interpolated_spline(&pts, &[d * t, DVec3::ZERO, DVec3::ZERO], false).unwrap();
+        let i = e.edge_info().unwrap();
+        (0..=100).map(|k| e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 100.0).unwrap().y).fold(f64::MIN, f64::max)
+    };
+    let small = max_y(1.0);
+    let big = max_y(8.0);
+    assert!(big > small * 2.0, "magnitude ignored: {small} vs {big}");
+    // Start/end tangent form.
+    let e = make_interpolated_spline(&pts, &[d * 8.0, DVec3::X], false).unwrap();
+    let e1 = make_interpolated_spline(&pts, &[d, DVec3::X], false).unwrap();
+    let span = |e: &Shape| {
+        let i = e.edge_info().unwrap();
+        (0..=100).map(|k| e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 100.0).unwrap().y.abs()).fold(0.0, f64::max)
+    };
+    assert!(span(&e) > span(&e1) * 2.0);
+}

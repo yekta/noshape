@@ -19,7 +19,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
     match on {
         Reference::Origin => Some(mk(DVec3::ZERO, DVec3::Z)),
         Reference::Plane(_) | Reference::FeaturePlane(_) => {
-            let f = ev.resolve_plane(on)?;
+            let f = ev.raw_plane(on)?;
             Some(Connector { reference: Reference::Implicit { on: Box::new(on.clone()), inference }, name: "Mate connector".into(), origin: f.origin, x: f.x, z: f.normal })
         }
         Reference::Face(_) => {
@@ -60,7 +60,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             }
         }
         Reference::Vertex(_) | Reference::SketchEntity { .. } => {
-            let p = ev.resolve_vertex_point(on)?;
+            let p = ev.raw_vertex_point(on)?;
             Some(mk(p, DVec3::Z))
         }
         _ => {

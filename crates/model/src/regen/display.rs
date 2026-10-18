@@ -27,6 +27,7 @@ fn f3(p: DVec3) -> [f32; 3] {
 }
 
 pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, Arc<MeshBuffers>)>) -> StudioDisplay {
+    let t_all = std::time::Instant::now();
     let mut d = StudioDisplay::defaults();
     let mut used = std::collections::HashSet::new();
     for b in &ctx.bodies {
@@ -39,7 +40,10 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                 let bb = b.shape.bounding_box(false).ok();
                 let diag = bb.map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
                 let lin = (diag * opts.relative_deflection).max(1e-6);
-                let m = match noshape_kernel::tessellate(&b.shape, lin, opts.angular_deflection, true) {
+                let tt = std::time::Instant::now();
+                let tess = noshape_kernel::tessellate(&b.shape, lin, opts.angular_deflection, true);
+                log::debug!("tessellate {}: {:?} (linear {lin:.2e})", b.name, tt.elapsed());
+                let m = match tess {
                     Ok(t) => Arc::new(MeshBuffers {
                         face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
                         edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
@@ -74,10 +78,13 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         });
     }
     meshes.retain(|k, _| used.contains(k));
+    log::debug!("display: bodies {:?}", t_all.elapsed());
 
+    let t_sk = std::time::Instant::now();
     for s in &ctx.sketches {
         d.sketches.push(sketch_display(s, opts.editing_sketch == Some(s.feature)));
     }
+    log::debug!("display: sketches {:?}", t_sk.elapsed());
     for p in &ctx.planes {
         d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, hidden: false });
     }

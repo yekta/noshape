@@ -359,19 +359,107 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
 /// Query variable: validates the name and that a "Selection" query resolves.
 // TODO(context): store the resolved selection in the context once it has a
 // query-variable table, so other features can reference it.
+/// Query variable: evaluates the selection into persistent references and
+/// stores them in the context's query-variable table under `name` (without
+/// the `#`). Downstream query parameters select the variable as
+/// `Reference::QueryVariable(name)`; the regenerator expands it before the
+/// using feature runs (references resolve at the point of use, so geometry
+/// that keeps its persistent names stays selected; "Evaluate on use" behaves
+/// the same).
+///
+/// Selection types: Selection, Created by (features + entity type), Owned by
+/// (bodies + entity type) and All solid bodies; additional queries combine
+/// with union / subtract / intersect. Other types store nothing and warn.
 pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
     let name = ev.params.text("name").trim().trim_start_matches('#').to_string();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
         return err("Enter a valid variable name");
     }
-    if ev.is("selectionType", "SELECTION") {
-        let refs = ev.query("selectionQuery");
-        let unresolved = refs.iter().filter(|r| !resolves(ev, r)).count();
-        if unresolved > 0 {
-            ev.warnings.push(format!("{unresolved} selected entities could not be resolved"));
+    let st = ev.enum_("selectionType").to_string();
+    let mut refs = query_selection(ev, ev.params, &st, "")?;
+    if ev.bool("addAdditionalQueries") {
+        for item in ev.params.array("additionalQueries") {
+            let t = item.enum_("addQSelectionType").to_string();
+            let more = query_selection(ev, item, &t, "addQ")?;
+            match item.enum_("booleanOperation") {
+                "SUBTRACTION" => refs.retain(|r| !more.contains(r)),
+                "INTERSECTION" => refs.retain(|r| more.contains(r)),
+                _ => {
+                    for r in more {
+                        if !refs.contains(&r) {
+                            refs.push(r);
+                        }
+                    }
+                }
+            }
         }
     }
+    let unresolved = refs.iter().filter(|r| !resolves(ev, r)).count();
+    if unresolved > 0 {
+        ev.warnings.push(format!("{unresolved} selected entities could not be resolved"));
+    }
+    ev.ctx.query_variables.insert(name, refs);
     Ok(())
+}
+
+/// Parameter id with the additional-query prefix ("selectionQuery" ->
+/// "addQSelectionQuery").
+fn qid(prefix: &str, id: &str) -> String {
+    if prefix.is_empty() {
+        id.to_string()
+    } else {
+        let mut c = id.chars();
+        let first = c.next().map(|x| x.to_ascii_uppercase()).unwrap_or_default();
+        format!("{prefix}{first}{}", c.as_str())
+    }
+}
+
+fn query_selection(ev: &mut EvalCtx, p: &crate::params::ParamValues, st: &str, prefix: &str) -> FResult<Vec<Reference>> {
+    // Entity type: per item for additional queries, else the feature's.
+    let entity_type = if prefix.is_empty() { p.enum_("entityType").to_string() } else { ev.enum_("entityType").to_string() };
+    let collect = |ev: &EvalCtx, bodies: &[usize], keep: &dyn Fn(&crate::naming::Name) -> bool| -> Vec<Reference> {
+        let mut out = Vec::new();
+        for &bi in bodies {
+            let b = &ev.ctx.bodies[bi];
+            match entity_type.as_str() {
+                "FACE" => out.extend(b.faces.iter().filter(|n| keep(n)).map(|n| Reference::Face((**n).clone()))),
+                "EDGE" => out.extend(b.edges.iter().filter(|n| keep(n)).map(|n| Reference::Edge((**n).clone()))),
+                "VERTEX" => out.extend(b.vertices.iter().filter(|n| keep(n)).map(|n| Reference::Vertex((**n).clone()))),
+                _ => out.push(Reference::Body(b.id.clone())),
+            }
+        }
+        out
+    };
+    Ok(match st {
+        "SELECTION" => p.query(&qid(prefix, "selectionQuery")).to_vec(),
+        "CREATED_BY" => {
+            let feats: Vec<crate::reference::FeatureId> = p.query(&qid(prefix, "createdByFeatures")).iter().filter_map(|r| if let Reference::Feature(f) = r { Some(*f) } else { None }).collect();
+            let all: Vec<usize> = (0..ev.ctx.bodies.len()).collect();
+            let by_body = entity_type == "BODY" || entity_type.is_empty();
+            if by_body {
+                ev.ctx.bodies.iter().filter(|b| feats.contains(&b.id.feature)).map(|b| Reference::Body(b.id.clone())).collect()
+            } else {
+                let edge_creator = |n: &crate::naming::Name| -> Option<crate::reference::FeatureId> {
+                    match &**n {
+                        crate::reference::TopoName::Edge { faces, .. } => faces.iter().filter_map(|f| f.creator()).max_by_key(|f| feats.contains(f)),
+                        crate::reference::TopoName::Vertex { faces, .. } => faces.iter().filter_map(|f| f.creator()).max_by_key(|f| feats.contains(f)),
+                        crate::reference::TopoName::Boundary { face, .. } => face.creator(),
+                        other => other.creator(),
+                    }
+                };
+                collect(ev, &all, &|n| edge_creator(n).is_some_and(|f| feats.contains(&f)))
+            }
+        }
+        "OWNED_BY" => {
+            let bodies = ev.resolve_bodies(p.query(&qid(prefix, "seedBodies")));
+            collect(ev, &bodies, &|_| true)
+        }
+        "ALL_SOLID_BODIES" => ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect(),
+        other => {
+            ev.warnings.push(format!("Query variable selection type {other} is not supported yet; it selects nothing"));
+            Vec::new()
+        }
+    })
 }
 
 fn resolves(ev: &EvalCtx, r: &Reference) -> bool {

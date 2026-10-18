@@ -24,6 +24,7 @@ use std::collections::HashMap;
 enum TabView {
     Variables(Entity<VariableStudioView>),
     PartStudio(Entity<PartStudioView>),
+    Drawing(Entity<crate::drawing_view::DrawingEditor>),
     Assembly(Entity<AssemblyView>),
     Placeholder(&'static str),
 }
@@ -91,7 +92,10 @@ impl Workspace {
                 let gpu = self.gpu.clone();
                 TabView::Assembly(cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx)))
             }
-            Some("drawing") => TabView::Placeholder("Drawing"),
+            Some("drawing") => {
+                let (doc, gpu) = (self.doc.clone(), self.gpu.clone());
+                TabView::Drawing(cx.new(|cx| crate::drawing_view::DrawingEditor::new(doc, tab, gpu, window, cx)))
+            }
             Some("variables") => {
                 let doc = self.doc.clone();
                 TabView::Variables(cx.new(|cx| VariableStudioView::new(doc, tab, window, cx)))
@@ -106,6 +110,10 @@ impl Workspace {
         self.ensure_view(tab, window, cx);
         if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
             let fh = v.read(cx).focus_handle(cx);
+            window.focus(&fh, cx);
+        }
+        if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
+            let fh = v.read(cx).focus.clone();
             window.focus(&fh, cx);
         }
         if let Some(TabView::Assembly(v)) = self.views.get(&tab) {
@@ -439,6 +447,7 @@ impl Render for Workspace {
         let tabs = self.render_tab_bar(cx);
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
+            Some(TabView::Drawing(v)) => v.clone().into_any_element(),
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
             Some(TabView::Assembly(v)) => v.clone().into_any_element(),
             Some(TabView::Placeholder(kind)) => div()

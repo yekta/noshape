@@ -8,12 +8,25 @@
 //!   (adds material) or a pocket (removes material) from the body's face
 //!   orientation; each instance of the tool is fused into / cut from the
 //!   parts it touches. Faces with non-planar boundaries give a clear error.
-//! * Feature pattern: evaluators only see the current context (not other
-//!   features' definitions), so features are patterned through their
-//!   geometry: bodies created by the feature are copied as new parts, and
-//!   the faces the feature left on other bodies are face-patterned as above.
-//!   "Reapply features" is therefore not available (a warning is shown).
-//!   Features are processed in selection order.
+//! * Feature pattern, "Reapply features" on (default for Mirror): for every
+//!   instance (in instance order), the selected features (in feature-list
+//!   order, sketches skipped) are re-evaluated against the current context
+//!   with the instance transform pushed on the `EvalCtx`: their sketches are
+//!   transformed in a scratch context, and the `resolve_*` helpers map
+//!   points, planes, axes, directions, mate connectors and face profiles,
+//!   while topology lookups (up-to faces, merge scopes, Up to next) see the
+//!   real geometry, so end conditions re-evaluate per instance. Faces an
+//!   instance creates are renamed `Copy { instance, of: <name the seed
+//!   feature gives> }` (the same names the geometric path produces), bodies
+//!   it creates get ids of the pattern feature. Instances that fail are
+//!   skipped with a warning; if the features can't be re-applied at all
+//!   (unknown or later features) or every instance fails, the geometric
+//!   path below is used instead.
+//! * Feature pattern, "Reapply features" off: features are patterned through
+//!   their geometry: bodies created by the feature are copied as new parts,
+//!   and the faces the feature left on other bodies are face-patterned as
+//!   above (falls back to re-applying when that fails, e.g. non-planar
+//!   boundaries). Features are processed in feature-list order.
 //!
 //! Naming: every face of an instance is `Copy { instance, of }` where
 //! `instance` encodes the instance's grid index relative to the seed (zig-zag
@@ -23,9 +36,9 @@
 use super::helpers_a::*;
 use crate::display::BodyKind;
 use crate::naming::Name;
-use crate::reference::{BodyId, FeatureId, Reference, Role, TopoName};
-use crate::regen::context::{Body, Connector};
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, kernel_plane};
+use crate::reference::{BodyId, FeatureId, Reference, Role, Source, TopoName};
+use crate::regen::context::{Body, Connector, SketchResult};
+use crate::regen::eval::{EffectiveFeature, EvalCtx, FResult, NamedShape, err, kernel_plane, transform_frame};
 use glam::{DMat4, DQuat, DVec3, DVec4};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -501,17 +514,51 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
 }
 
 fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
-    let feats: Vec<FeatureId> = ev.query("instanceFunction").iter().filter_map(|r| if let Reference::Feature(f) = r { Some(*f) } else { None }).collect();
+    let mut feats: Vec<FeatureId> = ev.query("instanceFunction").iter().filter_map(|r| if let Reference::Feature(f) = r { Some(*f) } else { None }).collect();
     if feats.is_empty() {
         return err("Select features to pattern");
     }
-    if ev.bool("fullFeaturePattern") {
-        ev.warnings.push("Reapply features is not supported yet; the features' geometry was patterned instead".into());
-    }
+    // Feature-list order (not selection order).
+    let order = |f: &FeatureId| ev.features.iter().position(|x| x.id == *f).unwrap_or(usize::MAX);
+    feats.sort_by_key(order);
+    feats.dedup();
     if instances.is_empty() {
         return Ok(());
     }
-    for f in feats {
+    let before = ev.ctx.clone();
+    let warnings_before = ev.warnings.len();
+    if ev.bool("fullFeaturePattern") {
+        match reapply_features(ev, &feats, instances) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                ev.ctx = before.clone();
+                ev.warnings.truncate(warnings_before);
+                let r = geometric_feature_pattern(ev, &feats, instances);
+                if r.is_err() {
+                    return Err(e);
+                }
+                ev.warnings.push(format!("Reapply features failed ({}); the features' geometry was patterned instead", e.message));
+                return r;
+            }
+        }
+    }
+    match geometric_feature_pattern(ev, &feats, instances) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            ev.ctx = before;
+            ev.warnings.truncate(warnings_before);
+            match reapply_features(ev, &feats, instances) {
+                Ok(()) => Ok(()),
+                Err(_) => Err(e),
+            }
+        }
+    }
+}
+
+/// Feature pattern through geometry (face / part patterns of what each
+/// feature created).
+fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance]) -> FResult<()> {
+    for &f in feats {
         let mut found = false;
         // Bodies created by the feature: copied as new parts.
         let created: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].id.feature == f).collect();
@@ -544,6 +591,260 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         }
     }
     Ok(())
+}
+
+// ------------------------------------------------------------------ reapply
+
+/// Stable 32-bit mix (FNV-1a) for derived ids.
+fn mix(parts: &[u64]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for p in parts {
+        for b in p.to_le_bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    h
+}
+
+/// Renames the entities a feature created while being re-applied for one
+/// instance: the scratch feature id `tmp` becomes the pattern feature.
+struct Renamer {
+    tmp: FeatureId,
+    seed: FeatureId,
+    pattern: FeatureId,
+    code: u32,
+}
+
+impl Renamer {
+    fn contains(&self, n: &TopoName) -> bool {
+        match n {
+            TopoName::Face { feature, role } => *feature == self.tmp || self.role_contains(role),
+            TopoName::Split { parent, by, .. } => *by == self.tmp || self.contains(parent),
+            TopoName::Edge { faces, .. } => faces.iter().any(|f| self.contains(f)),
+            TopoName::Vertex { faces, .. } => faces.iter().any(|f| self.contains(f)),
+            TopoName::Wire { feature, source } => *feature == self.tmp || self.source_contains(source),
+            TopoName::Boundary { face, .. } => self.contains(face),
+        }
+    }
+    fn role_contains(&self, r: &Role) -> bool {
+        match r {
+            Role::Side(s) | Role::Profile(s) => self.source_contains(s),
+            Role::CapStart(s) | Role::CapEnd(s) => s.as_ref().is_some_and(|s| self.source_contains(s)),
+            Role::Blend(n) | Role::Generated(n) | Role::Offset(n) | Role::Copy { of: n, .. } => self.contains(n),
+            Role::New(_) | Role::Datum(_) => false,
+        }
+    }
+    fn source_contains(&self, s: &Source) -> bool {
+        matches!(s, Source::Topo(n) if self.contains(n))
+    }
+
+    /// The name the seed feature would give: `tmp` replaced by the seed id.
+    fn to_seed(&self, n: &Name) -> Name {
+        if !self.contains(n) {
+            return n.clone();
+        }
+        Arc::new(match &**n {
+            TopoName::Face { feature, role } => TopoName::Face { feature: if *feature == self.tmp { self.seed } else { *feature }, role: self.map_role(role, true) },
+            TopoName::Split { parent, by, ordinal } => TopoName::Split { parent: self.to_seed(parent), by: if *by == self.tmp { self.seed } else { *by }, ordinal: *ordinal },
+            TopoName::Edge { faces: [a, b], ordinal } => TopoName::edge(self.to_seed(a), self.to_seed(b), *ordinal),
+            TopoName::Vertex { faces, ordinal } => TopoName::vertex(faces.iter().map(|f| self.to_seed(f)).collect(), *ordinal),
+            TopoName::Wire { feature, source } => TopoName::Wire { feature: if *feature == self.tmp { self.seed } else { *feature }, source: self.map_source(source, true) },
+            TopoName::Boundary { face, ordinal } => TopoName::Boundary { face: self.to_seed(face), ordinal: *ordinal },
+        })
+    }
+
+    /// Final instance name: faces created by `tmp` become
+    /// `Copy { instance, of: <seed name> }` of the pattern feature.
+    fn rename(&self, n: &Name) -> Name {
+        if !self.contains(n) {
+            return n.clone();
+        }
+        Arc::new(match &**n {
+            TopoName::Face { feature, role } if *feature == self.tmp => {
+                let of = Arc::new(TopoName::Face { feature: self.seed, role: self.map_role(role, true) });
+                TopoName::Face { feature: self.pattern, role: Role::Copy { instance: self.code, of } }
+            }
+            TopoName::Face { feature, role } => TopoName::Face { feature: *feature, role: self.map_role(role, false) },
+            TopoName::Split { parent, by, ordinal } => TopoName::Split { parent: self.rename(parent), by: if *by == self.tmp { self.pattern } else { *by }, ordinal: *ordinal },
+            TopoName::Edge { faces: [a, b], ordinal } => TopoName::edge(self.rename(a), self.rename(b), *ordinal),
+            TopoName::Vertex { faces, ordinal } => TopoName::vertex(faces.iter().map(|f| self.rename(f)).collect(), *ordinal),
+            TopoName::Wire { feature, source } => TopoName::Wire { feature: if *feature == self.tmp { self.pattern } else { *feature }, source: self.map_source(source, false) },
+            TopoName::Boundary { face, ordinal } => TopoName::Boundary { face: self.rename(face), ordinal: *ordinal },
+        })
+    }
+
+    fn map_name(&self, n: &Name, seed: bool) -> Name {
+        if seed { self.to_seed(n) } else { self.rename(n) }
+    }
+    fn map_source(&self, s: &Source, seed: bool) -> Source {
+        match s {
+            Source::Topo(n) => Source::Topo(self.map_name(n, seed)),
+            other => other.clone(),
+        }
+    }
+    fn map_role(&self, r: &Role, seed: bool) -> Role {
+        match r {
+            Role::Side(s) => Role::Side(self.map_source(s, seed)),
+            Role::Profile(s) => Role::Profile(self.map_source(s, seed)),
+            Role::CapStart(s) => Role::CapStart(s.as_ref().map(|s| self.map_source(s, seed))),
+            Role::CapEnd(s) => Role::CapEnd(s.as_ref().map(|s| self.map_source(s, seed))),
+            Role::Blend(n) => Role::Blend(self.map_name(n, seed)),
+            Role::Generated(n) => Role::Generated(self.map_name(n, seed)),
+            Role::Offset(n) => Role::Offset(self.map_name(n, seed)),
+            Role::Copy { instance, of } => Role::Copy { instance: *instance, of: self.map_name(of, seed) },
+            other => other.clone(),
+        }
+    }
+
+    fn body_id(&self, id: &BodyId) -> BodyId {
+        if id.feature != self.tmp {
+            return id.clone();
+        }
+        let index = (mix(&[self.seed.0, self.code as u64, id.index as u64]) & 0x7FFF_FFFF) as u32 | 0x8000_0000;
+        BodyId { feature: self.pattern, index }
+    }
+}
+
+/// Sketches referenced (directly or through implicit connectors) by a
+/// feature's parameters.
+fn referenced_sketches(p: &crate::params::ParamValues, out: &mut BTreeSet<FeatureId>) {
+    fn of_ref(r: &Reference, out: &mut BTreeSet<FeatureId>) {
+        match r {
+            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => {
+                out.insert(*sketch);
+            }
+            Reference::Implicit { on, .. } => of_ref(on, out),
+            _ => {}
+        }
+    }
+    for v in p.0.values() {
+        match v {
+            crate::params::ParamValue::Query(q) => q.iter().for_each(|r| of_ref(r, out)),
+            crate::params::ParamValue::Array(items) => items.iter().for_each(|i| referenced_sketches(i, out)),
+            _ => {}
+        }
+    }
+}
+
+/// Sketch moved by an instance transform (frame mapped; 2D data unchanged).
+fn transformed_sketch(s: &SketchResult, m: &DMat4) -> SketchResult {
+    SketchResult {
+        feature: s.feature,
+        name: s.name.clone(),
+        frame: transform_frame(&s.frame, m),
+        sketch: s.sketch.clone(),
+        report: s.report.clone(),
+        regions: s.regions.clone(),
+        wires: s.wires.clone(),
+        dimension_text: s.dimension_text.clone(),
+    }
+}
+
+/// Re-run the selected features for every instance (see the module docs).
+fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance]) -> FResult<()> {
+    if ev.features.is_empty() {
+        return err("The feature list is not available");
+    }
+    let me = ev.features.iter().position(|f| f.id == ev.feature);
+    let mut seeds: Vec<&EffectiveFeature> = Vec::new();
+    for f in feats {
+        let Some(i) = ev.features.iter().position(|x| x.id == *f) else { return err("A selected feature no longer exists") };
+        if me.is_some_and(|m| i >= m) {
+            return err("Only features before the pattern can be patterned");
+        }
+        let fd = &ev.features[i];
+        if fd.suppressed || fd.type_id == "sketch" {
+            continue;
+        }
+        if super::evaluator(&fd.type_id).is_none() {
+            return err(format!("{} can't be re-applied", fd.name));
+        }
+        seeds.push(fd);
+    }
+    if seeds.is_empty() {
+        return err("None of the selected features can be re-applied");
+    }
+    let features = ev.features;
+    let mut ok = 0usize;
+    let mut failures: Vec<String> = Vec::new();
+    for inst in instances {
+        let m = inst.t.matrix();
+        let total = match &ev.xform {
+            Some(outer) => m * *outer,
+            None => m,
+        };
+        for seed in &seeds {
+            let tmp = FeatureId(mix(&[ev.feature.0, seed.id.0, inst.code as u64]) | (1 << 62));
+            let expanded = crate::regen::eval::expand_query_variables(&seed.params, &ev.ctx);
+            let params = expanded.as_ref().unwrap_or(&seed.params);
+            // Scratch context: the seed's sketches moved to the instance.
+            let mut scratch = ev.ctx.clone();
+            let mut sk = BTreeSet::new();
+            referenced_sketches(params, &mut sk);
+            for s in scratch.sketches.iter_mut() {
+                if sk.contains(&s.feature) {
+                    *s = Arc::new(transformed_sketch(s, &m));
+                }
+            }
+            let mut sub = EvalCtx::new(tmp, &seed.name, params, ev.units, scratch, ev.outer_vars);
+            sub.features = features;
+            sub.xform = Some(total);
+            let eval_fn = super::evaluator(&seed.type_id).expect("checked above");
+            match eval_fn(&mut sub) {
+                Ok(()) => {
+                    ok += 1;
+                    for w in sub.warnings {
+                        if !ev.warnings.contains(&w) {
+                            ev.warnings.push(w);
+                        }
+                    }
+                    let rn = Renamer { tmp, seed: seed.id, pattern: ev.feature, code: inst.code };
+                    merge_instance(ev, sub.ctx, &rn);
+                }
+                Err(e) => failures.push(e.message),
+            }
+        }
+    }
+    if ok == 0 {
+        return Err(fe(failures.into_iter().next().unwrap_or_else(|| "Pattern failed".into())));
+    }
+    if !failures.is_empty() {
+        let n = failures.len();
+        let first = failures.into_iter().next().unwrap_or_default();
+        ev.warnings.push(format!("{n} pattern instance(s) failed: {first}"));
+    }
+    Ok(())
+}
+
+/// Take the bodies (and new mate connectors) of an instance evaluation,
+/// renaming what the scratch feature created.
+fn merge_instance(ev: &mut EvalCtx, sub: crate::regen::context::Context, rn: &Renamer) {
+    let mut bodies = Vec::with_capacity(sub.bodies.len());
+    for b in sub.bodies {
+        let unchanged = ev.ctx.bodies.iter().any(|o| Arc::ptr_eq(o, &b));
+        if unchanged || (b.id.feature != rn.tmp && !b.faces.iter().any(|n| rn.contains(n))) {
+            bodies.push(b);
+            continue;
+        }
+        let faces: Vec<Name> = b.faces.iter().map(|n| rn.rename(n)).collect();
+        let faces = if faces.is_empty() { faces } else { dedup_names(ev, faces) };
+        let nb = Body::new(rn.body_id(&b.id), b.name.clone(), b.kind, b.shape.clone(), faces, b.color, ev.feature);
+        bodies.push(Arc::new(nb));
+    }
+    ev.ctx.bodies = bodies;
+    ev.ctx.next_part = sub.next_part;
+    ev.ctx.next_surface = sub.next_surface;
+    ev.ctx.next_curve = sub.next_curve;
+    ev.ctx.next_color = sub.next_color;
+    for c in sub.connectors {
+        if let Reference::MateConnector { feature, index } = &c.reference
+            && *feature == rn.tmp
+        {
+            let idx = (mix(&[rn.seed.0, rn.code as u64, *index as u64]) & 0x7FFF_FFFF) as u32 | 0x8000_0000;
+            ev.ctx.connectors.push(Connector { reference: Reference::MateConnector { feature: ev.feature, index: idx }, ..c });
+        }
+    }
 }
 
 // ------------------------------------------------------------------ transform / copy

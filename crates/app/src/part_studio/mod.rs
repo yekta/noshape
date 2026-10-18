@@ -344,6 +344,7 @@ impl PartStudioView {
                 Reference::MateConnector { feature, .. } => fname(*feature),
                 Reference::Feature(f) => fname(*f),
                 Reference::Implicit { .. } => "Mate connector".into(),
+                Reference::QueryVariable(name) => format!("#{name}"),
             }
         })
     }

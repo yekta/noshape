@@ -201,6 +201,12 @@ pub enum Reference {
     Feature(FeatureId),
     /// Implicit mate connector inferred on an entity.
     Implicit { on: Box<Reference>, inference: Inference },
+    /// A query variable (`#name`, defined by a Query variable feature
+    /// upstream). Stands for the variable's references; the regenerator
+    /// expands it before a feature is evaluated and the `EvalCtx::resolve_*`
+    /// helpers accept it too. Serialized as `{"QueryVariable":"name"}`;
+    /// documents without it deserialize unchanged.
+    QueryVariable(String),
 }
 
 impl Reference {
@@ -214,6 +220,9 @@ impl Reference {
             Reference::FeaturePlane(f) | Reference::Feature(f) => Some(*f),
             Reference::MateConnector { feature, .. } => Some(*feature),
             Reference::Implicit { on, .. } => on.depends_on(),
+            // Depends on the defining Query variable feature, which is only
+            // known by name here.
+            Reference::QueryVariable(_) => None,
         }
     }
 
@@ -235,6 +244,7 @@ impl Reference {
             Reference::MateConnector { .. } => "Mate connector",
             Reference::Feature(_) => "Feature",
             Reference::Implicit { .. } => "Mate connector",
+            Reference::QueryVariable(_) => "Query variable",
         }
     }
 }
@@ -272,5 +282,16 @@ mod tests {
         let s = serde_json::to_string(&r).unwrap();
         let back: Reference = serde_json::from_str(&s).unwrap();
         assert_eq!(r, back);
+    }
+
+    #[test]
+    fn query_variable_reference_serde() {
+        let r = Reference::QueryVariable("holes".into());
+        let s = serde_json::to_string(&r).unwrap();
+        assert_eq!(s, r#"{"QueryVariable":"holes"}"#);
+        assert_eq!(serde_json::from_str::<Reference>(&s).unwrap(), r);
+        // Older variants still parse.
+        let old: Reference = serde_json::from_str(r#"{"Plane":"Top"}"#).unwrap();
+        assert_eq!(old, Reference::Plane(DatumPlane::Top));
     }
 }

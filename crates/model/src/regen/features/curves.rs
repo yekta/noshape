@@ -851,9 +851,6 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
     if edges.is_empty() {
         return err("Select a curve to edit");
     }
-    if ev.bool("editControlPoints") && !ev.params.array("controlPointEdits").is_empty() {
-        return err("Editing control points is not supported yet");
-    }
     let single_body = match refs {
         [r @ Reference::Body(_)] => ev.resolve_bodies(std::slice::from_ref(r)).first().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Wire),
         _ => None,
@@ -888,7 +885,7 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
         }
         changed = true;
     }
-    let shape = if changed {
+    let mut shape = if changed {
         if closed {
             pts.pop();
         }
@@ -896,6 +893,9 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         k::make_wire(&chain.into_iter().map(|(e, _)| e).collect::<Vec<_>>())?
     };
+    if ev.bool("editControlPoints") && !ev.params.array("controlPointEdits").is_empty() {
+        shape = edit_control_points(ev, &shape)?;
+    }
     match single_body {
         Some(bi) => {
             replace_wire_body(ev, bi, shape);
@@ -903,6 +903,78 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
         }
         None => add_wire_bodies(ev, vec![shape]),
     }
+}
+
+/// Apply the "Points overrides" of Edit curve: the curve (one edge) is
+/// converted to its exact B-spline (`Shape::edge_bspline`), each override
+/// moves control point `index` to its reference point (default: the
+/// original control point) plus the X/Y/Z offset, and multiplies its weight.
+/// Offsets are along world axes in XYZ mode; in the UVN modes U follows the
+/// curve tangent at the closest curve point (UVN tangent) or the control
+/// polygon leg (UVN control polygon), N is the curve plane normal (or a
+/// perpendicular), V = N x U.
+fn edit_control_points(ev: &EvalCtx, wire: &Shape) -> FResult<Shape> {
+    let edges = wire.edges();
+    let [edge] = edges.as_slice() else { return err("Editing control points needs a single curve (use Approximate for several edges)") };
+    let mut d = edge.edge_bspline()?;
+    let n = d.poles.len();
+    let orig = d.poles.clone();
+    let normal = wire.find_plane(1e-7).ok().flatten().map(|p| p.unit_normal());
+    let mode = ev.enum_("editPointMode").to_string();
+    let info = edge.edge_info()?;
+    for item in ev.params.array("controlPointEdits") {
+        let idx = ev.eval_num_in(item, "index", crate::params::NumKind::Integer)?.round();
+        if idx < 0.0 || idx as usize >= n {
+            return err(format!("Control point index {} is too large (the curve has {n} control points)", idx as i64));
+        }
+        let i = idx as usize;
+        let base = match item.query("reference").first() {
+            Some(r) => ev.resolve_vertex_point(r).ok_or_else(|| FeatureError::new("A control point reference no longer exists"))?,
+            None => orig[i],
+        };
+        let off = DVec3::new(
+            ev.eval_num_in(item, "x", crate::params::NumKind::Length).unwrap_or(0.0),
+            ev.eval_num_in(item, "y", crate::params::NumKind::Length).unwrap_or(0.0),
+            ev.eval_num_in(item, "z", crate::params::NumKind::Length).unwrap_or(0.0),
+        );
+        let off = if mode == "XYZ" {
+            off
+        } else {
+            let u = if mode == "UVN_POLYGON" {
+                let (a, b) = if i + 1 < n { (orig[i], orig[i + 1]) } else { (orig[i.saturating_sub(1)], orig[i]) };
+                (b - a).normalize_or_zero()
+            } else {
+                // Tangent at the curve point closest to the control point.
+                let samples = 64;
+                let (mut best, mut best_d) = (info.first_param, f64::INFINITY);
+                for k2 in 0..=samples {
+                    let t = info.first_param + (info.last_param - info.first_param) * k2 as f64 / samples as f64;
+                    if let Ok(p) = edge.point_at(t)
+                        && p.distance(orig[i]) < best_d
+                    {
+                        best_d = p.distance(orig[i]);
+                        best = t;
+                    }
+                }
+                edge.tangent_at(best).unwrap_or(DVec3::X).normalize_or_zero()
+            };
+            let u = if u.length_squared() < 0.5 { DVec3::X } else { u };
+            let nn = normal.filter(|v| v.cross(u).length() > 1e-6).unwrap_or_else(|| u.any_orthonormal_vector());
+            let nn = (nn - u * nn.dot(u)).normalize();
+            let v = nn.cross(u);
+            u * off.x + v * off.y + nn * off.z
+        };
+        d.poles[i] = base + off;
+        let w = ev.eval_num_in(item, "weight", crate::params::NumKind::Real).unwrap_or(1.0);
+        if (w - 1.0).abs() > 1e-12 {
+            if w <= 0.0 {
+                return err("Control point weights must be positive");
+            }
+            let ws = d.weights.get_or_insert_with(|| vec![1.0; n]);
+            ws[i] *= w;
+        }
+    }
+    Ok(k::make_wire(&[k::make_bspline_edge(&d)?])?)
 }
 
 /// Resample a polyline to `n` points evenly spaced by arc length.

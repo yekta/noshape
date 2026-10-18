@@ -16,40 +16,36 @@ fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
     m
 }
 
-/// Expand an edge set across tangent-continuous neighbors (tangent propagation).
-fn propagate_tangent(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
+/// Expand an edge set across tangent-continuous neighbors (tangent
+/// propagation): edges meeting at a shared vertex with parallel tangents
+/// (within ~1 degree) are added transitively. Shared by fillet, chamfer and
+/// face blend.
+pub fn propagate_tangent(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
     let all = shape.edges();
     let Ok(vertex_edges) = shape.vertex_edges() else { return edges.to_vec() };
-    let Ok(edge_vertices) = shape.ancestor_map(ShapeType::Vertex, ShapeType::Edge).map(|m| m.to_vecs()) else { return edges.to_vec() };
-    let _ = edge_vertices;
-    let mut set: BTreeSet<usize> = edges.iter().copied().collect();
-    let mut stack: Vec<usize> = edges.to_vec();
+    let verts = shape.vertices();
     let tangent_at = |e: &k::Shape, p: glam::DVec3| -> Option<glam::DVec3> {
         let info = e.edge_info().ok()?;
         let t = if (info.start - p).length() < (info.end - p).length() { info.first_param } else { info.last_param };
         e.tangent_at(t).ok().map(|v| v.normalize())
     };
-    let verts = shape.vertices();
+    let mut set: BTreeSet<usize> = edges.iter().copied().collect();
+    let mut stack = edges.to_vec();
     while let Some(ei) = stack.pop() {
         let Some(e) = all.get(ei) else { continue };
-        let Ok((a, b)) = e.endpoints() else { continue };
-        for p in [a, b] {
-            // Find the vertex at p.
-            for (vi, v) in verts.iter().enumerate() {
-                let Ok(vp) = v.vertex_point() else { continue };
-                if (vp - p).length() > 1e-7 {
+        for v in e.vertices() {
+            let Some(vi) = shape.index_of(&v, ShapeType::Vertex) else { continue };
+            let Ok(p) = verts[vi].vertex_point() else { continue };
+            for &o in vertex_edges.get(vi).map(|x| x.as_slice()).unwrap_or(&[]) {
+                let o = o as usize;
+                if set.contains(&o) {
                     continue;
                 }
-                for &other in vertex_edges.get(vi).map(|v| v.as_slice()).unwrap_or(&[]) {
-                    let other = other as usize;
-                    if set.contains(&other) {
-                        continue;
-                    }
-                    let (Some(t1), Some(t2)) = (tangent_at(e, p), all.get(other).and_then(|o| tangent_at(o, p))) else { continue };
-                    if t1.dot(t2).abs() > 0.9998 {
-                        set.insert(other);
-                        stack.push(other);
-                    }
+                if let (Some(t1), Some(t2)) = (tangent_at(e, p), all.get(o).and_then(|x| tangent_at(x, p)))
+                    && t1.dot(t2).abs() > 0.9998
+                {
+                    set.insert(o);
+                    stack.push(o);
                 }
             }
         }
@@ -81,10 +77,14 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+        let t0 = std::time::Instant::now();
         let res = k::fillet(&body.shape, &shapes, radius).map_err(|e| crate::regen::eval::FeatureError::new(format!("Fillet failed (radius may be too large): {e}")))?;
+        let t1 = std::time::Instant::now();
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
+        let t2 = std::time::Instant::now();
         ev.replace_body(bi, res.shape, face_names);
+        log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     Ok(())
 }

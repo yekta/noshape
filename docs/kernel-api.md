@@ -62,6 +62,7 @@ pub enum Surface { Plane(Plane), Cylinder{origin,axis,x_dir,radius}, Cone{origin
 pub enum Curve { Line{origin,direction}, Circle{center,axis,x_dir,radius}, Ellipse{..}, Hyperbola, Parabola,
                  Bezier{..}, BSpline{..}, Offset, Other }
 pub struct EdgeInfo { curve, start, end, first_param, last_param, length, closed, degenerated }
+pub struct BSplineCurveData { poles: Vec<DVec3>, weights: Option<Vec<f64>>, knots: Vec<f64>, mults: Vec<u32>, degree: u32, periodic: bool }
 pub struct FaceProjection { point, u, v, distance }
 
 impl Shape {
@@ -73,6 +74,7 @@ impl Shape {
     fn uv_bounds(&self) -> Result<[f64; 4]>;
     fn area(&self) -> Result<f64>;  fn centroid(&self) -> Result<DVec3>;   // faces (area centroid)
     fn edge_info(&self) -> Result<EdgeInfo>;  fn edge_curve(&self) -> Result<Curve>;
+    fn edge_bspline(&self) -> Result<BSplineCurveData>;  // exact B-spline of the edge (range + orientation applied)
     fn endpoints(&self) -> Result<(DVec3, DVec3)>;  fn length(&self) -> Result<f64>;
     fn point_at(&self, t) -> Result<DVec3>;  fn tangent_at(&self, t) -> Result<DVec3>;
     fn is_closed(&self) -> Result<bool>;     fn vertex_point(&self) -> Result<DVec3>;
@@ -104,6 +106,9 @@ fn make_plane_face(&Plane, umin, umax, vmin, vmax) -> Result<Shape>;
 fn make_vertex(DVec3); make_line(a,b); make_polyline(&[DVec3], closed); make_circle(c, axis, r);
 fn make_arc(c, axis, x_dir, r, a0, a1); make_arc_3pts(a,m,b);
 fn make_interpolated_spline(&[DVec3], tangents: &[DVec3], periodic); make_bspline(poles, weights, knots, mults, degree, periodic);
+   // tangents: none, [start, end] or one per point (zero = free); derivative vectors w.r.t. the
+   // chord-length parameter: magnitudes are kept (unit = natural speed, longer = pulls further)
+fn make_bspline_edge(&BSplineCurveData) -> Result<Shape>;   // e.g. after editing edge_bspline() poles/weights
 fn make_helix(frame: &Plane, radius, pitch, height, left_handed, taper_angle) -> Result<Shape>;  // wire
 fn offset_wire_2d(&Shape, distance, JoinType, open_result) -> Result<Shape>;
 fn edges_to_wires(&Shape, tol) -> Result<Vec<Shape>>;
@@ -154,7 +159,7 @@ fn sweep_pipe(profile, path);
    SweepOptions { mode: SweepMode{CorrectedFrenet, Frenet, Fixed{z,x}, Binormal(DVec3), Discrete},
                   solid, transition: SweepTransition{Transformed, RoundCorner}, scale_end, with_contact, with_correction }
 fn loft(&[Shape], &LoftOptions);   LoftOptions { solid, ruled, closed, start_points: Option<Vec<DVec3>> }
-fn thicken(shape, t1, t2);
+fn thicken(shape, t1, t2);   // result solids are always oriented outward (positive volume)
 fn shell(solid, remove_faces: &[Shape], thickness, ShellSide{Inside, Outside}, JoinType);
 fn fillet(shape, edges, radius);  fn fillet_radii(shape, edges, &[f64]);  fn fillet_variable(shape, edge, &[(t, r)]);
 fn chamfer(shape, edges, ChamferSpec{Equal(d), TwoDistances(d1,d2), DistanceAngle(d,angle)}, reference_faces: &[Shape]);
@@ -183,7 +188,8 @@ fn split(objects, tools, &opts); split_by_plane(shape, &Plane); imprint(shape, c
 fn unify_same_domain(shape) -> Result<OpResult>;      // history composed through USD
 fn section(a, b) -> Result<OpResult>;  section_plane(shape, &Plane) -> Result<Shape>;
 fn section_wires(shape, &Plane) -> Result<Vec<Shape>>;  section_caps(shape, &Plane) -> Result<Shape>;
-fn project_curves(curves, target, direction: Option<DVec3>) -> Result<Shape>;
+fn project_curves(curves, target, direction: Option<DVec3>) -> Result<Shape>;  // curves: edge, wire or any
+   // compound (of edges, wires or faces: every wire and free edge is projected); target: any shape with faces
 pub enum Transform { Translate(DVec3), Rotate{origin,axis,angle}, Scale{center,factor},
                      ScaleXyz{center,factors}, Mirror(Plane), Matrix(DMat4) }
   Transform::frame_to_frame(&Plane, &Plane), .matrix()

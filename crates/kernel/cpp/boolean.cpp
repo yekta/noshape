@@ -276,22 +276,57 @@ std::unique_ptr<OcShape> section_caps(const OcShape& s, const PlaneF& plane)
   return wrap(com.Shape());
 }
 
+// Curves to project: every wire (including face boundaries) and every edge
+// that is not part of a wire, so compounds of curves or faces are accepted
+// (BRepProj_Projection itself only takes a single edge or wire).
+static std::vector<TopoDS_Shape> projectable_curves(const TopoDS_Shape& s)
+{
+  std::vector<TopoDS_Shape> out;
+  if (s.ShapeType() == TopAbs_EDGE || s.ShapeType() == TopAbs_WIRE)
+  {
+    out.push_back(s);
+    return out;
+  }
+  for (TopExp_Explorer e(s, TopAbs_WIRE); e.More(); e.Next())
+    out.push_back(e.Current());
+  for (TopExp_Explorer e(s, TopAbs_EDGE, TopAbs_WIRE); e.More(); e.Next())
+    out.push_back(e.Current());
+  return out;
+}
+
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target, P3 dir)
 {
   require_non_null(curves.shape, "curves");
   require_non_null(target.shape, "target");
-  BRepProj_Projection pr(curves.shape, target.shape, to_dir(dir, "projection direction"));
-  if (!pr.IsDone())
+  const gp_Dir              d     = to_dir(dir, "projection direction");
+  std::vector<TopoDS_Shape> items = projectable_curves(curves.shape);
+  if (items.empty())
+    fail_invalid("nothing to project: the curves contain no edges");
+  std::vector<TopoDS_Shape> results;
+  for (const auto& c : items)
+  {
+    BRepProj_Projection pr(c, target.shape, d);
+    if (!pr.IsDone())
+      continue;
+    TopoDS_Shape r = pr.Shape();
+    if (!r.IsNull())
+      results.push_back(r);
+  }
+  if (results.empty())
     fail_op("projection failed (curves do not project onto the target)");
-  return wrap(pr.Shape());
+  return wrap(results.size() == 1 ? results[0] : compound_of(results));
 }
 
 std::unique_ptr<OcShape> project_normal(const OcShape& curves, const OcShape& target)
 {
   require_non_null(curves.shape, "curves");
   require_non_null(target.shape, "target");
+  std::vector<TopoDS_Shape> items = projectable_curves(curves.shape);
+  if (items.empty())
+    fail_invalid("nothing to project: the curves contain no edges");
   BRepOffsetAPI_NormalProjection np(target.shape);
-  np.Add(curves.shape);
+  for (const auto& c : items)
+    np.Add(c);
   np.Build();
   if (!np.IsDone())
     fail_op("normal projection failed");

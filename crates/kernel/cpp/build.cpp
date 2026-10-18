@@ -434,13 +434,16 @@ std::unique_ptr<OcShape> make_interpolated(rust::Slice<const double> pts,
   occ::handle<NCollection_HArray1<gp_Pnt>> hp = new NCollection_HArray1<gp_Pnt>(1, n);
   for (int i = 0; i < n; ++i)
     hp->SetValue(i + 1, p[i]);
+  // Tangents are derivative vectors with respect to the chord-length
+  // parameterization GeomAPI_Interpolate uses (unit vector = natural speed),
+  // so they are loaded unscaled: their magnitudes shape the curve.
   GeomAPI_Interpolate ip(hp, periodic, 1e-7);
   if (!tangents.empty())
   {
     auto t = points_of(tangents, "spline tangents");
     if (t.size() == 2 && n != 2)
     {
-      ip.Load(gp_Vec(t[0].XYZ()), gp_Vec(t[1].XYZ()), true);
+      ip.Load(gp_Vec(t[0].XYZ()), gp_Vec(t[1].XYZ()), false);
     }
     else if ((int)t.size() == n)
     {
@@ -451,7 +454,7 @@ std::unique_ptr<OcShape> make_interpolated(rust::Slice<const double> pts,
         tv(i + 1) = gp_Vec(t[i].XYZ());
         flags->SetValue(i + 1, tv(i + 1).Magnitude() > 1e-12);
       }
-      ip.Load(tv, flags, true);
+      ip.Load(tv, flags, false);
     }
     else
       fail_invalid("tangents must be either 2 (start, end) or one per point");

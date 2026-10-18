@@ -214,6 +214,9 @@ pub fn make_arc_3pts(a: DVec3, mid: DVec3, b: DVec3) -> Result<Shape> {
 
 /// An interpolating B-spline edge through `points` (GeomAPI_Interpolate).
 /// `tangents`: empty, `[start, end]`, or one per point (zero vector = free).
+/// Tangents are derivatives with respect to the chord-length parameter, so a
+/// unit vector gives the natural speed and longer vectors pull the curve
+/// further along that direction (magnitudes are kept, not normalized).
 pub fn make_interpolated_spline(points: &[DVec3], tangents: &[DVec3], periodic: bool) -> Result<Shape> {
     Shape::from_res(ffi::make_interpolated(&flat(points), &flat(tangents), periodic))
 }
@@ -236,6 +239,12 @@ pub fn make_bspline(
         degree as i32,
         periodic,
     ))
+}
+
+/// A 3D B-spline edge from [`BSplineCurveData`] (e.g. the data read with
+/// [`Shape::edge_bspline`] after editing poles or weights).
+pub fn make_bspline_edge(data: &crate::geom::BSplineCurveData) -> Result<Shape> {
+    make_bspline(&data.poles, data.weights.as_deref(), &data.knots, &data.mults, data.degree, data.periodic)
 }
 
 /// A helix wire around the `frame` Z axis starting at `frame.origin +

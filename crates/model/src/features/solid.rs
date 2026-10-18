@@ -335,6 +335,8 @@ pub fn hole() -> FeatureType {
         hidden(ParamSpec::bool("isMultiple", "Multiple", false)),
         hidden(ParamSpec::num("tappedAngle", "Tapped angle", NumSpec::angle(0.0, 0.0, 9.9))),
         hidden(ParamSpec::enum_("style", "Style", HOLE_STYLE)),
+        // Set by `hole_tables::apply_table_to_params` (dialog edit logic).
+        hidden(ParamSpec::bool(hole_tables::TABLE_SYNCED_PARAM, "Table values applied", false)),
         // Dialog.
         ParamSpec::enum_("unitsSystem", "Units", &[("INCH", "Inch"), ("METRIC", "Metric")]).hints(Hints::HORIZONTAL_ENUM | rem | Hints::UNCONFIGURABLE),
         ParamSpec::enum_("styleV2", "Style", HOLE_STYLE).hints(Hints::HORIZONTAL_ENUM | rem | Hints::UNCONFIGURABLE),

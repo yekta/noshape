@@ -67,7 +67,11 @@ pub struct FaceNamingInput<'a> {
     pub feature: FeatureId,
     pub args: &'a [&'a ShapeNames],
     pub records: &'a [HistRecord],
-    pub out_face_keys: &'a [GeoKey],
+    /// Number of output faces.
+    pub out_count: usize,
+    /// Geometric key of an output face; only called for faces that need
+    /// ordering (split pieces, new faces, duplicates), so it may be costly.
+    pub out_face_key: &'a dyn Fn(usize) -> GeoKey,
     /// Feature-specific roles for output faces (e.g. caps, sweep sides).
     /// Takes precedence over history-derived names.
     pub roles: &'a BTreeMap<u32, Role>,
@@ -78,7 +82,9 @@ pub struct FaceNamingInput<'a> {
 
 /// Name every output face.
 pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
-    let n = input.out_face_keys.len();
+    let n = input.out_count;
+    let key_cache: std::cell::RefCell<std::collections::HashMap<usize, GeoKey>> = Default::default();
+    let key = |i: usize| -> GeoKey { *key_cache.borrow_mut().entry(i).or_insert_with(|| (input.out_face_key)(i)) };
     // parents[j] = list of (relation, parent name)
     let mut parents: Vec<Vec<(Relation, Name)>> = vec![Vec::new(); n];
     // How many outputs each (arg, face) parent continues into.
@@ -108,7 +114,7 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
         outs.dedup();
         if outs.len() > 1 {
             let mut sorted = outs.clone();
-            sorted.sort_by(|a, b| key_cmp(&input.out_face_keys[*a as usize], &input.out_face_keys[*b as usize]).then(a.cmp(b)));
+            sorted.sort_by(|a, b| key_cmp(&key(*a as usize), &key(*b as usize)).then(a.cmp(b)));
             for (ord, o) in sorted.iter().enumerate() {
                 split_ordinal.insert((*arg, *idx, *o), ord as u16);
             }
@@ -156,17 +162,17 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
         unnamed.push(j as u32);
     }
     // New faces: ordinal by geometric key.
-    unnamed.sort_by(|a, b| key_cmp(&input.out_face_keys[*a as usize], &input.out_face_keys[*b as usize]).then(a.cmp(b)));
+    unnamed.sort_by(|a, b| key_cmp(&key(*a as usize), &key(*b as usize)).then(a.cmp(b)));
     for (ord, j) in unnamed.iter().enumerate() {
         out[*j as usize] = Some(Arc::new(TopoName::face(input.feature, Role::New(ord as u32))));
     }
     // Disambiguate accidental duplicates (e.g. two outputs generated from the
     // same edge) with split ordinals.
     let names: Vec<Name> = out.into_iter().map(|n| n.expect("all faces named")).collect();
-    disambiguate(names, input.out_face_keys, input.feature)
+    disambiguate(names, &key, input.feature)
 }
 
-fn disambiguate(mut names: Vec<Name>, keys: &[GeoKey], feature: FeatureId) -> Vec<Name> {
+fn disambiguate(mut names: Vec<Name>, key: &dyn Fn(usize) -> GeoKey, feature: FeatureId) -> Vec<Name> {
     let mut groups: BTreeMap<Name, Vec<usize>> = BTreeMap::new();
     for (i, n) in names.iter().enumerate() {
         groups.entry(n.clone()).or_default().push(i);
@@ -175,7 +181,7 @@ fn disambiguate(mut names: Vec<Name>, keys: &[GeoKey], feature: FeatureId) -> Ve
         if idxs.len() < 2 {
             continue;
         }
-        idxs.sort_by(|a, b| key_cmp(&keys[*a], &keys[*b]).then(a.cmp(b)));
+        idxs.sort_by(|a, b| key_cmp(&key(*a), &key(*b)).then(a.cmp(b)));
         for (ord, i) in idxs.into_iter().enumerate() {
             names[i] = Arc::new(TopoName::Split { parent: name.clone(), by: feature, ordinal: ord as u16 });
         }
@@ -186,7 +192,7 @@ fn disambiguate(mut names: Vec<Name>, keys: &[GeoKey], feature: FeatureId) -> Ve
 /// Name edges from face adjacency: `edge_faces[e]` lists the face indices
 /// adjacent to edge `e` (1 for boundary edges, 2 normally, more for
 /// non-manifold). `edge_keys` orders multiple edges between the same faces.
-pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_keys: &[GeoKey]) -> Vec<Name> {
+pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn Fn(usize) -> GeoKey) -> Vec<Name> {
     let mut base: Vec<(Vec<Name>, usize)> = Vec::with_capacity(edge_faces.len());
     for (e, faces) in edge_faces.iter().enumerate() {
         let mut fs: Vec<Name> = faces.iter().filter_map(|f| face_names.get(*f as usize).cloned()).collect();
@@ -199,7 +205,12 @@ pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_keys: &[Geo
     }
     let mut out: Vec<Option<Name>> = vec![None; edge_faces.len()];
     for (fs, mut edges) in groups {
-        edges.sort_by(|a, b| key_cmp(&edge_keys[*a], &edge_keys[*b]).then(a.cmp(b)));
+        if edges.len() > 1 {
+            edges.sort_by_cached_key(|e| {
+                let k = edge_key(*e);
+                (k.map(|x| (x * 1e9).round() as i64), *e)
+            });
+        }
         for (ord, e) in edges.into_iter().enumerate() {
             let ord = ord as u16;
             let name = match fs.len() {
@@ -215,7 +226,7 @@ pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_keys: &[Geo
 }
 
 /// Name vertices from their adjacent faces.
-pub fn name_vertices(face_names: &[Name], vertex_faces: &[Vec<u32>], vertex_keys: &[GeoKey]) -> Vec<Name> {
+pub fn name_vertices(face_names: &[Name], vertex_faces: &[Vec<u32>], vertex_key: &dyn Fn(usize) -> GeoKey) -> Vec<Name> {
     let mut groups: BTreeMap<Vec<Name>, Vec<usize>> = BTreeMap::new();
     for (v, faces) in vertex_faces.iter().enumerate() {
         let mut fs: Vec<Name> = faces.iter().filter_map(|f| face_names.get(*f as usize).cloned()).collect();
@@ -225,7 +236,12 @@ pub fn name_vertices(face_names: &[Name], vertex_faces: &[Vec<u32>], vertex_keys
     }
     let mut out: Vec<Option<Name>> = vec![None; vertex_faces.len()];
     for (fs, mut vs) in groups {
-        vs.sort_by(|a, b| key_cmp(&vertex_keys[*a], &vertex_keys[*b]).then(a.cmp(b)));
+        if vs.len() > 1 {
+            vs.sort_by_cached_key(|v| {
+                let k = vertex_key(*v);
+                (k.map(|x| (x * 1e9).round() as i64), *v)
+            });
+        }
         for (ord, v) in vs.into_iter().enumerate() {
             out[v] = Some(Arc::new(TopoName::vertex(fs.clone(), ord as u16)));
         }
@@ -256,7 +272,7 @@ mod tests {
         ];
         let keys = [[0.0; 4], [2.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]];
         let roles = BTreeMap::new();
-        let names = name_faces(&FaceNamingInput { feature: FeatureId(9), args: &args, records: &records, out_face_keys: &keys, roles: &roles, generated_role: None });
+        let names = name_faces(&FaceNamingInput { feature: FeatureId(9), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: None });
         assert_eq!(names[0], a);
         // Face 2 has the smaller key -> ordinal 0.
         assert_eq!(*names[2], TopoName::Split { parent: b.clone(), by: FeatureId(9), ordinal: 0 });
@@ -278,7 +294,7 @@ mod tests {
             TopoName::Wire { source, .. } => Role::Side(source.clone()),
             _ => Role::Generated(n.clone()),
         };
-        let names = name_faces(&FaceNamingInput { feature: FeatureId(3), args: &args, records: &records, out_face_keys: &keys, roles: &roles, generated_role: Some(&side) });
+        let names = name_faces(&FaceNamingInput { feature: FeatureId(3), args: &args, records: &records, out_count: keys.len(), out_face_key: &|i| keys[i], roles: &roles, generated_role: Some(&side) });
         assert_eq!(*names[0], TopoName::face(FeatureId(3), Role::CapStart(None)));
         assert_eq!(*names[1], TopoName::face(FeatureId(3), Role::Side(side_src(5))));
         assert_eq!(*names[2], TopoName::face(FeatureId(3), Role::New(0)));
@@ -291,7 +307,7 @@ mod tests {
         let faces = vec![a.clone(), b.clone()];
         let edge_faces = vec![vec![0, 1], vec![1, 0], vec![0]];
         let keys = [[1.0, 0.0, 0.0, 0.0], [0.0; 4], [0.0; 4]];
-        let names = name_edges(&faces, &edge_faces, &keys);
+        let names = name_edges(&faces, &edge_faces, &|i| keys[i]);
         assert_eq!(*names[1], TopoName::edge(a.clone(), b.clone(), 0));
         assert_eq!(*names[0], TopoName::edge(a.clone(), b.clone(), 1));
         assert_eq!(*names[2], TopoName::Boundary { face: a, ordinal: 0 });

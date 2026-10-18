@@ -486,7 +486,7 @@ pub fn resolve_connector_in(ctx: &Arc<Context>, body: Option<&BodyId>, reference
     }
     let params = ParamValues::default();
     let vars = BTreeMap::new();
-    let ev = EvalCtx { feature: FeatureId(0), name: "", params: &params, units, ctx: c, outer_vars: &vars, warnings: Vec::new(), editing_sketch: None };
+    let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
     let conn = match reference {
         Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.resolve_connector(reference)?,
         // A bare entity: infer its default connector.

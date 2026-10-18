@@ -7,6 +7,7 @@ pub mod detail;
 pub mod extrude;
 pub mod revolve;
 pub mod sketch;
+pub mod thin;
 // --- modules: batch A (solid/detail/pattern/direct) ---
 pub mod detail_a;
 pub mod direct;

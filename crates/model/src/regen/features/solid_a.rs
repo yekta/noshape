@@ -1,9 +1,10 @@
 //! Sweep, Loft, Thicken, Enclose, Rib and the FeatureScript primitives
 //! (Cube, Sphere).
 //!
-//! Unsupported options return a clear error (see each evaluator): thin
-//! sweeps/lofts, sweep twist and "lock profile faces", loft guides and path,
-//! rib draft.
+//! Thin sweeps sweep the offset wall regions of `thin`; thin lofts loft the
+//! wire profiles into a surface and thicken it. Unsupported options return a
+//! clear error (see each evaluator): sweep twist and "lock profile faces",
+//! loft guides and path, rib draft.
 
 use super::helpers_a::*;
 use crate::display::BodyKind;
@@ -20,9 +21,6 @@ use std::collections::BTreeMap;
 
 pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
-    if body_type == "THIN" {
-        return err("Thin sweep is not supported yet");
-    }
     let path_edges = resolve_curves(ev, ev.query("path"))?;
     if path_edges.is_empty() {
         return err("Select a sweep path");
@@ -66,11 +64,14 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         let op = ev.enum_("surfaceOperationType").to_string();
         return ev.apply_operation(tools, &op, None, BodyKind::Surface);
     }
-    let refs = ev.query("profiles");
+    // Thin: the wall curves are offset into planar regions (see `thin`),
+    // which are swept like solid profiles.
+    let thin = body_type == "THIN";
+    let refs = ev.query(if thin { "wallShape" } else { "profiles" });
     if refs.is_empty() {
-        return err("Select sketch regions or planar faces to sweep");
+        return err(if thin { "Select edges or faces to define the path of the thin wall" } else { "Select sketch regions or planar faces to sweep" });
     }
-    let profiles = ev.profiles(refs)?;
+    let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return err("No valid profiles to sweep");
     }
@@ -199,9 +200,6 @@ fn loft_names(ev: &EvalCtx, sections: &[Section], res: &k::OpResult, caps: bool)
 
 pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
-    if body_type == "THIN" {
-        return err("Thin loft is not supported yet");
-    }
     if ev.bool("addGuides") && ev.params.array("guidesArray").iter().any(|g| !g.query("guideEntities").is_empty()) {
         return err("Loft guides are not supported yet");
     }
@@ -251,6 +249,25 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         return err("Loft did not produce a solid");
     }
     let names = loft_names(ev, &sections, &res, solid);
+    if body_type == "THIN" {
+        // Thin loft: the lofted surface (through the wire profiles) is
+        // thickened by thickness 1 / 2 (Flip wall swaps the sides).
+        let (t1, t2) = super::thin::thicknesses(ev)?;
+        let inp = ThickenInput {
+            shape: res.shape.clone(),
+            face_sources: names.iter().map(|n| Source::Topo(n.clone())).collect(),
+            edge_sources: crate::regen::eval::names_for(&res.shape, names.clone()).edges.iter().map(|n| Source::Topo(n.clone())).collect(),
+        };
+        let th = k::thicken(&res.shape, t1, t2).map_err(kerr("Thin loft failed (thickness too large?)"))?;
+        if th.shape.count(ShapeType::Solid) == 0 {
+            return err("Thin loft did not produce a solid");
+        }
+        let names = thicken_names(ev, &inp, &th.shape, t1.max(t2));
+        let tools = vec![NamedShape::new(th.shape, names)];
+        let op = ev.enum_("operationType").to_string();
+        let scope = super::extrude::scope(ev);
+        return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+    }
     let tools = vec![NamedShape::new(res.shape, names)];
     if solid {
         let op = ev.enum_("operationType").to_string();
@@ -341,8 +358,7 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
         if res.shape.count(ShapeType::Solid) == 0 {
             return err("Thicken did not produce a solid");
         }
-        // The kernel may return an inside-out solid; fix its orientation.
-        let shape = if res.shape.volume().unwrap_or(0.0) < 0.0 { res.shape.reversed()? } else { res.shape };
+        let shape = res.shape;
         let names = thicken_names(ev, inp, &shape, t1.max(t2));
         tools.push(NamedShape::new(shape, names));
     }
