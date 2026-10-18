@@ -155,7 +155,7 @@ impl SheetGeometry {
         let (tw, th) = (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil());
         let (x0, y0) = (w - m - tw, m);
         self.rect(x0, y0, w - m, y0 + th, LineStyle::Border);
-        let rows = ((sheet.title_block.fields.len() + 1) / 2).max(1);
+        let rows = sheet.title_block.fields.len().div_ceil(2).max(1);
         for (i, (k, v)) in sheet.title_block.fields.iter().enumerate() {
             let col = i % 2;
             let row = i / 2;

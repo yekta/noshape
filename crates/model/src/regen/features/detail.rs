@@ -110,7 +110,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res = k::chamfer(&body.shape, &shapes, spec.clone(), &[]).map_err(|e| crate::regen::eval::FeatureError::new(format!("Chamfer failed: {e}")))?;
+        let res = k::chamfer(&body.shape, &shapes, spec, &[]).map_err(|e| crate::regen::eval::FeatureError::new(format!("Chamfer failed: {e}")))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         ev.replace_body(bi, res.shape, face_names);

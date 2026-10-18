@@ -229,11 +229,9 @@ impl PartStudio {
         idx.sort_unstable();
         if let Some(&first) = idx.first() {
             let moved: Vec<Feature> = idx.iter().rev().map(|&i| self.features.remove(i)).collect::<Vec<_>>().into_iter().rev().collect();
-            let mut at = first;
-            for mut f in moved {
+            for (at, mut f) in (first..).zip(moved) {
                 f.folder = Some(id);
                 self.features.insert(at, f);
-                at += 1;
             }
         }
         id

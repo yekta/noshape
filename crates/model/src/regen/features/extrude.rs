@@ -74,6 +74,7 @@ fn direction(ev: &EvalCtx, p: &Profile, thin: bool) -> FResult<DVec3> {
     Ok(d.normalize())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &str, body_id: &str, vertex_id: &str, has_off: &str, off_id: &str, off_flip: &str, dir: DVec3) -> FResult<End> {
     let off = if is_up_to(bound) && ev.bool(has_off) {
         let o = ev.length(off_id)?;
