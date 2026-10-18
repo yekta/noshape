@@ -72,6 +72,20 @@ pub struct PartStudio {
     pub part_properties: BTreeMap<BodyId, PartProperties>,
     #[serde(default)]
     pub next_folder_id: u32,
+    /// Saved camera views (Shift+V).
+    #[serde(default)]
+    pub named_views: Vec<NamedView>,
+}
+
+/// A saved camera (renderer-independent).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NamedView {
+    pub name: String,
+    pub target: [f64; 3],
+    /// Camera rotation quaternion (x, y, z, w).
+    pub rotation: [f64; 4],
+    pub distance: f64,
+    pub perspective: bool,
 }
 
 impl PartStudio {

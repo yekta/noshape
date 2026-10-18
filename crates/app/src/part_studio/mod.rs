@@ -144,6 +144,7 @@ pub struct PartStudioView {
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     manip_drag: Option<manipulators::ManipDrag>,
     folder_renaming: Option<(u32, Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -219,6 +220,7 @@ impl PartStudioView {
             dim_input: None,
             manip_drag: None,
             folder_renaming: None,
+            named_views: None,
             _subs: subs,
         };
         this.schedule_regen(window, cx);
@@ -244,8 +246,11 @@ impl PartStudioView {
             } else if let Some(slot) = ps.features.get_mut(e.index) {
                 *slot = draft;
             }
-            // While editing, show the model rolled to just after this feature.
-            upto = Some(e.index + 1);
+            // While editing, show the model rolled to just after this feature
+            // (or the finished model with "Final").
+            if !e.dialog.read(cx).show_final {
+                upto = Some(e.index + 1);
+            }
         }
         Some((ps, upto))
     }
@@ -1059,6 +1064,9 @@ impl PartStudioView {
         }
         // View cube / quick views.
         out.push(self.render_view_controls(cx));
+        if let Some(nv) = self.render_named_views(cx) {
+            out.push(nv);
+        }
         // Message toast.
         if let Some((st, msg)) = self.message.clone() {
             let c = match st {
@@ -1112,6 +1120,7 @@ impl PartStudioView {
             .child(btn("v-front", "front-view", "Front (Shift+1)", StandardView::Front, cx))
             .child(btn("v-top", "top-view", "Top (Shift+5)", StandardView::Top, cx))
             .child(btn("v-right", "right-view", "Right (Shift+4)", StandardView::Right, cx))
+            .child(Button::new("v-named").icon(Icon::empty().path(icon_path("camera"))).ghost().xsmall().tooltip("Named views (Shift+V)").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_named_views(window, cx))))
             .child(
                 Button::new("v-fit").icon(Icon::empty().path(icon_path("zoom-fit"))).ghost().xsmall().tooltip("Zoom to fit (F)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
@@ -1274,6 +1283,7 @@ impl Render for PartStudioView {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
+            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
                 if let Some(id) = this.selected_features.first().copied() {
                     this.start_rename(id, window, cx);

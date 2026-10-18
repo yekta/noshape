@@ -117,7 +117,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         let bb = s.sketch.bbox();
         ((bb.max - bb.min).length()).max(0.01)
     };
-    let tol = (size * 1e-3).max(1e-6);
+    let tol = (size * 2.5e-4).max(1e-6);
     let state_of = |id: noshape_sketch::EntityId| -> SketchEntityState {
         if !editing {
             return SketchEntityState::Inactive;
@@ -130,11 +130,24 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
     };
     let mut curves = Vec::new();
     let mut points = Vec::new();
+    // Interior spline control points (not curve endpoints).
+    let mut handles = std::collections::HashSet::new();
+    let mut ends = std::collections::HashSet::new();
+    for e in s.sketch.entities() {
+        if let Some((a, b)) = e.endpoints() {
+            ends.insert(a);
+            ends.insert(b);
+        }
+        if let noshape_sketch::Geometry::BSpline { control, .. } = &e.geometry {
+            handles.extend(control.iter().copied());
+        }
+    }
     for e in s.sketch.entities() {
         if e.kind() == EntityKind::Point {
             let Some(p) = s.sketch.point(e.id) else { continue };
             let standalone = s.sketch.users_of_point(e.id).is_empty();
-            points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone });
+            let handle = handles.contains(&e.id) && !ends.contains(&e.id);
+            points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone, handle });
         } else {
             let pts: Vec<[f32; 3]> = s.sketch.tessellate(e.id, tol).into_iter().map(|p| f3(frame.to_world(p))).collect();
             curves.push(SketchCurveDisplay { entity: e.id.0, points: pts, construction: e.construction, external: e.external, state: state_of(e.id) });

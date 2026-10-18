@@ -58,6 +58,8 @@ pub struct FeatureDialog {
     renaming: Option<Entity<InputState>>,
     /// Sources offered by the Derived feature's Part Studio picker.
     pub derived_sources: Vec<DerivedSource>,
+    /// Preview the end of the history instead of rolling to this feature.
+    pub show_final: bool,
 }
 
 impl EventEmitter<DialogEvent> for FeatureDialog {}
@@ -93,6 +95,7 @@ impl FeatureDialog {
             focus: cx.focus_handle(),
             renaming: None,
             derived_sources: Vec::new(),
+            show_final: false,
         };
         d.active_query = d.first_visible_query();
         d
@@ -924,6 +927,28 @@ impl Render for FeatureDialog {
                     ),
             )
             .child(v_flex().id("dialog-body").gap_2p5().p_3().overflow_y_scroll().children(rows))
+            .child(
+                h_flex()
+                    .px_3()
+                    .py_1p5()
+                    .gap_2()
+                    .border_t_1()
+                    .border_color(pal.border)
+                    .text_xs()
+                    .text_color(pal.text_muted)
+                    .child(
+                        gpui_kit::component::checkbox::Checkbox::new("dlg-final")
+                            .checked(self.show_final)
+                            .label("Final")
+                            .xsmall()
+                            .tooltip("Preview the finished model instead of rolling back to this feature")
+                            .on_click(cx.listener(|this, v: &bool, _, cx| {
+                                this.show_final = *v;
+                                cx.emit(DialogEvent::Changed);
+                                cx.notify();
+                            })),
+                    ),
+            )
             .when_some(status.filter(|s| s.0 != FeatureStatus::Ok), |d, (st, msg)| {
                 let c = match st {
                     FeatureStatus::Error => pal.error,

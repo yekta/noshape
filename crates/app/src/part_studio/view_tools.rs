@@ -10,6 +10,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
+use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::features;
 use noshape_model::reference::{FeatureId, Reference};
 
@@ -304,5 +305,130 @@ impl PartStudioView {
         });
         self.renaming = Some((id, st, sub));
         cx.notify();
+    }
+}
+
+// ------------------------------------------------------------ named views
+
+impl PartStudioView {
+    pub(super) fn toggle_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.named_views.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let st = cx.new(|cx| InputState::new(window, cx).placeholder("New view name"));
+            let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    let name = st.read(cx).value().trim().to_string();
+                    this.save_named_view(name, cx);
+                    st.update(cx, |s, cx| s.set_value("", window, cx));
+                    window.focus(&this.focus, cx);
+                }
+            });
+            st.update(cx, |s, cx| s.focus(window, cx));
+            self.named_views = Some((st, sub));
+        }
+        cx.notify();
+    }
+
+    fn save_named_view(&mut self, name: String, cx: &mut Context<Self>) {
+        let cam = self.viewport.read(cx).camera;
+        let existing: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+        let name = if name.is_empty() {
+            (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default()
+        } else {
+            name
+        };
+        let view = noshape_model::partstudio::NamedView {
+            name: name.clone(),
+            target: cam.target.to_array(),
+            rotation: cam.rotation.to_array(),
+            distance: cam.distance,
+            perspective: cam.projection == noshape_render::Projection::Perspective,
+        };
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, &format!("Save view : {name}"), cx, |ps| {
+                ps.named_views.retain(|v| v.name != view.name);
+                ps.named_views.push(view);
+            });
+        });
+    }
+
+    fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, cx: &mut Context<Self>) {
+        self.viewport.update(cx, |vp, cx| {
+            let mut to = vp.camera;
+            to.target = glam::DVec3::from_array(v.target);
+            to.rotation = glam::DQuat::from_array(v.rotation).normalize();
+            to.distance = v.distance;
+            to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
+            vp.animate_to(to, cx);
+        });
+    }
+
+    pub(super) fn render_named_views(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (st, _) = self.named_views.as_ref()?;
+        let st = st.clone();
+        let pal = p();
+        let views = self.studio(cx).map(|s| s.named_views.clone()).unwrap_or_default();
+        let rows: Vec<AnyElement> = views
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let name = v.name.clone();
+                h_flex()
+                    .id(SharedString::from(format!("nv-{i}")))
+                    .h(px(24.))
+                    .px_2()
+                    .gap_2()
+                    .rounded_sm()
+                    .text_sm()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(div().flex_1().truncate().child(v.name.clone()))
+                    .child(Button::new(SharedString::from(format!("nv-del-{i}"))).icon(IconName::Close).ghost().xsmall().tooltip("Delete view").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        let name = name.clone();
+                        this.doc.update(cx, |doc, cx| {
+                            doc.edit_studio(this.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
+                        });
+                    })))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.apply_named_view(&v, cx)))
+                    .into_any_element()
+            })
+            .collect();
+        let empty = rows.is_empty();
+        Some(
+            v_flex()
+                .id("named-views")
+                .absolute()
+                .top(px(44.))
+                .right(px(52.))
+                .w(px(220.))
+                .p_2()
+                .gap_1()
+                .rounded_md()
+                .bg(with_alpha(pal.panel_raised, 0.97))
+                .border_1()
+                .border_color(pal.border_strong)
+                .shadow_lg()
+                .child(
+                    h_flex()
+                        .justify_between()
+                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("NAMED VIEWS"))
+                        .child(Button::new("nv-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_named_views(w, cx)))),
+                )
+                .when(empty, |d| d.child(div().px_2().py_1().text_xs().text_color(pal.text_faint).child("No saved views yet.")))
+                .children(rows)
+                .child(
+                    h_flex()
+                        .gap_1()
+                        .pt_1()
+                        .child(div().flex_1().child(Input::new(&st).xsmall()))
+                        .child(Button::new("nv-save").label("Save").xsmall().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let name = st.read(cx).value().trim().to_string();
+                            this.save_named_view(name, cx);
+                            st.update(cx, |s, cx| s.set_value("", window, cx));
+                        }))),
+                )
+                .into_any_element(),
+        )
     }
 }

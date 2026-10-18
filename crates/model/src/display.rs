@@ -68,6 +68,8 @@ pub struct SketchPointDisplay {
     pub state: SketchEntityState,
     /// Endpoints of curves vs. standalone sketch points.
     pub standalone: bool,
+    /// Interior control point of a spline (drawn smaller).
+    pub handle: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -23,6 +23,16 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // Re-project used ("Use") 3D edges so they follow upstream changes.
     let mut missing = 0;
     for (eid, r) in &data.external_refs {
+        // Projected model vertices (snapped to while sketching).
+        if matches!(r, crate::reference::Reference::Vertex(_)) {
+            match ev.resolve_vertex_point(r) {
+                Some(p) => {
+                    let _ = sk.set_point(noshape_sketch::EntityId(*eid), frame.to_local(p));
+                }
+                None => missing += 1,
+            }
+            continue;
+        }
         let edges = ev.resolve_edges(std::slice::from_ref(r));
         let Some(&(bi, ei)) = edges.first() else {
             missing += 1;
