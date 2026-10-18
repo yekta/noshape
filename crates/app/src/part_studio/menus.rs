@@ -2,14 +2,15 @@
 //! properties for the Part Studio view.
 
 use super::PartStudioView;
+use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenu, PopupMenuItem};
-use gpui_kit::component::{IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::partstudio::{Appearance, PartProperties};
@@ -54,6 +55,7 @@ impl PartStudioView {
         match r {
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
             Reference::Face(n) => n.creator(),
+            Reference::Edge(n) | Reference::Vertex(n) => super::edge_creator(n),
             Reference::Body(b) => Some(b.feature),
             Reference::FeaturePlane(f) => Some(*f),
             Reference::MateConnector { feature, .. } => Some(*feature),
@@ -62,251 +64,348 @@ impl PartStudioView {
     }
 
     pub(super) fn open_context_menu(&mut self, target: Option<PickTarget>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        // Onshape (live capture): the menu lists, in groups, the feature
+        // commands of the clicked entity, creation tools, visibility, export,
+        // selection, view and delete commands, then materials/appearances.
         let view = cx.entity();
         let in_sketch = self.sketch.is_some();
         let target_ref = target.as_ref().map(|t| t.reference.clone());
+        let target_ref_for_highlight = target_ref.clone();
         let kind = target.as_ref().map(|t| t.kind);
         let body = target_ref.as_ref().and_then(|r| self.owning_body(r));
         let body_name = body.as_ref().and_then(|b| self.display.body(b)).map(|b| b.name.clone()).unwrap_or_else(|| "part".into());
         let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r));
-        let creator_name = creator.and_then(|id| self.studio(cx).and_then(|s| s.feature(id)).map(|f| f.name.clone()));
+        let studio = self.studio(cx);
+        let creator_name = creator.and_then(|id| studio.and_then(|s| s.feature(id)).map(|f| f.name.clone()));
+        let source_sketch = creator.and_then(|id| studio.and_then(|s| s.feature(id).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone())))));
         let sheet_metal = body.as_ref().is_some_and(|b| self.context.as_ref().is_some_and(|c| c.sheet_metal.contains_key(b)));
         let has_selection = !self.selection.is_empty() || !self.selected_features.is_empty();
         let isolate = self.ui.isolate.as_ref().map(|i| i.mode);
         let section = !self.ui.section.is_empty();
         let editing = self.edit.is_some();
         let editing_tool = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.feature_type()).map(|t| t.name);
-        let menu = PopupMenu::build(window, cx, move |mut m, window, cx| {
+        let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
+        let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
+        let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
+        let paste_sketch = Self::clipboard_has_sketch(cx);
+        // Faces the appearance entry applies to: the selected faces plus this one.
+        let mut faces = self.selected_faces();
+        if let Some(r @ Reference::Face(_)) = &target_ref
+            && !faces.contains(r)
+        {
+            faces.push(r.clone());
+        }
+        let menu = OsMenu::build(window, cx, move |mut m, window, cx| {
             let v = view.clone();
             let item = |label: &str, f: MenuAction| {
                 let v = v.clone();
-                PopupMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| {
+                OsMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| {
                     this.close_context_menu(cx);
                     f(this, window, cx)
                 }))
             };
-            let icon_item = |label: &str, icon: &str, f: MenuAction| item(label, f).icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path(icon)));
-            if let (Some(r), Some(k)) = (target_ref.clone(), kind) {
-                // Select other works on faces and edges under the cursor.
-                if matches!(k, PickKind::Face | PickKind::Edge) {
-                    m = m.item(item("Select other", Box::new(|this, _, cx| this.select_other(false, cx))));
-                    // Select ▸: grow the entity into related ones (Onshape).
-                    let criteria: &[noshape_model::select::Criterion] = if k == PickKind::Face { &noshape_model::select::Criterion::FACE } else { &noshape_model::select::Criterion::EDGE };
+            let icon_item = |label: &str, icon: &str, f: MenuAction| item(label, f).icon_name(icon);
+            // Start a tool with `r` preselected.
+            let tool = |label: &str, icon: &str, tool_id: &'static str, r: &Reference| {
+                let r = r.clone();
+                icon_item(label, icon, Box::new(move |this, w, cx| {
+                    this.selection = vec![r.clone()];
+                    this.start_feature(tool_id, w, cx);
+                }))
+            };
+            let select_menu = |m: OsMenu, r: &Reference, k: PickKind, window: &mut Window, cx: &mut Context<OsMenu>| -> OsMenu {
+                // Select ▸ grows the entity into related ones; Select other… lists what is under the cursor.
+                let criteria: &[noshape_model::select::Criterion] = match k {
+                    PickKind::Face => &noshape_model::select::Criterion::FACE,
+                    PickKind::Edge => &noshape_model::select::Criterion::EDGE,
+                    _ => &[],
+                };
+                let mut m = m;
+                if !criteria.is_empty() {
                     let (vs, rs) = (v.clone(), r.clone());
                     m = m.submenu("Select", window, cx, move |mut sm, _, _| {
                         for c in criteria {
                             let (v, r, c) = (vs.clone(), rs.clone(), *c);
-                            sm = sm.item(PopupMenuItem::new(c.label()).on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            sm = sm.item(OsMenuItem::new(c.label()).on_click(move |_, _, cx| v.update(cx, |this, cx| {
                                 this.close_context_menu(cx);
                                 this.select_related(&r, c, cx);
                             })));
                         }
-                        sm
+                        let (v, r9) = (vs.clone(), rs.clone());
+                        sm.separator().item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            if !this.selection.contains(&r9) {
+                                this.selection.push(r9.clone());
+                            }
+                            this.ui.create_selection = true;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })))
                     });
-                    let r9 = r.clone();
-                    m = m.item(item("Create selection…", Box::new(move |this, _, cx| {
-                        if !this.selection.contains(&r9) {
-                            this.selection.push(r9.clone());
-                        }
-                        this.ui.create_selection = true;
-                        this.refresh_scene(false, cx);
-                        cx.notify();
-                    })));
                 }
-                match k {
-                    PickKind::Face | PickKind::Plane if !in_sketch && !editing => {
-                        let r3 = r.clone();
-                        m = m.item(icon_item("New sketch", "sketch", Box::new(move |this, w, cx| {
-                            this.selection = vec![r3.clone()];
-                            this.start_feature("sketch", w, cx);
-                        })));
-                        if matches!(k, PickKind::Plane) {
-                            let r4 = r.clone();
-                            m = m.item(icon_item("Offset plane", "plane", Box::new(move |this, w, cx| {
-                                this.selection = vec![r4.clone()];
-                                this.start_feature("cPlane", w, cx);
-                            })));
-                        }
-                        let r5 = r.clone();
-                        m = m.item(item("View normal to", Box::new(move |this, _, cx| {
-                            this.hover = Some(r5.clone());
-                            let prev = std::mem::take(&mut this.selection);
-                            this.view_normal(cx);
-                            this.selection = prev;
-                        })));
-                    }
-                    PickKind::SketchRegion | PickKind::SketchCurve | PickKind::SketchPoint if !in_sketch && !editing => {
-                        if let Some(id) = creator {
-                            m = m.item(icon_item(&format!("Edit {}", creator_name.clone().unwrap_or_default()), "sketch", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
-                        }
-                        if matches!(k, PickKind::SketchRegion) {
-                            let r3 = r.clone();
-                            m = m.item(icon_item("Extrude", "extrude", Box::new(move |this, w, cx| {
-                                this.selection = vec![r3.clone()];
-                                this.start_feature("extrude", w, cx);
-                            })));
-                            let r4 = r.clone();
-                            m = m.item(icon_item("Revolve", "revolve", Box::new(move |this, w, cx| {
-                                this.selection = vec![r4.clone()];
-                                this.start_feature("revolve", w, cx);
-                            })));
-                        }
-                        let r5 = r.clone();
-                        m = m.item(item("View normal to", Box::new(move |this, _, cx| {
-                            let prev = std::mem::replace(&mut this.selection, vec![r5.clone()]);
-                            this.view_normal(cx);
-                            this.selection = prev;
-                        })));
-                    }
-                    PickKind::Edge if !in_sketch && !editing => {
-                        let r3 = r.clone();
-                        m = m.item(icon_item("Fillet", "fillet", Box::new(move |this, w, cx| {
-                            this.selection = vec![r3.clone()];
-                            this.start_feature("fillet", w, cx);
-                        })));
-                        let r4 = r.clone();
-                        m = m.item(icon_item("Chamfer", "chamfer", Box::new(move |this, w, cx| {
-                            this.selection = vec![r4.clone()];
-                            this.start_feature("chamfer", w, cx);
-                        })));
-                    }
-                    _ => {}
+                if !matches!(k, PickKind::Origin | PickKind::Connector) {
+                    m = m.item(item("Select other…", Box::new(|this, _, cx| this.select_other(false, cx))));
                 }
-                if let (Some(id), Some(name)) = (creator, creator_name.clone())
-                    && !in_sketch
-                    && !editing
-                    && !matches!(k, PickKind::SketchRegion | PickKind::SketchCurve | PickKind::SketchPoint)
-                {
-                    m = m.item(item(&format!("Edit {name}"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
-                }
-                // Sketches and planes hide themselves (parts below).
-                if body.is_none() && !in_sketch && !matches!(k, PickKind::Vertex | PickKind::Edge | PickKind::Face) {
-                    let r7 = r.clone();
-                    m = m.item(item("Hide", Box::new(move |this, _, cx| {
-                        this.set_visibility(std::slice::from_ref(&r7), true, cx);
-                        this.hover = None;
-                    })));
-                }
-                m = m.separator();
-                let r6 = r.clone();
-                m = m.item(item("Measure", Box::new(move |this, _, cx| {
-                    if !this.selection.contains(&r6) {
-                        this.selection.push(r6.clone());
-                    }
-                    this.measure_cache = None;
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                })));
-                let r8 = r.clone();
-                m = m.item(item("Zoom to selection", Box::new(move |this, _, cx| {
-                    if !this.selection.contains(&r8) {
-                        this.selection.push(r8.clone());
+                m
+            };
+            let zoom_fit = || item("Zoom to fit", Box::new(|this, _, cx| this.zoom_fit(cx)));
+            let zoom_sel = |r: &Reference| {
+                let r = r.clone();
+                item("Zoom to selection", Box::new(move |this, _, cx| {
+                    if !this.selection.contains(&r) {
+                        this.selection.push(r.clone());
                     }
                     this.zoom_to_selection(cx);
-                })));
-            }
-            if let (Some(r), Some(PickKind::Face | PickKind::Plane)) = (target_ref.clone(), kind)
-                && !in_sketch
-            {
-                let rp = r.clone();
-                m = m.item(item("Section view", Box::new(move |this, w, cx| this.section_through(r.clone(), w, cx))));
-                m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
-            }
-            if let (Some(r), Some(PickKind::Face)) = (target_ref.clone(), kind)
-                && !in_sketch
-            {
-                // Add appearance to the selected faces (or this face).
-                m = m.item(icon_item("Add appearance", "appearance", Box::new(move |this, w, cx| {
-                    let mut faces = this.selected_faces();
-                    if !faces.contains(&r) {
-                        faces.push(r.clone());
-                    }
-                    this.edit_appearance(super::appearance::EditTarget::Faces(faces, None), w, cx);
-                })));
-            }
-            if let Some(b) = body.clone() {
-                m = m.separator().label("Part");
-                let b1 = b.clone();
-                m = m.item(item("Part properties…", Box::new(move |this, w, cx| this.open_part_properties(b1.clone(), w, cx))));
-                let b0 = b.clone();
-                m = m.item(icon_item(&format!("Edit appearance for {body_name}…"), "appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b0.clone()]), w, cx))));
-                let b2 = b.clone();
-                m = m.item(item(&format!("Hide {body_name}"), Box::new(move |this, _, cx| {
-                    this.set_part_hidden(&b2, true, cx);
-                    this.hover = None;
-                })));
-                let b2b = b.clone();
-                m = m.item(item("Hide other parts", Box::new(move |this, _, cx| this.hide_other_parts(std::slice::from_ref(&b2b), cx))));
-                let b3 = b.clone();
-                m = m.item(item("Isolate", Box::new(move |this, w, cx| {
-                    this.selection = vec![Reference::Body(b3.clone())];
-                    this.hover = None;
-                    this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
-                })));
-                let b3b = b.clone();
-                m = m.item(item("Make transparent", Box::new(move |this, w, cx| {
-                    this.selection = vec![Reference::Body(b3b.clone())];
-                    this.hover = None;
-                    this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
-                })));
-                if sheet_metal {
-                    let b5 = b.clone();
-                    m = m.item(item("Export flat pattern (DXF)…", Box::new(move |this, w, cx| this.export_flat(b5.clone(), "dxf", w, cx))));
-                    let b6 = b.clone();
-                    m = m.item(item("Export flat pattern (SVG)…", Box::new(move |this, w, cx| this.export_flat(b6.clone(), "svg", w, cx))));
+                }))
+            };
+            let normal_to = |r: &Reference| {
+                let r = r.clone();
+                item("View normal to", Box::new(move |this, _, cx| {
+                    let prev = std::mem::replace(&mut this.selection, vec![r.clone()]);
+                    this.view_normal(cx);
+                    this.selection = prev;
+                }))
+            };
+
+            match (target_ref.clone(), kind) {
+                // A dialog is open: only what doesn't start another command.
+                (Some(r), Some(k)) if editing || in_sketch => {
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
                 }
-                let b4 = b.clone();
-                m = m.item(item("Mass properties", Box::new(move |this, _, cx| {
-                    this.selection = vec![Reference::Body(b4.clone())];
-                    this.show_mass = true;
-                    cx.notify();
-                })));
+                // Default and feature planes.
+                (Some(r), Some(PickKind::Plane)) => {
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx)))).separator();
+                    }
+                    m = m.item(tool("New sketch…", "sketch", "sketch", &r)).item(tool("Offset plane…", "plane", "cPlane", &r));
+                    if paste_sketch {
+                        let rp = r.clone();
+                        m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
+                    }
+                    let (rh, ro, rs) = (r.clone(), r.clone(), r.clone());
+                    m = m
+                        .separator()
+                        .item(item(&format!("Hide {plane_name}"), Box::new(move |this, _, cx| {
+                            this.set_visibility(std::slice::from_ref(&rh), true, cx);
+                            this.hover = None;
+                        })))
+                        .item(item("Hide other planes", Box::new(move |this, _, cx| this.hide_planes(Some(&ro), cx))))
+                        .item(item("Hide all planes", Box::new(|this, _, cx| this.hide_planes(None, cx))))
+                        .item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))))
+                        .separator();
+                    m = select_menu(m, &r, PickKind::Plane, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r)).item(normal_to(&r));
+                }
+                // Sketch regions, curves and points (live: region and curve menus).
+                (Some(r), Some(k @ (PickKind::SketchRegion | PickKind::SketchCurve | PickKind::SketchPoint))) => {
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m
+                            .item(icon_item(&format!("Edit {name}…"), "sketch", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))))
+                            .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(id, w, cx))))
+                            .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
+                                this.ui.dependencies = Some(id);
+                                cx.notify();
+                            })))
+                            .separator();
+                    }
+                    if k == PickKind::SketchRegion {
+                        m = m.item(tool("Extrude…", "extrude", "extrude", &r)).item(tool("Revolve…", "revolve", "revolve", &r)).separator();
+                    }
+                    let rh = r.clone();
+                    m = m.item(icon_item("Hide", "eye-off", Box::new(move |this, _, cx| {
+                        this.set_visibility(std::slice::from_ref(&rh), true, cx);
+                        this.hover = None;
+                    })));
+                    if k == PickKind::SketchRegion {
+                        let rs = r.clone();
+                        m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))));
+                        if let Some(id) = creator {
+                            m = m.separator().item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
+                        }
+                    }
+                    m = select_menu(m.separator(), &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                    if k == PickKind::SketchRegion {
+                        m = m.item(normal_to(&r));
+                    }
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m
+                            .separator()
+                            .item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))))
+                            .separator()
+                            .item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Feature(id, None), w, cx))));
+                    }
+                }
+                // Part faces, edges and vertices.
+                (Some(r), Some(k)) => {
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+                        if let Some((sid, sname)) = source_sketch.clone() {
+                            m = m
+                                .item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))))
+                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+                        }
+                        m = m
+                            .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
+                                this.ui.dependencies = Some(id);
+                                cx.notify();
+                            })))
+                            .separator();
+                    }
+                    // Creation tools for this entity.
+                    if k == PickKind::Face && planar && faces.len() <= 1 {
+                        m = m
+                            .item(tool("New sketch…", "sketch", "sketch", &r))
+                            .item(tool("Offset plane…", "plane", "cPlane", &r))
+                            .item(tool("Extrude…", "extrude", "extrude", &r))
+                            .item(tool("Revolve…", "revolve", "revolve", &r));
+                        if paste_sketch {
+                            let rp = r.clone();
+                            m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
+                        }
+                        m = m.separator();
+                    } else if k == PickKind::Edge {
+                        m = m.item(tool("Fillet…", "fillet", "fillet", &r)).item(tool("Chamfer…", "chamfer", "chamfer", &r)).separator();
+                    }
+                    if let Some(b) = body.clone() {
+                        let (b1, b2, b3, b4) = (b.clone(), b.clone(), b.clone(), b.clone());
+                        m = m
+                            .item(icon_item(&format!("Hide {body_name}"), "eye-off", Box::new(move |this, _, cx| {
+                                this.set_part_hidden(&b1, true, cx);
+                                this.hover = None;
+                            })))
+                            .item(item("Isolate…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(b2.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
+                            })))
+                            .item(item("Make transparent…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(b3.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                            })));
+                        let rs = r.clone();
+                        m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
+                            if this.frame_of_ref(&rs).is_some() {
+                                this.section_through(rs.clone(), w, cx);
+                            } else {
+                                this.section_part(&b4, w, cx);
+                            }
+                        })));
+                        // Copy the part (paste derives it in another Part Studio).
+                        let bc = b.clone();
+                        m = m.separator().item(icon_item(&format!("Copy {body_name}"), "copy", Box::new(move |this, _, cx| this.copy_part(bc.clone(), cx))));
+                        // Drawings and export.
+                        let (b7, b8, name) = (b.clone(), b.clone(), body_name.to_string());
+                        m = m
+                            .separator()
+                            .item(icon_item(&format!("Create Drawing of {body_name}…"), "drawing", Box::new(move |this, w, cx| {
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default() });
+                                crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
+                            })));
+                        if k == PickKind::Face && planar {
+                            let rf = r.clone();
+                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_face(rf.clone(), w, cx))));
+                        }
+                        if sheet_metal {
+                            let (b5, b6) = (b.clone(), b.clone());
+                            m = m
+                                .item(item("Export flat pattern (DXF)…", Box::new(move |this, w, cx| this.export_flat(b5.clone(), "dxf", w, cx))))
+                                .item(item("Export flat pattern (SVG)…", Box::new(move |this, w, cx| this.export_flat(b6.clone(), "svg", w, cx))));
+                        }
+                        m = m.item(item("Export…", Box::new(move |this, w, cx| this.open_export_dialog(vec![b8.clone()], w, cx))));
+                    }
+                    m = m.separator();
+                    if has_selection {
+                        m = m.item(item("Clear selection", Box::new(|this, _, cx| {
+                            this.selection.clear();
+                            this.selected_features.clear();
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })));
+                    }
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
+                    if planar {
+                        m = m.item(normal_to(&r));
+                    } else if linear_edge {
+                        let ra = r.clone();
+                        m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
+                    }
+                    if let Some(b) = body.clone() {
+                        let bd = b.clone();
+                        m = m.separator().item(icon_item(&format!("Delete {body_name}…"), "menu-delete", Box::new(move |this, w, cx| {
+                            this.selection = vec![Reference::Body(bd.clone())];
+                            this.delete_selected_parts(w, cx);
+                        })));
+                        if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                            m = m.item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
+                        }
+                        let (b1, b2) = (b.clone(), b.clone());
+                        m = m
+                            .separator()
+                            .item(item(&format!("Assign material for {body_name}…"), Box::new(move |this, w, cx| this.open_part_properties(b1.clone(), w, cx))))
+                            .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
+                        if k == PickKind::Face {
+                            let fs = faces.clone();
+                            let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
+                            m = m.item(icon_item(&label, "appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
+                        }
+                    }
+                }
+                // Empty space.
+                _ => {
+                    m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
+                    if has_selection {
+                        m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
+                            this.selection.clear();
+                            this.selected_features.clear();
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })));
+                    }
+                    m = m.separator().item(zoom_fit()).item(item("Isometric", Box::new(|this, _, cx| this.view(StandardView::Isometric, cx))));
+                }
             }
-            m = m.separator();
+            // Modes that are on: a way out of each.
+            let mut exits: Vec<OsMenuItem> = Vec::new();
             if let Some(tool) = editing_tool {
-                // Onshape: "Exit <tool>" while a tool is active.
-                m = m.item(item(&format!("Exit {tool}"), Box::new(|this, w, cx| this.cancel_edit(w, cx))));
+                exits.push(item(&format!("Exit {tool}"), Box::new(|this, w, cx| this.cancel_edit(w, cx))));
             }
             if let Some(mode) = isolate {
                 let label = match mode {
                     super::behaviors::IsolateMode::Isolate => "Exit isolate",
                     super::behaviors::IsolateMode::Transparent => "Exit make transparent",
                 };
-                m = m.item(item(label, Box::new(|this, w, cx| {
+                exits.push(item(label, Box::new(|this, w, cx| {
                     this.exit_isolate(w, cx);
                 })));
             }
+            if section && target_ref.is_none() {
+                exits.push(item("Edit section view…", Box::new(|this, w, cx| this.open_section_dialog(w, cx))));
+            }
             if section {
-                m = m.item(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
+                exits.push(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
             }
-            if target_ref.is_none() {
-                m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
-                m = m.item(item("Show all parts", Box::new(|this, _, cx| this.show_all_parts(cx))));
-                m = m.item(item("Zoom to fit", Box::new(|this, _, cx| this.zoom_fit(cx))));
-                m = m.item(item("Isometric", Box::new(|this, _, cx| this.view(StandardView::Isometric, cx))));
+            if !exits.is_empty() {
+                m = m.separator();
+                for e in exits {
+                    m = m.item(e);
+                }
             }
-            if has_selection {
-                m = m.item(item("Clear selection", Box::new(|this, _, cx| {
-                    this.selection.clear();
-                    this.selected_features.clear();
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                })));
-            }
-            m.item(item("Mass properties of all parts", Box::new(|this, _, cx| {
-                this.selection.clear();
-                this.show_mass = true;
-                cx.notify();
-            })))
+            m
         });
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
+        // Onshape keeps the right-clicked entity highlighted while its menu is open.
+        self.ui.menu_target = target_ref_for_highlight;
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
     pub(super) fn close_context_menu(&mut self, cx: &mut Context<Self>) {
         if self.context_menu.take().is_some() {
+            if self.ui.menu_target.take().is_some() {
+                self.refresh_scene(false, cx);
+            }
             cx.notify();
         }
     }
@@ -432,6 +531,56 @@ impl PartStudioView {
         });
     }
 
+    /// Onshape "Export…" on parts: choose a format, then where to save.
+    pub(super) fn open_export_dialog(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        let chosen = std::sync::Arc::new(parking_lot::Mutex::new(super::ExportFormat::Step));
+        let base = match bodies.as_slice() {
+            [b] => self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into()),
+            _ => self.studio_name(cx),
+        };
+        let pal = p();
+        window.open_dialog(cx, move |dialog, _, _| {
+            let current = *chosen.lock();
+            let formats = super::ExportFormat::ALL.iter().map(|f| {
+                let (f, c) = (*f, chosen.clone());
+                Button::new(SharedString::from(format!("exp-{}", f.ext())))
+                    .label(f.label())
+                    .xsmall()
+                    .when_selected(f == current)
+                    .on_click(move |_, window, _| {
+                        *c.lock() = f;
+                        window.refresh();
+                    })
+            });
+            let (v, c, bodies, base) = (view.clone(), chosen.clone(), bodies.clone(), base.clone());
+            dialog
+                .title("Export")
+                .w(px(420.))
+                .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
+                .footer(
+                    DialogFooter::new()
+                        .gap_2()
+                        .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
+                        .child(DialogAction::new().child(Button::new("ok").label("Export").primary())),
+                )
+                .on_ok(move |_, window, cx| {
+                    let format = *c.lock();
+                    let (v, bodies) = (v.clone(), bodies.clone());
+                    crate::files::request_save_path("Export", format!("{base}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
+                        v.update(cx, |this, cx| {
+                            let msg = match this.export_bodies(format, &path, &bodies) {
+                                Ok(()) => format!("Exported {}", path.display()),
+                                Err(e) => format!("Export failed: {e:#}"),
+                            };
+                            this.flash_info(msg, cx);
+                        });
+                    });
+                    true
+                })
+        });
+    }
+
     pub(super) fn export_flat(&mut self, body: BodyId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(ctx) = self.context.clone() else { return };
         let geometry = match noshape_model::sheetmetal::flat_pattern_for(&ctx, &body) {
@@ -467,46 +616,48 @@ impl PartStudioView {
     /// Model evaluation tools at the bottom right (Onshape): Measure and
     /// Mass properties.
     pub(super) fn render_evaluation_tools(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // Onshape (live): a 110x30 area flush with the viewport's bottom-right
+        // corner, white at 75%, holding three 30x30 buttons 5 px apart:
+        // Measure, Analysis tools and Mass properties (20 px icons).
         let pal = p();
         let measure_on = self.ui.measure_pinned;
         let mass_on = self.show_mass;
+        let btn = |id: &'static str, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
+        let view = cx.entity();
         h_flex()
             .id("eval-tools")
             .occlude()
             .absolute()
-            .bottom_3()
-            .right_3()
-            .gap_0p5()
-            .p_0p5()
-            .rounded_md()
-            .bg(with_alpha(pal.panel_raised, 0.85))
-            .border_1()
-            .border_color(pal.border)
+            .bottom_0()
+            .right_0()
+            .h(px(30.))
+            .pl(px(5.))
+            .pr(px(5.))
+            .gap(px(5.))
+            .bg(with_alpha(pal.panel, 0.75))
             .child(
-                Button::new("eval-measure")
-                    .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("measure")))
-                    .ghost()
-                    .xsmall()
-                    .selected(measure_on)
-                    .tooltip("Measure ([)")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.ui.measure_pinned = !this.ui.measure_pinned;
-                        this.show_mass = false;
-                        cx.notify();
-                    })),
+                btn("eval-measure", "measure", measure_on, cx).tooltip("Show measure details ([)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.ui.measure_pinned = !this.ui.measure_pinned;
+                    this.show_mass = false;
+                    cx.notify();
+                })),
             )
+            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some(), cx).tooltip("Analysis tools").dropdown_menu(move |m, _, _| {
+                let (v1, v2) = (view.clone(), view.clone());
+                m.item(PopupMenuItem::new("Curvature analysis").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
+                    .item(PopupMenuItem::new("Draft analysis").on_click(move |_, w, cx| {
+                        v2.update(cx, |this, cx| {
+                            let a = this.draft_analysis();
+                            this.toggle_analysis(a, w, cx)
+                        })
+                    }))
+            }))
             .child(
-                Button::new("eval-mass")
-                    .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("mass-properties")))
-                    .ghost()
-                    .xsmall()
-                    .selected(mass_on)
-                    .tooltip("Mass properties")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.show_mass = !this.show_mass;
-                        this.ui.measure_pinned = false;
-                        cx.notify();
-                    })),
+                btn("eval-mass", "mass-properties", mass_on, cx).tooltip("Mass properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.show_mass = !this.show_mass;
+                    this.ui.measure_pinned = false;
+                    cx.notify();
+                })),
             )
             .into_any_element()
     }

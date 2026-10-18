@@ -213,8 +213,23 @@ fn plate_edges_are_drawn_solid_over_faces() {
                 })
                 .min()
                 .unwrap();
+            // A sample the faces won reads like the surface beside the edge;
+            // a line straddling two pixel rows (no pixel fully covered) reads
+            // about half of it. Compare with the darker of the two surfaces
+            // 5 px away (never below the old absolute limit of 100), so
+            // brighter face shading doesn't turn anti-aliasing into failures.
+            let beside = [-5.0, 5.0]
+                .iter()
+                .map(|o| {
+                    let q = s + n * *o;
+                    let px = &f.bgra[((q.y.floor() as u32 * w + q.x.floor() as u32) * 4) as usize..][..3];
+                    px.iter().map(|&c| c as u32).sum::<u32>() / 3
+                })
+                .min()
+                .unwrap();
+            let limit = (beside * 7 / 10).max(100);
             total += 1;
-            if lum > 100 {
+            if lum > limit {
                 light.push(((a, b), k, lum));
             }
         }
@@ -293,4 +308,48 @@ fn every_scene_change_renders_fresh_content() {
     assert!(bluish(px[1]), "frame 2 {:?}", px[1]);
     assert_ne!(px[2], px[1], "selection state change must show");
     assert!(reddish(px[3]), "frame 4 {:?}", px[3]);
+}
+
+/// Section view caps: looking through a cut, the solid's inside is covered
+/// by a hatched cap on the cut plane. A red block buried in the material
+/// behind the cut must stay hidden (without caps the view went into the
+/// solid and showed it), and the cap shows dark hatch lines.
+#[test]
+fn section_caps_cover_the_cut() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    let blue = [0.45f32, 0.6, 0.75, 1.0];
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.03], [0.05, 0.03, 0.03], 1)))).with_color(blue));
+    // Inside the material at x < 0, behind the cut plane x = 0.
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.03, -0.01, -0.01], [-0.01, 0.01, 0.01], 100)))).with_color([1.0, 0.0, 0.0, 1.0]));
+    // Remove x > 0.
+    scene.clip = Some(ClipPlane { normal: glam::Vec3::X, d: 0.0 });
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, 0.15, -0.1).normalize(), glam::DVec3::Z), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.03, -0.03), glam::DVec3::new(0.05, 0.03, 0.03), w as f64 / h as f64);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let px = |x: u32, y: u32| {
+        let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+        (p[2] as i32, p[1] as i32, p[0] as i32)
+    };
+    let (mut red, mut lums) = (0, Vec::new());
+    for y in (h / 2 - 15)..(h / 2 + 15) {
+        for x in (w / 2 - 15)..(w / 2 + 15) {
+            let (r8, g8, b8) = px(x, y);
+            if r8 > 150 && g8 < 80 && b8 < 80 {
+                red += 1;
+            }
+            lums.push(r8 + g8 + b8);
+        }
+    }
+    assert_eq!(red, 0, "the buried block shows through the cut: no cap");
+    lums.sort();
+    let (dark, light) = (lums[lums.len() / 50], lums[lums.len() / 2]);
+    assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }

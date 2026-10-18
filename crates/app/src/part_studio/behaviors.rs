@@ -11,7 +11,7 @@ use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use glam::DVec2;
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
@@ -22,9 +22,6 @@ use noshape_render::Camera;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-/// Feature tools on the S shortcut toolbar (Part Studio).
-const MINI_FEATURES: &[&str] = &["sketch", "extrude", "revolve", "sweep", "loft", "fillet", "chamfer", "shell", "hole", "mirror", "linearPattern", "circularPattern", "cPlane", "booleanBodies"];
 
 /// Isolate (Shift+I) keeps the chosen parts opaque; Make transparent
 /// (Shift+T) makes them transparent.
@@ -88,6 +85,10 @@ pub struct UiState {
     pub var_hover: Option<String>,
     /// Section view planes (Shift+X).
     pub section: Vec<super::section::SectionPlane>,
+    /// Section view dialog, and the parts excluded (false) or the only ones
+    /// included (true) in the cut.
+    pub section_dialog: Option<super::section::SectionDialog>,
+    pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
     pub appearance_hover: Vec<Reference>,
@@ -135,6 +136,8 @@ pub struct UiState {
     /// Shortcut map search box.
     pub shortcut_filter: Option<(Entity<InputState>, Subscription)>,
     pub shortcut_query: String,
+    /// Shortcut sheet tab (General, Part Studio, …).
+    pub shortcut_tab: usize,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -148,6 +151,10 @@ pub struct UiState {
     pub remembered: std::collections::HashMap<(String, &'static str), ParamValue>,
     /// Feature list: "Default geometry" and "Parts" folders collapsed.
     pub default_geometry_collapsed: bool,
+    /// Entity whose graphics-area context menu is open (kept highlighted).
+    pub menu_target: Option<Reference>,
+    /// "Show dimensions" of a sketch.
+    pub shown_dims: Option<super::shown_dims::ShownDims>,
 }
 
 impl UiState {
@@ -172,6 +179,8 @@ impl UiState {
             palette_hover: None,
             var_hover: None,
             section: Vec::new(),
+            section_dialog: None,
+            section_parts: None,
             appearance_edit: None,
             appearance_hover: Vec::new(),
             analysis: None,
@@ -199,12 +208,15 @@ impl UiState {
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
+            shortcut_tab: 0,
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
             oriented: false,
             remembered: Default::default(),
             default_geometry_collapsed: false,
+            menu_target: None,
+            shown_dims: None,
         }
     }
 }
@@ -301,8 +313,29 @@ impl PartStudioView {
         if self.ui.var_hover.is_some() {
             return self.variable_users(cx).into_iter().flat_map(|f| self.feature_geometry(f)).collect();
         }
+        if let Some(r) = &self.ui.menu_target {
+            return vec![r.clone()];
+        }
         match &self.hover {
             Some(Reference::Body(b)) => self.body_geometry(b),
+            // A sketch curve under a region field pre-highlights its region.
+            Some(r @ Reference::SketchEntity { .. }) => {
+                let filter = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()).map(|(_, f, _)| f);
+                vec![filter.and_then(|f| self.curve_region(r, f)).unwrap_or_else(|| r.clone())]
+            }
+            // A face under a parts field pre-highlights the whole part.
+            Some(r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))) => {
+                let filter = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()).map(|(_, f, _)| f);
+                let wants_kind = filter.is_some_and(|f| match r {
+                    Reference::Face(_) => f.intersects(QueryFilter::ANY_FACE) || f.intersects(QueryFilter::PLANE_LIKE),
+                    Reference::Edge(_) => f.intersects(QueryFilter::ANY_EDGE) || f.intersects(QueryFilter::AXIS),
+                    _ => f.intersects(QueryFilter::POINT_LIKE),
+                });
+                match filter.filter(|_| !wants_kind).and_then(|f| self.part_for_field(r, f)) {
+                    Some(Reference::Body(b)) => self.body_geometry(&b),
+                    _ => vec![r.clone()],
+                }
+            }
             Some(r) => vec![r.clone()],
             None => Vec::new(),
         }
@@ -353,12 +386,15 @@ impl PartStudioView {
                 return;
             };
             if !kind_matches(target.kind, &target.reference, filter) {
-                // Clicking a sketch curve or point while a region field is
-                // active takes the sketch's regions (like clicking the
-                // sketch in the feature list).
-                if let (Reference::SketchEntity { sketch, .. }, true) = (&target.reference, filter.intersects(QueryFilter::SKETCH_REGION))
-                    && self.pick_feature_into_dialog(*sketch, cx)
-                {
+                // Clicking a sketch curve while a region field is active
+                // takes the region it bounds; a face, edge or vertex in a
+                // parts field takes its part (Onshape).
+                if let Some(region) = self.curve_region(&target.reference, filter).or_else(|| self.part_for_field(&target.reference, filter)) {
+                    dialog.update(cx, |d, cx| {
+                        d.add_pick(region, cx);
+                    });
+                    self.refresh_scene(false, cx);
+                    cx.notify();
                     return;
                 }
                 dialog.update(cx, |d, cx| d.flash_active_field(cx));
@@ -375,6 +411,25 @@ impl PartStudioView {
         }
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// The sketch region a curve bounds, when `filter` takes regions but not
+    /// curves (Onshape: hovering/clicking the curve picks the region).
+    pub(super) fn curve_region(&self, r: &Reference, filter: QueryFilter) -> Option<Reference> {
+        let Reference::SketchEntity { sketch, entity } = r else { return None };
+        if !filter.intersects(QueryFilter::SKETCH_REGION) || filter.intersects(QueryFilter::ANY_EDGE) || filter.intersects(QueryFilter::AXIS) {
+            return None;
+        }
+        let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
+        interaction::region_for_curve(&sk.regions, *entity).map(|reg| Reference::SketchRegion { sketch: *sketch, key: reg.key.clone() })
+    }
+
+    /// The part of a face/edge/vertex when `filter` takes parts but not that kind.
+    pub(super) fn part_for_field(&self, r: &Reference, filter: QueryFilter) -> Option<Reference> {
+        if !filter.intersects(QueryFilter::BODY) || !matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) {
+            return None;
+        }
+        self.body_of(r).map(Reference::Body)
     }
 
     /// Pick target for a reference shown in a list (default geometry, parts).
@@ -486,6 +541,30 @@ impl PartStudioView {
         self.selected_features = prev;
     }
 
+    /// Parts list "Copy here…": Transform preset to copy the parts, translated by XYZ.
+    pub(super) fn copy_here(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.selection = bodies.into_iter().map(Reference::Body).collect();
+        self.start_feature("transform", window, cx);
+        if let Some(e) = &self.edit {
+            e.dialog.update(cx, |d, cx| {
+                d.set_value("transformType", ParamValue::Enum("TRANSLATION_3D".into()), cx);
+                d.set_value("makeCopy", ParamValue::Bool(true), cx);
+            });
+        }
+    }
+
+    /// Whether the clipboard holds a sketch from "Copy sketch" (the menus
+    /// then offer "Paste sketch").
+    pub(super) fn clipboard_has_sketch(cx: &App) -> bool {
+        cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("\"noshape_features\"") && t.contains("\"type_id\":\"sketch\""))
+    }
+
+    /// Plane menus: "Hide other planes" (keep one) / "Hide all planes".
+    pub(super) fn hide_planes(&mut self, keep: Option<&Reference>, cx: &mut Context<Self>) {
+        let planes: Vec<Reference> = self.display.planes.iter().map(|p| p.reference.clone()).filter(|r| Some(r) != keep).collect();
+        self.set_visibility(&planes, true, cx);
+    }
+
     /// "Paste sketch" on a plane or planar face: paste the copied sketch(es)
     /// and move them onto that plane.
     pub(super) fn paste_sketch_onto(&mut self, plane: Reference, cx: &mut Context<Self>) {
@@ -524,6 +603,53 @@ impl PartStudioView {
             };
             view.update(cx, |this, cx| this.flash_info(msg, cx));
         });
+    }
+
+    /// Face menu "Export as DXF/DWG…": the planar face's boundary in its plane.
+    pub(super) fn export_face(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(frame) = self.frame_of_ref(&r) else { return };
+        let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)) else { return };
+        let fi = b.face_refs.iter().position(|x| *x == r).unwrap_or(0);
+        let lines = b.mesh.face_edges(fi).into_iter().filter_map(|e| b.mesh.edges.get(e).map(|pl| (pl.clone(), false))).collect();
+        let g = plane_sheet(&frame, lines);
+        let name = b.name.clone();
+        let view = cx.entity();
+        crate::files::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
+            let msg = match std::fs::write(&path, noshape_model::drawing::export::to_dxf(&g)) {
+                Ok(()) => format!("Exported {}", path.display()),
+                Err(e) => format!("Export failed: {e}"),
+            };
+            view.update(cx, |this, cx| this.flash_info(msg, cx));
+        });
+    }
+
+    /// "Copy Part 1": the part goes to the clipboard; Ctrl+V in another
+    /// Part Studio derives it (in this one, it copies it in place).
+    pub(super) fn copy_part(&mut self, b: BodyId, cx: &mut Context<Self>) {
+        let v = serde_json::json!({ "noshape_part": { "tab": self.tab.to_string(), "body": b } });
+        cx.write_to_clipboard(ClipboardItem::new_string(v.to_string()));
+        let name = self.display.body(&b).map(|d| d.name.clone()).unwrap_or_else(|| "part".into());
+        self.flash_info(format!("Copied {name}"), cx);
+    }
+
+    /// Ctrl+V of a copied part: returns false when the clipboard holds none.
+    pub(super) fn paste_part(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return false };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return false };
+        let Some(p) = v.get("noshape_part") else { return false };
+        let (Some(tab), Some(Ok(body))) = (p.get("tab").and_then(|t| t.as_str()).map(str::to_string), p.get("body").map(|b| serde_json::from_value::<BodyId>(b.clone()))) else { return false };
+        if tab == self.tab.to_string() {
+            self.copy_here(vec![body], window, cx);
+            return true;
+        }
+        self.start_feature("importDerived", window, cx);
+        if let Some(e) = &self.edit {
+            e.dialog.update(cx, |d, cx| {
+                d.set_value("partStudio", ParamValue::Text(tab.clone()), cx);
+                d.set_value("parts", ParamValue::Query(vec![Reference::Body(body.clone())]), cx);
+            });
+        }
+        true
     }
 
     // ------------------------------------------------------------ dynamic suppression
@@ -957,17 +1083,6 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// "Hide other parts": hide every part except `keep`.
-    pub(super) fn hide_other_parts(&mut self, keep: &[BodyId], cx: &mut Context<Self>) {
-        let others: Vec<Reference> = self.display.bodies.iter().filter(|b| !keep.contains(&b.id)).map(|b| Reference::Body(b.id.clone())).collect();
-        self.set_visibility(&others, true, cx);
-    }
-
-    pub(super) fn hide_all_parts(&mut self, cx: &mut Context<Self>) {
-        let all: Vec<Reference> = self.display.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
-        self.set_visibility(&all, true, cx);
-    }
-
     /// Shift+P: hide all construction geometry (planes, sketches).
     pub(super) fn hide_construction(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let any_shown = self.opts.show_planes || self.opts.show_sketches;
@@ -1105,6 +1220,14 @@ impl PartStudioView {
                 let mut b = b.clone();
                 b.color[3] *= (1.0 - s).max(0.02);
                 d.bodies.push(b);
+            }
+            return Arc::new(d);
+        }
+        // Show dimensions: the parts turn see-through (Onshape).
+        if self.ui.shown_dims.is_some() {
+            let mut d = (*self.display).clone();
+            for b in &mut d.bodies {
+                b.color[3] = b.color[3].min(0.35);
             }
             return Arc::new(d);
         }
@@ -1487,25 +1610,22 @@ impl PartStudioView {
     /// Onshape's cursor badge: the number of selected entities (up to 5,
     /// then "5+") beside the pointer over the graphics area.
     pub(super) fn render_selection_badge(&self, cx: &App) -> Option<AnyElement> {
-        let at = self.ui.badge_at.map(|(_, p)| p).filter(|_| self.viewport.read(cx).pointer_inside())?;
+        let at = self.ui.pointer.or(self.ui.badge_at.map(|(_, p)| p)).filter(|_| self.viewport.read(cx).pointer_inside())?;
         let n = self.selection.len() + self.selected_features.len();
         if n == 0 || self.edit.is_some() || self.ui.select_other.is_some() || self.ui.mini_toolbar.is_some() || self.context_menu.is_some() {
             return None;
         }
-        let pal = p();
-        Some(
-            div()
-                .absolute()
-                .left(px(at.x as f32 + 14.0))
-                .top(px(at.y as f32 + 14.0))
-                .px_1()
-                .rounded_sm()
-                .bg(pal.accent)
-                .text_size(px(10.))
-                .text_color(gpui_kit::rgb(0xffffff))
-                .child(if n > 5 { "5+".to_string() } else { n.to_string() })
-                .into_any_element(),
-        )
+        // Onshape draws the count into the cursor image (cursors/
+        // macSelectionCursor-N): a bold black digit with a white outline at
+        // the arrow's lower right, "5" for five or more.
+        let digit = n.min(5).to_string();
+        let glyph = |dx: f32, dy: f32, color: Rgba| div().absolute().left(px(dx)).top(px(dy)).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(color).child(digit.clone());
+        let white = gpui_kit::rgb(0xffffff);
+        let mut el = div().absolute().left(px(at.x as f32 + 11.0)).top(px(at.y as f32 + 9.0)).w(px(12.)).h(px(18.));
+        for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0), (-1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)] {
+            el = el.child(glyph(dx, dy, white));
+        }
+        Some(el.child(glyph(0.0, 0.0, gpui_kit::rgb(0x000000))).into_any_element())
     }
 
     /// Measure graphics (Onshape): a dotted line between the closest points
@@ -1553,6 +1673,47 @@ impl PartStudioView {
     }
 
     /// Arc-length midpoint of an edge polyline (display mesh).
+    /// Polyline of a part edge (world space).
+    pub(super) fn edge_points(&self, r: &Reference) -> Option<Vec<glam::DVec3>> {
+        let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
+        self.display.bodies.iter().find_map(|b| {
+            let ei = b.edge_refs.iter().position(|x| x == r)?;
+            Some(b.mesh.edges.get(ei)?.iter().map(|p| p3(*p)).collect())
+        })
+    }
+
+    /// Direction of a straight part edge.
+    pub(super) fn linear_edge_direction(&self, r: &Reference) -> Option<glam::DVec3> {
+        let pts = self.edge_points(r)?;
+        let (a, b) = (*pts.first()?, *pts.last()?);
+        let d = (b - a).try_normalize()?;
+        let straight = pts.iter().all(|p| (*p - a).cross(d).length() <= 1e-6 + 1e-4 * a.distance(b));
+        straight.then_some(d)
+    }
+
+    /// Edge menu "Align view with vertical axis": roll the view (keeping
+    /// its direction) so the edge points up the screen.
+    pub(super) fn align_view_vertical(&mut self, r: &Reference, cx: &mut Context<Self>) {
+        let Some(d) = self.linear_edge_direction(r) else { return };
+        let cam = self.viewport.read(cx).camera;
+        let fwd = cam.forward();
+        let Some(mut up) = (d - fwd * d.dot(fwd)).try_normalize() else { return };
+        if up.dot(cam.up()) < 0.0 {
+            up = -up;
+        }
+        self.push_camera_history(cx);
+        self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
+    }
+
+    /// "Section view…" on a part: a plane through its center, facing the view.
+    pub(super) fn section_part(&mut self, b: &BodyId, window: &mut Window, cx: &mut Context<Self>) {
+        let center = self.display.body(b).and_then(|b| b.bounds).map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or_default();
+        let n = -self.viewport.read(cx).camera.forward();
+        self.ui.section_dialog = None;
+        self.restore_section(&[[n.x, n.y, n.z, n.dot(center)]], window, cx);
+        self.open_section_dialog(window, cx);
+    }
+
     fn edge_midpoint(&self, r: &Reference) -> Option<glam::DVec3> {
         let p3 = |a: [f32; 3]| glam::DVec3::new(a[0] as f64, a[1] as f64, a[2] as f64);
         self.display.bodies.iter().find_map(|b| {
@@ -1618,7 +1779,10 @@ impl PartStudioView {
     /// S: the shortcut toolbar at the cursor (feature tools; sketch tools
     /// in a sketch). S again or Esc closes it.
     pub(super) fn toggle_mini_toolbar(&mut self, cx: &mut Context<Self>) {
-        if self.ui.mini_toolbar.take().is_none() {
+        if self.sketch.is_some() {
+            let at = self.ui.pointer.unwrap_or_else(|| self.viewport.read(cx).size() * 0.5);
+            self.ui.mini_toolbar = Some(at + DVec2::new(10.0, -30.0));
+        } else if self.ui.mini_toolbar.take().is_none() {
             let at = self.ui.pointer.unwrap_or_else(|| self.viewport.read(cx).size() * 0.5);
             self.ui.mini_toolbar = Some(at);
         }
@@ -1642,31 +1806,17 @@ impl PartStudioView {
                 .child(svg().path(icon).size(px(18.)).text_color(pal.text))
                 .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
         };
-        let mut row = h_flex().gap_0p5();
+        // Onshape: rows of five tools (sketch and Part Studio alike).
+        let mut row = h_flex().gap_0p5().w(px(158.)).flex_wrap();
         if in_sketch {
-            use crate::actions::*;
-            let tools: [(&str, &str, Box<dyn Action>); 12] = [
-                ("Line", "line", Box::new(SketchLine)),
-                ("Corner rectangle", "corner-rectangle", Box::new(SketchCornerRectangle)),
-                ("Center point rectangle", "center-rectangle", Box::new(SketchCenterRectangle)),
-                ("Center point circle", "circle", Box::new(SketchCircle)),
-                ("3 point arc", "three-point-arc", Box::new(SketchArc3)),
-                ("Point", "point-sketch", Box::new(SketchPoint)),
-                ("Fillet", "sketch-fillet", Box::new(SketchFillet)),
-                ("Trim", "trim", Box::new(SketchTrim)),
-                ("Offset", "offset", Box::new(SketchOffset)),
-                ("Use", "use", Box::new(SketchUse)),
-                ("Dimension", "dimension", Box::new(SketchDimension)),
-                ("Construction", "construction", Box::new(SketchConstruction)),
-            ];
-            for (name, icon, action) in tools {
-                row = row.child(btn(SharedString::from(format!("mini-{icon}")), crate::assets::icon_path(icon), name.to_string()).on_mouse_down(
+            for tool in super::sketch::SKETCH_SHORTCUT_TOOLS {
+                row = row.child(btn(SharedString::from(format!("mini-{}", tool.icon())), crate::assets::icon_path(tool.icon()), tool.label().to_string()).on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                         cx.stop_propagation();
                         this.ui.mini_toolbar = None;
                         window.focus(&this.focus, cx);
-                        window.dispatch_action(action.boxed_clone(), cx);
+                        this.activate_tool(tool, window, cx);
                         cx.notify();
                     }),
                 ));
@@ -1788,20 +1938,24 @@ impl PartStudioView {
         let studio = self.studio(cx)?;
         let idx = studio.index_of(id)?;
         let name = studio.features[idx].name.clone();
-        let names = |ids: Vec<FeatureId>| -> Vec<(FeatureId, String)> { ids.into_iter().filter_map(|i| studio.feature(i).map(|f| (i, f.name.clone()))).collect() };
+        let names = |ids: Vec<FeatureId>| -> Vec<(FeatureId, String, String)> { ids.into_iter().filter_map(|i| studio.feature(i).map(|f| (i, f.name.clone(), f.type_id.clone()))).collect() };
         let parents = names(interaction::feature_dependencies(&studio.features, idx));
         let children = names(interaction::feature_dependents(&studio.features, idx));
+        let this_row = (id, name.clone(), studio.features[idx].type_id.clone());
         let pal = p();
-        let row = |(fid, n): (FeatureId, String), cx: &mut Context<Self>| {
-            div()
+        // Onshape (live): 300 px panel at the dialog position; 26 px rows
+        // (15 px feature icon, 12 px name); the parents, a ▲ separator
+        // ("Features used by …"), the feature, a ▼ separator ("Features
+        // using …"), the children. Hovering a row highlights its geometry.
+        let row = |(fid, n, ty): (FeatureId, String, String), cx: &mut Context<Self>| {
+            h_flex()
                 .id(SharedString::from(format!("dep-{fid}")))
-                .px_2()
-                .py_0p5()
-                .rounded_sm()
-                .text_xs()
+                .h(px(26.))
+                .bg(with_alpha(gpui_kit::rgb(0x000000), 0.02))
                 .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(n)
+                .hover(|d| d.bg(pal.row_hover))
+                .child(div().w(px(25.)).flex().justify_center().child(svg().path(feature_icon(&ty)).size(px(15.)).text_color(pal.text).opacity(0.8)))
+                .child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(n))
                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                     this.ui.list_hover = h.then_some(fid);
                     this.refresh_scene(false, cx);
@@ -1813,29 +1967,44 @@ impl PartStudioView {
                 }))
                 .into_any_element()
         };
-        let none = |what: &str| div().px_2().text_xs().text_color(pal.text_faint).child(format!("No {what}")).into_any_element();
-        let parent_rows: Vec<AnyElement> = if parents.is_empty() { vec![none("parents")] } else { parents.into_iter().map(|x| row(x, cx)).collect() };
-        let child_rows: Vec<AnyElement> = if children.is_empty() { vec![none("children")] } else { children.into_iter().map(|x| row(x, cx)).collect() };
+        let separator = |idn: &'static str, up: bool, tip: String| {
+            div()
+                .id(idn)
+                .h(px(23.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui_kit::rgb(0xeeeeee))
+                .border_t_1()
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xd7d7d7))
+                .text_size(px(10.))
+                .text_color(with_alpha(pal.text, 0.5))
+                .child(if up { "▲" } else { "▼" })
+                .tooltip(crate::ui::tooltip(tip))
+        };
+        let parent_rows: Vec<AnyElement> = parents.into_iter().map(|x| row(x, cx)).collect();
+        let child_rows: Vec<AnyElement> = children.into_iter().map(|x| row(x, cx)).collect();
+        let me = row(this_row, cx);
         Some(
             v_flex()
                 .id("dependencies")
                 .occlude()
                 .absolute()
-                .top_3()
-                .left(px(340.))
-                .w(px(240.))
-                .p_2()
-                .gap_1()
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
+                .top(px(0.))
+                .left(px(0.))
+                .w(px(300.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .child(
                     h_flex()
+                        .h(px(29.))
+                        .px(px(6.))
                         .justify_between()
-                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(format!("Dependencies of {name}")))
-                        .child(div().id("dep-close").px_1().cursor_pointer().text_color(pal.text_faint).child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .border_b_1()
+                        .border_color(pal.border)
+                        .child(div().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(format!("Dependencies of {name}")))
+                        .child(div().id("dep-close").px_1().cursor_pointer().child(Icon::new(IconName::Close).small().text_color(pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.dependencies = None;
                             this.ui.list_hover = None;
                             this.refresh_scene(false, cx);
@@ -1843,9 +2012,9 @@ impl PartStudioView {
                         }))),
                 )
                 .children(parent_rows)
-                .child(div().text_center().text_sm().text_color(pal.accent).child("↑"))
-                .child(div().px_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name.clone()))
-                .child(div().text_center().text_sm().text_color(pal.accent).child("↓"))
+                .child(separator("dep-up", true, format!("Features used by {name}")))
+                .child(me)
+                .child(separator("dep-down", false, format!("Features using {name}")))
                 .children(child_rows)
                 .into_any_element(),
         )
@@ -1959,19 +2128,14 @@ impl PartStudioView {
 }
 
 /// A sketch as 2D sheet geometry in millimeters (plane coordinates).
-pub fn sketch_sheet(sk: &noshape_model::display::SketchDisplay) -> noshape_model::drawing::sheet::SheetGeometry {
+/// Flat sheet (millimeters, plane coordinates) of world polylines.
+fn plane_sheet(frame: &noshape_model::display::PlaneFrame, polylines: Vec<(Vec<[f32; 3]>, bool)>) -> noshape_model::drawing::sheet::SheetGeometry {
     use noshape_model::drawing::sheet::{LineStyle, Polyline2};
-    let f = &sk.frame;
     let local = |p: [f32; 3]| {
-        let d = glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64) - f.origin;
-        [d.dot(f.x) * 1000.0, d.dot(f.y) * 1000.0]
+        let d = glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64) - frame.origin;
+        [d.dot(frame.x) * 1000.0, d.dot(frame.y) * 1000.0]
     };
-    let lines: Vec<Polyline2> = sk
-        .curves
-        .iter()
-        .filter(|c| c.points.len() >= 2 && !c.external)
-        .map(|c| Polyline2 { points: c.points.iter().map(|p| local(*p)).collect(), style: if c.construction { LineStyle::Hidden } else { LineStyle::Visible }, closed: false, pick: 0 })
-        .collect();
+    let lines: Vec<Polyline2> = polylines.into_iter().map(|(pts, hidden)| Polyline2 { points: pts.into_iter().map(local).collect(), style: if hidden { LineStyle::Hidden } else { LineStyle::Visible }, closed: false, pick: 0 }).collect();
     let (mut w, mut h) = (0.0f64, 0.0f64);
     for l in &lines {
         for p in &l.points {
@@ -1982,6 +2146,10 @@ pub fn sketch_sheet(sk: &noshape_model::display::SketchDisplay) -> noshape_model
     let mut g = noshape_model::drawing::sheet::SheetGeometry::new(w * 2.0, h * 2.0);
     g.lines = lines;
     g
+}
+
+pub fn sketch_sheet(sk: &noshape_model::display::SketchDisplay) -> noshape_model::drawing::sheet::SheetGeometry {
+    plane_sheet(&sk.frame, sk.curves.iter().filter(|c| c.points.len() >= 2 && !c.external).map(|c| (c.points.clone(), c.construction)).collect())
 }
 
 #[cfg(test)]

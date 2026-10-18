@@ -17,6 +17,8 @@ pub enum SheetSize {
     A1,
     A0,
     AnsiA,
+    /// ANSI A portrait (8.5 x 11 in; Onshape's ANSI_A_Portrait templates).
+    AnsiAPortrait,
     AnsiB,
     AnsiC,
     AnsiD,
@@ -34,6 +36,7 @@ impl SheetSize {
             SheetSize::A1 => (841.0, 594.0),
             SheetSize::A0 => (1189.0, 841.0),
             SheetSize::AnsiA => (279.4, 215.9),
+            SheetSize::AnsiAPortrait => (215.9, 279.4),
             SheetSize::AnsiB => (431.8, 279.4),
             SheetSize::AnsiC => (558.8, 431.8),
             SheetSize::AnsiD => (863.6, 558.8),
@@ -43,7 +46,7 @@ impl SheetSize {
     }
 
     /// Standard sheet sizes (ISO A4..A0, then ANSI A..E).
-    pub const STANDARD: [SheetSize; 10] = [SheetSize::A4, SheetSize::A3, SheetSize::A2, SheetSize::A1, SheetSize::A0, SheetSize::AnsiA, SheetSize::AnsiB, SheetSize::AnsiC, SheetSize::AnsiD, SheetSize::AnsiE];
+    pub const STANDARD: [SheetSize; 11] = [SheetSize::A4, SheetSize::A3, SheetSize::A2, SheetSize::A1, SheetSize::A0, SheetSize::AnsiA, SheetSize::AnsiAPortrait, SheetSize::AnsiB, SheetSize::AnsiC, SheetSize::AnsiD, SheetSize::AnsiE];
 
     /// Size designation for title blocks ("A3", "B", "Custom").
     pub fn label(self) -> &'static str {
@@ -53,7 +56,7 @@ impl SheetSize {
             SheetSize::A2 => "A2",
             SheetSize::A1 => "A1",
             SheetSize::A0 => "A0",
-            SheetSize::AnsiA => "A",
+            SheetSize::AnsiA | SheetSize::AnsiAPortrait => "A",
             SheetSize::AnsiB => "B",
             SheetSize::AnsiC => "C",
             SheetSize::AnsiD => "D",
@@ -64,7 +67,7 @@ impl SheetSize {
 
     /// ANSI (inch) sheet sizes.
     pub fn is_ansi(self) -> bool {
-        matches!(self, SheetSize::AnsiA | SheetSize::AnsiB | SheetSize::AnsiC | SheetSize::AnsiD | SheetSize::AnsiE)
+        matches!(self, SheetSize::AnsiA | SheetSize::AnsiAPortrait | SheetSize::AnsiB | SheetSize::AnsiC | SheetSize::AnsiD | SheetSize::AnsiE)
     }
 }
 
@@ -263,6 +266,17 @@ pub struct DrawingView {
     /// without its parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_frame: Option<[[f64; 3]; 2]>,
+    /// Tangent edges drawn as phantom lines (View properties › Tangent
+    /// edges › Phantom); `show_tangent_edges` off = Hidden.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tangent_phantom: bool,
+    /// View properties › Name (None: the orientation, e.g. "Front").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// View properties › Scale label (None: shown with the view label when
+    /// the view has its own scale).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale_label: Option<bool>,
 }
 
 impl Default for DrawingView {
@@ -283,6 +297,9 @@ impl Default for DrawingView {
             partial: false,
             broken_out: Vec::new(),
             custom_frame: None,
+            tangent_phantom: false,
+            name: None,
+            scale_label: None,
         }
     }
 }
@@ -1251,6 +1268,8 @@ impl Drawing {
 }
 
 pub mod build;
+pub mod clipboard;
+pub mod create;
 pub mod export;
 pub mod font;
 pub mod format;

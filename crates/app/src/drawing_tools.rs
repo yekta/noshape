@@ -3,7 +3,6 @@
 
 use crate::drawing_scene::Overlay;
 use crate::drawing_view::*;
-use gpui_kit::component::menu::PopupMenu;
 use gpui_kit::*;
 use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::views::{self, EdgeGeom, SnapKind};
@@ -111,6 +110,10 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.take().is_some() {
+            cx.notify();
+            return;
+        }
         if self.panel.is_some() {
             self.panel = None;
             cx.notify();
@@ -414,7 +417,10 @@ impl DrawingEditor {
         }
         match &self.tool {
             Tool::InsertView { source, orientation, part } => {
-                Some(mk(ViewKind::Base { source: *source, config: Default::default(), orientation: *orientation, part: part.clone() }, c, None))
+                let mut v = mk(ViewKind::Base { source: *source, config: Default::default(), orientation: *orientation, part: part.clone() }, c, None);
+                // Insert view panel › View scale (None: the sheet scale).
+                v.scale = self.insert.scale;
+                Some(v)
             }
             Tool::Projected { parent: Some(pid) } => {
                 let parent = sheet.view(*pid)?;
@@ -753,6 +759,12 @@ impl DrawingEditor {
             self.menu = None;
             cx.notify();
         }
+        if e.button == MouseButton::Left && self.rotate_to_edge.is_some() && self.rotate_to_edge_click(cx) {
+            return;
+        }
+        if e.button == MouseButton::Left && self.align_views.is_some() && self.align_views_click(cx) {
+            return;
+        }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
             self.double_click(window, cx);
             return;
@@ -1046,8 +1058,9 @@ impl DrawingEditor {
             }
             Some(PickTarget::Table(id)) => self.open_cell_panel(id, window, cx),
             Some(t) => {
+                // Onshape: double-clicking a view opens View properties.
                 if let Some(v) = t.view() {
-                    self.open_scale_panel(Some(v), window, cx);
+                    self.open_view_props(v, window, cx);
                 }
             }
             None => {}
@@ -1070,49 +1083,18 @@ impl DrawingEditor {
         }
         let entries = self.context_entries(sel, cx);
         let ed = cx.entity();
-        let menu = PopupMenu::build(window, cx, move |m, window, cx| fill_menu(m, &entries, &ed, window, cx));
-        let sub = cx.subscribe_in(&menu, window, |this: &mut Self, _, _: &DismissEvent, _, cx| {
-            this.menu = None;
-            cx.notify();
-        });
-        menu.read(cx).focus_handle(cx).focus(window, cx);
-        self.menu = Some((menu, position, sub));
+        // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+        if !menu.read(cx).is_empty() {
+            crate::os_menu::open(position, menu, window, cx);
+        }
         cx.notify();
     }
 
     fn context_entries(&self, sel: Option<Sel>, cx: &App) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         match sel {
-            Some(Sel::View(id)) => {
-                let Some(v) = self.drawing.sheets[self.sheet].view(id).cloned() else { return out };
-                out.push(MenuEntry::item("Projected view", move |t, _, cx| t.set_tool(Tool::Projected { parent: Some(id) }, cx)));
-                out.push(MenuEntry::item("Section view", move |t, _, cx| t.set_tool(Tool::Section { parent: Some(id), p0: None, line: None, partial: false }, cx)));
-                out.push(MenuEntry::item("Detail view", move |t, _, cx| t.set_tool(Tool::Detail { parent: Some(id), center: None, radius: None }, cx)));
-                out.push(MenuEntry::item("Auxiliary view", move |t, _, cx| t.set_tool(Tool::Auxiliary { parent: None }, cx)));
-                out.push(MenuEntry::Separator);
-                let hidden = v.style == RenderStyle::HiddenLinesVisible;
-                out.push(MenuEntry::check("Show hidden lines", hidden, move |t, _, cx| {
-                    t.edit_view("Hidden lines", id, cx, |v| v.style = if hidden { RenderStyle::HiddenLinesRemoved } else { RenderStyle::HiddenLinesVisible })
-                }));
-                let tangent = v.show_tangent_edges;
-                out.push(MenuEntry::check("Show tangent edges", tangent, move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| v.show_tangent_edges = !tangent)));
-                let cl = v.show_centerlines;
-                out.push(MenuEntry::check("Automatic centermarks", cl, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| v.show_centerlines = !cl)));
-                let mut scales = vec![MenuEntry::check("Parent / sheet scale", v.scale.is_none(), move |t, _, cx| t.edit_view("View scale", id, cx, |v| v.scale = None))];
-                for s in [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0] {
-                    scales.push(MenuEntry::check(noshape_model::drawing::sheet::format_scale(s), v.scale == Some(s), move |t, _, cx| t.edit_view("View scale", id, cx, |v| v.scale = Some(s))));
-                }
-                scales.push(MenuEntry::item("Custom…", move |t, w, cx| t.open_scale_panel(Some(id), w, cx)));
-                out.push(MenuEntry::Submenu("Scale".into(), scales));
-                out.push(MenuEntry::item("View label…", move |t, w, cx| t.open_label_panel(id, w, cx)));
-                out.extend(self.view_extra_entries(id, cx));
-                out.extend(self.view_more_entries(id));
-                out.push(MenuEntry::Separator);
-                out.push(MenuEntry::item("Delete view", move |t, _, cx| {
-                    t.selection.clear();
-                    t.edit_sheet("Delete view", cx, |s| s.remove_view(id));
-                }));
-            }
+            Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::Annotation(id)) => {
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 if let Some(a) = &a {

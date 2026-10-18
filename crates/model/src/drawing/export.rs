@@ -97,8 +97,8 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
     pair(&mut s, 2, "TABLES");
     pair(&mut s, 0, "TABLE");
     pair(&mut s, 2, "LTYPE");
-    pair(&mut s, 70, "3");
-    for (name, pattern) in [("CONTINUOUS", &[][..]), ("HIDDEN", &[3.0, -1.5][..]), ("CENTER", &[8.0, -1.5, 1.5, -1.5][..])] {
+    pair(&mut s, 70, "4");
+    for (name, pattern) in [("CONTINUOUS", &[][..]), ("HIDDEN", &[3.0, -1.5][..]), ("CENTER", &[8.0, -1.5, 1.5, -1.5][..]), ("PHANTOM", &[8.0, -1.5, 1.5, -1.5, 1.5, -1.5][..])] {
         pair(&mut s, 0, "LTYPE");
         pair(&mut s, 2, name);
         pair(&mut s, 70, "0");
@@ -116,6 +116,7 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
         LineStyle::Visible,
         LineStyle::Hidden,
         LineStyle::Tangent,
+        LineStyle::Phantom,
         LineStyle::Centerline,
         LineStyle::Thin,
         LineStyle::Border,
@@ -132,6 +133,7 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
         let lt = match st {
             LineStyle::Hidden => "HIDDEN",
             LineStyle::Centerline | LineStyle::Section => "CENTER",
+            LineStyle::Phantom => "PHANTOM",
             _ => "CONTINUOUS",
         };
         pair(&mut s, 6, lt);

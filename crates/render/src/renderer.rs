@@ -436,7 +436,7 @@ fn outside_frustum((lo, hi): (Vec3, Vec3), mvp: &Mat4, (mx, my): (f32, f32)) -> 
     l || r || b || t
 }
 
-fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, pick: bool) {
+fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, pick: bool, section: bool) {
     let draw = |pass: &mut wgpu::RenderPass, list: &[usize], pipeline: &wgpu::RenderPipeline| {
         if list.is_empty() {
             return;
@@ -475,7 +475,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines, &pipelines.line_pick);
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
-        draw(pass, &lists.opaque, &pipelines.mesh_opaque);
+        draw(pass, &lists.opaque, if section { &pipelines.mesh_section } else { &pipelines.mesh_opaque });
         draw(pass, &lists.transparent, &pipelines.mesh_transparent);
         draw(pass, &lists.lines, &pipelines.line);
         draw(pass, &lists.points, &pipelines.point);
@@ -554,6 +554,8 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
 struct Pipelines {
     background: wgpu::RenderPipeline,
     mesh_opaque: wgpu::RenderPipeline,
+    /// Opaque meshes while a section view cuts: draws the caps.
+    mesh_section: wgpu::RenderPipeline,
     mesh_transparent: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
     point: wgpu::RenderPipeline,
@@ -845,6 +847,7 @@ impl Renderer {
         let pipelines = Pipelines {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            mesh_section: make(P { label: "mesh-section", vs: "vs_mesh", fs: "fs_mesh_section", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, ge)), bias: none, samples: msaa }),
             line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
             point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
@@ -939,7 +942,7 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32, inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1), inst.pickable as u32, inst.pick_base],
                 _pad: [0.0; 24],
             };
             let off = i * INST_STRIDE as usize;
@@ -1073,7 +1076,7 @@ impl Renderer {
             pass.set_bind_group(1, bind_inst, &[0]);
             pass.set_pipeline(&pipelines.background);
             pass.draw(0..3, 0..1);
-            draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, bind_inst, false);
+            draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, bind_inst, false, req.scene.clip.is_some());
         }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: &tex.resolve, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
@@ -1143,7 +1146,7 @@ impl Renderer {
                     multiview_mask: None,
                 });
                 pass.set_bind_group(0, self.bind_pick.as_ref().expect("bind groups"), &[]);
-                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), true);
+                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), true, false);
             }
             self.lists = lists;
             self.targets.get_mut(&target).expect("target").pick_valid = true;

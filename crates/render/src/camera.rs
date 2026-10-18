@@ -86,7 +86,9 @@ impl Camera {
             StandardView::Right => (DVec3::NEG_X, DVec3::Z),
             StandardView::Top => (DVec3::NEG_Z, DVec3::Y),
             StandardView::Bottom => (DVec3::Z, DVec3::NEG_Y),
-            StandardView::Isometric => (DVec3::new(-1.0, 1.0, -1.0).normalize(), DVec3::Z),
+            // Onshape's isometric (measured live): the camera sits 30° to the
+            // right of the front view and 30° above the ground plane.
+            StandardView::Isometric => (DVec3::new(-0.4330127, 0.75, -0.5).normalize(), DVec3::Z),
             StandardView::Dimetric => (DVec3::new(-1.0, 1.0, -0.5).normalize(), DVec3::Z),
             StandardView::Trimetric => (DVec3::new(-0.8, 1.0, -0.6).normalize(), DVec3::Z),
         };

@@ -83,6 +83,20 @@ impl Render for InstanceDrag {
     }
 }
 
+/// Mate feature row being dragged in the list (reorder).
+#[derive(Clone)]
+pub(crate) struct MateDrag {
+    pub id: MateId,
+    pub label: SharedString,
+}
+
+impl Render for MateDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.label.clone())
+    }
+}
+
 /// Section view state.
 pub(crate) struct AsmSection {
     pub label: String,
@@ -139,6 +153,17 @@ pub(crate) struct AsmUi {
     pub insert_search_sub: Option<Subscription>,
     pub insert_source: u8,
     pub insert_tab: u8,
+    /// Part Studios tab type filters (Onshape's filter icons): show parts,
+    /// show surfaces (both off: everything).
+    pub insert_filter: (bool, bool),
+    /// Instances inserted since the Insert dialog opened ("Inserted: N";
+    /// undone ones drop out) and the Part Studios collapsed in its tree.
+    pub insert_inserted: Vec<InstanceId>,
+    pub insert_collapsed: HashSet<TabId>,
+    /// Triad handle clicked (selected): right-clicking it opens its menu.
+    pub manip_selected: Option<ManipHandle>,
+    /// Grab offset while the floating mate toolbar is dragged.
+    pub hud_grab: Arc<Mutex<Point<Pixels>>>,
     /// Snap-insert: (source connector on the inserted instance, target), and
     /// which of the instance's explicit mate connectors is the source.
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
@@ -166,6 +191,11 @@ pub(crate) struct AsmUi {
     /// Select other (`): instances under the cursor (nearest first), the
     /// chosen one and where the list opens (viewport-local).
     pub select_other: Option<(Vec<InstanceId>, usize, DVec2)>,
+    /// Standard content tab of the Insert dialog and its edit dialog.
+    pub std: StdUi,
+    /// Isolate / Make transparent › Expand: (by connectivity, steps, the
+    /// instances isolated before expanding).
+    pub iso_expand: Option<(bool, usize, Vec<InstanceId>)>,
 }
 
 impl AssemblyView {
@@ -253,6 +283,7 @@ impl AssemblyView {
             cx.notify();
             return;
         }
+        self.ui.iso_expand = None;
         let set = if transparent { &mut self.ui.transparent } else { &mut self.isolate };
         match set {
             Some(s) => s.extend(ids),
@@ -268,6 +299,7 @@ impl AssemblyView {
     }
 
     pub(super) fn exit_isolate(&mut self, cx: &mut Context<Self>) -> bool {
+        self.ui.iso_expand = None;
         if self.isolate.take().is_none() && self.ui.transparent.take().is_none() {
             return false;
         }
@@ -285,6 +317,7 @@ impl AssemblyView {
         } else {
             return None;
         };
+        let (connectivity, expand_steps) = self.ui.iso_expand.as_ref().map(|e| (e.0, e.1)).unwrap_or((false, 0));
         Some(
             h_flex()
                 .id("asm-isolate-panel")
@@ -307,6 +340,13 @@ impl AssemblyView {
                 .child(Button::new("asm-iso-less").label("−").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.step_transparency(0.1, cx))))
                 .child(div().w(px(34.)).text_center().text_color(pal.text).child(format!("{:.0}%", (1.0 - self.ui.transparency.unwrap_or(if title == "Isolate" { 0.12 } else { 0.35 })) * 100.0)))
                 .child(Button::new("asm-iso-more").label("+").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.step_transparency(-0.1, cx))))
+                // Component controls: Expand by distance / connectivity.
+                .child(div().text_color(pal.text_muted).child("Expand"))
+                .child(Button::new("asm-iso-dist").label("Distance").ghost().xsmall().selected(!connectivity).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(Some(false), 0, cx))))
+                .child(Button::new("asm-iso-conn").label("Connectivity").ghost().xsmall().selected(connectivity).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(Some(true), 0, cx))))
+                .child(Button::new("asm-iso-exp-less").label("−").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(None, -1, cx))))
+                .child(div().w(px(18.)).text_center().text_color(pal.text).child(format!("{expand_steps}")))
+                .child(Button::new("asm-iso-exp-more").label("+").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(None, 1, cx))))
                 .child(Button::new("asm-iso-exit").label(if title == "Isolate" { "Exit isolate" } else { "Close" }).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.exit_isolate(cx);
                 })))
@@ -332,6 +372,9 @@ impl AssemblyView {
     /// a (flip primary axis) / q (reorient secondary axis): the connector
     /// dragged in snap mode, else the open mate or mate connector dialog.
     pub(super) fn flip_or_reorient(&mut self, flip: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if flip && self.std_flip_placing(cx) {
+            return;
+        }
         if let Some(s) = &mut self.snap_drag
             && s.started
             && let Some(src) = s.sources.get_mut(s.source_ix)
@@ -357,6 +400,28 @@ impl AssemblyView {
             self.schedule_eval(window, cx);
             cx.notify();
         }
+    }
+
+    /// Onshape's instance warnings (Instances list): several fixed parts,
+    /// several fixed parts inside a subassembly, fastened to the origin
+    /// while the assembly has fixed parts.
+    pub(super) fn instance_warning(&self, id: InstanceId, cx: &App) -> Option<&'static str> {
+        let a = self.assembly(cx)?;
+        let inst = a.instance(id)?;
+        let fixed = a.fixed_instances();
+        if inst.fixed && fixed.len() > 1 {
+            return Some("More than one part is fixed");
+        }
+        if let InstanceSource::Assembly { assembly } = &inst.source
+            && let Some(TabContent::Assembly(sub)) = self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content)
+            && sub.fixed_instances().len() > 1
+        {
+            return Some("More than one part inside is fixed");
+        }
+        let to_origin = a.mates.iter().any(|m| {
+            !m.suppressed && m.mate_type == MateType::Fastened && ((m.a.instance == id && m.b.is_origin()) || (m.b.instance == id && m.a.is_origin()))
+        });
+        (to_origin && !fixed.is_empty()).then_some("Fastened to origin even though Assembly has fixed part(s)")
     }
 
     // ------------------------------------------------------------ fix
@@ -422,7 +487,7 @@ impl AssemblyView {
         let valid = clip.instances.iter().all(|i| match &i.source {
             InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } => doc.tab(*studio).is_some(),
             InstanceSource::Assembly { assembly } => doc.tab(*assembly).is_some() && !contains_assembly(&doc, *assembly, self.tab, 0),
-            InstanceSource::External { .. } => true,
+            InstanceSource::External { .. } | InstanceSource::Standard { .. } => true,
         });
         if !valid {
             self.message = Some((true, "The copied instances come from another document.".into()));
@@ -557,8 +622,9 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ context menus
 
-    /// Instance context menu, in Onshape's order (part / subassembly / rigid
-    /// Part Studio instance). `graphics`: opened in the graphics area.
+    /// Instance context menu, in Onshape's order: the Instances list row
+    /// menu, or (`graphics`) the menu of the selected instances in the
+    /// graphics area (live Onshape, 2026-10-18).
     pub(super) fn instance_menu(&self, top: InstanceId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
         let Some(asm) = self.assembly(cx) else { return vec![] };
         let Some(inst) = asm.instance(top).cloned() else { return vec![] };
@@ -567,6 +633,7 @@ impl AssemblyView {
         let (fixed, hidden, suppressed) = (inst.fixed, inst.hidden, inst.suppressed);
         let is_asm = matches!(inst.source, InstanceSource::Assembly { .. });
         let isolating = self.isolate.is_some() || self.ui.transparent.is_some();
+        let name = inst.name.clone();
         let mut m: Vec<MenuEntry> = Vec::new();
         if isolating {
             m.push(item("Exit isolate", |t, _, cx| {
@@ -574,6 +641,7 @@ impl AssemblyView {
             }));
             m.push(MenuEntry::Sep);
         }
+        // Visibility group.
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
         let tg = targets.clone();
@@ -583,8 +651,12 @@ impl AssemblyView {
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
         let tg = targets.clone();
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
+        if graphics {
+            m.push(icon_item("Section view…", "section-view-3d", |t, w, cx| t.toggle_section(w, cx)));
+        }
         let tg = targets.clone();
-        m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
+        let sup = if suppressed { "Unsuppress" } else { "Suppress" };
+        m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
         let tg = targets.clone();
         m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
         if is_asm || multi {
@@ -594,61 +666,88 @@ impl AssemblyView {
                 t.run_interference(cx);
             }));
         }
-        m.push(MenuEntry::Sep);
-        if !multi {
-            m.push(icon_item("Add mate connector to instance origin…", "mate-connector-assembly", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
-        }
-        m.push(item(if multi { format!("Replace {} instances…", targets.len()) } else { "Replace instances…".to_string() }, move |t, _, cx| t.open_replace(top, cx)));
-        let switch_tab = match &inst.source {
-            InstanceSource::Assembly { assembly } => Some(*assembly),
-            other => other.studio(),
-        };
-        if let Some(tab) = switch_tab.filter(|_| !multi)
-            && let Some(name) = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())
-        {
-            m.push(icon_item(format!("Switch to {name}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
-        }
-        if let (false, InstanceSource::Assembly { assembly }) = (multi, &inst.source) {
-            // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
-            let names: Vec<String> = match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
-                Some(TabContent::Assembly(a)) => a.named_positions.iter().map(|n| n.name.clone()).collect(),
-                _ => vec![],
-            };
-            let cur = inst.lock.clone();
-            let mut children = vec![MenuEntry::Item {
-                label: if cur == SubassemblyLock::Current { "✓ Lock current position".into() } else { "Lock current position".into() },
-                icon: None,
-                disabled: false,
-                act: Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.set_sub_lock(top, SubassemblyLock::Current, cx)),
-            }];
-            for n in names {
-                let on = cur == SubassemblyLock::Named(n.clone());
-                let n2 = n.clone();
-                children.push(item(if on { format!("✓ {n}") } else { n }, move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Named(n2.clone()), cx)));
-            }
-            if !cur.is_flexible() {
-                children.push(MenuEntry::Sep);
-                children.push(item("Unlock", move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Flexible, cx)));
-            }
-            m.push(MenuEntry::Sub { label: "Lock/follow position to".into(), children });
-        }
-        if !multi && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
-            m.push(item("Change configuration…", move |t, w, cx| t.open_config(top, w, cx)));
-            let same = inst.source.clone();
-            m.push(item("Select instances with same part and same configuration", move |t, _, cx| {
-                let ids: Vec<InstanceId> = t.assembly(cx).map(|a| a.instances.iter().filter(|i| i.source == same).map(|i| i.id).collect()).unwrap_or_default();
-                t.selected = ids;
-                t.ui.scroll_to_selection = true;
+        // Show mates (instances with mates).
+        let mated = asm.mates.iter().any(|mt| mt.instances().contains(&top));
+        if mated {
+            m.push(item("Show mates", move |t, _, cx| {
+                t.show_mates_mode = true;
+                t.mates_pinned = Some(top);
+                t.update_capture(cx);
                 t.refresh_scene(false, cx);
             }));
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
-        let copy_label = if multi { format!("Copy {} items", targets.len()) } else { format!("Copy {}", inst.name) };
-        m.push(icon_item(copy_label, "copy", move |t, _, cx| {
+        let copy_label = if multi { format!("Copy {} items", targets.len()) } else { format!("Copy {name}") };
+        let copy = icon_item(copy_label, "copy", move |t, _, cx| {
             t.selected = tg.clone();
             t.copy_selection(cx);
-        }));
+        });
+        let drawing = self.instance_drawing_entry(&inst, multi);
+        let tg = targets.clone();
+        let export = icon_item("Export…", "export", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx));
+        // Edit group: mate connector, replace, switch to the source.
+        let mut edit: Vec<MenuEntry> = Vec::new();
+        if graphics {
+            edit.push(item("Find in instance list", move |t, _, cx| {
+                t.selected = vec![top];
+                t.ui.scroll_to_selection = true;
+                t.refresh_scene(false, cx);
+            }));
+        }
+        if !multi {
+            edit.push(icon_item("Add mate connector to instance origin…", "mate-connector-assembly", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
+        }
+        edit.push(icon_item(
+            match (graphics, multi) {
+                (_, true) => format!("Replace {} instances…", targets.len()),
+                (true, false) => format!("Replace {name}…"),
+                (false, false) => "Replace instances…".to_string(),
+            },
+            "replace-part",
+            move |t, _, cx| t.open_replace(top, cx),
+        ));
+        let switch_tab = match &inst.source {
+            InstanceSource::Assembly { assembly } => Some(*assembly),
+            other => other.studio(),
+        };
+        if let Some(tab) = switch_tab.filter(|_| !multi)
+            && let Some(tname) = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())
+        {
+            edit.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+        }
+        edit.extend(self.instance_source_entries(&inst, multi, cx));
+        if graphics {
+            m.push(copy);
+            m.push(MenuEntry::Sep);
+            m.extend(drawing);
+            let tab = self.tab;
+            let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+            m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
+                let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+                crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
+            }));
+            m.push(export);
+            m.push(MenuEntry::Sep);
+            m.extend(edit);
+            m.push(MenuEntry::Sep);
+            m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
+            m.push(MenuEntry::Sep);
+            m.push(icon_item("Zoom to fit", "zoom-fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+            let tg = targets.clone();
+            m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
+            if let Some((forward, up)) = self.hovered_face_normal(cx) {
+                m.push(icon_item("View normal to", "normal", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
+            }
+            m.push(MenuEntry::Sep);
+            let tg = targets;
+            m.push(icon_item(if multi { "Delete".to_string() } else { format!("Delete {name}") }, "delete", move |t, _, cx| t.delete_instances(tg.clone(), cx)));
+            return m;
+        }
+        m.push(MenuEntry::Sep);
+        m.extend(edit);
+        m.push(MenuEntry::Sep);
+        m.push(copy);
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
         m.push(item("Move to new subassembly", move |t, _, cx| t.move_to_new_subassembly(tg.clone(), cx)));
@@ -656,22 +755,12 @@ impl AssemblyView {
             let tg: Vec<InstanceId> = targets.iter().copied().filter(|id| asm.instance(*id).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { .. }))).collect();
             m.push(item("Dissolve subassembly", move |t, _, cx| t.dissolve_subassemblies(tg.clone(), cx)));
         }
+        m.push(export);
         m.push(MenuEntry::Sep);
-        if graphics {
-            m.push(item("Show mates", move |t, _, cx| {
-                t.show_mates_mode = true;
-                t.mates_pinned = Some(top);
-                t.update_capture(cx);
-                t.refresh_scene(false, cx);
-            }));
-            m.push(item("Go to item in list", move |t, _, cx| {
-                t.selected = vec![top];
-                t.ui.scroll_to_selection = true;
-                t.refresh_scene(false, cx);
-            }));
-        }
         let tg = targets.clone();
         m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
+        m.push(MenuEntry::Sep);
+        m.extend(drawing);
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
         m.push(icon_item("Add selection to folder…", "folder", move |t, w, cx| t.folder_from_instances(tg.clone(), w, cx)));
@@ -697,13 +786,93 @@ impl AssemblyView {
                     item("Collapse all", |t, _, cx| t.expand_all(false, cx)),
                 ],
             });
-            m.push(MenuEntry::Sep);
         }
         m.push(item("Create empty subassembly", |t, _, cx| t.create_empty_subassembly(cx)));
         m.push(MenuEntry::Sep);
         let tg = targets;
         m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_instances(tg.clone(), cx)));
         m
+    }
+
+    /// "Create Drawing of <part>…" for the part (or subassembly) an instance shows.
+    fn instance_drawing_entry(&self, inst: &Instance, multi: bool) -> Option<MenuEntry> {
+        let (tab, part, config) = match &inst.source {
+            InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
+            InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
+            InstanceSource::Assembly { assembly } => (*assembly, None, ConfigValues::default()),
+            _ => return None,
+        };
+        if multi {
+            return None;
+        }
+        // The part's own name (the instance name without " <n>").
+        let base = inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or_else(|| inst.name.clone());
+        Some(icon_item(format!("Create Drawing of {base}…"), "drawing", move |_, w, cx| {
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone() });
+            crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(base.clone()) }, w, cx);
+        }))
+    }
+
+    /// Source-specific instance entries: Lock/follow position (subassemblies),
+    /// Edit standard content, Change configuration, Select instances with the
+    /// same part and configuration.
+    fn instance_source_entries(&self, inst: &Instance, multi: bool, cx: &App) -> Vec<MenuEntry> {
+        let mut m = Vec::new();
+        let top = inst.id;
+        if let (false, InstanceSource::Assembly { assembly }) = (multi, &inst.source) {
+            // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
+            let names: Vec<String> = match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
+                Some(TabContent::Assembly(a)) => a.named_positions.iter().map(|n| n.name.clone()).collect(),
+                _ => vec![],
+            };
+            let cur = inst.lock.clone();
+            let mut children = vec![MenuEntry::Item {
+                label: if cur == SubassemblyLock::Current { "✓ Lock current position".into() } else { "Lock current position".into() },
+                icon: None,
+                disabled: false,
+                act: Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.set_sub_lock(top, SubassemblyLock::Current, cx)),
+            }];
+            for n in names {
+                let on = cur == SubassemblyLock::Named(n.clone());
+                let n2 = n.clone();
+                children.push(item(if on { format!("✓ {n}") } else { n }, move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Named(n2.clone()), cx)));
+            }
+            if !cur.is_flexible() {
+                children.push(MenuEntry::Sep);
+                children.push(item("Unlock", move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Flexible, cx)));
+            }
+            m.push(MenuEntry::Sub { label: "Lock/follow position to".into(), children });
+        }
+        if matches!(inst.source, InstanceSource::Standard { .. }) {
+            m.push(icon_item("Edit standard content instance…", "standard-content", move |t, _, cx| t.edit_standard_instance(top, cx)));
+        }
+        if !multi && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Standard { .. }) {
+            // Change configuration: only for configured Part Studios.
+            let configured = inst.source.studio().and_then(|s| self.doc.read(cx).session.doc.tab(s)).is_some_and(|t| matches!(&t.content, TabContent::PartStudio(ps) if !ps.configuration.inputs.is_empty()));
+            if configured && !matches!(inst.source, InstanceSource::Standard { .. }) {
+                m.push(item("Change configuration…", move |t, w, cx| t.open_config(top, w, cx)));
+            }
+            let same = inst.source.clone();
+            m.push(item("Select instances with same part and same configuration", move |t, _, cx| {
+                let ids: Vec<InstanceId> = t.assembly(cx).map(|a| a.instances.iter().filter(|i| i.source == same).map(|i| i.id).collect()).unwrap_or_default();
+                t.selected = ids;
+                t.ui.scroll_to_selection = true;
+                t.refresh_scene(false, cx);
+            }));
+        }
+        m
+    }
+
+    /// View normal to: camera direction into the hovered planar face (and an up vector).
+    fn hovered_face_normal(&self, cx: &App) -> Option<(DVec3, DVec3)> {
+        let t = self.hover.as_ref().filter(|t| t.kind == PickKind::Face)?;
+        let o = self.result.occurrences.get(t.occ)?;
+        let r = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
+        let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &r, &self.units(cx))?;
+        let w = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
+        let n = w.z();
+        let up = if n.z.abs() > 0.99 { DVec3::Y } else { DVec3::Z };
+        Some((-n, up))
     }
 
     // ------------------------------------------------------------ folders
@@ -1072,23 +1241,34 @@ impl AssemblyView {
         self.selected = created;
     }
 
-    /// Top-level assembly row menu.
+    /// Top-level assembly row menu (Onshape: Rename, Show center of mass,
+    /// Check interference… | Create Drawing…, Add exploded view… | Export… |
+    /// Expand all, Collapse all).
     pub(super) fn assembly_menu(&self, cx: &App) -> Vec<MenuEntry> {
         let any_fixed = self.assembly(cx).is_some_and(|a| a.instances.iter().any(|i| i.fixed));
         let mut m = vec![
-            item("Rename", |t, w, cx| t.rename_tab(w, cx)),
-            item("Check interference…", |t, _, cx| {
+            icon_item("Rename", "rename", |t, w, cx| t.rename_tab(w, cx)),
+            icon_item("Check interference…", "interference", |t, _, cx| {
                 t.selected.clear();
                 t.run_interference(cx);
-            }),
-            item("Add exploded view…", |t, _, cx| {
-                t.panel = Some(SidePanel::Explode);
-                t.add_exploded_view(false, cx);
             }),
         ];
         if any_fixed {
             m.push(item("Unfix all", |t, _, cx| t.unfix_all(cx)));
         }
+        m.push(MenuEntry::Sep);
+        let tab = self.tab;
+        let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        m.push(icon_item(format!("Create Drawing of {name}…"), "drawing", move |_, w, cx| {
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+            crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
+        }));
+        m.push(icon_item("Add exploded view…", "explode", |t, _, cx| {
+            t.panel = Some(SidePanel::Explode);
+            t.add_exploded_view(false, cx);
+        }));
+        m.push(MenuEntry::Sep);
+        m.push(icon_item("Export…", "export", |t, w, cx| t.open_asm_export(None, w, cx)));
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));
         m.push(item("Collapse all", |t, _, cx| t.expand_all(false, cx)));
@@ -1108,9 +1288,17 @@ impl AssemblyView {
             }));
             m.push(MenuEntry::Sep);
         }
-        m.push(item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
+        // Onshape: Rename, Edit… | Reset | Hide, Hide other mates, Hide all
+        // mates (hidden: Show, Show all mates), Isolate…, Make transparent…,
+        // Suppress | Animate… | Add selection to folder… | Delete.
+        m.push(icon_item("Rename", "rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
         m.push(icon_item("Edit…", "edit", move |t, w, cx| t.edit_mate(id, w, cx)));
+        let movable = mate.as_ref().is_some_and(|mt| mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width));
         if let Some(mt) = &mate {
+            m.push(MenuEntry::Sep);
+            if movable {
+                m.push(item("Reset", move |t, _, cx| t.reset_mate(id, cx)));
+            }
             let keys: Vec<&'static str> = noshape_model::assembly::eval::limit_keys(mt.mate_type).iter().copied().filter(|k| *k != "cone" && mt.limits.iter().any(|(x, _)| x == k)).collect();
             if !keys.is_empty() {
                 let mut children = Vec::new();
@@ -1126,30 +1314,37 @@ impl AssemblyView {
                 }
                 m.push(MenuEntry::Sub { label: "Apply limit position".into(), children });
             }
-            if mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width) {
-                m.push(item("Reset", move |t, _, cx| t.reset_mate(id, cx)));
-                m.push(icon_item(format!("Animate {}…", mt.name), "animate", move |t, w, cx| {
-                    t.selected_mate = Some(id);
-                    t.start_animation(w, cx);
+            m.push(MenuEntry::Sep);
+            let hidden = mt.hidden || !self.show_mates;
+            if hidden {
+                m.push(icon_item("Show", "eye", move |t, _, cx| t.set_mates_hidden(vec![id], false, cx)));
+                m.push(item("Show all mates", |t, _, cx| t.show_all_mates(cx)));
+            } else {
+                m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(vec![id], true, cx)));
+                m.push(item("Hide other mates", move |t, _, cx| {
+                    t.edit("Hide other mates", cx, |a| a.hide_other_mates(&[id]));
+                    t.refresh_scene(false, cx);
+                }));
+                m.push(item("Hide all mates", |t, _, cx| {
+                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+                    t.set_mates_hidden(ids, true, cx);
                 }));
             }
-            let hidden = mt.hidden || !self.show_mates;
-            m.push(MenuEntry::Sep);
-            m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_mates_hidden(vec![id], !hidden, cx)));
-            m.push(item("Show all mates", |t, _, cx| t.show_all_mates(cx)));
         }
         let ids = self.mate_instances(id, cx);
         let ids2 = ids.clone();
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, ids.clone(), cx)));
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
-        m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
+        m.push(icon_item(if suppressed { "Unsuppress" } else { "Suppress" }, "suppress", move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
+        if movable {
+            m.push(MenuEntry::Sep);
+            m.push(icon_item("Animate…", "animate", move |t, w, cx| {
+                t.selected_mate = Some(id);
+                t.start_animation(w, cx);
+            }));
+        }
         m.push(MenuEntry::Sep);
         m.push(icon_item("Add selection to folder…", "folder", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
-        m.push(item("Clear selection", |t, _, cx| {
-            t.selected.clear();
-            t.selected_mate = None;
-            t.refresh_scene(false, cx);
-        }));
         m.push(MenuEntry::Sep);
         m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
         m
@@ -1192,7 +1387,7 @@ impl AssemblyView {
         let entries = match top {
             Some(t) => self.instance_menu(t, true, cx),
             None => {
-                let any_hidden = self.assembly(cx).is_some_and(|a| a.instances.iter().any(|i| i.hidden));
+                // Onshape: Show all | Create Drawing of <assembly>… | Zoom to fit, Isometric.
                 let mut m = Vec::new();
                 if self.isolate.is_some() || self.ui.transparent.is_some() {
                     m.push(item("Exit isolate", |t, _, cx| {
@@ -1200,11 +1395,17 @@ impl AssemblyView {
                     }));
                     m.push(MenuEntry::Sep);
                 }
-                if any_hidden {
-                    m.push(item("Show all", |t, _, cx| t.show_hidden(cx)));
-                }
-                m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
-                m.push(item("Isometric", |t, _, cx| t.view(StandardView::Isometric, cx)));
+                m.push(item("Show all", |t, _, cx| t.show_hidden(cx)));
+                m.push(MenuEntry::Sep);
+                let tab = self.tab;
+                let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+                m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
+                    let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+                    crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
+                }));
+                m.push(MenuEntry::Sep);
+                m.push(icon_item("Zoom to fit", "zoom-fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+                m.push(icon_item("Isometric", "iso-view", |t, _, cx| t.view(StandardView::Isometric, cx)));
                 if !self.selected.is_empty() || self.selected_mate.is_some() {
                     m.push(item("Clear selection", |t, _, cx| {
                         t.selected.clear();
@@ -1316,7 +1517,7 @@ impl AssemblyView {
         if self.ui.filter_input.is_some() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name or type"));
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name"));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 this.ui.filter = ListFilter::parse(&st.read(cx).value());
@@ -1325,7 +1526,7 @@ impl AssemblyView {
         });
         self.ui.filter_input = Some(st);
         self.ui.filter_sub = Some(sub);
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search by name"));
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search Part Studios"));
         self.ui.insert_search_sub = Some(cx.subscribe(&st, |_: &mut Self, _, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();
@@ -1341,8 +1542,42 @@ impl AssemblyView {
         } else {
             self.close_mate(window, cx);
             self.insert_open = true;
+            self.ui.insert_inserted.clear();
             cx.notify();
         }
+    }
+
+    /// "Inserted: N" of the Insert dialog: placed instances inserted since
+    /// it opened that still exist (Undo removes them).
+    pub(super) fn inserted_count(&self, cx: &App) -> usize {
+        let Some(a) = self.assembly(cx) else { return 0 };
+        let placing = self.placing.as_deref().unwrap_or(&[]);
+        self.ui.insert_inserted.iter().filter(|id| a.instance(**id).is_some() && !placing.contains(id)).count()
+    }
+
+    /// The Insert dialog's undo icon: undo the last insert (an instance
+    /// still following the cursor is dropped first).
+    pub(super) fn undo_last_insert(&mut self, cx: &mut Context<Self>) {
+        if self.inserted_count(cx) == 0 && self.placing.is_none() {
+            return;
+        }
+        // Inserting and placing are two undo steps: undo until the last
+        // inserted instance (or the one following the cursor) is gone.
+        let targets: Vec<InstanceId> = match self.placing.take() {
+            Some(ids) => {
+                self.placing_point = None;
+                self.message = None;
+                ids
+            }
+            None => self.assembly(cx).and_then(|a| self.ui.insert_inserted.iter().rev().find(|id| a.instance(**id).is_some()).copied()).into_iter().collect(),
+        };
+        for _ in 0..targets.len() + 2 {
+            self.doc.update(cx, |d, cx| d.undo(cx));
+            if self.assembly(cx).is_none_or(|a| targets.iter().all(|id| a.instance(*id).is_none())) {
+                break;
+            }
+        }
+        cx.notify();
     }
 
     /// Close the Insert dialog (checkmark / Esc): an instance still following
@@ -1353,6 +1588,10 @@ impl AssemblyView {
         }
         self.insert_open = false;
         self.ext_pick = None;
+        self.ui.std.auto_size = false;
+        self.ui.std.holes.clear();
+        self.ui.std.flip = false;
+        self.update_capture(cx);
         cx.notify();
     }
 
@@ -2365,7 +2604,8 @@ impl AssemblyView {
         if sources.is_empty() {
             return false;
         }
-        let src = sources[self.ui.place_src_ix % sources.len()].clone();
+        let mut src = sources[self.ui.place_src_ix % sources.len()].clone();
+        src.flip = self.ui.std.flip;
         let Some(dst) = self.snap_target(self.pointer, id, cx) else {
             self.ui.place_snap = None;
             return false;
@@ -2387,7 +2627,7 @@ impl AssemblyView {
 
     /// Ctrl while snap-inserting: the next explicit connector is the source.
     pub(super) fn cycle_insert_source(&mut self, cx: &mut Context<Self>) -> bool {
-        if self.placing.as_ref().is_none_or(|p| p.len() != 1) || self.snap.is_none() {
+        if self.placing.as_ref().is_none_or(|p| p.len() != 1) || (self.snap.is_none() && !self.placing.as_ref().is_some_and(|p| self.std_placing(p[0], cx))) {
             return false;
         }
         self.ui.place_src_ix += 1;
@@ -2548,6 +2788,37 @@ impl AssemblyView {
         Some(Self::panel_frame("Section view", body, cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_section(window, cx)), "asm-sec-close").into_any_element())
     }
 
+    /// Isolate / Make transparent › Expand: switch distance / connectivity
+    /// (back to no expansion) or add / remove steps.
+    pub(super) fn set_iso_expand(&mut self, connectivity: Option<bool>, delta: i32, cx: &mut Context<Self>) {
+        let transparent = self.isolate.is_none();
+        let Some(current) = (if transparent { self.ui.transparent.clone() } else { self.isolate.clone() }) else { return };
+        let (mut by_conn, mut steps, seeds) = self.ui.iso_expand.clone().unwrap_or_else(|| {
+            let mut seeds: Vec<InstanceId> = current.iter().copied().collect();
+            seeds.sort();
+            (false, 0, seeds)
+        });
+        if let Some(c) = connectivity {
+            by_conn = c;
+            steps = 0;
+        }
+        let Some(asm) = self.assembly(cx) else { return };
+        let order = analysis::isolate_expansion(&self.result, asm, &seeds, by_conn);
+        steps = (steps as i32 + delta).clamp(0, order.len() as i32) as usize;
+        let mut set: HashSet<InstanceId> = seeds.iter().copied().collect();
+        for s in order.iter().take(steps) {
+            set.extend(s.iter().copied());
+        }
+        if transparent {
+            self.ui.transparent = Some(set);
+        } else {
+            self.isolate = Some(set);
+        }
+        self.ui.iso_expand = Some((by_conn, steps, seeds));
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
     /// Isolate / Make transparent panel slider steps.
     pub(super) fn step_transparency(&mut self, delta: f32, cx: &mut Context<Self>) {
         let default = if self.isolate.is_some() { 0.12 } else { 0.35 };
@@ -2555,5 +2826,101 @@ impl AssemblyView {
         self.ui.transparency = Some(v);
         self.rebuild_scene(false, cx);
         cx.notify();
+    }
+}
+
+// ---------------------------------------------------------------- export
+
+impl AssemblyView {
+    /// Export… (instance menu: those instances; top-level row: the whole
+    /// assembly): choose a format, then where to save. Parts are written at
+    /// their assembly positions.
+    pub(super) fn open_asm_export(&mut self, ids: Option<Vec<InstanceId>>, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::part_studio::ExportFormat;
+        use gpui_kit::component::WindowExt as _;
+        use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
+        let view = cx.entity();
+        let chosen = Arc::new(Mutex::new(ExportFormat::Step));
+        let base = match ids.as_deref() {
+            Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
+            _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
+        };
+        let pal = p();
+        window.open_dialog(cx, move |dialog, _, _| {
+            let current = *chosen.lock();
+            let formats = ExportFormat::ALL.iter().map(|f| {
+                let (f, c) = (*f, chosen.clone());
+                Button::new(SharedString::from(format!("asm-exp-{}", f.ext()))).label(f.label()).xsmall().selected(f == current).on_click(move |_, window, _| {
+                    *c.lock() = f;
+                    window.refresh();
+                })
+            });
+            let (v, c, ids, base) = (view.clone(), chosen.clone(), ids.clone(), base.clone());
+            dialog
+                .title("Export")
+                .w(px(420.))
+                .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
+                .footer(
+                    DialogFooter::new()
+                        .gap_2()
+                        .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
+                        .child(DialogAction::new().child(Button::new("ok").label("Export").primary())),
+                )
+                .on_ok(move |_, window, cx| {
+                    let format = *c.lock();
+                    let (v, ids, name) = (v.clone(), ids.clone(), format!("{base}.{}", format.ext()));
+                    // After this dialog closes (an in-app save prompt is a dialog too).
+                    window.defer(cx, move |window, cx| {
+                        crate::files::request_save_path("Export", name, format.ext(), window, cx, move |path, cx| {
+                            v.update(cx, |this, cx| {
+                                let msg = match this.export_occurrences(format, &path, ids.as_deref()) {
+                                    Ok(n) => (false, format!("Exported {n} parts to {}", path.display())),
+                                    Err(e) => (true, format!("Export failed: {e:#}")),
+                                };
+                                this.message = Some(msg);
+                                cx.notify();
+                            });
+                        });
+                    });
+                    true
+                })
+        });
+    }
+
+    /// Write the visible parts of `ids` (None: every instance) at their
+    /// assembly positions. Returns the number of parts written.
+    pub(super) fn export_occurrences(&self, format: crate::part_studio::ExportFormat, path: &std::path::Path, ids: Option<&[InstanceId]>) -> anyhow::Result<usize> {
+        use crate::part_studio::ExportFormat;
+        use noshape_kernel as k;
+        let mut shapes: Vec<k::ExportShape> = Vec::new();
+        for o in &self.result.occurrences {
+            if o.hidden || ids.is_some_and(|ids| !ids.contains(&o.top())) {
+                continue;
+            }
+            let Some(b) = o.context.bodies.iter().find(|b| b.id == o.body) else { continue };
+            let shape = b.shape.transformed(&k::Transform::Matrix(o.transform))?;
+            let c = o.color;
+            shapes.push(k::ExportShape { shape, name: Some(o.instance_name.clone()), color: Some([c[0].powf(1.0 / 2.2), c[1].powf(1.0 / 2.2), c[2].powf(1.0 / 2.2)]) });
+        }
+        anyhow::ensure!(!shapes.is_empty(), "There are no parts to export");
+        let n = shapes.len();
+        match format {
+            ExportFormat::Step => k::write_step(path, &shapes, k::LengthUnit::Meter)?,
+            ExportFormat::Iges => k::write_iges(path, &shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
+            ExportFormat::Brep => k::write_brep(&k::Shape::compound(&shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>()), path)?,
+            ExportFormat::Stl | ExportFormat::Obj => {
+                // Mesh formats are unitless; millimeters (as the Part Studio export).
+                let c = k::Shape::compound(&shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>());
+                let mm = c.transformed(&k::Transform::Scale { center: DVec3::ZERO, factor: 1000.0 })?;
+                let diag = mm.bounding_box(false).map(|b| b.diagonal()).unwrap_or(100.0);
+                let defl = (diag * 2e-4).max(1e-3);
+                if format == ExportFormat::Stl {
+                    k::write_stl(&mm, path, defl, k::StlFormat::Binary)?;
+                } else {
+                    k::write_obj(&mm, path, defl)?;
+                }
+            }
+        }
+        Ok(n)
     }
 }

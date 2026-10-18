@@ -1,6 +1,6 @@
 #!/bin/bash
 $(dirname "$0")/fresh.sh
-export DISPLAY=:106
+export DISPLAY=${DISPLAY:-:103}
 S=$(dirname "$0")/shot.sh
 # two lines at an angle
 xdotool mousemove 800 600 click 1; sleep 0.3; xdotool mousemove 1000 600 click 1; sleep 0.3; xdotool mousemove 1100 450 click 1; sleep 0.3; xdotool key Escape Escape; sleep 0.5

@@ -38,8 +38,10 @@ pub struct Workspace {
     history: Option<Entity<HistoryPanel>>,
     /// Previously active tabs, most recent first (Ctrl+Space).
     recent: Vec<TabId>,
-    /// Tab manager (Alt+T): search box and its query.
-    tab_manager: Option<(Entity<gpui_kit::component::input::InputState>, Subscription, String)>,
+    /// Tab manager (Alt+T), docked left like Onshape's.
+    tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
+    /// Create Drawing dialog (see `drawing_create`).
+    create_drawing: Option<(Entity<crate::drawing_create::CreateDrawingDialog>, Subscription)>,
     _thumbnailer: Entity<crate::start_thumbnail::Thumbnailer>,
     _subs: Vec<Subscription>,
 }
@@ -64,7 +66,7 @@ impl Workspace {
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, _thumbnailer: thumbnailer, _subs: subs };
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, create_drawing: None, _thumbnailer: thumbnailer, _subs: subs };
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -130,6 +132,9 @@ impl Workspace {
             self.recent.truncate(16);
         }
         self.active = Some(tab);
+        if let Some((tm, _)) = &self.tab_manager {
+            tm.update(cx, |t, cx| t.set_active(Some(tab), cx));
+        }
         self.ensure_view(tab, window, cx);
         if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
             let fh = v.read(cx).focus_handle(cx);
@@ -211,16 +216,17 @@ impl Workspace {
                     .pr_2()
                     .gap(px(4.))
                     .child(
+                        // Onshape: the logo block is 139 px wide with 14 px left padding.
                         h_flex()
                             .flex_none()
-                            .pl(px(4.))
-                            .pr(px(5.))
-                            .gap(px(5.))
-                            .child(crate::assets::icon("noshape-logo", 22., cx))
-                            .child(div().text_size(px(19.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")),
+                            .w(px(139.))
+                            .pl(px(14.))
+                            .gap(px(6.))
+                            .child(crate::assets::icon("noshape-logo", 24., cx))
+                            .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().px(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).truncate().child(name))
+                    .child(div().flex_none().px(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().child(name))
                     .child(div().flex_none().ml(px(4.)).text_size(px(16.)).text_color(pal.text_faint).child(if read_only { "History".to_string() } else { branch_name }))
                     .when(read_only, |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
@@ -436,16 +442,17 @@ impl Workspace {
                 .p_0()
                 .rounded(px(0.))
         };
-        let list_tabs = tabs.clone();
-        let list_view = view.clone();
-        let tab_list = cell("tab-list", cx).w(px(crate::ui::RAIL_W)).child(Icon::new(IconName::Search).with_size(px(18.)).text_color(gpui_kit::rgb(0x555555))).tooltip("Tabs").dropdown_menu(move |mut menu, _, _| {
-            for (id, name, kind) in &list_tabs {
-                let (id, v) = (*id, list_view.clone());
-                menu = menu.item(PopupMenuItem::new(name.clone()).icon(Icon::empty().path(icon_path(tab_icon(kind)))).on_click(move |_, w, cx| v.update(cx, |t, cx| t.activate(id, w, cx))));
-            }
-            menu
-        });
-        let add = cell("add-tab", cx).w(px(34.)).child(Icon::new(IconName::Plus).with_size(px(18.)).text_color(gpui_kit::rgb(0x555555))).tooltip("Insert new tab").dropdown_menu(move |menu, _, _| {
+        // Onshape: the tab-search cell (continuing the left rail, `#fafafa`
+        // with a 1 px right border) opens the Tab manager (Alt+T).
+        let tab_list = cell("tab-list", cx)
+            .w(px(crate::ui::RAIL_W))
+            .bg(pal.rail)
+            .border_r_1()
+            .border_color(pal.border)
+            .child(crate::assets::icon("tab-search", 20., cx))
+            .tooltip("Tab manager (Alt+T)")
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_tab_manager(window, cx)));
+        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(0x555555))).tooltip("Insert new tab").dropdown_menu(move |menu, _, _| {
             let v1 = view.clone();
             let v2 = view.clone();
             let v3 = view.clone();
@@ -453,14 +460,15 @@ impl Workspace {
             let v5 = view.clone();
             menu.item(PopupMenuItem::new("Part Studio").icon(Icon::empty().path(icon_path("part-studio"))).on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
                 .item(PopupMenuItem::new("Assembly").icon(Icon::empty().path(icon_path("assembly"))).on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
-                .item(PopupMenuItem::new("Drawing").icon(Icon::empty().path(icon_path("drawing"))).on_click(move |_, w, cx| v3.update(cx, |t, cx| t.add_tab("drawing", w, cx))))
+                .item(PopupMenuItem::new("Create Drawing").icon(Icon::empty().path(icon_path("drawing"))).on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
                 .item(PopupMenuItem::new("Variable Studio").icon(Icon::empty().path(icon_path("variable-studio"))).on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
                 .item(PopupMenuItem::new("Feature Studio").icon(Icon::empty().path(icon_path("feature-studio"))).on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
         });
-        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().gap(px(2.)).overflow_x_scroll();
+        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(2.)).overflow_x_scroll();
         for (id, name, kind) in tabs {
             let active = self.active == Some(id);
             let view = cx.entity();
+            let tab_name = name.clone();
             strip = strip.child(
                 h_flex()
                     .id(SharedString::from(format!("tab-{id}")))
@@ -485,8 +493,20 @@ impl Workspace {
                     .context_menu(move |menu, _, _| {
                         let v1 = view.clone();
                         let v2 = view.clone();
-                        menu.item(PopupMenuItem::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))))
-                            .separator()
+                        let v3 = view.clone();
+                        let menu = menu.item(PopupMenuItem::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))));
+                        // Onshape: Part Studio and Assembly tabs offer "Create Drawing of <tab>…".
+                        let menu = if matches!(kind, "partstudio" | "assembly") {
+                            let n = tab_name.clone();
+                            menu.item(PopupMenuItem::new(format!("Create Drawing of {tab_name}…")).on_click(move |_, w, cx| {
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default() });
+                                let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
+                                v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
+                            }))
+                        } else {
+                            menu
+                        };
+                        menu.separator()
                             .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.delete_tab(id, cx))))
                     }),
             );
@@ -502,7 +522,7 @@ impl Workspace {
             .w(px(crate::ui::RAIL_W))
             .h_full()
             .flex_none()
-            .pt(px(4.))
+            .pt(px(1.))
             .gap(px(4.))
             .bg(pal.rail)
             .border_r_1()
@@ -515,12 +535,8 @@ impl Workspace {
             )
             .child(
                 crate::ui::rail_button("rail-version", "version", false, true, cx)
-                    .tooltip(crate::ui::tooltip("Create version"))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        if this.history.is_none() {
-                            this.toggle_history(window, cx);
-                        }
-                    })),
+                    .tooltip(crate::ui::tooltip("Create version…"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx))),
             )
             .into_any_element()
     }
@@ -593,111 +609,127 @@ impl Render for Workspace {
             }))
             // Alt+T: Tab manager (search and open tabs).
             .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))
+            .on_action(cx.listener(|this, _: &ActivateRequestedTab, window, cx| {
+                if let Some(t) = REQUESTED_TAB.lock().take() {
+                    this.activate(t, window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &CreateDrawing, window, cx| {
+                if let Some(req) = crate::drawing_create::take_request() {
+                    this.open_create_drawing(req, window, cx);
+                }
+            }))
             .child(title)
-            .children(self.render_tab_manager(cx))
             .child(
                 h_flex()
                     .flex_1()
                     .min_h_0()
                     .child(rail)
-                    .children(self.history.clone().map(|h| div().w(px(300.)).h_full().flex_none().border_r_1().border_color(pal.border).child(h)))
+                    // One left panel at a time: the Tab manager or Versions and history.
+                    .children(match &self.tab_manager {
+                        Some((tm, _)) => Some(tm.clone().into_any_element()),
+                        None => self.history.clone().map(|h| h.into_any_element()),
+                    }.map(|panel| div().w(px(crate::history_panel::PANEL_W)).h_full().flex_none().border_r_1().border_color(pal.border).child(panel)))
                     .child(div().flex_1().h_full().min_w_0().child(content)),
             )
             .child(tabs)
+            .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
+            // Onshape right-click menus opened with `os_context_menu`.
+            .children(crate::os_menu::render_host(cx))
+    }
+}
+
+/// Tab to activate, set by views that are not subscribed to by the
+/// workspace (e.g. a drawing view's "Switch to <Part Studio>").
+static REQUESTED_TAB: parking_lot::Mutex<Option<TabId>> = parking_lot::Mutex::new(None);
+
+/// Ask the workspace to switch to `tab`.
+pub fn request_activate_tab(tab: TabId, window: &mut Window, cx: &mut App) {
+    *REQUESTED_TAB.lock() = Some(tab);
+    window.dispatch_action(Box::new(ActivateRequestedTab), cx);
+}
+
+impl Workspace {
+    /// Show the Create Drawing dialog (from "+" › Create Drawing or a
+    /// "Create drawing of …" menu entry).
+    fn open_create_drawing(&mut self, req: crate::drawing_create::CreateRequest, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::drawing_create::{CreateDrawingDialog, CreateDrawingEvent};
+        let doc = &self.doc.read(cx).session.doc;
+        // Onshape: "<part> Drawing 1" for a part or assembly, else "Drawing 1".
+        let default_name = doc.next_tab_name(&req.name.as_ref().map(|n| format!("{n} Drawing")).unwrap_or_else(|| "Drawing".into()));
+        let metric = !matches!(doc.settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+        let dialog = cx.new(|cx| CreateDrawingDialog::new(req, default_name, metric, window, cx));
+        let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &CreateDrawingEvent, window, cx| {
+            if let CreateDrawingEvent::Create { name, template, source, suggested } = ev {
+                this.create_drawing_tab(name.clone(), *template, source.clone(), *suggested, window, cx);
+            }
+            this.create_drawing = None;
+            cx.notify();
+        });
+        let fh = dialog.read(cx).focus.clone();
+        window.focus(&fh, cx);
+        self.create_drawing = Some((dialog, sub));
+        cx.notify();
+    }
+
+    /// Create the Drawing tab: suggested views are laid out from the source's
+    /// bounds (computed in the background); with No views the new drawing
+    /// starts placing a view of the source at the cursor.
+    fn create_drawing_tab(&mut self, name: String, template: noshape_model::drawing::templates::DrawingTemplate, source: Option<noshape_model::drawing::create::DrawingSource>, suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let doc = self.doc.read(cx).session.doc.clone();
+        cx.spawn_in(window, async move |this, cx| {
+            let src = source.clone();
+            let drawing = cx
+                .background_spawn(async move {
+                    let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds(&doc, s)) } else { None };
+                    noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested)
+                })
+                .await;
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                let mut new_id = None;
+                this.doc.update(cx, |doc, cx| {
+                    doc.edit_document(&format!("Insert tab : {name}"), cx, |d| {
+                        let name = if name.is_empty() || d.tabs.iter().any(|t| t.name == name) { d.next_tab_name("Drawing") } else { name.clone() };
+                        let id = d.add_tab(&name, TabContent::Drawing(drawing));
+                        // The new drawing tab lands right after its source tab (Onshape).
+                        if let Some(src) = source.as_ref().map(|s| s.tab)
+                            && let Some(at) = d.settings.tab_order.iter().position(|t| *t == src)
+                        {
+                            d.settings.tab_order.retain(|t| *t != id);
+                            d.settings.tab_order.insert(at + 1, id);
+                        }
+                        new_id = Some(id);
+                    });
+                });
+                let Some(id) = new_id else { return };
+                this.activate(id, window, cx);
+                if let (false, Some(s), Some(TabView::Drawing(v))) = (suggested, &source, this.views.get(&id)) {
+                    let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
+                    v.update(cx, |v, cx| v.set_tool(tool, cx));
+                }
+            });
+        })
+        .detach();
     }
 }
 
 impl Workspace {
     fn toggle_tab_manager(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::tab_manager::{TabManager as Panel, TabManagerEvent};
         if self.tab_manager.take().is_some() {
             if let Some(a) = self.active {
                 self.activate(a, window, cx);
             }
         } else {
-            let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("Search tabs"));
-            let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &gpui_kit::component::input::InputEvent, window, cx| match ev {
-                gpui_kit::component::input::InputEvent::Change => {
-                    if let Some(tm) = &mut this.tab_manager {
-                        tm.2 = st.read(cx).value().to_string();
-                    }
-                    cx.notify();
-                }
-                gpui_kit::component::input::InputEvent::PressEnter { .. } => {
-                    if let Some(t) = this.tab_manager_matches(cx).first().map(|t| t.0) {
-                        this.tab_manager = None;
-                        this.activate(t, window, cx);
-                    }
-                    cx.notify();
-                }
-                _ => {}
+            let (doc, active) = (self.doc.clone(), self.active);
+            let tm = cx.new(|cx| Panel::new(doc, active, window, cx));
+            let sub = cx.subscribe_in(&tm, window, |this: &mut Self, _, ev: &TabManagerEvent, window, cx| match ev {
+                TabManagerEvent::Open(t) => this.activate(*t, window, cx),
+                TabManagerEvent::Close => this.toggle_tab_manager(window, cx),
             });
-            st.update(cx, |s, cx| s.focus(window, cx));
-            self.tab_manager = Some((st, sub, String::new()));
+            self.tab_manager = Some((tm, sub));
         }
         cx.notify();
-    }
-
-    fn tab_manager_matches(&self, cx: &App) -> Vec<(TabId, String, &'static str)> {
-        let q = self.tab_manager.as_ref().map(|t| t.2.to_lowercase()).unwrap_or_default();
-        self.doc.read(cx).session.doc.ordered_tabs().iter().filter(|t| q.is_empty() || t.name.to_lowercase().contains(&q)).map(|t| (t.id, t.name.clone(), kind_of(&t.content))).collect()
-    }
-
-    fn render_tab_manager(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (st, _, _) = self.tab_manager.as_ref()?;
-        let st = st.clone();
-        let pal = p();
-        let active = self.active;
-        let rows: Vec<AnyElement> = self
-            .tab_manager_matches(cx)
-            .into_iter()
-            .map(|(id, name, kind)| {
-                div()
-                    .id(SharedString::from(format!("tm-{id}")))
-                    .flex()
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .rounded_sm()
-                    .cursor_pointer()
-                    .when(active == Some(id), |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().flex_1().text_sm().text_color(pal.text).child(name))
-                    .child(div().text_xs().text_color(pal.text_faint).child(kind))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        this.tab_manager = None;
-                        this.activate(id, window, cx);
-                        cx.notify();
-                    }))
-                    .into_any_element()
-            })
-            .collect();
-        Some(
-            deferred(
-                anchored().position(point(px(60.), px(80.))).child(
-                    v_flex()
-                        .id("tab-manager")
-                        .occlude()
-                        .w(px(320.))
-                        .p_2()
-                        .gap_1()
-                        .rounded_md()
-                        .bg(pal.panel_raised)
-                        .border_1()
-                        .border_color(pal.border_strong)
-                        .shadow_lg()
-                        .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                            if ev.keystroke.key == "escape" {
-                                this.toggle_tab_manager(window, cx);
-                            }
-                        }))
-                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Tab manager"))
-                        .child(gpui_kit::component::input::Input::new(&st))
-                        .children(rows),
-                ),
-            )
-            .with_priority(3)
-            .into_any_element(),
-        )
     }
 }
 

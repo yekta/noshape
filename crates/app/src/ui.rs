@@ -6,7 +6,7 @@ use crate::assets;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::h_flex;
+use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -24,11 +24,13 @@ pub const ROW_H: f32 = 26.;
 pub const ROW_TEXT: f32 = 13.33;
 /// Toolbar icons and their button cell (§3.2).
 pub const TOOL_ICON: f32 = 20.;
-pub const TOOL_CELL: f32 = 30.;
+pub const TOOL_CELL: f32 = 32.;
+/// The dropdown caret cell of a split tool (§3.2, measured 18 px live).
+pub const TOOL_CARET_W: f32 = 18.;
 /// Feature-list icons (17 px at 0.8 opacity, §3.4).
 pub const LIST_ICON: f32 = 17.;
 /// Left panel default width (§3.4).
-pub const LEFT_PANEL_W: f32 = 210.;
+pub const LEFT_PANEL_W: f32 = 206.;
 
 /// Onshape's simple tooltip: blue-gray `#d0dbe5`, 12 px / 500, square corners (§4.7).
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
@@ -52,21 +54,28 @@ pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) 
 
 /// Note: a custom variant paints only 20% of `color` at rest, so solid
 /// fills (the active tool) are set with `.bg()` on the button instead.
-fn tool_variant(cx: &App, active: bool) -> ButtonCustomVariant {
+fn tool_variant(cx: &App, active: bool, grouped: bool) -> ButtonCustomVariant {
     let pal = p();
+    let hover = if active {
+        pal.tool_active
+    } else if grouped {
+        pal.tool_hover_group
+    } else {
+        pal.tool_hover
+    };
     ButtonCustomVariant::new(cx)
         .color(gpui_kit::transparent_white())
         .foreground(pal.text.into())
-        .hover(if active { pal.tool_active.into() } else { pal.tool_hover.into() })
+        .hover(hover.into())
         .active(pal.tool_active.into())
         .shadow(false)
 }
 
-/// A 30x30 toolbar button holding a 20 px full-color icon (§3.2). Add
+/// A 32x32 toolbar button holding a 20 px full-color icon (§3.2). Add
 /// `.on_click` / `.dropdown_menu` to the result.
 pub fn tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App) -> Button {
     Button::new(id)
-        .custom(tool_variant(cx, active))
+        .custom(tool_variant(cx, active, false))
         .child(assets::icon(icon, TOOL_ICON, cx))
         .w(px(TOOL_CELL))
         .h(px(TOOL_CELL))
@@ -75,30 +84,144 @@ pub fn tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App)
         .when(active, |b| b.bg(p().tool_active))
 }
 
+/// The icon half of a split tool: like [`tool_button`], but with the
+/// group hover (`#d7d7d7`) and only the left corners rounded. Put it in a
+/// [`tool_group`] with a [`tool_caret`].
+pub fn split_tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App) -> Button {
+    Button::new(id)
+        .custom(tool_variant(cx, active, true))
+        .child(assets::icon(icon, TOOL_ICON, cx))
+        .w(px(TOOL_CELL))
+        .h(px(TOOL_CELL))
+        .p_0()
+        .rounded(px(0.))
+        .rounded_l(px(3.))
+        .when(active, |b| b.bg(p().tool_active))
+}
+
+/// A split tool: hovering either half fills both in `#d7d7d7` (live).
+pub fn tool_group(name: impl Into<SharedString>, main: impl IntoElement, caret: impl IntoElement) -> Div {
+    let pal = p();
+    let name: SharedString = name.into();
+    let (n1, n2) = (name.clone(), name.clone());
+    h_flex()
+        .flex_none()
+        .group(name)
+        .child(div().rounded_l(px(3.)).group_hover(n1, |d| d.bg(pal.tool_hover_group)).child(main))
+        .child(div().rounded_r(px(3.)).group_hover(n2, |d| d.bg(pal.tool_hover_group)).child(caret))
+}
+
+/// Onshape's toolbar tooltip: the title ("Extrude (shift+e)") appears first;
+/// after 2 s of hovering it expands in place with the tool's description,
+/// 400 px wide.
+pub struct RichTooltip {
+    title: SharedString,
+    description: SharedString,
+    expanded: bool,
+}
+
+impl Render for RichTooltip {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        div()
+            .bg(pal.tooltip)
+            .text_color(pal.text)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
+            .px(px(7.))
+            .pt(px(4.))
+            .pb(px(3.))
+            .text_size(px(12.))
+            .when(self.expanded, |d| d.w(px(400.)))
+            .child(div().font_weight(FontWeight::MEDIUM).child(self.title.clone()))
+            .when(self.expanded && !self.description.is_empty(), |d| d.child(div().pt(px(6.)).pb(px(2.)).child(self.description.clone())))
+    }
+}
+
+/// Tooltip closure for a toolbar tool (see [`RichTooltip`]).
+pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+    let title: SharedString = title.into();
+    let description: SharedString = description.into();
+    move |_, cx| {
+        let view = cx.new(|cx| {
+            if !description.is_empty() {
+                cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
+                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    let _ = this.update(cx, |t, cx| {
+                        t.expanded = true;
+                        cx.notify();
+                    });
+                })
+                .detach();
+            }
+            RichTooltip { title: title.clone(), description: description.clone(), expanded: false }
+        });
+        view.into()
+    }
+}
+
+/// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):
+/// panel headers, the viewport's quick tools. `on` draws the toggled fill.
+pub fn icon_button(id: impl Into<ElementId>, icon: &str, size: f32, on: bool, cx: &App) -> Button {
+    let pal = p();
+    let variant = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
+    Button::new(id).custom(variant).child(assets::icon(icon, TOOL_ICON, cx)).w(px(size)).h(px(size)).p_0().rounded(px(5.)).when(on, |b| b.bg(pal.panel_active))
+}
+
 /// A toolbar button with an icon and a label, like Onshape's "Sketch" (§3.2).
 pub fn text_tool_button(id: impl Into<ElementId>, icon: &str, label: impl Into<SharedString>, active: bool, cx: &App) -> Button {
     let pal = p();
     let label: SharedString = label.into();
     Button::new(id)
-        .custom(tool_variant(cx, active))
-        .child(h_flex().gap(px(5.)).child(assets::icon(icon, TOOL_ICON, cx)).child(div().text_size(px(14.)).text_color(pal.text).child(label)))
+        .custom(tool_variant(cx, active, false))
+        .child(h_flex().gap(px(4.)).child(assets::icon(icon, TOOL_ICON, cx)).child(div().text_size(px(14.)).text_color(pal.text).child(label)))
         .h(px(TOOL_CELL))
-        .pl(px(5.))
-        .pr(px(8.))
+        .pl(px(6.))
+        .pr(px(10.))
         .rounded(px(3.))
         .when(active, |b| b.bg(p().tool_active))
 }
 
-/// The 15 px dropdown caret cell next to a split tool (§3.2).
+/// The 18 px dropdown caret cell next to a split tool (§3.2).
 pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
     let pal = p();
     Button::new(id)
-        .custom(tool_variant(cx, false))
-        .child(glyph("ui-chevron-down", 9., pal.text))
-        .w(px(15.))
+        .custom(tool_variant(cx, false, true))
+        .child(glyph("ui-chevron-down", 10., pal.text))
+        .w(px(TOOL_CARET_W))
         .h(px(TOOL_CELL))
         .p_0()
-        .rounded(px(3.))
+        .rounded(px(0.))
+        .rounded_r(px(3.))
+}
+
+/// A keyboard shortcut chip (`shift`, `f`): 11 px text in a 1 px `#aaa`
+/// box with 2 px radius, as in Onshape's menus and the tool search box.
+pub fn shortcut_chip(text: impl Into<SharedString>) -> Div {
+    let pal = p();
+    div().px(px(4.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(11.)).text_color(pal.text).child(text.into())
+}
+
+/// Shortcut chips for an Onshape shortcut string such as "shift-f" or "ctrl+m".
+pub fn shortcut_chips(shortcut: &str) -> Div {
+    let keys: Vec<String> = shortcut.split(['-', '+']).filter(|k| !k.is_empty()).map(|k| k.to_lowercase()).collect();
+    h_flex().gap(px(2.)).children(keys.into_iter().map(shortcut_chip))
+}
+
+/// A toolbar dropdown row (§3.2, measured live): 32 px tall, a 20 px
+/// full-color icon in a 30 px cell, the name at 14 px and the shortcut
+/// chips at the right. Add `.on_click` to the result.
+pub fn menu_tool_item(name: &'static str, icon: &str, shortcut: Option<&'static str>) -> gpui_kit::component::menu::PopupMenuItem {
+    let icon = icon.to_string();
+    gpui_kit::component::menu::PopupMenuItem::element(move |_, cx| {
+        let pal = p();
+        h_flex()
+            .h(px(32.))
+            .w_full()
+            .gap(px(4.))
+            .child(div().w(px(30.)).flex_none().flex().items_center().justify_center().child(assets::icon(&icon, TOOL_ICON, cx)))
+            .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(name))
+            .children(shortcut.map(shortcut_chips))
+    })
 }
 
 /// Wrap a toolbar element so it shows an Onshape tooltip.
@@ -106,24 +229,30 @@ pub fn with_tooltip(id: impl Into<ElementId>, text: impl Into<SharedString>, el:
     div().id(id).flex_none().tooltip(tooltip(text)).child(el).into_any_element()
 }
 
-/// The toolbar row: white, 36 px, no bottom border (§3.2).
-pub fn toolbar() -> Div {
-    h_flex().h(px(TOOLBAR_H)).flex_none().px(px(4.)).gap(px(2.)).bg(p().panel).overflow_hidden()
+/// Wrap a toolbar tool so it shows the title now and the description after 2 s.
+pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, description: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
+    div().id(id).flex_none().tooltip(rich_tooltip(title, description)).child(el).into_any_element()
 }
 
-/// Toolbar group separator: 2 px wide, 26 px tall, `#d7d7d7` (§3.2).
+/// The toolbar row: white, 36 px, no bottom border (§3.2).
+pub fn toolbar() -> Div {
+    h_flex().h(px(TOOLBAR_H)).flex_none().px(px(2.)).gap(px(2.)).bg(p().panel).overflow_hidden()
+}
+
+/// Toolbar group separator: 2 px wide, 26 px tall, `#d7d7d7`, 2 px from
+/// the tools on each side (§3.2, measured live).
 pub fn tool_separator() -> Div {
-    div().flex_none().w(px(2.)).h(px(26.)).mx(px(4.)).bg(p().border)
+    div().flex_none().w(px(2.)).h(px(26.)).bg(p().border)
 }
 
 /// The "Search tools…" box at the right end of a toolbar (§3.2).
 pub fn search_tools_box(id: impl Into<ElementId>) -> Stateful<Div> {
     let pal = p();
-    let chip = |t: &'static str| div().px(px(3.)).h(px(15.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(10.)).text_color(pal.text).child(t);
+    let chip = |t: &'static str| div().px(px(3.)).h(px(16.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(11.)).text_color(pal.text).child(t);
     h_flex()
         .id(id)
         .flex_none()
-        .h(px(30.))
+        .h(px(32.))
         .px(px(10.))
         .gap(px(6.))
         .rounded(px(3.))
@@ -164,9 +293,35 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
         .into_any_element()
 }
 
-/// Panel header: "Features (11)" style, 14 px / 600 (§3.4).
-pub fn panel_title(text: impl Into<SharedString>) -> Div {
-    div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(p().text).child(text.into())
+/// Onshape's dialog checkbox (live DOM): a 27 px row, a 12 px box 4 px
+/// from the left (1 px `#888`, radius 3; checked `#1651b0` with a white
+/// check), then the 13.33 px `#666` label 4 px after it. Add `.on_click`.
+pub fn os_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    let pal = p();
+    h_flex()
+        .id(id)
+        .h(px(27.))
+        .pl(px(4.))
+        .pr(px(4.))
+        .gap(px(4.))
+        .flex_none()
+        .cursor_pointer()
+        .text_size(px(13.33))
+        .text_color(pal.text_muted)
+        .child(
+            div()
+                .size(px(12.))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(if on { pal.accent } else { gpui_kit::rgb(0x888888) })
+                .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
+                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)))),
+        )
+        .child(label.into())
 }
 
 /// A 26 px tree row with the standard hover / selected fills (§3.4).
@@ -198,7 +353,7 @@ pub fn caret(open: bool) -> Div {
         .flex()
         .items_center()
         .justify_center()
-        .child(glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., p().text))
+        .child(glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 13., p().text))
 }
 
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask

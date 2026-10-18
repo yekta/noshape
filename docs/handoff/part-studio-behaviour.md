@@ -1,135 +1,84 @@
-# Handoff: Part Studio behaviour parity with Onshape
+# Handoff: Part Studio behaviour parity with Onshape (agent "psb")
 
-Item-by-item status lives in `docs/parity/part-studio.md` (current as of
-this handoff: 207 items, 67 ✅, 116 🔧, 17 ❌, 7 ⏳). This note is for whoever
-continues.
+Item-by-item status: `docs/parity/part-studio.md` (section 13 = new items found
+in the live capture). Live reference: `/root/onshape-research/live/behaviours.md`
+(organised by area) plus `dom/*.txt` (menus, dialogs, shortcut sheet) — live beats
+the help docs.
 
-## State right now
+## State right now (pass 3)
 
-- The shared tree **compiles** (`cargo build -p noshape`, target
-  `/root/target-psb`). No half-finished edits. Newest done items: tab
-  manager and Ctrl+Space (`workspace.rs`), pause regeneration and times
-  panel, parts list sections/separator/collapse/properties, A flips the
-  mate connector axis.
-- The last change was 5.23 in `feature_dialog.rs`: an unfocused numeric field
-  shows its value converted to document units. Clicking it focuses the input.
-  It built but hasn't been tried in the app yet.
-- Built but not yet tried in the app either: the selection badge, missing
-  references, pick reordering, Convert to expression, dynamic suppression,
-  Copy/Paste sketch, sketch DXF export, multi-plane section, Select ▸ and
-  Create selection.
-- Tried in the app this round: curvature and draft maps, the Appearance
-  editor on a part, and the part context menu.
-- Not committed (the lead integrates).
+- Everything the previous pass built but never tried has been exercised in the
+  app: selection count, missing references, Convert to expression, dynamic
+  suppression, Copy/Paste sketch, sketch DXF export, multi-plane section,
+  Select ▸, Create selection, 5.23 unit display. Fixed on the way: count position,
+  5.23 (focusing showed the converted text), Convert to expression (now "true"/
+  "false", focused), status message wrapping.
+- Changed to match live:
+  - two-stage Enter/Esc in dialog fields (`baselines`, `apply_on_enter`,
+    `enter_applied` in `feature_dialog.rs`);
+  - sketch curve under a region field picks the bounded region
+    (`interaction::region_for_curve`, `curve_region` in behaviors.rs);
+  - all regions of a sketch show as one "Faces of Sketch 1" row
+    (`sketch_region_count`);
+  - pick row menu = Clear all (+ Clear missing references);
+  - all context menus rebuilt in the live order (menus.rs graphics area;
+    mod.rs feature rows / default geometry / parts list). Agent "ui" then moved
+    them onto its `os_menu` component (same content);
+  - right-clicked entity stays highlighted (`ui.menu_target`);
+  - Show dependencies panel restyled;
+  - shortcut sheet = live tabs and 114 rows (`SHORTCUT_TABS` in view_tools.rs);
+  - S toolbar = live 5×2 set, and its contents are editable in Customize toolbar;
+  - Q reorients a mate connector's secondary axis;
+  - an erroring feature commits with Enter (✓ disabled);
+  - a new feature hides the sketch it consumes;
+  - the selection count is drawn like Onshape's cursor digit.
+- New helpers: `interaction::source_sketch` (Edit Sketch 1… entries), `export_bodies` +
+  `open_export_dialog` (Export…), `align_view_vertical`, `section_part`,
+  `hide_planes`, `clipboard_has_sketch`.
 
-## Where things live
+## Done since (pass 3, continued)
 
-| Area | Files |
-|---|---|
-| Pure logic + tests | `crates/model/src/interaction.rs` (dependencies/reorder, list click, feature filter, wheel nudge, evaluated hint, ray hits, dynamic-suppression test), `crates/model/src/select.rs` (Select ▸ criteria, kernel topology) |
-| Model data | `partstudio.rs`: `Feature.hidden`, `Feature.suppression_expr`, `PartStudio.hidden_defaults`, `PartStudio.appearances` (`FaceAppearance`/`AppearanceTarget`), `PartProperties.{revision, mass_override, tessellation}`, `TessQuality`, `NamedView.section` |
-| Regen | `regen/mod.rs`: dynamic suppression and checkbox expressions (`eval_bool`, `resolve_bool_exprs`); `regen/display.rs`: hidden sketches/planes/origin/connectors, per-part tessellation quality (finer meshes cached under a separate key), `SketchDisplay.color` |
-| Render (surgical) | `renderer.rs`: `MeshVertex.color` (RGBA8, location 3), `upload_mesh_colored`, extra clip planes in `Globals` (`clip2`, `clip3`, `flags.x` = plane count); `scene.rs`: `Scene.clip_extra`; `shaders.wgsl`: `clipped()` = clipped by all planes, mesh vertex color for per-primitive instances |
-| Scene builder | `scene_builder.rs`: `SceneOptions.section: Vec<(n, d)>`, `vertex_colors`, `hidden_edges_visible`; `DisplayMode::Translucent`; colored-mesh and hidden-edge caches in `GpuCache` |
-| App | `part_studio/behaviors.rs` (`UiState`, picking, hide/isolate, select other, S toolbar, camera history, feature-list ops, auto Add/Remove, sketch copy/paste/export, dynamic suppression editor, Select ▸ and Create selection, selection badge), `view_cube.rs`, `section.rs`, `appearance.rs`, `analysis.rs`, `menus.rs` (graphics-area context menu), `mod.rs` (feature/parts list, actions), `view_tools.rs` (palette, shortcut sheet, named views), `config_panel.rs` (Appearance panel variant, variable hover), `feature_dialog.rs` (field behaviours), `actions.rs` (bindings), `viewport.rs` (zoom window, double middle-click, BoxSelect modifiers, `pointer_inside()`) |
+- Section 13: rollback bar (no menu, ↑/↓ after a row click, `#a0c7dd` focus, "Rollback bar" drag pill),
+  selected-row tooltip "X <- Y", Tab skips dropdowns, manipulator drag ends with the value
+  selected, Copy here… (Transform preset), Delete/Ctrl+Z verified.
+- 9.8/9.11: camera menu in the live order with Display / Hidden edges / Tangent edges submenus;
+  tangent edges phantom (dash-dot, new `LineSegment::DASH_DOT`) and removed
+  (`MeshBuffers::smooth_edges`, cached per mesh in `GpuCache.tangent`).
+- 6.24: Show dimensions (`part_studio/shown_dims.rs`).
+- Section view dialog (`section.rs` rewritten: `SectionDialog`, arrow via `section_arrow` in
+  the manipulator path, `SceneOptions.section_skip` for excluded parts).
+- Face menu complete: Copy Part (`copy_part`; Ctrl+V → `paste_part`: Derived in another
+  studio, Transform copy in the same), Export as DXF/DWG (`export_face`, `MeshBuffers::face_edges`).
+- Parts fields take the part of a clicked face/edge/vertex (`part_for_field`).
 
-## Live Onshape reference
+## Next (priority order)
 
-A live-reference agent is capturing real Onshape into
-`/root/onshape-research/live/` (screenshots plus `behaviours.md`). When
-`behaviours.md` lands, check every parity item against it and fix
-differences. For your own checks, the credentials are in
-`/root/.config/noshape/onshape.env`. Use Chrome `/usr/bin/google-chrome`
-with the profile `/root/live-pw/profile`. Never print or commit the
-credentials.
-
-## Remaining items (priority order) with notes
-
-1. **9.11 tangent edges.** Hidden edges visible and Translucent are done
-   (camera menu). Tangent-edge visible/phantom/removed needs per-edge
-   smoothness: use `noshape_model::select` style edge/face normal tests per
-   body edge, then draw those edges dashed or skip them in the scene builder.
-2. **5.18 dropdown keys.** Tab to an enum dropdown, then Enter/Space should
-   open it and arrows should move. Check whether gpui-kit already does this;
-   if not, handle `on_key_down` on the dropdown wrapper in
-   `feature_dialog.rs`.
-(6.25, 6.26, 7.6, 7.7, 1.25 and 1.27 are done.)
-
-(11.5, 6.38, 10.6 and 2.23 are done.)
-
-(11.3 and 3.10 are done.)
-
-(9.15 is done: `viewport.rs` `orbit_pivot_fn`, inertia in `render`.)
-
-(5.25 preview slider, 5.29 tolerances, 5.27 dialog moving and help are
-done. Dialog resizing remains: add a corner handle with `on_drag` and an
-`on_drag_move` on `viewport-area` like `DialogMove`, storing a width/height
-in `UiState` and passing it to the dialog.)
-
-(5.32 done: `manipulators.rs` `param_arrow`; consumed geometry uses `ui.before_context`.)
-
-17. **6.24 remainder.** Show dimensions needs sketch dims outside edit mode,
-    and Create drawing of sketch needs drawing-model support.
-18. **10.8 remainder.** Section drag manipulator (reuse the
-    `manipulators.rs` arrow), and caps (stencil pass in the renderer; large
-    change).
-19. **Toolbar customization.**
-    - 1.21 S toolbar contents and 4.7 toolbar customization: persist JSON in
-      the config dir.
-    - Search tools needs a "Removed from toolbar" section.
-    - `TOOLBAR` is a const in `mod.rs`. Make it data and keep the group
-      faces in `ui.toolbar_faces`.
-20. **Misc shortcuts.** 1.28: Ctrl+U shows an About/log dialog;
-    Ctrl+Shift+F is Feature Studio search.
+1. Section caps (hatched cut faces): needs a stencil pass in the renderer.
+2. Pick-row hover highlight `#f2ff80` in the viewport; depth-arrow hover outline (blue).
+3. 5.27 dialog resizing; 3.19 remaining Select ▸ criteria; Select ▸ in the empty-space menu.
+4. Plane menu: Rename, Size to Part Studio, Show dependencies; face Export as DXF/DWG.
 
 ## How to test
 
-- Build: `cd /root/noshape && OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-psb cargo build -p noshape`.
-- Tests:
-  - `cargo test -p noshape-model --lib interaction select`;
-  - app: `cargo test -p noshape -- view_cube behaviors view_tools appearance analysis`;
-  - full: `cargo test --workspace --exclude noshape --no-fail-fast`.
-  - The render `offscreen::plate_edges_are_drawn_solid_over_faces` failure
-    belongs to QA round 2.
-- Clippy: `cargo clippy -p noshape --all-targets` and `-p noshape-model`.
-  Filter the output to your own files; other agents' warnings may be present.
-- UI on Xvfb `:102` (window at x=82, y=50, viewport about x 335–1520,
-  y 125–918):
-  - `/tmp/psb/start.sh` kills our instance, deletes `/tmp/psb/x.noshape*`
-    (stale sqlite WAL files cause "disk I/O error"), starts
-    `NOSHAPE_NO_NATIVE_DIALOGS=1 DISPLAY=:102 timeout 200 …/noshape --demo /tmp/psb/x.noshape`
-    and waits 14 s.
-  - `/tmp/psb/x.sh <name> [xdotool args]` runs xdotool, waits `$WAIT` s
-    (default 1.5), and screenshots to `/tmp/psb/<name>.png`. Crop with
-    `convert`.
-  - The app exits after 200 s, so restart before each test session.
-  - Kill only `pkill -f "[t]arget-psb/debug/noshape"`.
-  - Use `timeout N tail -f /dev/null` to wait; foreground `sleep` is
-    blocked.
+- The shared tree often fails to build for a few minutes on another agent's
+  half-done file. `/tmp/psb/sync.sh` mirrors `/root/noshape` into `/root/psb-src`,
+  applies sed patches for those transient breaks **in the copy only**, and
+  builds with `CARGO_TARGET_DIR=/root/target-psb`. Drop patches that no longer
+  apply.
+- `/tmp/psb/start.sh` starts the app on `:102` (900 s timeout);
+  `/tmp/psb/x.sh <name> [xdotool args]` acts and screenshots.
+- The first double-click after launch is often missed (slow first frame). Open
+  features with click + Enter, or click once somewhere first.
+- Tests: `cargo test -p noshape-model --lib interaction` (13 tests).
 
 ## Gotchas
 
-- **Concurrent edits.** Other agents (theme/layout, sketch, QA) edit the
-  same files, including my `behaviors.rs`, `view_cube.rs` and the feature
-  list. Always re-read before editing, and use exact-match replacements that
-  assert. Builds often fail for a few minutes on someone else's half-done
-  file; retry.
-- **`.context_menu(...)` must be last** in a builder chain (it returns
-  `ContextMenu<E>`).
-- **Overlays need `.occlude()`.** Otherwise clicks fall through to the
-  viewport and select geometry.
-- **Re-rendering on mouse move re-renders the whole tree.** A child entity
-  doesn't help, because GPUI marks the ancestors dirty too. Throttle instead
-  (see the badge, ~30 Hz).
-- **No new `#[allow]`.** Use type aliases (`ViewAction`, `VertexColors`)
-  for complex types.
-- **Mesh cache keys.** The face mesh is per body and each face owns its
-  vertices, so per-face vertex colors work. A colored mesh is cached by
-  (mesh ptr, colors ptr), so keep the colors `Arc` stable
-  (`ui.vcolor_cache`).
-- **Space in dialogs.** `on_clear_selection` propagates while a dialog is
-  open, so Space can toggle checkboxes.
-- **Enter is bound in the Part Studio context.** Accept propagates in
-  sketches, which keeps the sketch agent's behaviour.
-- **Onshape vs coordinator.** Onshape's Shift+D is dihedral analysis; per
-  the coordinator it is draft analysis here.
+- Concurrent edits: "ui" restyles dialogs/menus in the same files
+  (`feature_dialog.rs`, `menus.rs`, `mod.rs`). Re-read before editing; use
+  exact-match replacements.
+- GPUI Input propagates Enter after emitting PressEnter, so the Part Studio's
+  Accept binding fires too; the dialog's capture handler for Accept on each
+  field is what makes "Enter applies" work.
+- InputState doesn't reliably emit `Focus`; the field baseline is refreshed on
+  every render while the field is unfocused.
+- Overlays need `.occlude()` or mouse-downs start box selections underneath.

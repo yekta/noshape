@@ -135,6 +135,9 @@ pub struct InstanceNode {
     pub dof: Option<usize>,
     pub error: Option<String>,
     pub children: Vec<InstanceNode>,
+    /// Subassembly detected as rigid: zero degrees of freedom and exactly
+    /// one fixed instance (Onshape shows the rigid assembly icon).
+    pub rigid: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -832,6 +835,8 @@ pub struct AssemblyEvaluator {
     /// Regenerated external Part Studios by (key, configuration); pinned
     /// snapshots never change.
     external_studios: HashMap<(String, String), Option<ExternalStudio>>,
+    /// Generated standard content parts (never change).
+    standard: HashMap<super::standard::StandardSpec, Result<Arc<RegenResult>, String>>,
 }
 
 /// Reflect a mesh across the plane through `p` with unit normal `n`
@@ -1256,7 +1261,19 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                 refs.push((implicit(on, Inference::Midpoint), None));
             }
         }
-        Reference::Vertex(_) => refs.push((implicit(on, Inference::Vertex), None)),
+        Reference::Vertex(n) => {
+            // A part vertex: primary axis normal to a planar face around it.
+            let face = bodies().find_map(|b| {
+                let &vi = b.find_vertices(n).first()?;
+                let ve = b.shape.vertex_edges().ok()?;
+                let ef = b.shape.edge_faces().ok()?;
+                let fi = ve.get(vi)?.iter().flat_map(|e| ef.get(*e as usize).into_iter().flatten()).copied().find(|f| {
+                    b.shape.sub_shape(noshape_kernel::ShapeType::Face, *f as usize).ok().and_then(|s| s.face_plane().ok()).flatten().is_some()
+                })?;
+                Some(Reference::Face((**b.faces.get(fi as usize)?).clone()))
+            });
+            refs.push((implicit(on, Inference::Vertex), face));
+        }
         Reference::Origin => refs.push((implicit(on, Inference::Origin), None)),
         Reference::MateConnector { .. } => refs.push((on.clone(), None)),
         _ => {}
@@ -1300,6 +1317,11 @@ impl AssemblyEvaluator {
             entry.hash = hash;
         }
         Some(entry.result.clone())
+    }
+
+    /// Regenerate a standard content part (cached per spec).
+    pub fn standard_part(&mut self, spec: &super::standard::StandardSpec) -> Result<Arc<RegenResult>, String> {
+        self.standard.entry(spec.clone()).or_insert_with(|| super::standard::regenerate(spec).map(Arc::new)).clone()
     }
 
     /// Set the resolver for parts inserted from other documents.
@@ -1471,6 +1493,7 @@ impl AssemblyEvaluator {
                 dof: None,
                 error: None,
                 children: Vec::new(),
+                rigid: false,
             };
             match &inst.source {
                 InstanceSource::Part { studio, body, config } => {
@@ -1551,6 +1574,29 @@ impl AssemblyEvaluator {
                         None => node.error = Some("The other document or its Part Studio could not be read".into()),
                     }
                 }
+                InstanceSource::Standard { spec } => {
+                    node.kind = NodeKind::Part;
+                    match self.standard_part(spec) {
+                        Ok(r) => {
+                            if !suppressed {
+                                leaves.push(LeafInstance {
+                                    path: vec![inst.id],
+                                    inner: DMat4::IDENTITY,
+                                    studio: super::standard::STANDARD_TAB,
+                                    body: super::standard::part_body(&r),
+                                    config: super::standard::config_values(spec),
+                                    regen: r,
+                                    name: inst.name.clone(),
+                                    hidden: inst.hidden,
+                                    mirrored: false,
+                                    external: None,
+                                    flex: None,
+                                });
+                            }
+                        }
+                        Err(e) => node.error = Some(e),
+                    }
+                }
                 InstanceSource::PartStudio { studio, config } => {
                     node.kind = NodeKind::PartStudio;
                     match self.studio(doc, *studio, config) {
@@ -1607,6 +1653,7 @@ impl AssemblyEvaluator {
                                 && sub.relations.iter().all(|r| r.suppressed)
                                 && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
                                 && sub_prep.flexible.is_empty();
+                            node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
                             let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
                             if flexible {
                                 prepared.flexible.insert(inst.id);
@@ -1755,7 +1802,35 @@ impl AssemblyEvaluator {
             if mc.suppressed {
                 continue;
             }
-            match resolve_entity(&mc.on) {
+            match resolve_entity(&mc.on).and_then(|(owner, f)| {
+                // Between entities / Realign: entities of the same instance.
+                let other = |r: &MateConnectorRef| -> Result<Frame, String> {
+                    let (o, g) = resolve_entity(r)?;
+                    if o != owner {
+                        return Err("Select entities of the same instance".into());
+                    }
+                    Ok(g)
+                };
+                let mut f = f;
+                if let Some(b) = &mc.between {
+                    f.origin = (f.origin + other(b)?.origin) * 0.5;
+                }
+                if let Some(p) = &mc.primary_axis {
+                    let z = other(p)?.z();
+                    let x = f.x() - z * z.dot(f.x());
+                    let x = if x.length_squared() < 1e-12 { z.any_orthonormal_vector() } else { x.normalize() };
+                    f = Frame::from_axes(f.origin, z, x);
+                }
+                if let Some(s) = &mc.secondary_axis {
+                    let d = other(s)?.z();
+                    let x = d - f.z() * f.z().dot(d);
+                    if x.length_squared() < 1e-12 {
+                        return Err("Secondary axis can't be parallel to the primary axis".into());
+                    }
+                    f = Frame::from_axes(f.origin, f.z(), x.normalize());
+                }
+                Ok((owner, f))
+            }) {
                 Ok((owner, f)) => {
                     let mut f = f;
                     if mc.on.flip {

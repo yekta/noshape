@@ -1113,6 +1113,22 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
                 Ok(())
             }
+            K::CircularPatternLink { seed, inst, center, angle } => {
+                let (sin, cos) = angle.sin_cos();
+                if self.sk.kind(*seed) == Some(EntityKind::Point) {
+                    let (s, i, c) = (self.pt(*seed)?, self.pt(*inst)?, self.pt(*center)?);
+                    // i = c + R(s - c). Keep the center as an unknown so it
+                    // can be dragged along with the constrained instances.
+                    self.lin(Lin::new().p(1.0, i[0]).p(-cos, s[0]).p(sin, s[1]).p(cos - 1.0, c[0]).p(-sin, c[1]));
+                    self.lin(Lin::new().p(1.0, i[1]).p(-sin, s[0]).p(-cos, s[1]).p(sin, c[0]).p(cos - 1.0, c[1]));
+                } else {
+                    let (s, i) = (self.ell(*seed)?, self.ell(*inst)?);
+                    self.lin(Lin::new().p(1.0, i[2]).p(-cos, s[2]).p(sin, s[3]));
+                    self.lin(Lin::new().p(1.0, i[3]).p(-sin, s[2]).p(-cos, s[3]));
+                    self.lin(Lin::new().p(1.0, i[4]).p(-1.0, s[4]));
+                }
+                Ok(())
+            }
             K::Quadrant { point, ellipse, major } => {
                 let p = self.pt(*point)?;
                 let e = self.ell(*ellipse)?;

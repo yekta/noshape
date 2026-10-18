@@ -76,6 +76,10 @@ pub enum ConstraintKind {
     /// points (Onshape's linear pattern constraint: every instance follows
     /// its seed and one shared step).
     PatternLink { seed: EntityId, inst: EntityId, ref_seed: EntityId, ref_inst: EntityId, k: f64 },
+    /// Circular pattern: a point is a rotated copy about a shared center.
+    /// For ellipses this relates the major vectors and minor radii instead;
+    /// their defining points have separate links.
+    CircularPatternLink { seed: EntityId, inst: EntityId, center: EntityId, angle: f64 },
     /// A point at an end of an ellipse's major (or minor) axis (Onshape's
     /// automatic Quadrant constraint).
     Quadrant { point: EntityId, ellipse: EntityId, major: bool },
@@ -181,6 +185,11 @@ impl ConstraintKind {
                 v.push(*ref_seed);
                 v.push(*ref_inst);
             }
+            CircularPatternLink { seed, inst, center, .. } => {
+                v.push(*seed);
+                v.push(*inst);
+                v.push(*center);
+            }
             Quadrant { point, ellipse, .. } => {
                 v.push(*point);
                 v.push(*ellipse);
@@ -248,6 +257,11 @@ impl ConstraintKind {
                 r(ref_seed);
                 r(ref_inst)
             }
+            CircularPatternLink { seed, inst, center, .. } => {
+                r(seed);
+                r(inst);
+                r(center)
+            }
             Quadrant { point, ellipse, .. } => {
                 r(point);
                 r(ellipse)
@@ -286,6 +300,7 @@ impl ConstraintKind {
             EllipseRadius { .. } => "Ellipse radius",
             Rho { .. } => "Rho",
             PatternLink { .. } => "Linear pattern",
+            CircularPatternLink { .. } => "Circular pattern",
             Quadrant { .. } => "Quadrant",
         }
     }

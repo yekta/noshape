@@ -9,8 +9,11 @@ mod assembly_view;
 mod assets;
 mod derived;
 mod doc_model;
+mod drawing_create;
+mod drawing_insert;
 mod drawing_extra;
 mod drawing_more;
+mod drawing_props;
 mod drawing_scene;
 mod drawing_tools;
 mod drawing_ui;
@@ -20,6 +23,8 @@ mod feature_studio;
 mod files;
 mod gpu;
 mod history_panel;
+mod os_menu;
+mod os_ui;
 mod part_studio;
 mod scene_builder;
 mod session;
@@ -27,6 +32,7 @@ mod sketch_mode;
 mod start_library;
 mod start_thumbnail;
 mod start_window;
+mod tab_manager;
 mod theme;
 mod ui;
 mod var_complete;
@@ -114,6 +120,11 @@ fn apply_theme(cx: &mut App) {
         t.scrollbar_thumb = gpui_kit::rgb(0xc1c1c1).into();
         t.scrollbar_thumb_hover = gpui_kit::rgb(0xa8a8a8).into();
         t.selection = gpui_kit::rgb(0xb2ddf6).into();
+        // Feature dialog preview slider: #777 track, white thumb (§1.6).
+        t.slider_bar = gpui_kit::rgb(0x777777).into();
+        t.slider_thumb = gpui_kit::rgb(0xffffff).into();
+        // Modal backdrop: Bootstrap's 50% black, as Onshape's modals.
+        t.overlay = gpui_kit::rgba(0x00000080).into();
     });
 }
 

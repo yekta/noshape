@@ -11,7 +11,7 @@ use crate::theme::p;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, Textarea};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenu};
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -164,34 +164,157 @@ impl DrawingEditor {
     fn open_sheet_menu(&mut self, i: usize, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let entries = self.sheet_entries(i);
         let ed = cx.entity();
-        let menu = PopupMenu::build(window, cx, move |m, window, cx| fill_menu(m, &entries, &ed, window, cx));
-        let sub = cx.subscribe_in(&menu, window, |this: &mut Self, _, _: &DismissEvent, _, cx| {
-            this.menu = None;
-            cx.notify();
-        });
-        menu.read(cx).focus_handle(cx).focus(window, cx);
-        self.menu = Some((menu, position, sub));
+        // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+        if !menu.read(cx).is_empty() {
+            crate::os_menu::open(position, menu, window, cx);
+        }
         cx.notify();
     }
 
-    /// Sheet tabs below the canvas.
-    /// Onshape's Sheets panel (left of the drawing, §3.11): a `#fafafa` header
-    /// with a blue "Sheets (n)" title and an add button, then one row per
-    /// sheet (the active one light blue with a 3 px blue bar) and the views of
-    /// the active sheet.
+    /// Name of the reference (part or source tab) a view's base view shows.
+    fn view_reference(&self, sheet: &Sheet, id: ViewId, cx: &App) -> String {
+        let mut root = id;
+        while let Some(p) = sheet.parent_of(root) {
+            root = p;
+        }
+        let Some(ViewKind::Base { source, part, .. }) = sheet.view(root).map(|v| &v.kind) else { return String::new() };
+        let src = self.sources.iter().find(|(k, _)| k.tab == *source).map(|(_, m)| m);
+        match (src, part) {
+            (Some(m), Some(_)) => m.part(part.as_ref()).map(|p| p.name.clone()).unwrap_or_else(|| m.name.clone()),
+            (Some(m), None) => m.name.clone(),
+            (None, _) => self.doc.read(cx).session.doc.tab(*source).map(|t| t.name.clone()).unwrap_or_default(),
+        }
+    }
+
+    fn sheet_view_row(&self, sheet: &Sheet, v: &DrawingView, indent: f32, cx: &mut Context<Self>) -> AnyElement {
+        // Derived views nest under their parent (20 px per level).
+        let mut depth = 0;
+        let mut cur = v.id;
+        while let Some(p) = sheet.parent_of(cur) {
+            depth += 1;
+            cur = p;
+        }
+        let (label, icon) = match &v.kind {
+            ViewKind::Base { orientation, .. } => (format!("{orientation:?}"), "base-view"),
+            ViewKind::Projected { .. } => ("Projected view".to_string(), "projected-view"),
+            ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), "auxiliary-view"),
+            ViewKind::Section { label, .. } => (format!("Section {label}"), "section-view"),
+            ViewKind::Detail { label, .. } => (format!("Detail {label}"), "detail-view"),
+            _ => ("Section view".to_string(), "section-view"),
+        };
+        let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
+        crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false)
+            .pl(px(indent + 20. * depth as f32))
+            .text_color(rgb(0x666666))
+            .child(crate::ui::tree_icon(icon, false, cx))
+            .child(div().flex_1().truncate().child(label))
+            .into_any_element()
+    }
+
+    /// Onshape's sheet tabs at the top-left of the drawing area ("Sheet1",
+    /// the active one on a `#c7c7c7` chip) and the 33x34 tab at the left
+    /// edge that opens the Sheets panel.
+    fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let mut tabs = h_flex().absolute().top(px(5.)).left(px(4.)).gap(px(2.));
+        // A dialog panel at the top left (Insert view, View properties)
+        // covers the sheet tabs, as in Onshape.
+        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some();
+        for (i, s) in self.drawing.sheets.iter().enumerate().filter(|_| !covered) {
+            let active = i == self.sheet;
+            tabs = tabs.child(
+                div()
+                    .id(("dr-sheet-chip", i))
+                    .occlude()
+                    .h(px(20.))
+                    .px(px(5.))
+                    .flex()
+                    .items_center()
+                    .text_size(px(13.))
+                    .text_color(pal.text)
+                    .cursor_pointer()
+                    .when(active, |d| d.bg(rgb(0xc7c7c7)))
+                    .when(!active, |d| d.hover(|d| d.bg(rgb(0xd0d0d0))))
+                    .child(s.name.clone())
+                    .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                        if e.click_count() >= 2 {
+                            this.open_sheet_name_panel(i, window, cx);
+                        } else {
+                            this.switch_sheet(i, cx);
+                        }
+                    }))
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |this, e: &MouseDownEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.open_sheet_menu(i, e.position, window, cx);
+                        }),
+                    ),
+            );
+        }
+        div().absolute().top_0().left_0().size_full().child(tabs).child(self.sheets_toggle(0., cx)).into_any_element()
+    }
+
+    fn sheets_toggle(&self, left: f32, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let open = self.sheets_open;
+        div()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left(px(left))
+            .flex()
+            .items_center()
+            .child(
+                div()
+                    .id("dr-sheets-toggle")
+                    .occlude()
+                    .w(px(33.))
+                    .h(px(34.))
+                    .ml(px(-1.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(pal.panel)
+                    .border_1()
+                    .border_color(pal.border_strong)
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(crate::assets::icon("sheet", 20., cx))
+                    .tooltip(crate::ui::tooltip(if open { "Collapse the Sheets panel" } else { "Show the Sheets panel" }))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.sheets_open = !this.sheets_open;
+                        cx.notify();
+                    })),
+            )
+            .into_any_element()
+    }
+
+    /// Onshape's Sheets panel: a 258 px `#fafafa` panel over the left of the
+    /// drawing area. Blue "Sheets (n)" title with the Insert sheet button,
+    /// a 2 px blue rule, "Sort by sheet | Sort by reference" tabs, then the
+    /// tree (sheet › reference › views; the active sheet `#e9eef2` with a
+    /// 4 px blue bar). Closed, only the sheet chips and the toggle show.
     pub fn render_sheet_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if !self.sheets_open {
+            return self.render_sheet_tabs(cx);
+        }
+        const W: f32 = 258.;
+        let blue = rgb(0x1b5faa);
         let pal = p();
         let si = self.sheet;
-        let mut list = gpui_kit::component::v_flex().id("dr-sheets").flex_1().min_h_0().pt(px(2.)).overflow_y_scroll();
-        for (i, s) in self.drawing.sheets.iter().enumerate() {
-            let active = i == self.sheet;
-            let row = crate::ui::tree_row(("dr-sheet-tab", i), active)
+        let by_ref = self.sheets_by_ref;
+        let mut list = gpui_kit::component::v_flex().id("dr-sheets").flex_1().min_h_0().pt(px(1.)).overflow_y_scroll();
+        let sheet_row = |i: usize, s: &Sheet, active: bool, cx: &mut Context<Self>| {
+            crate::ui::tree_row(("dr-sheet-tab", i), false)
                 .relative()
                 .cursor_pointer()
+                .when(active, |d| d.bg(rgb(0xe9eef2)).text_color(blue).font_weight(FontWeight::SEMIBOLD).border_b_1().border_color(rgb(0x90cef1)))
                 .child(crate::ui::caret(active))
-                .child(crate::ui::tree_icon("sheet", false, cx))
+                .child(crate::ui::tree_icon("sheet-page", false, cx))
                 .child(div().flex_1().truncate().child(format!("{} ({})", s.name, s.views.len())))
-                .when(active, |d| d.child(div().absolute().left_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
+                .when(active, |d| d.child(div().absolute().left(px(2.)).top_0().bottom_0().w(px(4.)).bg(blue)))
                 .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                     if e.click_count() >= 2 {
                         this.open_sheet_name_panel(i, window, cx);
@@ -205,50 +328,124 @@ impl DrawingEditor {
                         cx.stop_propagation();
                         this.open_sheet_menu(i, e.position, window, cx);
                     }),
-                );
-            list = list.child(row);
-            if active {
-                for v in &s.views {
-                    let (label, icon) = match &v.kind {
-                        ViewKind::Base { orientation, .. } => (format!("{orientation:?}"), "base-view"),
-                        ViewKind::Projected { .. } => ("Projected view".to_string(), "projected-view"),
-                        ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), "auxiliary-view"),
-                        ViewKind::Section { label, .. } => (format!("Section {label}"), "section-view"),
-                        ViewKind::Detail { label, .. } => (format!("Detail {label}"), "detail-view"),
-                        _ => ("Section view".to_string(), "section-view"),
+                )
+        };
+        let ref_row = |key: String, name: &str, indent: f32, cx: &mut Context<Self>| {
+            crate::ui::tree_row(SharedString::from(key), false)
+                .pl(px(indent))
+                .text_color(rgb(0x666666))
+                .child(crate::ui::caret(true))
+                .child(crate::ui::tree_icon("part", false, cx))
+                .child(div().flex_1().truncate().child(name.to_string()))
+        };
+        // (reference, views) groups of a sheet, in first-view order.
+        let groups = |this: &Self, s: &Sheet, cx: &App| {
+            let mut g: Vec<(String, Vec<DrawingView>)> = Vec::new();
+            for v in &s.views {
+                let r = this.view_reference(s, v.id, cx);
+                match g.iter_mut().find(|(n, _)| *n == r) {
+                    Some((_, vs)) => vs.push(v.clone()),
+                    None => g.push((r, vec![v.clone()])),
+                }
+            }
+            g
+        };
+        if by_ref {
+            let mut refs: Vec<(String, Vec<(usize, DrawingView)>)> = Vec::new();
+            for (sheet_i, s) in self.drawing.sheets.iter().enumerate() {
+                for (r, vs) in groups(self, s, cx) {
+                    let entry = match refs.iter().position(|(n, _)| *n == r) {
+                        Some(k) => &mut refs[k].1,
+                        None => {
+                            refs.push((r, Vec::new()));
+                            &mut refs.last_mut().expect("just pushed").1
+                        }
                     };
-                    let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
-                    list = list.child(crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false).pl(px(38.)).child(crate::ui::tree_icon(icon, false, cx)).child(div().flex_1().truncate().child(label)));
+                    entry.extend(vs.into_iter().map(|v| (sheet_i, v)));
+                }
+            }
+            for (k, (r, vs)) in refs.iter().enumerate() {
+                list = list.child(ref_row(format!("dr-ref-{k}"), r, 6., cx));
+                for (sheet_i, v) in vs {
+                    list = list.child(self.sheet_view_row(&self.drawing.sheets[*sheet_i], v, 44., cx));
+                }
+            }
+        } else {
+            for (i, s) in self.drawing.sheets.iter().enumerate() {
+                let active = i == self.sheet;
+                list = list.child(sheet_row(i, s, active, cx));
+                if active {
+                    for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
+                        list = list.child(ref_row(format!("dr-sheet-ref-{k}"), r, 24., cx));
+                        for v in vs {
+                            list = list.child(self.sheet_view_row(s, v, 62., cx));
+                        }
+                    }
                 }
             }
         }
-        gpui_kit::component::v_flex()
-            .w(px(crate::ui::LEFT_PANEL_W))
-            .h_full()
-            .flex_none()
-            .bg(pal.panel)
+        let tab = |id: &'static str, label: &'static str, selected: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .flex_1()
+                .h_full()
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_size(px(12.))
+                .cursor_pointer()
+                .when(selected, |d| d.text_color(blue).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(blue)))
+                .when(!selected, |d| d.text_color(pal.text))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.sheets_by_ref = id == "dr-sort-ref";
+                    cx.notify();
+                }))
+        };
+        let panel = gpui_kit::component::v_flex()
+            .id("dr-sheets-panel")
+            .occlude()
+            .absolute()
+            .top_0()
+            .left_0()
+            .bottom_0()
+            .w(px(W))
+            .bg(rgb(0xfafafa))
             .border_r_1()
-            .border_t_1()
-            .border_color(pal.border)
+            .border_color(rgb(0xd1d1d1))
+            .text_size(px(13.))
             .child(
                 h_flex()
                     .relative()
-                    .h(px(36.))
+                    .h(px(37.))
                     .flex_none()
                     .justify_center()
-                    .bg(pal.rail)
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.accent).child(format!("Sheets ({})", self.drawing.sheets.len())))
+                    .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(blue).child(format!("Sheets ({})", self.drawing.sheets.len())))
                     .child(
                         div()
+                            .id("dr-add-sheet")
                             .absolute()
-                            .right(px(6.))
-                            .child(crate::ui::tool_button("dr-add-sheet", "plus", false, cx).w(px(26.)).h(px(26.)).tooltip("Add sheet").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.add_sheet_after(si, cx)))),
+                            .right(px(2.))
+                            .top(px(4.))
+                            .size(px(29.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(4.))
+                            .bg(rgb(0xffffff))
+                            .shadow_sm()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(rgb(0xeaeaea)))
+                            .child(crate::assets::icon("sheet-insert", 20., cx))
+                            .tooltip(crate::ui::tooltip("Insert sheet"))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.add_sheet_after(si, cx))),
                     ),
             )
-            .child(list)
-            .into_any_element()
+            .child(div().h(px(2.)).flex_none().bg(blue))
+            .child(h_flex().h(px(27.)).flex_none().bg(rgb(0xffffff)).border_b_1().border_color(rgb(0xdbdbdb)).child(tab("dr-sort-sheet", "Sort by sheet", !by_ref, cx)).child(tab("dr-sort-ref", "Sort by reference", by_ref, cx)))
+            .child(list);
+        div().absolute().top_0().left_0().size_full().child(panel).child(self.sheets_toggle(W, cx)).into_any_element()
     }
 
     // ------------------------------------------------------------ tools
@@ -823,7 +1020,7 @@ impl DrawingEditor {
         out
     }
 
-    fn set_view_config(&mut self, view: ViewId, input: &str, value: &str, cx: &mut Context<Self>) {
+    pub(crate) fn set_view_config(&mut self, view: ViewId, input: &str, value: &str, cx: &mut Context<Self>) {
         let (input, value) = (input.to_string(), value.to_string());
         self.edit_view("View configuration", view, cx, |v| {
             if let ViewKind::Base { config, .. } = &mut v.kind {
@@ -834,7 +1031,7 @@ impl DrawingEditor {
     }
 
     /// Move a section view to the other side of its cutting line.
-    fn flip_section(&mut self, id: ViewId, cx: &mut Context<Self>) {
+    pub(crate) fn flip_section(&mut self, id: ViewId, cx: &mut Context<Self>) {
         let sheet = &self.drawing.sheets[self.sheet];
         let (Some(parent), Some(cut)) = (sheet.parent_of(id), views::section_cut(sheet, id)) else { return };
         let (Some(pv), Some(v)) = (sheet.view(parent), sheet.view(id)) else { return };

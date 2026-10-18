@@ -10,13 +10,16 @@ use noshape_model::drawing::sheet::LineStyle;
 use noshape_render::{LineData, LineSegment, MeshData, PointData, PointSprite};
 use std::collections::HashSet;
 
-const INK: [u8; 4] = [18, 18, 22, 255];
+// Onshape draws sheet ink pure black.
+const INK: [u8; 4] = [0, 0, 0, 255];
 const TANGENT_INK: [u8; 4] = [70, 70, 78, 255];
 const DANGLING_INK: [u8; 4] = [220, 40, 40, 255];
 
-/// Pixel width of a line style at a zoom (pixels per mm).
+/// Pixel width of a line style at a zoom (pixels per mm). Onshape's lines
+/// are hairlines at the fitted zoom (1 px for visible edges, frame and
+/// dimensions on a 4.3 px/mm A sheet) and thicken as you zoom in.
 pub fn px_width(style: LineStyle, zoom: f64) -> f32 {
-    (style.width_mm() * zoom * 0.75).clamp(1.0, 7.0) as f32
+    (style.width_mm() * zoom * 0.45).clamp(1.0, 7.0) as f32
 }
 
 /// Split a polyline into dashes following `pattern` (on, off, on, off...).
@@ -86,7 +89,8 @@ fn push(lines: &mut LineData, pts: &[[f64; 2]], color: [u8; 4], pick: u32, width
     }
 }
 
-/// All sheet polylines and texts as line segments.
+/// All sheet polylines as line segments, plus texts the filled font
+/// can't draw (the others: [`sheet_text`]).
 pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>) -> LineData {
     let g = &built.geometry;
     let mut lines = LineData::default();
@@ -97,7 +101,7 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>)
         }
         let color = if dangling_picks.contains(&l.pick) {
             DANGLING_INK
-        } else if l.style == LineStyle::Tangent {
+        } else if matches!(l.style, LineStyle::Tangent | LineStyle::Phantom) {
             TANGENT_INK
         } else {
             INK
@@ -107,17 +111,36 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>)
             push(&mut lines, &piece, color, l.pick, width);
         }
     }
-    for t in &g.texts {
-        if t.text.trim().is_empty() {
-            continue;
-        }
+    // Texts with symbols the filled font lacks (GD&T) stay stroked.
+    for t in g.texts.iter().filter(|t| !font::fill_supported(&t.text)) {
         let color = if dangling_picks.contains(&t.pick) { DANGLING_INK } else { INK };
-        let width = (t.height * 0.09 * zoom).clamp(1.0, 5.0) as f32;
+        let width = (t.height * 0.07 * zoom).clamp(1.0, 4.0) as f32;
         for s in font::text_strokes(t) {
             push(&mut lines, &s, color, t.pick, width);
         }
     }
     lines
+}
+
+/// Sheet texts as filled glyphs (Onshape's sheet text is a filled sans
+/// font): (ink, dangling) meshes, picked with the text's pick id.
+pub fn sheet_text(built: &BuiltSheet, dangling_picks: &HashSet<u32>) -> (MeshData, MeshData) {
+    let (mut ink, mut red) = (MeshData::default(), MeshData::default());
+    for t in &built.geometry.texts {
+        if t.text.trim().is_empty() || !font::fill_supported(&t.text) {
+            continue;
+        }
+        let (pts, idx) = font::text_fill(t);
+        let m = if dangling_picks.contains(&t.pick) { &mut red } else { &mut ink };
+        let base = m.positions.len() as u32;
+        for p in pts {
+            m.positions.push([p[0] as f32, p[1] as f32, 0.0]);
+            m.normals.push([0.0, 0.0, 1.0]);
+            m.pick_ids.push(t.pick);
+        }
+        m.indices.extend(idx.into_iter().map(|i| base + i));
+    }
+    (ink, red)
 }
 
 /// Arrowheads and other fills as triangles. The renderer shades meshes, so

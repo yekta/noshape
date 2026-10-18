@@ -63,7 +63,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ |
-| 3.13 | Shortcuts are user-customizable | B§2.1 | 🔧 user sketch shortcuts from `<config>/noshape/sketch-shortcuts.json` (`{"Slot": "shift-t"}`); no preferences page |
+| 3.13 | Shortcuts are user-customizable | B§2.1 | ⏳ (Shift+? sheet opens sketch shortcut preferences: Save, Restore default, Cancel; hot reload; GUI check pending) |
 
 ## 4. Geometry tools: clicks, drags and results
 
@@ -86,24 +86,24 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.15 | Ellipse: center, primary axis, secondary radius | H:ellipse | ✅ (T:sm) |
 | 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) |
 | 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) |
-| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (rho dimension, box opens after the third click) |
+| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) |
 | 4.19 | Inscribed / circumscribed polygon: center, circumference; construction circle | H:inscribed_polygon | ✅ |
 | 4.20 | Polygon: type the side count before the circumference click (3–50) | H:inscribed_polygon | ✅ |
-| 4.21 | Polygon: drag after the circumference click to change the side count | H:inscribed_polygon | ✅ (T:sm) |
+| 4.21 | Polygon: drag after the circumference click to change the side count | H:inscribed_polygon | ✅ (T:sm; GUI :103 circumference locked, typed 7 then Enter creates seven sides) |
 | 4.22 | Spline: click points, double-click to end | H:spline | ✅ (T:sm) |
 | 4.23 | Spline: closes when the last point lands on the first | H:spline | ✅ (T:sm) |
 | 4.24 | Spline: context menu **Confirm spline** finishes one point behind | H:spline | ✅ (T:sm) |
-| 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; white handles, drag to change the end tangents, not deletable) |
+| 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; GUI :103 open spline shows white tangent handles; handles are not deletable) |
 | 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) |
 | 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) |
-| 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; "Degree N" label, double-click to edit) |
+| 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) |
 | 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) |
 | 4.30 | Point: click to place | H:point | ✅ |
 | 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ |
 | 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ |
-| 4.33 | Text: Convert to expression | H:text | ✅ (Convert to expression / to text; strings, variables, `~`, roundToPrecision) |
+| 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) |
 | 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) |
-| 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux) |
+| 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) |
 | 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ |
 | 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) |
 | 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | 🔧 DXF (lines, arcs, circles, polylines, ellipses, splines, units, file origin) and images (drawn when the view is normal to the box); no DWG reader |
@@ -194,7 +194,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ |
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ |
-| 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ⏳ |
+| 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) |
 | 8.17 | Equal: if one curve is dimensioned, its size wins | H:equal | ✅ (solver) |
 | 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (both panels from the Sketch diagnostics tools) |
 
@@ -206,9 +206,9 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ |
 | 9.3 | Box select right→left: crossing (anything the box touches) | B§5.4 | ✅ (T:sm) |
 | 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ |
-| 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ⏳ |
+| 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ✅ (T:ux; fresh GUI :103 free point overlapping fixed origin drags away while origin stays fixed; current-point-priority.png) |
 | 9.6 | Clicking a closed region selects it | B§1.6 | ✅ |
-| 9.7 | Select other (`) | B§5.4 | ⏳ |
+| 9.7 | Select other (`) | B§5.4 | ✅ (GUI :103 backtick opens candidate popup; select-other-focus.png) |
 | 9.8 | Click in empty space clears the selection | Onshape | ✅ |
 
 ## 10. Dragging and solving
@@ -236,7 +236,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) |
 | 11.8 | Trim: click a standalone point deletes it | H:trim | ✅ (T:sm) |
 | 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ |
-| 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ⏳ |
+| 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |
 | 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves | H:offset | ✅ (T:sm) |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |
@@ -259,7 +259,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 12.2 | Construction, Transform sketch entities, Copy sketch entities | B§9 | ✅ |
 | 12.3 | Paste sketch entities (clipboard holds sketch entities) | B§9 | ✅ |
 | 12.4 | View normal to sketch plane; Exit tool; Clear selection | B§9 | ✅ |
-| 12.5 | Use (model edge under the cursor) | B§9 | ⏳ |
+| 12.5 | Use (model edge under the cursor) | B§9 | ✅ (GUI :103 right-click unused model edge offers Use; model-context-use.png) |
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ |
@@ -271,5 +271,44 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 |---|---|---|---|
 | 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ |
 | 13.2 | "Cannot fillet selected point." | i18n | ✅ |
-| 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ⏳ |
+| 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ |
+
+## 14. Continuation regressions (2026-10-18)
+
+| # | Behaviour | Source | Status |
+|---|---|---|---|
+| 14.1 | Circular pattern instances follow seed edits and a shared draggable center | H:sketch_circular_pattern | ✅ (T:ux: seed drag, center drag, circle/ellipse dimension edits, deletion cleanup; GUI recheck pending) |
+| 14.2 | Bezier creation rejects a seventeenth control point with the degree-15 message and still allows completion | H:bezier, i18n | ✅ (T:sm `bezier_creation_stops_at_degree_fifteen_and_can_still_finish`; live: 14 points → Deg 13, no message) |
+| 14.3 | Holding/releasing Shift updates inference at a stationary cursor; Shift before release suppresses a pending drag snap | H:automatic_inferencing | ⏳ (implemented; T:sm added) |
+| 14.4 | Reopening an ellipse dimension shows its diameter; reopening conic rho stays unitless; accepting unchanged preserves geometry | H:dimension, H:conic | ⏳ (fixed in-place input scaling/units; T:sm added) |
+| 14.5 | One Esc ends a Line chain and exits Line; double-click ends the chain while keeping Line active | Live sketch/56–57, behaviours.md | ✅ (T:sm `line_clicks_chain_and_one_esc_exits_the_tool`; GUI :103) |
+| 14.6 | Sketch context menu offers Confirm Sketch N, accepting the sketch | Live behaviours.md §Leaving a sketch | ✅ (GUI :103 k1-menu.png, k2-menu-line.png) |
+| 14.7 | Conic creation retains a default driving Rho dimension when its initial value box is dismissed; typing updates the same dimension | Live sketch/84–86 | ✅ (GUI :103 k6-conic-c.png: rho box opens with 0.5 selected; Esc keeps a driving `Rho 0.5`) |
+| 14.8 | Insert image/DXF fallback file chooser actually loads the selected file | GUI :103 | ✅ (GUI :103 current-image-loaded/current-image-inserted and current-dxf-inserted: image rectangle renders; fixture DXF inserts line + circle) |
+| 14.9 | Esc dismisses a sketch context menu/Select other popup and restores sketch shortcuts, without canceling the tool underneath | GUI :103 | ✅ (GUI :103 k1-esc.png: Esc closes the menu, tool/selection untouched) |
+| 14.10 | Fast trim drags crossing the viewport do not skip curves between mouse events | H:trim | ⏳ (swept-segment intersection replaces capped sampling; T:sm regression added) |
+| 14.11 | Esc preserves the sketch selection; Space or an empty-space click clears it | Live sketch/31,36 | ✅ (GUI :103 k1-esc.png: line stays selected after Esc) |
+| 14.12 | S toolbar has the live ten-tool order, includes Spline, and pressing S again repositions it at the cursor | Live sketch/38–39 | ✅ (GUI :103 current-s-toolbar-focused/current-s-repositioned: ten tools, 2×5, second S moves it) |
+| 14.13 | Sketch context menu offers Select other, Zoom to fit, Zoom to selection, with Confirm sketch first | Live sketch/31,37 | ✅ (GUI :103 k2-menu-line.png) |
+| 14.14 | Polygon side-count spinner adjusts the pending polygon; clicking a next center commits it and starts the next; Esc discards only the pending preview | Live sketch/87–98 | ✅ (GUI :103 k6-poly1-c.png: `◀ N ▶` spinner after the 2nd click; count follows the pointer distance as in live 97–98) |
+| 14.15 | Text box creation opens the Text dialog; editing supports confirmation/cancel, live preview and the 250-character limit | Live sketch/132–134 | ✅ (GUI :103 k6-text.png / k6-text-ok-c.png: dialog with preview, selected "Default text", 12/250; ✓ creates. Existing texts: double-click reopens the dialog, ✓ applies, ×/Esc keeps the text; T:sm `text_dialog_is_provisional_and_validates_character_limit`; no side panel for selected text; Convert to expression is in the dialog) |
+| 14.16 | Fillet first click previews/manipulator; Enter commits and opens the radius value box | Live sketch/110–115 | ✅ (T:sm `fillet_two_curves`: staged until Enter, Enter opens the radius box; GUI :103 k3-fillet.png + k3-enter-c.png; Enter path now syncs the value box) |
+| 14.17 | Linear sketch pattern offers independent X/Y counts and spacing, defaults 3×1 | Live sketch/136–137 | ✅ (two directions with linked grid, T:sm `linear_pattern_second_direction_links_grid_and_round_trips_edit`; GUI :103 k4: `3x`/`1x` + spacing `25` on canvas, typed 40 mm applied as a driving dimension) |
+| 14.18 | Enter mid-chain (or with any tool's idle value box) places the boxed value as a driving dimension; the tool and chain continue | Live sketch/212–213 | ✅ (T:sm `enter_mid_chain_places_the_boxed_length_as_a_driving_dimension`; GUI :103 e1/e2.png: boxed 18.188 → placed dimension, rubber band continues) |
+| 14.19 | Enter with a drawing tool and nothing pending does nothing (tool stays, sketch stays open) | Live behaviours.md §tool-state | ✅ (Accept capture stops propagation while a drawing tool is active) |
+| 14.20 | Press-drag-release from a Line chain's end makes no arc and places no point; the rubber band keeps following | Live sketch/210–211 | ✅ (T:sm `press_drag_from_the_chain_end_places_nothing`; GUI :103 g2.png matches live 211) |
+| 14.21 | Spline / Bezier: first Esc commits the curve through the placed points (cursor point dropped) and keeps the tool; second Esc exits | Live sketch/22x-esc-spline, 233 | ✅ (T:sm `first_escape_commits_a_spline_and_the_second_exits`; GUI :103 h123.png) |
+| 14.22 | The sketch's own plane is not pre-highlighted while sketching on it | Live sketch/09, 51 | ✅ (GUI :103 g1/g2.png: no tan plane highlight under the cursor; was highlighted before) |
+| 14.23 | An idle value box shows a bare number like a dimension label (`1.269`), units appear only once typing starts | Live sketch/211–212 | ✅ (T:sm asserts the label; GUI :103 k1-box-c.png shows `18.188`) |
+| 14.24 | Sketch context menu in live order: Confirm \| Use (model edge) \| Copy sketch entities, Transform sketch entities (nothing selected: Copy sketch) \| Show all (nothing selected), Curve/surface analysis…, Section view… \| Clear selection, Select ▸, Select other… \| Zoom to fit, Zoom to selection, View normal to sketch plane \| Delete sketch entity; no "Construction" item | Live sketch/31, 37, 204 | ✅ (GUI :103 k2-menu-line.png in live order; Add comment omitted: no comments in noshape; empty-state Select ▸ items requested from live capture) |
+| 14.25 | Select ▸ Tangent connected edges / Equal length/radius edges / Parallel edges grow the sketch selection | Live sketch/32 | ✅ (T:ux `select_related_grows_tangent_chains_equal_sizes_and_parallels`; GUI :103 k2-parallel-c.png: Parallel edges selects the slot sides + centerline) |
+| 14.26 | Default tool sizes follow the document unit: inch docs fillet R0.5, chamfer/offset 0.25, slot Ø0.5, pattern spacing 1 | Live sketch/107–137 | ✅ (live: inch R0.5/0.25/0.25/Ø0.5/1 in; mm R20/5/5/Ø20/25 mm; GUI :103 mm doc slot shows Ø20) |
+| 14.27 | Slot works only on existing curves (empty-space clicks do nothing); the slot is a light-blue preview until the next click / Enter / leaving the tool; the picked centerline stays solid; no value box opens | Live sketch/104–109, 307–311 | ✅ (T:sm `slot_previews_until_the_next_click_and_keeps_its_centerline_solid`, T:ux slot tests updated; GUI :103 k2-slot.png) |
+| 14.28 | Enter with no tool active does not accept the sketch | Live sketch/311 | ✅ (GUI :103 k2-enter.png: sketch dialog stays open) |
+| 14.29 | Show constraints starts on in a new session | Live sketch/00 | ✅ (GUI :103 k2-dd.png) |
+| 14.30 | Pattern instance counts are on-canvas `Nx` labels (click to type); the linear spacing is an on-canvas value (click to type, expressions allowed); no options panel for linear pattern | Live sketch/136–138 | ✅ (T:sm `pattern_count_labels_default_to_live_counts_and_accept_typing`; GUI :103 k4.png, k4b.png) |
+| 14.31 | No floating options panel for fillet, polygon, conic (they use the manipulator / spinner / rho box) | Live sketch/87–98, 84–86, 110–115 | ✅ (GUI :103 k3-enter-c.png: no panel) |
+| 14.32 | Circular pattern defaults to 3 instances | Live sketch/138 | ✅ (T:sm) |
+| 14.33 | Circular pattern / Transform still use the floating options panel (live: on-canvas only) | Live sketch/138–139 | ✅ (circular: `3x` label + open-pattern angle value, GUI :103 k5-open-c/k5-90-c.png; transform: triad on the selection, rotation/scale fields appear once dragged, GUI k5-xf-c/k5-rot-c.png; T:sm `transform_triad_follows_the_selection_until_its_center_is_dragged`; no options panels remain for patterns/transform) |
+| 14.34 | Right-click on a model edge in a sketch: Confirm \| Use \| Hide Part, Curve/surface analysis…, Isolate…, Make transparent… \| Clear selection, Select ▸, Select other… \| zoom/view items incl. Align view with vertical axis | Live sketch/204 | 🔧 (Confirm, Use, analysis, selection, zoom/view present; Hide/Isolate/Make transparent/Align view not in the sketch menu) |

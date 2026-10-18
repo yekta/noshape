@@ -253,6 +253,90 @@ pub fn text_strokes(t: &Text2) -> Vec<Vec<[f64; 2]>> {
     out
 }
 
+/// Liberation Sans cap height over its ascender (the unit of
+/// `noshape_sketch::text::layout_text`).
+const FILL_CAP: f64 = 1409.0 / 1854.0;
+
+/// Whether [`text_fill`] can draw every character (Latin and Greek; GD&T
+/// and other symbols only exist in the stroke font).
+pub fn fill_supported(text: &str) -> bool {
+    text.chars().all(|c| (c as u32) < 0x250 || ('\u{370}'..='\u{3ff}').contains(&c) || matches!(c, '\u{2212}' | '\u{2013}' | '\u{2014}' | '\u{2026}' | '\u{2018}'..='\u{201d}'))
+}
+
+/// The text as filled glyphs (Onshape draws sheet text in a filled sans
+/// font), as triangles in sheet coordinates: same cap height, anchor and
+/// angle as [`text_strokes`]. Glyphs are narrowed when they would be wider
+/// than [`text_width`], so layouts computed from it (dimension gaps, table
+/// cells, title block) still fit.
+pub fn text_fill(t: &Text2) -> (Vec<[f64; 2]>, Vec<u32>) {
+    let layout = noshape_sketch::text::layout_text(&t.text, "Sans", false, false);
+    if layout.contours.is_empty() || layout.width <= 0.0 {
+        return (Vec::new(), Vec::new());
+    }
+    let s = t.height / FILL_CAP;
+    let natural = layout.width * s;
+    let target = text_width(&t.text, t.height);
+    let sx = if natural > target && target > 0.0 { target / natural } else { 1.0 };
+    let off = anchor_offset(t.anchor, natural * sx, t.height);
+    let (c, sn) = (t.angle.cos(), t.angle.sin());
+    let map = |x: f64, y: f64| {
+        let (lx, ly) = (off[0] + x * s * sx, off[1] + y * s);
+        [t.pos[0] + lx * c - ly * sn, t.pos[1] + lx * sn + ly * c]
+    };
+    let steps = if t.height * 4.0 > 6.0 { 4 } else { 2 };
+    let mut rings: Vec<Vec<[f64; 2]>> = layout
+        .polylines(steps)
+        .into_iter()
+        .map(|mut r| {
+            if r.len() > 1 && (r[0] - r[r.len() - 1]).length() < 1e-9 {
+                r.pop();
+            }
+            r.into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>()
+        })
+        .filter(|r: &Vec<[f64; 2]>| r.len() >= 3)
+        .collect();
+    let area = |r: &[[f64; 2]]| r.iter().zip(r.iter().cycle().skip(1)).map(|(a, b)| a[0] * b[1] - b[0] * a[1]).sum::<f64>() / 2.0;
+    let inside = |p: [f64; 2], r: &[[f64; 2]]| {
+        let mut odd = false;
+        for (a, b) in r.iter().zip(r.iter().cycle().skip(1)) {
+            if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0]) {
+                odd = !odd;
+            }
+        }
+        odd
+    };
+    // Outer contours share the orientation of the largest one; each hole
+    // goes to the smallest outer contour around it.
+    let areas: Vec<f64> = rings.iter().map(|r| area(r)).collect();
+    let outer_sign = areas.iter().copied().fold(0.0f64, |m, a| if a.abs() > m.abs() { a } else { m }).signum();
+    let outers: Vec<usize> = (0..rings.len()).filter(|&i| areas[i].signum() == outer_sign).collect();
+    let mut holes: Vec<Vec<usize>> = vec![Vec::new(); rings.len()];
+    for i in (0..rings.len()).filter(|i| !outers.contains(i)) {
+        if let Some(&o) = outers.iter().filter(|&&o| inside(rings[i][0], &rings[o])).min_by(|&&a, &&b| areas[a].abs().total_cmp(&areas[b].abs())) {
+            holes[o].push(i);
+        }
+    }
+    let (mut pts, mut idx) = (Vec::new(), Vec::new());
+    for &o in &outers {
+        let mut flat: Vec<f64> = Vec::new();
+        let mut hole_starts = Vec::new();
+        let base = pts.len() as u32;
+        for (k, &r) in std::iter::once(&o).chain(holes[o].iter()).enumerate() {
+            if k > 0 {
+                hole_starts.push(flat.len() / 2);
+            }
+            for p in std::mem::take(&mut rings[r]) {
+                flat.extend([p[0], p[1]]);
+                pts.push(map(p[0], p[1]));
+            }
+        }
+        if let Ok(tris) = earcutr::earcut(&flat, &hole_starts, 2) {
+            idx.extend(tris.into_iter().map(|i| base + i as u32));
+        }
+    }
+    (pts, idx)
+}
+
 /// The four corners of the text's bounding box (sheet coordinates,
 /// counter-clockwise from the lower-left of the text frame), including a
 /// small margin and room for descenders.
@@ -281,6 +365,19 @@ pub fn text_hit(t: &Text2, p: [f64; 2]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn filled_text_fits_stroke_width() {
+        for text in ["SECTION A-A", "100", "Ø24 H7", "B"] {
+            let t = Text2 { pos: [10.0, 10.0], height: 3.5, text: text.into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 };
+            let (pts, idx) = text_fill(&t);
+            assert!(!idx.is_empty() && idx.len() % 3 == 0, "{text}");
+            let max_x = pts.iter().map(|p| p[0]).fold(f64::MIN, f64::max);
+            assert!(max_x <= 10.0 + text_width(text, 3.5) + 1e-6, "{text}");
+            let max_y = pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max);
+            assert!(max_y < 10.0 + 3.5 * 1.25, "{text}");
+        }
+    }
 
     #[test]
     fn every_glyph_parses() {

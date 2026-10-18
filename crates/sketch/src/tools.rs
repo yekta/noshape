@@ -755,16 +755,53 @@ impl Sketch {
 
     /// Circular pattern returning the created entities of each instance.
     pub fn circular_pattern_groups(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64) -> Result<Vec<Vec<EntityId>>> {
+        self.circular_pattern_groups_impl(ids, center, count, total_angle, false)
+    }
+
+    /// Circular pattern whose instances remain linked to their seeds. The
+    /// shared construction center belongs to the first group for deletion
+    /// and pattern editing. It can be constrained or dragged like any point.
+    pub fn circular_pattern_linked_groups(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64) -> Result<Vec<Vec<EntityId>>> {
+        self.circular_pattern_groups_impl(ids, center, count, total_angle, true)
+    }
+
+    fn circular_pattern_groups_impl(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64, linked: bool) -> Result<Vec<Vec<EntityId>>> {
         let mut out = Vec::new();
-        if count < 2 {
+        if count < 2 || ids.is_empty() {
             return Ok(out);
         }
+        // Validate before adding the center or making any copies.
+        for id in ids {
+            self.entity(*id).ok_or(SketchError::UnknownEntity(*id))?;
+        }
+        let center_id = if linked {
+            let id = self.add_point(center);
+            self.set_construction(id, true)?;
+            Some(id)
+        } else { None };
         let full = (total_angle.abs() - TAU).abs() < 1e-9;
         let step = if full { total_angle / count as f64 } else { total_angle / (count - 1) as f64 };
         for k in 1..count {
             let t = Transform::Rotate { center, angle: step * k as f64 };
             let mut res = EditResult::default();
-            self.copy_entities(ids, &move |p| t.apply(p), &move |v| t.apply_vec(v), false, &|_| false, &mut res)?;
+            let (points, entities) = self.copy_entities(ids, &move |p| t.apply(p), &move |v| t.apply_vec(v), false, &|_| false, &mut res)?;
+            if let Some(center) = center_id {
+                for (seed, inst) in points {
+                    self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
+                }
+                for (seed, inst) in entities {
+                    match self.kind(seed) {
+                        Some(EntityKind::Circle) => self.add_c(&mut res, ConstraintKind::Equal { a: seed, b: inst }),
+                        Some(EntityKind::Ellipse | EntityKind::EllipticalArc) => {
+                            self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
+                        }
+                        _ => {}
+                    }
+                }
+                if k == 1 {
+                    res.created.push(center);
+                }
+            }
             out.push(res.created);
         }
         Ok(out)
@@ -949,9 +986,8 @@ impl Sketch {
                     let _ = self.add_constraint(ConstraintKind::Equal { a: caps[n - 2], b: caps[n - 1] });
                 }
             }
-            for id in &chain {
-                self.set_construction(*id, true)?;
-            }
+            // Live Onshape: the picked centerline stays a normal (solid)
+            // line, like the single-curve slot (sketch/307–308).
             curves.extend(made);
         }
         Ok((curves, caps))

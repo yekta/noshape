@@ -50,6 +50,8 @@ pub struct LineSegment {
 impl LineSegment {
     pub const DASHED: u32 = 1;
     pub const ON_TOP: u32 = 2;
+    /// Dash-dot (phantom) pattern.
+    pub const DASH_DOT: u32 = 4;
 }
 
 impl LineData {
@@ -147,6 +149,8 @@ pub struct Instance {
     pub pickable: bool,
     /// Excluded from section-view clipping (e.g. sketch overlays, planes).
     pub ignore_clip: bool,
+    /// Drawn with its flat color, without lighting (construction planes).
+    pub unlit: bool,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
@@ -165,6 +169,7 @@ impl Instance {
             color_mode: ColorMode::Instance,
             pickable: true,
             ignore_clip: false,
+            unlit: false,
             layer: 0,
             pick_only: false,
             pick_base: 0,
@@ -200,6 +205,12 @@ impl Instance {
     }
     pub fn ignore_clip(mut self) -> Self {
         self.ignore_clip = true;
+        self
+    }
+
+    /// Draw with the flat instance color, without lighting.
+    pub fn unlit(mut self) -> Self {
+        self.unlit = true;
         self
     }
 }
@@ -319,6 +330,7 @@ impl Scene {
                     && a.color_mode == b.color_mode
                     && a.pickable == b.pickable
                     && a.ignore_clip == b.ignore_clip
+                    && a.unlit == b.unlit
                     && a.layer == b.layer
                     && a.pick_only == b.pick_only
                     && a.pick_base == b.pick_base

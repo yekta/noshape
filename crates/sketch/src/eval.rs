@@ -5,6 +5,7 @@ use crate::entities::EntityKind;
 use crate::geom::BBox;
 use crate::ids::EntityId;
 use crate::sketch::Sketch;
+use crate::solver::{ConstraintState, SolveReport};
 use glam::DVec2;
 
 impl Sketch {
@@ -42,6 +43,16 @@ impl Sketch {
     /// Hover picking: the entity nearest to `p` within `radius`. Points win
     /// over curves when both are within the radius.
     pub fn pick(&self, p: DVec2, radius: f64) -> Option<EntityId> {
+        self.pick_impl(p, radius, None)
+    }
+
+    /// Sketch selection prefers movable points to fully constrained points
+    /// when both fall within the pick radius. Curves still follow points.
+    pub fn pick_with_report(&self, p: DVec2, radius: f64, report: &SolveReport) -> Option<EntityId> {
+        self.pick_impl(p, radius, Some(report))
+    }
+
+    fn pick_impl(&self, p: DVec2, radius: f64, report: Option<&SolveReport>) -> Option<EntityId> {
         let mut best: Option<(u8, f64, EntityId)> = None;
         for e in self.entities() {
             let Some(bb) = self.entity_bbox(e.id) else { continue };
@@ -52,7 +63,9 @@ impl Sketch {
             if d > radius {
                 continue;
             }
-            let pri = if e.kind() == EntityKind::Point { 0 } else { 1 };
+            let pri = if e.kind() == EntityKind::Point {
+                u8::from(report.is_some_and(|r| r.state(e.id) == Some(ConstraintState::FullyConstrained)))
+            } else { 2 };
             if best.is_none_or(|b| (pri, d) < (b.0, b.1)) {
                 best = Some((pri, d, e.id));
             }

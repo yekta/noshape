@@ -16,8 +16,10 @@ pub struct Palette {
     pub panel_hover: Rgba,
     /// Toggled-on icon buttons (`--os-icon-button-fill--selected`).
     pub panel_active: Rgba,
-    /// Toolbar tool hover (`--os-color-constitution-rgba5` over white).
+    /// Toolbar tool hover (measured live: `#eaeaea`).
     pub tool_hover: Rgba,
+    /// Hover of a split tool group, both halves (`--os-icon-button-fill--hover-group`).
+    pub tool_hover_group: Rgba,
     /// Toolbar tool whose dialog is open (`--os-select-primary`).
     pub tool_active: Rgba,
     /// Left and right panel rails (`--os-left-panel-background`).
@@ -74,8 +76,6 @@ pub struct Palette {
     pub tab_bar: Rgba,
     /// Inactive tab (`--os-tab-bar-tab--inactive`).
     pub tab_inactive: Rgba,
-    /// Feature dialog footer (`--os-feature-dialog-footer-fill`).
-    pub dialog_footer: Rgba,
     /// Feature dialog accept check (`--os-feature-dialog-accept--idle`).
     pub accept: Rgba,
     /// Feature dialog cancel X (`--os-icon-accent-cancel`).
@@ -93,7 +93,8 @@ pub const PALETTE: Palette = Palette {
     panel_raised: rgb_const(0xffffff),
     panel_hover: rgb_const(0xeaeaea),
     panel_active: rgb_const(0xeaeaea),
-    tool_hover: rgb_const(0xf2f2f2),
+    tool_hover: rgb_const(0xeaeaea),
+    tool_hover_group: rgb_const(0xd7d7d7),
     tool_active: rgb_const(0xb2ddf6),
     rail: rgb_const(0xfafafa),
     focus: rgb_const(0x3e94ff),
@@ -124,7 +125,6 @@ pub const PALETTE: Palette = Palette {
     tooltip: rgb_const(0xd0dbe5),
     tab_bar: rgb_const(0xd7d7d7),
     tab_inactive: rgb_const(0xeaeaea),
-    dialog_footer: rgb_const(0xeeeeee),
     accept: rgb_const(0x009400),
     cancel: rgb_const(0xbd3039),
     success: rgb_const(0x009400),
@@ -148,10 +148,14 @@ pub mod viewport {
     pub const SELECTION: u32 = 0xffa90a;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).
     pub const ERROR: u32 = 0xbd3039;
-    /// Construction plane fill (`--os-construction-plane-ambient-color`).
+    /// Construction plane fill (`--os-construction-plane-ambient-color`),
+    /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;
     /// Construction plane outline (`--os-construction-plane-outline-color`, 35% alpha).
     pub const PLANE_OUTLINE: u32 = 0x1d60aa;
+    /// The same outline as it renders on white (`#1d60aa` at 35% in sRGB),
+    /// drawn opaque because the renderer blends in linear light.
+    pub const PLANE_OUTLINE_ON_WHITE: u32 = 0xaac3de;
     /// Construction plane label (`--os-construction-plane-text-color`).
     pub const PLANE_TEXT: u32 = 0x1651b0;
     /// Origin and point bodies (`--os-origin-color`).
@@ -165,6 +169,9 @@ pub mod viewport {
     /// Sketch: entities used from outside the sketch. A noshape convention
     /// (Onshape draws them in the constraint-state color); `--os-accent-nonary`.
     pub const SKETCH_EXTERNAL: u32 = 0x672f8f;
+    /// Closed sketch regions of the sketch being edited, drawn at ~26%
+    /// (`--os-sketch-region-fill-color` `#9aa5af33`; sampled live).
+    pub const SKETCH_REGION: u32 = 0x9aa5af;
     /// Driven dimensions (`--os-dimension-driven-line-point-color`).
     pub const DIM_DRIVEN: u32 = 0x666666;
     /// Drawing editor: the flat gray surround of the sheet (sampled).

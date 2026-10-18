@@ -79,13 +79,15 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 
 | Agent | Motile id | Account / model | Display, target | Handoff |
 |---|---|---|---|---|
-| ui: Part Studio chrome, dialogs, viewport | 4c87ff1e-dd12-48ad-8a96-aceea272ca85 | Unbind / Fable 5.1 | :101, target-ui | `docs/handoff/theme-layout.md` |
-| ui2: sketch/assembly/drawing/start-window visuals | 1ab28110-dc74-4006-8e5b-552669f57d0d | Unbind / Opus 5.5 | :105, target-ui2 | `docs/handoff/theme-studios.md` |
-| live: captures real Onshape into `/root/onshape-research/live/` | 2fdb41b3-d693-47fb-9eb8-8e69bcca552f | Motile / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
+| ui: Part Studio chrome, dialogs, viewport | 6b6696ee-ea16-473c-878c-1835191a432a | Yekta / Opus 5.5 | :101, target-ui | `docs/handoff/theme-layout.md` |
+| ui2: sketch/assembly/drawing/start-window visuals | 7ca75884-7b95-41f3-b02c-a59dc5100855 | Stablecog / Opus 5.5 | :105, target-ui2 | `docs/handoff/theme-studios.md` |
+| live: captures real Onshape into `/root/onshape-research/live/` (finished; restart one for new REQUESTS.md lines) | 2fdb41b3-d693-47fb-9eb8-8e69bcca552f | Motile / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
 | psb: Part Studio behaviour | b98a1037-8119-4552-9514-fba9ad39e0d0 | Motile / Opus 5.5 | :102, target-psb | `docs/handoff/part-studio-behaviour.md` |
-| skb: sketch behaviour | 0da86aed-871a-4059-a99b-800eaac48d5e | Codex / gpt-6.1-sol | :103, target-skb | `docs/handoff/sketch-behaviour.md` |
-| asb: assembly, then drawing behaviour | 8dd0feca-ba9f-4968-8546-e57efb6ce793 | Unbind / Opus 5.5 | :104, target-asb | `docs/handoff/assembly-behaviour.md`, `drawing-behaviour.md` |
+| skb: sketch behaviour | 275d333d-fa18-4bfb-9bae-624c1bd70f2d | Stablecog / Opus 5.5 (moved from Codex after its session limit) | :103, target-skb | `docs/handoff/sketch-behaviour.md` |
+| asb: assembly, then drawing behaviour | c50462f8-b3d4-499a-8dbc-7d866ee473ea | Yekta / Opus 5.5 | :104, target-asb | `docs/handoff/assembly-behaviour.md`, `drawing-behaviour.md` |
 
+Use Opus 5.5 for all agents (user, 2026-10-18; not Fable). Unbind and Codex hit session limits on 2026-10-18; their agents were moved.
+Motile bug: an agent in "waiting_for_usage_limit" ignores stop_agent; send it a message (that wakes it), then stop_agent while it shows "running".
 Accounts: "Ngyekta" (Claude) hit its weekly limit (resets 2026-10-19 04:00 UTC); the "Yekta" account's login expired.
 QA round 2 finished and is integrated; another QA round is due once the restyle lands.
 

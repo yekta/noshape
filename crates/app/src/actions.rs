@@ -26,9 +26,14 @@ actions!(
         MateConnectorTool,
         ToggleMateConnectors,
         FlipPrimaryAxis,
+        ReorientSecondaryAxis,
         SelectOther,
         SelectOtherPrevious,
         NewDocument,
+        /// Open the Create Drawing dialog (request in `drawing_create`).
+        CreateDrawing,
+        /// Activate the tab set by `workspace::request_activate_tab`.
+        ActivateRequestedTab,
         OpenDocument,
         SaveCopyAs,
         CloseWindow,
@@ -119,7 +124,6 @@ actions!(
         ToggleMates,
         ToggleShowMatesMode,
         ToggleSnapMode,
-        ReorientSecondaryAxis,
         // Drawing
         DrawingUpdate,
     ]
@@ -148,6 +152,8 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("enter", Accept, dlg),
         KeyBinding::new("shift-enter", AcceptAndRepeat, dlg),
         KeyBinding::new("escape", Cancel, dlg),
+        KeyBinding::new("enter", Accept, Some("CreateDrawing")),
+        KeyBinding::new("escape", Cancel, Some("CreateDrawing")),
         // Esc while typing in a dialog field still cancels the dialog (Onshape).
         KeyBinding::new("escape", Cancel, Some("FeatureDialog > Input")),
         KeyBinding::new("shift-n", RenameSelected, doc),
@@ -161,6 +167,7 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("ctrl-m", MateConnectorTool, doc_mod),
         KeyBinding::new("k", ToggleMateConnectors, doc),
         KeyBinding::new("a", FlipPrimaryAxis, dlg),
+        KeyBinding::new("q", ReorientSecondaryAxis, dlg),
         KeyBinding::new("`", SelectOther, doc),
         KeyBinding::new("shift-`", SelectOtherPrevious, doc),
         KeyBinding::new("~", SelectOtherPrevious, doc),

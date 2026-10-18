@@ -70,7 +70,7 @@ fn slot_around_line_and_arc() {
     let l = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
     let s = sk.slot_around(l, 2.0).unwrap();
     assert!(sk.solve().is_solved());
-    assert!(sk.entity(l).unwrap().construction);
+    assert!(!sk.entity(l).unwrap().construction, "centerline stays solid (live sketch/308)");
     assert_eq!(s.curves.len(), 4);
     let regions = sk.regions();
     assert_eq!(regions.len(), 1);
@@ -281,8 +281,8 @@ fn slot_around_a_chain_follows_it() {
     assert_eq!(caps.len(), 2);
     assert!(sk.solve().is_solved());
     let regions = sk.regions();
-    assert_eq!(regions.len(), 1, "one closed slot profile around the chain");
-    assert!(sk.entity(l1).unwrap().construction && sk.entity(l2).unwrap().construction);
+    assert_eq!(regions.len(), 1, "one closed slot profile (the solid centerline dangles inside)");
+    assert!(!sk.entity(l1).unwrap().construction && !sk.entity(l2).unwrap().construction, "centerline stays solid (live)");
     assert!(curves.len() >= 6);
 }
 
@@ -313,4 +313,116 @@ fn linear_pattern_instances_follow_their_seed() {
     let step = sk.point(first[0]).unwrap() - sk.point(s0).unwrap();
     assert!(((p - q) - step * 2.0).length() < 1e-9, "{p:?} {q:?} {step:?}");
     assert!((q - v(1.5, 0.3)).length() < 1e-3, "the seed end followed the drag");
+}
+
+#[test]
+fn circular_pattern_follows_seed_edits_and_center_drag() {
+    let mut sk = Sketch::new();
+    let line = sk.add_line(v(2.0, 1.0), v(3.0, 1.0));
+    let (a, b) = sk.endpoints(line).unwrap();
+    let groups = sk.circular_pattern_linked_groups(&[line], v(1.0, 1.0), 4, std::f64::consts::TAU).unwrap();
+    let center = sk.constraints().find_map(|c| match c.kind {
+        ConstraintKind::CircularPatternLink { center, .. } => Some(center),
+        _ => None,
+    }).unwrap();
+    sk.add_constraint(ConstraintKind::Fix { entity: a }).unwrap();
+    sk.add_constraint(ConstraintKind::Fix { entity: center }).unwrap();
+    assert!(sk.solve().is_solved());
+    let report = sk.drag(&[(DragHandle::Point(b), v(3.4, 1.6))]);
+    assert!(report.is_solved(), "{report:?}");
+    assert!((sk.point(b).unwrap() - v(3.4, 1.6)).length() < 1e-3);
+    let check = |sk: &Sketch| {
+        for (k, group) in groups.iter().enumerate() {
+            let copy = group.iter().copied().find(|id| sk.kind(*id) == Some(EntityKind::Line)).unwrap();
+            let (ca, cb) = sk.endpoints(copy).unwrap();
+            let t = Transform::Rotate { center: sk.point(center).unwrap(), angle: std::f64::consts::FRAC_PI_2 * (k + 1) as f64 };
+            assert!((sk.point(ca).unwrap() - t.apply(sk.point(a).unwrap())).length() < 1e-8);
+            assert!((sk.point(cb).unwrap() - t.apply(sk.point(b).unwrap())).length() < 1e-8);
+        }
+    };
+    check(&sk);
+    let fix = sk.constraints().find(|c| matches!(c.kind, ConstraintKind::Fix { entity } if entity == center)).unwrap().id;
+    sk.remove_constraint(fix).unwrap();
+    sk.add_constraint(ConstraintKind::Fix { entity: b }).unwrap();
+    let report = sk.drag(&[(DragHandle::Point(center), v(0.4, 0.7))]);
+    assert!(report.is_solved(), "{report:?}");
+    assert!((sk.point(center).unwrap() - v(0.4, 0.7)).length() < 1e-3);
+    check(&sk);
+}
+
+#[test]
+fn circular_pattern_keeps_circle_and_ellipse_sizes_linked() {
+    let mut sk = Sketch::new();
+    let circle = sk.add_circle(v(2.0, 0.0), 0.5);
+    let ellipse = sk.add_ellipse(v(0.0, 3.0), v(1.0, 0.2), 0.4);
+    let groups = sk.circular_pattern_linked_groups(&[circle, ellipse], DVec2::ZERO, 3, std::f64::consts::PI).unwrap();
+    let radius = sk.add_constraint(ConstraintKind::Radius { curve: circle, value: 0.5 }).unwrap();
+    let major = sk.add_constraint(ConstraintKind::EllipseRadius { ellipse, major: true, value: v(1.0, 0.2).length() }).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.set_dimension_value(radius, 0.8).unwrap();
+    sk.set_dimension_value(major, 1.8).unwrap();
+    assert!(sk.solve().is_solved());
+    for group in &groups {
+        for id in group {
+            match sk.curve(*id) {
+                Some(Curve2::Circle { radius, .. }) => assert!((radius - 0.8).abs() < 1e-8),
+                Some(Curve2::Ellipse { major, minor, .. }) => {
+                    assert!((major.length() - 1.8).abs() < 1e-8);
+                    let Some(Curve2::Ellipse { minor: seed_minor, .. }) = sk.curve(ellipse) else { unreachable!() };
+                    assert!((minor - seed_minor).abs() < 1e-8);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[test]
+fn removing_a_circular_pattern_drops_its_links_and_center() {
+    let mut sk = Sketch::new();
+    let p = sk.add_point(v(2.0, 0.0));
+    let groups = sk.circular_pattern_linked_groups(&[p], DVec2::ZERO, 4, std::f64::consts::TAU).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.remove_entities(&groups.into_iter().flatten().collect::<Vec<_>>());
+    assert_eq!(sk.entity_count(), 1);
+    assert_eq!(sk.constraint_count(), 0);
+    assert_eq!(sk.point(p), Some(v(2.0, 0.0)));
+}
+
+#[test]
+fn sketch_picking_prefers_a_movable_point_over_a_nearer_fixed_point() {
+    let mut sk = Sketch::new();
+    let fixed = sk.add_point(v(1.0, 1.0));
+    let movable = sk.add_point(v(1.003, 1.0));
+    sk.add_line(v(0.0, 1.0), v(2.0, 1.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: fixed }).unwrap();
+    let report = sk.solve();
+    assert_eq!(sk.pick(v(1.0, 1.0), 0.005), Some(fixed));
+    assert_eq!(sk.pick_with_report(v(1.0, 1.0), 0.005, &report), Some(movable));
+    assert_eq!(sk.pick_with_report(v(1.0, 1.0), 0.001, &report), Some(fixed));
+    assert_eq!(sk.pick_with_report(v(4.0, 4.0), 0.005, &report), None);
+}
+
+#[test]
+fn select_related_grows_tangent_chains_equal_sizes_and_parallels() {
+    let mut sk = Sketch::new();
+    let l1 = sk.add_line(v(0.0, 0.0), v(1.0, 0.0));
+    let (_, e1) = sk.endpoints(l1).unwrap();
+    let arc = sk.tangent_arc(e1, v(2.0, 1.0)).unwrap();
+    let arc_end = *arc.points.last().unwrap();
+    let up = sk.add_point(v(2.0, 2.0));
+    let l2 = sk.add_line_between(arc_end, up).unwrap();
+    let corner = sk.add_point(v(3.0, 2.0));
+    let l3 = sk.add_line_between(up, corner).unwrap();
+    let far = sk.add_line(v(5.0, 5.0), v(6.0, 5.0));
+    let circle = sk.add_circle(v(8.0, 8.0), 1.0);
+    let chain = sk.select_related(&[l1], RelatedSelection::TangentConnected);
+    assert_eq!(chain.len(), 3, "{chain:?}");
+    assert!(chain.contains(&arc.curves[0]) && chain.contains(&l2));
+    assert!(!chain.contains(&l3), "the corner is not smooth");
+    let equal = sk.select_related(&[l1, arc.curves[0]], RelatedSelection::EqualSize);
+    assert!(equal.contains(&l3) && equal.contains(&far) && equal.contains(&l2), "unit-length lines: {equal:?}");
+    assert!(equal.contains(&circle), "radius 1 like the arc");
+    let parallel = sk.select_related(&[l1], RelatedSelection::Parallel);
+    assert_eq!(parallel, vec![l1, l3, far]);
 }

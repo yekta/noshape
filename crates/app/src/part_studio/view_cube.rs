@@ -4,17 +4,22 @@
 //! dropdown under it is the *Camera and render options* menu.
 
 use super::PartStudioView;
-use crate::scene_builder::DisplayMode;
+use crate::scene_builder::{DisplayMode, TangentEdges};
 use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::h_flex;
 use gpui_kit::*;
 use noshape_render::{Camera, Projection, StandardView};
 
-/// Side of the cube widget in logical pixels.
-const CUBE_PX: f32 = 104.0;
+/// Side of the whole widget (cube, arrows and the view menu button): Onshape's
+/// `VIEW_CUBE_SCREEN_SIZE_PX`.
+const WIDGET_PX: f32 = 150.0;
+/// Side of the cube's hit box in logical pixels.
+const CUBE_PX: f32 = 120.0;
+/// The cube center sits slightly below the widget's center (measured live).
+const CUBE_CENTER_Y: f32 = 78.0;
 /// Fraction of a face (from its center) that belongs to the face cell;
 /// the rest are edge and corner cells.
 const FACE_FRACTION: f64 = 0.56;
@@ -43,22 +48,6 @@ impl CubeCell {
         match view {
             Some(v) => Camera::rotation_for(v),
             None => Camera::look_rotation(-self.dir().normalize(), DVec3::Z),
-        }
-    }
-
-    /// Tooltip-style name ("Front", "Top right edge", ...).
-    pub fn label(self) -> String {
-        let [x, y, z] = self.0;
-        let part = |v: i8, neg: &'static str, pos: &'static str| match v {
-            -1 => Some(neg),
-            1 => Some(pos),
-            _ => None,
-        };
-        let words: Vec<&str> = [part(z, "Bottom", "Top"), part(y, "Front", "Back"), part(x, "Left", "Right")].into_iter().flatten().collect();
-        match words.len() {
-            1 => words[0].to_string(),
-            2 => format!("{} {}", words[0], words[1].to_lowercase()),
-            _ => format!("{} {} {}", words[0], words[1].to_lowercase(), words[2].to_lowercase()),
         }
     }
 }
@@ -137,6 +126,260 @@ fn point_in_quad(p: DVec2, q: &[DVec2; 4]) -> bool {
     true
 }
 
+/// See [`CubeHooks::state`].
+pub type CubeState<'a> = (&'a mut Option<CubeCell>, &'a mut Option<Point<Pixels>>);
+
+/// What a view owning a [`view_cube`] provides: where it keeps the cube's
+/// hover cell and screen origin, its camera rotation, and the camera moves.
+pub struct CubeHooks<V: 'static> {
+    /// The owner's hover cell and the cube's last painted origin.
+    pub state: fn(&mut V) -> CubeState<'_>,
+    pub rotation: fn(&V, &App) -> DQuat,
+    /// Animate to a face, edge or corner view.
+    pub click: fn(&mut V, CubeCell, &mut Context<V>),
+    /// Rotate by (yaw, pitch) degrees (triangle arrows).
+    pub rotate: fn(&mut V, f64, f64, &mut Context<V>),
+    /// Roll by degrees about the line of sight (arc arrows).
+    pub roll: fn(&mut V, f64, &mut Context<V>),
+}
+
+impl<V: 'static> Clone for CubeHooks<V> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<V: 'static> Copy for CubeHooks<V> {}
+
+/// Onshape's 150 px View cube widget with its arrows and `menu` (the
+/// camera and render options button) at the bottom right. Shared by the
+/// Part Studio and the Assembly: place it 15 px from the graphics area's
+/// top-right corner.
+pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Context<V>) -> AnyElement {
+    let pal = p();
+    let radius = CUBE_PX as f64 * 0.5 - 5.0;
+    let polys = cube_polys(rotation, radius);
+    // Onshape (§1.10): white faces, rounded edge/corner cells in #cedbe5
+    // at 60%, hover #90cef1 at 60%, black labels, XYZ triad.
+    let face_fill: Hsla = pal.panel.into();
+    let edge_fill: Hsla = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6).into();
+    let hover_fill: Hsla = with_alpha(gpui_kit::rgb(0x90cef1), 0.6).into();
+    let polys2 = polys.clone();
+    // Triad from the cube's back-bottom-left corner (x red, y green, z blue).
+    let inv_t = rotation.inverse();
+    let s_t = radius / 3f64.sqrt();
+    let scr = move |w: DVec3| {
+        let c = inv_t * w;
+        DVec2::new(c.x * s_t, -c.y * s_t)
+    };
+    let t_origin = DVec3::new(-1.0, -1.0, -1.0);
+    let triad: Vec<(DVec2, DVec2, Hsla, &'static str)> = [(DVec3::X, 0xcd0000u32, "X"), (DVec3::Y, 0x009400, "Y"), (DVec3::Z, 0x0000d0, "Z")]
+        .into_iter()
+        .map(|(axis, c, l)| (scr(t_origin), scr(t_origin + axis * 2.55), Hsla::from(gpui_kit::rgb(c)), l))
+        .collect();
+    let triad_labels: Vec<AnyElement> = triad
+        .iter()
+        .map(|(_, tip, c, l)| {
+            let d = *tip * 1.08;
+            div()
+                .absolute()
+                .left(px(CUBE_PX * 0.5 + d.x as f32 - 5.0))
+                .top(px(CUBE_PX * 0.5 + d.y as f32 - 8.0))
+                .text_size(px(12.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(*c)
+                .child(*l)
+                .into_any_element()
+        })
+        .collect();
+    let triad2 = triad.clone();
+    // Labels drawn *on* the faces turned towards the viewer, like
+    // Onshape: glyph outlines laid out in the face plane and projected.
+    let inv = rotation.inverse();
+    let label_polys: Vec<(Vec<Vec<DVec2>>, f32)> = FACES
+        .iter()
+        .filter_map(|(n, name)| {
+            let c = inv * CubeCell(*n).dir();
+            if c.z < 0.2 {
+                return None;
+            }
+            // Face axes: text runs left to right along `right`, upright along `up`.
+            let (right, up) = match *n {
+                [0, -1, 0] => (DVec3::X, DVec3::Z),
+                [0, 1, 0] => (DVec3::NEG_X, DVec3::Z),
+                [-1, 0, 0] => (DVec3::NEG_Y, DVec3::Z),
+                [1, 0, 0] => (DVec3::Y, DVec3::Z),
+                [0, 0, 1] => (DVec3::X, DVec3::Y),
+                _ => (DVec3::X, DVec3::NEG_Y),
+            };
+            let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
+            // Ascender height in cube units (the face spans -1..1).
+            let asc = 0.46;
+            let base = CubeCell(*n).dir() - right * (layout.width * asc * 0.5) - up * (asc * 0.36);
+            let polys: Vec<Vec<DVec2>> = layout.polylines(5).into_iter().map(|c| c.into_iter().map(|q| scr(base + right * (q.x * asc) + up * (q.y * asc))).collect()).collect();
+            Some((polys, c.z as f32))
+        })
+        .collect();
+    let cube = div()
+        .id("view-cube")
+        .occlude()
+        .absolute()
+        .left(px(WIDGET_PX * 0.5 - CUBE_PX * 0.5))
+        .top(px(CUBE_CENTER_Y - CUBE_PX * 0.5))
+        .size(px(CUBE_PX))
+        .cursor_pointer()
+        .child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    let o = bounds.origin;
+                    let half = CUBE_PX * 0.5;
+                    let pt = |v: DVec2| point(o.x + px(half + v.x as f32), o.y + px(half + v.y as f32));
+                    for poly in &polys2 {
+                        let mut b = PathBuilder::fill();
+                        b.move_to(pt(poly.corners[0]));
+                        for c in &poly.corners[1..] {
+                            b.line_to(pt(*c));
+                        }
+                        b.close();
+                        let is_face = poly.cell.0.iter().filter(|v| **v != 0).count() == 1;
+                        let fill = if hover == Some(poly.cell) {
+                            hover_fill
+                        } else if is_face {
+                            face_fill
+                        } else {
+                            edge_fill
+                        };
+                        if let Ok(path) = b.build() {
+                            window.paint_path(path, fill);
+                        }
+                    }
+                    for (polys, facing) in &label_polys {
+                        let mut b = PathBuilder::fill();
+                        for poly in polys {
+                            if poly.len() < 3 {
+                                continue;
+                            }
+                            b.move_to(pt(poly[0]));
+                            for q in &poly[1..] {
+                                b.line_to(pt(*q));
+                            }
+                            b.close();
+                        }
+                        if let Ok(path) = b.build() {
+                            window.paint_path(path, with_alpha(gpui_kit::rgb(0x000000), 0.3 + 0.7 * facing));
+                        }
+                    }
+                    for (a, tip, c, _) in &triad2 {
+                        let mut b = PathBuilder::stroke(px(1.));
+                        b.move_to(pt(*a));
+                        b.line_to(pt(*tip));
+                        if let Ok(path) = b.build() {
+                            window.paint_path(path, *c);
+                        }
+                    }
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
+        .children(triad_labels)
+        .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, window, cx| {
+            let _ = window;
+            let rot = (hooks.rotation)(this, cx);
+            let (hover, origin) = (hooks.state)(this);
+            let local = origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
+            let hit = local.and_then(|l| cube_hit(rot, radius, l));
+            if hit != *hover {
+                *hover = hit;
+                cx.notify();
+            }
+        }))
+        .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+            if !*h && (hooks.state)(this).0.take().is_some() {
+                cx.notify();
+            }
+        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                cx.stop_propagation();
+                let rot = (hooks.rotation)(this, cx);
+                let origin = *(hooks.state)(this).1;
+                let local = origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
+                if let Some(cell) = local.and_then(|l| cube_hit(rot, radius, l)) {
+                    (hooks.click)(this, cell, cx);
+                }
+            }),
+        )
+        .child(
+            // Records the widget origin for hit testing.
+            canvas(
+                {
+                    let view = cx.entity();
+                    move |bounds, _, cx| {
+                        view.update(cx, |this, _| *(hooks.state)(this).1 = Some(bounds.origin));
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .size_full(),
+        );
+    // Onshape: four triangle nudge arrows around the cube and two curved
+    // roll arrows above it, `#cedbe5` at 60% (hover `#90cef1` at 60%),
+    // as tinted glyphs positioned in the 150 px widget.
+    let arrow_color = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6);
+    let arrow_hover = with_alpha(gpui_kit::rgb(0x90cef1), 0.6);
+    let arrow = |id: &'static str, icon: &'static str, size: f32, cx_: f32, cy: f32, tip: &'static str, dx: f64, dy: f64, roll: f64, cx: &mut Context<V>| {
+        div()
+            .id(id)
+            .absolute()
+            .left(px(cx_ - size * 0.5))
+            .top(px(cy - size * 0.5))
+            .size(px(size))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(arrow_color)
+            .cursor_pointer()
+            .hover(|d| d.text_color(arrow_hover))
+            .child(crate::ui::glyph(icon, size, arrow_color))
+            .tooltip(crate::ui::tooltip(tip))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                    cx.stop_propagation();
+                    // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
+                    let k = if e.modifiers.shift {
+                        6.0
+                    } else if e.modifiers.control || e.modifiers.platform {
+                        1.0 / 3.0
+                    } else {
+                        1.0
+                    };
+                    if roll != 0.0 {
+                        (hooks.roll)(this, roll * k, cx);
+                    } else {
+                        (hooks.rotate)(this, dx * k, dy * k, cx);
+                    }
+                }),
+            )
+    };
+    div()
+        .relative()
+        .size(px(WIDGET_PX))
+        .child(arrow("cube-up", "cube-up", 13., 75., 6., "Rotate up", 0.0, -15.0, 0.0, cx))
+        .child(arrow("cube-down", "cube-down", 13., 75., 144., "Rotate down", 0.0, 15.0, 0.0, cx))
+        .child(arrow("cube-left", "cube-left", 13., 6., 76., "Rotate left", -15.0, 0.0, 0.0, cx))
+        .child(arrow("cube-right", "cube-right", 13., 144., 76., "Rotate right", 15.0, 0.0, 0.0, cx))
+        .child(arrow("cube-roll-l", "cube-roll-left", 30., 36., 24., "Roll counterclockwise", 0.0, 0.0, 15.0, cx))
+        .child(arrow("cube-roll-r", "cube-roll-right", 30., 114., 24., "Roll clockwise", 0.0, 0.0, -15.0, cx))
+        .child(cube)
+        .child(div().absolute().left(px(106.)).top(px(128.)).child(menu))
+        .into_any_element()
+}
+
 impl PartStudioView {
     /// Animate to a cube cell's view (remembered for Previous view).
     pub(super) fn cube_click(&mut self, cell: CubeCell, cx: &mut Context<Self>) {
@@ -160,223 +403,16 @@ impl PartStudioView {
     }
 
     pub(super) fn render_view_cube(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let rotation = self.viewport.read(cx).camera.rotation;
-        let hover = self.ui.cube_hover;
-        let radius = CUBE_PX as f64 * 0.5 - 4.0;
-        let polys = cube_polys(rotation, radius);
-        // Onshape (§1.10): white faces, rounded edge/corner cells in #cedbe5
-        // at 60%, hover #90cef1 at 60%, black labels, XYZ triad.
-        let face_fill: Hsla = pal.panel.into();
-        let edge_fill: Hsla = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6).into();
-        let hover_fill: Hsla = with_alpha(gpui_kit::rgb(0x90cef1), 0.6).into();
-        let line: Hsla = gpui_kit::rgb(0x9aa5af).into();
-        let polys2 = polys.clone();
-        // Triad from the cube's front-left-bottom corner (x red, y green, z blue).
-        let inv_t = rotation.inverse();
-        let s_t = radius / 3f64.sqrt();
-        let scr = move |w: DVec3| {
-            let c = inv_t * w;
-            DVec2::new(c.x * s_t, -c.y * s_t)
+        let menu = self.render_camera_menu(cx);
+        let hooks = CubeHooks {
+            state: |this: &mut Self| (&mut this.ui.cube_hover, &mut this.ui.cube_origin),
+            rotation: |this: &Self, cx| this.viewport.read(cx).camera.rotation,
+            click: Self::cube_click,
+            rotate: |this, dx, dy, cx| this.rotate_by(&(), dx, dy, cx),
+            roll: Self::roll_view,
         };
-        let t_origin = DVec3::new(-1.0, -1.0, -1.0);
-        let triad: Vec<(DVec2, DVec2, Hsla, &'static str)> = [(DVec3::X, 0xcd0000u32, "X"), (DVec3::Y, 0x009400, "Y"), (DVec3::Z, 0x0000d0, "Z")]
-            .into_iter()
-            .map(|(axis, c, l)| (scr(t_origin), scr(t_origin + axis * 2.55), Hsla::from(gpui_kit::rgb(c)), l))
-            .collect();
-        let triad_labels: Vec<AnyElement> = triad
-            .iter()
-            .map(|(_, tip, c, l)| {
-                let d = *tip * 1.08;
-                div()
-                    .absolute()
-                    .left(px(CUBE_PX * 0.5 + d.x as f32 - 5.0))
-                    .top(px(CUBE_PX * 0.5 + d.y as f32 - 8.0))
-                    .text_size(px(12.))
-                    .text_color(*c)
-                    .child(*l)
-                    .into_any_element()
-            })
-            .collect();
-        let triad2 = triad.clone();
-        // Labels at the centers of faces turned towards the viewer.
-        let inv = rotation.inverse();
-        let labels: Vec<AnyElement> = FACES
-            .iter()
-            .filter_map(|(n, name)| {
-                let c = inv * CubeCell(*n).dir();
-                if c.z < 0.35 {
-                    return None;
-                }
-                let s = radius / 3f64.sqrt();
-                let (x, y) = (c.x * s, -c.y * s);
-                Some(
-                    div()
-                        .absolute()
-                        .left(px(CUBE_PX * 0.5 + x as f32 - 24.0))
-                        .top(px(CUBE_PX * 0.5 + y as f32 - 8.0))
-                        .w(px(48.))
-                        .text_center()
-                        .text_size(px(12.))
-                        .text_color(with_alpha(gpui_kit::rgb(0x000000), 0.25 + 0.75 * c.z as f32))
-                        .child(*name)
-                        .into_any_element(),
-                )
-            })
-            .collect();
-        let cube = div()
-            .id("view-cube")
-            .occlude()
-            .relative()
-            .size(px(CUBE_PX))
-            .cursor_pointer()
-            .child(
-                canvas(
-                    |_, _, _| {},
-                    move |bounds, _, window, _| {
-                        let o = bounds.origin;
-                        let half = CUBE_PX * 0.5;
-                        let pt = |v: DVec2| point(o.x + px(half + v.x as f32), o.y + px(half + v.y as f32));
-                        for poly in &polys2 {
-                            let mut b = PathBuilder::fill();
-                            b.move_to(pt(poly.corners[0]));
-                            for c in &poly.corners[1..] {
-                                b.line_to(pt(*c));
-                            }
-                            b.close();
-                            let is_face = poly.cell.0.iter().filter(|v| **v != 0).count() == 1;
-                            let fill = if hover == Some(poly.cell) {
-                                hover_fill
-                            } else if is_face {
-                                face_fill
-                            } else {
-                                edge_fill
-                            };
-                            if let Ok(path) = b.build() {
-                                window.paint_path(path, fill);
-                            }
-                            let mut b = PathBuilder::stroke(px(0.75));
-                            b.move_to(pt(poly.corners[0]));
-                            for c in &poly.corners[1..] {
-                                b.line_to(pt(*c));
-                            }
-                            b.close();
-                            if let Ok(path) = b.build() {
-                                window.paint_path(path, line.opacity(0.35));
-                            }
-                        }
-                        for (a, tip, c, _) in &triad2 {
-                            let mut b = PathBuilder::stroke(px(1.));
-                            b.move_to(pt(*a));
-                            b.line_to(pt(*tip));
-                            if let Ok(path) = b.build() {
-                                window.paint_path(path, *c);
-                            }
-                        }
-                    },
-                )
-                .absolute()
-                .size_full(),
-            )
-            .children(labels)
-            .children(triad_labels)
-            .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, window, cx| {
-                let _ = window;
-                let local = this.ui.cube_origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
-                let rot = this.viewport.read(cx).camera.rotation;
-                let hit = local.and_then(|l| cube_hit(rot, radius, l));
-                if hit != this.ui.cube_hover {
-                    this.ui.cube_hover = hit;
-                    cx.notify();
-                }
-            }))
-            .on_hover(cx.listener(|this, h: &bool, _, cx| {
-                if !*h && this.ui.cube_hover.take().is_some() {
-                    cx.notify();
-                }
-            }))
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, e: &MouseDownEvent, _, cx| {
-                    cx.stop_propagation();
-                    let local = this.ui.cube_origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
-                    let rot = this.viewport.read(cx).camera.rotation;
-                    if let Some(cell) = local.and_then(|l| cube_hit(rot, radius, l)) {
-                        this.cube_click(cell, cx);
-                    }
-                }),
-            )
-            .child(
-                // Records the widget origin for hit testing.
-                canvas(
-                    {
-                        let view = cx.entity();
-                        move |bounds, _, cx| {
-                            view.update(cx, |this, _| this.ui.cube_origin = Some(bounds.origin));
-                        }
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .size_full(),
-            );
-        let hover_label = hover.map(|c| c.label());
-        let arrow = |id: &'static str, glyph: &'static str, tip: &'static str, dx: f64, dy: f64, roll: f64, cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .px_1()
-                .text_size(px(13.))
-                .text_color(gpui_kit::rgb(0xb4c4d3))
-                .cursor_pointer()
-                .hover(|d| d.text_color(gpui_kit::rgb(0x90cef1)))
-                .child(glyph)
-                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, e: &MouseDownEvent, _, cx| {
-                        cx.stop_propagation();
-                        // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
-                        let k = if e.modifiers.shift {
-                            6.0
-                        } else if e.modifiers.control || e.modifiers.platform {
-                            1.0 / 3.0
-                        } else {
-                            1.0
-                        };
-                        if roll != 0.0 {
-                            this.roll_view(roll * k, cx);
-                        } else {
-                            this.rotate_by(&(), dx * k, dy * k, cx);
-                        }
-                    }),
-                )
-        };
-        v_flex()
-            .items_center()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .w(px(CUBE_PX + 24.))
-                    .child(arrow("cube-roll-l", "↺", "Roll left", 0.0, 0.0, 15.0, cx))
-                    .child(arrow("cube-up", "▲", "Rotate up", 0.0, -15.0, 0.0, cx))
-                    .child(arrow("cube-roll-r", "↻", "Roll right", 0.0, 0.0, -15.0, cx)),
-            )
-            .child(
-                h_flex()
-                    .items_center()
-                    .child(arrow("cube-left", "◀", "Rotate left", -15.0, 0.0, 0.0, cx))
-                    .child(cube)
-                    .child(arrow("cube-right", "▶", "Rotate right", 15.0, 0.0, 0.0, cx)),
-            )
-            .child(
-                h_flex()
-                    .gap_1()
-                    .items_center()
-                    .child(arrow("cube-down", "▼", "Rotate down", 0.0, 15.0, 0.0, cx))
-                    .child(self.render_camera_menu(cx)),
-            )
-            .child(div().h(px(14.)).text_xs().text_color(pal.text_muted).children(hover_label))
-            .into_any_element()
+        view_cube(rotation, self.ui.cube_hover, menu, hooks, cx)
     }
 
     /// Onshape's "Camera and render options" dropdown (under the cube).
@@ -389,15 +425,24 @@ impl PartStudioView {
         let has_history = !self.ui.cam_history.is_empty();
         let orient = self.ui.orient_on_edit;
         let hidden_edges = self.opts.hidden_edges_visible;
+        let tangent = self.opts.tangent_edges;
+        let high_quality = self.ui.high_quality;
         // Onshape: the view-mode cube icon with a ▾ under the cube.
+        let pal = p();
+        let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("camera-menu")
-            .ghost()
-            .child(h_flex().gap(px(2.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-chevron-down", 8., p().text)))
-            .h(px(24.))
-            .px(px(4.))
+            .custom(variant)
+            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-chevron-down", 8., pal.text)))
+            .w(px(44.))
+            .h(px(28.))
+            .p_0()
             .rounded(px(3.))
             .tooltip("Camera and render options")
-            .dropdown_menu(move |mut m, _, _| {
+            .dropdown_menu(move |mut m, window, cx| {
+                // Onshape (live, dom/menu-camera-render.txt): views | named and
+                // previous views | zoom | projection, sketch orientation |
+                // display, hidden edges, tangent edges (each a ✓ submenu
+                // showing the current choice) | high quality | section view.
                 let item = |label: &str, f: super::ViewAction| {
                     let v = view.clone();
                     PopupMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
@@ -407,14 +452,14 @@ impl PartStudioView {
                 }
                 m = m.separator();
                 m = m.item(item("Named views…", Box::new(|this, w, cx| this.toggle_named_views(w, cx))));
-                if has_history {
-                    m = m.item(item("Previous view", Box::new(|this, _, cx| this.previous_view(cx))));
-                }
+                m = m.item(item("Previous view", Box::new(|this, _, cx| this.previous_view(cx))).disabled(!has_history));
+                m = m.separator();
                 m = m.item(item("Zoom to fit", Box::new(|this, _, cx| this.zoom_fit(cx))));
                 m = m.item(item("Zoom to window", Box::new(|this, _, cx| this.toggle_zoom_window(cx))));
                 if has_selection {
                     m = m.item(item("Zoom to selection", Box::new(|this, _, cx| this.zoom_to_selection(cx))));
                 }
+                m = m.separator();
                 let v = view.clone();
                 m = m.item(PopupMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
                     v.update(cx, |this, cx| {
@@ -425,14 +470,6 @@ impl PartStudioView {
                     })
                 }));
                 let v = view.clone();
-                m = m.item(PopupMenuItem::new("Hidden edges visible").checked(hidden_edges).on_click(move |_, w, cx| {
-                    v.update(cx, |this, cx| {
-                        this.opts.hidden_edges_visible = !this.opts.hidden_edges_visible;
-                        let d = this.display.clone();
-                        this.apply_display(d, w, cx);
-                    })
-                }));
-                let v = view.clone();
                 m = m.item(PopupMenuItem::new("Orient normal to sketch on edit").checked(orient).on_click(move |_, _, cx| {
                     v.update(cx, |this, cx| {
                         this.ui.orient_on_edit = !this.ui.orient_on_edit;
@@ -440,14 +477,63 @@ impl PartStudioView {
                     })
                 }));
                 m = m.separator();
-                for dm in DisplayMode::ALL {
-                    let v = view.clone();
-                    m = m.item(PopupMenuItem::new(dm.label()).checked(dm == mode).on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_display_mode(dm, w, cx))));
-                }
+                let check = || Some(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check));
+                let v = view.clone();
+                m = m.submenu_with_icon(check(), display_label(mode), window, cx, move |mut sm, _, _| {
+                    for dm in [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Translucent] {
+                        let v = v.clone();
+                        sm = sm.item(PopupMenuItem::new(display_label(dm)).checked(dm == mode).on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_display_mode(dm, w, cx))));
+                    }
+                    sm
+                });
+                let v = view.clone();
+                m = m.submenu_with_icon(check(), if hidden_edges { "Hidden edges visible" } else { "Hidden edges removed" }, window, cx, move |mut sm, _, _| {
+                    for on in [true, false] {
+                        let v = v.clone();
+                        sm = sm.item(PopupMenuItem::new(if on { "Hidden edges visible" } else { "Hidden edges removed" }).checked(on == hidden_edges).on_click(move |_, w, cx| {
+                            v.update(cx, |this, cx| {
+                                this.opts.hidden_edges_visible = on;
+                                let d = this.display.clone();
+                                this.apply_display(d, w, cx);
+                            })
+                        }));
+                    }
+                    sm
+                });
+                let v = view.clone();
+                m = m.submenu_with_icon(check(), tangent.label(), window, cx, move |mut sm, _, _| {
+                    for t in TangentEdges::ALL {
+                        let v = v.clone();
+                        sm = sm.item(PopupMenuItem::new(t.label()).checked(t == tangent).on_click(move |_, w, cx| {
+                            v.update(cx, |this, cx| {
+                                this.opts.tangent_edges = t;
+                                let d = this.display.clone();
+                                this.apply_display(d, w, cx);
+                            })
+                        }));
+                    }
+                    sm
+                });
                 m = m.separator();
-                m.item(item(if section { "Turn off section view" } else { "Section view" }, Box::new(|this, w, cx| this.toggle_section(w, cx))))
+                m = m.item(PopupMenuItem::new("View in high quality").checked(high_quality).on_click({
+                    let v = view.clone();
+                    move |_, w, cx| v.update(cx, |this, cx| this.toggle_high_quality(w, cx))
+                }));
+                m = m.separator();
+                m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))))
             })
             .into_any_element()
+    }
+}
+
+/// Onshape's names for the display modes (camera menu).
+fn display_label(m: DisplayMode) -> &'static str {
+    match m {
+        DisplayMode::ShadedWithEdges => "Shaded with edges",
+        DisplayMode::Shaded => "Shaded without edges",
+        DisplayMode::HiddenLine => "Unshaded",
+        DisplayMode::Translucent => "Translucent",
+        DisplayMode::Wireframe => "Wireframe",
     }
 }
 
@@ -480,7 +566,5 @@ mod tests {
         // Edge cells look along the negated diagonal.
         let fwd = CubeCell([1, -1, 0]).rotation() * DVec3::NEG_Z;
         assert!(fwd.abs_diff_eq(DVec3::new(-1.0, 1.0, 0.0).normalize(), 1e-9));
-        assert_eq!(CubeCell([1, -1, 1]).label(), "Top front right");
-        assert_eq!(CubeCell([0, -1, 1]).label(), "Top front");
     }
 }

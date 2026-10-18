@@ -773,3 +773,30 @@ impl Assembly {
         new_ids
     }
 }
+
+// ---------------------------------------------------------------- feature order
+
+fn move_before<T>(v: &mut Vec<T>, id: impl Fn(&T) -> MateId, moved: MateId, target: MateId) -> Option<bool> {
+    let from = v.iter().position(|x| id(x) == moved)?;
+    let to = v.iter().position(|x| id(x) == target)?;
+    if from == to {
+        return Some(false);
+    }
+    let item = v.remove(from);
+    let to = v.iter().position(|x| id(x) == target).unwrap_or(to);
+    v.insert(to, item);
+    Some(true)
+}
+
+impl Assembly {
+    /// Drag to reorder in the Mates list: `moved` goes right before `target`
+    /// (both mate connectors, mates, relations or groups). False when they
+    /// are of different kinds or the same feature.
+    pub fn move_feature_before(&mut self, moved: MateId, target: MateId) -> bool {
+        move_before(&mut self.mates, |m| m.id, moved, target)
+            .or_else(|| move_before(&mut self.connectors, |c| c.id, moved, target))
+            .or_else(|| move_before(&mut self.relations, |r| r.id, moved, target))
+            .or_else(|| move_before(&mut self.groups, |g| g.id, moved, target))
+            .unwrap_or(false)
+    }
+}

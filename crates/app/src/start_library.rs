@@ -118,9 +118,14 @@ fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
 fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
     let img = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
     let mut rgba = img.to_rgba8();
-    // GPUI render images are BGRA.
+    // GPUI render images are BGRA. The white background becomes
+    // transparent so thumbnails sit on hovered and selected rows like
+    // Onshape's.
     for px in rgba.as_chunks_mut::<4>().0 {
         px.swap(0, 2);
+        if px[0] >= 250 && px[1] >= 250 && px[2] >= 250 {
+            *px = [0; 4];
+        }
     }
     Some(Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
 }
@@ -260,7 +265,11 @@ pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
 
 /// Suggested name for a new document in `dir`.
 pub fn next_untitled(dir: &Path) -> String {
-    (1..).map(|n| format!("Untitled {n}")).find(|n| !dir.join(format!("{n}.{EXT}")).exists()).expect("free name")
+    // Onshape: "Untitled document", then "Untitled document (1)", ...
+    std::iter::once("Untitled document".to_string())
+        .chain((1..).map(|n| format!("Untitled document ({n})")))
+        .find(|n| !dir.join(format!("{n}.{EXT}")).exists())
+        .expect("free name")
 }
 
 /// Close our write handle cleanly so SQLite folds the WAL back into the file.

@@ -258,8 +258,9 @@ impl Sketch {
 
     /// Slot of total `width` around a line or arc centerline (Onshape's Slot
     /// tool): two side curves joined by semicircular end caps centered on
-    /// the centerline's end points. The centerline becomes construction
-    /// geometry; the end caps are equal so one dimension sets the width.
+    /// the centerline's end points. The centerline stays a normal (solid)
+    /// curve, as in live Onshape; the end caps are equal so one dimension
+    /// sets the width.
     pub fn slot_around(&mut self, id: EntityId, width: f64) -> Result<ShapeIds> {
         if width <= 0.0 {
             return Err(SketchError::InvalidGeometry("slot width must be positive".into()));
@@ -316,8 +317,6 @@ impl Sketch {
             }
             _ => return Err(SketchError::InvalidGeometry("slots follow lines and arcs".into())),
         }
-        self.set_construction(id, true)?;
-        out.construction.push(id);
         Ok(out)
     }
 

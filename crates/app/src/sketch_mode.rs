@@ -244,7 +244,6 @@ impl Tool {
                 | Tool::Spline
                 | Tool::Bezier
                 | Tool::Conic
-                | Tool::Slot
                 | Tool::Polygon
                 | Tool::CircumPolygon
                 | Tool::Ellipse
@@ -293,6 +292,8 @@ pub enum PatternHandle {
     LinearStep,
     /// Linear pattern: last instance (instance count).
     LinearCount,
+    LinearSecondStep,
+    LinearSecondCount,
     /// Circular pattern / transform: center (pivot).
     Center,
     /// Circular pattern: end of the total angle.
@@ -428,17 +429,35 @@ pub struct SketchEditor {
     pub text_font: String,
     pub text_bold: bool,
     pub text_italic: bool,
+    pub text_flip_horizontal: bool,
+    pub text_flip_vertical: bool,
+    /// The text rectangle is provisional until the Text dialog is confirmed.
+    pub pending_text: Option<(DVec2, f64)>,
+    /// Existing text reopened in the Text dialog (double-click, live Onshape).
+    pub editing_text: Option<u32>,
+    /// The Text dialog's "Convert to expression" state.
+    pub text_expression: bool,
     pub pattern_count: usize,
     pub pattern_distance: f64,
     pub pattern_angle: f64,
+    pub pattern_second_count: usize,
+    pub pattern_second_distance: f64,
+    pub pattern_second_angle: f64,
     pub circular_count: usize,
     pub circular_angle: f64,
     pub pattern_center: DVec2,
+    /// Transform: the triad was dragged away from the selection's center.
+    xf_center_pinned: bool,
     pub xf_offset: DVec2,
     pub xf_angle: f64,
     pub xf_scale: f64,
     /// First fillet arc of the current fillet session (later fillets are equal to it).
     fillet_session: Option<EntityId>,
+    /// Fillet/chamfer preview is isolated from the document until Enter.
+    pending_corner: Option<(SketchData, noshape_sketch::EditResult)>,
+    /// Slot preview (live Onshape: light blue until the next click, Enter or
+    /// leaving the tool commits it): the previewed data and the new curves.
+    pending_slot: Option<(SketchData, Vec<EntityId>)>,
     pub chamfer_distance: f64,
     pub slot_width: f64,
     /// End cap of the first slot of the session (later slots are equal to it).
@@ -519,8 +538,9 @@ fn is_angle_kind(k: &ConstraintKind) -> bool {
     matches!(k, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. })
 }
 
-/// Last Show constraints setting (the Sketch dialog remembers its options).
-static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Last Show constraints setting (the Sketch dialog remembers its options;
+/// live Onshape starts with it on, sketch/00).
+static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// Inference guide lines and snap markers (`INFERENCE_SNAP_LINE_COLOR`).
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
@@ -564,14 +584,20 @@ pub fn dim_value_text_tol(k: &ConstraintKind, v: f64, units: &UnitPrefs, tol: Op
     let prefix = match k {
         ConstraintKind::Diameter { .. } | ConstraintKind::EllipseRadius { .. } | ConstraintKind::Distance { mode: DistanceMode::Centerline, .. } => "Ø",
         ConstraintKind::Radius { .. } => "R",
-        ConstraintKind::Rho { .. } => "ρ ",
+        ConstraintKind::Rho { .. } => "Rho ",
         _ => "",
     };
+    // Onshape shows lengths without the document unit ("4", "Ø1", "R2.5");
+    // angles keep their degree sign.
     let suffix = unit_suffix_of(dim, units);
+    let shown_suffix = if dim == Dim::LENGTH { String::new() } else { suffix.clone() };
     let prec = tol.and_then(|t| t.precision);
     let fmt = |x: f64| match prec {
-        Some(n) => format!("{}{suffix}", fixed_number(x, dim, units, n)),
-        None => noshape_units::format_quantity(Quantity::new(x, dim), units),
+        Some(n) => format!("{}{shown_suffix}", fixed_number(x, dim, units, n)),
+        None => {
+            let t = noshape_units::format_quantity(Quantity::new(x, dim), units);
+            if dim == Dim::LENGTH { t.strip_suffix(suffix.as_str()).map(str::to_string).unwrap_or(t) } else { t }
+        }
     };
     let dev = |x: f64| fixed_number(x, dim, units, prec.unwrap_or(if dim == Dim::ANGLE { units.angle_precision } else { units.length_precision }));
     let base = format!("{prefix}{}", fmt(v * scale));
@@ -608,6 +634,18 @@ fn truncate_chars(t: &str, n: usize) -> String {
 /// ellipse axes are shown as diameters (Onshape's major / minor diameter).
 pub fn dim_display_scale(k: &ConstraintKind) -> f64 {
     if matches!(k, ConstraintKind::EllipseRadius { .. }) { 2.0 } else { 1.0 }
+}
+
+/// Value used by in-place editing, in the same units and scale as its label.
+pub fn dimension_edit_text(data: &SketchData, cid: ConstraintId, units: &UnitPrefs) -> Option<String> {
+    if let Some(expr) = data.dimension_exprs.get(&cid.0) {
+        return Some(expr.text.clone());
+    }
+    let kind = &data.sketch.constraint(cid)?.kind;
+    let value = kind.value()? * dim_display_scale(kind);
+    let dim = dim_unit(kind);
+    let precision = if dim == Dim::ANGLE { units.angle_precision } else { units.length_precision }.max(9);
+    Some(noshape_units::format_quantity_with(Quantity::new(value, dim), units, precision))
 }
 
 /// Glyph icon for a geometric constraint (None for dimensions).
@@ -685,21 +723,32 @@ impl SketchEditor {
             offset_pending: None,
             offset_repeat: false,
             conic_rho: 0.5,
-            text_string: "Text".into(),
+            text_string: "Default text".into(),
             text_height: 0.01,
             text_font: noshape_sketch::text::DEFAULT_FONT.into(),
             text_bold: false,
             text_italic: false,
+            text_flip_horizontal: false,
+            text_flip_vertical: false,
+            pending_text: None,
+            editing_text: None,
+            text_expression: false,
             pattern_count: 3,
             pattern_distance: 0.02,
             pattern_angle: 0.0,
-            circular_count: 4,
+            pattern_second_count: 1,
+            pattern_second_distance: 0.02,
+            pattern_second_angle: PI * 0.5,
+            circular_count: 3,
             circular_angle: TAU,
             pattern_center: DVec2::ZERO,
+            xf_center_pinned: false,
             xf_offset: DVec2::ZERO,
             xf_angle: 0.0,
             xf_scale: 1.0,
             fillet_session: None,
+            pending_corner: None,
+            pending_slot: None,
             chamfer_distance: 0.005,
             slot_width: 0.005,
             slot_session: None,
@@ -738,6 +787,12 @@ impl SketchEditor {
         self.inference = None;
         self.external_snap = None;
         self.fillet_session = None;
+        self.pending_corner = None;
+        self.pending_slot = None;
+        self.editing_text = None;
+        self.text_expression = false;
+        self.xf_center_pinned = false;
+        self.pending_text = None;
         self.slot_session = None;
         self.offset_pending = None;
         self.offset_repeat = false;
@@ -768,9 +823,9 @@ impl SketchEditor {
             Tool::MidpointLine => Some("Click the midpoint, then an end point".into()),
             Tool::EllipticalArc => Some("Click the center, the primary axis, the start point, then the end point".into()),
             Tool::Polygon | Tool::CircumPolygon => Some("Click the center, then the circumference (type a number first to set the sides)".into()),
-            Tool::LinearPattern => Some("Select entities, set the pattern, click empty space to aim, then Apply".into()),
-            Tool::CircularPattern => Some("Select entities, click empty space to set the center, then Apply".into()),
-            Tool::Transform => Some("Select entities, set the transform (click empty space for the center), then Apply".into()),
+            Tool::LinearPattern => Some("Select entities and set the pattern; click in empty space or press Enter to accept".into()),
+            Tool::CircularPattern => Some("Select entities and set the center; click in empty space or press Enter to accept".into()),
+            Tool::Transform => Some("Select entities and set the transform; click in empty space or press Enter to accept".into()),
             Tool::Constraint(c) => Some(format!("Select {} entit{} for {}", c.arity(), if c.arity() == 1 { "y" } else { "ies" }, c.label())),
             _ => None,
         };
@@ -779,6 +834,7 @@ impl SketchEditor {
     /// Tools that act on a preselection as soon as they are chosen (Slot,
     /// Offset; Onshape "select curves, then click the tool").
     pub fn apply_preselection(&mut self, data: &mut SketchData) -> EditOutcome {
+        self.follow_transform_selection(&data.sketch);
         if self.selection.is_empty() {
             return EditOutcome::none();
         }
@@ -804,14 +860,24 @@ impl SketchEditor {
         if self.dim_edit.take().is_some() {
             return true;
         }
+        if self.editing_text.take().is_some() {
+            return true;
+        }
         // A box being typed into closes first; an idle box goes away with
         // the chain / tool.
         if self.otf_typing && self.otf.take().is_some() {
             self.otf_typing = false;
             return true;
         }
+        // Live Onshape: one Escape ends the Line chain and exits Line.
+        // A double-click ends only the chain and leaves the tool active.
+        if self.tool == Tool::Line {
+            self.set_tool(Tool::Select);
+            return true;
+        }
         let had_box = self.otf.take().is_some();
         if self.offset_pending.take().is_some() {
+            self.set_tool(Tool::Select);
             return true;
         }
         // Esc cancels a pattern / transform being set up.
@@ -821,30 +887,19 @@ impl SketchEditor {
             self.xf_offset = DVec2::ZERO;
             self.xf_angle = 0.0;
             self.xf_scale = 1.0;
+            self.set_tool(Tool::Select);
             return true;
         }
         if !self.clicks.is_empty() || !self.picks.is_empty() || self.chain_end.is_some() || self.mirror_axis.is_some() || self.tangent_mode {
-            self.clicks.clear();
-            self.picks.clear();
-            self.chain_end = None;
-                self.mirror_axis = None;
-            self.tangent_mode = false;
-            self.press = None;
-            if self.tool == Tool::Mirror {
-                self.message = Some("Select a mirror line.".into());
-            }
+            self.set_tool(Tool::Select);
             return true;
         }
         if self.tool != Tool::Select {
             self.set_tool(Tool::Select);
             return true;
         }
-        if !self.selection.is_empty() || !self.selected_constraints.is_empty() || !self.selected_regions.is_empty() {
-            self.selection.clear();
-            self.selected_constraints.clear();
-            self.selected_regions.clear();
-            return true;
-        }
+        // Onshape keeps a sketch selection on Escape; Space or an empty
+        // canvas click clears it.
         had_box
     }
 
@@ -957,6 +1012,22 @@ impl SketchEditor {
         EditOutcome::redraw()
     }
 
+    /// Modifier changes also affect a stationary cursor: holding Shift must
+    /// immediately suppress both drawing inferences and a pending drop snap.
+    pub fn modifiers_changed(&mut self, data: &SketchData, shift: bool, alt: bool) {
+        self.shift_held = shift;
+        self.alt_held = alt;
+        if shift {
+            self.external_snap = None;
+            self.drag_snap = None;
+        } else if let Some(DragState::Geometry { handle: DragHandle::Point(id) }) = self.drag {
+            self.drag_snap = self.point_drop_target(&data.sketch, id);
+        }
+        if let Some(p) = self.cursor && self.tool.draws() {
+            self.inference = self.infer(&data.sketch, p, shift);
+        }
+    }
+
     /// Show constraints toggle (remembered for the next sketch, Onshape).
     pub fn set_show_constraints(&mut self, on: bool) {
         self.show_constraints = on;
@@ -966,6 +1037,16 @@ impl SketchEditor {
     /// Polygon waiting for its side count (circumference locked).
     pub fn polygon_sides_pending(&self) -> bool {
         matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
+    }
+
+    pub fn polygon_side_control(&self) -> Option<(DVec2, usize)> {
+        self.polygon_sides_pending().then(|| (self.clicks[1].pos + DVec2::Y * self.world_per_px * 24.0, self.polygon_sides))
+    }
+
+    /// The on-canvas polygon spinner locks an explicitly chosen side count.
+    pub fn adjust_polygon_sides(&mut self, delta: isize) {
+        self.polygon_sides = (self.polygon_sides as isize + delta).clamp(3, 50) as usize;
+        self.polygon_typed = self.polygon_sides.to_string();
     }
 
     /// Set the pending polygon's side count (Enter / click).
@@ -985,6 +1066,23 @@ impl SketchEditor {
     /// No click of the current tool placed yet.
     pub fn clicks_empty(&self) -> bool {
         self.clicks.is_empty()
+    }
+
+    /// Default tool sizes follow the document's length unit. Live Onshape,
+    /// inch workspace: fillet R0.5, chamfer 0.25, offset 0.25, slot Ø0.5,
+    /// linear pattern spacing 1 in (sketch/107–137); millimetre workspace:
+    /// R20, 5, 5, Ø20, 25 mm (sketch/300–312).
+    pub fn apply_unit_defaults(&mut self, length: noshape_units::LengthUnit) {
+        use noshape_units::LengthUnit as L;
+        const IN: f64 = 0.0254;
+        let imperial = matches!(length, L::Inch | L::Foot | L::Yard);
+        let (fillet, quarter, slot, spacing) = if imperial { (0.5 * IN, 0.25 * IN, 0.5 * IN, IN) } else { (0.02, 0.005, 0.02, 0.025) };
+        self.fillet_radius = fillet;
+        self.chamfer_distance = quarter;
+        self.offset_distance = quarter;
+        self.slot_width = slot;
+        self.pattern_distance = spacing;
+        self.pattern_second_distance = spacing;
     }
 
     /// Toggle between Line and Tangent arc while chaining (Shift+A).
@@ -1103,6 +1201,9 @@ impl SketchEditor {
     }
 
     pub fn tool_down(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>, shift: bool, double_click: bool) -> EditOutcome {
+        if self.text_dialog_open() {
+            return EditOutcome::none();
+        }
         self.cursor = Some(p);
         // Overlay labels and glyphs take the press first, whatever the tool.
         if let Some((cid, additive, select)) = self.pressed_label.take() {
@@ -1123,6 +1224,13 @@ impl SketchEditor {
         }
         match self.tool {
             Tool::Select => {
+                // Double-clicking a text reopens it in the Text dialog.
+                if double_click
+                    && let Some(id) = hovered.and_then(|e| data.text_of_entity(e))
+                {
+                    self.drag = None;
+                    return if self.begin_text_edit(data, id) { EditOutcome::redraw() } else { EditOutcome::none() };
+                }
                 match hovered {
                     // Text: glyphs and box lines move the whole box (corners resize it).
                     Some(e) if !is_point(&data.sketch, e) && (data.text_of_entity(e).is_some() || data.image_of_entity(e).is_some()) => {
@@ -1144,18 +1252,27 @@ impl SketchEditor {
                 EditOutcome::none()
             }
             t if t.draws() => {
-                // Continuing to sketch leaves the last geometry undimensioned.
-                self.otf = None;
-                self.otf_typing = false;
                 if self.inference.is_none() {
                     self.inference = self.infer(&data.sketch, p, self.shift_held || shift);
                 }
                 self.take_vertex_snap(data);
                 let (pos, inference) = self.snapped().unwrap_or((p, None));
+                // Live Onshape: pressing on a Line chain's end and dragging
+                // neither makes an arc nor places a point on release; the
+                // rubber band just keeps following the cursor.
+                let on_chain_end = self.tool == Tool::Line
+                    && self.chain_end.and_then(|e| data.sketch.point(e)).is_some_and(|e| (e - pos).length() < 1e-9);
+                if on_chain_end && !double_click {
+                    self.press = None;
+                    return EditOutcome::redraw();
+                }
+                // Continuing to sketch leaves the last geometry undimensioned.
+                self.otf = None;
+                self.otf_typing = false;
                 let out = self.place(data, Click { pos, inference }, double_click);
                 // Press-drag-release: the release places the next click.
                 let pending = !self.clicks.is_empty() || (self.tool == Tool::Line && self.chain_end.is_some());
-                self.press = (pending && !matches!(self.tool, Tool::Spline | Tool::Bezier | Tool::Point)).then_some(p);
+                self.press = (pending && !on_chain_end && !matches!(self.tool, Tool::Spline | Tool::Bezier | Tool::Point)).then_some(p);
                 out
             }
             Tool::Fillet if self.fillet_handle(&data.sketch).is_some_and(|(_, m)| (m - p).length() <= self.world_per_px * 8.0) => {
@@ -1322,16 +1439,20 @@ impl SketchEditor {
 
     /// Fillet / chamfer tool click: a corner point, or the first / second curve.
     fn corner_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
+        if self.pending_corner.is_some() {
+            return self.commit_corner(data);
+        }
         let chamfer = self.tool == Tool::Chamfer;
         let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
+        let mut preview = data.clone();
+        let sk = &mut preview.sketch;
         let r = if let Some(pid) = corner {
             self.picks.clear();
-            if chamfer { data.sketch.chamfer_corner(pid, self.chamfer_distance, self.chamfer_distance) } else { data.sketch.fillet_corner(pid, self.fillet_radius) }
+            if chamfer { sk.chamfer_corner(pid, self.chamfer_distance, self.chamfer_distance) } else { sk.fillet_corner(pid, self.fillet_radius) }
         } else if let Some(c) = hovered {
-            // Two curves: the first click only picks.
             if let Some(&(first, _)) = self.picks.first().filter(|(f, _)| *f != c) {
                 self.picks.clear();
-                if chamfer { data.sketch.chamfer(first, c, self.chamfer_distance, self.chamfer_distance) } else { data.sketch.fillet(first, c, self.fillet_radius) }
+                if chamfer { sk.chamfer(first, c, self.chamfer_distance, self.chamfer_distance) } else { sk.fillet(first, c, self.fillet_radius) }
             } else {
                 self.picks = vec![(c, p)];
                 return EditOutcome::redraw();
@@ -1341,20 +1462,33 @@ impl SketchEditor {
         };
         match r {
             Ok(r) => {
-                self.finish_create(data, &r.created);
-                if chamfer {
-                    self.after_chamfer(data, &r);
-                } else {
-                    self.after_fillet(data, &r);
-                }
-                data.sketch.solve();
-                EditOutcome::changed()
+                self.pending_corner = Some((preview, r));
+                self.message = Some("Adjust the preview, then press Enter to confirm".into());
+                EditOutcome::redraw()
             }
             Err(e) => {
                 self.message = Some(if chamfer { format!("Cannot chamfer selected point. {e}") } else { format!("Cannot fillet selected point. {e}") });
                 EditOutcome::redraw()
             }
         }
+    }
+
+    pub fn corner_pending(&self) -> bool {
+        self.pending_corner.is_some()
+    }
+
+    pub fn commit_corner(&mut self, data: &mut SketchData) -> EditOutcome {
+        let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
+        *data = preview;
+        self.finish_create(data, &result.created);
+        if self.tool == Tool::Chamfer {
+            self.after_chamfer(data, &result);
+        } else {
+            self.after_fillet(data, &result);
+        }
+        self.message = None;
+        data.sketch.solve();
+        EditOutcome::changed()
     }
 
     /// First fillet of a session gets a radius value box; later ones are equal
@@ -1458,12 +1592,20 @@ impl SketchEditor {
 
     /// The fillet radius manipulator: the session's first fillet arc and its midpoint.
     fn fillet_handle(&self, sk: &Sketch) -> Option<(EntityId, DVec2)> {
+        if let Some((data, result)) = &self.pending_corner {
+            let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
+            return Some((arc, curve_mid(&data.sketch, arc)?));
+        }
         let arc = self.fillet_session.filter(|a| sk.entity(*a).is_some())?;
         Some((arc, curve_mid(sk, arc)?))
     }
 
     /// Preview of a fillet at the hovered corner: the arc, and whether it fits.
     fn fillet_preview(&self, sk: &Sketch) -> Option<(Vec<DVec2>, bool)> {
+        if let Some((data, result)) = &self.pending_corner {
+            let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
+            return Some((data.sketch.tessellate(arc, self.world_per_px), true));
+        }
         let pid = self.hover.filter(|e| is_point(sk, *e))?;
         let users: Vec<EntityId> = sk.entities().filter(|e| e.endpoints().is_some_and(|(s, en)| s == pid || en == pid)).map(|e| e.id).collect();
         if users.len() != 2 {
@@ -1494,10 +1636,8 @@ impl SketchEditor {
 
     /// Open the value box of a dimension (the Onshape dimension context dialog).
     fn open_value_box(&mut self, data: &SketchData, cid: ConstraintId) {
-        let Some(c) = data.sketch.constraint(cid) else { return };
-        let value = c.kind.value().unwrap_or(0.0) * dim_display_scale(&c.kind);
-        let q = Quantity::new(value, dim_unit(&c.kind));
-        self.dim_edit = Some(DimEdit { constraint: cid, text: noshape_units::format_quantity(q, &UnitPrefs::default()) });
+        let Some(text) = dimension_edit_text(data, cid, &UnitPrefs::default()) else { return };
+        self.dim_edit = Some(DimEdit { constraint: cid, text });
     }
 
     /// Trim tool: trim the curve under `p` (click, or each curve a drag crosses).
@@ -1536,19 +1676,43 @@ impl SketchEditor {
     /// Slot tool: slots of one shared width around the given centerlines
     /// (connected curves give one slot following the chain).
     fn make_slots(&mut self, data: &mut SketchData, ids: &[EntityId]) -> EditOutcome {
+        // A previous preview commits first (live: the next click commits it).
+        let committed = self.commit_slot(data).changed;
         let curves: Vec<EntityId> = ids.iter().copied().filter(|e| data.sketch.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
         if curves.is_empty() {
-            return EditOutcome::redraw();
+            return if committed { EditOutcome::changed() } else { EditOutcome::redraw() };
         }
-        let (created, caps) = match data.sketch.slot_chains(&curves, self.slot_width) {
+        let mut preview = data.clone();
+        let out = self.make_slots_in(&mut preview, &curves);
+        if let Some(created) = out {
+            self.pending_slot = Some((preview, created));
+        }
+        if committed { EditOutcome::changed() } else { EditOutcome::redraw() }
+    }
+
+    /// Is a slot preview waiting to be committed?
+    pub fn slot_pending(&self) -> bool {
+        self.pending_slot.is_some()
+    }
+
+    /// Commit the slot preview into the sketch.
+    pub fn commit_slot(&mut self, data: &mut SketchData) -> EditOutcome {
+        let Some((preview, created)) = self.pending_slot.take() else { return EditOutcome::none() };
+        *data = preview;
+        self.finish_create(data, &created);
+        EditOutcome::changed()
+    }
+
+    fn make_slots_in(&mut self, data: &mut SketchData, curves: &[EntityId]) -> Option<Vec<EntityId>> {
+        let (created, caps) = match data.sketch.slot_chains(curves, self.slot_width) {
             Ok(r) => r,
             Err(e) => {
                 self.message = Some(format!("{e}"));
-                return EditOutcome::redraw();
+                return None;
             }
         };
         if created.is_empty() {
-            return EditOutcome::redraw();
+            return None;
         }
         // One width for every slot of the session: the first cap carries the
         // diameter dimension, the others are equal to it.
@@ -1560,9 +1724,8 @@ impl SketchEditor {
                 }
                 None if k == 0 => {
                     let label = curve_mid(&data.sketch, *cap).map(|m| m + DVec2::new(1.0, 1.0).normalize() * self.world_per_px * 28.0);
-                    if let Some(d) = add_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label, None) {
-                        self.open_value_box(data, d);
-                    }
+                    // Live: no value box opens for a slot (sketch/307–311).
+                    let _ = add_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label, None);
                     self.slot_session = Some(*cap);
                 }
                 None => {
@@ -1570,8 +1733,8 @@ impl SketchEditor {
                 }
             }
         }
-        self.finish_create(data, &created);
-        EditOutcome::changed()
+        data.sketch.solve();
+        Some(created)
     }
 
     fn mirror_entities(&mut self, data: &mut SketchData, ids: &[EntityId]) -> EditOutcome {
@@ -1879,6 +2042,10 @@ impl SketchEditor {
                 }
             }
             Tool::Spline | Tool::Bezier => {
+                if self.tool == Tool::Bezier && self.clicks.len() >= 16 && !double_click {
+                    self.message = Some("The maximum bezier degree (15) has been reached.".into());
+                    return EditOutcome::redraw();
+                }
                 if double_click && self.clicks.len() >= 2 {
                     return self.finish_spline(data, false);
                 }
@@ -1908,6 +2075,10 @@ impl SketchEditor {
                         self.finish_create(data, &[id]);
                         // The rho box opens right away (Onshape).
                         let label = curve_mid(&data.sketch, id).unwrap_or_default() + DVec2::new(0.0, self.world_per_px * 26.0);
+                        // Rho is an intrinsic dimension: accepting or dismissing
+                        // the initial box keeps the default driving value.
+                        let rho = self.conic_rho.clamp(0.01, 0.99);
+                        add_dimension(data, ConstraintKind::Rho { conic: id, value: rho }, Some(label), None);
                         self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label }]);
                         EditOutcome::changed()
                     }
@@ -1935,6 +2106,7 @@ impl SketchEditor {
                 }
                 let c = self.clicks.remove(0);
                 let rim = self.clicks.remove(0);
+                let next_center = ((click.pos - rim.pos).length() > self.world_per_px * 9.0).then_some(click);
                 let sides = self.polygon_sides.clamp(3, 50);
                 self.polygon_typed.clear();
                 match sk.polygon(c.pos, rim.pos, sides, self.tool == Tool::Polygon) {
@@ -1953,6 +2125,9 @@ impl SketchEditor {
                         self.finish_create(data, &ids.curves);
                         if let Some(circle) = circle {
                             self.set_otf(data, vec![diameter_field(&data.sketch, circle, self.world_per_px)]);
+                        }
+                        if let Some(center) = next_center {
+                            self.clicks.push(center);
                         }
                         EditOutcome::changed()
                     }
@@ -2039,23 +2214,79 @@ impl SketchEditor {
                 }
                 let first = self.clicks.remove(0);
                 let (origin, height) = self.text_box_from(first.pos, click.pos);
-                let text = if self.text_string.trim().is_empty() { "Text".to_string() } else { self.text_string.clone() };
-                match data.add_text(&text, &self.text_font, self.text_bold, self.text_italic, origin, height) {
-                    Ok(id) => {
-                        data.sketch.solve();
-                        // Select the new text so its content and style can be edited.
-                        self.set_tool(Tool::Select);
-                        self.selection = data.texts.iter().find(|t| t.id == id).map(|t| t.box_lines.iter().map(|l| EntityId(*l)).collect()).unwrap_or_default();
-                        self.message = Some("Edit the text in the options box; drag the text to move it, a corner to resize".into());
-                        EditOutcome::changed()
-                    }
-                    Err(e) => {
-                        self.message = Some(e);
-                        EditOutcome::redraw()
-                    }
-                }
+                self.pending_text = Some((origin, height));
+                self.message = None;
+                EditOutcome::redraw()
             }
             _ => EditOutcome::none(),
+        }
+    }
+
+    /// Open an existing text in the Text dialog with its content and style.
+    pub fn begin_text_edit(&mut self, data: &SketchData, id: u32) -> bool {
+        let Some(t) = data.texts.iter().find(|t| t.id == id) else { return false };
+        self.text_string = t.text.clone();
+        self.text_font = t.font.clone();
+        self.text_bold = t.bold;
+        self.text_italic = t.italic;
+        self.text_flip_horizontal = t.mirror_horizontal;
+        self.text_flip_vertical = t.mirror_vertical;
+        self.text_expression = t.expression;
+        self.editing_text = Some(id);
+        self.message = None;
+        true
+    }
+
+    /// The Text dialog is open (creating a new text or editing one).
+    pub fn text_dialog_open(&self) -> bool {
+        self.pending_text.is_some() || self.editing_text.is_some()
+    }
+
+    pub fn accept_text(&mut self, data: &mut SketchData) -> EditOutcome {
+        if self.text_string.chars().count() > 250 {
+            self.message = Some("Text is limited to 250 characters".into());
+            return EditOutcome::redraw();
+        }
+        if self.text_string.trim().is_empty() {
+            self.message = Some("Enter text".into());
+            return EditOutcome::redraw();
+        }
+        if let Some(id) = self.editing_text {
+            let (text, font, bold, italic, fh, fv, expr) = (self.text_string.clone(), self.text_font.clone(), self.text_bold, self.text_italic, self.text_flip_horizontal, self.text_flip_vertical, self.text_expression);
+            let ok = self.edit_text(data, id, |t| {
+                t.text = text;
+                t.font = font;
+                t.bold = bold;
+                t.italic = italic;
+                t.mirror_horizontal = fh;
+                t.mirror_vertical = fv;
+                t.expression = expr;
+            });
+            if !ok {
+                return EditOutcome::redraw();
+            }
+            self.editing_text = None;
+            self.message = None;
+            return EditOutcome::changed();
+        }
+        let Some((origin, height)) = self.pending_text else { return EditOutcome::none() };
+        match data.add_text(&self.text_string, &self.text_font, self.text_bold, self.text_italic, origin, height) {
+            Ok(id) => {
+                if let Some(t) = data.texts.iter_mut().find(|t| t.id == id) {
+                    t.mirror_horizontal = self.text_flip_horizontal;
+                    t.mirror_vertical = self.text_flip_vertical;
+                    t.expression = self.text_expression;
+                }
+                self.pending_text = None;
+                self.set_tool(Tool::Select);
+                self.selection = data.texts.iter().find(|t| t.id == id).map(|t| t.box_lines.iter().map(|l| EntityId(*l)).collect()).unwrap_or_default();
+                data.sketch.solve();
+                EditOutcome::changed()
+            }
+            Err(e) => {
+                self.message = Some(e);
+                EditOutcome::redraw()
+            }
         }
     }
 
@@ -2096,6 +2327,24 @@ impl SketchEditor {
         EditOutcome::changed()
     }
 
+    /// Live Onshape: the first Esc in a Spline / Bezier with at least two
+    /// placed points commits the curve through them (the rubber-band point
+    /// is dropped) and keeps the tool; the next Esc exits it.
+    pub fn escape_commit(&mut self, data: &mut SketchData) -> Option<EditOutcome> {
+        // A slot preview commits when leaving the tool (live).
+        if self.pending_slot.is_some() {
+            let out = self.commit_slot(data);
+            self.set_tool(Tool::Select);
+            return Some(out);
+        }
+        if !matches!(self.tool, Tool::Spline | Tool::Bezier) || self.clicks.len() < 2 {
+            return None;
+        }
+        self.otf = None;
+        self.otf_typing = false;
+        Some(self.finish_spline(data, false))
+    }
+
     /// Confirm spline (context menu): finish at the point before the cursor.
     pub fn confirm_spline(&mut self, data: &mut SketchData) -> EditOutcome {
         if self.tool == Tool::Spline && self.clicks.len() >= 2 {
@@ -2126,6 +2375,13 @@ impl SketchEditor {
             .collect()
     }
 
+    /// Text of the idle boxes, like a dimension label (live Onshape shows a
+    /// bare `1.269`, without units, until you type into the box).
+    pub fn otf_labels(&self, data: &SketchData, units: &UnitPrefs) -> Vec<String> {
+        let Some(o) = &self.otf else { return Vec::new() };
+        o.fields.iter().filter_map(|f| Some(dim_value_text(&f.kind, data.sketch.measure_new(&f.kind)?, units))).collect()
+    }
+
     /// Switch the active on-the-fly box (Alt+arrows / Tab).
     pub fn otf_step(&mut self, delta: isize) {
         if let Some(o) = &mut self.otf {
@@ -2142,15 +2398,45 @@ impl SketchEditor {
         let text = text.trim().trim_start_matches('=').trim();
         let dim = dim_unit(&f.kind);
         let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
+        let expr = (is_expression(text) && f.scale == 1.0).then_some(text);
+        self.commit_otf_value(data, o, f, q.value, expr)
+    }
+
+    /// Enter while a tool shows an on-the-fly box (live Onshape: Enter in a
+    /// Line chain turns the previous segment's boxed length into a placed
+    /// driving dimension): dimension the active box at its current value.
+    /// Returns false when no box is showing.
+    pub fn accept_otf(&mut self, data: &mut SketchData) -> Result<bool, String> {
+        let Some(o) = self.otf.clone() else { return Ok(false) };
+        let Some(f) = o.fields.get(o.active).cloned() else { return Ok(false) };
+        let Some(v) = data.sketch.measure_new(&f.kind) else { return Ok(false) };
+        let value = v * f.scale;
+        self.commit_otf_value(data, o, f, value, None).map(|_| true)
+    }
+
+    fn commit_otf_value(&mut self, data: &mut SketchData, o: OnTheFly, f: OtfField, value: f64, expr: Option<&str>) -> Result<(), String> {
+        let q = Quantity::new(value, dim_unit(&f.kind));
         if !(q.value.is_finite() && q.value > 0.0) {
             return Err("Value must be positive".into());
         }
         let mut kind = f.kind.clone();
         kind.set_value(q.value / f.scale);
-        let expr = (is_expression(text) && f.scale == 1.0).then_some(text);
-        let Some(cid) = add_dimension(data, kind, Some(f.label), expr) else { return Err("Could not create the dimension.".into()) };
+        if matches!(kind, ConstraintKind::Rho { .. }) && q.value >= 1.0 {
+            return Err("Rho must be between 0 and 1".into());
+        }
+        let existing = match kind {
+            ConstraintKind::Rho { conic, .. } => data.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Rho { conic: id, .. } if id == conic)).map(|c| c.id),
+            _ => None,
+        };
+        let cid = if let Some(cid) = existing {
+            if let Some(text) = expr { data.dimension_exprs.insert(cid.0, ExprValue::new(text)); }
+            else { data.dimension_exprs.remove(&cid.0); }
+            cid
+        } else {
+            add_dimension(data, kind, Some(f.label), expr).ok_or("Could not create the dimension.")?
+        };
         if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
-            let _ = data.sketch.set_dimension_value(cid, q.value / f.scale);
+            data.sketch.set_dimension_value(cid, q.value / f.scale).map_err(|e| e.to_string())?;
             data.sketch.solve();
         } else {
             self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
@@ -2220,6 +2506,8 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
             Some(DragState::FilletRadius { arc }) => {
+                let pending = self.pending_corner.is_some();
+                let data = if let Some((preview, _)) = &mut self.pending_corner { preview } else { data };
                 // The arc midpoint follows the cursor along the corner bisector.
                 let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = data.sketch.curve(arc) else { return EditOutcome::none() };
                 let half = (end_angle - start_angle) * 0.5;
@@ -2235,16 +2523,36 @@ impl SketchEditor {
                     data.sketch.solve();
                     self.fillet_radius = r;
                 }
-                EditOutcome::changed()
+                if pending { EditOutcome::redraw() } else { EditOutcome::changed() }
             }
             Some(DragState::TrimPath { mut points }) => {
                 let last = points.last().copied().unwrap_or(p);
-                // Sample the path so fast drags don't skip thin curves.
-                let n = ((p - last).length() / (self.world_per_px * 4.0)).ceil().clamp(1.0, 64.0) as usize;
                 let mut out = EditOutcome::redraw();
-                for k in 1..=n {
-                    let q = last.lerp(p, k as f64 / n as f64);
-                    let o = self.trim_at(data, q, None);
+                // Intersect the swept segment rather than sampling it: a fast
+                // pointer event can cross the whole viewport and must still
+                // trim every crossed curve, including very short ones.
+                let path = Curve2::Line { a: last, b: p };
+                let radius = self.world_per_px * 6.0;
+                let bounds = path.bbox().expanded(radius);
+                let mut hits = Vec::new();
+                for entity in data.sketch.entities() {
+                    if !data.sketch.entity_bbox(entity.id).is_some_and(|b| b.intersects(&bounds)) { continue; }
+                    if let Some(q) = data.sketch.point(entity.id) {
+                        if data.sketch.users_of_point(entity.id).is_empty() {
+                            let (t, _, d) = path.closest(q);
+                            if d <= radius { hits.push((t, q, entity.id)); }
+                        }
+                    } else if let Some(curve) = data.sketch.curve(entity.id) {
+                        for hit in noshape_sketch::intersect::intersect(&path, &curve, self.world_per_px * 0.01) {
+                            hits.push((hit.t1, hit.point, entity.id));
+                        }
+                    }
+                }
+                hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+                for (_, q, entity) in hits {
+                    // Trimming an earlier hit may have replaced this curve.
+                    let hovered = data.sketch.entity(entity).map(|_| entity);
+                    let o = self.trim_at(data, q, hovered);
                     if o.changed {
                         out = o;
                     }
@@ -2315,6 +2623,23 @@ impl SketchEditor {
     }
 
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
+        let out = self.tool_up_inner(data, p);
+        self.follow_transform_selection(&data.sketch);
+        out
+    }
+
+    /// Live Onshape: the Transform triad sits on the picked entities
+    /// (sketch/139) until its center is dragged or a transform is applied.
+    fn follow_transform_selection(&mut self, sk: &Sketch) {
+        if self.tool != Tool::Transform || self.xf_center_pinned || self.xf_offset != DVec2::ZERO || self.xf_angle != 0.0 || self.xf_scale != 1.0 {
+            return;
+        }
+        if let Some(c) = self.selection_center(sk) {
+            self.pattern_center = c;
+        }
+    }
+
+    fn tool_up_inner(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
         // Press-drag-release with a drawing tool: the release is the next click.
         if self.tool.draws()
             && self.drag.is_none()
@@ -2410,7 +2735,7 @@ impl SketchEditor {
                 }
             }
             Some(DragState::Handle(_)) | Some(DragState::TrimPath { .. }) => EditOutcome::redraw(),
-            Some(DragState::FilletRadius { .. }) => EditOutcome::changed(),
+            Some(DragState::FilletRadius { .. }) => if self.pending_corner.is_some() { EditOutcome::redraw() } else { EditOutcome::changed() },
             Some(DragState::OffsetArrow { moved, .. }) => {
                 if !moved {
                     self.offset_flip = !self.offset_flip;
@@ -2448,9 +2773,13 @@ impl SketchEditor {
         match self.tool {
             Tool::LinearPattern => {
                 let step = DVec2::from_angle(self.pattern_angle) * self.pattern_distance;
-                for k in 1..self.pattern_count.clamp(1, 10) {
-                    let off = step * k as f64;
-                    out.push(Box::new(move |p| p + off));
+                let second = DVec2::from_angle(self.pattern_second_angle) * self.pattern_second_distance;
+                for j in 0..self.pattern_second_count.clamp(1, 10) {
+                    for k in 0..self.pattern_count.clamp(1, 10) {
+                        if j == 0 && k == 0 { continue; }
+                        let off = step * k as f64 + second * j as f64;
+                        out.push(Box::new(move |p| p + off));
+                    }
                 }
             }
             Tool::CircularPattern => {
@@ -2501,16 +2830,15 @@ impl SketchEditor {
         }
         let sk = &mut data.sketch;
         let groups = match self.tool {
-            Tool::LinearPattern => Some(sk.linear_pattern_groups(&ids, DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.pattern_count.max(1))),
-            Tool::CircularPattern => Some(sk.circular_pattern_groups(&ids, self.pattern_center, self.circular_count.max(1), self.circular_angle)),
+            Tool::LinearPattern => Some(linear_grid_pattern(data, &ids,
+                (DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.pattern_count.max(1)),
+                (DVec2::from_angle(self.pattern_second_angle) * self.pattern_second_distance, self.pattern_second_count.max(1)), self.world_per_px)),
+            Tool::CircularPattern => Some(sk.circular_pattern_linked_groups(&ids, self.pattern_center, self.circular_count.max(1), self.circular_angle)),
             _ => None,
         };
         if let Some(groups) = groups {
             return match groups {
                 Ok(groups) => {
-                    if self.tool == Tool::LinearPattern {
-                        link_linear_pattern(data, &ids, &groups, DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.world_per_px);
-                    }
                     let created: Vec<EntityId> = groups.iter().flatten().copied().collect();
                     let id = data.patterns.iter().map(|p| p.id + 1).max().unwrap_or(1);
                     let circular = self.tool == Tool::CircularPattern;
@@ -2523,6 +2851,9 @@ impl SketchEditor {
                         distance: self.pattern_distance,
                         angle: if circular { self.circular_angle } else { self.pattern_angle },
                         center: [self.pattern_center.x, self.pattern_center.y],
+                        second_count: self.pattern_second_count,
+                        second_distance: self.pattern_second_distance,
+                        second_angle: self.pattern_second_angle,
                     });
                     self.finish_create(data, &created);
                     self.selection.clear();
@@ -2534,6 +2865,7 @@ impl SketchEditor {
                 }
             };
         }
+        let sk = &mut data.sketch;
         let r = match self.tool {
             Tool::Transform => {
                 let c = self.pattern_center;
@@ -2587,11 +2919,17 @@ impl SketchEditor {
         if p.circular {
             self.circular_count = p.count;
             self.circular_angle = p.angle;
-            self.pattern_center = DVec2::new(p.center[0], p.center[1]);
+            self.pattern_center = data.sketch.constraints().find_map(|c| match c.kind {
+                ConstraintKind::CircularPatternLink { inst, center, .. } if p.instances.iter().flatten().any(|e| *e == inst.0) => data.sketch.point(center),
+                _ => None,
+            }).unwrap_or(DVec2::new(p.center[0], p.center[1]));
         } else {
             self.pattern_count = p.count;
             self.pattern_distance = p.distance;
             self.pattern_angle = p.angle;
+            self.pattern_second_count = p.second_count.max(1);
+            self.pattern_second_distance = if p.second_distance > 0.0 { p.second_distance } else { p.distance };
+            self.pattern_second_angle = if p.second_distance > 0.0 { p.second_angle } else { p.angle + PI * 0.5 };
         }
         self.message = Some("Adjust the pattern, then click in empty space or press Enter".into());
         true
@@ -2609,6 +2947,10 @@ impl SketchEditor {
                 out.push((PatternHandle::LinearStep, c + step));
                 let n = self.pattern_count.max(2);
                 out.push((PatternHandle::LinearCount, c + step * (n - 1) as f64 + dir * px * 22.0));
+                let second_dir = DVec2::from_angle(self.pattern_second_angle);
+                let second = second_dir * self.pattern_second_distance;
+                out.push((PatternHandle::LinearSecondStep, c + second));
+                out.push((PatternHandle::LinearSecondCount, c + second * (self.pattern_second_count.max(1) - 1) as f64 + second_dir * px * 22.0));
             }
             Tool::CircularPattern => {
                 out.push((PatternHandle::Center, self.pattern_center));
@@ -2629,6 +2971,97 @@ impl SketchEditor {
             _ => {}
         }
         out
+    }
+
+    /// On-canvas instance-count labels of the active pattern (live Onshape:
+    /// `3x` / `1x` next to each direction's count manipulator, click to
+    /// type a count; sketch/136–138).
+    pub fn pattern_count_labels(&self, sk: &Sketch) -> Vec<(PatternHandle, DVec2, usize)> {
+        let px = self.world_per_px;
+        self.pattern_handles(sk)
+            .into_iter()
+            .filter_map(|(h, at)| {
+                let n = match h {
+                    PatternHandle::LinearCount => self.pattern_count,
+                    PatternHandle::LinearSecondCount => self.pattern_second_count,
+                    PatternHandle::CircularCount => self.circular_count,
+                    _ => return None,
+                };
+                Some((h, at + DVec2::new(px * 26.0, px * 22.0), n))
+            })
+            .collect()
+    }
+
+    /// On-canvas values of the active pattern / transform, each typed in by
+    /// clicking it (Onshape has no options panel for these tools):
+    /// linear spacing (a dimension between the seed and the first instance,
+    /// live sketch/137; the second direction once it has 2+ instances), the
+    /// angle of an open circular pattern, and the rotation / scale of a
+    /// transform once they are changed (H:sketch_circular_pattern,
+    /// H:sketch_transform). Values are SI (meters, radians, ratio).
+    pub fn pattern_value_labels(&self, sk: &Sketch) -> Vec<(PatternHandle, DVec2, f64)> {
+        let px = self.world_per_px;
+        let mut out = Vec::new();
+        match self.tool {
+            Tool::LinearPattern => {
+                let Some(c) = self.selection_center(sk) else { return out };
+                for (h, angle, distance, count) in [
+                    (PatternHandle::LinearStep, self.pattern_angle, self.pattern_distance, self.pattern_count),
+                    (PatternHandle::LinearSecondStep, self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count),
+                ] {
+                    if h == PatternHandle::LinearSecondStep && count < 2 {
+                        continue;
+                    }
+                    let dir = DVec2::from_angle(angle);
+                    out.push((h, c + dir * distance * 0.5 - dir.perp() * px * 18.0, distance));
+                }
+            }
+            Tool::CircularPattern => {
+                let (_, full) = self.circular_step();
+                if !full
+                    && let Some((r, a0)) = self.circular_arm(sk)
+                {
+                    let mid = DVec2::from_angle(a0 + self.circular_angle * 0.5);
+                    out.push((PatternHandle::CircularAngle, self.pattern_center + mid * (r + px * 34.0), self.circular_angle));
+                }
+            }
+            Tool::Transform if !self.selection.is_empty() => {
+                let m = self.pattern_center + self.xf_offset;
+                if self.xf_angle.abs() > 1e-12 {
+                    out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * 92.0, self.xf_angle));
+                }
+                if (self.xf_scale - 1.0).abs() > 1e-12 {
+                    out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * (45.0 * self.xf_scale + 22.0), self.xf_scale));
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
+    /// Set a value typed into an on-canvas pattern / transform label.
+    pub fn set_pattern_value(&mut self, h: PatternHandle, v: f64) {
+        if !v.is_finite() {
+            return;
+        }
+        match h {
+            PatternHandle::LinearStep if v > 0.0 => self.pattern_distance = v,
+            PatternHandle::LinearSecondStep if v > 0.0 => self.pattern_second_distance = v,
+            PatternHandle::CircularAngle if v.abs() > 1e-9 => self.circular_angle = v.clamp(-TAU, TAU),
+            PatternHandle::Rotate => self.xf_angle = v,
+            PatternHandle::Scale if v > 0.0 => self.xf_scale = v,
+            _ => {}
+        }
+    }
+
+    /// Set a pattern direction's instance count (typed into its `Nx` label).
+    pub fn set_pattern_count(&mut self, h: PatternHandle, n: usize) {
+        match h {
+            PatternHandle::LinearCount => self.pattern_count = n.clamp(1, 100),
+            PatternHandle::LinearSecondCount => self.pattern_second_count = n.clamp(1, 100),
+            PatternHandle::CircularCount => self.circular_count = n.clamp(2, 100),
+            _ => {}
+        }
     }
 
     /// Radius and start angle of the circular pattern arm (selection center around the pattern center).
@@ -2670,7 +3103,25 @@ impl SketchEditor {
                     self.pattern_count = ((along / self.pattern_distance.max(1e-12)).round().max(1.0) as usize + 1).clamp(2, 100);
                 }
             }
-            PatternHandle::Center => self.pattern_center = self.inference_free_snap(sk, p),
+            PatternHandle::LinearSecondStep => {
+                if let Some(c) = self.selection_center(sk) {
+                    let d = p - c;
+                    if d.length() > px * 3.0 {
+                        self.pattern_second_angle = d.to_angle();
+                        self.pattern_second_distance = d.length();
+                    }
+                }
+            }
+            PatternHandle::LinearSecondCount => {
+                if let Some(c) = self.selection_center(sk) {
+                    let along = (p - c).dot(DVec2::from_angle(self.pattern_second_angle)) - px * 22.0;
+                    self.pattern_second_count = ((along / self.pattern_second_distance.max(1e-12)).round().max(0.0) as usize + 1).clamp(1, 100);
+                }
+            }
+            PatternHandle::Center => {
+                self.pattern_center = self.inference_free_snap(sk, p);
+                self.xf_center_pinned = true;
+            }
             PatternHandle::CircularAngle => {
                 if let Some((_, a0)) = self.circular_arm(sk) {
                     let mut a = noshape_sketch::geom::ccw_sweep(a0, (p - self.pattern_center).to_angle());
@@ -2715,11 +3166,6 @@ impl SketchEditor {
         let lo = a.min(b);
         let h = (b.y - a.y).abs();
         if h < self.world_per_px * 4.0 { (a, self.text_height) } else { (lo, h) }
-    }
-
-    /// The text whose box is (partly) selected.
-    pub fn selected_text(&self, data: &SketchData) -> Option<u32> {
-        data.texts.iter().find(|t| t.box_lines.iter().any(|l| self.selection.contains(&EntityId(*l)))).map(|t| t.id)
     }
 
     fn toggle_text_selection(&mut self, data: &SketchData, e: EntityId) {
@@ -2859,6 +3305,9 @@ impl SketchEditor {
         let mut out = Vec::new();
         for c in data.sketch.constraints() {
             let Some(v) = c.kind.value() else { continue };
+            if let ConstraintKind::Rho { conic, .. } = c.kind
+                && self.otf.as_ref().is_some_and(|o| o.fields.iter().any(|f| matches!(f.kind, ConstraintKind::Rho { conic: id, .. } if id == conic)))
+            { continue; }
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let value = dim_value_text_tol(&c.kind, v, units, data.dimension_tolerances.get(&c.id.0));
             // Expressions: an indicator, or the expression itself with Show expressions.
@@ -3050,7 +3499,7 @@ impl SketchEditor {
 
     /// Preview geometry, inference guides, picks, box selection and dimension
     /// graphics (world space).
-    pub fn overlay(&self, data: &SketchData) -> (LineData, PointData) {
+    pub fn overlay(&self, data: &SketchData, units: &UnitPrefs) -> (LineData, PointData) {
         let mut lines = LineData::default();
         let mut points = PointData::default();
         let frame = self.frame;
@@ -3219,23 +3668,6 @@ impl SketchEditor {
                         }
                     }
                 }
-                Tool::Slot => match anchors.len() {
-                    1 => poly(&[anchors[0], c], preview_color, true),
-                    2 => {
-                        let (a, b) = (anchors[0], anchors[1]);
-                        let d = (b - a).try_normalize().unwrap_or(DVec2::X);
-                        let n = d.perp();
-                        let r = dist_point_line(c, a, b).max(1e-9);
-                        let ang = d.to_angle();
-                        let mut pts = vec![a + n * r, b + n * r];
-                        pts.extend((1..24).map(|i| b + DVec2::from_angle(ang + PI * 0.5 - PI * i as f64 / 24.0) * r));
-                        pts.extend([b - n * r, a - n * r]);
-                        pts.extend((1..=24).map(|i| a + DVec2::from_angle(ang - PI * 0.5 - PI * i as f64 / 24.0) * r));
-                        poly(&pts, preview_color, false);
-                        poly(&[a, b], preview_color, true);
-                    }
-                    _ => {}
-                },
                 Tool::Ellipse => match anchors.len() {
                     1 => {
                         poly(&[anchors[0], c], preview_color, true);
@@ -3300,10 +3732,10 @@ impl SketchEditor {
                     }
                 }
                 Tool::Text => {
-                    let (origin, h) = match anchors.first() {
+                    let (origin, h) = self.pending_text.unwrap_or_else(|| match anchors.first() {
                         Some(a) => self.text_box_from(*a, c),
                         None => (c, self.text_height),
-                    };
+                    });
                     let text = if self.text_string.trim().is_empty() { "Text" } else { self.text_string.as_str() };
                     let layout = noshape_sketch::text::layout_text(text, &self.text_font, self.text_bold, self.text_italic);
                     let wdt = layout.width.max(0.3) * h;
@@ -3348,6 +3780,14 @@ impl SketchEditor {
             if let Some((_, m)) = self.fillet_handle(&data.sketch) {
                 let s = self.world_per_px * 5.0;
                 poly(&[m + DVec2::new(-s, -s), m + DVec2::new(s, -s), m + DVec2::new(s, s), m + DVec2::new(-s, s), m + DVec2::new(-s, -s)], [0x4c, 0xc9, 0xf0, 255], false);
+            }
+        }
+        // Slot preview (light blue until committed).
+        if let Some((pd, created)) = &self.pending_slot {
+            for id in created {
+                if pd.sketch.curve(*id).is_some() {
+                    poly(&pd.sketch.tessellate(*id, self.world_per_px * 0.2), preview_color, false);
+                }
             }
         }
         // Trim drag path.
@@ -3395,10 +3835,11 @@ impl SketchEditor {
             let sel_c = self.selection_center(&data.sketch);
             for (h, q) in self.pattern_handles(&data.sketch) {
                 match h {
-                    PatternHandle::LinearStep => {
+                    PatternHandle::LinearStep | PatternHandle::LinearSecondStep => {
                         if let Some(c) = sel_c {
-                            let dir = DVec2::from_angle(self.pattern_angle);
-                            let end = c + dir * self.pattern_distance * (self.pattern_count.max(2) - 1) as f64;
+                            let (angle, distance, count) = if h == PatternHandle::LinearStep { (self.pattern_angle, self.pattern_distance, self.pattern_count) } else { (self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count) };
+                            let dir = DVec2::from_angle(angle);
+                            let end = c + dir * distance * (count.max(2) - 1) as f64;
                             poly(&[c, end], guide_color, true);
                             let n = dir.perp();
                             poly(&[q - dir * px * 9.0 + n * px * 5.0, q, q - dir * px * 9.0 - n * px * 5.0], guide_color, false);
@@ -3517,8 +3958,23 @@ impl SketchEditor {
             let pts3: Vec<[f32; 3]> = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y), a].iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 1.0, on_top | if end.x < start.x { LineSegment::DASHED } else { 0 });
         }
-        // Dimension graphics.
-        for g in self.dimension_graphics(data) {
+        // The sketch frame.
+        {
+            let (lo, hi) = self.sketch_box(data);
+            let pts3: Vec<[f32; 3]> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y), lo].iter().map(|p| w(*p)).collect();
+            lines.push_polyline(&pts3, crate::theme::rgb8(SKETCH_BOX_COLOR), 0, 1.0, 0);
+        }
+        // Dimension graphics. The dimension line is broken around its value
+        // (Onshape draws no box behind the text).
+        let gaps: std::collections::HashMap<ConstraintId, (DVec2, DVec2)> = self
+            .dimension_labels(data, units)
+            .into_iter()
+            .map(|(cid, pos, text, _)| (cid, (pos, DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px)))
+            .collect();
+        for mut g in self.dimension_graphics(data) {
+            if let Some((c, half)) = gaps.get(&g.constraint) {
+                g.segments = g.segments.iter().flat_map(|sg| clip_outside_box(*sg, *c, *half)).collect();
+            }
             let selected = self.selected_constraints.contains(&g.constraint);
             let hovered = self.hover_constraint == Some(g.constraint);
             // Onshape dimension colors: black driving, gray driven, gold hover/selection.
@@ -3534,7 +3990,7 @@ impl SketchEditor {
             } else {
                 rgb8(vc::DIM_DRIVEN)
             };
-            let width = if selected { 1.8 } else { 1.0 };
+            let width = if selected { 2.0 } else { 1.0 };
             for s in &g.segments {
                 lines.segments.push(LineSegment { a: w(s[0]), b: w(s[1]), color, pick_id: 0, width, style: on_top });
             }
@@ -3751,6 +4207,19 @@ fn retarget_auto(c: AutoConstraint, from: EntityId, to: EntityId) -> AutoConstra
 /// pattern constraint): every instance point = seed point + k * step, the
 /// step's length is a spacing dimension and an axis-aligned step keeps its
 /// direction. Instance points are found by position (seed + k * step).
+fn linear_grid_pattern(data: &mut SketchData, seeds: &[EntityId], x: (DVec2, usize), y: (DVec2, usize), wpp: f64) -> Result<Vec<Vec<EntityId>>, noshape_sketch::SketchError> {
+    let mut groups = data.sketch.linear_pattern_groups(seeds, x.0, x.1)?;
+    link_linear_pattern(data, seeds, &groups, x.0, wpp);
+    if y.1 > 1 {
+        let mut row = seeds.to_vec();
+        row.extend(groups.iter().flatten().copied());
+        let rows = data.sketch.linear_pattern_groups(&row, y.0, y.1)?;
+        link_linear_pattern(data, &row, &rows, y.0, wpp);
+        groups.extend(rows);
+    }
+    Ok(groups)
+}
+
 fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<EntityId>], step: DVec2, wpp: f64) {
     let sk = &mut data.sketch;
     let seed_points: Vec<EntityId> = seeds
@@ -3853,15 +4322,6 @@ fn nearest_point(sk: &Sketch, p: DVec2, radius: f64) -> Option<EntityId> {
         .filter(|(_, d)| *d <= radius)
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|x| x.0)
-}
-
-fn dist_point_line(p: DVec2, a: DVec2, b: DVec2) -> f64 {
-    let d = b - a;
-    let l = d.length();
-    if l < 1e-15 {
-        return (p - a).length();
-    }
-    (d.perp_dot(p - a) / l).abs()
 }
 
 /// Remove texts whose box was deleted, and dimension expressions, labels
@@ -3997,17 +4457,56 @@ fn default_label_pos(sk: &Sketch, k: &ConstraintKind, wpp: f64) -> Option<DVec2>
 // ---------------------------------------------------------------- dimension graphics
 
 fn arrow(out: &mut Vec<[DVec2; 2]>, tip: DVec2, dir: DVec2, s: f64) {
-    // `dir` is the direction the arrow travels (pointing at `tip`).
+    // `dir` is the direction the arrow travels (pointing at `tip`). Onshape's
+    // arrowheads are filled, narrow triangles (about 10 x 4 px): hatched with
+    // 1 px lines from the tip to the base so they read as solid.
     let d = dir.try_normalize().unwrap_or(DVec2::X);
     let n = d.perp();
-    let (len, half) = (s * 9.0, s * 3.2);
+    let (len, half) = (s * 10.0, s * 2.2);
     let base = tip - d * len;
-    out.push([tip, base + n * half]);
-    out.push([tip, base - n * half]);
-    out.push([base + n * half, base - n * half]);
-    out.push([tip, base]);
-    out.push([tip - d * len * 0.15 + n * half * 0.5, base + n * half * 0.85]);
-    out.push([tip - d * len * 0.15 - n * half * 0.5, base - n * half * 0.85]);
+    let steps = 6;
+    for i in 0..=steps {
+        let t = i as f64 / steps as f64 * 2.0 - 1.0;
+        out.push([tip, base + n * half * t]);
+    }
+}
+
+/// Screen width of a dimension value at 14 px (Roboto, digits ~7.6 px).
+pub fn label_width_px(text: &str) -> f64 {
+    text.chars().count() as f64 * 7.6 + 4.0
+}
+
+/// The parts of a segment outside an axis-aligned box (center, half size).
+fn clip_outside_box(sg: [DVec2; 2], c: DVec2, half: DVec2) -> Vec<[DVec2; 2]> {
+    let (a, b) = (sg[0], sg[1]);
+    let d = b - a;
+    // Liang-Barsky: the parameter interval of the segment inside the box.
+    let (mut t0, mut t1) = (0.0f64, 1.0f64);
+    for (p, q) in [(-d.x, a.x - (c.x - half.x)), (d.x, (c.x + half.x) - a.x), (-d.y, a.y - (c.y - half.y)), (d.y, (c.y + half.y) - a.y)] {
+        if p.abs() < 1e-15 {
+            if q < 0.0 {
+                return vec![sg];
+            }
+        } else {
+            let r = q / p;
+            if p < 0.0 {
+                t0 = t0.max(r);
+            } else {
+                t1 = t1.min(r);
+            }
+        }
+    }
+    if t0 >= t1 {
+        return vec![sg];
+    }
+    let mut out = Vec::new();
+    if t0 > 1e-9 {
+        out.push([a, a + d * t0]);
+    }
+    if t1 < 1.0 - 1e-9 {
+        out.push([a + d * t1, b]);
+    }
+    out
 }
 
 fn polyline(out: &mut Vec<[DVec2; 2]>, pts: &[DVec2]) {
@@ -4555,6 +5054,30 @@ impl SketchEditor {
     }
 }
 
+/// Onshape's frame around the sketch being edited.
+pub const SKETCH_BOX_COLOR: u32 = 0xb2ddf6;
+
+impl SketchEditor {
+    /// The light-blue frame Onshape draws around the sketch being edited
+    /// (with the sketch's name at its top-left): 16:9, centered on the
+    /// sketch origin, enclosing the geometry with a margin. Returns the
+    /// lower-left and upper-right corners in sketch coordinates.
+    pub fn sketch_box(&self, data: &SketchData) -> (DVec2, DVec2) {
+        let mut half = DVec2::ZERO;
+        for e in data.sketch.entities() {
+            for p in data.sketch.tessellate(e.id, self.world_per_px * 4.0) {
+                half = half.max(p.abs());
+            }
+            if let Some(p) = data.sketch.point(e.id) {
+                half = half.max(p.abs());
+            }
+        }
+        let h = (half.y.max(half.x * 9.0 / 16.0) * 1.55).max(self.world_per_px * 150.0);
+        let half = DVec2::new(h * 16.0 / 9.0, h);
+        (-half, half)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     //! Headless tests of the sketch editor's Onshape interaction rules:
@@ -4600,7 +5123,7 @@ mod tests {
     }
 
     #[test]
-    fn line_clicks_chain_and_esc_ends_the_chain() {
+    fn line_clicks_chain_and_one_esc_exits_the_tool() {
         let (mut ed, mut d) = editor(Tool::Line);
         click(&mut ed, &mut d, v(0.01, 0.013));
         click(&mut ed, &mut d, v(0.03, 0.017));
@@ -4609,10 +5132,163 @@ mod tests {
         // the two segments share their joint
         let pts = count(&d, EntityKind::Point);
         assert_eq!(pts, 3);
-        assert!(ed.cancel(), "Esc ends the chain");
-        assert_eq!(ed.tool, Tool::Line, "first Esc keeps the tool");
-        assert!(ed.cancel());
-        assert_eq!(ed.tool, Tool::Select, "second Esc exits the tool");
+        assert!(ed.cancel(), "one Esc ends the chain and exits Line");
+        assert_eq!(ed.tool, Tool::Select);
+        assert!(ed.clicks.is_empty() && ed.chain_end.is_none());
+        assert_eq!(count(&d, EntityKind::Line), 2, "completed segments remain");
+    }
+
+    #[test]
+    fn enter_mid_chain_places_the_boxed_length_as_a_driving_dimension() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.013));
+        click(&mut ed, &mut d, v(0.03, 0.017));
+        assert!(ed.otf.is_some(), "the segment's length is boxed");
+        let labels = ed.otf_labels(&d, &UnitPrefs::default());
+        assert!(labels.len() == 1 && !labels[0].contains("mm") && labels[0].starts_with("20."), "bare number like a dimension label: {labels:?}");
+        let before = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Length { .. })).count();
+        assert!(ed.accept_otf(&mut d).unwrap());
+        let dims: Vec<_> = d.sketch.constraints().filter(|c| c.driving && matches!(c.kind, ConstraintKind::Length { .. })).collect();
+        assert_eq!(dims.len(), before + 1);
+        let len = (v(0.03, 0.017) - v(0.01, 0.013)).length();
+        assert!((dims[0].kind.value().unwrap() - len).abs() < 1e-9, "dimensioned at the drawn length");
+        assert_eq!(ed.tool, Tool::Line);
+        assert!(ed.chain_end.is_some(), "the chain keeps going");
+        assert!(ed.otf.is_none());
+        assert!(!ed.accept_otf(&mut d).unwrap(), "nothing left to accept");
+    }
+
+    #[test]
+    fn press_drag_from_the_chain_end_places_nothing() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        drag(&mut ed, &mut d, v(0.03, 0.01), v(0.04, 0.03));
+        assert_eq!(count(&d, EntityKind::Line), 1, "release does not end a segment");
+        assert_eq!(count(&d, EntityKind::Arc), 0, "and no arc is made");
+        assert!(ed.chain_end.is_some() && ed.otf.is_some(), "chain and boxed length stay");
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+    }
+
+    #[test]
+    fn first_escape_commits_a_spline_and_the_second_exits() {
+        for tool in [Tool::Spline, Tool::Bezier] {
+            let (mut ed, mut d) = editor(tool);
+            click(&mut ed, &mut d, v(0.01, 0.01));
+            click(&mut ed, &mut d, v(0.02, 0.03));
+            click(&mut ed, &mut d, v(0.04, 0.02));
+            ed.pointer_move(&mut d, v(0.05, 0.05), false, false);
+            assert!(ed.escape_commit(&mut d).is_some());
+            assert_eq!(count(&d, EntityKind::FitSpline) + count(&d, EntityKind::BSpline), 1, "{tool:?} committed through the clicked points");
+            assert_eq!(ed.tool, tool, "tool stays active");
+            assert!(ed.escape_commit(&mut d).is_none());
+            assert!(ed.cancel());
+            assert_eq!(ed.tool, Tool::Select);
+        }
+        // One placed point: nothing to commit, Esc just exits.
+        let (mut ed, mut d) = editor(Tool::Spline);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        assert!(ed.escape_commit(&mut d).is_none());
+    }
+
+    #[test]
+    fn slot_previews_until_the_next_click_and_keeps_its_centerline_solid() {
+        let (mut ed, mut d) = editor(Tool::Slot);
+        let line = d.sketch.add_line(v(0.01, 0.01), v(0.05, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        assert!(ed.slot_pending(), "light-blue preview");
+        assert_eq!(count(&d, EntityKind::Arc), 0, "nothing committed yet");
+        assert!(ed.dim_edit.is_none(), "no value box for a slot");
+        click(&mut ed, &mut d, v(0.03, 0.04));
+        assert!(!ed.slot_pending());
+        assert_eq!(count(&d, EntityKind::Arc), 2, "the empty-space click committed it");
+        assert!(!d.sketch.entity(line).unwrap().construction, "centerline stays solid");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Diameter { .. })), "Ø width dimension");
+        // Leaving the tool (Esc) commits a pending slot as well.
+        let other = d.sketch.add_line(v(0.01, 0.06), v(0.05, 0.06));
+        click(&mut ed, &mut d, v(0.03, 0.06));
+        assert!(ed.slot_pending());
+        assert!(ed.escape_commit(&mut d).is_some_and(|o| o.changed));
+        assert_eq!(ed.tool, Tool::Select);
+        assert_eq!(count(&d, EntityKind::Arc), 4);
+        assert!(!d.sketch.entity(other).unwrap().construction);
+    }
+
+    #[test]
+    fn pattern_count_labels_default_to_live_counts_and_accept_typing() {
+        let (mut ed, mut d) = editor(Tool::LinearPattern);
+        let line = d.sketch.add_line(v(0.01, 0.01), v(0.02, 0.01));
+        ed.selection.push(line);
+        let counts = |ed: &SketchEditor, d: &SketchData| ed.pattern_count_labels(&d.sketch).into_iter().map(|(h, _, n)| (h, n)).collect::<Vec<_>>();
+        assert_eq!(counts(&ed, &d), vec![(PatternHandle::LinearCount, 3), (PatternHandle::LinearSecondCount, 1)], "3x along X, 1x along Y");
+        assert_eq!(ed.pattern_value_labels(&d.sketch).len(), 1, "Y spacing hidden while Y is 1x");
+        ed.set_pattern_count(PatternHandle::LinearSecondCount, 2);
+        assert_eq!(ed.pattern_second_count, 2);
+        assert_eq!(ed.pattern_value_labels(&d.sketch).len(), 2);
+        ed.set_pattern_value(PatternHandle::LinearStep, 0.03);
+        assert!((ed.pattern_distance - 0.03).abs() < 1e-12);
+        ed.set_pattern_value(PatternHandle::LinearStep, -1.0);
+        assert!((ed.pattern_distance - 0.03).abs() < 1e-12, "non-positive spacing ignored");
+        ed.set_tool(Tool::CircularPattern);
+        ed.selection.push(line);
+        ed.pattern_center = v(0.0, 0.0);
+        assert_eq!(counts(&ed, &d), vec![(PatternHandle::CircularCount, 3)], "live circular default is 3");
+        ed.set_pattern_count(PatternHandle::CircularCount, 1);
+        assert_eq!(ed.circular_count, 2, "at least two instances");
+        assert!(ed.pattern_value_labels(&d.sketch).is_empty(), "a closed (360°) pattern shows no angle");
+        ed.set_pattern_value(PatternHandle::CircularAngle, PI);
+        let labels = ed.pattern_value_labels(&d.sketch);
+        assert_eq!(labels.len(), 1);
+        assert!(labels[0].0 == PatternHandle::CircularAngle && (labels[0].2 - PI).abs() < 1e-12, "open pattern angle is typed on canvas");
+        ed.set_tool(Tool::Transform);
+        ed.selection = vec![line];
+        assert!(ed.pattern_value_labels(&d.sketch).is_empty(), "rotation / scale fields appear once used");
+        ed.set_pattern_value(PatternHandle::Rotate, 0.5);
+        ed.set_pattern_value(PatternHandle::Scale, 2.0);
+        assert_eq!(ed.pattern_value_labels(&d.sketch).iter().map(|l| l.0).collect::<Vec<_>>(), vec![PatternHandle::Rotate, PatternHandle::Scale]);
+        let _ = &mut d;
+    }
+
+    #[test]
+    fn transform_triad_follows_the_selection_until_its_center_is_dragged() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let c = d.sketch.add_circle(v(0.03, 0.02), 0.004);
+        ed.selection.push(c);
+        ed.set_tool(Tool::Transform);
+        ed.apply_preselection(&mut d);
+        assert!((ed.pattern_center - v(0.03, 0.02)).length() < 1e-9, "triad on the preselected circle");
+        ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, v(0.0, 0.0));
+        ed.follow_transform_selection(&d.sketch);
+        assert!(ed.pattern_center.length() < 1e-6, "a dragged center stays put");
+    }
+
+    #[test]
+    fn escape_preserves_sketch_selection() {
+        let (mut ed, mut data) = editor(Tool::Select);
+        let line = data.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        ed.selection.push(line);
+        assert!(!ed.cancel());
+        assert_eq!(ed.selection, vec![line]);
+    }
+
+    #[test]
+    fn polygon_spinner_and_next_center_commit_the_previous_polygon() {
+        let (mut ed, mut data) = editor(Tool::Polygon);
+        click(&mut ed, &mut data, v(0.02, 0.02));
+        click(&mut ed, &mut data, v(0.03, 0.02));
+        assert_eq!(count(&data, EntityKind::Line), 0, "circumference is still a preview");
+        ed.adjust_polygon_sides(1);
+        assert_eq!(ed.polygon_side_control().map(|c| c.1), Some(7));
+        ed.pointer_move(&mut data, v(0.08, 0.06), false, false);
+        assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
+        click(&mut ed, &mut data, v(0.08, 0.06));
+        assert_eq!(count(&data, EntityKind::Line), 7);
+        assert_eq!(ed.clicks.len(), 1, "the click also starts the next polygon");
+        assert_eq!(ed.clicks[0].pos, v(0.08, 0.06));
+        ed.cancel();
+        assert_eq!(ed.tool, Tool::Select);
+        assert_eq!(count(&data, EntityKind::Line), 7, "only the new preview is discarded");
     }
 
     #[test]
@@ -4626,6 +5302,47 @@ mod tests {
     }
 
     #[test]
+    fn bezier_creation_stops_at_degree_fifteen_and_can_still_finish() {
+        let (mut ed, mut data) = editor(Tool::Bezier);
+        for k in 0..16 {
+            ed.place(&mut data, Click { pos: v(0.01 + k as f64 * 0.002, 0.02 + (k as f64).sin() * 0.004), inference: None }, false);
+        }
+        let end = ed.clicks.last().unwrap().clone();
+        ed.place(&mut data, Click { pos: v(0.08, 0.03), inference: None }, false);
+        assert_eq!(ed.clicks.len(), 16);
+        assert_eq!(ed.message.as_deref(), Some("The maximum bezier degree (15) has been reached."));
+        assert!(ed.place(&mut data, end, true).changed);
+        let curve = data.sketch.entities().find(|e| e.kind() == EntityKind::BSpline).unwrap().id;
+        assert_eq!(data.sketch.bezier_degree(curve), Some(15));
+    }
+
+    #[test]
+    fn extend_without_a_boundary_reports_the_onshape_error() {
+        let (mut ed, mut data) = editor(Tool::Extend);
+        data.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut data, v(0.025, 0.01));
+        assert_eq!(ed.message.as_deref(), Some("Unable to extend the selected geometry."));
+        assert_eq!(count(&data, EntityKind::Line), 1);
+        assert_eq!(ed.tool, Tool::Extend);
+    }
+
+    #[test]
+    fn fast_trim_drag_does_not_skip_curves_between_pointer_events() {
+        let (mut ed, mut data) = editor(Tool::Trim);
+        let (a, b) = (v(0.001, 0.02), v(0.13, 0.02));
+        // All fall between samples of the former 64-sample path limit.
+        let step = (b.x - a.x) / 64.0;
+        for k in [0.5, 10.5, 30.5] {
+            let x = a.x + k * step;
+            data.sketch.add_line(v(x, 0.017), v(x, 0.023));
+        }
+        ed.tool_down(&mut data, a, None, false, false);
+        assert!(ed.tool_drag(&mut data, b).changed);
+        ed.tool_up(&mut data, b);
+        assert_eq!(count(&data, EntityKind::Line), 0);
+    }
+
+    #[test]
     fn line_snaps_to_origin_and_infers_horizontal() {
         let (mut ed, mut d) = editor(Tool::Line);
         click(&mut ed, &mut d, v(PX * 2.0, -PX * 3.0));
@@ -4635,6 +5352,71 @@ mod tests {
         assert!(d.sketch.entity(s).unwrap().external, "start point is the fixed origin point");
         assert_eq!(d.sketch.point(s).unwrap(), DVec2::ZERO);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
+    }
+
+    #[test]
+    fn shift_suppresses_inference_and_drop_snap_without_pointer_movement() {
+        let (mut ed, mut data) = editor(Tool::Line);
+        ed.pointer_move(&mut data, v(PX, PX), false, false);
+        assert!(ed.inference.is_some());
+        ed.modifiers_changed(&data, true, false);
+        assert!(ed.inference.is_none());
+        ed.modifiers_changed(&data, false, false);
+        assert!(ed.inference.is_some());
+        let (mut ed, mut data) = editor(Tool::Select);
+        let p = data.sketch.add_point(v(0.01, 0.01));
+        ed.tool_down(&mut data, v(0.01, 0.01), Some(p), false, false);
+        ed.tool_drag(&mut data, v(PX, PX));
+        assert!(ed.drag_snap.is_some());
+        ed.modifiers_changed(&data, true, false);
+        ed.tool_up(&mut data, v(PX, PX));
+        assert_eq!(data.sketch.entity_count(), 1);
+        assert!(!data.sketch.entity(p).unwrap().external);
+    }
+
+    #[test]
+    fn reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value() {
+        let (mut ed, mut data) = editor(Tool::Select);
+        let ellipse = data.sketch.add_ellipse(v(0.02, 0.02), v(0.01, 0.0), 0.005);
+        let cid = data.sketch.add_constraint(ConstraintKind::EllipseRadius { ellipse, major: true, value: 0.01 }).unwrap();
+        let units = UnitPrefs::default();
+        let text = dimension_edit_text(&data, cid, &units).unwrap();
+        let q = noshape_units::evaluate_as(&text, Dim::LENGTH, &units, &noshape_units::EmptyScope).unwrap();
+        assert!((q.value - 0.02).abs() < 1e-12, "ellipse input shows diameter: {text}");
+        let inches = UnitPrefs { length: noshape_units::LengthUnit::Inch, ..units };
+        let inch_text = dimension_edit_text(&data, cid, &inches).unwrap();
+        assert!(inch_text.ends_with("in"), "entry uses document units: {inch_text}");
+        let inch_value = noshape_units::evaluate_as(&inch_text, Dim::LENGTH, &inches, &noshape_units::EmptyScope).unwrap();
+        assert!((inch_value.value - 0.02).abs() < 1e-10);
+        ed.apply_dimension(&mut data, cid, &text, &units, &noshape_units::EmptyScope).unwrap();
+        assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - 0.01).abs() < 1e-12);
+        let conic = data.sketch.add_conic(v(0.05, 0.01), v(0.06, 0.02), v(0.07, 0.01), 0.7).unwrap();
+        let rho = data.sketch.add_constraint(ConstraintKind::Rho { conic, value: 0.7 }).unwrap();
+        let text = dimension_edit_text(&data, rho, &units).unwrap();
+        assert_eq!(text, "0.7");
+        ed.apply_dimension(&mut data, rho, &text, &units, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(data.sketch.constraint(rho).unwrap().kind.value(), Some(0.7));
+    }
+
+    #[test]
+    fn conic_default_rho_survives_dismissal_and_typing_edits_one_dimension() {
+        let draw = || {
+            let (mut ed, mut data) = editor(Tool::Conic);
+            for p in [v(0.01, 0.01), v(0.03, 0.01), v(0.02, 0.02)] { click(&mut ed, &mut data, p); }
+            (ed, data)
+        };
+        let (mut ed, mut data) = draw();
+        ed.cancel();
+        assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Rho { value, .. } if value == 0.5) && c.driving));
+        let (mut ed, mut data2) = draw();
+        let units = UnitPrefs::default();
+        assert!(ed.commit_otf(&mut data2, "1.5", &units, &noshape_units::EmptyScope).is_err());
+        ed.commit_otf(&mut data2, "0.7", &units, &noshape_units::EmptyScope).unwrap();
+        let dims: Vec<_> = data2.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Rho { .. })).collect();
+        assert_eq!(dims.len(), 1);
+        assert_eq!(dims[0].kind.value(), Some(0.7));
+        assert!(dims[0].driving);
+        assert!(data.sketch.solve().is_solved());
     }
 
     #[test]
@@ -4738,7 +5520,7 @@ mod tests {
         assert_eq!(count(&d, EntityKind::Circle), 4);
         assert_eq!(ed.tool, Tool::Mirror);
         ed.cancel();
-        assert_eq!(ed.message.as_deref(), Some("Select a mirror line."));
+        assert_eq!(ed.tool, Tool::Select, "Escape exits Mirror");
     }
 
     #[test]
@@ -4783,6 +5565,8 @@ mod tests {
         click(&mut ed, &mut d, v(0.01, 0.01));
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert!(ed.cancel());
+        assert_eq!(ed.tool, Tool::Select);
+        ed.set_tool(Tool::Bezier);
         click(&mut ed, &mut d, v(0.03, 0.01));
         assert!(ed.clicks.len() == 1 && count(&d, EntityKind::BSpline) == 0);
     }
@@ -4863,7 +5647,106 @@ mod tests {
         click(&mut ed, &mut d, v(0.02, 0.0));
         assert_eq!(count(&d, EntityKind::Arc), 0, "the first curve only picks");
         click(&mut ed, &mut d, v(0.04, 0.02));
+        assert_eq!(count(&d, EntityKind::Arc), 0, "the second curve stages the preview");
+        assert!(ed.corner_pending());
+        assert!(ed.dim_edit.is_none(), "the radius box waits for Enter");
+        assert!(ed.commit_corner(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Arc), 1);
+        assert!(ed.dim_edit.is_some(), "Enter opens the radius box");
+    }
+
+    #[test]
+    fn text_dialog_is_provisional_and_validates_character_limit() {
+        let (mut ed, mut d) = editor(Tool::Text);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        assert!(ed.pending_text.is_some());
+        assert!(d.texts.is_empty());
+        assert!(ed.cancel());
+        assert!(ed.pending_text.is_none());
+        assert!(d.texts.is_empty(), "cancel never adds text geometry");
+        ed.set_tool(Tool::Text);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        ed.text_string = "é".repeat(251);
+        assert!(!ed.accept_text(&mut d).changed);
+        assert!(ed.pending_text.is_some());
+        assert!(d.texts.is_empty());
+        ed.text_string = "é".repeat(250);
+        ed.text_flip_horizontal = true;
+        assert!(ed.accept_text(&mut d).changed);
+        assert_eq!(d.texts.len(), 1);
+        assert!(d.texts[0].mirror_horizontal);
+        assert_eq!(ed.tool, Tool::Select);
+        // Double-clicking the text reopens it in the dialog (live Onshape).
+        let line = EntityId(d.texts[0].box_lines[0]);
+        let at = d.sketch.curve(line).unwrap().point(0.5);
+        ed.tool_down(&mut d, at, Some(line), false, true);
+        assert_eq!(ed.editing_text, Some(d.texts[0].id));
+        assert!(ed.text_dialog_open() && ed.text_flip_horizontal, "dialog shows the text's style");
+        ed.text_string = "Changed".into();
+        assert!(ed.cancel(), "Esc / × closes the dialog");
+        assert!(d.texts[0].text.starts_with('é'), "cancel keeps the text");
+        ed.tool_down(&mut d, at, Some(line), false, true);
+        ed.text_string = "Changed".into();
+        ed.text_expression = false;
+        assert!(ed.accept_text(&mut d).changed);
+        assert_eq!(d.texts.len(), 1, "edited in place");
+        assert_eq!(d.texts[0].text, "Changed");
+        assert!(ed.editing_text.is_none());
+    }
+
+    #[test]
+    fn fillet_preview_cancel_preserves_original_geometry() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let rect = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+        let original = d.sketch.clone();
+        let p = d.sketch.point(rect.points[0]).unwrap();
+        click(&mut ed, &mut d, p);
+        assert!(ed.corner_pending());
+        assert!(ed.cancel());
+        assert!(!ed.corner_pending());
+        assert_eq!(count(&d, EntityKind::Arc), 0);
+        for e in original.entities() {
+            assert_eq!(original.curve(e.id), d.sketch.curve(e.id));
+            assert_eq!(original.point(e.id), d.sketch.point(e.id));
+        }
+    }
+
+    #[test]
+    fn linear_pattern_second_direction_links_grid_and_round_trips_edit() {
+        let (mut ed, mut d) = editor(Tool::LinearPattern);
+        let c = d.sketch.add_circle(v(0.01, 0.01), 0.002);
+        ed.selection = vec![c];
+        assert_eq!(ed.pattern_count, 3);
+        assert_eq!(ed.pattern_second_count, 1);
+        ed.pattern_distance = 0.01;
+        ed.pattern_second_distance = 0.015;
+        ed.pattern_second_count = 2;
+        assert_eq!(ed.pattern_transforms().len(), 5);
+        assert!(ed.apply_pattern(&mut d).changed);
+        assert_eq!(count(&d, EntityKind::Circle), 6);
+        assert!(d.sketch.solve().is_solved());
+        let center = d.sketch.entity(c).unwrap().center().unwrap();
+        d.sketch.set_point(center, v(0.012, 0.013)).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        let actual: Vec<DVec2> = d.sketch.entities().filter_map(|e| match d.sketch.curve(e.id) { Some(Curve2::Circle { center, .. }) => Some(center), _ => None }).collect();
+        // Translation is shared by all rows; relative grid offsets remain exact.
+        let origin = d.sketch.point(center).unwrap();
+        for j in 0..2 {
+            for i in 0..3 {
+                let target = origin + v(i as f64 * 0.01, j as f64 * 0.015);
+                assert!(actual.iter().any(|p| (*p - target).length() < 1e-7), "missing {target:?} in {actual:?}");
+            }
+        }
+        let id = d.patterns[0].id;
+        assert!(ed.edit_pattern(&d, id));
+        assert_eq!(ed.pattern_second_count, 2);
+        assert!((ed.pattern_second_distance - 0.015).abs() < 1e-12);
+        ed.pattern_second_count = 3;
+        assert!(ed.apply_pattern(&mut d).changed);
+        assert_eq!(count(&d, EntityKind::Circle), 9);
+        assert!(d.sketch.solve().is_solved());
     }
 
     #[test]
@@ -4933,6 +5816,8 @@ mod tests {
             ed.tool_drag(&mut d, m.lerp(target, k as f64 / 4.0));
         }
         ed.tool_up(&mut d, target);
+        assert_eq!(count(&d, EntityKind::Arc), 0, "dragging the preview leaves the document untouched");
+        assert!(ed.commit_corner(&mut d).changed);
         let Some(Curve2::Arc { radius, .. }) = d.sketch.curve(arc) else { panic!() };
         assert!((radius - 0.005).abs() > 1e-6, "dragging changed the radius");
         let (mut ed, mut d) = editor(Tool::Conic);
@@ -5079,8 +5964,10 @@ mod tests {
         let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
         let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
         click(&mut ed, &mut d, p0);
+        assert!(ed.commit_corner(&mut d).changed);
         assert!(ed.dim_edit.is_some(), "radius box after the first fillet");
         click(&mut ed, &mut d, p1);
+        assert!(ed.commit_corner(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Arc), 2);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
     }

@@ -3,8 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Default S shortcut toolbar (Part Studio).
-pub const DEFAULT_SHORTCUT_TOOLS: &[&str] = &["sketch", "extrude", "revolve", "sweep", "loft", "fillet", "chamfer", "shell", "hole", "mirror", "linearPattern", "circularPattern", "cPlane", "booleanBodies"];
+/// Default S shortcut toolbar (Part Studio, live: two rows of five).
+pub const DEFAULT_SHORTCUT_TOOLS: &[&str] = &["sketch", "extrude", "revolve", "sweep", "loft", "fillet", "chamfer", "hole", "booleanBodies", "transform"];
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ToolbarPrefs {

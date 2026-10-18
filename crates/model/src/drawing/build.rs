@@ -605,6 +605,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         for (i, e) in geo.edges.iter().enumerate() {
             let style = match (e.visible, e.class) {
                 (_, EdgeClass::Seam) => continue,
+                (true, EdgeClass::Smooth) if v.show_tangent_edges && v.tangent_phantom => LineStyle::Phantom,
                 (true, EdgeClass::Smooth) if v.show_tangent_edges => LineStyle::Tangent,
                 (true, EdgeClass::Smooth) => continue,
                 (false, EdgeClass::Smooth) => continue,
@@ -726,13 +727,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             _ => {}
         }
-        if let Some(l) = v.label.as_ref().filter(|l| !l.is_empty())
-            && !matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. })
-        {
+        let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
+        let user_label = v.label.as_ref().filter(|l| !l.is_empty() && !auto_label);
+        if let Some(l) = user_label {
             label_lines.push((expand(l), 5.0));
-            if v.scale.is_some() {
-                label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
-            }
+        }
+        // Scale label: View properties › Scale label, else with a view label
+        // when the view has its own scale.
+        if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
+            label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
         }
         let mut y = pl.min[1] - 6.0;
         for (text, height) in label_lines {

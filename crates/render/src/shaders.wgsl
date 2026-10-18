@@ -56,7 +56,7 @@ fn state_of(id: u32) -> u32 {
 }
 
 fn clipped(world: vec3<f32>) -> bool {
-    if (g.flags.x == 0u || inst.params.y != 0u) { return false; }
+    if (g.flags.x == 0u || (inst.params.y & 1u) != 0u) { return false; }
     var c = dot(world, g.clip.xyz) > g.clip.w;
     if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w; }
     if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w; }
@@ -71,6 +71,21 @@ fn highlight(base: vec3<f32>, st: u32) -> vec3<f32> {
     if ((st & HOVER) != 0u) { c = mix(c, g.hover.rgb, 0.55); }
     return c;
 }
+
+// Edges, sketch curves and points (Onshape, live): hovered ones turn fully
+// light orange, selected ones fully amber.
+fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
+    var c = base;
+    if ((st & ERROR) != 0u) { c = g.error.rgb; }
+    if ((st & ACCENT) != 0u) { c = mix(c, g.accent.rgb, 0.55); }
+    if ((st & SELECTED) != 0u) { c = g.select.rgb; }
+    if ((st & HOVER) != 0u) { c = g.hover.rgb; }
+    return c;
+}
+
+// A selected face or part (Onshape, live: the top face of a box reads
+// `#e4b049`): amber with half of the usual light contrast.
+const FACE_SELECTED: vec3<f32> = vec3<f32>(0.80, 0.444, 0.07);
 
 // ---------------------------------------------------------------- background
 
@@ -133,34 +148,96 @@ fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -
         v = -g.camera_fwd.xyz;
     }
     let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
-    // Key light: slightly above and left of the viewer (headlight-style, so
-    // shading is consistent as the model rotates, like most CAD tools).
-    let key = normalize(v + g.camera_up.xyz * 0.45 - right * 0.25);
-    let fill = normalize(v - g.camera_up.xyz * 0.3 + right * 0.6);
-    let diff = max(dot(n, key), 0.0) * 0.72 + max(dot(n, fill), 0.0) * 0.18;
-    // Hemispheric ambient (world Z up).
-    let hemi = mix(0.16, 0.30, n.z * 0.5 + 0.5);
+    // Onshape's look, fitted to its rendered face colors (a box in the
+    // default view: top 0.98, right 0.71, front 0.28 of the base color plus
+    // a broad highlight on the top face): one key light above and to the
+    // right of the viewer, flat ambient, no fill light.
+    let key = normalize(right * 0.52 + g.camera_up.xyz * 0.65 + v * 0.55);
+    let diff = max(dot(n, key), 0.0) * 0.82;
+    let ambient = 0.284;
     let h = normalize(key + v);
-    let spec = pow(max(dot(n, h), 0.0), 48.0) * 0.28;
-    let rim = pow(1.0 - max(dot(n, v), 0.0), 3.0) * 0.08;
-    return base * (diff + hemi) + vec3(spec + rim);
+    let spec = pow(max(dot(n, h), 0.0), 6.0) * 0.42;
+    return base * (diff + ambient) + vec3(spec);
 }
 
-@fragment
-fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     // Per-primitive instances color each vertex (analysis maps, face
     // appearances); vertices with alpha 0 keep the instance color.
     var own = inst.color.rgb;
     if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
-    var base = highlight(own, st);
-    var c = shade(i.world, i.normal, front, base);
+    // params.y bit 1: unlit (construction planes keep their flat color and
+    // tint on hover). Shaded faces don't change on hover: the app outlines
+    // the hovered face instead (Onshape).
+    let unlit = (inst.params.y & 2u) != 0u;
+    var c = highlight(own, select(st & ~HOVER, st, unlit));
+    if (!unlit) {
+        if ((st & SELECTED) != 0u && (st & ERROR) == 0u) {
+            c = mix(FACE_SELECTED * 0.97, shade(i.world, i.normal, front, FACE_SELECTED), 0.45);
+        } else {
+            c = shade(i.world, i.normal, front, c);
+        }
+    }
     // Back faces revealed by a section cut are tinted so cut solids read well.
     if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
     var a = inst.color.a;
     if ((st & DIM) != 0u) { a = a * 0.25; }
     return vec4(c, a);
+}
+
+@fragment
+fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    return mesh_color(i, front);
+}
+
+struct SectionOut {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+};
+
+// Section view (separate pipeline, used only while planes cut): a back face
+// seen through the cut is replaced by the cap — the part's color, lit as
+// the cut plane and hatched, at the depth where the view ray leaves the
+// removed region (the intersection of the planes' removed half-spaces).
+@fragment
+fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut {
+    var o: SectionOut;
+    o.color = mesh_color(i, front);
+    o.depth = i.pos.z;
+    if (front || g.flags.x == 0u || (inst.params.y & 3u) != 0u) { return o; }
+    var dir = g.camera_fwd.xyz;
+    if (g.camera_pos.w > 0.5) { dir = normalize(i.world - g.camera_pos.xyz); }
+    // Walk back toward the eye: p(s) = world - dir * s. Enter the removed
+    // region at the largest crossing of the planes the point is outside of.
+    var planes = array<vec4<f32>, 3>(g.clip, g.clip2, g.clip3);
+    var s_in = 0.0;
+    var normal = vec3<f32>(0.0);
+    for (var k = 0u; k < g.flags.x; k = k + 1u) {
+        let pl = planes[k];
+        let f = dot(i.world, pl.xyz) - pl.w;
+        if (f > 0.0) { continue; }
+        let nd = dot(pl.xyz, dir);
+        if (nd >= 0.0) { return o; }
+        let s = f / nd;
+        if (s >= s_in) { s_in = s; normal = pl.xyz; }
+    }
+    if (dot(normal, normal) == 0.0) { return o; }
+    let c = i.world - dir * s_in;
+    for (var k = 0u; k < g.flags.x; k = k + 1u) {
+        let pl = planes[k];
+        if (dot(c, pl.xyz) - pl.w < -1e-5 * max(1.0, abs(pl.w))) { return o; }
+    }
+    let clip = g.view_proj * vec4(c, 1.0);
+    o.depth = clamp(clip.z / clip.w, 0.0, 1.0);
+    var own = inst.color.rgb;
+    if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
+    var col = shade(c, normal, true, own);
+    // Hatching: thin diagonal lines (Onshape draws the cut in the part color, hatched).
+    let k = (i.pos.x + i.pos.y) / (9.0 * g.viewport.z);
+    if (fract(k) < 0.13) { col = col * 0.45; }
+    o.color = vec4(col, 1.0);
+    return o;
 }
 
 @fragment
@@ -246,7 +323,7 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
     var alpha: f32;
     if (inst.params.x != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
-    o.color = vec4(highlight(base, st), alpha);
+    o.color = vec4(highlight_stroke(base, st), alpha);
     o.pick = pick;
     o.along = t * len;
     o.world = mix(wa, wb, t);
@@ -259,6 +336,10 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
 fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     if (clipped(i.world)) { discard; }
     if ((i.style & 1u) != 0u && fract(i.along / (7.0 * g.viewport.z)) > 0.55) { discard; }
+    if ((i.style & 4u) != 0u) {
+        let t = fract(i.along / (16.0 * g.viewport.z));
+        if (t > 0.55 && (t < 0.68 || t > 0.8)) { discard; }
+    }
     return i.color;
 }
 
@@ -285,6 +366,7 @@ struct PointOut {
     @location(1) @interpolate(flat) pick: u32,
     @location(2) uv: vec2<f32>,
     @location(3) world: vec3<f32>,
+    @location(4) @interpolate(flat) style: u32,
 };
 
 @vertex
@@ -307,17 +389,21 @@ fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
     var base: vec3<f32>;
     var alpha: f32;
     if (inst.params.x != 0u) { base = srgb_to_linear(p.color.rgb); alpha = p.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
-    o.color = vec4(highlight(base, st), alpha);
+    o.color = vec4(highlight_stroke(base, st), alpha);
     o.pick = pick;
     o.uv = uv;
     o.world = w;
+    o.style = p.style;
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
 
 @fragment
 fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
-    if (dot(i.uv, i.uv) > 1.0 || clipped(i.world)) { discard; }
+    let r2 = dot(i.uv, i.uv);
+    if (r2 > 1.0 || clipped(i.world)) { discard; }
+    // Style bit 4: a ring with a center dot (the origin).
+    if ((i.style & 4u) != 0u && r2 < 0.42 && r2 > 0.1) { discard; }
     return i.color;
 }
 

@@ -44,6 +44,8 @@ pub enum InstanceSource {
         #[serde(default)]
         config: ConfigValues,
     },
+    /// A standard content part (fastener) of the built-in library.
+    Standard { spec: standard::StandardSpec },
 }
 
 impl InstanceSource {
@@ -60,7 +62,14 @@ impl InstanceSource {
     pub fn studio(&self) -> Option<TabId> {
         match self {
             InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } => Some(*studio),
-            InstanceSource::Assembly { .. } | InstanceSource::External { .. } => None,
+            InstanceSource::Assembly { .. } | InstanceSource::External { .. } | InstanceSource::Standard { .. } => None,
+        }
+    }
+    /// Standard content spec (instances of the fastener library).
+    pub fn standard(&self) -> Option<&standard::StandardSpec> {
+        match self {
+            InstanceSource::Standard { spec } => Some(spec),
+            _ => None,
         }
     }
     /// External reference key (instances inserted from another document).
@@ -269,6 +278,16 @@ pub struct AsmMateConnector {
     pub hidden: bool,
     #[serde(default)]
     pub suppressed: bool,
+    /// Origin type Between entities: the origin is halfway between `on`
+    /// and this entity (same instance).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub between: Option<MateConnectorRef>,
+    /// Realign: the Z axis along this entity (face normal, edge direction)
+    /// and the X axis toward the secondary entity's direction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_axis: Option<MateConnectorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_axis: Option<MateConnectorRef>,
 }
 
 fn default_rot_axis() -> u8 {
@@ -277,7 +296,7 @@ fn default_rot_axis() -> u8 {
 
 impl AsmMateConnector {
     pub fn new(id: MateId, name: String, on: MateConnectorRef) -> Self {
-        Self { id, name, on, flip_primary: false, reorient: 0, translation: [None, None, None], rotation_axis: 2, rotation: None, hidden: false, suppressed: false }
+        Self { id, name, on, flip_primary: false, reorient: 0, translation: [None, None, None], rotation_axis: 2, rotation: None, hidden: false, suppressed: false, between: None, primary_axis: None, secondary_axis: None }
     }
     pub fn owner(&self) -> InstanceId {
         self.on.instance
@@ -621,6 +640,7 @@ pub mod analysis;
 pub mod eval;
 pub mod ops;
 pub mod solver;
+pub mod standard;
 
 impl Assembly {
     pub fn instance(&self, id: InstanceId) -> Option<&Instance> {

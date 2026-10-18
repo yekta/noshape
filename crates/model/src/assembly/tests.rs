@@ -1863,3 +1863,165 @@ fn measure_between_instances() {
     let m = analysis::measure_entities(&res, &[(vec![InstanceId(2)], top)]);
     assert!(m.iter().any(|(l, m)| l == "Area" && matches!(m, Measurement::Area(a) if (a - 0.0008).abs() < 1e-9)));
 }
+
+#[test]
+fn standard_content_parts_regenerate_with_mate_connectors() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for c in CATALOGUE {
+        let spec = StandardSpec::new(c);
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{e}"));
+        let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+        assert!(failed.is_empty(), "{}: {failed:?}", spec.part_name());
+        let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let v = body.shape.volume().unwrap();
+        let d = c.diameter_m(c.size(&spec.size).unwrap());
+        assert!(v > d * d * d * 0.05, "{}: volume {v}", spec.part_name());
+        // Bolts: one connector under the head; nuts and washers: both faces.
+        let want = if c.shape.has_length() { 1 } else { 2 };
+        assert_eq!(r.context.connectors.len(), want, "{}", spec.part_name());
+        assert!(r.context.connectors[0].origin.length() < 1e-9);
+        // Primary axis out of the contact face (mates oppose Z axes).
+        assert!((r.context.connectors[0].z + DVec3::Z).length() < 1e-9);
+    }
+}
+
+#[test]
+fn standard_content_auto_size_and_bom() {
+    use super::standard::{self, CATALOGUE, StandardSpec, auto_size};
+    let bolt = CATALOGUE.iter().find(|c| c.name == "Hex socket head cap screw ISO 4762").unwrap();
+    let nut = CATALOGUE.iter().find(|c| c.name == "Hex nut grade A & B ISO 4032").unwrap();
+    let washer = CATALOGUE.iter().find(|c| c.name == "Plain washer normal grade A ISO 7089").unwrap();
+    // A 6.4 mm clearance hole: bolts round down, nuts round up; a 6 mm shaft takes an M6 washer.
+    assert_eq!(auto_size(bolt, 0.0064), Some("M6"));
+    assert_eq!(auto_size(nut, 0.0064), Some("M8"));
+    assert_eq!(auto_size(nut, 0.006), Some("M6"));
+    assert_eq!(auto_size(washer, 0.006), Some("M6"));
+    assert_eq!(auto_size(bolt, 0.001), None);
+    assert_eq!(standard::length_value("1 1/4 in"), Some(1.25 * 0.0254));
+    let mut spec = StandardSpec::new(bolt);
+    assert_eq!(spec.size, "M8");
+    spec.set_size("M6");
+    assert_eq!(spec.part_name(), "Hex socket head cap screw ISO 4762 - M6 x 25 mm");
+    let mut long = spec.clone();
+    long.length = Some("40 mm".into());
+    let inst = |id: u64, spec: &StandardSpec, x: f64| Instance::new(InstanceId(id), format!("{} <{id}>", spec.part_name()), InstanceSource::Standard { spec: spec.clone() }, Placement { translation: [x, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] });
+    let asm = Assembly { instances: vec![inst(1, &spec, 0.0), inst(2, &spec, 0.02), inst(3, &long, 0.04)], ..Default::default() };
+    let doc = Document::new();
+    let mut ev = AssemblyEvaluator::new();
+    let res = ev.evaluate(&doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(res.occurrences.len(), 3);
+    let rows = bom(&res);
+    assert_eq!(rows.iter().map(|r| r.quantity).collect::<Vec<_>>(), vec![2, 1]);
+    // The 40 mm screw reaches 15 mm further down than the 25 mm one.
+    let low = |i: usize| res.occurrences[i].world_bounds().unwrap().0.z;
+    assert!((low(0) - low(2) - 0.015).abs() < 1e-6, "{} {}", low(0), low(2));
+}
+
+#[test]
+fn isolate_expands_by_distance_and_connectivity() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let at = |id: u64, x: f64| part_instance(id, &format!("Block <{id}>"), f.studios[0], body.clone(), DVec3::new(x, 0.0, 0.0), id == 1);
+    // 1 - 2 - 3 mated in a chain; 4 sits right next to 1 but is not mated.
+    let mut asm = Assembly { instances: vec![at(1, 0.0), at(2, 0.2), at(3, 0.4), at(4, 0.05)], ..Default::default() };
+    let mc = |i: u64| MateConnectorRef::on(InstanceId(i), vec![], Reference::Origin);
+    asm.mates.push(Mate::new(MateId(10), "Planar 1".into(), MateType::Planar, mc(1), mc(2)));
+    asm.mates.push(Mate::new(MateId(11), "Planar 2".into(), MateType::Planar, mc(2), mc(3)));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let by_distance = analysis::isolate_expansion(&res, &asm, &[InstanceId(1)], false);
+    assert_eq!(by_distance.first(), Some(&vec![InstanceId(4)]));
+    assert_eq!(by_distance.len(), 3);
+    let by_mates = analysis::isolate_expansion(&res, &asm, &[InstanceId(1)], true);
+    assert_eq!(by_mates, vec![vec![InstanceId(2)], vec![InstanceId(3)]]);
+}
+
+#[test]
+fn mate_connector_between_entities_and_realign() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let side = side_face(&r);
+    let asm_with = |c: AsmMateConnector| Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true)], connectors: vec![c], ..Default::default() };
+    let on = |r: &Reference| MateConnectorRef::on(InstanceId(1), vec![], r.clone());
+    // Between the top and bottom faces: halfway up the block (z = 5 mm).
+    let mut c = AsmMateConnector::new(MateId(5), "Mate connector 1".into(), on(&top));
+    c.between = Some(on(&bottom));
+    let res = ev.evaluate(&f.doc, &asm_with(c.clone()), &SolveOptions::default(), None);
+    let fr = res.connector_frame(MateId(5)).unwrap();
+    assert!((fr.origin - DVec3::new(0.02, 0.01, 0.005)).length() < 1e-9, "{:?}", fr.origin);
+    // Realign: Z along a side face's normal (horizontal).
+    c.primary_axis = Some(on(&side));
+    let res = ev.evaluate(&f.doc, &asm_with(c.clone()), &SolveOptions::default(), None);
+    let fr = res.connector_frame(MateId(5)).unwrap();
+    assert!(fr.z().z.abs() < 1e-9 && (fr.z().length() - 1.0).abs() < 1e-9, "{:?}", fr.z());
+    // A secondary axis parallel to the primary one is an error.
+    c.secondary_axis = Some(on(&side));
+    let res = ev.evaluate(&f.doc, &asm_with(c), &SolveOptions::default(), None);
+    assert!(res.connector_frame(MateId(5)).is_none());
+}
+
+/// A planar side face of the block (normal horizontal).
+fn side_face(r: &crate::regen::RegenResult) -> Reference {
+    let b = &r.context.bodies[0];
+    for (i, f) in b.faces.iter().enumerate() {
+        let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+        if let Ok(Some(p)) = face.face_plane()
+            && p.normal.z.abs() < 1e-9
+        {
+            return Reference::Face((**f).clone());
+        }
+    }
+    panic!("no side face");
+}
+
+#[test]
+fn reorder_mate_features() {
+    let mc = |i: u64| MateConnectorRef::on(InstanceId(i), vec![], Reference::Origin);
+    let mut asm = Assembly::default();
+    for (id, n) in [(1, "Fastened 1"), (2, "Revolute 1"), (3, "Slider 1")] {
+        asm.mates.push(Mate::new(MateId(id), n.into(), MateType::Fastened, mc(10), mc(11)));
+    }
+    asm.connectors.push(AsmMateConnector::new(MateId(4), "Mate connector 1".into(), MateConnectorRef::origin()));
+    assert!(asm.move_feature_before(MateId(3), MateId(1)));
+    assert_eq!(asm.mates.iter().map(|m| m.id.0).collect::<Vec<_>>(), vec![3, 1, 2]);
+    assert!(asm.move_feature_before(MateId(3), MateId(2)));
+    assert_eq!(asm.mates.iter().map(|m| m.id.0).collect::<Vec<_>>(), vec![1, 3, 2]);
+    // Different kinds don't mix.
+    assert!(!asm.move_feature_before(MateId(4), MateId(1)));
+}
+
+#[test]
+fn hole_connectors_through_a_filleted_rim() {
+    use super::standard::hole_connectors;
+    // The demo plate: holes with a filleted top edge.
+    let mut doc = Document::new();
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        *ps = crate::demo::plate_studio();
+    }
+    let tab = doc.tabs[0].id;
+    let mut ev = AssemblyEvaluator::new();
+    let r = ev.studio(&doc, tab, &ConfigValues::default()).unwrap();
+    let b = &r.context.bodies[0];
+    let units = UnitPrefs::default();
+    // Small holes (radius 4.8 mm): their cylinder and the fillet around them.
+    let mut cylinders = 0;
+    for (i, f) in b.faces.iter().enumerate() {
+        let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+        let surf = face.face_surface().unwrap();
+        let is_small_cyl = matches!(surf, noshape_kernel::Surface::Cylinder { radius, .. } if (radius - 0.0048).abs() < 1e-6);
+        if !is_small_cyl {
+            continue;
+        }
+        cylinders += 1;
+        let holes = hole_connectors(&r.context, None, &Reference::Face((**f).clone()), DVec3::Z, &units);
+        assert_eq!(holes.len(), 1);
+        let (p, d) = &holes[0];
+        assert!((d - 0.0096).abs() < 1e-9, "{d}");
+        // The top end: on the top face (z = 12 mm), primary axis up.
+        assert!((p.frame.origin.z - 0.012).abs() < 1e-9 && p.frame.z().z > 0.999, "{:?} {:?}", p.frame.origin, p.frame.z());
+    }
+    assert_eq!(cylinders, 2);
+}

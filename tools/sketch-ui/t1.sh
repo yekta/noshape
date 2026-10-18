@@ -1,6 +1,6 @@
 #!/bin/bash
 $(dirname "$0")/fresh.sh
-export DISPLAY=:106
+export DISPLAY=${DISPLAY:-:103}
 xdotool mousemove 800 450 mousedown 1; sleep 0.2; xdotool mousemove 850 430; sleep 0.2; xdotool mousemove 900 400; sleep 0.3; xdotool mouseup 1; sleep 0.5
 xdotool mousemove 1000 380; sleep 0.4
 $(dirname "$0")/shot.sh /tmp/skb/a.png

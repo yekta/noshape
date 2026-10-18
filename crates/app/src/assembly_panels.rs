@@ -64,6 +64,14 @@ pub(crate) struct McSession {
     pub inputs: [Entity<InputState>; 4],
     /// Opened from a mate dialog's connector field (the mate keeps it).
     pub for_mate: Option<usize>,
+    /// Field receiving picks while `active`: 0 origin entity, 1 between
+    /// entity, 2 primary axis entity, 3 secondary axis entity.
+    pub slot: usize,
+    /// Origin type Between entities, and Realign.
+    pub between: bool,
+    pub realign: bool,
+    /// Between entity, primary and secondary axis entities.
+    pub extra: [Option<MateConnectorRef>; 3],
     _subs: Vec<Subscription>,
 }
 
@@ -81,6 +89,13 @@ impl McSession {
         c.rotation_axis = self.rot_axis;
         c.rotation = expr(3);
         c.hidden = self.hidden;
+        if self.between {
+            c.between = self.extra[0].clone();
+        }
+        if self.realign {
+            c.primary_axis = self.extra[1].clone();
+            c.secondary_axis = self.extra[2].clone();
+        }
         Some(c)
     }
 }
@@ -256,6 +271,10 @@ impl AssemblyView {
             hidden: existing.as_ref().is_some_and(|c| c.hidden),
             inputs,
             for_mate,
+            slot: 0,
+            between: existing.as_ref().is_some_and(|c| c.between.is_some()),
+            realign: existing.as_ref().is_some_and(|c| c.primary_axis.is_some() || c.secondary_axis.is_some()),
+            extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
             _subs: subs,
         });
         self.insert_open = false;
@@ -323,11 +342,40 @@ impl AssemblyView {
     pub(super) fn render_mc_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.mc else { return div().into_any_element() };
-        let field = self.conn_field("mcd-origin", &s.on, s.active, "Select origin entity", cx, |this, _| {
+        let field = self.conn_field("mcd-origin", &s.on, s.active && s.slot == 0, "Select origin entity", cx, |this, _| {
             if let Some(m) = &mut this.mc {
                 m.active = true;
+                m.slot = 0;
             }
         });
+        let extra_field = |this: &Self, slot: usize, id: &'static str, ph: &'static str, cx: &mut Context<Self>| {
+            let s = this.mc.as_ref()?;
+            Some(this.conn_field(id, &s.extra[slot - 1], s.active && s.slot == slot, ph, cx, move |this, _| {
+                if let Some(m) = &mut this.mc {
+                    m.active = true;
+                    m.slot = slot;
+                }
+            }))
+        };
+        let (between, realign) = (s.between, s.realign);
+        let between_field = if between { extra_field(self, 1, "mcd-between", "Select between entity", cx) } else { None };
+        let primary_field = if realign { extra_field(self, 2, "mcd-primary", "Primary axis entity", cx) } else { None };
+        let secondary_field = if realign { extra_field(self, 3, "mcd-secondary", "Secondary axis entity", cx) } else { None };
+        let Some(s) = &self.mc else { return div().into_any_element() };
+        let origin_type = |k: bool, label: &'static str, cx: &mut Context<Self>| {
+            Button::new(SharedString::from(format!("mcd-type-{k}"))).label(label).ghost().xsmall().selected(between == k).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                if let Some(m) = &mut this.mc {
+                    m.between = k;
+                    if k && m.extra[0].is_none() {
+                        m.active = true;
+                        m.slot = 1;
+                    }
+                }
+                this.update_capture(cx);
+                this.schedule_eval(window, cx);
+                cx.notify();
+            }))
+        };
         let axis_btn = |k: u8, label: &'static str, cur: u8, cx: &mut Context<Self>| {
             Button::new(SharedString::from(format!("mcd-ax-{k}"))).label(label).ghost().xsmall().selected(cur == k).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 if let Some(m) = &mut this.mc {
@@ -341,8 +389,11 @@ impl AssemblyView {
         let body = v_flex()
             .p_3()
             .gap_2()
+            // Origin type: On entity / Between entities (Onshape).
+            .child(h_flex().gap_1().child(origin_type(false, "On entity", cx)).child(origin_type(true, "Between entities", cx)))
             .child(div().text_xs().text_color(pal.text_muted).child("Origin entity (geometry inference point, or the assembly origin)"))
             .child(field)
+            .children(between_field)
             .child(
                 h_flex()
                     .gap_1()
@@ -361,6 +412,20 @@ impl AssemblyView {
                         cx.notify();
                     }))),
             )
+            .child(Checkbox::new("mcd-realign").label("Realign").checked(realign).on_click(cx.listener(|this, v: &bool, window, cx| {
+                if let Some(m) = &mut this.mc {
+                    m.realign = *v;
+                    if *v && m.extra[1].is_none() {
+                        m.active = true;
+                        m.slot = 2;
+                    }
+                }
+                this.update_capture(cx);
+                this.schedule_eval(window, cx);
+                cx.notify();
+            })))
+            .children(primary_field)
+            .children(secondary_field)
             .child(section("MOVE"))
             .child(field_row("X translation", Input::new(&s.inputs[0]).xsmall()))
             .child(field_row("Y translation", Input::new(&s.inputs[1]).xsmall()))
@@ -1337,6 +1402,10 @@ impl AssemblyView {
                 cx.notify();
                 return;
             }
+            InstanceSource::Standard { .. } => {
+                self.edit_standard_instance(top, cx);
+                return;
+            }
         };
         if inputs.is_empty() {
             self.message = Some((false, format!("{} is not configured (its Part Studio has no configuration inputs).", inst.name)));
@@ -1465,7 +1534,7 @@ impl AssemblyView {
                     .child(div().flex_1().truncate().child(format!("{sname} (rigid)")))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.do_replace(InstanceSource::PartStudio { studio: tab, config: ConfigValues::default() }, sname.clone(), cx))),
             );
-            for (body_id, pname, _) in st.parts {
+            for (body_id, pname, _, _) in st.parts {
                 let pname2 = pname.clone();
                 body = body.child(
                     h_flex()

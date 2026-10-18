@@ -6,7 +6,8 @@
 
 use crate::actions::{CloseWindow, NewDocument, OpenDocument};
 use crate::start_library::{self as lib, DocEntry, Library, ScanInput};
-use crate::theme::{p, with_alpha};
+use crate::os_ui as os;
+use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem};
@@ -17,6 +18,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,13 +30,7 @@ const CARD_W: f32 = 224.0;
 const THUMB_H: f32 = 168.0;
 
 // Lucide-style stroke icons that are not in the kit's default icon set.
-const ICON_CLOCK: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>"#;
-const ICON_LIBRARY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>"#;
-const ICON_GRID: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>"#;
-const ICON_LIST: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg>"#;
-const ICON_FOLDER_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>"#;
 const ICON_PENCIL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>"#;
-const ICON_BOX: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>"#;
 const ICON_X_CIRCLE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>"#;
 
 fn icon(data: &'static [u8]) -> Icon {
@@ -178,6 +175,10 @@ pub struct StartView {
     search: Entity<InputState>,
     query: String,
     selected: Option<PathBuf>,
+    /// The "Folders" section of "Owned by me" is expanded.
+    folders_open: bool,
+    /// The search box placeholder shown ("Search in <place>").
+    placeholder: String,
     scan_task: Option<Task<()>>,
     _poll: Task<()>,
     _subs: Vec<Subscription>,
@@ -229,6 +230,8 @@ impl StartView {
             search,
             query: String::new(),
             selected: None,
+            folders_open: true,
+            placeholder: String::new(),
             scan_task: None,
             _poll: poll,
             _subs: subs,
@@ -310,10 +313,6 @@ impl StartView {
         v
     }
 
-    fn count(&self, source: &Source) -> usize {
-        self.docs.iter().filter(|d| self.in_source(d, source)).count()
-    }
-
     fn set_source(&mut self, s: Source, cx: &mut Context<Self>) {
         self.source = s;
         self.selected = None;
@@ -372,19 +371,23 @@ impl StartView {
     }
 
     fn new_document(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let dir = match &self.source {
+        let root = crate::files::documents_dir();
+        let start = match &self.source {
             Source::Folder(f) => f.clone(),
-            _ => crate::files::documents_dir(),
+            _ => root.clone(),
         };
-        let default = lib::next_untitled(&dir);
-        let hint = format!("Saved in {}", display_path(&dir));
+        let default = lib::next_untitled(&start);
+        let location = Location { others: self.folders.iter().filter(|f| **f != root).cloned().collect(), root, chosen: Rc::new(RefCell::new(start)) };
+        let chosen = location.chosen.clone();
         let view = cx.entity();
-        prompt_name("New document", "Create", default, hint, window, cx, move |name, window, cx| {
+        let prompt = NamePrompt { title: "New document", ok_label: "Create document", label: "Document name", default, hint: None, location: Some(location) };
+        prompt_name(prompt, window, cx, move |name, window, cx| {
             let clean = lib::sanitize_name(&name);
             if clean.is_empty() {
                 Self::notify(window, cx, Notification::warning("Enter a name for the document"));
                 return false;
             }
+            let dir = chosen.borrow().clone();
             let path = dir.join(format!("{clean}.{}", lib::EXT));
             if path.exists() {
                 Self::notify(window, cx, Notification::warning(format!("\"{clean}\" already exists in this folder")));
@@ -448,7 +451,8 @@ impl StartView {
         }
         let view = cx.entity();
         let hint = format!("Renames {}", d.path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default());
-        prompt_name("Rename document", "Rename", d.name.clone(), hint, window, cx, move |name, window, cx| match lib::rename_document(&d.path, &name) {
+        let prompt = NamePrompt { title: "Rename document", ok_label: "Rename", label: "Document name", default: d.name.clone(), hint: Some(hint), location: None };
+        prompt_name(prompt, window, cx, move |name, window, cx| match lib::rename_document(&d.path, &name) {
             Ok(dest) => {
                 crate::files::replace_recent(&d.path, &dest);
                 view.update(cx, |this, cx| {
@@ -545,246 +549,290 @@ impl StartView {
         cx.notify();
     }
 
-    /// Onshape documents page top bar: 40 px `#eaeaea`, logo, search box.
+    /// Onshape documents page top bar: 40 px `#eaeaea`, logo at the left,
+    /// the search box (390 px, with its square search button) centered.
     fn render_title_bar(&self, cx: &App) -> AnyElement {
         let pal = p();
         TitleBar::new()
             .h(px(crate::ui::NAVBAR_H))
             .bg(pal.panel_inactive)
-            .border_b_0()
+            .border_b_1()
+            .border_color(pal.border)
             .child(
                 h_flex()
                     .w_full()
                     .h_full()
-                    .gap(px(5.))
-                    .pl(px(4.))
-                    .child(crate::assets::icon("noshape-logo", 22., cx))
-                    .child(div().text_size(px(19.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape"))
-                    .child(div().w(px(24.)))
                     .child(
-                        div().w(px(360.)).child(
-                            Input::new(&self.search)
-                                .small()
+                        h_flex()
+                            .w(px(220.))
+                            .flex_none()
+                            .gap(px(5.))
+                            .pl(px(8.))
+                            .child(crate::assets::icon("noshape-logo", 22., cx))
+                            .child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")),
+                    )
+                    .child(
+                        div().flex_1().flex().justify_center().child(
+                            h_flex()
+                                .w(px(390.))
                                 .h(px(28.))
-                                .prefix(Icon::new(IconName::Search).size(px(14.)).text_color(pal.text_muted))
-                                .cleanable(true),
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .h_full()
+                                        .bg(pal.panel)
+                                        .border_1()
+                                        .border_color(pal.border_strong)
+                                        .rounded_l(px(2.))
+                                        .child(Input::new(&self.search).appearance(false).small().h(px(26.)).cleanable(true)),
+                                )
+                                .child(
+                                    div()
+                                        .id("search-go")
+                                        .w(px(30.))
+                                        .h_full()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .border_1()
+                                        .border_l_0()
+                                        .border_color(pal.border_strong)
+                                        .rounded_r(px(2.))
+                                        .cursor_pointer()
+                                        .hover(|d| d.bg(pal.border))
+                                        .child(os::glyph(os::GLYPH_SEARCH, 17., pal.text))
+                                        .on_click({
+                                            let search = self.search.clone();
+                                            move |_, window, cx| search.update(cx, |s, cx| s.focus(window, cx))
+                                        }),
+                                ),
                         ),
-                    ),
+                    )
+                    .child(div().w(px(220.)).flex_none()),
             )
             .into_any_element()
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn sidebar_item(&self, id: &str, ic: Icon, label: String, count: Option<usize>, source: Source, tooltip: Option<String>, cx: &mut Context<Self>) -> Stateful<Div> {
+    /// A left-nav row: 32 px, 18 px glyph, 14 px label; the current one is
+    /// blue and semibold with a 4 px blue bar at the left edge.
+    fn nav_item(&self, id: &'static str, glyph: &'static [u8], label: &'static str, source: Source, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
-        let active = self.source == source;
+        let active = match (&self.source, &source) {
+            (Source::Folder(_), Source::All) => true,
+            (a, b) => a == b,
+        };
+        let color = if active { pal.accent } else { pal.text };
         h_flex()
-            .id(SharedString::from(format!("src-{id}")))
-            .h(px(30.))
-            .px_2()
-            .gap_2()
+            .id(id)
+            .relative()
+            .h(px(32.))
+            .pl(px(20.))
+            .gap(px(7.))
             .cursor_pointer()
             .text_size(px(14.))
-            .text_color(pal.text)
-            .when(active, |d| d.bg(pal.accent_soft))
-            .when(!active, |d| d.hover(|d| d.bg(pal.row_hover)))
-            .child(ic.size(px(16.)).text_color(if active { pal.accent } else { pal.text_muted }))
-            .child(div().flex_1().min_w_0().truncate().child(label))
-            .when_some(count, |d, n| d.child(div().text_xs().text_color(if active { pal.text_muted } else { pal.text_faint }).child(n.to_string())))
-            .when_some(tooltip, |d, t| d.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(t.clone()).build(window, cx)))
+            .text_color(color)
+            .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)))
+            .when(!active, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
+            .child(os::glyph(glyph, 18., color))
+            .child(label)
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx)))
     }
 
     fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let docs_dir = crate::files::documents_dir();
-        let section = |label: &'static str| div().px_2().pt_4().pb_1().text_size(px(12.)).text_color(pal.text_muted).child(label);
-        let mut folders = v_flex().gap_0p5();
-        for (i, f) in self.folders.clone().into_iter().enumerate() {
-            let is_default = f == docs_dir;
-            let label = if is_default { "noshape documents".to_string() } else { f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string()) };
-            let count = self.count(&Source::Folder(f.clone()));
-            let view = cx.entity();
-            let folder = f.clone();
-            let ic = if is_default { Icon::new(IconName::HardDrive) } else { Icon::new(IconName::Folder) };
-            folders = folders.child(
-                self.sidebar_item(&format!("folder-{i}"), ic, label, Some(count), Source::Folder(f.clone()), Some(display_path(&f)), cx).context_menu(move |menu, _, _| {
-                    let (v1, v2) = (view.clone(), view.clone());
-                    let (f1, f2) = (folder.clone(), folder.clone());
-                    let menu = menu.item(PopupMenuItem::new("Show in file manager").icon(IconName::ExternalLink).on_click(move |_, window, cx| v1.update(cx, |t, cx| t.reveal(&f1, window, cx))));
-                    if is_default {
-                        menu
-                    } else {
-                        menu.separator().item(PopupMenuItem::new("Remove from list").icon(icon(ICON_X_CIRCLE)).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.remove_folder(f2.clone(), cx))))
-                    }
-                }),
-            );
-        }
+        let view = cx.entity();
+        let create = Button::new("create")
+            .primary()
+            .w(px(150.))
+            .h(px(34.))
+            .rounded(px(3.))
+            .child(h_flex().gap(px(6.)).text_size(px(14.)).child("Create").child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0xffffff))))
+            .dropdown_menu(move |menu, _, _| {
+                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                menu.min_w(px(150.))
+                    .item(os::menu_item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
+                    .item(os::menu_item(os::GLYPH_FOLDER, "Folder…").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.add_folder(window, cx))))
+                    .separator()
+                    .item(os::menu_item(os::GLYPH_OPEN, "Open file…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.open_dialog(window, cx))))
+            });
         v_flex()
-            .w(px(236.))
+            .w(px(220.))
             .h_full()
             .flex_none()
-            .bg(pal.rail)
+            .bg(pal.panel)
             .border_r_1()
             .border_color(pal.border)
-            .px_2()
-            .py_3()
+            .child(div().pt(px(8.)).flex().justify_center().child(create))
             .child(
                 v_flex()
-                    .gap_2()
-                    .child(
-                        accent_button("new-doc", "Create", true)
-                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.new_document(window, cx))),
-                    )
-                    .child(
-                        Button::new("open-doc")
-                            .outline()
-                            .icon(IconName::FolderOpen)
-                            .label("Open…")
-                            .w_full()
-                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_dialog(window, cx))),
-                    ),
-            )
-            .child(section("Library"))
-            .child(
-                v_flex()
-                    .gap_0p5()
-                    .child(self.sidebar_item("recent", icon(ICON_CLOCK), "Recent".into(), Some(self.count(&Source::Recent)), Source::Recent, None, cx))
-                    .child(self.sidebar_item("all", icon(ICON_LIBRARY), "All documents".into(), Some(self.docs.len()), Source::All, None, cx)),
-            )
-            .child(
-                h_flex().justify_between().child(section("Folders")).child(
-                    div().pt_3().child(
-                        Button::new("add-folder")
-                            .icon(icon(ICON_FOLDER_PLUS))
-                            .ghost()
-                            .xsmall()
-                            .tooltip("Add a folder…")
-                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_folder(window, cx))),
-                    ),
-                ),
-            )
-            .child(div().id("folders").flex_1().min_h_0().overflow_y_scrollbar().child(folders))
-            .child(
-                h_flex()
-                    .pt_3()
-                    .gap_2()
-                    .border_t_1()
-                    .border_color(pal.border)
-                    .text_xs()
-                    .text_color(pal.text_faint)
-                    .child(Icon::new(IconName::HardDrive).size(px(13.)))
-                    .child("Stored on this computer"),
+                    .pt(px(15.))
+                    .child(self.nav_item("nav-owned", os::GLYPH_OWNED, "Owned by me", Source::All, cx))
+                    .child(self.nav_item("nav-recent", os::GLYPH_RECENT, "Recently opened", Source::Recent, cx)),
             )
             .into_any_element()
     }
 
     fn source_title(&self) -> String {
         match &self.source {
-            Source::Recent => "Recent".into(),
-            Source::All => "All documents".into(),
-            Source::Folder(f) if *f == crate::files::documents_dir() => "noshape documents".into(),
-            Source::Folder(f) => f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string()),
+            Source::Recent => "Recently opened".into(),
+            Source::All => "Owned by me".into(),
+            Source::Folder(f) => folder_label(f),
         }
     }
 
-    fn render_header(&mut self, shown: usize, cx: &mut Context<Self>) -> AnyElement {
+    /// "Owned by me" / "Owned by me › folder" breadcrumb (16 px / 500).
+    fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let sort_label = match self.sort {
-            SortKey::Modified => "Last modified",
-            SortKey::Name => "Name",
-        };
-        let view = cx.entity();
-        let (sort, desc) = (self.sort, self.descending);
-        let subtitle: Option<String> = match &self.source {
-            Source::Folder(f) => Some(display_path(f)),
-            Source::Recent => Some("Documents you opened recently".into()),
-            Source::All => Some("Recent documents and every document in your folders".into()),
-        };
+        let glyph = if self.source == Source::Recent { os::GLYPH_RECENT } else { os::GLYPH_OWNED };
+        let root = if self.source == Source::Recent { "Recently opened" } else { "Owned by me" };
+        let in_folder = matches!(self.source, Source::Folder(_));
         h_flex()
-            .px_4()
-            .pt_3()
-            .pb_3()
-            .gap_3()
+            .h(px(52.))
+            .flex_none()
+            .pl(px(20.))
+            .gap(px(6.))
+            .text_size(px(16.))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(pal.text)
+            .child(os::glyph(glyph, 18., pal.text))
             .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap_0p5()
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(self.source_title()))
-                            .child(div().text_size(px(14.)).text_color(pal.text_faint).child(format!("({shown})"))),
-                    )
-                    .when_some(subtitle, |d, s| d.child(div().text_xs().text_color(pal.text_faint).truncate().child(s))),
-            )
-            .child(
-                Button::new("sort")
-                    .ghost()
-                    .small()
-                    .icon(if self.descending { IconName::SortDescending } else { IconName::SortAscending })
-                    .label(sort_label)
-                    .dropdown_caret(true)
-                    .dropdown_menu(move |menu, _, _| {
-                        let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
-                        menu.label("Sort by")
-                            .item(PopupMenuItem::new("Last modified").checked(sort == SortKey::Modified).on_click(move |_, _, cx| {
-                                v1.update(cx, |t, cx| {
-                                    if t.sort != SortKey::Modified {
-                                        t.set_sort(SortKey::Modified, cx)
-                                    }
-                                })
-                            }))
-                            .item(PopupMenuItem::new("Name").checked(sort == SortKey::Name).on_click(move |_, _, cx| {
-                                v2.update(cx, |t, cx| {
-                                    if t.sort != SortKey::Name {
-                                        t.set_sort(SortKey::Name, cx)
-                                    }
-                                })
-                            }))
-                            .separator()
-                            .item(PopupMenuItem::new(if desc { "Reverse order (ascending)" } else { "Reverse order (descending)" }).on_click(move |_, _, cx| {
-                                v3.update(cx, |t, cx| {
-                                    t.descending = !t.descending;
-                                    t.save_prefs();
-                                    cx.notify();
-                                })
-                            }))
+                div()
+                    .id("crumb-root")
+                    .child(root)
+                    .when(in_folder, |d| {
+                        d.cursor_pointer().hover(|d| d.text_color(pal.accent)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_source(Source::All, cx)))
                     }),
             )
+            .when(in_folder, |d| d.child(os::glyph(os::GLYPH_CHEVRON_RIGHT, 14., pal.text_muted)).child(os::glyph(os::GLYPH_FOLDER, 18., pal.text)).child(self.source_title()))
+            .into_any_element()
+    }
+
+    /// The "Folders" section of "Owned by me": a collapsible caption and
+    /// gray folder tiles, then the divider with its collapse handle.
+    fn render_folders(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let docs_dir = crate::files::documents_dir();
+        let open = self.folders_open;
+        let has_tiles = self.folders.iter().any(|f| *f != docs_dir);
+        let mut tiles = div().flex().flex_wrap().gap(px(10.)).pl(px(14.)).pr(px(10.));
+        // The documents folder is "Owned by me" itself; the tiles are the
+        // other folders added to the start window.
+        for (i, f) in self.folders.clone().into_iter().filter(|f| *f != docs_dir).enumerate() {
+            let view = cx.entity();
+            let folder = f.clone();
+            let source = Source::Folder(f.clone());
+            tiles = tiles.child(
+                h_flex()
+                    .id(SharedString::from(format!("folder-{i}")))
+                    .w(px(213.))
+                    .h(px(38.))
+                    .px(px(10.))
+                    .gap(px(7.))
+                    .rounded(px(3.))
+                    .bg(rgb(0xf5f5f5))
+                    .border_1()
+                    .border_color(rgb(0xf1f1f1))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .text_size(px(14.))
+                    .text_color(pal.text)
+                    .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
+                    .child(div().flex_1().min_w_0().truncate().child(folder_label(&f)))
+                    .tooltip(crate::ui::tooltip(display_path(&f)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx)))
+                    .context_menu(move |menu, _, _| {
+                        let (v1, v2) = (view.clone(), view.clone());
+                        let (f1, f2) = (folder.clone(), folder.clone());
+                        menu.item(PopupMenuItem::new("Show in file manager").icon(IconName::ExternalLink).on_click(move |_, window, cx| v1.update(cx, |t, cx| t.reveal(&f1, window, cx))))
+                            .separator()
+                            .item(PopupMenuItem::new("Remove from list").icon(icon(ICON_X_CIRCLE)).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.remove_folder(f2.clone(), cx))))
+                    }),
+            );
+        }
+        v_flex()
+            .flex_none()
             .child(
                 h_flex()
-                    .p_0p5()
-                    .gap_0p5()
-                    .rounded_md()
-                    .bg(pal.panel)
-                    .border_1()
-                    .border_color(pal.border)
+                    .id("folders-caption")
+                    .h(px(30.))
+                    .pl(px(12.))
+                    .gap(px(6.))
+                    .cursor_pointer()
+                    .text_size(px(14.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(pal.text)
+                    .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text))
+                    .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
+                    .child("Folders")
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.folders_open = !this.folders_open;
+                        cx.notify();
+                    })),
+            )
+            .when(open && has_tiles, |d| d.child(div().pt(px(6.)).pb(px(14.)).child(tiles)))
+            .child(
+                // The splitter between folders and documents, with its
+                // round collapse handle in the middle.
+                div()
+                    .relative()
+                    .h(px(20.))
+                    .mx(px(10.))
+                    .child(div().absolute().left_0().right_0().top(px(4.)).h(px(1.)).bg(pal.tooltip))
                     .child(
-                        seg_button("view-grid", icon(ICON_GRID), "Grid view", self.view == ViewMode::Grid)
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_view(ViewMode::Grid, cx))),
-                    )
-                    .child(
-                        seg_button("view-list", icon(ICON_LIST), "List view", self.view == ViewMode::List)
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_view(ViewMode::List, cx))),
+                        div().absolute().left_0().right_0().top_0().flex().justify_center().child(
+                            div()
+                                .id("folders-toggle")
+                                .w(px(26.))
+                                .h(px(16.))
+                                .rounded(px(8.))
+                                .bg(pal.panel)
+                                .shadow_sm()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 12., pal.text))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.folders_open = !this.folders_open;
+                                    cx.notify();
+                                })),
+                        ),
                     ),
+            )
+            .into_any_element()
+    }
+
+    /// View toggles above the table (Onshape's list / grid buttons).
+    fn render_list_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        h_flex()
+            .h(px(40.))
+            .flex_none()
+            .pl(px(14.))
+            .gap(px(4.))
+            .child(
+                view_toggle("view-list", os::GLYPH_LIST_VIEW, "List", self.view == ViewMode::List)
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_view(ViewMode::List, cx))),
+            )
+            .child(
+                view_toggle("view-grid", os::GLYPH_GRID_VIEW, "Grid", self.view == ViewMode::Grid)
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_view(ViewMode::Grid, cx))),
             )
             .into_any_element()
     }
 
     fn thumbnail(&self, d: &DocEntry, w: f32, h: f32, big: bool) -> AnyElement {
         let pal = p();
-        // Onshape document thumbnails: the model on white.
-        let base = div().w(px(w)).h(px(h)).flex_none().overflow_hidden().bg(pal.panel);
+        // Onshape document thumbnails: the model on white; documents
+        // without one show the gray document glyph.
+        let base = div().w(px(w)).h(px(h)).flex_none().overflow_hidden();
         match &d.thumbnail {
             Some(img) => base.child(gpui_kit::img(img.clone()).size_full()).into_any_element(),
             None => {
-                let (ic, color) = if d.broken { (Icon::new(IconName::TriangleAlert), pal.warning) } else { (icon(ICON_BOX), pal.text_faint) };
+                let (ic, color) = if d.broken { (Icon::new(IconName::TriangleAlert), pal.warning) } else { (icon(os::GLYPH_DOCUMENT), pal.text_faint) };
                 base.flex()
                     .items_center()
                     .justify_center()
-                    .child(ic.size(px(if big { 40. } else { 16. })).text_color(with_alpha(color, 0.7)))
+                    .child(ic.size(px(if big { 40. } else { 22. })).text_color(color))
                     .into_any_element()
             }
         }
@@ -794,13 +842,13 @@ impl StartView {
         let pal = p();
         h_flex()
             .gap_1()
-            .px_1p5()
-            .py_0p5()
-            .rounded_md()
-            .bg(with_alpha(pal.app_bg, 0.8))
-            .text_xs()
-            .text_color(pal.success)
-            .child(div().size(px(6.)).rounded_full().bg(pal.success))
+            .px(px(5.))
+            .rounded(px(3.))
+            .bg(pal.info_fill)
+            .border_1()
+            .border_color(pal.info_outline)
+            .text_size(px(11.))
+            .text_color(pal.info_text)
             .child("Open")
             .into_any_element()
     }
@@ -809,50 +857,40 @@ impl StartView {
         let pal = p();
         let selected = self.selected.as_ref() == Some(&d.path);
         let open = crate::files::is_document_open(&d.path, cx);
-        let view = cx.entity();
-        let (d1, d2, d3) = (d.clone(), d.clone(), d.clone());
-                let p1 = d.path.clone();
-        let v2 = view.clone();
-        let subtitle = if d.broken { "Cannot read this file".to_string() } else { format!("Edited {}", lib::format_modified(d.modified)) };
+        let (d1, d2) = (d.clone(), d.clone());
+        let p1 = d.path.clone();
+        let v2 = cx.entity();
+        let subtitle = if d.broken { "Cannot read this file".to_string() } else { lib::capitalize(&lib::format_modified(d.modified)) };
         v_flex()
             .id(SharedString::from(format!("card-{ix}")))
             .w(px(CARD_W))
-            .rounded(px(4.))
+            .rounded(px(3.))
             .overflow_hidden()
             .border_1()
             .bg(pal.panel)
             .cursor_pointer()
-            .when(selected, |c| c.border_color(pal.accent))
-            .when(!selected, |c| c.border_color(pal.border).hover(|c| c.border_color(pal.field_outline)))
+            .when(selected, |c| c.border_color(pal.accent_soft).bg(pal.accent_soft))
+            .when(!selected, |c| c.border_color(rgb(0xececec)).hover(|c| c.bg(pal.row_hover).border_color(pal.row_hover)))
             .child(
                 div()
                     .relative()
+                    .bg(pal.panel)
                     .child(self.thumbnail(d, CARD_W - 2.0, THUMB_H, true))
                     .when(open, |c| c.child(div().absolute().top_2().left_2().child(Self::open_badge()))),
             )
             .child(
                 h_flex()
-                    .pl_3()
+                    .pl(px(10.))
                     .pr_1()
-                    .py_2()
+                    .py(px(6.))
                     .gap_1()
-                    .border_t_1()
-                    .border_color(pal.border)
-                    .when(selected, |c| c.bg(pal.accent_soft))
                     .child(
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(pal.text).truncate().child(d.name.clone()))
-                            .child(div().text_xs().text_color(if d.broken { pal.warning } else { pal.text_faint }).truncate().child(subtitle)),
+                            .child(div().text_size(px(14.)).text_color(pal.text).truncate().child(d.name.clone()))
+                            .child(div().text_size(px(12.)).text_color(if d.broken { pal.warning } else { pal.text_muted }).truncate().child(subtitle)),
                     )
-                    .child(
-                        Button::new(SharedString::from(format!("more-{ix}")))
-                            .icon(IconName::EllipsisVertical)
-                            .ghost()
-                            .xsmall()
-                            .dropdown_menu(move |menu, _, _| Self::doc_menu(view.clone(), d3.clone(), menu)),
-                    ),
             )
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
             .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.select(&p1, cx)))
@@ -866,81 +904,75 @@ impl StartView {
             .id("doc-grid")
             .size_full()
             .overflow_y_scrollbar()
-            .child(div().px_4().pb_6().flex().flex_wrap().gap_4().children(cards))
+            .child(div().pl(px(14.)).pr(px(10.)).pt(px(4.)).pb_6().flex().flex_wrap().gap(px(12.)).children(cards))
             .into_any_element()
     }
 
+    /// A table header cell: 14 px semibold, with the 2 px column divider at
+    /// its right edge; sortable columns show ▲/▼.
     fn list_header_cell(&self, id: &'static str, label: &'static str, key: Option<SortKey>, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
         let active = key == Some(self.sort);
         h_flex()
             .id(id)
-            .gap_1()
-            .text_size(px(12.))
-            .text_color(if active { pal.text } else { pal.text_muted })
+            .h_full()
+            .pl(px(16.))
+            .gap(px(6.))
+            .text_size(px(14.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(pal.text)
             .child(label)
-            .when(active, |d| d.child(Icon::new(if self.descending { IconName::ChevronDown } else { IconName::ChevronUp }).size(px(12.))))
-            .when_some(key, |d, k| d.cursor_pointer().hover(|d| d.text_color(pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx))))
+            .when(active, |d| d.child(os::glyph(os::GLYPH_CARET, 9., pal.text_muted).when(!self.descending, |i| i.rotate(gpui_kit::percentage(0.5)))))
+            .child(div().flex_1())
+            .child(div().w(px(2.)).h(px(22.)).flex_none().bg(pal.border))
+            .when_some(key, |d, k| d.cursor_pointer().hover(|d| d.bg(rgb(0xf5f5f5))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx))))
     }
 
     fn render_list(&self, docs: &[DocEntry], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let header = h_flex()
-            .h(px(30.))
-            .mx_4()
-            .px_3()
-            .gap_3()
-            .bg(pal.panel_inactive)
+            .h(px(32.))
+            .flex_none()
             .border_b_1()
-            .border_color(pal.border)
-            .child(div().w(px(52.)))
-            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).flex_1().min_w_0())
-            .child(self.list_header_cell("h-folder", "Folder", None, cx).w(px(260.)))
-            .child(self.list_header_cell("h-mod", "Modified", Some(SortKey::Modified), cx).w(px(120.)))
-            .child(self.list_header_cell("h-size", "Size", None, cx).w(px(70.)))
-            .child(div().w(px(28.)));
+            .border_color(pal.border_strong)
+            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).flex_1().min_w(px(240.)))
+            .child(self.list_header_cell("h-mod", "Modified", Some(SortKey::Modified), cx).w(px(200.)).flex_none())
+            .child(self.list_header_cell("h-folder", "Location", None, cx).w(px(220.)).flex_none())
+            .child(self.list_header_cell("h-size", "Size", None, cx).w(px(110.)).flex_none());
         let rows: Vec<AnyElement> = docs
             .iter()
             .enumerate()
             .map(|(ix, d)| {
                 let selected = self.selected.as_ref() == Some(&d.path);
                 let open = crate::files::is_document_open(&d.path, cx);
-                let view = cx.entity();
-                let v2 = view.clone();
-                let (d1, d2, d3) = (d.clone(), d.clone(), d.clone());
+                let v2 = cx.entity();
+                let (d1, d2) = (d.clone(), d.clone());
                 let p1 = d.path.clone();
+                let cell = |w: f32| div().w(px(w)).flex_none().pl(px(16.)).truncate();
                 h_flex()
                     .id(SharedString::from(format!("row-{ix}")))
-                    .h(px(48.))
-                    .px_3()
-                    .gap_3()
+                    .h(px(42.))
+                    .flex_none()
                     .cursor_pointer()
                     .text_size(px(14.))
+                    .text_color(pal.text)
                     .border_b_1()
-                    .border_color(pal.border)
+                    .border_color(rgb(0xececec))
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
-                    .child(div().rounded_sm().overflow_hidden().border_1().border_color(pal.border).child(self.thumbnail(d, 50.0, 36.0, false)))
                     .child(
                         h_flex()
                             .flex_1()
-                            .min_w_0()
-                            .gap_2()
-                            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(if d.broken { pal.warning } else { pal.text }).child(d.name.clone()))
+                            .min_w(px(240.))
+                            .pl(px(10.))
+                            .gap(px(10.))
+                            .child(self.thumbnail(d, 54.0, 36.0, false))
+                            .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(d.name.clone()))
                             .when(open, |r| r.child(Self::open_badge())),
                     )
-                    .child(div().w(px(260.)).truncate().text_xs().text_color(pal.text_faint).child(display_path(d.folder())))
-                    .child(div().w(px(120.)).text_xs().text_color(pal.text_muted).child(lib::capitalize(&lib::format_modified(d.modified))))
-                    .child(div().w(px(70.)).text_xs().text_color(pal.text_faint).child(lib::format_size(d.size)))
-                    .child(
-                        div().w(px(28.)).flex().justify_end().child(
-                            Button::new(SharedString::from(format!("rmore-{ix}")))
-                                .icon(IconName::EllipsisVertical)
-                                .ghost()
-                                .xsmall()
-                                .dropdown_menu(move |menu, _, _| Self::doc_menu(view.clone(), d3.clone(), menu)),
-                        ),
-                    )
+                    .child(cell(200.).child(lib::capitalize(&lib::format_modified(d.modified))))
+                    .child(cell(220.).text_color(pal.text_muted).child(display_path(d.folder())))
+                    .child(cell(110.).text_color(pal.text_muted).child(lib::format_size(d.size)))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.select(&p1, cx)))
                     .context_menu(move |menu, _, _| Self::doc_menu(v2.clone(), d2.clone(), menu))
@@ -949,51 +981,71 @@ impl StartView {
             .collect();
         v_flex()
             .size_full()
+            .pl(px(10.))
+            .pr(px(12.))
             .child(header)
-            .child(div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().px_4().children(rows)))
+            .child(div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().children(rows)))
             .into_any_element()
     }
 
-    fn render_empty(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// Empty list: the large gray noshape mark and one line of `#666` text,
+    /// as Onshape's "No documents owned by you."
+    fn render_empty(&self) -> AnyElement {
         let pal = p();
         let searching = !self.query.trim().is_empty();
-        let (title, body): (String, String) = if !self.loaded {
-            ("Loading documents…".into(), String::new())
+        let text: String = if !self.loaded {
+            "Loading documents…".into()
         } else if searching {
-            (format!("No documents match \"{}\"", self.query.trim()), "Try a different name, or look in All documents.".into())
+            format!("No documents match \"{}\".", self.query.trim())
         } else {
             match &self.source {
-                Source::Recent => ("No recent documents".into(), "Documents you open appear here.".into()),
-                Source::Folder(_) => ("This folder has no noshape documents".into(), "Create a document here, or add another folder.".into()),
-                Source::All => ("No documents yet".into(), "Create your first document to start modeling.".into()),
+                Source::Recent => "No recently opened documents.".into(),
+                Source::Folder(_) => "No documents in this folder.".into(),
+                Source::All => "No documents owned by you.".into(),
             }
         };
         v_flex()
             .size_full()
             .items_center()
             .justify_center()
-            .gap_3()
-            .pb(px(80.))
-            .child(div().size(px(64.)).rounded_full().bg(pal.panel_raised).flex().items_center().justify_center().child(icon(ICON_BOX).size(px(30.)).text_color(pal.text_faint)))
-            .child(div().text_base().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
-            .when(!body.is_empty(), |d| d.child(div().text_sm().text_color(pal.text_muted).child(body)))
-            .when(self.loaded && !searching, |d| {
-                d.child(
-                    accent_button("empty-new", "New document", false)
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.new_document(window, cx))),
-                )
-            })
+            .gap(px(20.))
+            .child(os::glyph(os::GLYPH_EMPTY, 150., rgb(0xd7d7d7)))
+            .child(div().text_size(px(14.)).text_color(pal.text_muted).child(text))
+            .into_any_element()
+    }
+
+    /// Bottom strip: 30 px, white, small `#666` text (Onshape's footer).
+    fn render_footer(&self) -> AnyElement {
+        let pal = p();
+        h_flex()
+            .h(px(28.))
+            .flex_none()
+            .px(px(20.))
+            .border_t_1()
+            .border_color(pal.border)
+            .text_size(px(11.))
+            .text_color(pal.text_muted)
+            .child(div().flex_1().child(format!("Documents are stored on this computer in {}", display_path(&crate::files::documents_dir()))))
+            .child(format!("noshape {}", env!("CARGO_PKG_VERSION")))
             .into_any_element()
     }
 }
 
 impl Render for StartView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        // Onshape: "Search in Owned by me" (the current place).
+        let placeholder = format!("Search in {}", self.source_title());
+        if self.placeholder != placeholder {
+            self.placeholder = placeholder.clone();
+            self.search.update(cx, |s, cx| s.set_placeholder(placeholder, window, cx));
+        }
         let docs = self.visible();
-        let header = self.render_header(docs.len(), cx);
+        let header = self.render_header(cx);
+        let folders = (self.source == Source::All && self.query.trim().is_empty()).then(|| self.render_folders(cx));
+        let toolbar = self.render_list_toolbar(cx);
         let content = if docs.is_empty() {
-            self.render_empty(cx)
+            self.render_empty()
         } else if self.view == ViewMode::Grid {
             self.render_grid(&docs, cx)
         } else {
@@ -1033,49 +1085,46 @@ impl Render for StartView {
                     .min_h_0()
                     .items_start()
                     .child(self.render_sidebar(cx))
-                    .child(v_flex().flex_1().min_w_0().h_full().child(header).child(div().flex_1().min_h_0().child(content))),
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .h_full()
+                            .child(header)
+                            .children(folders)
+                            .child(toolbar)
+                            .child(div().flex_1().min_h_0().child(content)),
+                    ),
             )
+            .child(self.render_footer())
     }
 }
 
-/// One segment of the grid/list toggle.
-fn seg_button(id: &'static str, ic: Icon, tip: &'static str, selected: bool) -> Stateful<Div> {
+/// A 28x26 view toggle (list / grid): `#eaeaea` when on.
+fn view_toggle(id: &'static str, glyph: &'static [u8], tip: &'static str, selected: bool) -> Stateful<Div> {
     let pal = p();
     div()
         .id(id)
         .w(px(28.))
-        .h(px(24.))
+        .h(px(26.))
         .flex()
         .items_center()
         .justify_center()
-        .rounded_sm()
+        .rounded(px(3.))
         .cursor_pointer()
         .when(selected, |d| d.bg(pal.panel_active))
         .when(!selected, |d| d.hover(|d| d.bg(pal.panel_hover)))
-        .child(ic.size(px(15.)).text_color(if selected { pal.accent } else { pal.text_muted }))
-        .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
+        .child(os::glyph(glyph, 18., pal.text))
+        .tooltip(crate::ui::tooltip(tip))
 }
 
-/// The accent call-to-action button (the kit's primary style is neutral here).
-fn accent_button(id: &'static str, label: &'static str, full_width: bool) -> Stateful<Div> {
-    let pal = p();
-    h_flex()
-        .id(id)
-        .h(px(32.))
-        .px_4()
-        .gap_2()
-        .justify_center()
-        .rounded(px(4.))
-        .cursor_pointer()
-        .bg(pal.accent)
-        .text_color(gpui_kit::rgb(0xffffff))
-        .text_size(px(14.))
-        .font_weight(FontWeight::MEDIUM)
-        .hover(|d| d.bg(pal.accent_hover))
-        .active(|d| d.opacity(0.85))
-        .when(full_width, |d| d.w_full())
-        .child(Icon::new(IconName::Plus).size(px(15.)))
-        .child(label)
+/// A folder's display name ("noshape documents" for the default folder).
+fn folder_label(f: &Path) -> String {
+    if f == crate::files::documents_dir() {
+        "noshape documents".to_string()
+    } else {
+        f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.display().to_string())
+    }
 }
 
 /// Path for display, with the home directory shortened to `~`.
@@ -1088,17 +1137,96 @@ fn display_path(p: &Path) -> String {
     p.display().to_string()
 }
 
-/// Modal name prompt. `then` returns whether to close the dialog.
-fn prompt_name(
+/// Where a new document goes: the documents folder ("Owned by me") or one
+/// of the other folders shown in the start window.
+struct Location {
+    root: PathBuf,
+    others: Vec<PathBuf>,
+    chosen: Rc<RefCell<PathBuf>>,
+}
+
+impl Location {
+    /// Onshape's "Document location" browser: a header with home, back and
+    /// the current place, above the list of folders.
+    fn render(&self) -> AnyElement {
+        let pal = p();
+        let chosen = self.chosen.borrow().clone();
+        let at_root = chosen == self.root;
+        let mut list = v_flex().p(px(6.)).gap(px(2.));
+        if self.others.is_empty() {
+            list = list.items_center().pt(px(15.)).child(os::info_box("No additional folders"));
+        }
+        for (i, f) in self.others.iter().enumerate() {
+            let (c, f2) = (self.chosen.clone(), f.clone());
+            list = list.child(
+                os::row_states(
+                    h_flex().id(SharedString::from(format!("loc-{i}"))).h(px(30.)).px(px(8.)).gap(px(7.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)),
+                    chosen == *f,
+                )
+                .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
+                .child(div().flex_1().min_w_0().truncate().child(folder_label(f)))
+                .child(div().text_size(px(12.)).text_color(pal.text_faint).child(display_path(f)))
+                .on_click(move |_, window, _| {
+                    *c.borrow_mut() = f2.clone();
+                    window.refresh();
+                }),
+            );
+        }
+        let home = {
+            let (c, root) = (self.chosen.clone(), self.root.clone());
+            move |_: &ClickEvent, window: &mut Window, _: &mut App| {
+                *c.borrow_mut() = root.clone();
+                window.refresh();
+            }
+        };
+        v_flex()
+            .h(px(242.))
+            .border_1()
+            .border_color(pal.border_strong)
+            .rounded(px(4.))
+            .child(
+                h_flex()
+                    .h(px(40.))
+                    .flex_none()
+                    .px(px(8.))
+                    .gap(px(12.))
+                    .border_b_1()
+                    .border_color(rgb(os::MODAL_DIVIDER))
+                    .child(div().id("loc-home").cursor_pointer().child(os::glyph(os::GLYPH_HOME, 20., pal.text_muted)).on_click(home.clone()))
+                    .child(
+                        div()
+                            .id("loc-back")
+                            .when(!at_root, |d| d.cursor_pointer().on_click(home))
+                            .child(os::glyph(os::GLYPH_BACK, 18., if at_root { pal.text_faint } else { pal.text_muted })),
+                    )
+                    .child(
+                        h_flex()
+                            .gap(px(5.))
+                            .text_size(px(14.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(os::glyph(if at_root { os::GLYPH_OWNED } else { os::GLYPH_FOLDER }, 18., pal.text))
+                            .child(if at_root { "Owned by me".to_string() } else { folder_label(&chosen) }),
+                    ),
+            )
+            .child(div().id("loc-list").flex_1().min_h_0().overflow_y_scrollbar().child(list))
+            .into_any_element()
+    }
+}
+
+/// What a name prompt shows.
+struct NamePrompt {
     title: &'static str,
     ok_label: &'static str,
+    label: &'static str,
     default: String,
-    hint: String,
-    window: &mut Window,
-    cx: &mut App,
-    then: impl Fn(String, &mut Window, &mut App) -> bool + 'static,
-) {
-    use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
+    hint: Option<String>,
+    location: Option<Location>,
+}
+
+/// Modal name prompt in Onshape's modal style. `then` returns whether to
+/// close the dialog.
+fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl Fn(String, &mut Window, &mut App) -> bool + 'static) {
+    let NamePrompt { title, ok_label, label, default, hint, location } = prompt;
     let state = cx.new(|cx| InputState::new(window, cx).default_value(default));
     // Enter reaches both the field subscription and the dialog's OK handler;
     // run the action once.
@@ -1129,23 +1257,22 @@ fn prompt_name(
             .detach();
     }
     let focus_state = state.clone();
-    window.open_dialog(cx, move |dialog, _, _| {
+    let location = location.map(Rc::new);
+    window.open_dialog(cx, move |dialog, _, cx| {
         let st = state.clone();
         let then = then.clone();
-        dialog
-            .title(title)
-            .w(px(440.))
+        os::modal(dialog, title, if location.is_some() { 598. } else { 460. })
             .child(
-                v_flex()
-                    .gap_2()
-                    .child(Input::new(&state))
-                    .child(div().text_xs().text_color(p().text_faint).child(hint.clone())),
+                os::modal_body()
+                    .child(os::field_label(label))
+                    .child(Input::new(&state).h(px(32.)).text_size(px(14.)))
+                    .when_some(hint.clone(), |d, h| d.child(div().text_size(px(12.)).text_color(p().text_muted).child(h)))
+                    .when_some(location.clone(), |d, loc| d.child(div().pt(px(10.)).child(os::field_label("Document location"))).child(loc.render())),
             )
             .footer(
-                DialogFooter::new()
-                    .gap_2()
-                    .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
-                    .child(DialogAction::new().child(Button::new("ok").label(ok_label).primary())),
+                os::modal_footer()
+                    .child(os::modal_ok(os::primary_button("ok", ok_label)))
+                    .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
             )
             .on_ok(move |_, window, cx| {
                 let name = st.read(cx).value().to_string();

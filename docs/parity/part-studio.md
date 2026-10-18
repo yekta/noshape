@@ -19,12 +19,12 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 1.1 | Enter commits the open dialog | keyboard_shortcuts; Home__dialogs | ✅ |
+| 1.1 | Enter commits the open dialog (in a number field whose text changed, the first Enter applies the value and selects it, the second commits) | keyboard_shortcuts; live | ✅ (two-stage Enter per live capture) |
 | 1.2 | Enter works after clicking the feature list/viewport (focus left the dialog) | keyboard_shortcuts | 🔧 |
 | 1.3 | Enter with a feature selected in the list (no dialog) opens it for editing | A §3.3 (implied by Edit) | 🔧 |
 | 1.4 | Shift+Enter commits and reopens the same tool, empty | keyboard_shortcuts; Home__dialogs | ✅ |
 | 1.5 | Esc exits the command / cancels the dialog | keyboard_shortcuts | ✅ |
-| 1.6 | Esc while typing in a dialog field cancels the dialog | feature_basics ("cancel at any time … Escape") | 🔧 |
+| 1.6 | Esc in a changed dialog field reverts the typed value; the next Esc cancels the dialog | live (behaviours.md: Feature dialog basics) | ✅ |
 | 1.7 | Esc closes transient UI first (S toolbar, Select other, zoom-window mode), then exits isolate/transparent, then clears the selection | View__isolate; select_other | 🔧 |
 | 1.8 | Space deselects everything (features and entities) | keyboard_shortcuts | 🔧 (features were not cleared) |
 | 1.9 | Ctrl/⌘+C copies selected features | keyboard_shortcuts | ✅ |
@@ -35,15 +35,15 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.14 | Shift+N renames the selected feature in place | keyboard_shortcuts | ✅ |
 | 1.15 | Alt/⌥+C opens Search tools | keyboard_shortcuts; Home__search_tools | ✅ |
 | 1.16 | Shift+/ toggles the keyboard shortcut map | keyboard_shortcuts | ✅ |
-| 1.17 | Shortcut map has a search box (and tab-type filter) | keyboard_shortcuts | 🔧 (search; no tab filter) |
+| 1.17 | Shift+/ opens Onshape's shortcut sheet: tabs General, Part Studio, Assembly, 3D view, Sketch, Feature Studio, Drawing; key chips + action, 🔒 locked; search across tabs; legend | live (shortcuts/, dom/keyboard-shortcuts.txt) | ✅ (the live 114-row list) |
 | 1.18 | ` (grave) opens Select other at the cursor | keyboard_shortcuts; Home__select_other | 🔧 |
 | 1.19 | ` again moves down the Select other list, Shift+` up, Enter picks | Home__select_other | 🔧 |
-| 1.20 | S opens the shortcut toolbar at the cursor (feature tools; sketch tools in a sketch) | keyboard_shortcuts; feature_basics | 🔧 |
-| 1.21 | S toolbar contents customizable in preferences | part_studios | ❌ |
+| 1.20 | S opens the shortcut toolbar at the cursor: 5x2 tools (Part Studio: Sketch, Extrude, Revolve, Sweep, Loft / Fillet, Chamfer, Hole, Boolean, Transform) | live (shortcuts/16) | ✅ |
+| 1.21 | S toolbar contents customizable in preferences | part_studios | ✅ (Customize toolbar > Shortcut toolbar (S) checklist; saved in the config dir) |
 | 1.22 | [ opens the Measure tool | keyboard_shortcuts | 🔧 |
 | 1.23 | Ctrl+M opens the Mate connector dialog | keyboard_shortcuts | 🔧 |
 | 1.24 | K shows/hides mate connectors | keyboard_shortcuts | 🔧 (toggles the Mate connector features' visibility) |
-| 1.25 | A flips the primary axis while editing a mate connector | keyboard_shortcuts | 🔧 (dialog focused) |
+| 1.25 | A flips the primary axis, Q reorients the secondary axis while editing a mate connector | keyboard_shortcuts | ✅ |
 | 1.26 | Shift+C curvature map, Shift+D draft analysis (per-vertex color maps with legend; draft angle and pull direction adjustable) | keyboard_shortcuts | 🔧 (Onshape's Shift+D is dihedral analysis; draft per coordinator; dihedral ❌) |
 | 1.27 | Alt/⌥+T tab manager (search, open), Ctrl+Space switches to the previously active tab | keyboard_shortcuts | 🔧 |
 | 1.28 | Ctrl+U feedback, Ctrl+Shift+F FeatureScript search | keyboard_shortcuts | ❌ (out of scope) |
@@ -72,7 +72,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | 🔧 |
 | 2.18 | Shift+I isolates the hovered/selected parts (others transparent); cumulative | keyboard_shortcuts; View__isolate | 🔧 |
 | 2.19 | Shift+T makes the hovered/selected parts transparent; cumulative | keyboard_shortcuts; View__make_transparent | 🔧 |
-| 2.20 | Shift+X section view | keyboard_shortcuts | 🔧 (up to 3 planes) |
+| 2.20 | Shift+X opens the Section view dialog (again with a section on: turns it off) | keyboard_shortcuts | ✅ |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
 | 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 |
 | 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | 🔧 (isolate/transparent and translucent part appearances) |
@@ -90,7 +90,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.6 | Ctrl+drag box deselects | Home__selection | 🔧 |
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
-| 3.9 | Cursor badge with the selection count (up to 5+) | Home__selection | 🔧 (re-render throttled to ~30 Hz) |
+| 3.9 | Selection count next to the cursor, 1–5 ("5" for five or more) | Home__selection; live cursors/ | ✅ (Onshape bakes the digit into the cursor image; GPUI has no image cursors, so a black digit with a white outline is drawn at the arrow's lower right) |
 | 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges; sketch-curve midpoints ❌) |
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | 🔧 |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
@@ -100,7 +100,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.16 | Selecting a feature in the list highlights its geometry | A §5.3 (FEATURE_HIGHLIGHT) | 🔧 |
 | 3.17 | Selecting / hovering a part in the parts list highlights the whole part | A §5.3 (PART_HIGHLIGHT) | 🔧 |
 | 3.18 | Double-click a sketch in the graphics area edits it | (Onshape behaviour) | 🔧 |
-| 3.19 | Create selection panel and Select ▸ submenu (tangent faces, face loop, tangent edges, parallel edges, equal radius, part faces) | Home__create_selection | 🔧 (protrusion/pocket/hole/bounded criteria ❌) |
+| 3.19 | Create selection panel and Select ▸ submenu (tangent faces, face loop, tangent edges, parallel edges, equal radius, part faces) | Home__create_selection | ✅ (verified Select ▸ Tangent connected edges, Create selection > Parallel edges; protrusion/pocket/hole criteria ❌) |
 
 ## 4. Preselection and tools (A §2.3, PartStudio__feature_basics)
 
@@ -112,7 +112,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 4.4 | Clicking the active toolbar tool again closes it | Home__selection | 🔧 |
 | 4.5 | Picking a tool from a toolbar dropdown makes it the group's face for the session | A §2.3 | 🔧 |
 | 4.6 | Toolbar tooltips show the shortcut | A §2.2 | ✅ |
-| 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ❌ |
+| 4.7 | Customize toolbar (drag tool sets, Reset) | part_studios | ✅ (built by an earlier pass: move tool sets, remove/restore tools, reset) |
 | 4.8 | Search tools: typing filters tools, Enter runs the first, Esc closes | Home__search_tools | ✅ |
 | 4.9 | Search tools with no query lists recently used tools first; description on hover | Home__search_tools | 🔧 |
 | 4.10 | REMEMBER_PREVIOUS_VALUE parameters default to the last accepted value of that tool | A §7.2 | 🔧 |
@@ -122,7 +122,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 5.1 | Green check accepts, red X cancels | feature_basics | ✅ |
-| 5.2 | Title red while the feature errors; accept is refused with the reason | feature_basics ("prevents you from committing a broken feature") | 🔧 |
+| 5.2 | Title red while the feature errors; the ✓ is disabled but Enter still commits (the model falls back to the state before the feature) | live | ✅ (was: commit refused) |
 | 5.3 | Error/warning message shown in the dialog | Home__error_indicators | ✅ |
 | 5.4 | Fields appear/disappear live from their visibility conditions | A §7.1 | ✅ |
 | 5.4b | Clicks and right-clicks on the dialog (and other panels over the graphics area) never reach the model beneath | (Onshape behaviour) | 🔧 (clicking a field also picked/deselected geometry under it) |
@@ -130,27 +130,27 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.6 | Click a selection field to make it active; it stays active while a number field has keyboard focus ("two fields are active") | Home__dialogs; feature_basics | 🔧 (typing deactivated it) |
 | 5.7 | Picks go to the active field; clicking a picked entity again removes it | Home__selection; A §5.4 | ✅ |
 | 5.8 | Picks that don't pass the field filter are rejected: the field flashes red and a message names what it takes | A §5.4 | 🔧 (generic message before) |
-| 5.8b | Clicking a sketch curve in the graphics area while a region field is active takes all the sketch's regions | features_and_parts_lists | 🔧 |
+| 5.8b | Clicking a sketch curve while a region field is active takes the region it bounds (the smaller one for a curve between two regions); hovering the curve pre-highlights that region | live (Extrude dialog) | ✅ (was "all regions"; changed per live) |
 | 5.9 | List clicks (default planes, parts) obey the field filter | A §5.4 | 🔧 (were added unfiltered) |
-| 5.10 | Clicking a sketch in the feature list fills a region field with all its regions; feature fields take the feature | features_and_parts_lists | ✅ |
+| 5.10 | Clicking a sketch in the feature list fills a region field with all its regions, shown as one "Faces of Sketch 1" row; clicking again removes them; feature fields take the feature | features_and_parts_lists; live | ✅ |
 | 5.11 | Single-pick fields replace their pick and move focus to the next empty selection field | A §5.4 | ✅ |
 | 5.12 | × on a chip removes that pick | feature_basics | ✅ |
-| 5.13 | Right-click a selection field > Clear all; right-click a pick > Remove / Clear all | feature_basics | 🔧 |
-| 5.14 | Hovering a chip highlights its entity in the graphics area | Home__dialogs | 🔧 |
-| 5.15 | Missing references shown red; Clear missing references | feature_basics | 🔧 (missing = creating feature deleted or suppressed) |
-| 5.16 | Reorder picks in order-sensitive fields (drag a row, or Move up/down) | feature_basics | 🔧 |
+| 5.13 | Right-click a pick > Clear all (plus Clear missing references when some are missing); × on hover removes one row | live (Fillet dialog) | ✅ |
+| 5.14 | Hovering a pick row highlights its entity in the graphics area, tints the row and shows its name as a tooltip | Home__dialogs; live | 🔧 (tooltip/tint added; highlight colour is the renderer's hover colour, live uses #f2ff80) |
+| 5.15 | Missing references shown red; Clear missing references | feature_basics | ✅ (verified: red rows, accept disabled, Clear missing references) |
+| 5.16 | Reorder picks in order-sensitive fields by dragging a row | feature_basics | 🔧 (the Move up/down menu items were removed: live menus only have Clear all) |
 | 5.17 | Tab moves between fields (inputs and checkboxes) | feature_basics | ✅ |
-| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ⏳ (Space 🔧: it cleared the selection instead; dropdown keys ❌) |
+| 5.18 | Space toggles a focused checkbox; arrows/Enter in dropdowns | feature_basics | ✅ (Space toggles a checkbox; Enter/Space opens a dropdown, arrows move, Enter picks — the list opens without the current value highlighted) |
 | 5.19 | Numeric fields accept expressions, units and #variables | Home__numeric_fields | ✅ |
 | 5.20 | Invalid expression: red outline and message | Home__numeric_fields | ✅ |
 | 5.21 | Expressions show their evaluated value | Home__numeric_fields | 🔧 |
 | 5.22 | Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1 (integers ±1), clamped to the field range | Home__numeric_fields | 🔧 |
-| 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | 🔧 |
+| 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | ✅ (fixed: focusing showed the converted text) |
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | 🔧 (was always shown) |
 | 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
 | 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |
 | 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ⏳ (drag the title to move 🔧; ? shows the description 🔧; resizing ❌) |
-| 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | 🔧 |
+| 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | ✅ (starts as true/false text, focused) |
 | 5.29 | Tolerance options on tolerant quantities (± icon: type, deviation/limits, precision) | Home__tolerance_options | 🔧 (stored as `<param>__tolerance`; fit tolerances ❌) |
 | 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | 🔧 |
 | 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | 🔧 |
@@ -179,15 +179,15 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.16 | Missing-selection / warning yellow triangle | features_and_parts_lists | 🔧 |
 | 6.17 | Eye icon on hover hides/shows sketches, planes, mate connectors | features_and_parts_lists | 🔧 |
 | 6.18 | Rename in place (context menu / Shift+N) | features_and_parts_lists | ✅ |
-| 6.19 | Context menu: Edit, Rename, Roll to here, Suppress/Unsuppress, Hide/Show, Show dependencies, Copy, Paste, Add selection to folder, Zoom to selection, View normal to (sketches/planes), Clear selection, Delete | context_menus; A §3.10 | 🔧 (Hide/Show, dependencies, zoom, view normal, clear added) |
-| 6.20 | Context menu commands act on all selected features | features_and_parts_lists | 🔧 |
-| 6.21 | Show dependencies: parents above ↑, children below ↓; hover highlights | features_and_parts_lists | 🔧 |
-| 6.22 | Configure suppression; Dynamic suppression (expression editor, ƒx icon, live true/false preview) | features_and_parts_lists | 🔧 |
-| 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | 🔧 |
-| 6.24 | Show dimensions, Export as DXF/DWG, Create drawing of sketch | Home__context_menus | ⏳ (Export DXF/SVG 🔧; show dimensions, drawing ❌) |
+| 6.19 | Feature context menu in the live order: Rename | Edit…, Edit <sketch>…, Copy sketch | Add selection to folder… | Show/Hide | Export as DXF/DWG… | Suppress, Configure suppression, Dynamic suppression ▸ | Zoom to selection, View normal to | Show dependencies… | Roll to here (not on the last feature) | sketch/feature appearance | Delete | live (dom/context-menus-partstudio.txt) | ✅ (Show dimensions, Create Drawing of Sketch, Add comment ❌) |
+| 6.20 | Several selected features: Add selection to folder… | Suppress, Dynamic suppression ▸ | Clear selection | appearance | Delete | live | ✅ (Section view… ❌) |
+| 6.21 | Show dependencies…: "Dependencies of X" panel at the dialog position: parents, ▲, the feature, ▼, children (icons, hover highlights, tooltips) | live (part-studio/100) | ✅ |
+| 6.22 | Dynamic suppression ▸ Add expression… (expression editor, ƒx icon, live true/false preview) | live | ✅ |
+| 6.23 | Copy sketch / Paste sketch onto a plane or planar face | Home__context_menus | ✅ (verified: Copy sketch, Front plane > Paste sketch) |
+| 6.24 | Show dimensions (feature/face/sketch menus): the sketch's dimensions in 3D, parts see-through, hover gold on tan, double-click edits the sketch, click elsewhere or Esc hides; Export as DXF/DWG | Home__context_menus; live part-studio/40–42 | ✅ (Create drawing of sketch ❌) |
 | 6.25 | Pause regeneration (banner: Regenerate / Regenerate and exit / Discard) ; regeneration times panel (hover highlights) | features_and_parts_lists | 🔧 |
 | 6.26 | Collapse the whole list; drag the feature/parts separator | features_and_parts_lists | 🔧 |
-| 6.27 | Default geometry context menu: New sketch, Offset plane, Hide/Show, View normal to | context_menus; PartStudio__plane | 🔧 |
+| 6.27 | Default plane row menu: New sketch…, Offset plane… (Paste sketch when a sketch was copied) | Hide, Hide other planes, Hide all planes | Zoom to selection, View normal to; origin: Hide | live | ✅ (Rename, Size to Part Studio, Show dependencies ❌) |
 | 6.28 | Default planes/origin can be hidden (never deleted) | part_studios | 🔧 |
 | 6.29 | Clicking empty list space clears the feature selection | (Onshape behaviour) | 🔧 |
 
@@ -197,8 +197,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 6.30 | Drag the bar to roll back/forward; model shows up to the bar | features_and_parts_lists | ✅ |
 | 6.31 | Right-click a feature > Roll to here | features_and_parts_lists | ✅ |
-| 6.32 | Right-click the bar > Roll to end | features_and_parts_lists | 🔧 |
-| 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | 🔧 |
+| 6.32 | (Right-click the bar > Roll to end) | features_and_parts_lists | ✅ removed (live has no menu on the bar) |
+| 6.33 | Select the bar, ↑/↓ step one feature | features_and_parts_lists | ✅ (also after clicking a feature row; the bar turns #a0c7dd while focused) |
 | 6.34 | Features below the bar greyed; new features inserted at the bar | A §3.2 | ✅ |
 
 ### Folders
@@ -218,7 +218,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 7.2 | Click selects (or fills a part field in a dialog, filtered) | features_and_parts_lists | 🔧 (unfiltered before) |
 | 7.3 | Hover highlights the part in the graphics area | features_and_parts_lists | 🔧 |
 | 7.4 | Eye on hover hides/shows the part; hidden parts greyed | features_and_parts_lists | 🔧 |
-| 7.5 | Context menu: Rename, Properties, Assign material, Edit appearance, Hide/Show, Hide other parts, Hide all parts, Isolate, Make transparent, Zoom to selection, Mass properties, Delete | features_and_parts_lists | 🔧 (no menu before) |
+| 7.5 | Parts list menu (live order): Rename, Properties…, Assign material…, Edit appearance… | Create Drawing of Part…, Export… | Hide, Isolate…, Make transparent… | Zoom to selection | Delete… | live | ✅ (Copy here…, Copy part, Release… ❌) |
 | 7.6 | Separate Parts / Surfaces / Curves sections (collapsible, eye hides a section) | features_and_parts_lists | 🔧 (no Composite parts: not modelled) |
 | 7.7 | Show parts list properties (part number, revision) from the section header menu | features_and_parts_lists | 🔧 |
 
@@ -227,16 +227,16 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 8.1 | Right-click without drag opens the menu; right-drag rotates | A §4 | ✅ |
-| 8.2 | Empty space: Show all, Show all parts, Zoom to fit, Isometric, Clear selection | Home__context_menus | 🔧 (Show all, Clear selection added) |
-| 8.3 | Face: Select other, New sketch, View normal to, Edit <feature>, Measure, Zoom to selection | A §4 | 🔧 |
-| 8.4 | Edge: Select other, Fillet, Chamfer, Edit <feature> | A §4 | 🔧 |
-| 8.5 | Plane: New sketch, Offset plane, View normal to, Hide | Home__context_menus | 🔧 |
-| 8.6 | Sketch entity/region: Edit sketch, Extrude, Revolve, View normal to, Hide | A §4 | 🔧 |
-| 8.7 | Part section: Part properties, Hide <part>, Hide other parts, Isolate, Make transparent, Mass properties | A §3.9 | 🔧 |
+| 8.2 | Empty space: Show all | (Clear selection) | Zoom to fit, Isometric | live | ✅ (live also has Select ▸ here; contents unknown) |
+| 8.3 | Face: Edit <feature>…, Edit <sketch>…, Show dimensions, Show dependencies of <feature>… | New sketch…, Offset plane…, Extrude…, Revolve… (planar) | Hide <part>, Isolate…, Make transparent…, Section view… | Copy <part> | Create Drawing of <part>…, Export as DXF/DWG… (planar), Export… | (Clear selection) Select ▸, Select other… | Zoom to fit, Zoom to selection, View normal to | Delete <part>…, Delete <feature> | Assign material…, Edit appearance…, Add appearance to N faces… | live | ✅ (Add comment n/a; Copy part + Ctrl+V in another Part Studio opens a prefilled Derived, in the same one a Transform copy) |
+| 8.4 | Edge: same groups with Fillet…, Chamfer… and Align view with vertical axis (straight edges) | live | ✅ (Curve/surface analysis ❌) |
+| 8.5 | Plane: New sketch…, Offset plane… | Hide <plane>, Hide other planes, Hide all planes, Section view… | Select ▸, Select other… | Zoom to fit, Zoom to selection, View normal to | live | ✅ |
+| 8.6 | Sketch region/curve: Edit <sketch>…, Show dependencies… | Extrude…, Revolve… (region) | Hide, Section view… | Export as DXF/DWG… | Select other… | Zoom to fit, Zoom to selection, View normal to | Delete <sketch> | Edit sketch appearance… | live (dom/context-menus-ps-sketch-entities.txt) | ✅ (New sketch/Offset plane on a region, Copy sketch entities, Show dimensions ❌) |
+| 8.7 | The right-clicked entity stays highlighted while its menu is open | live (menus/rmb-ps-face.png) | ✅ |
 | 8.8 | Exit isolate / Exit make transparent / Turn off section view when active | View__isolate; View__section_view | 🔧 |
-| 8.9 | Creation commands carry their tool icon | Home__context_menus | 🔧 |
+| 8.9 | Creation commands carry their tool icon | Home__context_menus | ✅ (creation, hide, section, drawing, delete and appearance entries carry icons) |
 | 8.10 | Exit <tool> entry while a tool is active | Home__selection | 🔧 |
-| 8.11 | Create selection / Select ▸ / Add appearance / Section view / Paste sketch entries | A §4 | 🔧 |
+| 8.11 | Create selection / Select ▸ / Add appearance / Section view / Paste sketch entries | A §4 | ✅ (Create selection… is the last entry of Select ▸) |
 
 ## 9. View navigation, view cube, camera menu (View__view_navigation_and_the_view_cube, A §6)
 
@@ -249,10 +249,10 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.5 | Click a cube edge or corner for the view along it | view_navigation; A §6.2 | 🔧 |
 | 9.6 | Cube faces/edges/corners highlight on hover (name shown) | A §6.2 | 🔧 |
 | 9.7 | Cube arrows rotate 15° (Shift 90°, Ctrl 5°); arc arrows roll | A §6.2 | 🔧 |
-| 9.8 | Camera and render options menu under the cube: Isometric/Dimetric/Trimetric, Named views, Previous view, Zoom to fit/window/selection, Perspective, display modes, Section view | View__camera_and_render_options | 🔧 |
+| 9.8 | Camera menu (live order): Isometric/Dimetric/Trimetric | Named views…, Previous view | Zoom to fit/window | Perspective, Orient normal to sketch on edit | ✓ display ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… | live dom/menu-camera-render.txt | ✅ (Graphics preferences…, Highlight boundary edges ❌) |
 | 9.9 | Previous view returns to the camera before the last view change | View__previous_view | 🔧 |
 | 9.10 | Zoom to selection (parts, faces, edges, sketches, planes, features) | View__zoom_to_fit | 🔧 |
-| 9.11 | Display modes: Shaded with edges / Shaded / Hidden line / Wireframe / Translucent | View__shaded_unshaded | ⏳ (Translucent and Hidden edges visible 🔧; tangent-edge options ❌) |
+| 9.11 | Display: Shaded with edges / Shaded without edges / Unshaded / Translucent; Hidden edges visible/removed; Tangent edges visible / phantom (dash-dot) / removed | live | ✅ (tangency found from the mesh: `MeshBuffers::smooth_edges`) |
 | 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | 🔧 (not persisted across sessions) |
 | 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ |
 | 9.14 | Named views store the section state | View__named_views | 🔧 |
@@ -268,8 +268,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | 🔧 |
 | 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
 | 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
-| 10.7 | Section view by plane with offset | View__section_view | 🔧 (offset, flip, remove per plane) |
-| 10.8 | Section by faces/mate connectors, several planes, manipulator, caps | View__section_view | ⏳ (faces/MCs/up to 3 planes 🔧; drag manipulator and caps ❌) |
+| 10.7 | Section view dialog (live): Exclude | Include tabs, "Section planes" field (planes, planar faces, mate connectors; × removes) + a view-facing plane button, "Items to exclude/include"; ✓/Enter keeps, ✕/Esc restores; empty-space menu Edit section view… / Turn off section view | live part-studio/70–74 | ✅ |
+| 10.8 | Section by several planes (up to 3), drag arrow on the active plane with an offset box, caps | View__section_view | ⏳ (planes and arrow ✅; hatched caps ❌: needs a stencil pass in the renderer) |
 
 ## 11. Measure, mass properties, appearance (View__measure_tool, View__mass_properties_tool, PartStudio__customizing_appearances)
 
@@ -291,6 +291,22 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 12.2 | Configuration panel and configuration selectors | configurations | ✅ |
 | 12.3 | `#variable` in any numeric field; :variable filter finds users | variable_table; features_and_parts_lists | 🔧 (filter) |
 | 12.4 | Hover a variable highlights the features that use it; right-click > Filter feature list | variable_table | 🔧 |
+
+### Found in the live capture
+
+| # | Behaviour | Source | Status |
+|---|---|---|---|
+| 13.1 | A new feature hides the sketch it consumes | live (selection/02) | ✅ |
+| 13.2 | Ctrl+A does nothing in the Part Studio | live (shortcuts/14) | ✅ (not bound) |
+| 13.3 | Delete/Backspace on a selected feature deletes it at once (no confirmation, no toast); Ctrl+Z restores it | live (shortcuts/15) | ✅ (Delete and Ctrl+Z verified) |
+| 13.4 | Tab skips the End type dropdown; Shift+Tab from Depth reaches the flip button | live | ✅ |
+| 13.5 | Depth arrow: hover outlines it blue; dragging updates the Depth field with the value selected; no viewport label | live (dialogs/extrude-05..07) | ✅ (drag end focuses the field with the value selected; arrow hover outline ❌) |
+| 13.6 | Hovering a selected feature row shows "Extrude 1 <- Sketch 1" | live | ✅ |
+| 13.7 | Rollback bar: no right-click menu; after clicking a feature row ↑/↓ move the bar; focused bar `#a0c7dd`; dragging shows a "Rollback bar" pill and a 2 px blue drop line | live | ✅ |
+| 13.8 | Picking through planes: a part face behind a transparent plane always wins | live (selection/30–31) | ✅ (verified: the face behind the Right plane is picked) |
+| 13.9 | Copy here… opens Transform (Translate by XYZ, Copy part) for the part | live (part-studio/102) | ✅ |
+| 13.11 | Deleting a tab: no confirmation, no toast | live | ✅ (deliberate deviation: Ctrl+Z restores the tab here; Onshape can't undo it but has version history, which noshape doesn't) |
+| 13.10 | Clicking a face/edge/vertex while a parts field is active (Boolean Tools…) takes its part; hovering highlights the whole part | (Onshape behaviour) | ✅ |
 
 ## Not applicable to a local app
 

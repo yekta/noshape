@@ -131,14 +131,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         }
         d.connectors.push(ConnectorDisplay { reference: c.reference.clone(), name: c.name.clone(), origin: c.origin, x: c.x, z: c.z });
     }
-    // Scale default planes to the model.
-    if let Some((lo, hi)) = d.bounds() {
-        let half = ((hi - lo).length() * 0.6).max(0.05);
-        for p in d.planes.iter_mut().filter(|p| matches!(p.reference, Reference::Plane(_))) {
-            p.half_width = half;
-            p.half_height = half;
-        }
-    }
+    // Onshape keeps the default planes at their default size whatever the
+    // model's extent (they only grow with "Size to Part Studio"), so they are
+    // not scaled to the model here.
     (d, needs_refine)
 }
 

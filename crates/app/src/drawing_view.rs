@@ -213,7 +213,6 @@ pub enum Panel {
     NewTable { pos: [f64; 2], rows: Entity<InputState>, cols: Entity<InputState>, title: Entity<InputState>, header: bool },
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
     Scale { view: Option<ViewId>, input: Entity<InputState> },
-    Label { view: ViewId, input: Entity<InputState> },
     /// Depth of a new (`edit` None) or existing broken-out section.
     BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, depth: Entity<InputState>, depth_ref: Option<PointRef> },
     /// Angle of a straight cutting line.
@@ -265,6 +264,30 @@ pub fn fill_menu(mut menu: PopupMenu, entries: &[MenuEntry], ed: &Entity<Drawing
     menu
 }
 
+/// [`fill_menu`] for Onshape's right-click menus ([`crate::os_menu`]).
+pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu {
+    for e in entries {
+        match e {
+            MenuEntry::Item { label, checked, act } => {
+                let ed = ed.clone();
+                let act = act.clone();
+                let handler: Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)> = Rc::new(move |_, window, cx| {
+                    let act = act.clone();
+                    ed.update(cx, |t, cx| act(t, window, cx));
+                });
+                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon: None, checked: *checked, disabled: false, handler: Some(handler) });
+            }
+            MenuEntry::Separator => menu = menu.separator(),
+            MenuEntry::Submenu(label, children) => {
+                let children = children.clone();
+                let ed = ed.clone();
+                menu = menu.submenu(label.clone(), window, cx, move |m, w, cx| fill_os_menu(m, &children, &ed, w, cx));
+            }
+        }
+    }
+    menu
+}
+
 pub struct DrawingEditor {
     pub doc: Entity<DocModel>,
     pub tab: TabId,
@@ -275,6 +298,9 @@ pub struct DrawingEditor {
     pub drawing: Drawing,
     pub preview: Option<Drawing>,
     pub sheet: usize,
+    /// Sheets panel open (Onshape starts with it closed) and sorted by reference.
+    pub sheets_open: bool,
+    pub sheets_by_ref: bool,
 
     pub sources: Sources,
     regens: HashMap<SourceKey, Arc<Mutex<Regenerator>>>,
@@ -299,6 +325,8 @@ pub struct DrawingEditor {
     lines: Option<LinesHandle>,
     lines_zoom: f64,
     fills: Option<MeshHandle>,
+    /// Filled sheet text: (ink, dangling).
+    texts: [Option<MeshHandle>; 2],
     paper: Option<(MeshHandle, MeshHandle, [f64; 2])>,
     overlay_handles: Option<(LinesHandle, PointsHandle)>,
     geometry_dirty: bool,
@@ -318,6 +346,16 @@ pub struct DrawingEditor {
     pub overlay: Overlay,
     pub menu: Option<(Entity<PopupMenu>, Point<Pixels>, Subscription)>,
     pub panel: Option<Panel>,
+    /// View properties dialog (double-click a view; see `drawing_props`).
+    pub view_props: Option<crate::drawing_props::ViewProps>,
+    /// Insert view panel settings and its part chooser (see `drawing_insert`).
+    pub insert: crate::drawing_insert::InsertViewState,
+    /// Align views ▸ Vertically / Horizontally: (view to move, vertical)
+    /// until the next click picks the view to align with.
+    pub align_views: Option<(ViewId, bool)>,
+    /// Rotate view vertically / horizontally: (view, vertical) until the
+    /// next click picks the straight edge to line up.
+    pub rotate_to_edge: Option<(ViewId, bool)>,
     pub status: Option<SharedString>,
     pub _subs: Vec<Subscription>,
 }
@@ -364,6 +402,8 @@ impl DrawingEditor {
             drawing,
             preview: None,
             sheet: 0,
+            sheets_open: false,
+            sheets_by_ref: false,
             sources: Sources::new(),
             regens: HashMap::new(),
             assemblies: Arc::new(Mutex::new(AssemblyEvaluator::new())),
@@ -383,6 +423,7 @@ impl DrawingEditor {
             lines: None,
             lines_zoom: 0.0,
             fills: None,
+            texts: [None, None],
             paper: None,
             overlay_handles: None,
             geometry_dirty: true,
@@ -400,6 +441,10 @@ impl DrawingEditor {
             overlay: Overlay::default(),
             menu: None,
             panel: None,
+            view_props: None,
+            insert: Default::default(),
+            align_views: None,
+            rotate_to_edge: None,
             status: None,
             _subs: subs,
         };
@@ -501,6 +546,12 @@ impl DrawingEditor {
         let mut wanted = views::referenced_sources(self.display());
         if let Tool::InsertView { source, .. } = &self.tool {
             let k = SourceKey::studio(*source);
+            if !wanted.contains(&k) {
+                wanted.push(k);
+            }
+        }
+        // The Insert view chooser lists the parts of every Part Studio.
+        for k in self.chooser_sources(cx) {
             if !wanted.contains(&k) {
                 wanted.push(k);
             }
@@ -686,6 +737,8 @@ impl DrawingEditor {
         self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling)));
         self.lines_zoom = self.zoom;
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
+        let (ink, red) = drawing_scene::sheet_text(&built, &dangling);
+        self.texts = [ink, red].map(|m| (!m.indices.is_empty()).then(|| up.upload_mesh(&m)));
         self.geometry_dirty = false;
     }
 
@@ -733,13 +786,18 @@ impl DrawingEditor {
         let mut scene = Scene::default();
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = &self.paper {
-            scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unpickable().layer(-5));
+            scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
         }
         if let Some(f) = &self.fills {
             scene.instances.push(Instance::new(Drawable::Mesh(f.clone())).with_color(drawing_scene::FILL_COLOR).unpickable());
         }
         if let Some(l) = &self.lines {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color());
+        }
+        for (m, color) in self.texts.iter().zip([[0.0, 0.0, 0.0, 1.0], crate::theme::lin(0xdc2828)]) {
+            if let Some(m) = m {
+                scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(color).unlit());
+            }
         }
         if let Some((l, pts)) = &self.overlay_handles {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color().unpickable().layer(20));
@@ -938,6 +996,9 @@ impl Render for DrawingEditor {
             .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
             .child(status)
             .children(panel)
+            .children(self.render_view_props(cx))
+            .children(self.render_insert_view_panel(cx))
+            .children(self.render_insert_chooser(cx))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
@@ -953,6 +1014,8 @@ impl Render for DrawingEditor {
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &Cancel, _, cx| this.cancel(cx)))
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
+            .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_views(None, cx)))
+            .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_views(cx)))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {
                 let s = this.size_px();
@@ -968,7 +1031,7 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &TogglePlanes, _, cx| this.set_tool(Tool::Projected { parent: None }, cx)))
             .on_key_down(cx.listener(Self::on_key))
             .child(toolbar)
-            .child(gpui_kit::component::h_flex().flex_1().min_h_0().child(sheet_bar).child(canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border)))
+            .child(gpui_kit::component::h_flex().flex_1().min_h_0().relative().child(canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border)).child(sheet_bar))
             .children(menu.map(|(m, pos)| deferred(anchored().position(pos).snap_to_window().child(m)).with_priority(2)))
     }
 }

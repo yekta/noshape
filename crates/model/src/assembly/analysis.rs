@@ -648,3 +648,54 @@ fn entity_on_body(b: &crate::regen::context::Body, r: &Reference) -> bool {
         _ => true,
     }
 }
+
+/// Isolate › Expand (Onshape's Component controls): the top-level instances
+/// in the order they join the isolated set, one step per slider notch.
+/// By distance, one instance per step, nearest (bounding boxes) to the
+/// isolated instances first; by connectivity, every instance mated (or
+/// grouped) to the previous step's instances joins together.
+pub fn isolate_expansion(result: &AssemblyResult, asm: &Assembly, seeds: &[InstanceId], connectivity: bool) -> Vec<Vec<InstanceId>> {
+    let mut done: Vec<InstanceId> = seeds.to_vec();
+    let others: Vec<InstanceId> = asm.instances.iter().filter(|i| !i.suppressed && !seeds.contains(&i.id)).map(|i| i.id).collect();
+    let mut steps: Vec<Vec<InstanceId>> = Vec::new();
+    if connectivity {
+        let mut links: Vec<(InstanceId, InstanceId)> = asm.mates.iter().filter(|m| !m.suppressed).map(|m| (m.a.instance, m.b.instance)).collect();
+        for g in asm.groups.iter().filter(|g| !g.suppressed) {
+            for w in g.instances.windows(2) {
+                links.push((w[0], w[1]));
+            }
+        }
+        let mut frontier = done.clone();
+        loop {
+            let mut next: Vec<InstanceId> = Vec::new();
+            for &(a, b) in &links {
+                for (x, y) in [(a, b), (b, a)] {
+                    if frontier.contains(&x) && others.contains(&y) && !done.contains(&y) && !next.contains(&y) {
+                        next.push(y);
+                    }
+                }
+            }
+            if next.is_empty() {
+                break;
+            }
+            done.extend(next.iter().copied());
+            frontier = next.clone();
+            steps.push(next);
+        }
+    } else {
+        let aabb_distance = |a: (DVec3, DVec3), b: (DVec3, DVec3)| (a.0 - b.1).max(b.0 - a.1).max(DVec3::ZERO).length();
+        let seed_boxes: Vec<(DVec3, DVec3)> = seeds.iter().filter_map(|s| result.instance_bounds(*s)).collect();
+        let mut ranked: Vec<(f64, usize, InstanceId)> = others
+            .iter()
+            .enumerate()
+            .filter_map(|(i, id)| {
+                let bb = result.instance_bounds(*id)?;
+                let d = seed_boxes.iter().map(|s| aabb_distance(*s, bb)).fold(f64::MAX, f64::min);
+                Some((d, i, *id))
+            })
+            .collect();
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        steps = ranked.into_iter().map(|(_, _, id)| vec![id]).collect();
+    }
+    steps
+}

@@ -5,7 +5,7 @@
 //! cursor, nearest first). Kept free of UI types so it can be unit tested.
 
 use crate::display::{FeatureStatus, StudioDisplay};
-use crate::params::ParamValue;
+use crate::params::{ParamValue, ParamValues};
 use crate::partstudio::{Feature, PartStudio};
 use crate::reference::{FeatureId, Reference};
 use glam::DVec3;
@@ -439,10 +439,40 @@ fn ray_segment(o: DVec3, d: DVec3, a: DVec3, b: DVec3) -> (f64, f64) {
     (p1.distance(p2), s)
 }
 
+/// The sketch a feature was built from (Onshape's "Edit Sketch 1…" entry
+/// for an extrude, revolve…): the first sketch its selections reference.
+pub fn source_sketch(features: &[Feature], f: &Feature) -> Option<FeatureId> {
+    fn walk(values: &ParamValues, out: &mut Vec<FeatureId>) {
+        for v in values.0.values() {
+            match v {
+                ParamValue::Query(refs) => out.extend(refs.iter().filter_map(|r| match r {
+                    Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
+                    _ => None,
+                })),
+                ParamValue::Array(items) => items.iter().for_each(|i| walk(i, out)),
+                _ => {}
+            }
+        }
+    }
+    let mut ids = Vec::new();
+    walk(&f.params, &mut ids);
+    ids.into_iter().find(|id| *id != f.id && features.iter().any(|g| g.id == *id && g.type_id == "sketch"))
+}
+
+/// Onshape: clicking a sketch curve while a region field is active picks
+/// the region bounded by that curve; a curve between two regions (a hole's
+/// circle) gives the smaller one. Region keys list their boundary as
+/// `[ordinal, (entity << 1) | forward, ...]`.
+pub fn region_for_curve(regions: &[crate::display::SketchRegionDisplay], entity: u32) -> Option<&crate::display::SketchRegionDisplay> {
+    regions
+        .iter()
+        .filter(|r| r.key.iter().skip(1).any(|k| k >> 1 == entity))
+        .min_by(|a, b| a.area.total_cmp(&b.area))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::params::ParamValues;
     use noshape_units::{Dim, EmptyScope, UnitPrefs};
 
     fn feat(id: u64, ty: &str, name: &str, params: ParamValues) -> Feature {
@@ -648,5 +678,23 @@ mod tests {
         let refs: Vec<_> = hits.iter().map(|h| h.reference.clone()).collect();
         assert_eq!(refs, vec![edge, face(1), face(0)]);
         assert!(entities_along_ray(&d, DVec3::new(0.0, 0.01, 5.0), DVec3::NEG_Z, 0.05, &|_| true, 20).is_empty());
+    }
+
+    #[test]
+    fn sketch_curve_click_picks_the_bounded_region() {
+        let region = |key: Vec<u32>, area: f64| crate::display::SketchRegionDisplay { key, positions: vec![], indices: vec![], area };
+        // Rectangle (entities 1-4) with a hole (circle 7): the outer region is
+        // bounded by both, the disc by the circle only.
+        let regions = vec![region(vec![0, 2, 4, 6, 8, 15], 80.0), region(vec![1, 14], 3.0)];
+        assert_eq!(region_for_curve(&regions, 2).map(|r| r.area), Some(80.0));
+        assert_eq!(region_for_curve(&regions, 7).map(|r| r.area), Some(3.0));
+        assert!(region_for_curve(&regions, 9).is_none());
+    }
+
+    #[test]
+    fn source_sketch_of_an_extrude() {
+        let ps = studio();
+        assert_eq!(source_sketch(&ps.features, &ps.features[2]), Some(FeatureId(1001)));
+        assert_eq!(source_sketch(&ps.features, &ps.features[3]), None);
     }
 }

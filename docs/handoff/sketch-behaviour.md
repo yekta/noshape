@@ -9,7 +9,7 @@ Also touched (sketch-specific, surgical): `crates/model/src/regen/features/sketc
 `patterns`, `images`; `SketchText.expression`; image helpers; base64).
 
 The checklist with statuses is `docs/parity/sketch.md`. **Keep it current** (it is up to
-date as of the latest handoff update: 187 ✅, 9 ⏳, 4 🔧).
+date as of the current continuation: 210 rows, 191 ✅, 15 ⏳, 4 🔧).
 
 ## State right now
 
@@ -129,3 +129,212 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 * `SketchData` fields are compared in its manual `PartialEq`: add new fields there.
 * Ellipse axes are stored as radii but shown/typed as diameters (`dim_display_scale`);
   their expressions aren't stored (regen would re-evaluate them as radii).
+
+## skb continuation — 2026-10-18
+
+- Working on DISPLAY=:103, CARGO_TARGET_DIR=/root/target-skb. No commits/pushes.
+- Both requested test commands started; cold dependency compilation in progress.
+- Added circular-pattern solver links (points, circle radii, ellipse axes/sizes),
+  shared draggable construction center, and center recovery when editing a pattern.
+  Regression tests cover seed dragging, center dragging, size edits and deletion.
+- Fixed Bezier creation accepting more than 16 control points (silently became a
+  multi-span B-spline): now shows the exact max-degree message and can still finish.
+- Added Extend error and Bezier creation regressions. Verification still pending.
+- Updated tools/sketch-ui scripts to respect DISPLAY, default :103 (old :106).
+- Requested focused live checks in /root/onshape-research/live/REQUESTS.md.
+- Sketch crate tests: **89 passed, 1 ignored**, including circular pattern tests.
+- GUI baseline checked conic rho auto-focus/value commit (0.7), polygon side
+  entry after locking circumference (7 sides/Enter), open spline white handles.
+  Evidence: /tmp/skb/2026-10-18/*.png. Baseline is a copy of the integrated
+  /root/target-lead/debug/noshape under target-skb/debug/noshape-baseline;
+  new code still needs the fresh app build.
+- Added sketch shortcut preferences in the sketch context menu; save/default/
+  cancel; saved assignments take effect immediately; canonical modifier ordering.
+  Compile/GUI verification pending. The initial app test compilation was terminated
+  (SIGTERM, exit 143); restarted with -j 2, log app-tests.log in the evidence dir.
+- Xvfb has no window manager: explicitly `xdotool windowfocus <window>` before
+  keyboard scenarios. Added this to sketch_top.sh. Backtick Select other popup
+  verified after setting native focus (row 9.7 updated).
+- Foreground tool sessions may receive SIGTERM before long builds/UI sessions
+  finish. Restarted the GUI with setsid; PID saved in evidence dir/app.pid.
+- Fixed Use hover preview arriving one pointer event late: the GPU Hover result
+  now refreshes the projection directly; switching tools resets its preview cache.
+- Reused copied read-only dependency cache from target-lead in target-skb to
+  avoid duplicating the full cold dependency build on this heavily loaded server.
+  Builds still run only in target-skb. Stopped exact own orphan rustc PIDs after
+  cancelling the earlier build; never broad-killed processes.
+- Further fixes: Shift/Alt modifier changes now refresh inference even without
+  pointer movement, and pressing Shift immediately before releasing a dragged point
+  suppresses a pending coincident drop. New editor regression.
+- In-place dimension input used length units for rho and radius scaling for ellipse
+  diameters. Centralized edit text with dim_unit/dim_display_scale; new unchanged-
+  acceptance regression for ellipse and rho. These app checks remain pending.
+- GUI found a real Insert image/DXF fallback chooser bug: callbacks re-entered
+  window_handle.update while that window was already borrowed by the chooser's
+  confirm handler, silently dropping the import. Image now updates its view
+  directly; DXF defers the window update before regeneration. Must recheck with
+  NOSHAPE_NO_NATIVE_DIALOGS=1 in the fresh build; baseline cannot load either.
+- Live behaviours.md now has sketch observations. Important correction: **one
+  Esc ends a Line chain AND exits Line**, while double-click ends only the chain.
+  Corrected cancel logic/test; prior test incorrectly required two Esc presses.
+  Requested clarification of other tools' Esc, conic default rho persistence,
+  and elliptical-arc click count (capture text differs from help's four clicks).
+- Added Confirm <sketch name> to the sketch context menu per live observations.
+- Conic now creates its intrinsic default driving Rho dimension immediately;
+  dismissing its box retains it, typing edits that same dimension, rho >= 1 is
+  rejected. Regression added; live sketch/84–86 shows persistent default Rho.
+- T:ux pick priority regression added; stale-GPU fallback now also prefers an
+  under-constrained point over nearby fully constrained points (not only GPU hover).
+- GUI baseline model-face sketch: Use successfully projected the demo plate's
+  large hole edge; right-click then offered "Delete sketch entity" (not just
+  model actions), and selected the projected circle. Evidence use-circle.png and
+  model-edge-context.png. The preview still needs the fresh-build timing recheck.
+- Bezier creation finally verified (Degree 4 label in bezier-retry.png). Do not
+  count degree editing as GUI-passed yet: the double-click edit attempt did not
+  open an input in the baseline, despite T:ux degree-elevation passing.
+- Found why baseline popup keyboard scenarios became unreliable: sketch root's
+  capture-phase Escape handler did not treat context_menu as transient, so it
+  intercepted Escape before the popup could dismiss/restore focus. Added it to
+  the transient guard (also fixes Select other popup dismissal). Fresh GUI check
+  required; click the canvas to dismiss baseline menus while testing it.
+- Verified external constraint glyphs (8.16): Equal between a new circle and
+  the projected demo model circle resizes the new one and shows blue glyph
+  backgrounds on both entities. Screenshot external-equal.png. Cleared row 8.16.
+- Updated row 4.28 to partial: GUI label exists, but baseline double-click input
+  failed to open. This is now explicitly tracked instead of claimed complete.
+- Verified 12.5: right-click a different, unused model edge in the face sketch
+  offers "Use" and "View normal to sketch plane" (model-context-use.png).
+- Verified chained slots (4.35) in baseline GUI: draw two connected L-shaped
+  lines, preselect both, activate Slot. One continuous slot follows the chain,
+  centerlines become construction, and one width input controls the end caps
+  (chained-slot.png). Row updated with GUI evidence.
+- Heavy-user sweep: trim used a capped 64-sample path, so a single large mouse
+  move could skip curves between samples. Replaced it with swept-segment curve
+  intersections and added a regression with lines deliberately between samples.
+  Still awaiting the app test build.
+- Verified Extend's exact error text (11.10) against a circle in the GUI:
+  "Unable to extend the selected geometry." (extend-error.png). Row updated.
+- Started subsequent baseline GUI runs with LP_NUM_THREADS=2 to reduce llvmpipe
+  contention while the independent app dependency build is running.
+- Live menu observations: Esc preserves selection; changed editor cancel and
+  added a regression. Pending drawing/Mirror/Offset/pattern tools now exit on
+  Esc too (polygon Esc must discard its pending preview per live observations).
+- Live S toolbar: ten tools (includes Spline), two rows of five, S again moves
+  it to the new cursor instead of toggling closed. Corrected sketch-only branch
+  in part_studio/behaviors.rs; Part Studio toolbar behavior outside sketches kept.
+- Sketch context menu now starts with Confirm and includes Select other,
+  Zoom to fit/selection. Remaining generic analysis/Select submenus need integration.
+- Surgical cross-file changes: part_studio/view_tools.rs adds a sketch-only
+  Customize button to Shift+? shortcut sheet; preferences moved there from the
+  sketch context menu. part_studio/behaviors.rs changes only sketch S toolbar.
+- Live polygon captures exposed two missing interactions: on-canvas ◀ N ▶
+  side-count control, and starting the next polygon with the commit click.
+  Added both plus a regression; Enter still commits without starting another,
+  Esc discards only the pending preview. Spinner locks the explicitly selected
+  count so pointer movement toward its buttons does not alter it.
+- Newly captured behaviors reveal broader inherited gaps, now explicitly tracked:
+  14.15 Text uses a confirm/cancel dialog (250-character limit), but current code
+  creates immediately and uses option rows; 14.16 fillet should stage its preview
+  until Enter before opening radius input; 14.17 linear pattern needs a second
+  independent direction/count (current linked implementation has one axis).
+  These are not claimed complete. Fresh build/tests of current fixes take priority.
+- LP_NUM_THREADS=2 and a 30-ms double-click made the baseline degree editor
+  reliable: degree 16 shows the exact limit message, then 6 succeeds. Cleared
+  4.28 and 13.3 with screenshots bezier-degree-input-lp2.png,
+  bezier-max-degree-error.png, bezier-degree-six-verified.png. Earlier failed
+  double-click attempts were not a degree-editor logic defect.
+- Found stale max-degree message after a successful correction; cleared it on
+  successful degree edit. Matched live strings "Deg N" and "Rho 0.5".
+- Dimension value-box initialization now uses the document's actual units
+  (previous generic creation used default mm even in inch documents), with
+  extra entry precision instead of label precision. Inch ellipse regression
+  added to the in-place edit test.
+- Latest sketch-crate rerun completed: **90 passed, 1 ignored**, including
+  circular seed/center/size links and movable-point pick priority. Used private
+  nested cache /root/target-skb/sketch-tests while the app build held the main
+  target-skb lock. Both stay inside the assigned build directory. Clippy for
+  the sketch crate now running there; logs in the evidence directory.
+- Sketch crate Clippy passed with -D warnings, all targets, no warnings.
+- Refreshed the main target-skb dependency cache from completed target-ui;
+  preserve cxxbridge symlinks when copying build/ (dereferencing hits SameFile
+  errors against shared source). After a coherent refresh Cargo now compiles
+  only the app test binary, rather than rebuilding the dependency graph.
+- Fresh shared-root build became available in target-ui (12:26). Copied it to
+  target-skb/debug/noshape-current for GUI validation while own app tests compile;
+  its binary contains the new shortcut preferences/rho validation strings.
+- App test compilation reports two existing unused-code warnings: stale
+  MINI_FEATURES in behaviors.rs (removed, as S toolbar now uses toolbar prefs),
+  and os_ui::secondary_button (UI agent area; leave for its owner).
+- Requested app editor tests now passed: **36 passed, 0 failed** (`sketch_mode`),
+  including all new Escape/polygon/fast-trim/rho/dimension/modifier regressions.
+  Test build had the two warnings noted above; MINI_FEATURES has since been
+  removed. Running the sketch integration parser/toolbar tests next.
+- Fresh GUI passed 9.5: a free point placed one pixel from the fixed origin
+  with Shift can be dragged from the origin overlap; origin stays fixed. Baseline
+  failed this same scenario. Evidence current-point-priority.png. Row cleared.
+
+- Fresh GUI verified import callback fixes: image chooser loads fixture.png and
+  placing its box renders the bitmap; DXF chooser inserts both fixture entities
+  (line + circle). Evidence current-image-loaded/current-image-inserted and
+  current-dxf-inserted.png. 14.8 cleared; DWG reader remains absent (4.38).
+- Fresh S toolbar verified ten tools in live order, two rows of five; second S
+  at new pointer relocates it. Evidence current-s-toolbar-focused and
+  current-s-repositioned.png. 14.12 cleared. Click canvas first after file dialog
+  to restore keyboard focus. LP_NUM_THREADS=2 keeps interaction reliable.
+- Used shared os_ui::secondary_button for shortcut Cancel, eliminating its
+  unused-helper warning through a real UI integration.
+- Integration-test rerun was interrupted by another agent's feature_dialog.rs
+  select_all API typo; the owner has already corrected it. New editor test run
+  now includes staged fillet/chamfer and Text dialog changes below.
+- Text second click now stages a box, opening confirm/cancel Text dialog with
+  preview, style/flip controls and 250-character validation; no document text
+  exists until accept. Existing selected-text edits still use option rows.
+- Fillet/chamfer click now stages an isolated SketchData preview; Enter commits
+  then opens radius field. Fillet manipulator edits only that preview. These
+  additions are compiling/test verification in progress; 14.15/14.16 pending.
+
+## skb (Claude) continuation — 2026-10-18 13:00 UTC onwards
+
+Took over from the Codex skb. Baseline check: the previous agent left one half-applied
+edit (fillet "staged preview" assertions had landed in the tangent-arc section of
+`remaining_geometry_tools_click_sequences`); moved back into `fillet_two_curves`. App
+editor tests: **47 pass** (`cargo test -p noshape --bin noshape sketch`), sketch crate 91 pass.
+
+New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
+* Enter while any tool shows an idle value box = place it as a driving dimension at the
+  current value (`SketchEditor::accept_otf`, Accept capture in sketch.rs); Enter with a
+  drawing tool and nothing pending is swallowed (does not accept the sketch). Live 212–213.
+* Press-drag-release from a Line chain's end places nothing (no arc, no point); the boxed
+  length stays. Live 210–211.
+* Spline/Bezier: first Esc commits through the placed points and keeps the tool
+  (`escape_commit`, called from the Cancel capture before `sketch_cancel`); second exits.
+* The sketch's own plane (or a coincident datum plane / the sketch face) is never
+  hover-highlighted in sketch mode (`is_own_sketch_plane`; was tan under the cursor).
+* Idle value boxes show bare numbers like dimension labels (`otf_labels`); units only
+  once typing starts.
+* `SketchEditor::apply_unit_defaults` (called on sketch entry): inch docs use live
+  defaults; metric values are guesses until live capture answers (REQUESTS.md).
+* Sketch context menu rebuilt in live order with Show all / Copy sketch / Curve-surface
+  analysis / Section view / Select ▸ submenu (`noshape_sketch::select` —
+  `Sketch::select_related`, `RelatedSelection`). "Construction" item removed (not in Onshape).
+* Not my area but noticed: Sketch dialog "Show constraints" defaults off in noshape, live
+  00-sketch-dialog-empty has it on (09 shows it off — user toggled?). Not changed.
+* Later (after the lead's live-capture note): mm defaults R20/5/5/Ø20/25 mm; Enter never
+  accepts the sketch (all unhandled Enter swallowed in the Accept capture); Show
+  constraints starts on; Slot is preview-until-next-click (`pending_slot`,
+  `commit_slot`, committed by click/Enter/Esc/tool switch — the toolbar switch path uses
+  `needs_regen` because `set_tool` has no window), Slot is no longer a `draws()` tool
+  (no 3-click slot drawing; live has none), centerlines stay solid (sketch crate
+  `slot_around`/`slot_chains`); fillet Enter now syncs the radius value box; options
+  panel removed for fillet/polygon/conic/linear pattern; on-canvas `Nx` count labels and
+  linear spacing values (`pattern_count_labels`, `pattern_distance_labels`,
+  `open_count_edit`); circular default 3.
+* Next: circular pattern angle + Transform values on canvas (14.33), model-edge menu items
+  (14.34), the remaining ⏳ GUI checks. For ui2: constraint glyphs draw over the value
+  box (k3-enter-c.png); colours: fully defined #000000 vs live #101011, region #9aa5af
+  (alpha?) vs live #dde2e6.
+* Circular pattern / Transform panels removed too: `pattern_value_labels` /
+  `set_pattern_value` (linear spacing, open circular angle, transform rotate/scale) and
+  `pattern_value_dim` in sketch.rs; the Transform triad follows the selection
+  (`follow_transform_selection`, `xf_center_pinned`). Text is the only tool with option
+  rows left (OptKind is now Length/Text). App tests: 47 pass.

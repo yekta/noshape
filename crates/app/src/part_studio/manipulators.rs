@@ -56,7 +56,8 @@ pub(super) struct ManipDrag {
 impl PartStudioView {
     /// The manipulator of the feature being edited, if it has one.
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
-        match self.edit.as_ref()?.dialog.read(cx).feature.type_id.as_str() {
+        let Some(e) = self.edit.as_ref() else { return self.section_arrow().map(Manip::Arrow) };
+        match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
             "cPlane" | "shell" | "fillet" | "chamfer" => self.param_arrow(cx).map(Manip::Arrow),
             "revolve" => self.current_arc(cx).map(Manip::Arc),
@@ -259,6 +260,10 @@ impl PartStudioView {
                 let Some(m) = self.manip_drag else { return false };
                 let (o, d) = ray(self, *position, cx);
                 let Some(t) = Self::axis_param(&a, o, d) else { return true };
+                if a.param == super::section::SECTION_PARAM {
+                    self.drag_section_arrow(t - m.grab_offset, window, cx);
+                    return true;
+                }
                 let mut len = t - m.grab_offset;
                 let symmetric = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.params.bool("symmetric"));
                 if symmetric {
@@ -286,13 +291,22 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::ToolUp { .. } => self.manip_drag.take().is_some(),
+            ViewportEvent::ToolUp { .. } => self.end_manip_drag(a.param, window, cx),
             _ => false,
         }
     }
 }
 
 impl PartStudioView {
+    /// End of a manipulator drag: Onshape leaves the value selected in its field.
+    fn end_manip_drag(&mut self, param: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let dragged = self.manip_drag.take().is_some();
+        if dragged && let Some(e) = &self.edit {
+            e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(param, window, cx));
+        }
+        dragged
+    }
+
     fn arc_event(&mut self, h: ArcHandle, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         // Angle of the cursor around the axis (ray ∩ plane through the arc).
         let angle_at = |this: &Self, p: DVec2, cx: &App| -> Option<f64> {
@@ -331,7 +345,7 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::ToolUp { .. } => self.manip_drag.take().is_some(),
+            ViewportEvent::ToolUp { .. } => self.end_manip_drag("angle", window, cx),
             _ => false,
         }
     }

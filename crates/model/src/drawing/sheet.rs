@@ -12,6 +12,8 @@ pub enum LineStyle {
     Visible,
     Hidden,
     Tangent,
+    /// Tangent edges as phantom lines (long dash, two short dashes).
+    Phantom,
     Centerline,
     Thin,
     Border,
@@ -25,7 +27,7 @@ impl LineStyle {
             LineStyle::Visible => 0.5,
             LineStyle::Border => 0.7,
             LineStyle::Section => 0.7,
-            LineStyle::Hidden | LineStyle::Tangent => 0.35,
+            LineStyle::Hidden | LineStyle::Tangent | LineStyle::Phantom => 0.35,
             LineStyle::Centerline | LineStyle::Thin => 0.25,
         }
     }
@@ -34,6 +36,7 @@ impl LineStyle {
         match self {
             LineStyle::Hidden => &[3.0, 1.5],
             LineStyle::Centerline => &[8.0, 1.5, 1.5, 1.5],
+            LineStyle::Phantom => &[8.0, 1.5, 1.5, 1.5, 1.5, 1.5],
             LineStyle::Section => &[10.0, 2.0, 2.0, 2.0],
             _ => &[],
         }
@@ -43,6 +46,7 @@ impl LineStyle {
             LineStyle::Visible => "VISIBLE",
             LineStyle::Hidden => "HIDDEN",
             LineStyle::Tangent => "TANGENT",
+            LineStyle::Phantom => "PHANTOM",
             LineStyle::Centerline => "CENTER",
             LineStyle::Thin => "ANNOTATION",
             LineStyle::Border => "BORDER_FRAME",
@@ -134,28 +138,44 @@ impl SheetGeometry {
     pub fn add_border_and_title_full(&mut self, sheet: &Sheet, projection: Projection, expand: &dyn Fn(&str) -> String) {
         let (w, h) = (self.width, self.height);
         let m = 10.0;
+        // Onshape's templates: a thin line along the sheet edge, the frame
+        // inset by the margin, and zone dividers across the band between them
+        // with the zone labels centered in it. ANSI numbers zones from the
+        // right and letters them from the bottom (A size: 2 x 2); ISO 5457
+        // uses 50 mm zones numbered from the left, lettered from the top.
+        self.rect(0.0, 0.0, w, h, LineStyle::Thin);
         self.rect(m, m, w - m, h - m, LineStyle::Border);
-        // Zone ticks.
-        let nx = ((w - 2.0 * m) / 50.0).round().max(2.0) as usize;
-        let ny = ((h - 2.0 * m) / 50.0).round().max(2.0) as usize;
+        let ansi = sheet.size.is_ansi();
+        let (nx, ny) = match sheet.size {
+            super::SheetSize::AnsiA | super::SheetSize::AnsiAPortrait => (2, 2),
+            super::SheetSize::AnsiB => (4, 2),
+            super::SheetSize::AnsiC => (4, 4),
+            super::SheetSize::AnsiD | super::SheetSize::AnsiE => (8, 4),
+            _ => (((w - 2.0 * m) / 50.0).round().max(2.0) as usize, ((h - 2.0 * m) / 50.0).round().max(2.0) as usize),
+        };
+        let th = if ansi { 5.0 } else { 3.5 };
         for i in 1..nx {
             let x = m + (w - 2.0 * m) * i as f64 / nx as f64;
-            self.line([x, m], [x, m - 4.0], LineStyle::Thin);
-            self.line([x, h - m], [x, h - m + 4.0], LineStyle::Thin);
+            self.line([x, 0.0], [x, m], LineStyle::Thin);
+            self.line([x, h - m], [x, h], LineStyle::Thin);
         }
         for i in 0..nx {
             let x = m + (w - 2.0 * m) * (i as f64 + 0.5) / nx as f64;
-            self.text([x, h - m + 2.0], 2.5, format!("{}", i + 1), Anchor::BottomCenter);
+            let n = if ansi { nx - i } else { i + 1 };
+            self.text([x, h - m / 2.0], th, n.to_string(), Anchor::Center);
+            self.text([x, m / 2.0], th, n.to_string(), Anchor::Center);
         }
         for j in 1..ny {
             let y = m + (h - 2.0 * m) * j as f64 / ny as f64;
-            self.line([m, y], [m - 4.0, y], LineStyle::Thin);
-            self.line([w - m, y], [w - m + 4.0, y], LineStyle::Thin);
+            self.line([0.0, y], [m, y], LineStyle::Thin);
+            self.line([w - m, y], [w, y], LineStyle::Thin);
         }
         for j in 0..ny {
             let y = m + (h - 2.0 * m) * (j as f64 + 0.5) / ny as f64;
-            let letter = (b'A' + (ny - 1 - j) as u8) as char;
-            self.text([m - 2.0, y], 2.5, letter.to_string(), Anchor::Center);
+            let k = if ansi { j } else { ny - 1 - j };
+            let letter = (b'A' + k as u8) as char;
+            self.text([m / 2.0, y], th, letter.to_string(), Anchor::Center);
+            self.text([w - m / 2.0, y], th, letter.to_string(), Anchor::Center);
         }
         let value_of = |k: &str, v: &str| -> String {
             match k {

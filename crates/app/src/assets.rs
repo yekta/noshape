@@ -54,7 +54,10 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
-static ICON_CACHE: LazyLock<Mutex<HashMap<(String, u32), Arc<RenderImage>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Rasterized icons by (name, pixel size).
+type IconCache = HashMap<(String, u32), Arc<RenderImage>>;
+
+static ICON_CACHE: LazyLock<Mutex<IconCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 /// Device scale factor of the most recently rendered window, x100.
 static SCALE_X100: AtomicU32 = AtomicU32::new(100);
 

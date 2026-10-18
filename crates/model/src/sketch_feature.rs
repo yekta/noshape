@@ -86,7 +86,17 @@ pub struct SketchPattern {
     pub distance: f64,
     pub angle: f64,
     pub center: [f64; 2],
+    /// Independent second direction of a linear sketch pattern. Old files
+    /// remain a single row.
+    #[serde(default = "one_pattern_row")]
+    pub second_count: usize,
+    #[serde(default)]
+    pub second_distance: f64,
+    #[serde(default)]
+    pub second_angle: f64,
 }
+
+fn one_pattern_row() -> usize { 1 }
 
 /// An inserted image: an encoded image file drawn in a box whose corners
 /// are solver points (lower-left, lower-right, upper-right, upper-left).

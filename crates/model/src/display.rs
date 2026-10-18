@@ -27,6 +27,68 @@ pub struct MeshBuffers {
     pub vertices: Vec<[f32; 3]>,
 }
 
+impl MeshBuffers {
+    /// Per edge: whether its two faces meet tangentially (Onshape's
+    /// "tangent edges", e.g. a fillet's boundary). Found from the mesh: a
+    /// triangle side lying on the edge in two faces whose normals agree.
+    pub fn smooth_edges(&self) -> Vec<bool> {
+        use std::collections::HashMap;
+        let q = |p: [f32; 3]| [(p[0] as f64 * 1e6).round() as i64, (p[1] as f64 * 1e6).round() as i64, (p[2] as f64 * 1e6).round() as i64];
+        let key = |a: [i64; 3], b: [i64; 3]| if a <= b { (a, b) } else { (b, a) };
+        // Triangle sides: (face, normal at the side's midpoint).
+        type Side = ([i64; 3], [i64; 3]);
+        let mut sides: HashMap<Side, Vec<(usize, glam::Vec3)>> = HashMap::new();
+        for (f, &(first, count)) in self.face_ranges.iter().enumerate() {
+            let tris = self.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]);
+            for t in tris.as_chunks::<3>().0 {
+                for (i, j) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                    let (Some(pa), Some(pb), Some(na), Some(nb)) = (self.positions.get(i as usize), self.positions.get(j as usize), self.normals.get(i as usize), self.normals.get(j as usize)) else { continue };
+                    let n = (glam::Vec3::from(*na) + glam::Vec3::from(*nb)).normalize_or_zero();
+                    let e = sides.entry(key(q(*pa), q(*pb))).or_default();
+                    if !e.iter().any(|(g, _)| *g == f) {
+                        e.push((f, n));
+                    }
+                }
+            }
+        }
+        self.edges
+            .iter()
+            .map(|pl| {
+                let mut seen = false;
+                for w in pl.windows(2) {
+                    if let Some(fs) = sides.get(&key(q(w[0]), q(w[1])))
+                        && fs.len() == 2
+                    {
+                        seen = true;
+                        if fs[0].1.dot(fs[1].1) < 0.999 {
+                            return false;
+                        }
+                    }
+                }
+                seen
+            })
+            .collect()
+    }
+
+    /// Edges bounding face `face` (a triangle side of the face lies on them).
+    pub fn face_edges(&self, face: usize) -> Vec<usize> {
+        use std::collections::HashSet;
+        let q = |p: [f32; 3]| [(p[0] as f64 * 1e6).round() as i64, (p[1] as f64 * 1e6).round() as i64, (p[2] as f64 * 1e6).round() as i64];
+        let key = |a: [i64; 3], b: [i64; 3]| if a <= b { (a, b) } else { (b, a) };
+        let Some(&(first, count)) = self.face_ranges.get(face) else { return Vec::new() };
+        let tris = self.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]);
+        let mut sides = HashSet::new();
+        for t in tris.as_chunks::<3>().0 {
+            for (i, j) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                if let (Some(a), Some(b)) = (self.positions.get(i as usize), self.positions.get(j as usize)) {
+                    sides.insert(key(q(*a), q(*b)));
+                }
+            }
+        }
+        self.edges.iter().enumerate().filter(|(_, pl)| pl.windows(2).any(|w| sides.contains(&key(q(w[0]), q(w[1]))))).map(|(i, _)| i).collect()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct BodyDisplay {
     pub id: BodyId,
@@ -247,5 +309,38 @@ impl StudioDisplay {
             }
         }
         acc
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two quads sharing the edge x = 0: flat (tangent) or folded (sharp).
+    fn two_faces(fold: bool) -> MeshBuffers {
+        let n2: [f32; 3] = if fold { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] };
+        let p2 = |y: f32| if fold { [0.0, y, -1.0] } else { [1.0, y, 0.0] };
+        MeshBuffers {
+            positions: vec![[-1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [-1.0, 1.0, 0.0], [0.0, 0.0, 0.0], p2(0.0), p2(1.0), [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], n2, n2, n2, n2],
+            indices: vec![0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7],
+            face_ranges: vec![(0, 6), (6, 6)],
+            edges: vec![vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], vec![[-1.0, 0.0, 0.0], [-1.0, 1.0, 0.0]]],
+            vertices: vec![],
+        }
+    }
+
+    #[test]
+    fn tangent_edges_from_the_mesh() {
+        assert_eq!(two_faces(false).smooth_edges(), vec![true, false]);
+        assert_eq!(two_faces(true).smooth_edges(), vec![false, false]);
+    }
+
+    #[test]
+    fn edges_of_a_face() {
+        let m = two_faces(false);
+        assert_eq!(m.face_edges(0), vec![0, 1]);
+        assert_eq!(m.face_edges(1), vec![0]);
+        assert!(m.face_edges(5).is_empty());
     }
 }
