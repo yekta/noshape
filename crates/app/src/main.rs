@@ -44,6 +44,12 @@ fn apply_theme(cx: &mut App) {
         t.border = pal.border.into();
         t.primary = pal.accent.into();
         t.primary_hover = pal.accent_hover.into();
+        t.primary_active = pal.accent.into();
+        t.primary_foreground = gpui_kit::rgb(0xffffff).into();
+        t.button_primary = pal.accent.into();
+        t.button_primary_hover = pal.accent_hover.into();
+        t.button_primary_active = pal.accent.into();
+        t.button_primary_foreground = gpui_kit::rgb(0xffffff).into();
         t.popover = pal.panel_raised.into();
         t.popover_foreground = pal.text.into();
         t.muted = pal.panel_hover.into();
