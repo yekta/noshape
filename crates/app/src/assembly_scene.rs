@@ -85,6 +85,8 @@ pub struct AsmSceneOptions {
     pub isolate: Option<HashSet<noshape_model::assembly::InstanceId>>,
     /// Instances shown with the interference / error tint.
     pub error_tops: HashSet<noshape_model::assembly::InstanceId>,
+    /// Instances drawn transparent and not pickable (being dragged in snap mode).
+    pub ghost_tops: HashSet<noshape_model::assembly::InstanceId>,
 }
 
 fn to_mat4(m: &DMat4) -> Mat4 {
@@ -124,8 +126,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         }
         let t = to_mat4(&o.transform);
         let mut color = o.color;
-        let dimmed = opts.isolate.as_ref().is_some_and(|s| !s.contains(&o.top()));
-        if dimmed {
+        let dimmed = opts.isolate.as_ref().is_some_and(|s| !s.contains(&o.top())) || opts.ghost_tops.contains(&o.top());
+        if opts.ghost_tops.contains(&o.top()) {
+            color[3] = 0.35;
+        } else if dimmed {
             color[3] = 0.12;
         } else if o.kind == BodyKind::Surface {
             color[3] = 0.85;
@@ -202,13 +206,19 @@ pub struct Highlights {
     pub mate_lines: Vec<(DVec3, DVec3, bool)>,
     /// Placement preview cross at the cursor (insert).
     pub cursor_mark: Option<(DVec3, f64)>,
+    /// Explode lines (dashed), start to exploded position.
+    pub trails: Vec<(DVec3, DVec3)>,
 }
 
-/// Manipulator handle: translate along axis k or rotate about axis k.
+/// Manipulator handle: translate along axis k, rotate about axis k,
+/// translate in the plane normal to axis k, or the center ball (moves the
+/// manipulator itself).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ManipHandle {
     Axis(usize),
     Ring(usize),
+    Plane(usize),
+    Center,
 }
 
 /// Pickable overlay items beyond the geometry picks.
@@ -230,7 +240,9 @@ pub fn overlay_id(built: &AsmBuilt, o: OverlayPick) -> u32 {
         OverlayPick::Manip(ManipHandle::Axis(k)) => b + k as u32,
         OverlayPick::Manip(ManipHandle::Ring(k)) => b + 3 + k as u32,
         OverlayPick::Origin => b + 6,
-        OverlayPick::Connector(i) => b + 7 + i as u32,
+        OverlayPick::Manip(ManipHandle::Plane(k)) => b + 7 + k as u32,
+        OverlayPick::Manip(ManipHandle::Center) => b + 10,
+        OverlayPick::Connector(i) => b + 11 + i as u32,
     }
 }
 
@@ -244,7 +256,9 @@ pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
         k @ 0..=2 => OverlayPick::Manip(ManipHandle::Axis(k as usize)),
         k @ 3..=5 => OverlayPick::Manip(ManipHandle::Ring(k as usize - 3)),
         6 => OverlayPick::Origin,
-        k => OverlayPick::Connector(k as usize - 7),
+        k @ 7..=9 => OverlayPick::Manip(ManipHandle::Plane(k as usize - 7)),
+        10 => OverlayPick::Manip(ManipHandle::Center),
+        k => OverlayPick::Connector(k as usize - 11),
     })
 }
 
@@ -305,6 +319,9 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for (a, b, strong) in &h.mate_lines {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: [0xff, 0xb0, 0x20, 255], pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP });
     }
+    for (a, b) in &h.trails {
+        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: [0xe7, 0xe9, 0xee, 255], pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+    }
     if let Some((p, size)) = h.cursor_mark {
         for axis in [DVec3::X, DVec3::Y, DVec3::Z] {
             lines.segments.push(LineSegment { a: (p - axis * size).as_vec3().into(), b: (p + axis * size).as_vec3().into(), color: [0x4c, 0xc9, 0xf0, 255], pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
@@ -354,8 +371,27 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
                 ol.segments.push(LineSegment { a: p0.as_vec3().into(), b: p1.as_vec3().into(), color: rc, pick_id: rid, width: 3.0, style: LineSegment::ON_TOP });
             }
             scene.set_state(rid, 0);
+            // Plane square for the plane normal to axis k (between the other two axes).
+            let pid = overlay_id(built, OverlayPick::Manip(ManipHandle::Plane(k)));
+            let hl = *hovered == Some(ManipHandle::Plane(k));
+            let pc = if hl { [0xff, 0xe0, 0x66, 255] } else { let c = AXIS_COLORS[k]; [c[0], c[1], c[2], 200] };
+            let (a0, a1) = (*size * 0.24, *size * 0.5);
+            let q = |x: f64, y: f64| -> [f32; 3] { (f.origin + u * x + v * y).as_vec3().into() };
+            for (pa, pb) in [((a0, a0), (a1, a0)), ((a1, a0), (a1, a1)), ((a1, a1), (a0, a1)), ((a0, a1), (a0, a0))] {
+                ol.segments.push(LineSegment { a: q(pa.0, pa.1), b: q(pb.0, pb.1), color: pc, pick_id: pid, width: 2.5, style: LineSegment::ON_TOP });
+            }
+            // Hatch fill (pickable over the whole square).
+            let fill = if hl { [0xff, 0xe0, 0x66, 150] } else { let c = AXIS_COLORS[k]; [c[0], c[1], c[2], 90] };
+            for i in 1..8 {
+                let y = a0 + (a1 - a0) * i as f64 / 8.0;
+                ol.segments.push(LineSegment { a: q(a0, y), b: q(a1, y), color: fill, pick_id: pid, width: 4.0, style: LineSegment::ON_TOP });
+            }
+            scene.set_state(pid, 0);
         }
-        op.points.push(PointSprite { position: o, color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+        let cid = overlay_id(built, OverlayPick::Manip(ManipHandle::Center));
+        let cc = if *hovered == Some(ManipHandle::Center) { [0xff, 0xe0, 0x66, 255] } else { [0xff, 0xff, 0xff, 255] };
+        op.points.push(PointSprite { position: o, color: cc, pick_id: cid, size: 14.0, style: LineSegment::ON_TOP, _pad: 0 });
+        scene.set_state(cid, 0);
     }
     if !ol.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ol))).per_primitive_color().ignore_clip().layer(22));

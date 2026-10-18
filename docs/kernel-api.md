@@ -197,6 +197,38 @@ fn transform(shape, &Transform, copy: bool) -> Result<OpResult>;   // every sub-
 impl Shape { fn transformed(&self, &Transform) -> Result<Shape>; fn translated(&self, DVec3) -> Result<Shape>; }
 ```
 
+## Surfacing: wrap, isocline, surface fitting (`surfacing`)
+
+```rust
+pub enum Developable {                 // developable surface with an isometric "flat" development
+    Plane { origin, x_dir, normal },   //   flat = ((p-o)·x, (p-o)·y), y = normal × x
+    Cylinder { origin, axis, x_dir, radius },          //   flat = (R·φ, h)
+    Cone { origin, axis, x_dir, radius /* at origin */, half_angle /* (0, π/2), grows along axis */ },
+}                                      //   flat = ρ(cos ψ, sin ψ), ρ = slant from apex, ψ = φ·sin(half_angle)
+impl Developable {
+    fn of_face(&Shape) -> Result<Developable>;          // plane / cylinder / cone face (cones normalized to a positive angle)
+    fn flat(&self, p, ref_angle) -> DVec2;  fn point(&self, flat, ref_angle) -> DVec3;
+    fn project(&self, p, ref_angle) -> DVec2;           // closest surface point, in flat coordinates
+    fn flat_axes(&self, flat, ref_angle) -> (DVec3, DVec3, DVec3);  // 3D directions of flat X, Y and their cross product
+    fn angle_of(&self, p, ref_angle) -> f64;  fn apex(&self) -> DVec3;
+}   // angles around the axis are taken within ±π of `ref_angle` (a wrapped region must stay within one turn)
+pub struct Placement2d { m: DMat2, t: DVec2 }          // flat_dst = m·flat_src + t (rigid motion or reflection)
+  Placement2d::align(from, from_dir, to, to_dir, mirror), .then_rotate_shift(center, angle, shift), .apply(p)
+fn wrap_faces(faces, src: &Developable, src_ref, dst: &Developable, dst_ref, &Placement2d, tolerance) -> Result<OpResult>;
+   // faces on `src` mapped onto `dst` through the developments (lengths/areas kept); faces are built on the exact
+   // target surface with mapped pcurves (exact for plane/cylinder combinations, approximated within `tolerance`
+   // for cones); errors if a region goes more than once around. History: arg 0 = compound of the input faces;
+   // input faces/edges Generated their images. Output: the face, or a compound in input order.
+fn isocline_curves(face, direction, angle, extend_past_boundary) -> Result<Vec<Shape>>;
+   // edges on the face where normal·direction = sin(angle) (draft isoclines), clipped to the face; with
+   // `extend_past_boundary` they overshoot the boundary slightly so `imprint(body, &edges)` splits the face
+fn bspline_surface_from_grid(frame: &Plane, x0, dx, y0, dy, heights: &[f64] /* [i*ny+j] */, nx, ny, max_degree, tol) -> Result<Shape>;
+fn fit_surface(points, normals: &[(usize, DVec3)], &SurfaceFitOptions{tolerance, interpolate, smooth}) -> Result<SurfaceFit{face, max_deviation}>;
+   // height field over the points' best-fit plane spanning their extent: thin-plate interpolation through the
+   // points (normals constrain the tangent plane), or a local least-squares fit for dense / noisy points (meshes)
+fn max_deviation(face, points) -> Result<f64>;
+```
+
 ## Tessellation (`mesh`)
 
 ```rust

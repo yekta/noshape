@@ -253,6 +253,7 @@ pub fn build(ev: &mut EvalCtx, ef: &EdgeFrame, g: &FlangeGeom, data: &mut SheetM
         ref_inner,
         inner_faces: current_names(&body, &[side_name(feature, &ef.name, 0)]),
         outer_faces: current_names(&body, &[side_name(feature, &ef.name, 4)]),
+        flat: false,
     });
     Ok(())
 }

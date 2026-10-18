@@ -266,9 +266,34 @@ enum DragState {
     Geometry { handle: DragHandle },
     /// Pressed on a dimension label: moves it when dragged, selects it on release.
     Label { constraint: ConstraintId, start: DVec2, moved: bool, additive: bool },
-    /// Pressed on a constraint glyph: selects it on release.
-    Glyph { constraint: ConstraintId, additive: bool },
+    /// Pressed on a constraint glyph: moves it when dragged, selects it on release.
+    Glyph { constraint: ConstraintId, entity: EntityId, start: DVec2, orig: DVec2, moved: bool, additive: bool },
+    /// Dragging an on-canvas pattern / transform manipulator.
+    Handle(PatternHandle),
+    /// Pressed on a text (glyph or box line): moves the whole box when dragged.
+    Text { entity: EntityId, start: DVec2, points: Vec<(EntityId, DVec2)>, moved: bool },
     Box { start: DVec2 },
+}
+
+/// On-canvas manipulators of the pattern and transform tools.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PatternHandle {
+    /// Linear pattern: first instance (direction and spacing).
+    LinearStep,
+    /// Linear pattern: last instance (instance count).
+    LinearCount,
+    /// Circular pattern / transform: center (pivot).
+    Center,
+    /// Circular pattern: end of the total angle.
+    CircularAngle,
+    /// Circular pattern: first instance (instance count).
+    CircularCount,
+    /// Transform: translation.
+    Move,
+    /// Transform: rotation.
+    Rotate,
+    /// Transform: scale.
+    Scale,
 }
 
 /// Pending inline dimension edit.
@@ -298,6 +323,13 @@ pub struct GlyphInfo {
     pub anchor: DVec2,
     /// The anchored entity is a point (glyph goes above-right) or a curve.
     pub on_point: bool,
+    /// User placement offset (sketch-plane units) when the glyph was dragged.
+    pub offset: Option<DVec2>,
+}
+
+/// Key of a moved constraint glyph in [`SketchData::glyph_offsets`].
+pub fn glyph_key(c: ConstraintId, e: EntityId) -> String {
+    format!("{}:{}", c.0, e.0)
 }
 
 /// Snap to model geometry (from the 3D hover) supplied by the view.
@@ -346,6 +378,9 @@ pub struct SketchEditor {
     pub conic_rho: f64,
     pub text_string: String,
     pub text_height: f64,
+    pub text_font: String,
+    pub text_bold: bool,
+    pub text_italic: bool,
     pub pattern_count: usize,
     pub pattern_distance: f64,
     pub pattern_angle: f64,
@@ -364,9 +399,12 @@ pub struct SketchEditor {
     pub entry_values: Vec<Option<f64>>,
     /// Entities created by the last tool action.
     last_created: Vec<EntityId>,
+    /// Previous line of the current line chain (typed angles are relative to it)
+    /// and the unit vector from the chain end back along it.
+    last_line: Option<(EntityId, DVec2)>,
     /// Label/glyph pressed in the GPUI overlay (consumed by the next tool_down).
     pub pressed_label: Option<(ConstraintId, bool, bool)>,
-    pub pressed_glyph: Option<(ConstraintId, bool)>,
+    pub pressed_glyph: Option<(ConstraintId, EntityId, bool)>,
     /// Constraints the solver reported as conflicting (set by the view).
     pub conflicting: Vec<ConstraintId>,
     /// World units per pixel at the sketch (for snap radii).
@@ -471,6 +509,9 @@ impl SketchEditor {
             conic_rho: 0.5,
             text_string: "Text".into(),
             text_height: 0.01,
+            text_font: noshape_sketch::text::DEFAULT_FONT.into(),
+            text_bold: false,
+            text_italic: false,
             pattern_count: 3,
             pattern_distance: 0.02,
             pattern_angle: 0.0,
@@ -485,6 +526,7 @@ impl SketchEditor {
             entry_active: false,
             entry_values: Vec::new(),
             last_created: Vec::new(),
+            last_line: None,
             pressed_label: None,
             pressed_glyph: None,
             conflicting: Vec::new(),
@@ -499,6 +541,7 @@ impl SketchEditor {
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
         self.clicks.clear();
         self.chain_end = None;
+        self.last_line = None;
         self.picks.clear();
         self.inference = None;
         self.external_snap = None;
@@ -516,7 +559,7 @@ impl SketchEditor {
             Tool::Dimension => Some("Select one or two entities, then click to place the dimension".into()),
             Tool::Use => Some("Click model edges or faces to project them into the sketch".into()),
             Tool::Intersection => Some("Click a model face crossing the sketch plane".into()),
-            Tool::Text => Some("Click to place the text (lower-left corner)".into()),
+            Tool::Text => Some("Drag (or click two corners) to place the text box; its height sets the text size".into()),
             Tool::Conic => Some("Click start, end, then the control point".into()),
             Tool::Bezier => Some("Click control points; double-click to finish".into()),
             Tool::LinearPattern => Some("Select entities, set the pattern, click empty space to aim, then Apply".into()),
@@ -541,6 +584,7 @@ impl SketchEditor {
             self.clicks.clear();
             self.picks.clear();
             self.chain_end = None;
+            self.last_line = None;
             self.mirror_axis = None;
             return true;
         }
@@ -673,9 +717,16 @@ impl SketchEditor {
             self.drag = Some(DragState::Label { constraint: cid, start: p, moved: !select, additive });
             return EditOutcome::none();
         }
-        if let Some((cid, additive)) = self.pressed_glyph.take() {
-            self.drag = Some(DragState::Glyph { constraint: cid, additive });
+        if let Some((cid, entity, additive)) = self.pressed_glyph.take() {
+            let orig = data.glyph_offsets.get(&glyph_key(cid, entity)).map(|o| DVec2::new(o[0], o[1])).unwrap_or(DVec2::ZERO);
+            self.drag = Some(DragState::Glyph { constraint: cid, entity, start: p, orig, moved: false, additive });
             return EditOutcome::none();
+        }
+        if self.tool.is_pattern()
+            && let Some(h) = self.handle_at(&data.sketch, p)
+        {
+            self.drag = Some(DragState::Handle(h));
+            return EditOutcome::redraw();
         }
         if self.entry_active && self.tool.draws() {
             // Clicking while typing a value commits the typed value.
@@ -684,6 +735,17 @@ impl SketchEditor {
         match self.tool {
             Tool::Select => {
                 match hovered {
+                    // Text: glyphs and box lines move the whole box (corners resize it).
+                    Some(e) if !is_point(&data.sketch, e) && data.text_of_entity(e).is_some() => {
+                        let tid = data.text_of_entity(e).unwrap_or_default();
+                        let points: Vec<(EntityId, DVec2)> = data
+                            .texts
+                            .iter()
+                            .find(|t| t.id == tid)
+                            .map(|t| t.box_points.iter().filter_map(|q| data.sketch.point(EntityId(*q)).map(|pos| (EntityId(*q), pos))).collect())
+                            .unwrap_or_default();
+                        self.drag = Some(DragState::Text { entity: e, start: p, points, moved: false });
+                    }
                     Some(e) => {
                         self.drag = Some(DragState::Pending { entity: e, start: p, additive: shift });
                     }
@@ -815,6 +877,7 @@ impl SketchEditor {
             }
             Tool::LinearPattern | Tool::CircularPattern | Tool::Transform => {
                 match hovered {
+                    Some(e) if data.text_of_entity(e).is_some() && !is_point(&data.sketch, e) => self.toggle_text_selection(data, e),
                     Some(e) => {
                         if let Some(pos) = self.selection.iter().position(|x| *x == e) {
                             self.selection.remove(pos);
@@ -908,6 +971,7 @@ impl SketchEditor {
                 if double_click {
                     self.clicks.clear();
                     self.chain_end = None;
+                    self.last_line = None;
                     return EditOutcome::redraw();
                 }
                 let Some(prev) = self.clicks.last().cloned() else {
@@ -931,9 +995,15 @@ impl SketchEditor {
                 if closed {
                     self.clicks.clear();
                     self.chain_end = None;
+                    self.last_line = None;
                 } else {
+                    let back = match (data.sketch.point(a), data.sketch.point(b)) {
+                        (Some(pa), Some(pb)) => (pa - pb).try_normalize().unwrap_or(-DVec2::X),
+                        _ => -DVec2::X,
+                    };
                     self.clicks = vec![click];
                     self.chain_end = Some(b);
+                    self.last_line = Some((line, back));
                 }
                 EditOutcome::changed()
             }
@@ -1167,18 +1237,27 @@ impl SketchEditor {
                 }
             }
             Tool::Text => {
-                let text = self.text_string.clone();
-                if text.trim().is_empty() {
-                    self.message = Some("Enter some text first".into());
+                if self.clicks.is_empty() {
+                    self.clicks.push(click);
                     return EditOutcome::redraw();
                 }
-                let created = text::add_text(sk, &text, click.pos, self.text_height);
-                if created.is_empty() {
-                    self.message = Some("The text produced no geometry".into());
-                    return EditOutcome::redraw();
+                let first = self.clicks.remove(0);
+                let (origin, height) = self.text_box_from(first.pos, click.pos);
+                let text = if self.text_string.trim().is_empty() { "Text".to_string() } else { self.text_string.clone() };
+                match data.add_text(&text, &self.text_font, self.text_bold, self.text_italic, origin, height) {
+                    Ok(id) => {
+                        data.sketch.solve();
+                        // Select the new text so its content and style can be edited.
+                        self.set_tool(Tool::Select);
+                        self.selection = data.texts.iter().find(|t| t.id == id).map(|t| t.box_lines.iter().map(|l| EntityId(*l)).collect()).unwrap_or_default();
+                        self.message = Some("Edit the text in the options box; drag the text to move it, a corner to resize".into());
+                        EditOutcome::changed()
+                    }
+                    Err(e) => {
+                        self.message = Some(e);
+                        EditOutcome::redraw()
+                    }
                 }
-                self.finish_create(data, &created);
-                EditOutcome::changed()
             }
             _ => EditOutcome::none(),
         }
@@ -1217,7 +1296,36 @@ impl SketchEditor {
                 self.box_end = Some(p);
                 EditOutcome::redraw()
             }
-            Some(DragState::Glyph { .. }) | None => EditOutcome::none(),
+            Some(DragState::Glyph { constraint, entity, start, orig, moved, additive }) => {
+                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                    return EditOutcome::none();
+                }
+                self.drag = Some(DragState::Glyph { constraint, entity, start, orig, moved: true, additive });
+                let o = orig + (p - start);
+                data.glyph_offsets.insert(glyph_key(constraint, entity), [o.x, o.y]);
+                EditOutcome::redraw()
+            }
+            Some(DragState::Handle(h)) => {
+                self.drag_handle(&data.sketch, h, p);
+                EditOutcome::redraw()
+            }
+            Some(DragState::Text { entity, start, points, moved }) => {
+                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                    return EditOutcome::none();
+                }
+                let d = p - start;
+                let handles: Vec<(DragHandle, DVec2)> = points.iter().map(|(id, q)| (DragHandle::Point(*id), *q + d)).collect();
+                let _ = data.sketch.drag(&handles);
+                self.drag = Some(DragState::Text { entity, start, points, moved: true });
+                EditOutcome::changed()
+            }
+            // Drawing tools: keep the preview following the pointer while a
+            // button is held (text box / click-drag placement).
+            None if self.tool.draws() => {
+                self.inference = self.infer(&data.sketch, p, false);
+                EditOutcome::redraw()
+            }
+            None => EditOutcome::none(),
         }
     }
 
@@ -1249,6 +1357,10 @@ impl SketchEditor {
     }
 
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
+        // Text box by click-drag: the release is the second corner.
+        if self.tool == Tool::Text && self.drag.is_none() && self.clicks.len() == 1 && (p - self.clicks[0].pos).length() > self.world_per_px * 6.0 {
+            return self.place(data, Click { pos: p, inference: None }, false);
+        }
         let out = match self.drag.take() {
             Some(DragState::Pending { entity, .. }) => {
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
@@ -1303,9 +1415,23 @@ impl SketchEditor {
                     EditOutcome::redraw()
                 }
             }
-            Some(DragState::Glyph { constraint, additive }) => {
-                self.toggle_constraint_selection(constraint, additive);
-                EditOutcome::redraw()
+            Some(DragState::Glyph { constraint, moved, additive, .. }) => {
+                if moved {
+                    EditOutcome::changed()
+                } else {
+                    self.toggle_constraint_selection(constraint, additive);
+                    EditOutcome::redraw()
+                }
+            }
+            Some(DragState::Handle(_)) => EditOutcome::redraw(),
+            Some(DragState::Text { entity, moved, .. }) => {
+                if moved {
+                    data.sketch.solve();
+                    EditOutcome::changed()
+                } else {
+                    self.toggle_text_selection(data, entity);
+                    EditOutcome::redraw()
+                }
             }
             None => EditOutcome::none(),
         };
@@ -1353,8 +1479,17 @@ impl SketchEditor {
         Some(match self.tool {
             Tool::Line => {
                 let len = v(0).unwrap_or((c - last).length());
-                let ang = v(1).unwrap_or_else(|| (c - last).to_angle());
-                last + DVec2::from_angle(ang) * len
+                let dir = match (v(1), self.chained_back()) {
+                    (None, _) => dir_of(last),
+                    // Chained: the typed angle is measured from the previous
+                    // line at the joint, on the cursor's side.
+                    (Some(ang), Some(u)) => {
+                        let (d1, d2) = (DVec2::from_angle(ang).rotate(u), DVec2::from_angle(-ang).rotate(u));
+                        if d1.dot(dir_of(last)) >= d2.dot(dir_of(last)) { d1 } else { d2 }
+                    }
+                    (Some(ang), None) => DVec2::from_angle(ang),
+                };
+                last + dir * len
             }
             Tool::Circle | Tool::Polygon | Tool::CircumPolygon => {
                 let r = v(0).map(|d| d * 0.5).unwrap_or((c - first).length());
@@ -1380,6 +1515,11 @@ impl SketchEditor {
         })
     }
 
+    /// Unit vector from the chain end back along the previous line, while chaining.
+    fn chained_back(&self) -> Option<DVec2> {
+        self.chain_end.and(self.last_line).map(|(_, u)| u)
+    }
+
     /// Start typing values (first key press while drawing).
     pub fn begin_entry(&mut self) -> bool {
         if self.entry_fields().is_empty() {
@@ -1400,6 +1540,7 @@ impl SketchEditor {
         let tool = self.tool;
         let values = std::mem::take(&mut self.entry_values);
         let anchor = self.clicks.first().map(|c| c.pos);
+        let prev_line = self.chain_end.and(self.last_line).map(|(l, _)| l);
         self.entry_active = false;
         self.last_created.clear();
         let out = self.place(data, Click { pos, inference: None }, false);
@@ -1428,12 +1569,7 @@ impl SketchEditor {
                         dims.push((ConstraintKind::Length { curve: l, value: len }, Some((a + b) * 0.5 + n * off), expr(0)));
                     }
                     if let Some(ang) = v(1) {
-                        let deg = ang.to_degrees().rem_euclid(180.0);
-                        if deg.abs() < 1e-6 || (deg - 180.0).abs() < 1e-6 {
-                            let _ = data.sketch.add_constraint(ConstraintKind::Horizontal { a: l, b: None });
-                        } else if (deg - 90.0).abs() < 1e-6 {
-                            let _ = data.sketch.add_constraint(ConstraintKind::Vertical { a: l, b: None });
-                        }
+                        dims.extend(line_angle_dimension(data, l, prev_line, ang, off, expr(1)));
                     }
                 }
             }
@@ -1506,7 +1642,18 @@ impl SketchEditor {
 
     /// Apply the pattern/transform tool to the selection.
     pub fn apply_pattern(&mut self, data: &mut SketchData) -> EditOutcome {
-        let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| data.sketch.entity(*e).is_some()).collect();
+        let mut ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| data.sketch.entity(*e).is_some()).collect();
+        // Text can be transformed but not patterned inside a sketch (Onshape).
+        if self.tool != Tool::Transform {
+            let n = ids.len();
+            ids.retain(|e| data.text_of_entity(*e).is_none());
+            if ids.len() != n {
+                self.message = Some("Text can't be patterned in a sketch; use a feature pattern".into());
+                if ids.is_empty() {
+                    return EditOutcome::redraw();
+                }
+            }
+        }
         if ids.is_empty() {
             self.message = Some("Select entities first".into());
             return EditOutcome::redraw();
@@ -1547,6 +1694,141 @@ impl SketchEditor {
                 self.message = Some(format!("{e}"));
                 EditOutcome::redraw()
             }
+        }
+    }
+
+    /// On-canvas manipulators of the active pattern / transform tool.
+    pub fn pattern_handles(&self, sk: &Sketch) -> Vec<(PatternHandle, DVec2)> {
+        let mut out = Vec::new();
+        let px = self.world_per_px;
+        match self.tool {
+            Tool::LinearPattern => {
+                let Some(c) = self.selection_center(sk) else { return out };
+                let dir = DVec2::from_angle(self.pattern_angle);
+                let step = dir * self.pattern_distance;
+                out.push((PatternHandle::LinearStep, c + step));
+                let n = self.pattern_count.max(2);
+                out.push((PatternHandle::LinearCount, c + step * (n - 1) as f64 + dir * px * 22.0));
+            }
+            Tool::CircularPattern => {
+                out.push((PatternHandle::Center, self.pattern_center));
+                if let Some((r, a0)) = self.circular_arm(sk) {
+                    let (step, _) = self.circular_step();
+                    out.push((PatternHandle::CircularAngle, self.pattern_center + DVec2::from_angle(a0 + self.circular_angle) * (r + px * 18.0)));
+                    out.push((PatternHandle::CircularCount, self.pattern_center + DVec2::from_angle(a0 + step) * (r - px * 18.0).max(r * 0.5)));
+                }
+            }
+            Tool::Transform => {
+                let c = self.pattern_center;
+                let m = c + self.xf_offset;
+                out.push((PatternHandle::Center, c));
+                out.push((PatternHandle::Move, m + DVec2::new(px * 14.0, px * 14.0)));
+                out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * 70.0));
+                out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * 45.0 * self.xf_scale));
+            }
+            _ => {}
+        }
+        out
+    }
+
+    /// Radius and start angle of the circular pattern arm (selection center around the pattern center).
+    fn circular_arm(&self, sk: &Sketch) -> Option<(f64, f64)> {
+        let c = self.selection_center(sk)?;
+        let d = c - self.pattern_center;
+        let r = d.length();
+        (r > self.world_per_px * 4.0).then(|| (r, d.to_angle()))
+    }
+
+    /// Angle between circular instances and whether the pattern is a full circle.
+    fn circular_step(&self) -> (f64, bool) {
+        let n = self.circular_count.max(2);
+        let full = (self.circular_angle.abs() - TAU).abs() < 1e-9;
+        (if full { self.circular_angle / n as f64 } else { self.circular_angle / (n - 1) as f64 }, full)
+    }
+
+    fn handle_at(&self, sk: &Sketch, p: DVec2) -> Option<PatternHandle> {
+        let r = self.world_per_px * 9.0;
+        self.pattern_handles(sk).into_iter().map(|(h, q)| (h, (q - p).length())).filter(|x| x.1 <= r).min_by(|a, b| a.1.total_cmp(&b.1)).map(|x| x.0)
+    }
+
+    /// Updates the pattern / transform parameters from a dragged manipulator.
+    fn drag_handle(&mut self, sk: &Sketch, h: PatternHandle, p: DVec2) {
+        let px = self.world_per_px;
+        match h {
+            PatternHandle::LinearStep => {
+                if let Some(c) = self.selection_center(sk) {
+                    let d = p - c;
+                    if d.length() > px * 3.0 {
+                        self.pattern_angle = d.to_angle();
+                        self.pattern_distance = d.length();
+                    }
+                }
+            }
+            PatternHandle::LinearCount => {
+                if let Some(c) = self.selection_center(sk) {
+                    let along = (p - c).dot(DVec2::from_angle(self.pattern_angle)) - px * 22.0;
+                    self.pattern_count = ((along / self.pattern_distance.max(1e-12)).round().max(1.0) as usize + 1).clamp(2, 100);
+                }
+            }
+            PatternHandle::Center => self.pattern_center = self.inference_free_snap(sk, p),
+            PatternHandle::CircularAngle => {
+                if let Some((_, a0)) = self.circular_arm(sk) {
+                    let mut a = noshape_sketch::geom::ccw_sweep(a0, (p - self.pattern_center).to_angle());
+                    if a < 3f64.to_radians() || a > TAU - 3f64.to_radians() {
+                        a = TAU;
+                    }
+                    self.circular_angle = a;
+                }
+            }
+            PatternHandle::CircularCount => {
+                if let Some((_, a0)) = self.circular_arm(sk) {
+                    let a = noshape_sketch::geom::ccw_sweep(a0, (p - self.pattern_center).to_angle()).max(1f64.to_radians());
+                    let (_, full) = self.circular_step();
+                    let n = (self.circular_angle / a).round().max(1.0) as usize;
+                    self.circular_count = if full { n } else { n + 1 }.clamp(2, 100);
+                }
+            }
+            PatternHandle::Move => self.xf_offset = p - DVec2::new(px * 14.0, px * 14.0) - self.pattern_center,
+            PatternHandle::Rotate => {
+                let d = p - (self.pattern_center + self.xf_offset);
+                if d.length() > px * 3.0 {
+                    let mut a = d.to_angle();
+                    // Snap to whole 15 degree steps near them.
+                    let step = 15f64.to_radians();
+                    if (a / step - (a / step).round()).abs() * step < 2f64.to_radians() {
+                        a = (a / step).round() * step;
+                    }
+                    self.xf_angle = a;
+                }
+            }
+            PatternHandle::Scale => {
+                let d = (p - (self.pattern_center + self.xf_offset)).length();
+                self.xf_scale = (d / (px * 45.0)).clamp(0.01, 100.0);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ text
+
+    /// Lower-left corner and height of a text box dragged between two corners.
+    fn text_box_from(&self, a: DVec2, b: DVec2) -> (DVec2, f64) {
+        let lo = a.min(b);
+        let h = (b.y - a.y).abs();
+        if h < self.world_per_px * 4.0 { (a, self.text_height) } else { (lo, h) }
+    }
+
+    /// The text whose box is (partly) selected.
+    pub fn selected_text(&self, data: &SketchData) -> Option<u32> {
+        data.texts.iter().find(|t| t.box_lines.iter().any(|l| self.selection.contains(&EntityId(*l)))).map(|t| t.id)
+    }
+
+    fn toggle_text_selection(&mut self, data: &SketchData, e: EntityId) {
+        let Some(t) = data.text_of_entity(e).and_then(|id| data.texts.iter().find(|t| t.id == id)) else { return };
+        let lines: Vec<EntityId> = t.box_lines.iter().map(|l| EntityId(*l)).collect();
+        if lines.iter().any(|l| self.selection.contains(l)) {
+            self.selection.retain(|x| !lines.contains(x));
+        } else {
+            self.selection.extend(lines);
         }
     }
 
@@ -1654,11 +1936,18 @@ impl SketchEditor {
     pub fn constraint_glyphs(&self, data: &SketchData) -> Vec<GlyphInfo> {
         let sk = &data.sketch;
         let mut out = Vec::new();
+        // Internal shape constraints of text boxes (perpendicular / parallel
+        // edges) are not shown; the horizontal one is (delete it to rotate).
+        let text_lines: std::collections::HashSet<u32> = data.texts.iter().flat_map(|t| t.box_lines.iter().copied()).collect();
         for c in sk.constraints() {
             let Some(icon) = constraint_icon(&c.kind) else { continue };
+            if matches!(c.kind, ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. }) && c.kind.entities().iter().all(|e| text_lines.contains(&e.0)) {
+                continue;
+            }
             for e in glyph_entities(sk, &c.kind) {
                 let Some(anchor) = glyph_anchor(sk, e) else { continue };
-                out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e) });
+                let offset = data.glyph_offsets.get(&glyph_key(c.id, e)).map(|o| DVec2::new(o[0], o[1]));
+                out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e), offset });
             }
         }
         out
@@ -1687,6 +1976,40 @@ impl SketchEditor {
             data.sketch.solve();
         }
         changed
+    }
+
+    /// Deletes one constraint or dimension (context menu).
+    pub fn delete_constraint(&mut self, data: &mut SketchData, cid: ConstraintId) -> bool {
+        self.selected_constraints.retain(|c| *c != cid);
+        if self.hover_constraint == Some(cid) {
+            self.hover_constraint = None;
+        }
+        if data.sketch.remove_constraint(cid).is_err() {
+            return false;
+        }
+        prune_exprs(data);
+        data.sketch.solve();
+        true
+    }
+
+    /// Toggles a dimension between driving and driven. A dimension that
+    /// would over-constrain the sketch stays driven.
+    pub fn toggle_driving(&mut self, data: &mut SketchData, cid: ConstraintId) -> Result<(), String> {
+        let Some(c) = data.sketch.constraint(cid) else { return Err("Dimension no longer exists".into()) };
+        if c.driving {
+            data.sketch.set_driving(cid, false).map_err(|e| e.to_string())?;
+            data.dimension_exprs.remove(&cid.0);
+            data.sketch.solve();
+            return Ok(());
+        }
+        data.sketch.set_driving(cid, true).map_err(|e| e.to_string())?;
+        let report = data.sketch.solve();
+        if report.conflicting().contains(&cid) || report.redundant.contains(&cid) || !report.is_solved() {
+            let _ = data.sketch.set_driving(cid, false);
+            data.sketch.solve();
+            return Err("Making this dimension driving would over-constrain the sketch".into());
+        }
+        Ok(())
     }
 
     pub fn toggle_construction(&mut self, data: &mut SketchData) -> bool {
@@ -1918,9 +2241,18 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Text => {
-                    let h = self.text_height;
-                    let wdt = h * 0.6 * self.text_string.chars().count().max(1) as f64;
-                    poly(&[c, c + DVec2::X * wdt, c + DVec2::new(wdt, h), c + DVec2::Y * h, c], preview_color, true);
+                    let (origin, h) = match anchors.first() {
+                        Some(a) => self.text_box_from(*a, c),
+                        None => (c, self.text_height),
+                    };
+                    let text = if self.text_string.trim().is_empty() { "Text" } else { self.text_string.as_str() };
+                    let layout = noshape_sketch::text::layout_text(text, &self.text_font, self.text_bold, self.text_italic);
+                    let wdt = layout.width.max(0.3) * h;
+                    poly(&[origin, origin + DVec2::X * wdt, origin + DVec2::new(wdt, h), origin + DVec2::Y * h, origin], preview_color, true);
+                    for pl in layout.polylines(6) {
+                        let pts: Vec<DVec2> = pl.iter().map(|q| origin + *q * h).collect();
+                        poly(&pts, preview_color, false);
+                    }
                 }
                 _ => {}
             }
@@ -1946,11 +2278,64 @@ impl SketchEditor {
                     poly(&pts, preview_color, false);
                 }
             }
-            if matches!(self.tool, Tool::CircularPattern | Tool::Transform) {
-                let c = self.pattern_center;
-                let r = self.world_per_px * 6.0;
-                poly(&[c - DVec2::X * r, c + DVec2::X * r], guide_color, false);
-                poly(&[c - DVec2::Y * r, c + DVec2::Y * r], guide_color, false);
+        }
+        // Pattern / transform manipulators.
+        if self.tool.is_pattern() {
+            let px = self.world_per_px;
+            let handle_color = [0x4c, 0xc9, 0xf0, 255];
+            let active = match &self.drag {
+                Some(DragState::Handle(h)) => Some(*h),
+                _ => None,
+            };
+            let sel_c = self.selection_center(&data.sketch);
+            for (h, q) in self.pattern_handles(&data.sketch) {
+                match h {
+                    PatternHandle::LinearStep => {
+                        if let Some(c) = sel_c {
+                            let dir = DVec2::from_angle(self.pattern_angle);
+                            let end = c + dir * self.pattern_distance * (self.pattern_count.max(2) - 1) as f64;
+                            poly(&[c, end], guide_color, true);
+                            let n = dir.perp();
+                            poly(&[q - dir * px * 9.0 + n * px * 5.0, q, q - dir * px * 9.0 - n * px * 5.0], guide_color, false);
+                        }
+                    }
+                    PatternHandle::Center => {
+                        let r = px * 7.0;
+                        poly(&[q - DVec2::X * r, q + DVec2::X * r], guide_color, false);
+                        poly(&[q - DVec2::Y * r, q + DVec2::Y * r], guide_color, false);
+                    }
+                    PatternHandle::CircularAngle => {
+                        if let Some((r, a0)) = self.circular_arm(&data.sketch) {
+                            let rr = r + px * 18.0;
+                            let n = ((self.circular_angle.abs() / TAU * 96.0).ceil() as usize).clamp(4, 96);
+                            let pts: Vec<DVec2> = (0..=n).map(|i| self.pattern_center + DVec2::from_angle(a0 + self.circular_angle * i as f64 / n as f64) * rr).collect();
+                            poly(&pts, guide_color, true);
+                            poly(&[self.pattern_center, self.pattern_center + DVec2::from_angle(a0) * rr], guide_color, true);
+                        }
+                    }
+                    PatternHandle::Rotate => {
+                        let m = self.pattern_center + self.xf_offset;
+                        poly(&[m, q], guide_color, true);
+                        poly(&circle_pts(m, px * 70.0, 96), [0xff, 0xc2, 0x0e, 110], true);
+                    }
+                    PatternHandle::Scale => {
+                        let m = self.pattern_center + self.xf_offset;
+                        poly(&[m, q], guide_color, true);
+                        let d = (q - m).try_normalize().unwrap_or(DVec2::X);
+                        let n = d.perp();
+                        let s = px * 6.0;
+                        poly(&[q + d * s, q - d * s * 0.6 + n * s, q - d * s * 0.6 - n * s, q + d * s], handle_color, false);
+                    }
+                    PatternHandle::Move => {
+                        let m = self.pattern_center + self.xf_offset;
+                        let s = px * 5.0;
+                        poly(&[m, q], guide_color, true);
+                        poly(&[q + DVec2::new(-s, -s), q + DVec2::new(s, -s), q + DVec2::new(s, s), q + DVec2::new(-s, s), q + DVec2::new(-s, -s)], handle_color, false);
+                    }
+                    _ => {}
+                }
+                let size = if active == Some(h) { 13.0 } else { 10.0 };
+                points.points.push(PointSprite { position: w(q), color: if active == Some(h) { guide_color } else { handle_color }, pick_id: 0, size, style: on_top, _pad: 0 });
             }
         }
         // Related entities (constraint/dimension tool picks, mirror axis, entities
@@ -2035,6 +2420,57 @@ impl SketchEditor {
     }
 }
 
+/// Constraint or angle dimension for a typed line angle. The first line of a
+/// chain is measured from horizontal (a construction reference line equal to
+/// the line is added at its start); later lines are measured from the
+/// previous line at the joint. Right and straight angles become
+/// horizontal/vertical or perpendicular/parallel constraints instead.
+fn line_angle_dimension(data: &mut SketchData, line: EntityId, prev: Option<EntityId>, ang: f64, off: f64, expr: Option<String>) -> Option<(ConstraintKind, Option<DVec2>, Option<String>)> {
+    let (s, e) = data.sketch.endpoints(line)?;
+    let (ps, pe) = (data.sketch.point(s)?, data.sketch.point(e)?);
+    let dir = (pe - ps).try_normalize()?;
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-6;
+    if let Some(prev) = prev.filter(|p| data.sketch.entity(*p).is_some()) {
+        let deg = ang.to_degrees().rem_euclid(360.0);
+        let deg = if deg > 180.0 { 360.0 - deg } else { deg };
+        if near(deg, 90.0) {
+            let _ = data.sketch.add_constraint(ConstraintKind::Perpendicular { a: prev, b: line });
+            return None;
+        }
+        if near(deg, 0.0) || near(deg, 180.0) {
+            let _ = data.sketch.add_constraint(ConstraintKind::Parallel { a: prev, b: line });
+            return None;
+        }
+        let (a0, a1) = data.sketch.endpoints(prev)?;
+        let far = if a1 == s { a0 } else { a1 };
+        let back = (data.sketch.point(far)? - ps).try_normalize()?;
+        let bis = (back + dir).try_normalize().unwrap_or(dir.perp());
+        return Some((ConstraintKind::Angle { a: prev, b: line, value: deg.to_radians() }, Some(ps + bis * off * 1.6), expr));
+    }
+    let deg = ang.to_degrees().rem_euclid(180.0);
+    if near(deg, 0.0) || near(deg, 180.0) {
+        let _ = data.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None });
+        return None;
+    }
+    if near(deg, 90.0) {
+        let _ = data.sketch.add_constraint(ConstraintKind::Vertical { a: line, b: None });
+        return None;
+    }
+    // Horizontal construction reference on the side the line leans to.
+    let ref_dir = if dir.x >= 0.0 { DVec2::X } else { -DVec2::X };
+    let len = (pe - ps).length();
+    let q = data.sketch.add_point(ps + ref_dir * len);
+    let r = data.sketch.add_line_between(s, q).ok()?;
+    let _ = data.sketch.set_construction(r, true);
+    let _ = data.sketch.add_constraint(ConstraintKind::Horizontal { a: r, b: None });
+    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: r, b: line });
+    let theta = ref_dir.dot(dir).clamp(-1.0, 1.0).acos();
+    let bis = (ref_dir + dir).try_normalize().unwrap_or(dir.perp());
+    // The typed text only matches the dimension when it is the acute angle itself.
+    let expr = expr.filter(|_| (theta - ang).abs() < 1e-9);
+    Some((ConstraintKind::Angle { a: r, b: line, value: theta }, Some(ps + bis * off * 1.6), expr))
+}
+
 /// Add a dimension: driving if possible, driven when it would over-constrain.
 pub fn add_dimension(data: &mut SketchData, kind: ConstraintKind, label: Option<DVec2>, expr: Option<&str>) -> Option<ConstraintId> {
     // Added as a reference first so it takes the measured value, then made
@@ -2093,11 +2529,18 @@ fn dist_point_line(p: DVec2, a: DVec2, b: DVec2) -> f64 {
     (d.perp_dot(p - a) / l).abs()
 }
 
-/// Remove dimension expressions/labels whose constraints are gone.
+/// Remove texts whose box was deleted, and dimension expressions, labels
+/// and glyph offsets whose constraints are gone.
 fn prune_exprs(data: &mut SketchData) {
+    data.prune_texts();
     let live: std::collections::HashSet<u32> = data.sketch.constraints().map(|c| c.id.0).collect();
     data.dimension_exprs.retain(|k, _| live.contains(k));
     data.dimension_labels.retain(|k, _| live.contains(k));
+    data.glyph_offsets.retain(|k, _| k.split(':').next().and_then(|c| c.parse::<u32>().ok()).is_some_and(|c| live.contains(&c)));
+    data.intersections.retain_mut(|l| {
+        l.entities.retain(|e| data.sketch.entity(EntityId(*e)).is_some());
+        !l.entities.is_empty()
+    });
 }
 
 fn curve_mid(sk: &Sketch, id: EntityId) -> Option<DVec2> {
@@ -2556,6 +2999,34 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
 }
 
 impl SketchEditor {
+    /// Add intersection curves of a model face with the sketch plane; they
+    /// are re-computed on every regeneration.
+    pub fn add_intersection(&mut self, data: &mut SketchData, face: noshape_model::reference::Reference, curves: &[noshape_model::regen::features::sketch::SectionCurve]) -> bool {
+        let ids = noshape_model::regen::features::sketch::add_section_curves(&mut data.sketch, curves);
+        if ids.is_empty() {
+            self.message = Some("That face does not cross the sketch plane".into());
+            return false;
+        }
+        data.intersections.push(noshape_model::sketch_feature::IntersectionLink { face, entities: ids.iter().map(|e| e.0).collect() });
+        data.sketch.solve();
+        true
+    }
+
+    /// Edits the selected text box (content / font / style); the glyphs are
+    /// regenerated from it.
+    pub fn edit_text(&mut self, data: &mut SketchData, id: u32, f: impl FnOnce(&mut noshape_model::sketch_feature::SketchText)) -> bool {
+        match data.update_text(id, f) {
+            Ok(()) => {
+                data.sketch.solve();
+                true
+            }
+            Err(e) => {
+                self.message = Some(e);
+                false
+            }
+        }
+    }
+
     /// Add a projected (used) curve linked to a 3D reference.
     pub fn add_used(&mut self, data: &mut SketchData, curve: &Curve2, reference: Option<noshape_model::reference::Reference>) -> bool {
         match data.sketch.use_external(curve) {
@@ -2571,136 +3042,5 @@ impl SketchEditor {
                 false
             }
         }
-    }
-}
-
-/// Sketch text: glyph outlines of a bundled open font converted to sketch curves.
-mod text {
-    use super::*;
-
-    static FONT: &[u8] = include_bytes!("../assets/fonts/LiberationSans-Regular.ttf");
-
-    struct Outline {
-        scale: f64,
-        origin: DVec2,
-        contours: Vec<Vec<Seg>>,
-        cur: Vec<Seg>,
-        last: DVec2,
-        start: DVec2,
-    }
-
-    enum Seg {
-        Line(DVec2, DVec2),
-        Bezier(Vec<DVec2>),
-    }
-
-    impl Outline {
-        fn p(&self, x: f32, y: f32) -> DVec2 {
-            self.origin + DVec2::new(x as f64, y as f64) * self.scale
-        }
-        fn flush(&mut self) {
-            if (self.last - self.start).length() > 1e-12 {
-                self.cur.push(Seg::Line(self.last, self.start));
-            }
-            if !self.cur.is_empty() {
-                self.contours.push(std::mem::take(&mut self.cur));
-            }
-        }
-    }
-
-    impl ttf_parser::OutlineBuilder for Outline {
-        fn move_to(&mut self, x: f32, y: f32) {
-            self.flush();
-            self.start = self.p(x, y);
-            self.last = self.start;
-        }
-        fn line_to(&mut self, x: f32, y: f32) {
-            let q = self.p(x, y);
-            if (q - self.last).length() > 1e-12 {
-                self.cur.push(Seg::Line(self.last, q));
-            }
-            self.last = q;
-        }
-        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-            let (c, q) = (self.p(x1, y1), self.p(x, y));
-            self.cur.push(Seg::Bezier(vec![self.last, c, q]));
-            self.last = q;
-        }
-        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-            let (c1, c2, q) = (self.p(x1, y1), self.p(x2, y2), self.p(x, y));
-            self.cur.push(Seg::Bezier(vec![self.last, c1, c2, q]));
-            self.last = q;
-        }
-        fn close(&mut self) {
-            self.flush();
-        }
-    }
-
-    /// Adds `text` with its first baseline starting at `origin`; `height` is
-    /// the cap height. Returns the created curves.
-    pub fn add_text(sk: &mut Sketch, text: &str, origin: DVec2, height: f64) -> Vec<EntityId> {
-        let Ok(face) = ttf_parser::Face::parse(FONT, 0) else { return Vec::new() };
-        let cap = face.capital_height().filter(|h| *h > 0).unwrap_or(face.ascender()) as f64;
-        let scale = height / cap.max(1.0);
-        let line_h = (face.ascender() as f64 - face.descender() as f64 + face.line_gap() as f64) * scale;
-        let mut created = Vec::new();
-        let mut pen = origin;
-        for (li, line) in text.lines().enumerate() {
-            pen = origin - DVec2::Y * line_h * li as f64;
-            for ch in line.chars() {
-                let Some(gid) = face.glyph_index(ch) else { continue };
-                let mut ol = Outline { scale, origin: pen, contours: Vec::new(), cur: Vec::new(), last: pen, start: pen };
-                face.outline_glyph(gid, &mut ol);
-                ol.flush();
-                for contour in &ol.contours {
-                    created.extend(add_contour(sk, contour));
-                }
-                pen.x += face.glyph_hor_advance(gid).unwrap_or(0) as f64 * scale;
-            }
-        }
-        let _ = pen;
-        created
-    }
-
-    /// Adds one closed contour with shared endpoints.
-    fn add_contour(sk: &mut Sketch, segs: &[Seg]) -> Vec<EntityId> {
-        let mut out = Vec::new();
-        let Some(first) = segs.first() else { return out };
-        let p0 = match first {
-            Seg::Line(a, _) => *a,
-            Seg::Bezier(c) => c[0],
-        };
-        let start_id = sk.add_point(p0);
-        let mut prev = start_id;
-        for (i, s) in segs.iter().enumerate() {
-            let last = i + 1 == segs.len();
-            match s {
-                Seg::Line(_, b) => {
-                    let end = if last { start_id } else { sk.add_point(*b) };
-                    if end == prev {
-                        continue;
-                    }
-                    if let Ok(l) = sk.add_line_between(prev, end) {
-                        out.push(l);
-                    }
-                    prev = end;
-                }
-                Seg::Bezier(ctrl) => {
-                    let Ok(id) = sk.add_bspline(ctrl, ctrl.len() - 1) else { continue };
-                    let refs = sk.entity(id).map(|e| e.point_refs()).unwrap_or_default();
-                    if let (Some(&f), Some(&l)) = (refs.first(), refs.last()) {
-                        let _ = sk.merge_points(f, prev);
-                        if last && l != start_id {
-                            let _ = sk.merge_points(l, start_id);
-                            prev = start_id;
-                        } else {
-                            prev = l;
-                        }
-                    }
-                    out.push(id);
-                }
-            }
-        }
-        out
     }
 }

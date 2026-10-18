@@ -17,7 +17,7 @@ use crate::reference::{FeatureId, TopoName};
 use glam::{DMat4, DVec3};
 
 pub mod flat;
-pub use flat::{FlatBendLine, FlatPattern, flat_pattern, flat_pattern_for};
+pub use flat::{FlatBendLine, FlatForm, FlatPattern, flat_pattern, flat_pattern_for};
 
 /// Bend relief shape (model default or Bend relief override).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,6 +99,9 @@ pub struct Bend {
     pub ref_inner: bool,
     pub inner_faces: Vec<Name>,
     pub outer_faces: Vec<Name>,
+    /// Unfolded in the model (Unfold feature): the bend region is a flat
+    /// strip and the walls past it already lie in the flat position.
+    pub flat: bool,
 }
 
 impl Bend {
@@ -117,6 +120,14 @@ impl Bend {
     /// folded coordinates, extended past the parent's tangent line by the
     /// developed length).
     pub fn unfold_matrix(&self, thickness: f64) -> DMat4 {
+        if self.flat {
+            return DMat4::IDENTITY;
+        }
+        self.fold_inverse(thickness)
+    }
+
+    /// Unfolding transform of the bend's geometry (ignores [`Bend::flat`]).
+    pub fn fold_inverse(&self, thickness: f64) -> DMat4 {
         let rot = DMat4::from_translation(self.origin) * DMat4::from_axis_angle(self.axis, -self.angle) * DMat4::from_translation(-self.origin);
         DMat4::from_translation(-self.dir_a * self.allowance(thickness)) * rot
     }
@@ -151,6 +162,66 @@ pub struct Rip {
     pub gap: f64,
 }
 
+/// What a [`FlatMark`] stands for in the flat pattern.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlatMarkKind {
+    /// A form tool footprint: the flat shows the region filled, with the
+    /// outline and a center mark drawn on top (Onshape's form sketch).
+    Form,
+    /// A cutout (corner relief) removed from the flat.
+    Cut,
+}
+
+/// Geometry attached to a wall for the flat pattern only (form outlines,
+/// relief cutouts). Loops lie in the plane of the wall's reference face, in
+/// folded coordinates (they follow the wall when later bends move it).
+#[derive(Clone, Debug)]
+pub struct FlatMark {
+    pub feature: FeatureId,
+    pub wall: usize,
+    pub kind: FlatMarkKind,
+    pub loops: Vec<Vec<DVec3>>,
+    /// Center mark position (forms).
+    pub origin: Option<DVec3>,
+    /// Exact planar region filled in the flat (form footprint), if any.
+    pub fill: Option<noshape_kernel::Shape>,
+}
+
+impl FlatMark {
+    /// Center of the mark (the origin, else the first loop's average).
+    pub fn center(&self) -> Option<DVec3> {
+        self.origin.or_else(|| {
+            let l = self.loops.first()?;
+            (!l.is_empty()).then(|| l.iter().copied().sum::<DVec3>() / l.len() as f64)
+        })
+    }
+
+    pub fn transform(&mut self, m: &DMat4) {
+        for l in &mut self.loops {
+            for p in l.iter_mut() {
+                *p = m.transform_point3(*p);
+            }
+        }
+        self.origin = self.origin.map(|p| m.transform_point3(p));
+        self.fill = self.fill.as_ref().and_then(|f| f.transformed(&noshape_kernel::Transform::Matrix(*m)).ok());
+    }
+}
+
+/// A form tool tagged in a Part Studio (Tag feature, purpose Form): the
+/// part added to and the part removed from a sheet metal wall, placed by
+/// aligning `origin` (z = outward normal of the sheet face, the sheet lies
+/// below z = 0) with each form location.
+#[derive(Clone, Debug)]
+pub struct FormTool {
+    pub feature: FeatureId,
+    pub add: Option<crate::reference::BodyId>,
+    pub remove: Option<crate::reference::BodyId>,
+    /// Sketch drawn in the flat pattern (construction geometry), if any.
+    pub sketch: Option<FeatureId>,
+    /// Form origin: (origin, x axis, z axis).
+    pub origin: Option<(DVec3, DVec3, DVec3)>,
+}
+
 /// Per-body sheet metal model.
 #[derive(Clone, Debug)]
 pub struct SheetMetalData {
@@ -175,6 +246,8 @@ pub struct SheetMetalData {
     pub walls: Vec<Wall>,
     pub bends: Vec<Bend>,
     pub rips: Vec<Rip>,
+    /// Form outlines and relief cutouts shown in the flat pattern.
+    pub marks: Vec<FlatMark>,
 }
 
 impl SheetMetalData {
@@ -196,6 +269,7 @@ impl SheetMetalData {
             walls: Vec::new(),
             bends: Vec::new(),
             rips: Vec::new(),
+            marks: Vec::new(),
         }
     }
 

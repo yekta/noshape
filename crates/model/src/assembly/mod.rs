@@ -29,6 +29,47 @@ pub enum InstanceSource {
     PartStudio { studio: TabId, config: ConfigValues },
     /// A sub-assembly tab.
     Assembly { assembly: TabId },
+    /// Mirrored (opposite-handed) version of one part: the part's geometry
+    /// reflected across the plane through `point` with normal `normal`
+    /// (Part Studio coordinates). Created by mirrors of handed parts.
+    MirroredPart { studio: TabId, body: BodyId, config: ConfigValues, point: [f64; 3], normal: [f64; 3] },
+    /// A Part Studio of another document pinned to a version: `key` is the
+    /// app's external reference (`ext:<microversion>|<tab>|<path>`), resolved
+    /// through [`eval::ExternalStudios`]. `body`: one part (`None`: the whole
+    /// Part Studio as one rigid instance).
+    External {
+        key: String,
+        #[serde(default)]
+        body: Option<BodyId>,
+        #[serde(default)]
+        config: ConfigValues,
+    },
+}
+
+impl InstanceSource {
+    /// The opposite-handed version of a part source (mirrored parts turn
+    /// back into the plain part). `None` for Part Studios and assemblies.
+    pub fn mirrored(&self) -> Option<InstanceSource> {
+        match self {
+            InstanceSource::Part { studio, body, config } => Some(InstanceSource::MirroredPart { studio: *studio, body: body.clone(), config: config.clone(), point: [0.0; 3], normal: [1.0, 0.0, 0.0] }),
+            InstanceSource::MirroredPart { studio, body, config, .. } => Some(InstanceSource::Part { studio: *studio, body: body.clone(), config: config.clone() }),
+            _ => None,
+        }
+    }
+    /// Part Studio the source comes from (parts and rigid Part Studios).
+    pub fn studio(&self) -> Option<TabId> {
+        match self {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } => Some(*studio),
+            InstanceSource::Assembly { .. } | InstanceSource::External { .. } => None,
+        }
+    }
+    /// External reference key (instances inserted from another document).
+    pub fn external_key(&self) -> Option<&str> {
+        match self {
+            InstanceSource::External { key, .. } => Some(key),
+            _ => None,
+        }
+    }
 }
 
 /// Rigid transform stored as translation (m) + rotation quaternion (x, y, z, w).
@@ -238,6 +279,14 @@ pub struct Mate {
     /// `a` = tab 1 and `b` = width 1. Unused by the other mate types.
     #[serde(default)]
     pub extra: Vec<MateConnectorRef>,
+    /// Tangent mates: the contact may move onto faces tangent-connected to
+    /// the selected ones (Onshape "Tangent propagation", on by default).
+    #[serde(default = "default_true")]
+    pub tangent_propagation: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Mate {
@@ -257,6 +306,7 @@ impl Mate {
             limits: vec![],
             suppressed: false,
             extra: vec![],
+            tangent_propagation: true,
         }
     }
     /// All connectors of the mate.
@@ -317,6 +367,11 @@ pub struct Group {
 pub struct NamedPosition {
     pub name: String,
     pub placements: Vec<(InstanceId, Placement)>,
+    /// Values of the driving mates (revolute / slider / cylindrical... free
+    /// values: rotation about Z, translations X/Y/Z) when the position was
+    /// saved; restoring the position re-imposes them.
+    #[serde(default)]
+    pub mate_values: Vec<(MateId, [f64; 4])>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -337,6 +392,18 @@ pub struct ExplodeStep {
     pub pivot: Option<[f64; 3]>,
 }
 
+impl ExplodedView {
+    /// Move step `from` to index `to` (steps in between shift by one).
+    pub fn move_step(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.steps.len() || to >= self.steps.len() || from == to {
+            return false;
+        }
+        let s = self.steps.remove(from);
+        self.steps.insert(to, s);
+        true
+    }
+}
+
 impl ExplodeStep {
     pub fn translate(instances: Vec<InstanceId>, t: [f64; 3]) -> Self {
         Self { instances, translation: t, rotation_axis: None, rotation_angle: 0.0, pivot: None }
@@ -354,9 +421,14 @@ pub enum PatternKind {
     Linear { direction: MateConnectorRef, distance: ExprValue, count: u32, opposite: bool, equal_spacing: bool, second: Option<LinearDirection> },
     /// Copies about the Z axis of a mate connector (cylinder axis, circular edge...).
     Circular { axis: MateConnectorRef, angle: ExprValue, count: u32, opposite: bool, equal_spacing: bool },
-    /// Mirror across the XY plane of a mate connector (rigid transform with
-    /// the part's own symmetry plane, so no geometry is mirrored).
-    Mirror { plane: MateConnectorRef },
+    /// Mirror across the XY plane of a mate connector. By default copies are
+    /// placed with a rigid transform (symmetric parts); with `handed`, part
+    /// copies use a mirrored version of the part ([`InstanceSource::MirroredPart`]).
+    Mirror {
+        plane: MateConnectorRef,
+        #[serde(default)]
+        handed: bool,
+    },
     /// Follow a Part Studio pattern: the seed's mate is re-created on every
     /// patterned copy of its target geometry.
     PartPattern { mate: MateId },
@@ -579,7 +651,7 @@ impl Assembly {
         self.patterns.retain(|p| match &p.kind {
             PatternKind::Linear { direction, second, .. } => !Self::uses_dead_connector(direction, &dead_conn) && direction.instance != id && second.as_ref().is_none_or(|s| s.direction.instance != id),
             PatternKind::Circular { axis, .. } => !Self::uses_dead_connector(axis, &dead_conn) && axis.instance != id,
-            PatternKind::Mirror { plane } => !Self::uses_dead_connector(plane, &dead_conn) && plane.instance != id,
+            PatternKind::Mirror { plane, .. } => !Self::uses_dead_connector(plane, &dead_conn) && plane.instance != id,
             PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => !dead.contains(mate),
         });
         for g in &mut self.groups {
@@ -618,7 +690,7 @@ impl Assembly {
             self.patterns.retain(|p| match &p.kind {
                 PatternKind::Linear { direction, .. } => !Self::uses_dead_connector(direction, &dead),
                 PatternKind::Circular { axis, .. } => !Self::uses_dead_connector(axis, &dead),
-                PatternKind::Mirror { plane } => !Self::uses_dead_connector(plane, &dead),
+                PatternKind::Mirror { plane, .. } => !Self::uses_dead_connector(plane, &dead),
                 _ => true,
             });
             return;
@@ -650,7 +722,20 @@ impl Assembly {
     pub fn sync_pattern(&mut self, id: MateId) -> Vec<InstanceId> {
         let Some(p) = self.pattern(id).cloned() else { return vec![] };
         let wanted: Vec<(InstanceId, u32)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
-        self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect())
+        let created = self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect());
+        // Mirror copies of handed parts use the mirrored part (and back).
+        if let PatternKind::Mirror { handed, .. } = p.kind
+            && let Some(p) = self.pattern(id).cloned()
+        {
+            for g in &p.generated {
+                let Some(seed) = self.instance(g.seed).map(|i| i.source.clone()) else { continue };
+                let want = if handed { seed.mirrored().unwrap_or(seed) } else { seed };
+                if let Some(inst) = self.instance_mut(g.instance) {
+                    inst.source = want;
+                }
+            }
+        }
+        created
     }
 
     /// Set a matched pattern's (part pattern / replicate) targets: one
@@ -736,10 +821,25 @@ impl Assembly {
         ids
     }
 
+    /// Re-point every instance using external reference `from` at `to`
+    /// (update to another version of the other document). Returns the count.
+    pub fn update_external(&mut self, from: &str, to: &str) -> usize {
+        let mut n = 0;
+        for i in &mut self.instances {
+            if let InstanceSource::External { key, .. } = &mut i.source
+                && key == from
+            {
+                *key = to.to_string();
+                n += 1;
+            }
+        }
+        n
+    }
+
     /// Change the configuration of a Part / Part Studio instance.
     pub fn set_instance_config(&mut self, id: InstanceId, cfg: ConfigValues) -> bool {
         match self.instance_mut(id).map(|i| &mut i.source) {
-            Some(InstanceSource::Part { config, .. }) | Some(InstanceSource::PartStudio { config, .. }) => {
+            Some(InstanceSource::Part { config, .. }) | Some(InstanceSource::PartStudio { config, .. }) | Some(InstanceSource::MirroredPart { config, .. }) | Some(InstanceSource::External { config, .. }) => {
                 *config = cfg;
                 true
             }

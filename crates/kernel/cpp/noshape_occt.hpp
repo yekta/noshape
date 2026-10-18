@@ -149,6 +149,7 @@ struct BoolOpts;
 struct SweepOpts;
 struct FillOpts;
 struct ProjPoint;
+struct DevSurf;
 
 // ---- shapes & lists (common.cpp)
 std::unique_ptr<OcShape> shape_null();
@@ -308,5 +309,14 @@ void                     write_iges(const OcShapeList& shapes, rust::Str path);
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,
                    bool exact, double deflection);
+
+// ---- surfacing: wrap, isocline, surface fitting (surfacing.cpp)
+OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src, const DevSurf& dst,
+                    rust::Slice<const double> xf, double tol);
+std::unique_ptr<OcShapeList> isocline_edges(const OcShape& face, P3 dir, double angle, bool extend);
+std::unique_ptr<OcShape> bspline_grid_face(const PlaneF& frame, double x0, double dx, double y0, double dy,
+                                           rust::Slice<const double> z, uint32_t nx, uint32_t ny,
+                                           int32_t deg_max, double tol, rust::Slice<const double> bounds);
+double face_max_deviation(const OcShape& face, rust::Slice<const double> pts);
 
 } // namespace noshape

@@ -228,6 +228,8 @@ pub struct Context {
     pub sheet_metal: BTreeMap<BodyId, Arc<crate::sheetmetal::SheetMetalData>>,
     /// Frame members (frame segments, gussets, end caps) by body, for cut lists.
     pub frame_members: BTreeMap<BodyId, Arc<super::features::frames::FrameMember>>,
+    /// Form tools tagged by Tag features (purpose Form), for sheet metal Form.
+    pub form_tools: Vec<crate::sheetmetal::FormTool>,
     // --- end batch SM ---
 }
 

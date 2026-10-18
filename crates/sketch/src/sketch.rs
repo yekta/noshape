@@ -216,6 +216,25 @@ impl Sketch {
         Ok(id)
     }
 
+    /// Inserts an entity with a caller-chosen id at or above the allocator
+    /// range (`id >= next id`). Used for derived geometry with stable ids
+    /// (text glyph outlines added after solving). Such entities must not be
+    /// referenced by constraints; the solver treats them as frozen.
+    pub fn add_entity_with_id(&mut self, id: EntityId, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
+        if id.0 < self.next_entity || self.entities.contains_key(&id) {
+            return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
+        }
+        let probe = Entity { id, geometry, construction, external };
+        for r in probe.point_refs() {
+            if self.kind(r) != Some(EntityKind::Point) {
+                return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
+            }
+        }
+        self.entities.insert(id, probe);
+        self.touch();
+        Ok(id)
+    }
+
     pub fn add_point(&mut self, p: DVec2) -> EntityId {
         self.add_entity(Geometry::Point { pos: p }, false, false).unwrap()
     }
@@ -470,6 +489,38 @@ impl Sketch {
         if !c.kind.set_value(value) {
             return Err(SketchError::InvalidConstraint(format!("{id} is not a dimension")));
         }
+        self.touch();
+        Ok(())
+    }
+
+    /// Changes the ratio of a [`ConstraintKind::LengthRatio`] constraint.
+    pub fn set_length_ratio(&mut self, id: ConstraintId, ratio: f64) -> Result<()> {
+        if !(ratio.is_finite() && ratio > 0.0) {
+            return Err(SketchError::InvalidConstraint("length ratio must be positive".into()));
+        }
+        let c = self.constraints.get_mut(&id).ok_or(SketchError::UnknownConstraint(id))?;
+        match &mut c.kind {
+            ConstraintKind::LengthRatio { ratio: r, .. } => *r = ratio,
+            _ => return Err(SketchError::InvalidConstraint(format!("{id} is not a length ratio"))),
+        }
+        self.touch();
+        Ok(())
+    }
+
+    /// Re-targets a constraint to new entities (same id, so labels and
+    /// expressions keyed by it survive). Hints are recomputed from the
+    /// current geometry; the change is rejected if the new kind is invalid.
+    pub fn retarget_constraint(&mut self, id: ConstraintId, kind: ConstraintKind) -> Result<()> {
+        for e in kind.entities() {
+            if !self.entities.contains_key(&e) {
+                return Err(SketchError::UnknownEntity(e));
+            }
+        }
+        let old = self.constraints.get(&id).ok_or(SketchError::UnknownConstraint(id))?.clone();
+        let (hints, aux) = self.compute_hints(&kind);
+        let c = Constraint { id, kind, driving: old.driving, hints, aux };
+        crate::equations::validate(self, &c).map_err(SketchError::InvalidConstraint)?;
+        self.constraints.insert(id, c);
         self.touch();
         Ok(())
     }

@@ -474,6 +474,29 @@ impl Sketch {
         }
         let (_, center, ta, tb) = best.ok_or_else(|| SketchError::OperationFailed("fillet radius too large".into()))?;
         let mut res = EditResult::default();
+        // Length dimensions of trimmed lines are kept by re-targeting them to
+        // the "virtual sharp" (the old corner point, kept as a construction
+        // point on both lines), so the design intent survives the fillet.
+        let mut retargeted = false;
+        for (id, corner) in [(a, ca), (b, cb)] {
+            if self.kind(id) != Some(EntityKind::Line) {
+                continue;
+            }
+            let Some((s, e)) = self.endpoints(id) else { continue };
+            let far = if s == corner { e } else { s };
+            let lens: Vec<(ConstraintId, f64)> = self
+                .constraints()
+                .filter_map(|c| match c.kind {
+                    ConstraintKind::Length { curve, value } if curve == id => Some((c.id, value)),
+                    _ => None,
+                })
+                .collect();
+            for (cid, value) in lens {
+                if self.retarget_constraint(cid, ConstraintKind::Distance { a: far, b: ca, value, mode: crate::constraints::DistanceMode::Center }).is_ok() {
+                    retargeted = true;
+                }
+            }
+        }
         let pa = self.add_point(ta);
         let pb = self.add_point(tb);
         let pc = self.add_point(center);
@@ -492,7 +515,20 @@ impl Sketch {
         self.add_c(&mut res, ConstraintKind::Tangent { a, b: arc });
         self.add_c(&mut res, ConstraintKind::Tangent { a: b, b: arc });
         self.add_c(&mut res, ConstraintKind::Radius { curve: arc, value: radius });
-        let olds: Vec<EntityId> = if ca == cb { vec![ca] } else { vec![ca, cb] };
+        let mut olds: Vec<EntityId> = if ca == cb { vec![ca] } else { vec![ca, cb] };
+        // Keep the corner as a virtual sharp when dimensions or constraints
+        // still refer to it.
+        let keep_sharp = retargeted || self.constraints().any(|c| c.kind.entities().contains(&ca));
+        if keep_sharp && self.users_of_point(ca).is_empty() {
+            olds.retain(|p| *p != ca);
+            let _ = self.set_construction(ca, true);
+            for id in [a, b] {
+                if matches!(self.kind(id), Some(EntityKind::Line)) {
+                    self.add_c(&mut res, ConstraintKind::Coincident { a: ca, b: id });
+                }
+            }
+            res.modified.push(ca);
+        }
         self.remove_orphans(&olds, &mut res);
         Ok(res)
     }
@@ -822,6 +858,10 @@ impl Sketch {
             /// Arc traversed from `s` to `e` around `center` (`ccw` traversal).
             Arc { center_pt: EntityId, center: DVec2, r: f64, s: DVec2, e: DVec2, ccw: bool },
             Fit { pts: Vec<DVec2> },
+            /// Conic approximation of a conic's offset: start, control, end, rho.
+            Conic { s: DVec2, c: DVec2, e: DVec2, rho: f64 },
+            /// Least-squares cubic B-spline fit of the offset (few control points).
+            Spline { n: Nurbs },
         }
         // lone closed curves
         if items.len() == 1 {
@@ -871,12 +911,24 @@ impl Sketch {
                     let (a0, a1) = if fwd { (*start_angle, *end_angle) } else { (*end_angle, *start_angle) };
                     Off::Arc { center_pt: *cp, center: *center, r, s: *center + DVec2::from_angle(a0) * r, e: *center + DVec2::from_angle(a1) * r, ccw: fwd }
                 }
-                _ => Off::Fit { pts: self.offset_samples(&c, fwd, d) },
+                (_, Geometry::Conic { .. }) => match conic_offset(&c, fwd, d) {
+                    Some((s, cc, e, rho)) => Off::Conic { s, c: cc, e, rho },
+                    None => match fit_offset(&c, fwd, d) {
+                        Some(n) => Off::Spline { n },
+                        None => Off::Fit { pts: self.offset_samples(&c, fwd, d) },
+                    },
+                },
+                _ => match fit_offset(&c, fwd, d) {
+                    Some(n) => Off::Spline { n },
+                    None => Off::Fit { pts: self.offset_samples(&c, fwd, d) },
+                },
             };
             let (s, en) = match &off {
                 Off::Line { a, b } => (*a, *b),
                 Off::Arc { s, e, .. } => (*s, *e),
                 Off::Fit { pts } => (pts[0], *pts.last().unwrap()),
+                Off::Conic { s, e, .. } => (*s, *e),
+                Off::Spline { n } => (n.ctrl[0], *n.ctrl.last().unwrap()),
             };
             offs.push((id, off, s, en));
             // shared original vertex with the next item
@@ -1002,6 +1054,25 @@ impl Sketch {
                     res.created.push(id);
                     id
                 }
+                Off::Spline { n } => {
+                    let mut control = vec![sp];
+                    for q in &n.ctrl[1..n.ctrl.len() - 1] {
+                        let p = self.add_point(*q);
+                        res.created.push(p);
+                        control.push(p);
+                    }
+                    control.push(ep);
+                    let id = self.add_entity(Geometry::BSpline { control, degree: n.degree, knots: n.knots, weights: None }, false, false)?;
+                    res.created.push(id);
+                    id
+                }
+                Off::Conic { c, rho, .. } => {
+                    let cp = self.add_point(c);
+                    res.created.push(cp);
+                    let id = self.add_entity(Geometry::Conic { start: sp, control: cp, end: ep, rho }, false, false)?;
+                    res.created.push(id);
+                    id
+                }
                 Off::Fit { pts } => {
                     let mut ids = vec![sp];
                     for q in &pts[1..pts.len() - 1] {
@@ -1032,24 +1103,70 @@ impl Sketch {
         Ok(())
     }
 
+    /// Points of the offset of `c` for an interpolating spline: as few as
+    /// needed for the spline through them to stay within a small tolerance
+    /// of the true offset (avoids dense splines when offsetting conics,
+    /// ellipses and splines).
     fn offset_samples(&self, c: &Curve2, fwd: bool, d: f64) -> Vec<DVec2> {
         let (a, b) = c.domain();
-        let n = 24;
-        let mut pts: Vec<DVec2> = (0..=n)
-            .map(|i| {
-                let t = a + (b - a) * i as f64 / n as f64;
-                let der = c.ders(t);
-                let dir = if fwd { der[1] } else { -der[1] };
-                der[0] + dir.normalize_or_zero().perp() * d
-            })
-            .collect();
-        if !fwd {
-            pts.reverse();
+        let periodic = c.is_periodic();
+        let offset_at = |t: f64| -> DVec2 {
+            let der = c.ders(t);
+            let dir = if fwd { der[1] } else { -der[1] };
+            der[0] + dir.normalize_or_zero().perp() * d
+        };
+        // Arc-length parametrization of the offset curve (samples spread
+        // evenly along it, not along the source parameter).
+        const DENSE: usize = 256;
+        let ts: Vec<f64> = (0..=DENSE).map(|i| a + (b - a) * i as f64 / DENSE as f64).collect();
+        let mut acc = vec![0.0];
+        let mut prev = offset_at(a);
+        for t in &ts[1..] {
+            let q = offset_at(*t);
+            acc.push(acc.last().unwrap() + (q - prev).length());
+            prev = q;
         }
-        if c.is_periodic() {
-            pts.pop();
+        let total = *acc.last().unwrap();
+        let param_at = |s: f64| -> f64 {
+            if total <= 1e-300 {
+                return a + (b - a) * s;
+            }
+            let target = s * total;
+            let k = acc.partition_point(|x| *x < target).clamp(1, DENSE);
+            let (l0, l1) = (acc[k - 1], acc[k]);
+            let f = if l1 > l0 { (target - l0) / (l1 - l0) } else { 0.0 };
+            ts[k - 1] + (ts[k] - ts[k - 1]) * f
+        };
+        let sample = |n: usize| -> Vec<DVec2> {
+            let mut pts: Vec<DVec2> = (0..=n).map(|i| offset_at(param_at(i as f64 / n as f64))).collect();
+            if !fwd {
+                pts.reverse();
+            }
+            if periodic {
+                pts.pop();
+            }
+            pts
+        };
+        let tol = ((c.size() + d.abs()) * 2e-4).max(1e-9);
+        let mut n = if periodic { 6 } else { 3 };
+        loop {
+            let pts = sample(n);
+            if n >= 64 {
+                return pts;
+            }
+            let mut fit = pts.clone();
+            if periodic {
+                fit.push(fit[0]);
+            }
+            if let Some(nb) = Nurbs::interpolate(&fit) {
+                let cv = Curve2::Nurbs(nb);
+                let ok = (0..2 * n).all(|i| cv.distance(offset_at(param_at((i as f64 + 0.5) / (2 * n) as f64))) <= tol);
+                if ok {
+                    return pts;
+                }
+            }
+            n += (n / 2).max(1);
         }
-        pts
     }
 
     /// Bounding box of a set of entities.
@@ -1064,4 +1181,69 @@ impl Sketch {
             _ => None,
         }
     }
+}
+
+/// Offset of a conic approximated by a conic: the ends move along their
+/// normals, the control point is where the offset end tangents meet and rho
+/// puts the shoulder on the true offset. Exact for circular conics; `None`
+/// when the approximation deviates from the true offset (the caller then
+/// fits a spline). Returns (start, control, end, rho) in traversal order.
+fn conic_offset(c: &Curve2, fwd: bool, d: f64) -> Option<(DVec2, DVec2, DVec2, f64)> {
+    let (a, b) = c.domain();
+    let off = |t: f64| -> (DVec2, DVec2) {
+        let der = c.ders(t);
+        let tan = der[1].normalize_or_zero();
+        let dir = if fwd { tan } else { -tan };
+        (der[0] + dir.perp() * d, tan)
+    };
+    let ((s, ts), (e, te)) = (off(a), off(b));
+    let den = ts.perp_dot(te);
+    if den.abs() < 1e-9 {
+        return None;
+    }
+    let k = (e - s).perp_dot(te) / den;
+    let ctrl = s + ts * k;
+    let m = (s + e) * 0.5;
+    let (shoulder, _) = off((a + b) * 0.5);
+    let mc = ctrl - m;
+    let rho = (shoulder - m).dot(mc) / mc.length_squared().max(1e-300);
+    if !(0.01..=0.99).contains(&rho) {
+        return None;
+    }
+    let approx = Curve2::Nurbs(Nurbs::conic(s, ctrl, e, rho));
+    let tol = ((c.size() + d.abs()) * 2e-4).max(1e-9);
+    let ok = (1..32).all(|i| approx.distance(off(a + (b - a) * i as f64 / 32.0).0) <= tol);
+    if !ok {
+        return None;
+    }
+    Some(if fwd { (s, ctrl, e, rho) } else { (e, ctrl, s, rho) })
+}
+
+/// Offset of an open curve as a least-squares cubic B-spline with as few
+/// control points as keep it within tolerance of the true offset. Returned
+/// in traversal order.
+fn fit_offset(c: &Curve2, fwd: bool, d: f64) -> Option<Nurbs> {
+    if c.is_periodic() {
+        return None;
+    }
+    let (a, b) = c.domain();
+    let off = |t: f64| -> DVec2 {
+        let der = c.ders(t);
+        let dir = if fwd { der[1] } else { -der[1] };
+        der[0] + dir.normalize_or_zero().perp() * d
+    };
+    const M: usize = 160;
+    let mut pts: Vec<DVec2> = (0..=M).map(|i| off(a + (b - a) * i as f64 / M as f64)).collect();
+    if !fwd {
+        pts.reverse();
+    }
+    let tol = ((c.size() + d.abs()) * 2e-4).max(1e-9);
+    for n in 4..=24 {
+        let Some(fit) = Nurbs::fit_least_squares(&pts, n) else { continue };
+        let cv = Curve2::Nurbs(fit.clone());
+        if pts.iter().all(|q| cv.distance(*q) <= tol) {
+            return Some(fit);
+        }
+    }
+    None
 }

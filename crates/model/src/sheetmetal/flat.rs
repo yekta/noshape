@@ -25,6 +25,13 @@ pub struct FlatBendLine {
     pub bend: usize,
 }
 
+/// A form shown in the flat pattern: its outline and center mark.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatForm {
+    pub loops: Vec<Vec<DVec2>>,
+    pub center: DVec2,
+}
+
 /// The unfolded part: outline loops and bend lines in the flat plane.
 #[derive(Clone, Debug)]
 pub struct FlatPattern {
@@ -35,6 +42,8 @@ pub struct FlatPattern {
     /// and holes. The first loop has the largest extent.
     pub loops: Vec<Vec<DVec2>>,
     pub bend_lines: Vec<FlatBendLine>,
+    /// Form outlines and center marks (drawn over the flat region).
+    pub forms: Vec<FlatForm>,
     /// The flat region as planar face(s) in model space.
     pub shape: Option<Shape>,
     pub thickness: f64,
@@ -107,6 +116,17 @@ impl FlatPattern {
             let off = text_h * 0.4;
             let pos = [mid[0] - ang.sin() * off, mid[1] + ang.cos() * off];
             g.texts.push(Text2 { pos, height: text_h, text: label, angle: ang, anchor: Anchor::BottomCenter, pick: 0 });
+        }
+        for f in &self.forms {
+            for l in &f.loops {
+                if l.len() >= 2 {
+                    g.lines.push(Polyline2 { points: l.iter().map(|p| map(*p)).collect(), style: LineStyle::Thin, closed: true, pick: 0 });
+                }
+            }
+            let c = map(f.center);
+            let arm = text_h * 0.6;
+            g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: LineStyle::Centerline, closed: false, pick: 0 });
+            g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: 0 });
         }
         g
     }
@@ -309,18 +329,45 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
             warnings.push("The part has walls not connected by bends; they are laid out separately".into());
         }
     }
+    // Form footprints fill the flat (shown as outlines); relief cutouts are removed.
+    let mut forms = Vec::new();
+    let mut cuts: Vec<Shape> = Vec::new();
+    for mk in &data.marks {
+        let Some(m) = xf.get(mk.wall).copied().flatten() else { continue };
+        let loops3: Vec<Vec<DVec3>> = mk.loops.iter().map(|l| l.iter().map(|p| m.transform_point3(*p)).collect()).collect();
+        let face = match &mk.fill {
+            Some(f) => f.transformed(&mat_transform(&m)).ok(),
+            None => loops3.first().filter(|l| l.len() >= 3).and_then(|l| k::make_polyline(l, true).and_then(|w| k::make_face_from_wire(&w, true)).ok()),
+        };
+        match mk.kind {
+            super::FlatMarkKind::Form => {
+                if let Some(f) = face {
+                    pieces.extend(f.faces());
+                }
+                let center = mk.center().map(|c| frame.to_local(m.transform_point3(c))).unwrap_or_default();
+                forms.push(FlatForm { loops: loops3.iter().map(|l| l.iter().map(|p| frame.to_local(*p)).collect()).collect(), center });
+            }
+            super::FlatMarkKind::Cut => cuts.extend(face),
+        }
+    }
     warnings.dedup();
     if pieces.is_empty() {
         return Err("Nothing to flatten".into());
     }
     // Union of all planar pieces into one region.
-    let shape = match union_planar(&pieces) {
+    let mut shape = match union_planar(&pieces) {
         Ok(s) => Some(s),
         Err(e) => {
             warnings.push(format!("The flat outline could not be merged ({e}); showing the pieces"));
             None
         }
     };
+    if let (Some(s), false) = (&shape, cuts.is_empty()) {
+        match k::boolean(k::BooleanOp::Cut, std::slice::from_ref(s), &cuts, &k::BooleanOptions { fuzzy: 1e-7, ..Default::default() }) {
+            Ok(r) if r.shape.count(ShapeType::Face) > 0 => shape = Some(k::unify_same_domain(&r.shape).map(|u| u.shape).unwrap_or(r.shape)),
+            _ => warnings.push("A relief cutout could not be removed from the flat".into()),
+        }
+    }
     let faces_src: Vec<Shape> = match &shape {
         Some(s) => s.faces(),
         None => pieces.clone(),
@@ -335,7 +382,7 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
         }
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-    Ok(FlatPattern { frame, loops, bend_lines: lines, shape, thickness: t, warnings })
+    Ok(FlatPattern { frame, loops, bend_lines: lines, forms, shape, thickness: t, warnings })
 }
 
 fn extent(l: &[DVec2]) -> f64 {
@@ -386,6 +433,11 @@ fn union_planar(pieces: &[Shape]) -> Result<Shape, String> {
 
 /// Sample the edges of a wire into one closed polyline (plane coordinates).
 fn wire_loop(w: &Shape, frame: &k::Plane) -> Vec<DVec2> {
+    wire_points(w).into_iter().map(|p| frame.to_local(p)).collect()
+}
+
+/// Sample the edges of a wire into one chained polyline (model space).
+pub(crate) fn wire_points(w: &Shape) -> Vec<DVec3> {
     let mut segs: Vec<Vec<DVec3>> = Vec::new();
     for e in w.edges() {
         let Ok(info) = e.edge_info() else { continue };
@@ -403,7 +455,7 @@ fn wire_loop(w: &Shape, frame: &k::Plane) -> Vec<DVec2> {
             segs.push(pts);
         }
     }
-    chain_loop(segs).into_iter().map(|p| frame.to_local(p)).collect()
+    chain_loop(segs)
 }
 
 fn chain_loop(mut segs: Vec<Vec<DVec3>>) -> Vec<DVec3> {

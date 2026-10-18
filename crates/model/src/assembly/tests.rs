@@ -405,6 +405,23 @@ fn demo_assembly_is_mated() {
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
     assert_eq!(res.nodes[2].dof, Some(1));
     assert_eq!(bom(&res).len(), 2);
+    // The pin's Part Studio is configured (Change configuration… is offered):
+    // the default is 40 mm long, "Long" 60 mm, and the mate keeps resolving.
+    let pin_len = |res: &eval::AssemblyResult| {
+        let (lo, hi) = res.occurrences.iter().find(|o| o.instance_name == "Pin <1>").unwrap().world_bounds().unwrap();
+        (hi - lo).max_element()
+    };
+    assert!((pin_len(&res) - 0.04).abs() < 1e-6);
+    let pin_studio = asm.instances[2].source.studio().unwrap();
+    let TabContent::PartStudio(ps) = &doc.tab(pin_studio).unwrap().content else { panic!() };
+    assert_eq!(ps.configuration.inputs.len(), 1);
+    let mut asm2 = asm.clone();
+    let mut long = ConfigValues::default();
+    long.0.insert("Length".into(), "Long".into());
+    assert!(asm2.set_instance_config(InstanceId(3), long));
+    let res2 = ev.evaluate(&doc, &asm2, &SolveOptions::default(), None);
+    assert!(res2.mates.iter().all(|m| m.ok), "{:?}", res2.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
+    assert!((pin_len(&res2) - 0.06).abs() < 1e-6, "{}", pin_len(&res2));
     // The second plate sits on top of the first (12 mm plates), turned about Z only.
     let p = res.solved.placement(InstanceId(2)).unwrap();
     assert!((p.translation[2] - 0.012).abs() < 1e-6, "{p:?}");
@@ -705,7 +722,7 @@ fn mirror_instances_across_connector_plane() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN) },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -885,4 +902,450 @@ fn snap_explode_progress_replace_and_config() {
     cfg.0.insert("Size".into(), "Large".into());
     assert!(asm.set_instance_config(InstanceId(2), cfg.clone()));
     assert!(matches!(&asm.instances[1].source, InstanceSource::Part { config, .. } if *config == cfg));
+}
+
+// ------------------------------------------------------------ remaining gaps
+
+fn with_feature(mut ps: PartStudio, kind: &str, set: impl FnOnce(&mut crate::partstudio::Feature, &crate::regen::RegenResult)) -> PartStudio {
+    let units = UnitPrefs::default();
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let mut f = ps.new_feature(kind, &units).unwrap();
+    set(&mut f, &r);
+    ps.features.push(f);
+    ps
+}
+
+/// Edges of the first body whose name mentions `needle`.
+fn edges_with(r: &crate::regen::RegenResult, needle: &str) -> Vec<Reference> {
+    r.context.bodies[0].edges.iter().filter(|e| format!("{e:?}").contains(needle)).map(|e| Reference::Edge((**e).clone())).collect()
+}
+
+/// Face of the first body with a given surface kind.
+fn face_of_kind(r: &crate::regen::RegenResult, pred: impl Fn(&noshape_kernel::Surface) -> bool) -> Reference {
+    let b = &r.context.bodies[0];
+    for (i, f) in b.faces.iter().enumerate() {
+        let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+        if face.face_surface().is_ok_and(|s| pred(&s)) {
+            return Reference::Face((**f).clone());
+        }
+    }
+    panic!("no face of the requested kind");
+}
+
+#[test]
+fn explode_lines_and_step_reorder() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let asm = Assembly {
+        instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.01), false)],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let mut view = ExplodedView { name: "Explode 1".into(), steps: vec![ExplodeStep::translate(vec![InstanceId(2)], [0.0, 0.0, 0.05]), ExplodeStep::translate(vec![InstanceId(2)], [0.03, 0.0, 0.0])] };
+    // One line per step and instance, from the start to the exploded position.
+    let lines = eval::explode_trails(&res, &view, f64::INFINITY);
+    assert_eq!(lines.len(), 2);
+    let c0 = DVec3::new(0.02, 0.01, 0.015);
+    assert!((lines[0].0 - c0).length() < 1e-9 && (lines[0].1 - (c0 + DVec3::new(0.0, 0.0, 0.05))).length() < 1e-9, "{lines:?}");
+    assert!((lines[1].0 - lines[0].1).length() < 1e-9, "the second line starts where the first ends");
+    // Played halfway: only the first line, half long; the display result carries them.
+    let mut r2 = res.clone();
+    r2.apply_placements_progress(res.solved.clone(), Some((&view, 0.5)));
+    assert_eq!(r2.explode_trails.len(), 1);
+    assert!((r2.explode_trails[0].1.z - (c0.z + 0.025)).abs() < 1e-9);
+    // Reordering steps.
+    assert!(view.move_step(1, 0));
+    assert_eq!(view.steps[0].translation, [0.03, 0.0, 0.0]);
+    assert!(!view.move_step(0, 5));
+    let lines = eval::explode_trails(&res, &view, f64::INFINITY);
+    assert!((lines[0].1 - (c0 + DVec3::new(0.03, 0.0, 0.0))).length() < 1e-9);
+}
+
+#[test]
+fn named_position_restores_driving_mate_values() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio(), block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (block, rb) = body_of(&mut ev, &f.doc, f.studios[2]);
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.05, 0.04, 0.02), false),
+            part_instance(3, "Block <1>", f.studios[2], block, DVec3::new(0.0, 0.0, 0.05), false),
+        ],
+        mates: vec![
+            mate(10, MateType::Revolute, conn(1, cylinder_face(&rp), Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis)),
+            mate(11, MateType::Slider, conn(1, face_with(&rp, "CapEnd"), Inference::Centroid), conn(3, face_with(&rb, "CapStart"), Inference::Centroid)),
+        ],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
+    // Turn the pin to 0.7 rad and slide the block 30 mm up, then save the position.
+    let start: std::collections::HashMap<_, _> = res.solved.placements.iter().cloned().collect();
+    let s = res.prepared.solve(&SolveOptions { drive: Some((MateId(10), 0.7)), start: Some(start), ..Default::default() });
+    let start: std::collections::HashMap<_, _> = s.placements.iter().cloned().collect();
+    let s = res.prepared.solve(&SolveOptions { drive: Some((MateId(11), 0.03)), start: Some(start), ..Default::default() });
+    let mut saved = res.clone();
+    saved.apply_placements(s.clone(), None);
+    let values = saved.named_position_values(&asm);
+    assert_eq!(values.len(), 2, "revolute and slider values are stored");
+    let np = NamedPosition { name: "Open".into(), placements: s.placements.clone(), mate_values: values };
+    // Move away (both mates back to 0), then restore: the stored values come back
+    // even from placements that do not match them.
+    for (id, p) in &res.solved.placements {
+        asm.instance_mut(*id).unwrap().placement = *p;
+    }
+    let mut np_stale = np.clone();
+    np_stale.placements = res.solved.placements.clone();
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let r = res.prepared.solve_named_position(&np_stale);
+    assert!(r.converged);
+    let wrap = |a: f64| (a + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+    assert!(wrap(r.mate_values[&MateId(10)][0] - 0.7).abs() < 1e-5, "pin angle restored: {:?}", r.mate_values[&MateId(10)]);
+    assert!((r.mate_values[&MateId(11)][3] - 0.03).abs() < 1e-6, "slider distance restored: {:?}", r.mate_values[&MateId(11)]);
+    // The restored positions still satisfy the mates (with their own free values).
+    assert_eq!(r.mate_ok.values().filter(|ok| !**ok).count(), 0);
+    // Old documents without stored values just use the placements.
+    let old: NamedPosition = serde_json::from_str(r#"{"name":"Old","placements":[]}"#).unwrap();
+    assert!(old.mate_values.is_empty());
+}
+
+#[test]
+fn replicate_updates_when_target_geometry_changes() {
+    let mut f = doc_with(vec![plate_with_holes(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let b = &rp.context.bodies[0];
+    let hole = b
+        .faces
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()? {
+            noshape_kernel::Surface::Cylinder { origin, radius, .. } if (radius - 0.005).abs() < 1e-9 && origin.x < 0.0 => Some(Reference::Face((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true), part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.0, 0.05, 0.0), false)],
+        mates: vec![mate(10, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis))],
+        ..Default::default()
+    };
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    let units = UnitPrefs::default();
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    // A new pattern is stale until synced; afterwards it is up to date.
+    let stale = analysis::stale_matched_patterns(&res, &asm, &units);
+    assert_eq!(stale.len(), 1);
+    for (id, t) in stale {
+        asm.sync_matched_pattern(id, t);
+    }
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(analysis::stale_matched_patterns(&res, &asm, &units).is_empty());
+    assert_eq!(asm.patterns[0].generated.len(), 1);
+    // The Part Studio gains two more 5 mm holes (sketch edited in place, same
+    // features): the replicate is stale and re-syncs to three copies.
+    if let TabContent::PartStudio(ps) = &mut f.doc.tabs[0].content
+        && let Some(ParamValue::Sketch(sd)) = ps.features[0].params.get("sketch").cloned()
+    {
+        let mut sd = sd;
+        sd.sketch.add_circle(DVec2::new(-0.02, 0.012), 0.005);
+        sd.sketch.add_circle(DVec2::new(0.02, 0.012), 0.005);
+        ps.features[0].params.set("sketch", ParamValue::Sketch(sd));
+    }
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let stale = analysis::stale_matched_patterns(&res, &asm, &units);
+    assert_eq!(stale.len(), 1, "geometry changed: pattern is stale");
+    assert_eq!(stale[0].1.len(), 3);
+    for (id, t) in stale {
+        asm.sync_matched_pattern(id, t);
+    }
+    assert_eq!(asm.patterns[0].generated.len(), 3);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
+    assert!(analysis::stale_matched_patterns(&res, &asm, &units).is_empty());
+}
+
+#[test]
+fn handed_mirror_creates_mirrored_part() {
+    let f = doc_with(vec![plate_with_holes()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let small = face_of_kind(&r, |s| matches!(s, noshape_kernel::Surface::Cylinder { radius, .. } if (radius - 0.003).abs() < 1e-9));
+    // Mirror plane: the assembly XZ plane (connector Z along +Y).
+    let mut plane = AsmMateConnector::new(MateId(60), "Mate connector 1".into(), MateConnectorRef::origin());
+    plane.rotation_axis = 0;
+    plane.rotation = Some(ExprValue::new("-90 deg"));
+    let mut asm = Assembly { instances: vec![part_instance(1, "Plate <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), true)], connectors: vec![plane], ..Default::default() };
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Mirror 1".into(),
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true },
+        seeds: vec![InstanceId(1)],
+        generated: vec![],
+        suppressed: false,
+    });
+    let created = asm.sync_pattern(MateId(70));
+    assert!(matches!(asm.instance(created[0]).unwrap().source, InstanceSource::MirroredPart { .. }));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    let occ = res.occurrences.iter().find(|o| o.top() == created[0]).unwrap();
+    assert!(occ.mirrored);
+    // The small hole (y = +10 mm on the seed, so world y = 110 mm) lands at
+    // y = -110 mm: a true mirror image (a rigid copy would put it at -90 mm).
+    let units = UnitPrefs::default();
+    let w = res.connector_world(&conn(created[0].0, small.clone(), Inference::Centroid), &units).expect("mate connectors resolve on the mirrored part");
+    assert!((w.origin.y + 0.11).abs() < 1e-6 && w.origin.x.abs() < 1e-6, "{:?}", w.origin);
+    let (lo, hi) = occ.world_bounds().unwrap();
+    assert!((lo.y + 0.12).abs() < 1e-6 && (hi.y + 0.08).abs() < 1e-6, "{lo:?} {hi:?}");
+    // Kernel shape mirrored too (interference, measurements): same volume, same face names.
+    let mb = occ.context.body(&occ.body).unwrap();
+    assert_eq!(mb.faces.len(), r.context.bodies[0].faces.len());
+    assert!((mb.shape.volume().unwrap() - r.context.bodies[0].shape.volume().unwrap()).abs() < 1e-12);
+    // The BOM lists the mirrored part separately.
+    let rows = bom(&res);
+    assert_eq!(rows.len(), 2);
+    assert!(rows[1].mirrored && rows[1].name.ends_with("(mirrored)"));
+    // Turning the option off makes the copy a plain (rigid) part again.
+    if let PatternKind::Mirror { handed, .. } = &mut asm.patterns[0].kind {
+        *handed = false;
+    }
+    asm.sync_pattern(MateId(70));
+    assert!(matches!(asm.instance(created[0]).unwrap().source, InstanceSource::Part { .. }));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let w = res.connector_world(&conn(created[0].0, small, Inference::Centroid), &units).unwrap();
+    assert!((w.origin.y + 0.09).abs() < 1e-6, "rigid copy: {:?}", w.origin);
+}
+
+#[test]
+fn replace_instance_matches_geometry_when_names_differ() {
+    // A block whose features have other ids (a dummy sketch first), so no face names match.
+    let units = UnitPrefs::default();
+    let mut other = PartStudio::new();
+    let mut dummy = other.new_feature("sketch", &units).unwrap();
+    dummy.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+    other.features.push(dummy);
+    let base = block_studio();
+    for mut ft in base.features.clone() {
+        let fresh = other.new_feature(&ft.type_id, &units).unwrap();
+        ft.id = fresh.id;
+        // Re-point the extrude's region query at the renumbered sketch.
+        if let Some(ParamValue::Query(q)) = ft.params.get("entities").cloned() {
+            let q: Vec<Reference> = q
+                .into_iter()
+                .map(|r| match r {
+                    Reference::SketchRegion { sketch, key } if sketch == base.features[0].id => Reference::SketchRegion { sketch: other.features[1].id, key },
+                    r => r,
+                })
+                .collect();
+            ft.params.set("entities", ParamValue::Query(q));
+        }
+        other.features.push(ft);
+    }
+    let f = doc_with(vec![block_studio(), other]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (body2, r2) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    assert!(r2.context.bodies[0].find_faces(match &bottom {
+        Reference::Face(n) => n,
+        _ => unreachable!(),
+    })
+    .is_empty(), "names must differ for this test");
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.01), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    let old = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(old.mates[0].ok);
+    let ids = asm.replace_instance(InstanceId(2), InstanceSource::Part { studio: f.studios[1], body: body2.clone(), config: ConfigValues::default() }, "Block B", false);
+    // Without remapping the mate loses its geometry.
+    let broken = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(!broken.mates[0].ok);
+    let n = analysis::remap_replaced(&mut asm, &ids, &old, &r2.context, Some(&body2));
+    assert_eq!(n, 1);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    assert!((origin_of(&res, 2) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-6, "{:?}", origin_of(&res, 2));
+    // The bottom face was matched (same type, nearest position and normal), not the top one.
+    let Reference::Implicit { on, .. } = &asm.mates[0].b.reference else { panic!() };
+    let bf = r2.context.bodies[0].find_faces(match &**on {
+        Reference::Face(n) => n,
+        _ => panic!(),
+    })[0];
+    let face = r2.context.bodies[0].shape.sub_shape(noshape_kernel::ShapeType::Face, bf).unwrap();
+    assert!(face.centroid().unwrap().z.abs() < 1e-9);
+}
+
+#[test]
+fn tangent_cones_tori_and_propagation() {
+    // Pin with a 2 mm chamfer (cone) on its top edge, pin with a 2 mm fillet (torus).
+    let chamfered = with_feature(pin_studio(), "chamfer", |f, r| {
+        f.params.set("entities", ParamValue::Query(edges_with(r, "CapEnd")));
+        f.params.set("width", ParamValue::Expr(ExprValue::new("2 mm")));
+    });
+    let filleted = with_feature(pin_studio(), "fillet", |f, r| {
+        f.params.set("entities", ParamValue::Query(edges_with(r, "CapEnd")));
+        f.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    });
+    let rounded_block = with_feature(block_studio(), "fillet", |f, r| {
+        f.params.set("entities", ParamValue::Query(edges_with(r, "CapEnd")));
+        f.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    });
+    let f = doc_with(vec![block_studio(), chamfered, filleted, rounded_block]);
+    let mut ev = AssemblyEvaluator::new();
+    let (block, rb) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (cpin, rc) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (tpin, rt) = body_of(&mut ev, &f.doc, f.studios[2]);
+    let (rblock, rr) = body_of(&mut ev, &f.doc, f.studios[3]);
+    let top = face_with(&rb, "CapEnd");
+    let cone = face_of_kind(&rc, |s| matches!(s, noshape_kernel::Surface::Cone { .. }));
+    let torus = face_of_kind(&rt, |s| matches!(s, noshape_kernel::Surface::Torus { .. }));
+    let ent = |i: u64, r: Reference| MateConnectorRef::on(InstanceId(i), vec![], r);
+    let tilted = |at: DVec3, ang: f64| Placement { translation: at.into(), rotation: { let q = DQuat::from_rotation_x(ang); [q.x, q.y, q.z, q.w] } };
+
+    // Cone lying on the block's top face: apex on the plane, 2 DOF removed.
+    let mut p2 = part_instance(2, "Pin <1>", f.studios[1], cpin, DVec3::ZERO, false);
+    p2.placement = tilted(DVec3::new(0.02, 0.01, 0.05), 2.0);
+    let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], block.clone(), DVec3::ZERO, true), p2], mates: vec![mate(10, MateType::Tangent, ent(1, top.clone()), ent(2, cone.clone()))], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "cone: {:?}", res.mates[0].message);
+    assert_eq!(res.nodes[1].dof, Some(4));
+
+    // Torus (upside-down filleted pin) resting on the top face: the rounded tip touches it.
+    let mut p3 = part_instance(2, "Pin <2>", f.studios[2], tpin, DVec3::ZERO, false);
+    p3.placement = tilted(DVec3::new(0.02, 0.01, 0.06), std::f64::consts::PI);
+    let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], block.clone(), DVec3::ZERO, true), p3], mates: vec![mate(10, MateType::Tangent, ent(1, top.clone()), ent(2, torus.clone()))], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "torus: {:?}", res.mates[0].message);
+    let units = UnitPrefs::default();
+    let tg = eval::tangent_geometry(&rt.context, None, &torus, &units).unwrap().transformed(&eval::matrix_frame(&res.occurrences[1].transform));
+    let crate::assembly::solver::TangentGeom::Torus { center, axis, major, minor } = tg else { panic!("{tg:?}") };
+    let lowest = center.z - (major * (1.0 - axis.z * axis.z).sqrt() + minor);
+    assert!((lowest - 0.01).abs() < 1e-6, "the torus touches the face: {lowest}");
+    assert!(axis.z.abs() > 0.99, "still nearly upright: {axis:?}");
+    assert_eq!(res.nodes[1].dof, Some(5));
+
+    // A vertex (point) on the cone surface.
+    let corner = {
+        let b = &rb.context.bodies[0];
+        let i = (0..b.vertices.len()).find(|&i| b.shape.sub_shape(noshape_kernel::ShapeType::Vertex, i).unwrap().vertex_point().unwrap().length() < 1e-9).unwrap();
+        Reference::Vertex((*b.vertices[i]).clone())
+    };
+    let asm = Assembly {
+        instances: vec![part_instance(1, "Pin <1>", f.studios[1], rc.context.bodies[0].id.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], block.clone(), DVec3::new(0.01, 0.0, 0.035), false)],
+        mates: vec![mate(10, MateType::Tangent, ent(1, cone.clone()), ent(2, corner.clone()))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "vertex on cone: {:?}", res.mates[0].message);
+    let g = eval::tangent_geometry(&rc.context, None, &cone, &units).unwrap();
+    let v = DVec3::from(res.solved.placement(InstanceId(2)).unwrap().translation);
+    assert!(g.signed_distance(v).abs() < 1e-6, "vertex lies on the cone: {}", g.signed_distance(v));
+
+    // Unsupported pairs are reported.
+    let asm2 = Assembly { mates: vec![mate(10, MateType::Tangent, ent(1, cone.clone()), ent(2, face_with(&rb, "CapStart")))], ..asm.clone() };
+    let mut asm2 = asm2;
+    asm2.instances[1] = part_instance(2, "Pin <2>", f.studios[2], rt.context.bodies[0].id.clone(), DVec3::new(0.05, 0.0, 0.0), false);
+    asm2.mates[0].b = ent(2, torus.clone());
+    let res = ev.evaluate(&f.doc, &asm2, &SolveOptions::default(), None);
+    assert!(!res.mates[0].ok && res.mates[0].message.as_deref().unwrap_or("").contains("not supported"));
+
+    // Tangent propagation: a block corner held on the rounded block's top face
+    // follows over the fillet onto the side face when dragged past the edge.
+    let rtop = {
+        let b = &rr.context.bodies[0];
+        let i = b.faces.iter().position(|n| matches!(&**n, crate::reference::TopoName::Face { role: crate::reference::Role::CapEnd(_), .. })).unwrap();
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let chain = eval::tangent_chain(&rr.context, None, &rtop, &units);
+    assert_eq!(chain.len(), 9, "top + 4 fillets + 4 sides");
+    let mk = |prop: bool| {
+        let mut m = mate(10, MateType::Tangent, ent(1, rtop.clone()), ent(2, corner.clone()));
+        m.tangent_propagation = prop;
+        Assembly { instances: vec![part_instance(1, "Rounded <1>", f.studios[3], rblock.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], block.clone(), DVec3::new(0.02, 0.01, 0.01), false)], mates: vec![m], ..Default::default() }
+    };
+    for prop in [true, false] {
+        let asm = mk(prop);
+        let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+        // Pull the corner outward and down in steps (like a drag).
+        let mut start: std::collections::HashMap<_, _> = res.solved.placements.iter().cloned().collect();
+        let mut v = DVec3::ZERO;
+        for k in 1..=12 {
+            let t = k as f64 / 12.0;
+            let target = DVec3::new(0.02 + 0.04 * t, 0.01, 0.01 - 0.006 * t);
+            let s = res.prepared.solve(&SolveOptions { drags: vec![(InstanceId(2), DVec3::ZERO, target)], start: Some(start.clone()), ..Default::default() });
+            start = s.placements.iter().cloned().collect();
+            v = DVec3::from(s.placement(InstanceId(2)).unwrap().translation);
+        }
+        if prop {
+            assert!((v.x - 0.04).abs() < 1e-5 && v.z < 0.0081, "on the side face: {v:?}");
+        } else {
+            assert!((v.z - 0.01).abs() < 1e-6 && v.x > 0.045, "stays on the (infinite) top plane: {v:?}");
+        }
+    }
+}
+
+struct TestExternal {
+    docs: Vec<(String, std::sync::Arc<Document>, TabId)>,
+}
+
+impl eval::ExternalStudios for TestExternal {
+    fn studio(&self, key: &str) -> Option<(std::sync::Arc<Document>, TabId)> {
+        self.docs.iter().find(|(k, _, _)| k == key).map(|(_, d, t)| (d.clone(), *t))
+    }
+}
+
+#[test]
+fn instances_from_other_documents() {
+    // "Other document": two versions of a Part Studio, the block 10 mm then 25 mm thick.
+    let v1 = doc_with(vec![block_studio()]);
+    let mut v2 = v1.doc.clone();
+    if let TabContent::PartStudio(ps) = &mut v2.tabs[0].content {
+        ps.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("25 mm")));
+    }
+    let v2 = Fixture { doc: v2, studios: v1.studios.clone() };
+    let ext = TestExternal { docs: vec![("ext:v1".into(), std::sync::Arc::new(v1.doc.clone()), v1.studios[0]), ("ext:v2".into(), std::sync::Arc::new(v2.doc.clone()), v2.studios[0])] };
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    ev.set_external(std::sync::Arc::new(ext));
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (_, er) = ev.external_studio("ext:v1", &ConfigValues::default()).expect("resolved");
+    let ebody = er.context.bodies[0].id.clone();
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&er, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true),
+            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false },
+        ],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[1].error.is_none(), "{:?}", res.nodes[1].error);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    assert_eq!(res.occurrences[1].external.as_deref(), Some("ext:v1"));
+    assert_eq!(bom(&res).len(), 2, "external part is its own BOM row");
+    // Update to the newer version: same feature ids, so the mate keeps resolving.
+    assert_eq!(asm.update_external("ext:v1", "ext:v2"), 1);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[1].error.is_none(), "{:?}", res.nodes[1].error);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let (lo, hi) = res.occurrences[1].world_bounds().unwrap();
+    assert!((hi.z - lo.z - 0.025).abs() < 1e-6, "the new version's geometry: {lo:?} {hi:?}");
+    // A missing document is reported on the instance.
+    asm.update_external("ext:v2", "ext:gone");
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[1].error.is_some());
+    // Serialized form round-trips.
+    let json = serde_json::to_string(&asm.instances[1].source).unwrap();
+    assert_eq!(serde_json::from_str::<InstanceSource>(&json).unwrap(), asm.instances[1].source);
 }

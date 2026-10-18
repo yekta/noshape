@@ -1,0 +1,1161 @@
+//! Batch C features: sheet metal Jog, Form, Corner, Sheet metal loft, Wrap,
+//! Isocline, Constrained surface and Derived placement.
+
+use glam::{DVec2, DVec3};
+use noshape_model::configuration::ConfigValues;
+use noshape_model::display::FeatureStatus;
+use noshape_model::params::{ParamValue, ParamValues};
+use noshape_model::partstudio::PartStudio;
+use noshape_model::reference::{DatumPlane, FeatureId, Reference};
+use noshape_model::regen::{RegenOptions, RegenResult, Regenerator};
+use noshape_model::sheetmetal::{FlatPattern, flat_pattern_for};
+use noshape_model::sketch_feature::SketchData;
+use noshape_units::{ExprValue, UnitPrefs};
+use std::f64::consts::PI;
+
+struct Studio {
+    ps: PartStudio,
+    units: UnitPrefs,
+    reg: Regenerator,
+    opts: RegenOptions,
+}
+
+fn expr(s: &str) -> ParamValue {
+    ParamValue::Expr(ExprValue::new(s))
+}
+
+fn en(s: &str) -> ParamValue {
+    ParamValue::Enum(s.into())
+}
+
+fn q(r: Reference) -> ParamValue {
+    ParamValue::Query(vec![r])
+}
+
+impl Studio {
+    fn new() -> Self {
+        Self { ps: PartStudio::new(), units: UnitPrefs::default(), reg: Regenerator::new(), opts: RegenOptions::default() }
+    }
+
+    fn regen(&mut self) -> RegenResult {
+        self.reg.regenerate(&self.ps, &ConfigValues::default(), &self.units, &self.opts)
+    }
+
+    fn add(&mut self, ty: &str, set: impl FnOnce(&mut ParamValues)) -> FeatureId {
+        let mut f = self.ps.new_feature(ty, &self.units).unwrap_or_else(|| panic!("unknown feature {ty}"));
+        set(&mut f.params);
+        let id = f.id;
+        self.ps.features.push(f);
+        id
+    }
+
+    fn sketch(&mut self, plane: Reference, sk: noshape_sketch::Sketch) -> FeatureId {
+        self.add("sketch", |p| {
+            p.set("sketchPlane", ParamValue::Query(vec![plane]));
+            p.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        })
+    }
+
+    /// Regenerate and assert every feature succeeded (warnings allowed).
+    fn ok(&mut self) -> RegenResult {
+        let r = self.regen();
+        for (f, s) in self.ps.features.iter().zip(&r.display.features) {
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+        }
+        r
+    }
+
+    fn last_status(&mut self) -> (FeatureStatus, String) {
+        let r = self.regen();
+        let s = r.display.features.last().unwrap();
+        (s.status, s.message.clone().unwrap_or_default())
+    }
+
+    fn region(&mut self, sketch: FeatureId) -> Reference {
+        let r = self.regen();
+        let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
+        let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+        Reference::SketchRegion { sketch, key }
+    }
+}
+
+fn near(a: f64, b: f64, tol: f64) -> bool {
+    (a - b).abs() <= tol
+}
+
+fn mm(v: f64) -> f64 {
+    v * 1e-3
+}
+
+fn polyline(sk: &mut noshape_sketch::Sketch, pts: &[(f64, f64)], closed: bool) -> Vec<u32> {
+    let ids: Vec<_> = pts.iter().map(|&(x, y)| sk.add_point(DVec2::new(mm(x), mm(y)))).collect();
+    let n = if closed { ids.len() } else { ids.len() - 1 };
+    (0..n).map(|i| sk.add_line_between(ids[i], ids[(i + 1) % ids.len()]).unwrap().0).collect()
+}
+
+fn entities(sketch: FeatureId, ids: &[u32]) -> ParamValue {
+    ParamValue::Query(ids.iter().map(|&e| Reference::SketchEntity { sketch, entity: e }).collect())
+}
+
+fn face_at(r: &RegenResult, bi: usize, p: DVec3) -> Reference {
+    let b = &r.context.bodies[bi];
+    for (i, f) in b.shape.faces().iter().enumerate() {
+        if (f.centroid().unwrap() - p).length() < 1e-7 {
+            return Reference::Face((*b.faces[i]).clone());
+        }
+    }
+    panic!("no face at {p:?}");
+}
+
+fn flat(r: &RegenResult, bi: usize) -> FlatPattern {
+    flat_pattern_for(&r.context, &r.context.bodies[bi].id).expect("flat pattern")
+}
+
+fn volume(r: &RegenResult, bi: usize) -> f64 {
+    r.context.bodies[bi].shape.volume().unwrap()
+}
+
+fn sorted_size(f: &FlatPattern) -> (f64, f64) {
+    let s = f.size();
+    (s.x.max(s.y), s.x.min(s.y))
+}
+
+fn set_model(p: &mut ParamValues, t: &str, r: &str) {
+    p.set("thickness", expr(t));
+    p.set("radius", expr(r));
+    p.set("kFactor", expr("0.45"));
+}
+
+/// Thickened 100 x 40 x 2 mm plate on the Top plane (z from 0 to 2 mm).
+fn plate() -> Studio {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 40.0), (0.0, 40.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", q(region));
+        set_model(p, "2 mm", "3 mm");
+    });
+    s
+}
+
+/// Jog of the plate along x = 60 mm (the side with the face center is held).
+fn jogged(set: impl FnOnce(&mut ParamValues)) -> Studio {
+    let mut s = plate();
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = polyline(&mut sk, &[(60.0, -10.0), (60.0, 50.0)], false);
+    let lid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(20.0), mm(2.0)));
+    s.add("sheetMetalJog", move |p| {
+        p.set("bendReference", entities(lid, &line));
+        p.set("face", q(top));
+        p.set("bendAngle", expr("90 deg"));
+        p.set("bendOffset", expr("15 mm"));
+        p.set("bendOffsetAnchor", en("NOMINAL"));
+        set(p);
+    });
+    s
+}
+
+#[test]
+fn jog_offsets_wall_and_keeps_flat_length() {
+    let mut s = jogged(|_| {});
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
+    assert_eq!(data.walls.len(), 3, "held, middle and jogged wall");
+    assert_eq!(data.bends.len(), 2);
+    assert!(data.bends.iter().all(|b| near(b.angle, PI / 2.0, 1e-9)));
+    let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
+    // Flat pattern: preserve material keeps the original length.
+    let fp = flat(&r, 0);
+    let (len, width) = sorted_size(&fp);
+    assert!(near(len, mm(100.0), 1e-7), "jog flat length {len}");
+    assert!(near(width, mm(40.0), 1e-9));
+    assert_eq!(fp.bend_lines.len(), 2);
+    assert!(fp.warnings.is_empty(), "{:?}", fp.warnings);
+    // Folded: the far wall is offset by the jog (nominal 15 mm).
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(2.0) + mm(15.0), 1e-6), "{bb:?}");
+    // Volume: bends are full annular sectors; the flat strip they replace has
+    // the developed length (K factor), so V = flat volume + 2 * theta * T^2 * W * (0.5 - K).
+    let w = mm(40.0);
+    let expected = mm(100.0) * w * t + 2.0 * (PI / 2.0) * t * t * w * (0.5 - k);
+    assert!(near(volume(&r, 0), expected, 1e-12), "volume {} vs {expected}", volume(&r, 0));
+    let _ = rad;
+
+    // Offset anchors: inside adds the thickness.
+    let mut s = jogged(|p| p.set("bendOffsetAnchor", en("INSIDE")));
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(2.0) + mm(17.0), 1e-6), "inside anchor {bb:?}");
+
+    // Thickness bounding type: 5 x T = 10 mm nominal.
+    let mut s = jogged(|p| {
+        p.set("offsetType", en("THICKNESS"));
+        p.set("thicknessFactor", expr("5"));
+    });
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(12.0), 1e-6), "thickness factor {bb:?}");
+}
+
+#[test]
+fn jog_preserve_material_off_and_errors() {
+    let mut s = jogged(|p| p.set("preserveMaterial", ParamValue::Bool(false)));
+    let r = s.ok();
+    let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
+    let ba = (PI / 2.0) * (rad + k * t);
+    // Adjacent bends at 90 deg give 2R + T; the wall between = 15 - 8 = 7 mm.
+    let wall = mm(15.0) - (2.0 * rad + t);
+    // Far end stays at x = 100: folded extent along x unchanged.
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.x, mm(100.0), 1e-6), "far end moved: {bb:?}");
+    let fp = flat(&r, 0);
+    let (len, _) = sorted_size(&fp);
+    // Material added = developed jog length - its horizontal extent.
+    // Along the reference (top) side the jog spans R (bend 1, inner) + R + T (bend 2, outer).
+    let horiz = 2.0 * rad + t;
+    let extra = 2.0 * ba + wall - horiz;
+    assert!(near(len, mm(100.0) + extra, 1e-6), "flat {len} vs {}", mm(100.0) + extra);
+
+    // Too small an offset for the radius.
+    let mut s = jogged(|p| p.set("bendOffset", expr("3 mm")));
+    let (st, msg) = s.last_status();
+    assert_eq!(st, FeatureStatus::Error);
+    assert!(msg.contains("too small"), "{msg}");
+}
+
+/// Derived provider over pre-regenerated studios (tab id -> context).
+struct Tabs(std::collections::HashMap<String, std::sync::Arc<noshape_model::regen::context::Context>>);
+
+impl std::fmt::Debug for Tabs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Tabs")
+    }
+}
+
+impl noshape_model::regen::derived::DerivedProvider for Tabs {
+    fn context(&self, tab: &str) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {
+        self.0.get(tab).cloned()
+    }
+    fn version(&self, _tab: &str) -> u64 {
+        1
+    }
+}
+
+fn circle_sketch(s: &mut Studio, r_mm: f64) -> FeatureId {
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, mm(r_mm));
+    s.sketch(Reference::Plane(DatumPlane::Top), sk)
+}
+
+/// Form tool studio: a 3 mm high boss of radius 5 (added) over a hole of
+/// radius 4 through the sheet (removed), tagged as a form.
+fn form_studio(tag: bool) -> std::sync::Arc<noshape_model::regen::context::Context> {
+    let mut s = Studio::new();
+    let a = circle_sketch(&mut s, 5.0);
+    let ra = s.region(a);
+    s.add("extrude", move |p| {
+        p.set("entities", q(ra));
+        p.set("depth", expr("3 mm"));
+    });
+    let b = circle_sketch(&mut s, 4.0);
+    let rb = s.region(b);
+    s.add("extrude", move |p| {
+        p.set("entities", q(rb));
+        p.set("depth", expr("5 mm"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    if tag {
+        let (add, rem) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
+        s.add("tag", move |p| {
+            p.set("tagPurpose", en("FORM"));
+            p.set("partToAdd", q(Reference::Body(add)));
+            p.set("partToRemove", q(Reference::Body(rem)));
+        });
+    }
+    s.ok().context
+}
+
+#[test]
+fn form_adds_and_cuts_and_shows_in_flat() {
+    let mut s = plate();
+    s.opts.derived = Some(std::sync::Arc::new(Tabs([("form".to_string(), form_studio(true))].into_iter().collect())));
+    // Two locations on the top face.
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(mm(30.0), mm(20.0)));
+    let p2 = sk.add_point(DVec2::new(mm(70.0), mm(20.0)));
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("2 mm"));
+    });
+    let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    s.add("sheetMetalFormed", move |p| {
+        p.set("formPartStudio", ParamValue::Text("form".into()));
+        p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p1.0 }, Reference::SketchEntity { sketch: sid, entity: p2.0 }]));
+    });
+    let r = s.ok();
+    let t = mm(2.0);
+    let expected = v0 + 2.0 * (PI * mm(5.0).powi(2) * mm(3.0) - PI * mm(4.0).powi(2) * t);
+    assert!(near(volume(&r, 0), expected, 1e-12), "form volume {} vs {expected}", volume(&r, 0));
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(5.0), 1e-6), "{bb:?}");
+    // Flat: same outline as the plate, plus two form outlines with center marks.
+    let fp = flat(&r, 0);
+    assert!(near(fp.area(), mm(100.0) * mm(40.0), 1e-10), "flat area {}", fp.area());
+    assert_eq!(fp.forms.len(), 2);
+    for f in &fp.forms {
+        assert!(!f.loops.is_empty());
+        let l = &f.loops[0];
+        let r_avg = l.iter().map(|p| (*p - f.center).length()).sum::<f64>() / l.len() as f64;
+        assert!(near(r_avg, mm(5.0), 1e-5), "outline radius {r_avg}");
+    }
+    let g = fp.to_sheet_geometry();
+    assert!(g.lines.iter().any(|l| l.style == noshape_model::drawing::sheet::LineStyle::Centerline));
+    // Untagged studio: parts are classified by name (none says "remove": both added).
+    let mut s2 = plate();
+    s2.opts.derived = Some(std::sync::Arc::new(Tabs([("form".to_string(), form_studio(false))].into_iter().collect())));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(mm(30.0), mm(20.0)));
+    let pl = s2.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("2 mm"));
+    });
+    let sid = s2.sketch(Reference::FeaturePlane(pl), sk);
+    s2.add("sheetMetalFormed", move |p| {
+        p.set("formPartStudio", ParamValue::Text("form".into()));
+        p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p1.0 }]));
+    });
+    let r2 = s2.ok();
+    assert!(volume(&r2, 0) > mm(100.0) * mm(40.0) * t);
+    // Missing studio / location off the part.
+    let mut s3 = plate();
+    s3.add("sheetMetalFormed", |p| p.set("formPartStudio", ParamValue::Text("nope".into())));
+    assert_eq!(s3.last_status().0, FeatureStatus::Error);
+}
+
+/// Plate with flanges on two adjacent edges (x = 100 and y = 40), ripped at the corner.
+fn two_flanges() -> Studio {
+    let mut s = plate();
+    let r = s.ok();
+    let e1 = edge_mid(&r, DVec3::new(mm(100.0), mm(20.0), mm(2.0)));
+    let e2 = edge_mid(&r, DVec3::new(mm(50.0), mm(40.0), mm(2.0)));
+    s.add("sheetMetalFlange", move |p| {
+        p.set("edges", ParamValue::Query(vec![e1, e2]));
+        p.set("distance", expr("20 mm"));
+    });
+    s
+}
+
+fn edge_mid(r: &RegenResult, p: DVec3) -> Reference {
+    let b = &r.context.bodies[0];
+    for (i, e) in b.shape.edges().iter().enumerate() {
+        let (a, c) = e.endpoints().unwrap();
+        if ((a + c) * 0.5 - p).length() < 1e-7 {
+            return Reference::Edge((*b.edges[i]).clone());
+        }
+    }
+    panic!("no edge at {p:?}");
+}
+
+#[test]
+fn corner_relief_cuts_folded_and_flat() {
+    let mut s = two_flanges();
+    let r = s.ok();
+    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
+    assert_eq!(data.bends.len(), 2, "two flange bends");
+    let v0 = volume(&r, 0);
+    let a0 = flat(&r, 0).area();
+    // Vertex nearest to the corner of the two bends.
+    let b = &data.bends[0];
+    let corner = DVec3::new(mm(100.0), mm(40.0), mm(2.0));
+    let _ = b;
+    let body = &r.context.bodies[0];
+    let mut best = (f64::INFINITY, 0usize);
+    for (i, v) in body.shape.vertices().iter().enumerate() {
+        let d = (v.vertex_point().unwrap() - corner).length();
+        if d < best.0 {
+            best = (d, i);
+        }
+    }
+    let vref = Reference::Vertex((*body.vertices[best.1]).clone());
+    s.add("sheetMetalCorner", move |p| {
+        p.set("corner", q(vref));
+        p.set("cornerStyle", en("SIZED_ROUND"));
+        p.set("roundReliefDiameter", expr("12 mm"));
+    });
+    let r = s.ok();
+    assert!(volume(&r, 0) < v0 - 1e-12, "relief removes material");
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Solid), 1);
+    let fp = flat(&r, 0);
+    assert!(fp.area() < a0 - 1e-8, "flat shows the relief: {} vs {a0}", fp.area());
+    // A single bend end is not a corner.
+    let mut s = plate();
+    let r = s.ok();
+    let e = edge_mid(&r, DVec3::new(mm(100.0), mm(20.0), mm(2.0)));
+    s.add("sheetMetalFlange", move |p| p.set("edges", ParamValue::Query(vec![e])));
+    let r = s.ok();
+    let body = &r.context.bodies[0];
+    let v = body.shape.vertices().iter().position(|v| (v.vertex_point().unwrap() - DVec3::new(mm(100.0), mm(40.0), mm(2.0))).length() < mm(6.0)).unwrap();
+    let vref = Reference::Vertex((*body.vertices[v]).clone());
+    s.add("sheetMetalCorner", move |p| p.set("corner", q(vref)));
+    let (st, msg) = s.last_status();
+    assert_eq!(st, FeatureStatus::Error, "{msg}");
+}
+
+#[test]
+fn sheet_metal_loft_hopper_flattens() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = polyline(&mut sk, &[(-40.0, -30.0), (40.0, -30.0), (40.0, 30.0), (-40.0, 30.0)], true);
+    let s1 = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("50 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let b = polyline(&mut sk, &[(-20.0, -15.0), (20.0, -15.0), (20.0, 15.0), (-20.0, 15.0)], true);
+    let s2 = s.sketch(Reference::FeaturePlane(pl), sk);
+    s.add("sheetMetalLoft", move |p| {
+        p.set("profile1", entities(s1, &a));
+        p.set("profile2", entities(s2, &b));
+        set_model(p, "1 mm", "2 mm");
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Solid), 1);
+    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
+    assert_eq!(data.walls.len(), 4);
+    assert_eq!(data.bends.len(), 3, "three bends and one rip");
+    assert_eq!(data.rips.len(), 1);
+    // Facet areas of the reference surface (trapezoids).
+    let slant_x = (mm(50.0).powi(2) + mm(15.0).powi(2)).sqrt();
+    let slant_y = (mm(50.0).powi(2) + mm(20.0).powi(2)).sqrt();
+    let facets = 2.0 * (mm(80.0) + mm(40.0)) * 0.5 * slant_x + 2.0 * (mm(60.0) + mm(30.0)) * 0.5 * slant_y;
+    let fp = flat(&r, 0);
+    assert_eq!(fp.bend_lines.len(), 3);
+    assert!(fp.warnings.is_empty(), "{:?}", fp.warnings);
+    assert!(fp.area() > facets * 0.9 && fp.area() < facets * 1.05, "flat area {} vs facets {facets}", fp.area());
+    // Mismatched segment counts fail with a clear message.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = polyline(&mut sk, &[(-40.0, -30.0), (40.0, -30.0), (40.0, 30.0), (-40.0, 30.0)], true);
+    let s1 = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("50 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let b = polyline(&mut sk, &[(-20.0, -15.0), (20.0, -15.0), (0.0, 15.0)], true);
+    let s2 = s.sketch(Reference::FeaturePlane(pl), sk);
+    s.add("sheetMetalLoft", move |p| {
+        p.set("profile1", entities(s1, &a));
+        p.set("profile2", entities(s2, &b));
+    });
+    let (st, msg) = s.last_status();
+    assert_eq!(st, FeatureStatus::Error);
+    assert!(msg.contains("same number"), "{msg}");
+}
+
+/// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a
+/// 10 x 20 mm rectangle sketched on the tangent plane x = 20 mm.
+fn cylinder_and_tool() -> (Studio, Reference) {
+    let mut s = Studio::new();
+    let c = circle_sketch(&mut s, 20.0);
+    let rc = s.region(c);
+    s.add("extrude", move |p| {
+        p.set("entities", q(rc));
+        p.set("depth", expr("60 mm"));
+        p.set("symmetric", ParamValue::Bool(true));
+    });
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Right)));
+        p.set("offset", expr("20 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-5.0, -10.0), (5.0, -10.0), (5.0, 10.0), (-5.0, 10.0)], true);
+    let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+    let region = s.region(sid);
+    (s, region)
+}
+
+fn cylinder_face(r: &RegenResult, bi: usize) -> Reference {
+    let b = &r.context.bodies[bi];
+    let i = b.shape.faces().iter().position(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { .. })).expect("cylindrical face");
+    Reference::Face((*b.faces[i]).clone())
+}
+
+fn total_area(r: &RegenResult, bi: usize) -> f64 {
+    r.context.bodies[bi].shape.faces().iter().map(|f| f.area().unwrap()).sum()
+}
+
+#[test]
+fn wrap_surface_solid_split_and_unwrap() {
+    let (mut s, region) = cylinder_and_tool();
+    let r = s.ok();
+    let target = cylinder_face(&r, 0);
+    let (reg2, t2) = (region.clone(), target.clone());
+    let w = s.add("wrap", move |p| {
+        p.set("resultType", en("SURFACE"));
+        p.set("source", q(reg2));
+        p.set("destination", q(t2));
+    });
+    let r = s.ok();
+    let surf = r.context.bodies.iter().position(|b| b.id.feature == w).expect("wrapped surface");
+    assert_eq!(r.context.bodies[surf].kind, noshape_model::display::BodyKind::Surface);
+    let a = total_area(&r, surf);
+    assert!(near(a, mm(10.0) * mm(20.0), 1e-10), "wrapped area {a}");
+    for v in r.context.bodies[surf].shape.vertices() {
+        let p = v.vertex_point().unwrap();
+        assert!(near((p.x * p.x + p.y * p.y).sqrt(), mm(20.0), 1e-7), "vertex off the cylinder {p:?}");
+    }
+    // Rolled in place: the tangent line x = 20, y = 0 stays.
+    let on = r.context.bodies[surf].shape.faces()[0].project_point(DVec3::new(mm(20.0), 0.0, 0.0)).unwrap();
+    assert!(on.distance < 1e-7, "tangent line moved: {}", on.distance);
+    // Stable names across regenerations.
+    let names: Vec<_> = r.context.bodies[surf].faces.clone();
+    let r2 = s.ok();
+    let surf2 = r2.context.bodies.iter().position(|b| b.id.feature == w).unwrap();
+    assert_eq!(names, r2.context.bodies[surf2].faces);
+
+    // Unwrap the wrapped face onto the tangent plane: same area, flat again.
+    let wf = Reference::Face((*r.context.bodies[surf].faces[0]).clone());
+    let pl = s.ps.features.iter().find(|f| f.type_id == "cPlane").unwrap().id;
+    s.add("wrap", move |p| {
+        p.set("resultType", en("SURFACE"));
+        p.set("source", q(wf));
+        p.set("destination", q(Reference::FeaturePlane(pl)));
+    });
+    let r = s.ok();
+    let un = r.context.bodies.len() - 1;
+    assert!(near(total_area(&r, un), mm(200.0) * 1e-3, 1e-10), "unwrapped area {}", total_area(&r, un));
+    let bb = r.context.bodies[un].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.x, mm(20.0), 1e-6) && near(bb.min.x, mm(20.0), 1e-6), "unwrapped onto x = 20: {bb:?}");
+    assert!(near(bb.max.y - bb.min.y, mm(10.0), 1e-6), "{bb:?}");
+
+    // Solid: thickened outward and added to the cylinder.
+    let (mut s, region) = cylinder_and_tool();
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let target = cylinder_face(&r, 0);
+    s.add("wrap", move |p| {
+        p.set("resultType", en("SOLID"));
+        p.set("operationType", en("ADD"));
+        p.set("source", q(region));
+        p.set("destination", q(target));
+        p.set("thickness", expr("2 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1, "added to the cylinder");
+    // Annular sector: angle = 10/20 rad, (R+t)^2 - R^2 over 2, times the 20 mm height.
+    let added = 0.5 * (mm(10.0) / mm(20.0)) * (mm(22.0).powi(2) - mm(20.0).powi(2)) * mm(20.0);
+    assert!(near(volume(&r, 0) - v0, added, added * 1e-4), "wrap solid added {} vs {added}", volume(&r, 0) - v0);
+
+    // Split: the rectangle's edges imprint on the cylinder face.
+    let (mut s, region) = cylinder_and_tool();
+    let r = s.ok();
+    let n0 = r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+    let target = cylinder_face(&r, 0);
+    s.add("wrap", move |p| {
+        p.set("resultType", en("IMPRINT"));
+        p.set("source", q(region));
+        p.set("destination", q(target));
+    });
+    let r = s.ok();
+    assert!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face) > n0, "split adds faces");
+    assert!(near(volume(&r, 0), PI * mm(20.0).powi(2) * mm(60.0), 1e-12));
+
+    // Planar target for planar tools is an error.
+    let (mut s, region) = cylinder_and_tool();
+    s.add("wrap", move |p| {
+        p.set("source", q(region));
+        p.set("destination", q(Reference::Plane(DatumPlane::Top)));
+    });
+    assert_eq!(s.last_status().0, FeatureStatus::Error);
+}
+
+#[test]
+fn isocline_curves_and_split() {
+    let mut s = Studio::new();
+    let c = circle_sketch(&mut s, 20.0);
+    let rc = s.region(c);
+    s.add("extrude", move |p| {
+        p.set("entities", q(rc));
+        p.set("depth", expr("30 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let sides: Vec<Reference> = b.shape.faces().iter().enumerate().filter(|(_, f)| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { .. })).map(|(i, _)| Reference::Face((*b.faces[i]).clone())).collect();
+    s.add("isocline", move |p| {
+        p.set("faces", ParamValue::Query(sides));
+        p.set("direction", q(Reference::Plane(DatumPlane::Right)));
+        p.set("angle", expr("30 deg"));
+    });
+    let r = s.ok();
+    let edges: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Wire).flat_map(|b| b.shape.edges()).collect();
+    assert_eq!(edges.len(), 2, "two lines at +-60 deg");
+    for e in &edges {
+        assert!(near(e.length().unwrap(), mm(30.0), 1e-7));
+        let (a, _) = e.endpoints().unwrap();
+        assert!(near(a.x.abs(), mm(10.0), 1e-6), "{a:?}");
+    }
+    // Split the face along the isoclines.
+    let n0 = r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+    s.ps.features.last_mut().unwrap().params.set("split", ParamValue::Bool(true));
+    let r = s.ok();
+    assert!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face) > n0, "split faces");
+    assert!(r.context.bodies.iter().all(|b| b.kind != noshape_model::display::BodyKind::Wire));
+    // No isocline: error in curve mode.
+    s.ps.features.last_mut().unwrap().params.set("split", ParamValue::Bool(false));
+    s.ps.features.last_mut().unwrap().params.set("direction", q(Reference::Plane(DatumPlane::Top)));
+    s.ps.features.last_mut().unwrap().params.set("angle", expr("30 deg"));
+    assert_eq!(s.last_status().0, FeatureStatus::Error);
+}
+
+#[test]
+fn constrained_surface_from_points_and_mesh() {
+    // Points of a dome-like patch: sketch points on three planes.
+    let mut s = Studio::new();
+    let f = |x: f64, y: f64| 10.0 - 0.01 * (x * x + y * y);
+    let mut ids = Vec::new();
+    let mut planes = Vec::new();
+    for (k, y) in [-20.0f64, 0.0, 20.0].into_iter().enumerate() {
+        let pl = s.add("cPlane", move |p| {
+            p.set("entities", q(Reference::Plane(DatumPlane::Front)));
+            p.set("offset", expr(&format!("{} mm", -y)));
+        });
+        planes.push(pl);
+        let mut sk = noshape_sketch::Sketch::new();
+        let pts: Vec<_> = [-20.0f64, 0.0, 20.0].into_iter().map(|x| sk.add_point(DVec2::new(mm(x), mm(f(x, y))))).collect();
+        let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+        ids.push((sid, pts));
+        let _ = k;
+    }
+    let items: Vec<ParamValues> = ids
+        .iter()
+        .flat_map(|(sid, pts)| {
+            pts.iter().map(move |e| {
+                let mut v = ParamValues::default();
+                v.set("vertex", q(Reference::SketchEntity { sketch: *sid, entity: e.0 }));
+                v
+            })
+        })
+        .collect();
+    s.add("constrainedSurface", move |p| {
+        p.set("vertices", ParamValue::Array(items));
+        p.set("computeDeviation", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let surf = r.context.bodies.len() - 1;
+    assert_eq!(r.context.bodies[surf].kind, noshape_model::display::BodyKind::Surface);
+    // The surface passes through the points.
+    let face = &r.context.bodies[surf].shape.faces()[0];
+    let mut worst: f64 = 0.0;
+    for (sid, pts) in &ids {
+        let sk = r.context.sketches.iter().find(|x| x.feature == *sid).unwrap();
+        for e in pts {
+            let p = sk.frame.to_world(sk.sketch.point(*e).unwrap());
+            worst = worst.max(face.project_point(p).unwrap().distance);
+        }
+    }
+    assert!(worst < 1e-5, "deviation {worst}");
+    assert!(r.display.features.last().unwrap().message.as_deref().unwrap_or("").contains("deviation"));
+
+    // Mesh mode: fit the top face vertices of a box-shaped mesh-like part.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (30.0, 0.0), (30.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("5 mm"));
+    });
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(15.0), mm(10.0), mm(5.0)));
+    s.add("constrainedSurface", move |p| {
+        p.set("csType", en("MESH"));
+        p.set("meshes", q(top));
+    });
+    let r = s.ok();
+    let surf = r.context.bodies.len() - 1;
+    let a = total_area(&r, surf);
+    assert!(near(a, mm(30.0) * mm(20.0), 1e-9), "mesh fit area {a}");
+    let bb = r.context.bodies[surf].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(5.0), 1e-5) && near(bb.min.z, mm(5.0), 1e-5), "planar fit {bb:?}");
+}
+
+#[test]
+fn derived_placed_at_mate_connectors() {
+    // Source studio: a 10 mm cube-ish block with a mate connector on its top face center.
+    let mut src = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)], true);
+    let sid = src.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = src.region(sid);
+    src.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = src.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(5.0), mm(5.0), mm(10.0)));
+    src.add("mateConnector", move |p| {
+        p.set("originQuery", q(top));
+        p.set("entityInferenceType", en("CENTROID"));
+    });
+    let src_ctx = src.ok().context;
+    assert_eq!(src_ctx.connectors.len(), 1);
+    let mc_name = src_ctx.connectors[0].name.clone();
+
+    // Target: two points -> two instances at the base origin; then placed by
+    // the source mate connector.
+    let mut s = Studio::new();
+    s.opts.derived = Some(std::sync::Arc::new(Tabs([("src".to_string(), src_ctx)].into_iter().collect())));
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(mm(50.0), 0.0));
+    let b = sk.add_point(DVec2::new(mm(-50.0), mm(20.0)));
+    let pts = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let d = s.add("importDerived", move |p| {
+        p.set("partStudio", ParamValue::Text("src".into()));
+        p.set("location", ParamValue::Query(vec![Reference::SketchEntity { sketch: pts, entity: a.0 }, Reference::SketchEntity { sketch: pts, entity: b.0 }]));
+    });
+    let r = s.ok();
+    let derived: Vec<_> = r.context.bodies.iter().filter(|x| x.id.feature == d).collect();
+    assert_eq!(derived.len(), 2, "one instance per location");
+    let bb0 = derived[0].shape.bounding_box(true).unwrap();
+    let bb1 = derived[1].shape.bounding_box(true).unwrap();
+    assert!(near(bb0.min.x, mm(50.0), 1e-6) && near(bb0.min.z, 0.0, 1e-6), "{bb0:?}");
+    assert!(near(bb1.min.x, mm(-50.0), 1e-6) && near(bb1.min.y, mm(20.0), 1e-6), "{bb1:?}");
+    assert_ne!(derived[0].faces[0], derived[1].faces[0], "instances have distinct names");
+
+    // Base mate connector (top face center) on the point: the block hangs below it.
+    s.ps.features.last_mut().unwrap().params.set("placement", en("AT_MATE_CONNECTOR"));
+    s.ps.features.last_mut().unwrap().params.set("mateConnectorId", ParamValue::Text(mc_name));
+    let r = s.ok();
+    let derived: Vec<_> = r.context.bodies.iter().filter(|x| x.id.feature == d).collect();
+    let bb0 = derived[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb0.max.z, 0.0, 1e-6) && near(bb0.min.z, mm(-10.0), 1e-6), "{bb0:?}");
+    assert!(near((bb0.min.x + bb0.max.x) * 0.5, mm(50.0), 1e-6), "{bb0:?}");
+    // Unknown connector name: clear error.
+    s.ps.features.last_mut().unwrap().params.set("mateConnectorId", ParamValue::Text("nope".into()));
+    let (st, msg) = s.last_status();
+    assert_eq!(st, FeatureStatus::Error);
+    assert!(msg.contains("nope"), "{msg}");
+}
+
+/// Feature clipboard payloads for manual UI checks (paste with Ctrl+V):
+/// `cargo test -p noshape-model --test features_c write_clips -- --ignored`.
+#[test]
+#[ignore]
+fn write_clips() {
+    let dir = std::env::temp_dir();
+    let save = |s: &mut Studio, name: &str| {
+        s.ok();
+        let v = serde_json::json!({ "noshape_features": s.ps.features });
+        std::fs::write(dir.join(name), v.to_string()).unwrap();
+    };
+    let mut s = jogged(|_| {});
+    save(&mut s, "noshape-clip-jog.json");
+    let mut s = two_flanges();
+    let r = s.ok();
+    let body = &r.context.bodies[0];
+    let corner = DVec3::new(mm(100.0), mm(40.0), mm(2.0));
+    let i = (0..body.shape.vertices().len()).min_by(|&a, &b| {
+        let d = |k: usize| (body.shape.vertices()[k].vertex_point().unwrap() - corner).length();
+        d(a).total_cmp(&d(b))
+    });
+    let vref = Reference::Vertex((*body.vertices[i.unwrap()]).clone());
+    s.add("sheetMetalCorner", move |p| {
+        p.set("corner", q(vref));
+        p.set("cornerStyle", en("SIZED_ROUND"));
+        p.set("roundReliefDiameter", expr("12 mm"));
+    });
+    save(&mut s, "noshape-clip-corner.json");
+    let (mut s, region) = cylinder_and_tool();
+    let r = s.ok();
+    let target = cylinder_face(&r, 0);
+    s.add("wrap", move |p| {
+        p.set("resultType", en("SOLID"));
+        p.set("operationType", en("ADD"));
+        p.set("source", q(region));
+        p.set("destination", q(target));
+        p.set("thickness", expr("2 mm"));
+    });
+    save(&mut s, "noshape-clip-wrap.json");
+}
+
+fn vertex_near(r: &RegenResult, p: DVec3) -> Reference {
+    let b = &r.context.bodies[0];
+    let i = (0..b.shape.vertices().len())
+        .min_by(|&x, &y| {
+            let d = |k: usize| (b.shape.vertices()[k].vertex_point().unwrap() - p).length();
+            d(x).total_cmp(&d(y))
+        })
+        .unwrap();
+    Reference::Vertex((*b.vertices[i]).clone())
+}
+
+#[test]
+fn rip_splits_wall_between_vertices() {
+    let mut s = plate();
+    let r = s.ok();
+    let (a, b) = (vertex_near(&r, DVec3::new(0.0, 0.0, mm(2.0))), vertex_near(&r, DVec3::new(mm(100.0), mm(40.0), mm(2.0))));
+    s.add("sheetMetalRip", move |p| p.set("vertices", ParamValue::Query(vec![a, b])));
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2, "the diagonal rip splits the plate");
+    let v: f64 = (0..2).map(|i| volume(&r, i)).sum();
+    let full = mm(100.0) * mm(40.0) * mm(2.0);
+    assert!(v < full && v > full * 0.99, "rip removes a thin slab: {v}");
+}
+
+#[test]
+fn recognize_rebuilds_sheet_metal_model() {
+    // An L bracket made as sheet metal, finished, then recognized again.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("EXTRUDE"));
+        p.set("sketchCurves", entities(sid, &ids));
+        p.set("depth", expr("20 mm"));
+        set_model(p, "2 mm", "3 mm");
+    });
+    s.add("sheetMetalEnd", |_| {});
+    let r = s.ok();
+    let expected = flat(&r, 0).size();
+    let id = r.context.bodies[0].id.clone();
+    s.add("sheetMetalRecognize", move |p| {
+        p.set("bodies", q(Reference::Body(id)));
+        p.set("kFactor", expr("0.45"));
+    });
+    let r = s.ok();
+    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
+    assert!(data.active);
+    assert!(near(data.thickness, mm(2.0), 1e-9));
+    assert_eq!(data.walls.len(), 2);
+    assert_eq!(data.bends.len(), 1);
+    assert!(near(data.bends[0].radius, mm(3.0), 1e-9));
+    let got = flat(&r, 0).size();
+    assert!(near(got.x.max(got.y), expected.x.max(expected.y), 1e-7), "recognized flat {got:?} vs {expected:?}");
+}
+
+#[test]
+fn unfold_then_refold_restores_the_part() {
+    let mut s = plate();
+    let r = s.ok();
+    let e = edge_mid(&r, DVec3::new(mm(100.0), mm(20.0), mm(2.0)));
+    s.add("sheetMetalFlange", move |p| {
+        p.set("edges", ParamValue::Query(vec![e]));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let bb0 = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    let f0 = flat(&r, 0).size();
+    let id = r.context.bodies[0].id.clone();
+    s.add("sheetMetalUnfold", move |p| p.set("partToUnfold", q(Reference::Body(id.clone()))));
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(bb.max.z - bb.min.z < mm(2.0) + 1e-6, "unfolded part is flat: {bb:?}");
+    let f1 = flat(&r, 0).size();
+    assert!(near(f1.x, f0.x, 1e-7) && near(f1.y, f0.y, 1e-7), "flat unchanged {f1:?} vs {f0:?}");
+    assert!(near(bb.max.x - bb.min.x, f0.x.max(f0.y), 1e-6), "in-model flat length {bb:?}");
+    let id = r.context.bodies[0].id.clone();
+    s.add("sheetMetalRefold", move |p| p.set("toRefold", q(Reference::Body(id))));
+    let r = s.ok();
+    let bb2 = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!((bb2.max - bb0.max).length() < 1e-6 && (bb2.min - bb0.min).length() < 1e-6, "refolded {bb2:?} vs {bb0:?}");
+    assert!(near(volume(&r, 0), v0, 1e-12), "refold volume {} vs {v0}", volume(&r, 0));
+}
+
+/// 100 x 50 x 25 mm block on the Top plane.
+fn block() -> Studio {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 50.0), (0.0, 50.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("25 mm"));
+    });
+    s
+}
+
+fn top_plane_at(s: &mut Studio, z_mm: f64) -> FeatureId {
+    s.add("cPlane", move |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr(&format!("{z_mm} mm")));
+    })
+}
+
+#[test]
+fn replace_face_extends_and_trims() {
+    for (z, expect) in [(35.0, 35.0), (15.0, 15.0)] {
+        let mut s = block();
+        let pl = top_plane_at(&mut s, z);
+        let r = s.ok();
+        let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+        s.add("replaceFace", move |p| {
+            p.set("replaceFaces", q(top));
+            p.set("templateFace", q(Reference::FeaturePlane(pl)));
+        });
+        let r = s.ok();
+        let v = mm(100.0) * mm(50.0) * mm(expect);
+        assert!(near(volume(&r, 0), v, 1e-12), "replace to z = {z}: {} vs {v}", volume(&r, 0));
+        assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 6, "neighbours merged");
+    }
+    // Offset from the template.
+    let mut s = block();
+    let pl = top_plane_at(&mut s, 30.0);
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("replaceFace", move |p| {
+        p.set("replaceFaces", q(top));
+        p.set("templateFace", q(Reference::FeaturePlane(pl)));
+        p.set("offset", expr("5 mm"));
+    });
+    let r = s.ok();
+    assert!(near(volume(&r, 0), mm(100.0) * mm(50.0) * mm(35.0), 1e-12));
+}
+
+#[test]
+fn move_face_rotate_up_to_translate_and_create() {
+    // Rotate the top face about its back edge by 10 degrees (tilts down to the front).
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ax = polyline(&mut sk, &[(0.0, 50.0), (100.0, 50.0)], false);
+    let pl = top_plane_at(&mut s, 25.0);
+    let sid = s.sketch(Reference::FeaturePlane(pl), sk);
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", q(top));
+        p.set("moveFaceType", en("ROTATE"));
+        p.set("axis", entities(sid, &ax));
+        p.set("angle", expr("10 deg"));
+    });
+    let r = s.ok();
+    let drop = mm(50.0) * (10f64).to_radians().tan();
+    let v = mm(100.0) * (mm(50.0) * mm(25.0) - 0.5 * mm(50.0) * drop);
+    let v2 = mm(100.0) * (mm(50.0) * mm(25.0) + 0.5 * mm(50.0) * drop);
+    let got = volume(&r, 0);
+    assert!(near(got, v, 1e-11) || near(got, v2, 1e-11), "rotated volume {got} vs {v} / {v2}");
+
+    // Offset up to a plane.
+    let mut s = block();
+    let pl = top_plane_at(&mut s, 40.0);
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", q(top));
+        p.set("limitType", en("UP_TO_ENTITY"));
+        p.set("limitQuery", q(Reference::FeaturePlane(pl)));
+    });
+    let r = s.ok();
+    assert!(near(volume(&r, 0), mm(100.0) * mm(50.0) * mm(40.0), 1e-12), "up to {}", volume(&r, 0));
+
+    // Translate a hole sideways (non-planar face).
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(mm(30.0), mm(25.0)), mm(5.0));
+    let pl = top_plane_at(&mut s, 25.0);
+    let hs = s.sketch(Reference::FeaturePlane(pl), sk);
+    let hr = s.region(hs);
+    s.add("extrude", move |p| {
+        p.set("entities", q(hr));
+        p.set("operationType", en("REMOVE"));
+        p.set("endBound", en("THROUGH_ALL"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let b = &r.context.bodies[0];
+    let holes: Vec<Reference> = b.shape.faces().iter().enumerate().filter(|(_, f)| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { .. })).map(|(i, _)| Reference::Face((*b.faces[i]).clone())).collect();
+    assert!(!holes.is_empty());
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", ParamValue::Query(holes));
+        p.set("moveFaceType", en("TRANSLATE"));
+        p.set("direction", q(Reference::Plane(DatumPlane::Right)));
+        p.set("translationDistance", expr("20 mm"));
+    });
+    let r = s.ok();
+    assert!(near(volume(&r, 0), v0, 1e-12), "hole moved, same volume");
+    let cyl = r.context.bodies[0].shape.faces().into_iter().find(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { .. })).unwrap();
+    let c = cyl.bounding_box(true).unwrap().center();
+    assert!(near(c.x, mm(50.0), 1e-6) || near(c.x, mm(10.0), 1e-6), "hole center {c:?}");
+
+    // Create: offset copy of the top face as a new surface.
+    let mut s = block();
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("moveFace", move |p| {
+        p.set("outputType", en("CREATE"));
+        p.set("surfacesAndFaces", q(top));
+        p.set("offsetDistance", expr("5 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let surf = &r.context.bodies[1];
+    assert_eq!(surf.kind, noshape_model::display::BodyKind::Surface);
+    let bb = surf.shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, mm(30.0), 1e-6), "{bb:?}");
+}
+
+#[test]
+fn full_round_fillet_parting_draft_swept_blend() {
+    // Full round on a 100 x 10 x 25 rib: the top becomes a half cylinder of R5.
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 10.0), (0.0, 10.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("25 mm"));
+    });
+    let r = s.ok();
+    let (s1, s2, top) = (
+        face_at(&r, 0, DVec3::new(mm(50.0), 0.0, mm(12.5))),
+        face_at(&r, 0, DVec3::new(mm(50.0), mm(10.0), mm(12.5))),
+        face_at(&r, 0, DVec3::new(mm(50.0), mm(5.0), mm(25.0))),
+    );
+    s.add("fillet", move |p| {
+        p.set("filletType", en("FULL_ROUND"));
+        p.set("side1Face", q(s1));
+        p.set("side2Face", q(s2));
+        p.set("centerFaces", q(top));
+    });
+    let r = s.ok();
+    let v = mm(100.0) * (mm(10.0) * mm(20.0) + PI * mm(5.0).powi(2) * 0.5);
+    assert!(near(volume(&r, 0), v, 1e-12), "full round volume {} vs {v}", volume(&r, 0));
+    assert!(r.context.bodies[0].shape.faces().iter().any(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { radius, .. } if near(radius, mm(5.0), 1e-9))));
+
+    // Parting line draft: the bottom edges of the block, sides drafted 5 deg (one sided).
+    let mut s = block();
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let bottom: Vec<Reference> = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| {
+            let (a, c) = e.endpoints().unwrap();
+            a.z.abs() < 1e-9 && c.z.abs() < 1e-9
+        })
+        .map(|(i, _)| Reference::Edge((*b.edges[i]).clone()))
+        .collect();
+    assert_eq!(bottom.len(), 4);
+    s.add("draft", move |p| {
+        p.set("draftFeatureType", en("PARTING_LINE"));
+        p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
+        p.set("partingEdges", ParamValue::Query(bottom));
+        p.set("angle", expr("5 deg"));
+    });
+    let r = s.ok();
+    let (h, tn) = (mm(25.0), 5f64.to_radians().tan());
+    let a1 = mm(100.0) * mm(50.0);
+    let a2 = (mm(100.0) - 2.0 * h * tn) * (mm(50.0) - 2.0 * h * tn);
+    let am = (mm(100.0) - h * tn) * (mm(50.0) - h * tn);
+    let v = h / 6.0 * (a1 + a2 + 4.0 * am);
+    assert!(near(volume(&r, 0), v, 1e-11), "parting draft volume {} vs {v}", volume(&r, 0));
+
+    // Swept profile face blend along a spine parallel to the edge = rolling ball.
+    let mut s = block();
+    let r = s.ok();
+    let (side, top) = (face_at(&r, 0, DVec3::new(mm(50.0), 0.0, mm(12.5))), face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0))));
+    let spine = edge_mid(&r, DVec3::new(mm(50.0), 0.0, mm(25.0)));
+    s.add("faceBlend", move |p| {
+        p.set("side1", q(side));
+        p.set("side2", q(top));
+        p.set("crossSection", en("SWEPT_PROFILE"));
+        p.set("spine", q(spine));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    let v = mm(100.0) * mm(50.0) * mm(25.0) - mm(100.0) * (mm(5.0).powi(2) - PI * mm(5.0).powi(2) / 4.0);
+    assert!(near(volume(&r, 0), v, 1e-12), "swept blend volume {}", volume(&r, 0));
+}
+
+#[test]
+fn flat_spiral_planes_and_ruled_overrides() {
+    // Flat spiral: radius 10 -> 30 mm over 3 turns in the Top plane.
+    let mut s = Studio::new();
+    s.add("helix", |p| {
+        p.set("axisType", en("AXIS"));
+        p.set("axis", q(Reference::Plane(DatumPlane::Top)));
+        p.set("startRadius", expr("10 mm"));
+        p.set("height", expr("0 mm"));
+        p.set("endRadToggle", ParamValue::Bool(true));
+        p.set("endRadius", expr("30 mm"));
+        p.set("revolutions", expr("3"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let bb = b.shape.bounding_box(true).unwrap();
+    assert!(bb.max.z - bb.min.z < 1e-6, "flat: {bb:?}");
+    let len: f64 = b.shape.edges().iter().map(|e| e.length().unwrap()).sum();
+    let approx = 2.0 * PI * 3.0 * mm(20.0);
+    assert!(near(len, approx, approx * 0.01), "spiral length {len} vs {approx}");
+    let (a, e) = b.shape.edges()[0].endpoints().unwrap();
+    let (ra, re) = (DVec2::new(a.x, a.y).length(), DVec2::new(e.x, e.y).length());
+    assert!(near(ra.min(re), mm(10.0), 1e-6) && near(ra.max(re), mm(30.0), 1e-6), "radii {ra} {re}");
+
+    // Mid plane between two intersecting planes (Top and Right): the bisector.
+    let mut s = Studio::new();
+    s.add("cPlane", |p| {
+        p.set("cplaneType", en("MID_PLANE"));
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Right)]));
+    });
+    let r = s.ok();
+    let n = r.context.planes.last().unwrap().frame.normal;
+    assert!(near(n.z.abs(), 0.5f64.sqrt(), 1e-9) && near(n.x.abs(), 0.5f64.sqrt(), 1e-9), "bisector normal {n:?}");
+
+    // Tangent plane to a cylinder face at a point.
+    let (mut s, _) = cylinder_and_tool();
+    let r = s.ok();
+    let cyl = cylinder_face(&r, 0);
+    let pl = s.ps.features.iter().find(|f| f.type_id == "cPlane").unwrap().id;
+    let _ = pl;
+    s.add("cPlane", move |p| {
+        p.set("cplaneType", en("TANGENT_PLANE"));
+        p.set("entities", ParamValue::Query(vec![cyl, Reference::Origin]));
+    });
+    let r = s.ok();
+    let f = r.context.planes.last().unwrap().frame;
+    assert!(near((f.origin.x.powi(2) + f.origin.y.powi(2)).sqrt(), mm(20.0), 1e-6), "on the cylinder {f:?}");
+    assert!(f.normal.z.abs() < 1e-9, "tangent plane is vertical");
+
+    // Ruled surface along Z with one end overridden to X.
+    let mut s = block();
+    let r = s.ok();
+    let edge = edge_mid(&r, DVec3::new(mm(50.0), 0.0, mm(25.0)));
+    let v = vertex_near(&r, DVec3::new(mm(100.0), 0.0, mm(25.0)));
+    let mut item = ParamValues::default();
+    item.set("vertex", q(v));
+    item.set("overrideType", en("ALIGNED_WITH_VECTOR"));
+    item.set("axisOverride", q(Reference::Plane(DatumPlane::Right)));
+    item.set("distanceOverride", expr("10 mm"));
+    s.add("ruledSurface", move |p| {
+        p.set("edges", q(edge));
+        p.set("ruledType", en("ALIGNED_WITH_VECTOR"));
+        p.set("axis", q(Reference::Plane(DatumPlane::Top)));
+        p.set("distance", expr("10 mm"));
+        p.set("vertexOverrides", ParamValue::Array(vec![item]));
+    });
+    let r = s.ok();
+    let surf = &r.context.bodies[1];
+    let has = |p: DVec3| surf.shape.vertices().iter().any(|x| (x.vertex_point().unwrap() - p).length() < 1e-6);
+    assert!(has(DVec3::new(mm(110.0), 0.0, mm(25.0))), "override end rules along X");
+    assert!(has(DVec3::new(0.0, 0.0, mm(35.0))), "other end rules along Z");
+}

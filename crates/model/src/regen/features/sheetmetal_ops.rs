@@ -112,6 +112,7 @@ pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, paren
         ref_inner: m.ref_inner,
         inner_faces: current_names(&nb, &[inner_name]),
         outer_faces: current_names(&nb, &[outer_name]),
+        flat: false,
     });
     data.rips.retain(|x| !((x.a == parent && x.b == child) || (x.a == child && x.b == parent)));
     Ok(())
@@ -391,12 +392,34 @@ pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
 
 // ------------------------------------------------------------------ bend
 
-pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
+/// Inputs of a Bend / Jog shared by both features: the face and its wall,
+/// the bend line on the face plane, held direction and bend side.
+pub struct BendInputs {
+    pub bi: usize,
+    pub fi: usize,
+    pub data: SheetMetalData,
+    /// Point on the bend line in the plane of the selected face.
+    pub lp: DVec3,
+    /// Unit direction across the bend line, away from the held side.
+    pub wdir: DVec3,
+    /// Bend toward this side (± the face normal).
+    pub up: DVec3,
+    /// Outward normal of the selected face.
+    pub n: DVec3,
+    pub theta: f64,
+    pub r: f64,
+    pub kf: f64,
+}
+
+/// Resolve the face, bend line, angle, radius and K factor of a Bend or Jog.
+pub fn bend_inputs(ev: &EvalCtx) -> FResult<BendInputs> {
     let Some(fr) = ev.query("face").first().cloned() else { return err("Select the sheet metal face to bend") };
     let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(&fr)).first() else { return err("The face to bend no longer exists") };
-    let mut data = (*active_data(ev, bi)?).clone();
+    let data = (*active_data(ev, bi)?).clone();
     let body = ev.ctx.bodies[bi].clone();
-    let Some((w, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return err("Select a planar face of a sheet metal wall") };
+    if data.wall_of_face(&body.faces[fi]).is_none() {
+        return err("Select a planar face of a sheet metal wall");
+    }
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
     let Some((fc, n)) = plane_of(&face) else { return err("The face to bend must be planar") };
     let Some(lr) = ev.query("bendReference").first() else { return err("Select a bend line") };
@@ -444,17 +467,69 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
     if r <= 0.0 {
         return err("Bend radius must be positive");
     }
-    let t = data.thickness;
-    let ba = theta * (r + kf * t);
+    Ok(BendInputs { bi, fi, data, lp, wdir, up, n, theta, r, kf })
+}
+
+/// Start of the bend region across the bend line for a Bend alignment.
+pub fn alignment_start(alignment: &str, theta: f64, r: f64, t: f64, ba: f64) -> f64 {
     let th = (theta.min(std::f64::consts::FRAC_PI_2) * 0.5).tan();
-    let w0 = match ev.enum_("bendAlignment") {
+    match alignment {
         "HELD_EDGE" => 0.0,
         "BENT_EDGE" => -ba,
         "BENT_INSIDE" => -r * th,
         "BENT_OUTSIDE" => -(r + t) * th,
         "BENT_MIDPLANE" => -(r + t * 0.5) * th,
         _ => -ba * 0.5,
-    };
+    }
+}
+
+/// One bend of a face along a line (geometry in folded coordinates).
+#[derive(Clone, Copy, Debug)]
+pub struct BendSpec {
+    /// Point on the bend line in the plane of the face being bent.
+    pub lp: DVec3,
+    /// Outward normal of the face being bent.
+    pub n: DVec3,
+    /// Unit direction across the line toward the moving side.
+    pub wdir: DVec3,
+    /// Side the moving part bends toward (± `n`).
+    pub up: DVec3,
+    pub theta: f64,
+    pub r: f64,
+    pub kf: f64,
+    /// Start of the bend region along `wdir` from `lp`.
+    pub w0: f64,
+    /// Offset of the naming slots (distinct per bend of one feature).
+    pub kbase: u16,
+}
+
+impl BendSpec {
+    pub fn allowance(&self, t: f64) -> f64 {
+        self.theta * (self.r + self.kf * t)
+    }
+
+    /// (bend axis point, axis direction, folding transform of the moving
+    /// side: flat position -> folded position).
+    pub fn fold(&self, t: f64) -> (DVec3, DVec3, DMat4) {
+        let ba = self.allowance(t);
+        let ip = if self.up.dot(self.n) > 0.0 { self.lp } else { self.lp - self.n * t };
+        let axis_pt = ip + self.wdir * self.w0 + self.up * self.r;
+        let a = self.wdir.cross(self.up);
+        let m = DMat4::from_translation(axis_pt) * DMat4::from_axis_angle(a, self.theta) * DMat4::from_translation(-axis_pt) * DMat4::from_translation(-self.wdir * ba);
+        (axis_pt, a, m)
+    }
+}
+
+/// Bend face `fi` of body `bi` (a wall face) per `spec`, updating the sheet
+/// metal model. Returns the new (moving) wall and the folding transform.
+pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalData, spec: &BendSpec) -> FResult<(usize, DMat4)> {
+    let body = ev.ctx.bodies[bi].clone();
+    let Some((w, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return err("Select a planar face of a sheet metal wall") };
+    let face = body.shape.sub_shape(ShapeType::Face, fi)?;
+    let Some((fc, n)) = plane_of(&face) else { return err("The face to bend must be planar") };
+    let BendSpec { lp, wdir, up, theta, r, kf, w0, kbase, .. } = *spec;
+    let t = data.thickness;
+    let ba = spec.allowance(t);
     let big = ev.model_extent();
     let feature = ev.feature;
     let fname = body.faces[fi].clone();
@@ -471,17 +546,15 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     let named = body_named(&body);
-    let cut_h = tool_named(oriented_box(lp, wdir, n, [w0, big], [-big, big], [-big, big])?, |i| side_name(feature, &fname, 60 + i as u16));
-    let cut_m = tool_named(oriented_box(lp, wdir, n, [-big, w0 + ba], [-big, big], [-big, big])?, |i| side_name(feature, &fname, 70 + i as u16));
+    let cut_h = tool_named(oriented_box(lp, wdir, n, [w0, big], [-big, big], [-big, big])?, |i| side_name(feature, &fname, kbase + 60 + i as u16));
+    let cut_m = tool_named(oriented_box(lp, wdir, n, [-big, w0 + ba], [-big, big], [-big, big])?, |i| side_name(feature, &fname, kbase + 70 + i as u16));
     let (hs, hn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_h])?;
     let (ms, mn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_m])?;
     if hs.count(ShapeType::Solid) == 0 || ms.count(ShapeType::Solid) == 0 {
         return err("The bend line must split the face into two parts");
     }
     // Bend region: revolve the held part's end faces.
-    let ip = if up.dot(n) > 0.0 { lp } else { lp - n * t };
-    let axis_pt = ip + wdir * w0 + up * r;
-    let a = wdir.cross(up);
+    let (axis_pt, a, m) = spec.fold(t);
     let ends: Vec<Shape> = hs
         .faces()
         .into_iter()
@@ -500,12 +573,11 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
                 Ok(k::Surface::Cylinder { .. }) => 1,
                 _ => 2,
             };
-            roles.insert(j as u32, Role::Side(piece_source(&fname, feature, kk)));
+            roles.insert(j as u32, Role::Side(piece_source(&fname, feature, kbase + kk)));
         }
         let names = ev.name_result(&[&Default::default()], &res.history, &res.shape, &roles, None);
         tools.push(NamedShape::new(res.shape, names));
     }
-    let m = DMat4::from_translation(axis_pt) * DMat4::from_axis_angle(a, theta) * DMat4::from_translation(-axis_pt) * DMat4::from_translation(-wdir * ba);
     let mv = k::transform(&ms, &k::Transform::Matrix(m), true)?;
     let m_names = crate::regen::eval::names_for(&ms, mn);
     let mv_faces = ev.name_result(&[&m_names], &mv.history, &mv.shape, &BTreeMap::new(), None);
@@ -560,6 +632,14 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
             b.transform(&m);
         }
     }
+    for mk in data.marks.iter_mut() {
+        if mk.wall == w && mk.center().is_some_and(|c| side(c) > w0 + ba * 0.5) {
+            mk.wall = w2;
+            mk.transform(&m);
+        } else if moving.get(mk.wall).copied().unwrap_or(false) {
+            mk.transform(&m);
+        }
+    }
     let mut all_ends = ends[0].clone();
     if ends.len() > 1 {
         all_ends = Shape::compound(&ends);
@@ -581,9 +661,20 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
         s0,
         s1,
         ref_inner,
-        inner_faces: current_names(&nb, &[side_name(feature, &fname, 0)]),
-        outer_faces: current_names(&nb, &[side_name(feature, &fname, 1)]),
+        inner_faces: current_names(&nb, &[side_name(feature, &fname, kbase)]),
+        outer_faces: current_names(&nb, &[side_name(feature, &fname, kbase + 1)]),
+        flat: false,
     });
+    Ok((w2, m))
+}
+
+pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
+    let BendInputs { bi, fi, mut data, lp, wdir, up, n, theta, r, kf } = bend_inputs(ev)?;
+    let t = data.thickness;
+    let ba = theta * (r + kf * t);
+    let w0 = alignment_start(ev.enum_("bendAlignment"), theta, r, t, ba);
+    let spec = BendSpec { lp, n, wdir, up, theta, r, kf, w0, kbase: 0 };
+    bend_core(ev, bi, fi, &mut data, &spec)?;
     put_data(ev, bi, data);
     Ok(())
 }
@@ -591,7 +682,7 @@ pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ reliefs
 
 /// Point and body of a vertex or edge reference.
-fn point_of(ev: &EvalCtx, r: &Reference) -> Option<(usize, DVec3)> {
+pub fn point_of(ev: &EvalCtx, r: &Reference) -> Option<(usize, DVec3)> {
     match r {
         Reference::Vertex(n) => {
             for (bi, b) in ev.ctx.bodies.iter().enumerate() {

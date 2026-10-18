@@ -80,6 +80,21 @@ pub(super) struct SketchUi {
     entry_subs: Vec<Subscription>,
     opts: HashMap<&'static str, Entity<InputState>>,
     opt_subs: Vec<Subscription>,
+    /// Text box the "tedit.text" field currently edits.
+    text_edit_for: Option<u32>,
+    text_edit_sub: Option<Subscription>,
+    /// Open dimension context menu: constraint and viewport position.
+    dim_menu: Option<(noshape_sketch::ConstraintId, f32, f32)>,
+}
+
+/// Style changes of sketch text from the options box.
+#[derive(Clone, Copy)]
+enum TextStyle {
+    Font(&'static str),
+    Bold,
+    Italic,
+    FlipHorizontal,
+    FlipVertical,
 }
 
 /// Kind of value an option field holds.
@@ -99,7 +114,7 @@ fn tool_options(tool: Tool) -> &'static [(&'static str, &'static str, OptKind)] 
         Tool::Offset => &[("offset.distance", "Distance", OptKind::Length)],
         Tool::Polygon | Tool::CircumPolygon => &[("polygon.sides", "Sides", OptKind::Count)],
         Tool::Conic => &[("conic.rho", "Rho", OptKind::Number)],
-        Tool::Text => &[("text.text", "Text", OptKind::Text), ("text.height", "Height", OptKind::Length)],
+        Tool::Text => &[("text.text", "Text", OptKind::Text), ("text.height", "Height (click)", OptKind::Length)],
         Tool::LinearPattern => &[("lp.count", "Instances", OptKind::Count), ("lp.distance", "Distance", OptKind::Length), ("lp.angle", "Direction", OptKind::Angle)],
         Tool::CircularPattern => &[("cp.count", "Instances", OptKind::Count), ("cp.angle", "Total angle", OptKind::Angle)],
         Tool::Transform => &[("xf.dx", "Move X", OptKind::Length), ("xf.dy", "Move Y", OptKind::Length), ("xf.angle", "Rotate", OptKind::Angle), ("xf.scale", "Scale", OptKind::Number)],
@@ -231,12 +246,24 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn hovered_sketch_entity(&self) -> Option<noshape_sketch::EntityId> {
+    fn hovered_sketch_entity(&self, cx: &App) -> Option<noshape_sketch::EntityId> {
         let ed = self.sketch.as_ref()?;
-        match &self.hover {
-            Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
-            _ => None,
+        let e = match &self.hover {
+            Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => noshape_sketch::EntityId(*entity),
+            _ => return None,
+        };
+        // Text glyph outlines are derived geometry: they stand for their text
+        // box when selecting / transforming, and are ignored by other tools.
+        if noshape_sketch::text::glyph_text_id(e).is_some() {
+            if !(ed.tool == Tool::Select || ed.tool.is_pattern()) {
+                return None;
+            }
+            let d = self.edit.as_ref()?.dialog.read(cx);
+            let data = d.sketch_data()?;
+            let t = data.text_of_entity(e)?;
+            return data.texts.iter().find(|x| x.id == t).and_then(|x| x.box_lines.first()).map(|l| noshape_sketch::EntityId(*l));
         }
+        Some(e)
     }
 
     /// Snap candidate from the hovered model vertex/edge (sketching on parts).
@@ -315,7 +342,7 @@ impl PartStudioView {
                 let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
                 if let Some(ed) = &mut self.sketch {
                     let ent = match &r {
-                        Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
+                        Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature && noshape_sketch::text::glyph_text_id(noshape_sketch::EntityId(*entity)).is_none() => Some(noshape_sketch::EntityId(*entity)),
                         _ => None,
                     };
                     if ed.hover != ent {
@@ -339,7 +366,7 @@ impl PartStudioView {
                     {
                         ed.apply_external_snap(snap);
                     }
-                    let hov = self.hovered_sketch_entity();
+                    let hov = self.hovered_sketch_entity(cx);
                     if let Some(ed) = &mut self.sketch {
                         ed.hover = hov;
                     }
@@ -352,6 +379,7 @@ impl PartStudioView {
                 false
             }
             ViewportEvent::ToolDown { position, modifiers, click_count } => {
+                self.close_dim_menu(cx);
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
                 if !overlay_pressed && tool == Some(Tool::Use) {
@@ -366,8 +394,14 @@ impl PartStudioView {
                     // Clicking the canvas leaves option/value fields.
                     window.focus(&self.focus, cx);
                 }
+                if !overlay_pressed && self.dim_input.take().is_some() {
+                    // ... and drops an open dimension value field.
+                    if let Some(ed) = &mut self.sketch {
+                        ed.dim_edit = None;
+                    }
+                }
                 let Some(p) = to_plane(self, *position, cx) else { return true };
-                let hovered = self.hovered_sketch_entity();
+                let hovered = self.hovered_sketch_entity(cx);
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
                     self.apply_outcome(out, window, cx);
@@ -382,6 +416,9 @@ impl PartStudioView {
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                if self.sketch.as_ref().is_some_and(|s| s.tool.is_pattern()) {
+                    self.sync_pattern_inputs(window, cx);
+                }
                 true
             }
             ViewportEvent::ToolUp { position, .. } => {
@@ -389,6 +426,7 @@ impl PartStudioView {
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                self.sync_pattern_inputs(window, cx);
                 true
             }
             ViewportEvent::Click { .. } => true,
@@ -498,67 +536,35 @@ impl PartStudioView {
         let Some(frame) = self.sketch.as_ref().map(|s| s.frame) else { return };
         let shapes = noshape_model::regen::measure::resolve_shapes(&ctx, &r);
         let Some(face) = shapes.first() else { return };
-        let plane = noshape_kernel::Plane::new(frame.origin, frame.normal, frame.x);
-        let mut curves: Vec<noshape_sketch::Curve2> = Vec::new();
-        let mut splines: Vec<Vec<DVec2>> = Vec::new();
-        match noshape_kernel::section_plane(face, &plane) {
-            Ok(sec) => {
-                for e in sec.edges() {
-                    match noshape_model::regen::features::sketch::project_edge(&e, &frame) {
-                        Some(c) => curves.push(c),
-                        None => {
-                            // Free-form intersection: sample it.
-                            if let Ok(t) = noshape_kernel::tessellate(&e, 1e-4, 0.1, false)
-                                && !t.edges.is_empty()
-                            {
-                                let pl: Vec<DVec2> = t.edge_polyline(0).iter().map(|v| frame.to_local(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))).collect();
-                                if pl.len() >= 2 {
-                                    let step = (pl.len() / 12).max(1);
-                                    let mut pts: Vec<DVec2> = pl.iter().step_by(step).copied().collect();
-                                    if pts.last() != pl.last() {
-                                        pts.push(*pl.last().unwrap());
-                                    }
-                                    splines.push(pts);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        let curves = match noshape_model::regen::features::sketch::section_face(face, &frame) {
+            Ok(c) => c,
             Err(e) => {
                 if let Some(ed) = &mut self.sketch {
                     ed.message = Some(format!("Intersection failed: {e}"));
                 }
+                cx.notify();
+                return;
             }
-        }
-        if curves.is_empty() && splines.is_empty() {
+        };
+        if curves.is_empty() {
             if let Some(ed) = &mut self.sketch {
-                ed.message.get_or_insert_with(|| "That face does not cross the sketch plane".into());
+                ed.message = Some("That face does not cross the sketch plane".into());
             }
             cx.notify();
             return;
         }
-        let changed = self.with_sketch(cx, |ed, data| {
-            let mut any = false;
-            for c in &curves {
-                any |= ed.add_used(data, c, None);
-            }
-            for pts in &splines {
-                if let Ok(id) = data.sketch.add_fit_spline(pts) {
-                    let _ = data.sketch.set_external(id, true);
-                    any = true;
-                }
-            }
-            data.sketch.solve();
-            any
-        });
-        if changed == Some(true) {
+        // The curves stay linked to the face and follow model changes.
+        if self.with_sketch(cx, |ed, data| ed.add_intersection(data, r.clone(), &curves)) == Some(true) {
             self.regen_sync(window, cx);
         }
         cx.notify();
     }
 
     pub(super) fn sketch_cancel(&mut self, cx: &mut Context<Self>) {
+        if self.ui_ref().is_some_and(|u| u.dim_menu.is_some()) {
+            self.close_dim_menu(cx);
+            return;
+        }
         let cancelled = self.sketch.as_mut().map(|s| s.cancel()).unwrap_or(false);
         if cancelled {
             self.dim_input = None;
@@ -679,7 +685,11 @@ impl PartStudioView {
                 self.regen_sync(window, cx);
                 window.focus(&self.focus, cx);
             }
-            Some(Err(e)) => self.message = Some((FeatureStatus::Error, e)),
+            Some(Err(e)) => {
+                // Show the resulting (possibly conflicting) state, red where it fails.
+                self.regen_sync(window, cx);
+                self.message = Some((FeatureStatus::Error, e));
+            }
             None => {}
         }
         cx.notify();
@@ -703,6 +713,8 @@ impl PartStudioView {
             .unwrap_or_default();
         if let Some(ed) = &mut self.sketch {
             ed.dim_edit = Some(crate::sketch_mode::DimEdit { constraint: cid, text });
+            // The label is replaced by the input, so it never sees the hover end.
+            ed.hover_constraint = None;
         }
         self.sync_dim_edit(window, cx);
         cx.notify();
@@ -878,11 +890,12 @@ impl PartStudioView {
                 this.set_option(key, kind, &t, cx);
             }
             InputEvent::PressEnter { .. } => {
+                // Leave the field first so the post-apply refresh updates it.
+                window.focus(&this.focus, cx);
                 let tool = this.sketch.as_ref().map(|s| s.tool);
                 if tool.is_some_and(|t| t.is_pattern()) {
                     this.apply_pattern(window, cx);
                 }
-                window.focus(&this.focus, cx);
             }
             _ => {}
         });
@@ -945,7 +958,7 @@ impl PartStudioView {
 
     /// Refresh pattern fields that a viewport click may have changed.
     fn sync_pattern_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let keys = ["lp.distance", "lp.angle", "xf.dx", "xf.dy", "xf.angle", "xf.scale"];
+        let keys = ["lp.count", "lp.distance", "lp.angle", "cp.count", "cp.angle", "xf.dx", "xf.dy", "xf.angle", "xf.scale"];
         for k in keys {
             let text = self.option_text(k, cx);
             if let Some(st) = self.ui_ref().and_then(|u| u.opts.get(k).cloned())
@@ -955,6 +968,165 @@ impl PartStudioView {
                 st.update(cx, |s, cx| s.set_value(text, window, cx));
             }
         }
+    }
+
+    // ------------------------------------------------------------ sketch text
+
+    /// Text box being edited (selected in the Select tool).
+    fn selected_text(&self, cx: &App) -> Option<noshape_model::sketch_feature::SketchText> {
+        let ed = self.sketch.as_ref()?;
+        if ed.tool != Tool::Select {
+            return None;
+        }
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let data = d.sketch_data()?;
+        let id = ed.selected_text(data)?;
+        data.texts.iter().find(|t| t.id == id).cloned()
+    }
+
+    /// Input bound to the selected text's content (recreated when the selection changes).
+    fn text_edit_input(&mut self, t: &noshape_model::sketch_feature::SketchText, window: &mut Window, cx: &mut Context<Self>) -> Option<Entity<InputState>> {
+        if let Some(ui) = self.ui_ref()
+            && ui.text_edit_for == Some(t.id)
+            && let Some(st) = ui.opts.get("tedit.text")
+        {
+            return Some(st.clone());
+        }
+        let id = t.id;
+        let state = cx.new(|cx| InputState::new(window, cx).default_value(t.text.clone()));
+        let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+            InputEvent::Change => {
+                let text = st.read(cx).value().to_string();
+                if text.trim().is_empty() {
+                    return;
+                }
+                if this.with_sketch(cx, |ed, data| ed.edit_text(data, id, |t| t.text = text)) == Some(true) {
+                    this.regen_sync(window, cx);
+                }
+            }
+            InputEvent::PressEnter { .. } => window.focus(&this.focus, cx),
+            _ => {}
+        });
+        let ui = self.ui_mut()?;
+        ui.opts.insert("tedit.text", state.clone());
+        ui.text_edit_for = Some(id);
+        ui.text_edit_sub = Some(sub);
+        Some(state)
+    }
+
+    /// Font / bold / italic / flip for the selected text, or for new texts.
+    fn set_text_style(&mut self, style: TextStyle, window: &mut Window, cx: &mut Context<Self>) {
+        let selected = self.selected_text(cx).map(|t| t.id);
+        if let Some(ed) = &mut self.sketch {
+            match style {
+                TextStyle::Font(f) => ed.text_font = f.to_string(),
+                TextStyle::Bold => ed.text_bold = !ed.text_bold,
+                TextStyle::Italic => ed.text_italic = !ed.text_italic,
+                _ => {}
+            }
+        }
+        if let Some(id) = selected {
+            let ok = self.with_sketch(cx, |ed, data| {
+                ed.edit_text(data, id, |t| match style {
+                    TextStyle::Font(f) => t.font = f.to_string(),
+                    TextStyle::Bold => t.bold = !t.bold,
+                    TextStyle::Italic => t.italic = !t.italic,
+                    TextStyle::FlipHorizontal => t.mirror_horizontal = !t.mirror_horizontal,
+                    TextStyle::FlipVertical => t.mirror_vertical = !t.mirror_vertical,
+                })
+            });
+            if ok == Some(true) {
+                self.regen_sync(window, cx);
+            }
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// Font, bold, italic (and flip for existing texts) controls.
+    fn text_style_row(&self, font: &str, bold: bool, italic: bool, flips: Option<(bool, bool)>, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let view = cx.entity();
+        let cur = font.to_string();
+        let mut row = h_flex().gap_1().flex_wrap().child(
+            Button::new("sk-text-font")
+                .label(SharedString::from(cur.clone()))
+                .ghost()
+                .xsmall()
+                .dropdown_caret(true)
+                .dropdown_menu(move |mut menu, _, _| {
+                    for f in noshape_sketch::text::FONTS {
+                        let v = view.clone();
+                        menu = menu.item(PopupMenuItem::new(f).checked(f == cur).on_click(move |_, window, cx| v.update(cx, |this, cx| this.set_text_style(TextStyle::Font(f), window, cx))));
+                    }
+                    menu
+                }),
+        );
+        row = row
+            .child(Button::new("sk-text-bold").label("B").ghost().xsmall().selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_text_style(TextStyle::Bold, window, cx))))
+            .child(Button::new("sk-text-italic").label("I").ghost().xsmall().selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_text_style(TextStyle::Italic, window, cx))));
+        if let Some((fh, fv)) = flips {
+            row = row
+                .child(Button::new("sk-text-fliph").label("Flip H").ghost().xsmall().selected(fh).tooltip("Flip about the horizontal center").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_text_style(TextStyle::FlipHorizontal, window, cx))))
+                .child(Button::new("sk-text-flipv").label("Flip V").ghost().xsmall().selected(fv).tooltip("Flip about the vertical center").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_text_style(TextStyle::FlipVertical, window, cx))));
+        }
+        let _ = pal;
+        row.into_any_element()
+    }
+
+    // ------------------------------------------------------------ dimension context menu
+
+    fn close_dim_menu(&mut self, cx: &mut Context<Self>) {
+        if let Some(ui) = self.ui_mut()
+            && ui.dim_menu.take().is_some()
+        {
+            cx.notify();
+        }
+    }
+
+    fn dim_menu_action(&mut self, cid: noshape_sketch::ConstraintId, action: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_dim_menu(cx);
+        match action {
+            "edit" => self.open_dim_edit(cid, window, cx),
+            "driving" => {
+                let r = self.with_sketch(cx, |ed, data| ed.toggle_driving(data, cid));
+                if let Some(Err(e)) = &r {
+                    self.message = Some((FeatureStatus::Warning, e.clone()));
+                }
+                self.regen_sync(window, cx);
+            }
+            "delete" => {
+                if self.with_sketch(cx, |ed, data| ed.delete_constraint(data, cid)) == Some(true) {
+                    self.regen_sync(window, cx);
+                }
+            }
+            _ => {}
+        }
+        cx.notify();
+    }
+
+    fn render_dim_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let pal = p();
+        let (cid, x, y) = self.ui_ref()?.dim_menu?;
+        let driving = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| c.driving))?;
+        let item = |id: &'static str, label: &'static str, icon: &'static str, action: &'static str, cx: &mut Context<Self>| {
+            Button::new(id)
+                .label(label)
+                .icon(icon_px(icon, 13.0, pal.text))
+                .ghost()
+                .xsmall()
+                .w_full()
+                .justify_start()
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.dim_menu_action(cid, action, window, cx)))
+        };
+        let mut menu = v_flex().absolute().left(px(x)).top(px(y)).occlude().w(px(170.)).p_1().gap_0p5().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.border_strong).shadow_lg();
+        if driving {
+            menu = menu.child(item("sk-dim-edit", "Edit value", "dimension", "edit", cx));
+        }
+        menu = menu
+            .child(item("sk-dim-driving", if driving { "Make driven (reference)" } else { "Make driving" }, "dimension", "driving", cx))
+            .child(item("sk-dim-delete", "Delete", "delete", "delete", cx));
+        Some(menu.into_any_element())
     }
 
     // ------------------------------------------------------------ overlay rendering
@@ -974,6 +1146,24 @@ impl PartStudioView {
         let tool = self.sketch.as_ref().map(|s| s.tool).unwrap_or(Tool::Select);
         let fields = tool_options(tool);
         let mut rows: Vec<AnyElement> = Vec::new();
+        // Editing a selected text box: content, font and style.
+        let editing_text = self.selected_text(cx);
+        if let Some(t) = &editing_text
+            && let Some(st) = self.text_edit_input(t, window, cx)
+        {
+            rows.push(
+                h_flex()
+                    .gap_2()
+                    .justify_between()
+                    .child(div().text_xs().text_color(pal.text_muted).child("Text"))
+                    .child(div().w(px(160.)).child(Input::new(&st).xsmall()))
+                    .into_any_element(),
+            );
+            rows.push(self.text_style_row(&t.font, t.bold, t.italic, Some((t.mirror_horizontal, t.mirror_vertical)), cx));
+        } else if tool == Tool::Text {
+            let (f, b, i) = self.sketch.as_ref().map(|e| (e.text_font.clone(), e.text_bold, e.text_italic)).unwrap_or_default();
+            rows.push(self.text_style_row(&f, b, i, None, cx));
+        }
         for (key, label, kind) in fields {
             if let Some(st) = self.option_input(key, *kind, window, cx) {
                 let w = if *kind == OptKind::Text { 150.0 } else { 90.0 };
@@ -1045,6 +1235,14 @@ impl PartStudioView {
                             }
                         }
                     }))
+                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                        // Context menu: edit / driving-driven / delete (the viewport must not rotate).
+                        cx.stop_propagation();
+                        if let Some(ui) = this.ui_mut() {
+                            ui.dim_menu = Some((cid, x + 6.0, y + 10.0));
+                        }
+                        cx.notify();
+                    }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
                         // editor turns it into a label drag / selection.
@@ -1076,11 +1274,22 @@ impl PartStudioView {
             if !visible {
                 continue;
             }
-            let Some((x, y)) = project(g.anchor) else { continue };
-            let k = per_entity.entry(g.entity.0).or_default();
-            let (dx, dy) = if g.on_point { (7.0 + 19.0 * *k as f32, -25.0) } else { (6.0 + 19.0 * *k as f32, 6.0) };
-            *k += 1;
+            // Dragged glyphs sit centered on their stored offset; others stack next to the entity.
+            let (x, y, dx, dy) = match g.offset {
+                Some(o) => {
+                    let Some((x, y)) = project(g.anchor + o) else { continue };
+                    (x, y, -9.0, -9.0)
+                }
+                None => {
+                    let Some((x, y)) = project(g.anchor) else { continue };
+                    let k = per_entity.entry(g.entity.0).or_default();
+                    let d = if g.on_point { (7.0 + 19.0 * *k as f32, -25.0) } else { (6.0 + 19.0 * *k as f32, 6.0) };
+                    *k += 1;
+                    (x, y, d.0, d.1)
+                }
+            };
             let cid = g.constraint;
+            let gent = g.entity;
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);
             let conflict = ed.conflicting.contains(&cid);
@@ -1121,8 +1330,9 @@ impl PartStudioView {
                         }
                     }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
+                        // Drag to move the glyph, click to select its constraint.
                         if let Some(ed) = &mut this.sketch {
-                            ed.pressed_glyph = Some((cid, ev.modifiers.shift || ev.modifiers.control));
+                            ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control));
                         }
                     }))
                     .into_any_element(),
@@ -1188,21 +1398,23 @@ impl PartStudioView {
             );
         }
 
-        // ---- tool options box
+        // ---- tool options box: a small floating panel at the top of the
+        // viewport, right of the feature dialog (clear of the view toggles).
         if !rows.is_empty() || tool == Tool::Offset {
+            let (icon, title) = if editing_text.is_some() { ("text", "Edit text") } else { (tool.icon(), tool.label()) };
             let mut panel = v_flex()
                 .absolute()
-                .top(px(40.))
-                .right(px(56.))
+                .top(px(12.))
+                .left(px(342.))
                 .occlude()
-                .w(px(250.))
+                .w(px(260.))
                 .p_2()
                 .gap_1p5()
                 .rounded_md()
                 .bg(with_alpha(pal.panel_raised, 0.96))
                 .border_1()
                 .border_color(pal.border)
-                .child(h_flex().gap_1p5().child(icon_px(tool.icon(), 14.0, pal.text)).child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(tool.label())))
+                .child(h_flex().gap_1p5().child(icon_px(icon, 14.0, pal.text)).child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title)))
                 .children(rows);
             if tool == Tool::Offset {
                 let flip = ed.offset_flip;
@@ -1237,6 +1449,10 @@ impl PartStudioView {
             out.push(panel.into_any_element());
         }
 
+        if let Some(menu) = self.render_dim_menu(cx) {
+            out.push(menu);
+        }
+        let ed = self.sketch.as_ref().expect("sketch");
         if let Some(m) = ed.message.clone() {
             out.push(div().absolute().bottom_3().left(px(340.)).px_2().py_1().rounded_md().bg(with_alpha(pal.panel_raised, 0.9)).text_xs().text_color(pal.text_muted).child(m).into_any_element());
         }

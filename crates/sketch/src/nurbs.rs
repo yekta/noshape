@@ -376,6 +376,104 @@ impl Nurbs {
         Some(Nurbs { degree: p, knots, ctrl, weights: None })
     }
 
+    /// Least-squares cubic B-spline with `n_ctrl` control points (clamped
+    /// uniform knots) approximating `pts` (ordered samples), interpolating
+    /// the first and last sample. Parameters start chord-length and are
+    /// refined by projecting the samples onto the fit a few times.
+    pub fn fit_least_squares(pts: &[DVec2], n_ctrl: usize) -> Option<Nurbs> {
+        let m = pts.len();
+        let p = 3usize;
+        if n_ctrl < p + 1 || m < n_ctrl + 2 {
+            return None;
+        }
+        let mut total = 0.0;
+        let mut ub = vec![0.0; m];
+        for k in 1..m {
+            total += (pts[k] - pts[k - 1]).length();
+            ub[k] = total;
+        }
+        if total <= 1e-300 {
+            return None;
+        }
+        ub.iter_mut().for_each(|u| *u /= total);
+        ub[m - 1] = 1.0;
+        // Knots spread evenly over a blend of arc length and turning angle, so
+        // spans concentrate where the curve bends.
+        let mut g = vec![0.0; m];
+        let mut turn_total = 0.0;
+        let mut turns = vec![0.0; m];
+        for k in 1..m - 1 {
+            let (d0, d1) = (pts[k] - pts[k - 1], pts[k + 1] - pts[k]);
+            turns[k] = d0.perp_dot(d1).atan2(d0.dot(d1)).abs();
+            turn_total += turns[k];
+        }
+        for k in 1..m {
+            let lf = (ub[k] - ub[k - 1]).max(0.0);
+            let tf = if turn_total > 1e-12 { 0.5 * (turns[k - 1] + turns[k]) / turn_total } else { lf };
+            g[k] = g[k - 1] + 0.5 * lf + 0.5 * tf;
+        }
+        let gt = g[m - 1].max(1e-300);
+        let interior = n_ctrl - p - 1;
+        let mut knots = vec![0.0; p + 1];
+        for i in 1..=interior {
+            let target = gt * i as f64 / (interior + 1) as f64;
+            let k = g.partition_point(|x| *x < target).clamp(1, m - 1);
+            let f = if g[k] > g[k - 1] { (target - g[k - 1]) / (g[k] - g[k - 1]) } else { 0.0 };
+            knots.push(ub[k - 1] + (ub[k] - ub[k - 1]) * f);
+        }
+        knots.extend(std::iter::repeat_n(1.0, p + 1));
+        if knots.windows(2).any(|w| w[1] < w[0]) {
+            knots = clamped_uniform_knots(n_ctrl, p);
+        }
+        let mut fit = Nurbs { degree: p, knots: knots.clone(), ctrl: vec![DVec2::ZERO; n_ctrl], weights: None };
+        let (p0, pn) = (pts[0], pts[m - 1]);
+        for iter in 0..4 {
+            // Normal equations for the interior control points.
+            let ni = n_ctrl - 2;
+            let mut ata = nalgebra::DMatrix::<f64>::zeros(ni, ni);
+            let mut atb = nalgebra::DMatrix::<f64>::zeros(ni, 2);
+            for (k, &u) in ub.iter().enumerate().take(m - 1).skip(1) {
+                let span = fit.find_span(u);
+                let d = fit.basis_ders(span, u, 0);
+                let mut row = vec![0.0; n_ctrl];
+                for j in 0..=p {
+                    row[span - p + j] = d[0][j];
+                }
+                let r = pts[k] - p0 * row[0] - pn * row[n_ctrl - 1];
+                for a in 0..ni {
+                    let ra = row[a + 1];
+                    if ra == 0.0 {
+                        continue;
+                    }
+                    atb[(a, 0)] += ra * r.x;
+                    atb[(a, 1)] += ra * r.y;
+                    for b in 0..ni {
+                        ata[(a, b)] += ra * row[b + 1];
+                    }
+                }
+            }
+            let sol = ata.lu().solve(&atb)?;
+            fit.ctrl[0] = p0;
+            fit.ctrl[n_ctrl - 1] = pn;
+            for a in 0..ni {
+                fit.ctrl[a + 1] = DVec2::new(sol[(a, 0)], sol[(a, 1)]);
+            }
+            if iter == 3 {
+                break;
+            }
+            // Parameter correction (Newton step of the foot point).
+            for (k, u) in ub.iter_mut().enumerate().take(m - 1).skip(1) {
+                let [c, d1, d2] = fit.eval_ders(*u);
+                let r = c - pts[k];
+                let den = d1.dot(d1) + r.dot(d2);
+                if den.abs() > 1e-300 {
+                    *u = (*u - r.dot(d1) / den).clamp(0.0, 1.0);
+                }
+            }
+        }
+        Some(fit)
+    }
+
     /// Derivatives of an end of a clamped curve expressed through the first
     /// three control points (P0 at the end, P1, P2 inward):
     /// `C'(end) = alpha (P1-P0)`, `C''(end) = b1 (P2-P1) - b0 (P1-P0)`,

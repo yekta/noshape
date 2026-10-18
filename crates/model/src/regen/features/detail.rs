@@ -58,8 +58,8 @@ fn blend_role(n: &Name) -> Role {
 }
 
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
-    if !ev.is("filletType", "EDGE") {
-        return err("Full round fillet is not supported yet");
+    if ev.is("filletType", "FULL_ROUND") {
+        return full_round(ev);
     }
     let refs = ev.query("entities");
     if refs.is_empty() {
@@ -146,5 +146,72 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
         ev.replace_body(bi, res.shape, face_names);
     }
+    Ok(())
+}
+
+/// Full round fillet: the center faces between two parallel planar side
+/// faces become a half cylinder tangent to both sides (radius = half the
+/// distance between them).
+fn full_round(ev: &mut EvalCtx) -> FResult<()> {
+    use super::sheetmetal_util::{bool_named, body_named, oriented_box, plane_of, tool_named};
+    use crate::reference::TopoName;
+    use std::sync::Arc;
+    let s1 = ev.resolve_faces(ev.query("side1Face"));
+    let s2 = ev.resolve_faces(ev.query("side2Face"));
+    let center = ev.resolve_faces(ev.query("centerFaces"));
+    let (Some(&(b1, f1)), Some(&(b2, f2))) = (s1.first(), s2.first()) else { return err("Select both side faces") };
+    if center.is_empty() {
+        return err("Select the center faces to replace with the full round");
+    }
+    if b1 != b2 || center.iter().any(|c| c.0 != b1) {
+        return err("The side and center faces must belong to one part");
+    }
+    let bi = b1;
+    let body = ev.ctx.bodies[bi].clone();
+    let face = |f: usize| body.shape.sub_shape(ShapeType::Face, f);
+    let (Some((p1, n1)), Some((p2, n2))) = (plane_of(&face(f1)?), plane_of(&face(f2)?)) else {
+        return err("Full round fillets need planar side faces");
+    };
+    if n1.dot(n2) > -1.0 + 1e-7 {
+        return err("Full round fillets need parallel side faces facing away from each other");
+    }
+    let w = (p2 - p1).dot(n1).abs();
+    if w < 1e-9 {
+        return err("The side faces coincide");
+    }
+    let r = w * 0.5;
+    let cf = face(center[0].1)?;
+    let Some((cc, nc)) = plane_of(&cf) else { return err("Full round fillets need a planar center face") };
+    if nc.dot(n1).abs() > 1e-6 {
+        return err("The center face must be perpendicular to the side faces");
+    }
+    let e = nc.cross(n1).normalize();
+    // Axis: mid-plane between the sides, R below the center face.
+    let mid = p1 - n1 * (w * 0.5);
+    let c_mid = cc - n1 * (cc - mid).dot(n1);
+    let axis = c_mid - nc * r;
+    // Extent along the axis: the center faces.
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for &(_, f) in &center {
+        for v in face(f)?.vertices() {
+            let d = (v.vertex_point()? - axis).dot(e);
+            lo = lo.min(d);
+            hi = hi.max(d);
+        }
+    }
+    let margin = w * 1e-3;
+    let ez = e.cross(n1);
+    let zr = if ez.dot(nc) > 0.0 { [0.0, 2.0 * r] } else { [-2.0 * r, 0.0] };
+    let block = oriented_box(axis, e, n1, [lo - margin, hi + margin], [-r - margin, r + margin], zr)?;
+    let cyl = k::make_cylinder(&k::Plane::new(axis + e * (lo - 2.0 * margin), e, n1), r, hi - lo + 4.0 * margin, std::f64::consts::TAU)?;
+    let tool = k::cut(&block, &cyl)?.shape;
+    let feature = ev.feature;
+    let key = body.faces[center[0].1].clone();
+    let tool = tool_named(tool, |i| Arc::new(TopoName::face(feature, Role::Blend(Arc::new(TopoName::Split { parent: key.clone(), by: feature, ordinal: i as u16 })))));
+    let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &[tool])?;
+    let un = k::unify_same_domain(&shape)?;
+    let rn = crate::regen::eval::names_for(&shape, names);
+    let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
     Ok(())
 }

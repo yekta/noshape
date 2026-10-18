@@ -151,7 +151,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
         (height, revs)
     };
     if height < 1e-9 {
-        return err("Flat spiral helices are not supported yet");
+        return flat_spiral(ev, base, z, x, r0, revs, left_handed, &path);
     }
     if revs < 1e-9 {
         return err("Revolutions must be positive");
@@ -162,6 +162,46 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     let pitch = height / revs;
     let frame = k::Plane::new(base, z, x);
     let wire = k::make_helix(&frame, r0, pitch, height, left_handed, taper)?;
+    add_wire_bodies(ev, vec![wire])
+}
+
+/// Flat (Archimedean) spiral in the plane normal to `z`: radius from `r0`
+/// to the end radius / end point over the revolutions (Pitch = radial growth per turn).
+#[allow(clippy::too_many_arguments)]
+fn flat_spiral(ev: &mut EvalCtx, base: DVec3, z: DVec3, x: DVec3, r0: f64, revs: f64, left_handed: bool, path: &str) -> FResult<()> {
+    let r1 = if ev.is("endType", "END_POINT") {
+        let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select an end point") };
+        let radial = p - base - z * (p - base).dot(z);
+        radial.length()
+    } else if ev.bool("endRadToggle") {
+        ev.length("endRadius")?
+    } else {
+        return err("A flat spiral (height 0) needs an end radius or end point");
+    };
+    let dr = r1 - r0;
+    let revs = if path == "PITCH" {
+        let p = ev.length("helicalPitch")?;
+        if p < 1e-12 {
+            return err("Pitch must be positive");
+        }
+        dr.abs() / p
+    } else {
+        revs
+    };
+    if revs < 1e-9 || dr.abs() < 1e-12 {
+        return err("A flat spiral needs revolutions and different start and end radii");
+    }
+    let y = z.cross(x);
+    let sgn = if left_handed { -1.0 } else { 1.0 };
+    let n = ((revs * 48.0).ceil() as usize).max(8);
+    let pts: Vec<DVec3> = (0..=n)
+        .map(|i| {
+            let t = i as f64 / n as f64;
+            let a = sgn * TAU * revs * t;
+            base + (x * a.cos() + y * a.sin()) * (r0 + dr * t)
+        })
+        .collect();
+    let wire = k::make_interpolated_spline(&pts, &[], false)?;
     add_wire_bodies(ev, vec![wire])
 }
 
@@ -709,10 +749,6 @@ fn chain_split_pieces(split: &Shape, tools: &[Shape]) -> FResult<Vec<Shape>> {
 }
 
 // ------------------------------------------------------------------ isocline / offset curve
-
-pub fn isocline(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Isocline is not supported yet")
-}
 
 /// Offset curve on planar faces (geodesic = Euclidean on a plane).
 pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {

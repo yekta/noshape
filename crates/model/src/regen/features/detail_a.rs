@@ -33,7 +33,7 @@ fn edge_normals(shape: &Shape, faces: &[Shape], edge_faces: &[Vec<u32>], ei: usi
 
 pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("draftFeatureType", "PARTING_LINE") {
-        return err("Parting line draft is not supported yet");
+        return parting_line_draft(ev);
     }
     let Some(np) = ev.query("neutralPlane").first() else { return err("Select a neutral plane") };
     let frame = ev.resolve_plane(np).ok_or_else(|| fe("The neutral plane could not be resolved"))?;
@@ -56,6 +56,89 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         ev.replace_body(bi, res.shape, face_names);
+    }
+    Ok(())
+}
+
+/// Parting line draft with planar parting lines (perpendicular to the pull
+/// direction): the faces next to the parting edges on the drafted side(s)
+/// are tapered about the parting plane.
+fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
+    let Some(pr) = ev.query("pullDirectionEntity").first() else { return err("Select the pull direction") };
+    let mut pull = ev.resolve_direction(pr).ok_or_else(|| fe("The pull direction could not be resolved"))?.normalize();
+    if ev.bool("pullDirection") {
+        pull = -pull;
+    }
+    let edges = ev.resolve_edges(ev.query("partingEdges"));
+    if edges.is_empty() {
+        return err("Select the parting edges");
+    }
+    let bi = edges[0].0;
+    if edges.iter().any(|e| e.0 != bi) {
+        return err("The parting edges must belong to one part");
+    }
+    let body = ev.ctx.bodies[bi].clone();
+    let mut pts = Vec::new();
+    for &(_, ei) in &edges {
+        let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
+        let info = e.edge_info()?;
+        for t in 0..=4 {
+            pts.push(e.point_at(info.first_param + (info.last_param - info.first_param) * t as f64 / 4.0)?);
+        }
+    }
+    let h0 = pts[0].dot(pull);
+    if pts.iter().any(|p| (p.dot(pull) - h0).abs() > 1e-7) {
+        return err("Parting lines must lie in a plane perpendicular to the pull direction");
+    }
+    let origin = pts[0];
+    let ef = body.shape.edge_faces()?;
+    let faces = body.shape.faces();
+    let (mut above, mut below): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+    for &(_, ei) in &edges {
+        for &f in ef.get(ei).map(|v| v.as_slice()).unwrap_or(&[]) {
+            let f = f as usize;
+            let Some(p) = point_on_face(&faces[f]) else { continue };
+            let Some((_, n)) = face_normal_near(&faces[f], p) else { continue };
+            if n.normalize().dot(pull).abs() > 1.0 - 1e-9 {
+                continue; // faces perpendicular to the pull are not drafted
+            }
+            let list = if (p - origin).dot(pull) >= 0.0 { &mut above } else { &mut below };
+            if !list.contains(&f) {
+                list.push(f);
+            }
+        }
+    }
+    let angle = ev.angle("angle")?;
+    let sets: Vec<(Vec<usize>, DVec3, f64)> = match ev.enum_("partingLineSides") {
+        "SYMMETRIC" => vec![(above, pull, angle), (below, -pull, angle)],
+        "TWO_SIDED" => {
+            let a2 = ev.angle("secondAngle")?;
+            let a2 = if ev.bool("secondPullDirection") { a2 } else { -a2 };
+            vec![(above, pull, angle), (below, -pull, a2)]
+        }
+        _ => {
+            if ev.bool("alongPull") { vec![(above, pull, angle)] } else { vec![(below, -pull, angle)] }
+        }
+    };
+    let orig = body.faces.clone();
+    let mut drafted = false;
+    for (set, dir, ang) in sets {
+        if set.is_empty() || ang.abs() < 1e-12 {
+            continue;
+        }
+        let body = ev.ctx.bodies[bi].clone();
+        // Faces by name (indices change after the first draft).
+        let names: Vec<Name> = set.iter().filter_map(|&f| orig.get(f).cloned()).collect();
+        let idx: Vec<usize> = names.iter().flat_map(|n| body.find_faces(n)).collect();
+        let shapes: Vec<Shape> = idx.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
+        let neutral = k::Plane::new(origin, dir, if dir.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y });
+        let res = k::draft(&body.shape, &shapes, dir, &neutral, ang).map_err(kerr("Parting line draft failed"))?;
+        let face_names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+        drafted = true;
+        ev.replace_body(bi, res.shape, face_names);
+    }
+    if !drafted {
+        return err("No faces next to the parting edges to draft");
     }
     Ok(())
 }
@@ -94,9 +177,13 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
 // ------------------------------------------------------------------ face blend
 
 pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
-    if ev.is("crossSection", "SWEPT_PROFILE") {
-        return err("Face blend with a swept profile cross section is not supported yet");
-    }
+    let swept = ev.is("crossSection", "SWEPT_PROFILE");
+    let spine_dir = if swept {
+        let Some(r) = ev.query("spine").first() else { return err("Select the spine of the swept profile") };
+        Some(ev.resolve_axis(r).ok_or_else(|| fe("The spine must be a straight edge"))?.1)
+    } else {
+        None
+    };
     if ev.bool("asymmetric") {
         return err("Asymmetric face blends are not supported yet");
     }
@@ -137,6 +224,20 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         }
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
             edges = super::detail::propagate_tangent(&body.shape, &edges);
+        }
+        // A circular profile swept along a spine parallel to the blended
+        // (straight) edges is the rolling-ball blend.
+        if let Some(d) = spine_dir {
+            for &ei in &edges {
+                let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
+                let parallel = match e.edge_curve()? {
+                    k::Curve::Line { direction, .. } => direction.normalize().cross(d.normalize()).length() < 1e-6,
+                    _ => false,
+                };
+                if !parallel {
+                    return err("Swept profile blends are supported when the spine is parallel to straight blended edges");
+                }
+            }
         }
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let res = if shape_kind == "CHAMFER" {

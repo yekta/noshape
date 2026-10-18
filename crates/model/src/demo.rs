@@ -183,15 +183,33 @@ pub fn pin_studio() -> PartStudio {
     ps
 }
 
+/// Make the pin Part Studio configured: a list input "Length" switching the
+/// pin length (Standard 40 mm, the default, or Long 60 mm).
+pub fn configure_pin_length(ps: &mut PartStudio) {
+    use crate::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption};
+    let Some(ex) = ps.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id) else { return };
+    let opt = |id: &str| ListOption { id: id.into(), name: id.into() };
+    ps.configuration.inputs.push(ConfigInput { id: "Length".into(), name: "Length".into(), kind: ConfigInputKind::List { options: vec![opt("Standard"), opt("Long")], default: "Standard".into() }, visible_when: None });
+    ps.configuration.configured.push(ConfiguredParam {
+        input: "Length".into(),
+        feature: ex,
+        param: "depth".into(),
+        values: [("Standard".to_string(), ParamValue::Expr(ExprValue::new("40 mm"))), ("Long".to_string(), ParamValue::Expr(ExprValue::new("60 mm")))].into_iter().collect(),
+    });
+}
+
 /// Fill the document's first Assembly tab with a demo assembly: two plates
 /// (the second fastened on top of the first, turned 90°) and a pin in a
-/// revolute mate through the center holes. Adds a "Pin" Part Studio.
+/// revolute mate through the center holes. Adds a "Pin" Part Studio, which
+/// is configured (Length: Standard / Long; the instance uses the default).
 pub fn add_demo_assembly(doc: &mut Document) {
     use crate::assembly::eval::AssemblyEvaluator;
     use crate::assembly::*;
     use crate::reference::Inference;
     let Some(plate_tab) = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| t.id) else { return };
-    let pin_tab = doc.add_tab("Pin", TabContent::PartStudio(pin_studio()));
+    let mut pin_ps = pin_studio();
+    configure_pin_length(&mut pin_ps);
+    let pin_tab = doc.add_tab("Pin", TabContent::PartStudio(pin_ps));
     let mut ev = AssemblyEvaluator::new();
     let cfg = ConfigValues::default();
     let (Some(plate), Some(pin)) = (ev.studio(doc, plate_tab, &cfg), ev.studio(doc, pin_tab, &cfg)) else { return };
@@ -242,6 +260,7 @@ pub fn add_demo_assembly(doc: &mut Document) {
         limits: vec![],
         suppressed: false,
         extra: vec![],
+        tangent_propagation: true,
     };
     let mut fastened = mate(4, "Fastened 1", MateType::Fastened, mc(1, top, Inference::Centroid), mc(2, bottom, Inference::Centroid));
     fastened.reorient_secondary = 1;

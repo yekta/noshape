@@ -22,10 +22,11 @@ pub fn derived() -> FeatureType {
         hidden(ParamSpec::bool("newUI", "New UI", true)),
         ParamSpec::text("partStudio", "Part Studio", "").visible(new_ui),
         ParamSpec::bool("preserveActiveSheetMetal", "Preserve active sheet metal models", false).visible(new_ui),
-        ParamSpec::query("location", "Locations", QueryFilter::MATE_CONNECTOR).visible(new_ui),
+        ParamSpec::query("location", "Locations", QueryFilter::MATE_CONNECTOR | QueryFilter::POINT_LIKE).visible(new_ui),
         ParamSpec::enum_("placement", "Placement", &[("AT_ORIGIN", "Base origin"), ("AT_MATE_CONNECTOR", "Base mate connector")]).visible(new_ui),
         hidden(ParamSpec::num("mateConnectorIndex", "Mate connector index", NumSpec::integer(0, 0, 100_000))),
-        hidden(ParamSpec::text("mateConnectorId", "Mate connector id", "")),
+        // Name of the source Part Studio's mate connector aligned with the locations.
+        ParamSpec::text("mateConnectorId", "Base mate connector", "").visible(move |v| new_ui(v) && v.is("placement", "AT_MATE_CONNECTOR")),
         hidden(ParamSpec::num("mateConnectorIndexInFeature", "Mate connector index in feature", NumSpec::integer(0, 0, 100_000))),
         ParamSpec::bool("includeMateConnectors", "Include mate connectors", true).visible(new_ui),
         ParamSpec::bool("includeProperties", "Include properties", true).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(new_ui),

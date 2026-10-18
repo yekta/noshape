@@ -12,6 +12,7 @@ thiserror.workspace = true
 smallvec.workspace = true
 indexmap.workspace = true
 log.workspace = true
+ttf-parser = "0.25"
 
 [dev-dependencies]
 serde_json = { workspace = true, features = ["float_roundtrip"] }

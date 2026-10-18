@@ -154,7 +154,9 @@ impl Params {
         };
         for e in sk.entities() {
             let own = e.own_params();
-            if own.is_empty() {
+            // Frozen entities inserted above the id allocator (e.g. text glyph
+            // outlines added after solving) take no part in the system.
+            if own.is_empty() || e.id.0 as usize >= p.ent_base.len() {
                 continue;
             }
             p.ent_base[e.id.0 as usize] = p.values.len() as u32;
@@ -955,7 +957,7 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
             ids.extend(e.point_refs());
             let mut free = false;
             for id in ids {
-                let base = sys.p.ent_base[id.0 as usize];
+                let base = sys.p.ent_base.get(id.0 as usize).copied().unwrap_or(NONE);
                 if base == NONE {
                     continue;
                 }

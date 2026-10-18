@@ -78,6 +78,10 @@ pub struct BomRow {
     pub config: ConfigValues,
     pub quantity: usize,
     pub instances: Vec<InstancePath>,
+    /// Mirrored (opposite-handed) version of the part.
+    pub mirrored: bool,
+    /// External reference key (part inserted from another document).
+    pub external: Option<String>,
 }
 
 /// Flattened parts-only bill of materials grouped by source part and
@@ -85,18 +89,20 @@ pub struct BomRow {
 pub fn bom(result: &AssemblyResult) -> Vec<BomRow> {
     let mut rows: Vec<BomRow> = Vec::new();
     for o in result.occurrences.iter().filter(|o| matches!(o.kind, BodyKind::Solid | BodyKind::Surface)) {
-        if let Some(r) = rows.iter_mut().find(|r| r.studio == o.studio && r.body == o.body && r.config == o.config) {
+        if let Some(r) = rows.iter_mut().find(|r| r.studio == o.studio && r.body == o.body && r.config == o.config && r.mirrored == o.mirrored && r.external == o.external) {
             r.quantity += 1;
             r.instances.push(o.path.clone());
         } else {
             rows.push(BomRow {
                 item: rows.len() + 1,
-                name: o.body_name.clone(),
+                name: if o.mirrored { format!("{} (mirrored)", o.body_name) } else { o.body_name.clone() },
                 studio: o.studio,
                 body: o.body.clone(),
                 config: o.config.clone(),
                 quantity: 1,
                 instances: vec![o.path.clone()],
+                mirrored: o.mirrored,
+                external: o.external.clone(),
             });
         }
     }
@@ -383,4 +389,185 @@ pub fn matched_targets(result: &AssemblyResult, asm: &Assembly, pattern: &Instan
     }
     out.sort_by_key(|(c, _, _)| *c);
     Ok(out)
+}
+
+/// One matched target: (stable code, target connector, initial placement of the copy).
+pub type MatchedTarget = (u32, MateConnectorRef, Option<Placement>);
+
+/// Part patterns and replicates whose matched targets no longer agree with
+/// their generated instances (the target geometry changed: more or fewer
+/// holes, a different Part Studio pattern count...): (pattern id, targets
+/// to pass to [`Assembly::sync_matched_pattern`]).
+pub fn stale_matched_patterns(result: &AssemblyResult, asm: &Assembly, units: &UnitPrefs) -> Vec<(super::MateId, Vec<MatchedTarget>)> {
+    let mut out = Vec::new();
+    for p in asm.patterns.iter().filter(|p| !p.suppressed && matches!(p.kind, PatternKind::PartPattern { .. } | PatternKind::Replicate { .. })) {
+        // An empty match list (the target geometry is gone) removes all copies.
+        let targets = matched_targets(result, asm, p, units).unwrap_or_default();
+        let mut want: Vec<(u32, &MateConnectorRef)> = targets.iter().map(|(c, t, _)| (*c, t)).collect();
+        let mut have: Vec<(u32, &MateConnectorRef)> = p.generated.iter().filter_map(|g| g.target.as_ref().map(|t| (g.index, t))).collect();
+        want.sort_by_key(|x| x.0);
+        have.sort_by_key(|x| x.0);
+        let same = want.len() == have.len() && want.iter().zip(&have).all(|(a, b)| a.0 == b.0 && a.1.instance == b.1.instance && a.1.path == b.1.path && a.1.reference == b.1.reference);
+        if !same {
+            out.push((p.id, targets));
+        }
+    }
+    out
+}
+
+// ------------------------------------------------------------ replace instance
+
+/// Geometric description of a face / edge / vertex used to find its
+/// counterpart on a replacement part.
+#[derive(Clone, Copy, Debug)]
+enum EntityGeom {
+    Face { kind: u8, point: DVec3, normal: DVec3, size: f64 },
+    Edge { kind: u8, point: DVec3, dir: DVec3, size: f64 },
+    Vertex { point: DVec3 },
+}
+
+fn surface_kind(s: &k::Surface) -> u8 {
+    match s {
+        k::Surface::Plane(_) => 0,
+        k::Surface::Cylinder { .. } => 1,
+        k::Surface::Cone { .. } => 2,
+        k::Surface::Sphere { .. } => 3,
+        k::Surface::Torus { .. } => 4,
+        _ => 9,
+    }
+}
+
+fn face_geom(f: &k::Shape) -> Option<EntityGeom> {
+    let kind = surface_kind(&f.face_surface().ok()?);
+    let point = f.centroid().ok()?;
+    let normal = match f.face_surface().ok()? {
+        k::Surface::Cylinder { axis, .. } | k::Surface::Cone { axis, .. } | k::Surface::Torus { axis, .. } => axis.normalize(),
+        _ => f.normal_at_point(point).ok()?.normalize_or_zero(),
+    };
+    let size = f.bounding_box(true).map(|b| b.diagonal()).unwrap_or(0.0);
+    Some(EntityGeom::Face { kind, point, normal, size })
+}
+
+fn edge_geom(e: &k::Shape) -> Option<EntityGeom> {
+    let info = e.edge_info().ok()?;
+    let (kind, dir) = match info.curve {
+        k::Curve::Line { direction, .. } => (0, direction.normalize()),
+        k::Curve::Circle { axis, .. } => (1, axis.normalize()),
+        _ => (9, (info.end - info.start).normalize_or_zero()),
+    };
+    let point = e.point_at((info.first_param + info.last_param) * 0.5).unwrap_or((info.start + info.end) * 0.5);
+    Some(EntityGeom::Edge { kind, point, dir, size: info.length })
+}
+
+fn entity_geom(b: &crate::regen::context::Body, r: &Reference) -> Option<EntityGeom> {
+    match r {
+        Reference::Face(n) => face_geom(&b.shape.sub_shape(k::ShapeType::Face, *b.find_faces(n).first()?).ok()?),
+        Reference::Edge(n) => edge_geom(&b.shape.sub_shape(k::ShapeType::Edge, *b.find_edges(n).first()?).ok()?),
+        Reference::Vertex(n) => Some(EntityGeom::Vertex { point: b.shape.sub_shape(k::ShapeType::Vertex, *b.find_vertices(n).first()?).ok()?.vertex_point().ok()? }),
+        _ => None,
+    }
+}
+
+/// Mismatch score between two entity descriptions (None: different types).
+fn geom_score(a: &EntityGeom, b: &EntityGeom) -> Option<f64> {
+    match (a, b) {
+        (EntityGeom::Face { kind: k1, point: p1, normal: n1, size: s1 }, EntityGeom::Face { kind: k2, point: p2, normal: n2, size: s2 }) if k1 == k2 => {
+            let scale = s1.max(*s2).max(1e-6);
+            let ndev = if *k1 == 0 { 1.0 - n1.dot(*n2) } else { 1.0 - n1.dot(*n2).abs() };
+            Some(p1.distance(*p2) / scale + 2.0 * ndev + 0.25 * (s1 - s2).abs() / scale)
+        }
+        (EntityGeom::Edge { kind: k1, point: p1, dir: d1, size: s1 }, EntityGeom::Edge { kind: k2, point: p2, dir: d2, size: s2 }) if k1 == k2 => {
+            let scale = s1.max(*s2).max(1e-6);
+            Some(p1.distance(*p2) / scale + 2.0 * (1.0 - d1.dot(*d2).abs()) + 0.25 * (s1 - s2).abs() / scale)
+        }
+        (EntityGeom::Vertex { point: p1 }, EntityGeom::Vertex { point: p2 }) => Some(p1.distance(*p2)),
+        _ => None,
+    }
+}
+
+/// Counterpart of `entity` (named in `old`) on the body `new`: the same
+/// name when it still exists there, else the entity of the same surface /
+/// curve type with the nearest position and normal / direction.
+pub fn match_entity(old: &crate::regen::context::Body, new: &crate::regen::context::Body, entity: &Reference) -> Option<Reference> {
+    let resolves = |r: &Reference| match r {
+        Reference::Face(n) => !new.find_faces(n).is_empty(),
+        Reference::Edge(n) => !new.find_edges(n).is_empty(),
+        Reference::Vertex(n) => !new.find_vertices(n).is_empty(),
+        _ => true,
+    };
+    if resolves(entity) {
+        return Some(entity.clone());
+    }
+    let g = entity_geom(old, entity)?;
+    let candidates: Vec<(Reference, Option<EntityGeom>)> = match entity {
+        Reference::Face(_) => new.faces.iter().enumerate().map(|(i, n)| (Reference::Face((**n).clone()), new.shape.sub_shape(k::ShapeType::Face, i).ok().and_then(|f| face_geom(&f)))).collect(),
+        Reference::Edge(_) => new.edges.iter().enumerate().map(|(i, n)| (Reference::Edge((**n).clone()), new.shape.sub_shape(k::ShapeType::Edge, i).ok().and_then(|e| edge_geom(&e)))).collect(),
+        Reference::Vertex(_) => new.vertices.iter().enumerate().map(|(i, n)| (Reference::Vertex((**n).clone()), new.shape.sub_shape(k::ShapeType::Vertex, i).ok().and_then(|v| v.vertex_point().ok()).map(|p| EntityGeom::Vertex { point: p }))).collect(),
+        _ => return None,
+    };
+    candidates.into_iter().filter_map(|(r, cg)| geom_score(&g, &cg?).map(|s| (r, s))).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| r)
+}
+
+/// Remap a connector reference from the old part to the new one (see [`match_entity`]).
+fn remap_reference(old: &crate::regen::context::Body, new: &crate::regen::context::Body, r: &Reference) -> Option<Reference> {
+    match r {
+        Reference::Implicit { on, inference } => match &**on {
+            Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) => match_entity(old, new, on).map(|e| Reference::Implicit { on: Box::new(e), inference: *inference }),
+            _ => Some(r.clone()),
+        },
+        Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) => match_entity(old, new, r),
+        _ => Some(r.clone()),
+    }
+}
+
+/// After replacing instances, re-point mate connectors (mates, assembly
+/// connectors, pattern directions) on them whose geometry names do not exist
+/// on the replacement part to geometrically matching entities. `old` is the
+/// result evaluated before the replacement, `new_ctx` / `new_body` the
+/// replacement part (`None` body: a rigid Part Studio, matched against its
+/// first part). Returns the number of references remapped.
+pub fn remap_replaced(asm: &mut Assembly, ids: &[InstanceId], old: &AssemblyResult, new_ctx: &crate::regen::context::Context, new_body: Option<&BodyId>) -> usize {
+    let new_b = match new_body {
+        Some(id) => new_ctx.body(id),
+        None => new_ctx.bodies.first(),
+    };
+    let Some(new_b) = new_b.cloned() else { return 0 };
+    let mut count = 0;
+    let mut fix = |c: &mut MateConnectorRef| {
+        if c.connector.is_some() || !c.path.is_empty() || !ids.contains(&c.instance) {
+            return;
+        }
+        let Some(occ) = old.occurrences.iter().find(|o| o.path == [c.instance]) else { return };
+        let Some(old_b) = occ.context.body(&occ.body) else { return };
+        if let Some(r) = remap_reference(old_b, &new_b, &c.reference)
+            && r != c.reference
+        {
+            c.reference = r;
+            count += 1;
+        }
+    };
+    for m in &mut asm.mates {
+        fix(&mut m.a);
+        fix(&mut m.b);
+        for e in &mut m.extra {
+            fix(e);
+        }
+    }
+    for c in &mut asm.connectors {
+        fix(&mut c.on);
+    }
+    for p in &mut asm.patterns {
+        match &mut p.kind {
+            PatternKind::Linear { direction, second, .. } => {
+                fix(direction);
+                if let Some(s) = second {
+                    fix(&mut s.direction);
+                }
+            }
+            PatternKind::Circular { axis, .. } => fix(axis),
+            PatternKind::Mirror { plane, .. } => fix(plane),
+            _ => {}
+        }
+    }
+    count
 }

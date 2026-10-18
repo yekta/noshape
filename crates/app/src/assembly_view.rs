@@ -52,6 +52,18 @@ type CatalogPart = (BodyId, String, Option<(DVec3, DVec3)>);
 type InferCache = ((Vec<InstanceId>, Reference), Vec<(Reference, Frame)>);
 type MenuAction = Box<dyn Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>)>;
 
+/// Resolves parts inserted from other documents (version-pinned snapshots).
+struct AppExternal;
+
+impl noshape_model::assembly::eval::ExternalStudios for AppExternal {
+    fn studio(&self, key: &str) -> Option<(Arc<Document>, TabId)> {
+        let r = crate::derived::ExternalRef::parse(key)?;
+        let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
+        let tab = doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.id;
+        Some((doc, tab))
+    }
+}
+
 /// A Part Studio or Assembly offered by the Insert panel.
 #[derive(Clone, Debug)]
 struct CatalogStudio {
@@ -105,8 +117,41 @@ struct DragState {
     ring_v0: DVec3,
     /// Current displacement along the axis (m) or angle about it (rad).
     value: f64,
+    /// Plane drag: cursor hit on the drag plane at the press, and the
+    /// current displacement in that plane.
+    grab0: DVec3,
+    offset: DVec3,
+    /// Center (ball) drag: the manipulator frame being placed.
+    triad_preview: Option<Frame>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
+}
+
+/// Snap mode drag: a connector of one instance dragged onto another's.
+struct SnapDrag {
+    top: InstanceId,
+    press: DVec2,
+    started: bool,
+    /// Connectors on the dragged instance (Ctrl cycles) and the current one.
+    sources: Vec<MateConnectorRef>,
+    source_ix: usize,
+    /// Target connector under the cursor.
+    target: Option<MateConnectorRef>,
+    /// Placement of the dragged instance when the drag started.
+    start: Placement,
+    /// Grab point (world) and camera plane normal for the free follow.
+    grab: DVec3,
+    normal: DVec3,
+}
+
+/// Explode step edit dialog.
+pub(crate) struct StepEdit {
+    pub view: usize,
+    pub step: usize,
+    pub instances: Vec<InstanceId>,
+    /// Translation X / Y / Z, rotation angle.
+    pub inputs: [Entity<InputState>; 4],
+    pub rotation: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -205,6 +250,26 @@ pub struct AssemblyView {
     transient_sub: Option<Subscription>,
     config_panel: Option<ConfigSession>,
     replace_panel: Option<ReplaceSession>,
+    /// Repositioned manipulator: instances it belongs to and its frame
+    /// relative to the first one's placement (follows the part).
+    triad: Option<(Vec<InstanceId>, Frame)>,
+    /// Manipulator context menu (position, handle).
+    triad_menu: Option<(Point<Pixels>, ManipHandle)>,
+    snap_drag: Option<SnapDrag>,
+    /// The snap drag was started on a fixed instance (only a click picks).
+    snap_fixed: bool,
+    /// Snapped placement of the dragged instance, used as the start of the
+    /// mate dialog's preview (until the dialog closes).
+    snap_start: Option<(InstanceId, Placement)>,
+    /// A Part Studio changed: re-sync part patterns / replicates after the next evaluation.
+    pattern_resync: bool,
+    step_edit: Option<StepEdit>,
+    ctrl_down: bool,
+    /// Insert from another document: the document's versions and the chosen one.
+    ext_pick: Option<(crate::derived::ExternalDocInfo, usize)>,
+    /// Newer version of each external reference (None: up to date), and keys being checked.
+    ext_updates: HashMap<String, Option<crate::derived::VersionChoice>>,
+    ext_checking: HashSet<String>,
     focus: FocusHandle,
     fitted_once: bool,
     _subs: Vec<Subscription>,
@@ -263,7 +328,14 @@ impl AssemblyView {
         subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
-            DocEvent::TabChanged(_) | DocEvent::TabsChanged => this.schedule_eval(window, cx),
+            DocEvent::TabChanged(t) => {
+                // Target geometry of part patterns / replicates may have changed.
+                if *t != this.tab {
+                    this.pattern_resync = true;
+                }
+                this.schedule_eval(window, cx)
+            }
+            DocEvent::TabsChanged => this.schedule_eval(window, cx),
             DocEvent::Reloaded => {
                 this.close_mate(window, cx);
                 this.schedule_eval(window, cx)
@@ -279,7 +351,11 @@ impl AssemblyView {
             doc,
             gpu,
             viewport,
-            evaluator: Arc::new(Mutex::new(AssemblyEvaluator::new())),
+            evaluator: Arc::new(Mutex::new({
+                let mut ev = AssemblyEvaluator::new();
+                ev.set_external(Arc::new(AppExternal));
+                ev
+            })),
             result: Arc::new(AssemblyResult::default()),
             built: None,
             cache: AsmGpuCache::default(),
@@ -332,6 +408,17 @@ impl AssemblyView {
             transient_sub: None,
             config_panel: None,
             replace_panel: None,
+            triad: None,
+            triad_menu: None,
+            snap_drag: None,
+            snap_fixed: false,
+            snap_start: None,
+            pattern_resync: false,
+            step_edit: None,
+            ctrl_down: false,
+            ext_pick: None,
+            ext_updates: HashMap::new(),
+            ext_checking: HashSet::new(),
             focus: cx.focus_handle(),
             fitted_once: false,
             _subs: subs,
@@ -364,6 +451,12 @@ impl AssemblyView {
             // The second connector's instance stays put unless the first is fixed.
             if !fixed(m.a.instance) && !fixed(m.b.instance) {
                 opts.hold.push(m.b.instance);
+            }
+            // After a snap drag the dragged instance starts at its snapped placement.
+            if let Some((id, p)) = self.snap_start {
+                let mut start: HashMap<InstanceId, Placement> = asm.instances.iter().map(|i| (i.id, i.placement)).collect();
+                start.insert(id, p);
+                opts.start = Some(start);
             }
             match s.editing.and_then(|id| asm.mates.iter().position(|x| x.id == id)) {
                 Some(i) => asm.mates[i] = m,
@@ -432,6 +525,10 @@ impl AssemblyView {
     fn apply_result(&mut self, result: Arc<AssemblyResult>, _window: &mut Window, cx: &mut Context<Self>) {
         self.result = result;
         self.infer = None;
+        if std::mem::take(&mut self.pattern_resync) && self.mate.is_none() && self.pattern.is_none() {
+            self.resync_patterns(cx);
+        }
+        self.check_external_updates(cx);
         if self.explode.is_some() || self.placing.is_some() {
             // Re-apply display-only state (explode playback, cursor placement).
             self.update_placing(cx);
@@ -461,6 +558,11 @@ impl AssemblyView {
 
     fn scene_options(&self) -> AsmSceneOptions {
         let mut o = AsmSceneOptions { isolate: self.isolate.clone(), ..Default::default() };
+        if let Some(s) = &self.snap_drag
+            && s.started
+        {
+            o.ghost_tops.insert(s.top);
+        }
         if let (Some(list), Some(SidePanel::Interference)) = (&self.interference, self.panel) {
             for i in list {
                 o.error_tops.insert(i.a[0]);
@@ -592,6 +694,15 @@ impl AssemblyView {
         if let Some(Some(src)) = &self.snap {
             chosen.push(src.clone());
         }
+        if let Some(s) = &self.snap_drag
+            && s.started
+        {
+            chosen.extend(s.sources.get(s.source_ix).cloned());
+            chosen.extend(s.target.clone());
+        }
+        if self.explode.is_some() {
+            h.trails = self.result.explode_trails.clone();
+        }
         for c in &chosen {
             if let Some(f) = self.result.connector_world(c, &units) {
                 h.triads.push(Triad { frame: f, size, strong: false });
@@ -637,7 +748,7 @@ impl AssemblyView {
 
     /// Instances the manipulator moves.
     fn manip_targets(&self, cx: &App) -> Vec<InstanceId> {
-        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() {
+        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() {
             return vec![];
         }
         let Some(asm) = self.assembly(cx) else { return vec![] };
@@ -666,6 +777,15 @@ impl AssemblyView {
             if let Some((a, b)) = self.result.instance_bounds(*id) {
                 bb = Some(bb.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)));
             }
+        }
+        if let Some(f) = self.drag.as_ref().and_then(|d| d.triad_preview) {
+            return Some(f);
+        }
+        if let Some((tids, local)) = &self.triad
+            && *tids == ids
+            && let Some(p) = self.result.solved.placement(ids[0])
+        {
+            return Some(placement_to_frame(&p).mul(local));
         }
         let center = bb.map(|(a, b)| (a + b) * 0.5).or_else(|| self.result.solved.placement(ids[0]).map(|p| DVec3::from(p.translation)))?;
         Some(Frame::new(center, glam::DQuat::IDENTITY))
@@ -1028,6 +1148,7 @@ impl AssemblyView {
         };
         let editing = s.editing;
         self.mate = None;
+        self.snap_start = None;
         let desc = if editing.is_some() { format!("Edit : {}", m.name) } else { format!("Insert : {}", m.name) };
         // Solved placements of the preview (which includes this mate) are folded in.
         self.edit(&desc, cx, |a| match editing.and_then(|id| a.mates.iter().position(|x| x.id == id)) {
@@ -1040,6 +1161,7 @@ impl AssemblyView {
     }
 
     fn close_mate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.snap_start = None;
         if self.mate.take().is_some() {
             window.focus(&self.focus, cx);
             self.infer = None;
@@ -1267,18 +1389,21 @@ impl AssemblyView {
 
     fn save_named_position(&mut self, name: String, cx: &mut Context<Self>) {
         let placements = self.result.solved.placements.clone();
+        let mate_values = self.assembly(cx).map(|a| self.result.named_position_values(a)).unwrap_or_default();
         self.edit(&format!("Insert : Named position {name}"), cx, |a| {
             a.named_positions.retain(|n| n.name != name);
-            a.named_positions.push(NamedPosition { name, placements });
+            a.named_positions.push(NamedPosition { name, placements, mate_values });
         });
     }
 
     fn update_named_position(&mut self, i: usize, cx: &mut Context<Self>) {
         let placements = self.result.solved.placements.clone();
+        let mate_values = self.assembly(cx).map(|a| self.result.named_position_values(a)).unwrap_or_default();
         let name = self.assembly(cx).and_then(|a| a.named_positions.get(i).map(|n| n.name.clone())).unwrap_or_default();
         self.edit(&format!("Update named position : {name}"), cx, |a| {
             if let Some(np) = a.named_positions.get_mut(i) {
                 np.placements = placements;
+                np.mate_values = mate_values;
             }
         });
         self.message = Some((false, format!("{name} updated to the current positions.")));
@@ -1295,11 +1420,20 @@ impl AssemblyView {
 
     fn apply_named_position(&mut self, i: usize, cx: &mut Context<Self>) {
         let Some(np) = self.assembly(cx).and_then(|a| a.named_positions.get(i).cloned()) else { return };
+        // Stored placements as the start, stored driving mate values imposed.
+        let solved = self.result.prepared.solve_named_position(&np);
+        let mut placements = np.placements.clone();
+        for (id, p) in &solved.placements {
+            match placements.iter_mut().find(|(i, _)| i == id) {
+                Some(x) => x.1 = *p,
+                None => placements.push((*id, *p)),
+            }
+        }
         let tab = self.tab;
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab(tab, &format!("Apply named position : {}", np.name), cx, |c| {
                 if let TabContent::Assembly(a) = c {
-                    for (id, p) in &np.placements {
+                    for (id, p) in &placements {
                         if let Some(inst) = a.instance_mut(*id) {
                             inst.placement = *p;
                         }
@@ -1484,7 +1618,9 @@ impl AssemblyView {
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
         let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode;
-        let capture = free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit));
+        // Snap mode: pressing on geometry starts a snap drag (a click still picks).
+        let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
+        let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
     }
 
@@ -1641,6 +1777,7 @@ impl AssemblyView {
             }
             ViewportEvent::Click { pick, position, modifiers, .. } => {
                 self.context_menu = None;
+                self.triad_menu = None;
                 self.pointer = *position;
                 if self.placing.is_some() {
                     // Only a click after the cursor moved over the viewport places
@@ -1672,18 +1809,20 @@ impl AssemblyView {
             }
             ViewportEvent::ToolDown { position, .. } => {
                 self.context_menu = None;
+                self.triad_menu = None;
                 if let (Some(h), Some(f)) = (self.manip_hover, self.manipulator(cx)) {
                     let ids = self.manip_targets(cx);
                     let top = ids[0];
-                    let (k, ring) = match h {
-                        ManipHandle::Axis(k) => (k, false),
-                        ManipHandle::Ring(k) => (k, true),
+                    let axes = [f.x(), f.y(), f.z()];
+                    let axis = match h {
+                        ManipHandle::Axis(k) | ManipHandle::Ring(k) | ManipHandle::Plane(k) => axes[k],
+                        ManipHandle::Center => self.viewport.read(cx).camera.forward(),
                     };
-                    let axis = [f.x(), f.y(), f.z()][k];
                     let pose = self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default();
                     let local = pose.inverse().transform_point(f.origin);
                     let start: HashMap<InstanceId, Placement> = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p))).collect();
-                    let ring_v0 = if ring { self.ring_vector(*position, f.origin, axis, cx).unwrap_or(DVec3::X) } else { DVec3::ZERO };
+                    let ring_v0 = if matches!(h, ManipHandle::Ring(_)) { self.ring_vector(*position, f.origin, axis, cx).unwrap_or(DVec3::X) } else { DVec3::ZERO };
+                    let grab0 = if matches!(h, ManipHandle::Plane(_) | ManipHandle::Center) { self.ray_plane(*position, f.origin, axis, cx).unwrap_or(f.origin) } else { DVec3::ZERO };
                     self.manip_value = None;
                     self.drag = Some(DragState {
                         top,
@@ -1699,8 +1838,15 @@ impl AssemblyView {
                         start,
                         ring_v0,
                         value: 0.0,
+                        grab0,
+                        offset: DVec3::ZERO,
+                        triad_preview: None,
                         explode: self.explode_edit,
                     });
+                    return;
+                }
+                if self.snap.is_some() {
+                    self.start_snap_drag(*position, cx);
                     return;
                 }
                 let Some(t) = self.hover.clone() else { return };
@@ -1727,10 +1873,17 @@ impl AssemblyView {
                     start: HashMap::new(),
                     ring_v0: DVec3::ZERO,
                     value: 0.0,
+                    grab0: DVec3::ZERO,
+                    offset: DVec3::ZERO,
+                    triad_preview: None,
                     explode: false,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
+                if self.snap_drag.is_some() {
+                    self.update_snap_drag(*position, cx);
+                    return;
+                }
                 let Some(d) = &self.drag else { return };
                 if !d.started && position.distance(d.press) > 3.0 {
                     self.drag.as_mut().unwrap().started = true;
@@ -1765,6 +1918,28 @@ impl AssemblyView {
                         d.value = s;
                         d.pending = Some(p);
                     }
+                    Some(ManipHandle::Plane(_)) => {
+                        let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
+                        let Some(hit) = self.ray_plane(*position, pp, n, cx) else { return };
+                        let d = self.drag.as_mut().unwrap();
+                        d.offset = hit - g0;
+                        d.pending = Some(pp + d.offset);
+                    }
+                    Some(ManipHandle::Center) => {
+                        // Reposition the manipulator itself (snapping to mate connectors).
+                        let frame = self.triad_snap(*position, cx).unwrap_or_else(|| {
+                            let (pp, n, g0) = (d.plane_point, d.plane_normal, d.grab0);
+                            let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
+                            let hit = self.ray_plane(*position, pp, n, cx).unwrap_or(g0);
+                            Frame::new(pp + (hit - g0), rot)
+                        });
+                        if let Some(d) = self.drag.as_mut() {
+                            d.triad_preview = Some(frame);
+                        }
+                        self.refresh_scene(false, cx);
+                        cx.notify();
+                        return;
+                    }
                     None => {
                         let denom = dir.dot(d.plane_normal);
                         if denom.abs() < 1e-9 {
@@ -1781,11 +1956,27 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::ToolUp { modifiers, .. } => {
+                if self.snap_drag.is_some() {
+                    self.finish_snap_drag(window, cx);
+                    return;
+                }
                 let Some(d) = self.drag.take() else { return };
+                if d.handle == Some(ManipHandle::Center) {
+                    // The manipulator keeps its new frame relative to the part.
+                    if d.started
+                        && let Some(f) = d.triad_preview
+                        && let Some(p) = self.result.solved.placement(d.ids[0])
+                    {
+                        self.triad = Some((d.ids.clone(), placement_to_frame(&p).inverse().mul(&f)));
+                    }
+                    self.refresh_scene(false, cx);
+                    cx.notify();
+                    return;
+                }
                 if d.started {
                     if d.explode {
                         if let Some(step) = self.explode_preview.take()
-                            && d.value.abs() > 1e-9
+                            && (d.value.abs() > 1e-9 || d.offset.length() > 1e-9)
                         {
                             self.push_explode_step(step, cx);
                             self.open_manip_value(&d, window, cx);
@@ -1811,6 +2002,13 @@ impl AssemblyView {
                 cx.notify();
             }
             ViewportEvent::ContextMenu { pick, position } => {
+                if let Some(OverlayPick::Manip(h)) = self.overlay(*pick) {
+                    self.context_menu = None;
+                    self.triad_menu = Some((*position, h));
+                    cx.notify();
+                    return;
+                }
+                self.triad_menu = None;
                 match self.pick(*pick) {
                     Some(t) => {
                         let top = t.path[0];
@@ -1842,17 +2040,38 @@ impl AssemblyView {
         (v.length() > 1e-12).then(|| v.normalize())
     }
 
-    /// Start placements of a manipulator drag moved by `value` (translation
-    /// along the axis or rotation about it through the triad center).
-    fn manip_targets_for(handle: ManipHandle, axis: DVec3, center: DVec3, value: f64, start: &HashMap<InstanceId, Placement>) -> Vec<(InstanceId, Placement)> {
-        let m = match handle {
+    /// Rigid motion of a manipulator drag: translation along the axis by
+    /// `value`, rotation by `value` about it through the triad center, or
+    /// translation by `offset` in a plane.
+    fn manip_motion(handle: ManipHandle, axis: DVec3, center: DVec3, value: f64, offset: DVec3) -> Frame {
+        match handle {
             ManipHandle::Axis(_) => Frame::new(axis * value, glam::DQuat::IDENTITY),
             ManipHandle::Ring(_) => {
                 let r = glam::DQuat::from_axis_angle(axis.normalize(), value);
                 Frame::new(center - r * center, r)
             }
-        };
+            ManipHandle::Plane(_) => Frame::new(offset, glam::DQuat::IDENTITY),
+            ManipHandle::Center => Frame::default(),
+        }
+    }
+
+    /// Start placements moved by a rigid motion.
+    fn moved_placements(m: &Frame, start: &HashMap<InstanceId, Placement>) -> Vec<(InstanceId, Placement)> {
         start.iter().map(|(id, p)| (*id, frame_to_placement(&m.mul(&placement_to_frame(p))))).collect()
+    }
+
+    fn manip_targets_for(handle: ManipHandle, axis: DVec3, center: DVec3, value: f64, start: &HashMap<InstanceId, Placement>) -> Vec<(InstanceId, Placement)> {
+        Self::moved_placements(&Self::manip_motion(handle, axis, center, value, DVec3::ZERO), start)
+    }
+
+    /// Cursor ray hit on a plane.
+    fn ray_plane(&self, position: DVec2, point: DVec3, normal: DVec3, cx: &App) -> Option<DVec3> {
+        let (o, d) = self.viewport.read(cx).ray(position);
+        let den = d.dot(normal);
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        Some(o + d * ((point - o).dot(normal) / den))
     }
 
     fn update_explode_preview(&mut self, cx: &mut Context<Self>) {
@@ -1860,7 +2079,8 @@ impl AssemblyView {
         let step = match d.handle {
             Some(ManipHandle::Axis(_)) => ExplodeStep::translate(d.ids.clone(), (d.plane_normal * d.value).into()),
             Some(ManipHandle::Ring(_)) => ExplodeStep::rotate(d.ids.clone(), d.plane_normal.into(), d.value, d.plane_point.into()),
-            None => return,
+            Some(ManipHandle::Plane(_)) => ExplodeStep::translate(d.ids.clone(), d.offset.into()),
+            Some(ManipHandle::Center) | None => return,
         };
         self.explode_preview = Some(step);
         self.reapply_display(cx);
@@ -1885,6 +2105,10 @@ impl AssemblyView {
             None if !additive => self.selected.clear(),
             None => {}
         }
+        // A repositioned manipulator belongs to its instances until they are deselected.
+        if self.triad.as_ref().is_some_and(|(ids, _)| *ids != self.selected) {
+            self.triad = None;
+        }
     }
 
     fn run_drag_solve(&mut self, cx: &mut Context<Self>) {
@@ -1895,9 +2119,10 @@ impl AssemblyView {
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
         let opts = match d.handle {
             Some(h @ ManipHandle::Ring(_)) => SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), ..Default::default() },
-            Some(h @ ManipHandle::Axis(_)) if self.result.solved.instance_dof.get(&d.top).copied() == Some(6) => {
+            Some(h @ (ManipHandle::Axis(_) | ManipHandle::Plane(_))) if self.result.solved.instance_dof.get(&d.top).copied() == Some(6) => {
                 // Free instance: exact translation from the drag start.
-                SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), ..Default::default() }
+                let m = Self::manip_motion(h, d.plane_normal, d.plane_point, d.value, d.offset);
+                SolveOptions { targets: Self::moved_placements(&m, &d.start), start: Some(start), ..Default::default() }
             }
             _ => SolveOptions { drags: vec![(d.top, d.local, target)], start: Some(start), ..Default::default() },
         };
@@ -2051,6 +2276,8 @@ impl AssemblyView {
         let hidden = inst.map(|i| i.hidden).unwrap_or_else(|| node.is_some_and(|n| n.hidden));
         let suppressed = inst.map(|i| i.suppressed).unwrap_or_else(|| node.is_some_and(|n| n.suppressed));
         let error = node.and_then(|n| n.error.clone());
+        let ext_key = inst.and_then(|i| i.source.external_key().map(|k| k.to_string()));
+        let update = ext_key.as_ref().and_then(|k| self.ext_updates.get(k).cloned().flatten()).zip(ext_key.clone());
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
         let selected = is_top && self.selected.contains(&top);
         let has_children = node.is_some_and(|n| !n.children.is_empty());
@@ -2101,6 +2328,24 @@ impl AssemblyView {
                 d.child(div().id(SharedString::from(format!("dof-{}", top.0))).text_xs().text_color(pal.info).child(format!("{n}")).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has {n} degrees of freedom")).build(w, cx)))
             })
             .when_some(error.clone(), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
+            .when_some(update.clone(), |d, (v, key)| {
+                let tip = format!("Update available: {} (click to update)", v.label);
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("upd-{}", top.0)))
+                        .px_1()
+                        .rounded_sm()
+                        .bg(with_alpha(pal.info, 0.2))
+                        .text_xs()
+                        .text_color(pal.info)
+                        .child("update")
+                        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            this.update_external(&key, &v, cx);
+                        })),
+                )
+            })
             .when(is_top, |d| {
                 d.child(
                     Button::new(SharedString::from(format!("eye-{}", top.0)))
@@ -2132,7 +2377,7 @@ impl AssemblyView {
         let view = cx.entity();
         row.context_menu(move |menu, _, _| {
             let (v1, v2, v3, v4, v5) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
-            menu.item(PopupMenuItem::new(if fixed { "Unfix" } else { "Fix" }).on_click(move |_, _, cx| v1.update(cx, |t, cx| {
+            let menu = menu.item(PopupMenuItem::new(if fixed { "Unfix" } else { "Fix" }).on_click(move |_, _, cx| v1.update(cx, |t, cx| {
                 let ids = t.targets(Some(top));
                 t.set_fixed(ids, !fixed, cx)
             })))
@@ -2157,6 +2402,7 @@ impl AssemblyView {
                 let v = view.clone();
                 PopupMenuItem::new("Replace instance…").on_click(move |_, _, cx| v.update(cx, |t, cx| t.open_replace(top, cx)))
             })
+
             .item({
                 let v = view.clone();
                 PopupMenuItem::new("Add mate connector at instance origin").on_click(move |_, window, cx| v.update(cx, |t, cx| t.mc_at_instance_origin(top, window, cx)))
@@ -2174,7 +2420,14 @@ impl AssemblyView {
             .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v5.update(cx, |t, cx| {
                 let ids = t.targets(Some(top));
                 t.delete_instances(ids, cx)
-            })))
+            })));
+            match update.clone() {
+                Some((ver, key)) => {
+                    let v = view.clone();
+                    menu.separator().item(PopupMenuItem::new(format!("Update to {}", ver.label)).on_click(move |_, _, cx| v.update(cx, |t, cx| t.update_external(&key, &ver, cx))))
+                }
+                None => menu,
+            }
         })
         .into_any_element()
     }
@@ -2421,6 +2674,34 @@ impl AssemblyView {
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))),
             );
         }
+        body = body.child(div().pt_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("OTHER DOCUMENTS"));
+        body = body.child(
+            h_flex()
+                .id("ins-other-doc")
+                .h(px(26.))
+                .px_2()
+                .gap_2()
+                .rounded_sm()
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.panel_hover))
+                .child(svg().path(icon_path("document")).size_4().text_color(pal.accent))
+                .child(div().flex_1().text_sm().child("Other document…"))
+                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                    let v = cx.entity();
+                    crate::files::request_open_path("Insert from document", "noshape documents", &["noshape"], window, cx, move |path, cx| {
+                        v.update(cx, |this, cx| {
+                            match crate::derived::external_doc_info(&path) {
+                                Ok(info) => this.ext_pick = Some((info, 0)),
+                                Err(e) => this.message = Some((true, format!("Could not open {}: {e:#}", path.display()))),
+                            }
+                            cx.notify();
+                        });
+                    });
+                })),
+        );
+        if let Some(ch) = self.render_ext_insert_chooser(cx) {
+            body = body.child(ch);
+        }
         Self::panel_frame("Insert parts and assemblies", body, cx.listener(|this, _: &ClickEvent, _, cx| {
             this.insert_open = false;
             cx.notify();
@@ -2578,7 +2859,10 @@ impl AssemblyView {
                             .hover(|d| d.bg(pal.panel_hover))
                             .child(div().w(px(28.)).text_color(pal.text_faint).child(format!("{}", r.item)))
                             .child(div().flex_1().truncate().child(r.name.clone()))
-                            .child(div().w(px(90.)).truncate().text_xs().text_color(pal.text_muted).child(studio_name(r.studio)))
+                            .child(div().w(px(90.)).truncate().text_xs().text_color(pal.text_muted).child(match r.external.as_deref().and_then(crate::derived::ExternalRef::parse) {
+                                Some(e) => e.path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Other document".into()),
+                                None => studio_name(r.studio),
+                            }))
                             .child(div().w(px(32.)).child(format!("{}", r.quantity))),
                     );
                 }
@@ -2737,6 +3021,10 @@ impl AssemblyView {
             left = left.child(self.render_replace_panel(cx));
             any_left = true;
         }
+        if self.step_edit.is_some() {
+            left = left.child(self.render_step_edit(cx));
+            any_left = true;
+        }
         if any_left {
             out.push(left.into_any_element());
         }
@@ -2779,6 +3067,9 @@ impl AssemblyView {
             );
         }
         if let Some(m) = self.render_context_menu(cx) {
+            out.push(m);
+        }
+        if let Some(m) = self.render_triad_menu(cx) {
             out.push(m);
         }
         out
@@ -2883,8 +3174,22 @@ impl Render for AssemblyView {
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
+            .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
+                // Ctrl (tap) cycles the dragged connector in snap mode.
+                let ctrl = ev.modifiers.control;
+                if ctrl && !this.ctrl_down {
+                    this.cycle_snap_source(cx);
+                }
+                this.ctrl_down = ctrl;
+            }))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
-                if this.placing.is_some() {
+                if this.triad_menu.is_some() {
+                    this.triad_menu = None;
+                    cx.notify();
+                } else if this.step_edit.is_some() {
+                    this.step_edit = None;
+                    cx.notify();
+                } else if this.placing.is_some() {
                     this.finish_placing(true, window, cx);
                 } else if this.mate.is_some() {
                     this.close_mate(window, cx);

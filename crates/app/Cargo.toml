@@ -29,7 +29,6 @@ rust-embed = "8"
 rfd = "0.15"
 dirs = "6"
 serde_json.workspace = true
-ttf-parser = "0.25"
 serde.workspace = true
 rusqlite.workspace = true
 trash = "5"

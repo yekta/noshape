@@ -80,7 +80,7 @@ pub fn plane(ev: &mut EvalCtx) -> FResult<()> {
                 _ => return err("Select a plane and a point"),
             }
         }
-        "POINT_NORMAL" => {
+        "POINT_NORMAL" | "LINE_POINT" => {
             let point = refs.iter().find_map(|r| ev.resolve_vertex_point(r));
             let axis = refs.iter().find_map(|r| ev.resolve_axis(r));
             match (point, axis) {
@@ -103,9 +103,22 @@ pub fn plane(ev: &mut EvalCtx) -> FResult<()> {
         }
         "MID_PLANE" => {
             let frames: Vec<PlaneFrame> = refs.iter().filter_map(|r| ev.resolve_plane(r)).collect();
-            if frames.len() == 2 {
+            if frames.len() == 2 && frames[0].normal.cross(frames[1].normal).length() < 1e-9 {
                 let o = (frames[0].origin + frames[1].origin) * 0.5;
                 PlaneFrame { origin: o, ..frames[0] }
+            } else if frames.len() == 2 {
+                // Bisector of two intersecting planes (through their common line).
+                let (a, b) = (frames[0], frames[1]);
+                let nb = if a.normal.dot(b.normal) < 0.0 { -b.normal } else { b.normal };
+                let n = (a.normal + nb).normalize();
+                let d = a.normal.cross(b.normal).normalize();
+                // A point on both planes: solve in the plane spanned by the normals.
+                let (n1, n2) = (a.normal, b.normal);
+                let (h1, h2) = (a.origin.dot(n1), b.origin.dot(n2));
+                let c = n1.dot(n2);
+                let det = 1.0 - c * c;
+                let p = n1 * ((h1 - h2 * c) / det) + n2 * ((h2 - h1 * c) / det);
+                PlaneFrame { origin: p, x: d, y: n.cross(d), normal: n }
             } else {
                 let pts: Vec<DVec3> = refs.iter().filter_map(|r| ev.resolve_vertex_point(r)).collect();
                 if pts.len() == 2 {
@@ -134,6 +147,16 @@ pub fn plane(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         "TANGENT_CYLINDER" => super::refgeom::tangent_cylinder_frame(ev, refs, ev.bool("oppositeDirection"))?,
+        "TANGENT_PLANE" => {
+            // Tangent to a face at a point (or at the face center).
+            let face = ev.resolve_faces(refs).first().copied();
+            let Some((bi, fi)) = face else { return err("Select a face and optionally a point") };
+            let f = ev.face_shape(bi, fi)?;
+            let p = refs.iter().filter(|r| !matches!(r, Reference::Face(_))).find_map(|r| ev.resolve_vertex_point(r)).unwrap_or(f.centroid()?);
+            let q = f.project_point(p)?;
+            let n = f.normal_at_point(q.point)?;
+            frame_from(q.point, n)
+        }
         other => return err(format!("Plane type {other} is not supported yet")),
     };
     let frame = if ev.bool("flipAlignment") { PlaneFrame { normal: -frame.normal, y: -frame.y, ..frame } } else { frame };

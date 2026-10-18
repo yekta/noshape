@@ -161,9 +161,10 @@ pub fn plane() -> FeatureType {
         ("MID_PLANE", "Mid plane"),
         ("CURVE_POINT", "Curve point"),
         ("TANGENT_CYLINDER", "Tangent to cylinder"),
+        ("TANGENT_PLANE", "Tangent to face"),
     ];
     let p = vec![
-        ParamSpec::query("entities", "Entities", QueryFilter::PLANE_LIKE | QueryFilter::POINT_LIKE | QueryFilter::ANY_EDGE | QueryFilter::CYLINDRICAL_FACE)
+        ParamSpec::query("entities", "Entities", QueryFilter::PLANE_LIKE | QueryFilter::POINT_LIKE | QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE)
             .hints(Hints::INITIAL_FOCUS),
         ParamSpec::enum_("cplaneType", "Plane type", TYPES).hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::SHOW_LABEL),
         ParamSpec::length("offset", "Offset distance", 25.0, 1.0).visible(|v| v.is("cplaneType", "OFFSET")),

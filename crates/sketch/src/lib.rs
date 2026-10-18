@@ -13,6 +13,7 @@
 //! * [`tools`] implements editing operations (trim, extend, split, offset,
 //!   fillet, mirror, patterns, transform, use/convert) and [`shapes`] the
 //!   compound creation tools (rectangles, polygons, slots, arcs, circles).
+//! * [`text`] lays out sketch text (bundled Liberation fonts) in text boxes.
 //! * [`inference`] computes snapping / auto-constraint candidates for the UI.
 //!
 //! All quantities are SI (meters, radians) in `f64`.
@@ -33,6 +34,7 @@ pub mod regions;
 pub mod shapes;
 pub mod sketch;
 pub mod solver;
+pub mod text;
 pub mod tools;
 
 pub use constraints::{reflect, Constraint, ConstraintKind, DistanceMode, Hints};

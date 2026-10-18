@@ -65,6 +65,8 @@ pub struct MateDialog {
     pub flip_primary: bool,
     pub reorient: u8,
     pub suppressed: bool,
+    /// Tangent mates: contact may move onto tangent-connected faces.
+    pub tangent_propagation: bool,
     use_offset: bool,
     use_limits: bool,
     offsets: [Entity<InputState>; 4],
@@ -134,6 +136,7 @@ impl MateDialog {
             flip_primary: mate.flip_primary,
             reorient: mate.reorient_secondary,
             suppressed: mate.suppressed,
+            tangent_propagation: mate.tangent_propagation,
             use_offset,
             use_limits,
             offsets,
@@ -143,6 +146,15 @@ impl MateDialog {
             focus: cx.focus_handle(),
             _subs: subs,
         }
+    }
+
+    /// Fill both connectors (snap mode: the dragged and the target connector).
+    pub fn prefill(&mut self, a: MateConnectorRef, b: MateConnectorRef, cx: &mut Context<Self>) {
+        self.a = Some(a);
+        self.b = Some(b);
+        self.active = self.next_active();
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
     }
 
     pub fn awaiting_pick(&self) -> bool {
@@ -247,6 +259,7 @@ impl MateDialog {
             limits,
             suppressed: self.suppressed,
             extra,
+            tangent_propagation: self.tangent_propagation,
         })
     }
 
@@ -441,6 +454,13 @@ impl Render for MateDialog {
                                     })),
                             ),
                     )
+                    .when(t == MateType::Tangent, |d| {
+                        d.child(Checkbox::new("mate-tangent-prop").label("Tangent propagation").checked(self.tangent_propagation).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            this.tangent_propagation = *v;
+                            cx.emit(MateDialogEvent::Changed);
+                            cx.notify();
+                        })))
+                    })
                     .when(has_offset, |d| {
                         d.child(Checkbox::new("mate-offset").label("Offset").checked(self.use_offset).on_click(cx.listener(|this, v: &bool, _, cx| {
                             this.use_offset = *v;

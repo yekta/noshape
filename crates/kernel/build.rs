@@ -64,6 +64,7 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/io.cpp",
     "cpp/mesh_io.cpp",
     "cpp/hlr.cpp",
+    "cpp/surfacing.cpp",
 ];
 
 fn main() {

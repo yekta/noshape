@@ -49,6 +49,9 @@ pub enum ConstraintKind {
     Curvature { a: EntityId, b: EntityId },
     /// A sketch point pinned to external (projected) geometry.
     Pierce { point: EntityId, target: EntityId },
+    /// Line `a` is `ratio` times as long as line `b` (keeps the aspect of a
+    /// sketch text box). Not shown as a constraint glyph.
+    LengthRatio { a: EntityId, b: EntityId, ratio: f64 },
 
     // ----- dimensions -----
     /// Point-point, point-line, line-line (parallel) or anything-circle distance.
@@ -121,6 +124,7 @@ impl ConstraintKind {
             | Equal { a, b }
             | Collinear { a, b }
             | Curvature { a, b }
+            | LengthRatio { a, b, .. }
             | Distance { a, b, .. }
             | HorizontalDistance { a, b, .. }
             | VerticalDistance { a, b, .. }
@@ -176,6 +180,7 @@ impl ConstraintKind {
             | Equal { a, b }
             | Collinear { a, b }
             | Curvature { a, b }
+            | LengthRatio { a, b, .. }
             | Distance { a, b, .. }
             | HorizontalDistance { a, b, .. }
             | VerticalDistance { a, b, .. }
@@ -232,6 +237,7 @@ impl ConstraintKind {
             Collinear { .. } => "Collinear",
             Curvature { .. } => "Curvature",
             Pierce { .. } => "Pierce",
+            LengthRatio { .. } => "Length ratio",
             Distance { .. } => "Distance",
             HorizontalDistance { .. } => "Horizontal distance",
             VerticalDistance { .. } => "Vertical distance",

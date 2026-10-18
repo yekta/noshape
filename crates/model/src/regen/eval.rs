@@ -391,7 +391,7 @@ impl<'a> EvalCtx<'a> {
                 // Sketch origin on a face: world origin projected onto the face plane.
                 let n = pl.unit_normal();
                 let x = pl.unit_x();
-                let origin = pl.origin - n * (pl.origin.dot(n));
+                let origin = n * pl.origin.dot(n);
                 Some(PlaneFrame { origin, x, y: n.cross(x), normal: n })
             }
             Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => self.ctx.sketch(*sketch).map(|s| s.frame),

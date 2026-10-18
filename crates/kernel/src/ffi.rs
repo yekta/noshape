@@ -203,6 +203,19 @@ pub(crate) mod ffi {
         with_correction: bool,
     }
 
+    /// Developable surface for wrap / unwrap (see `crate::surfacing`).
+    /// kind: 0 plane, 1 cylinder, 2 cone.
+    #[derive(Debug, Clone, Copy)]
+    struct DevSurf {
+        kind: u8,
+        origin: P3,
+        axis: P3,
+        xdir: P3,
+        radius: f64,
+        half_angle: f64,
+        ref_angle: f64,
+    }
+
     unsafe extern "C++" {
         include!("noshape-kernel/cpp/noshape_occt.hpp");
 
@@ -459,6 +472,24 @@ pub(crate) mod ffi {
         fn read_iges(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
         fn write_iges(shapes: &OcShapeList, path: &str) -> Result<()>;
+
+        // ---- surfacing (wrap, isocline, surface fitting)
+        fn op_wrap_faces(faces: &OcShapeList, src: &DevSurf, dst: &DevSurf, xf: &[f64], tol: f64) -> Result<OpOut>;
+        fn isocline_edges(face: &OcShape, dir: P3, angle: f64, extend: bool) -> Result<UniquePtr<OcShapeList>>;
+        fn bspline_grid_face(
+            frame: &PlaneF,
+            x0: f64,
+            dx: f64,
+            y0: f64,
+            dy: f64,
+            z: &[f64],
+            nx: u32,
+            ny: u32,
+            deg_max: i32,
+            tol: f64,
+            bounds: &[f64],
+        ) -> Result<UniquePtr<OcShape>>;
+        fn face_max_deviation(face: &OcShape, pts: &[f64]) -> Result<f64>;
 
         // ---- HLR
         fn project_hlr(s: &OcShape, dir: P3, up: P3, exact: bool, deflection: f64)

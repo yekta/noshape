@@ -11,8 +11,8 @@
 //!   drag targets or a driven mate value (dragging, animation) and is a pure
 //!   function of its inputs, so it can run on any thread.
 
-use super::solver::{self, DragTarget, Follow, FollowXform, Frame, RelationKind, SolverBody, SolverMate, SolverRelation, TangentGeom, TangentPair};
-use super::{AsmMateConnector, Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, PatternKind, Placement, Relation, RelationType};
+use super::solver::{self, DragTarget, Follow, FollowXform, Frame, RelationKind, SolverBody, SolverMate, SolverRelation, TangentFace, TangentGeom, TangentPair};
+use super::{AsmMateConnector, Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, NamedPosition, PatternKind, Placement, Relation, RelationType};
 use crate::configuration::ConfigValues;
 use crate::display::{BodyKind, MeshBuffers};
 use crate::document::{Document, TabContent, TabId};
@@ -85,6 +85,10 @@ pub struct PartOccurrence {
     pub local_bounds: Option<(DVec3, DVec3)>,
     /// Regenerated studio (for inference and interference).
     pub context: Arc<Context>,
+    /// Mirrored (opposite-handed) version of the part.
+    pub mirrored: bool,
+    /// External reference key for parts inserted from another document.
+    pub external: Option<String>,
 }
 
 impl PartOccurrence {
@@ -178,6 +182,9 @@ pub struct SolveOptions {
     /// Requested placements (triad move / rotate). Unconstrained instances
     /// take them exactly; constrained ones move toward them within their DOF.
     pub targets: Vec<(InstanceId, Placement)>,
+    /// Mates held at given free values (rotation about Z, translations
+    /// X/Y/Z), e.g. when restoring a named position.
+    pub locks: Vec<(MateId, [f64; 4])>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -207,6 +214,8 @@ struct LeafInstance {
     regen: Arc<RegenResult>,
     name: String,
     hidden: bool,
+    mirrored: bool,
+    external: Option<String>,
 }
 
 /// Prepared solver problem (instance graph + resolved connector frames).
@@ -335,6 +344,18 @@ impl Prepared {
         self.body_of.contains_key(&id)
     }
 
+    /// Solve for a named position: its placements as the start, its stored
+    /// driving mate values imposed.
+    pub fn solve_named_position(&self, np: &NamedPosition) -> Solved {
+        let mut start: HashMap<InstanceId, Placement> = self.instances.iter().cloned().collect();
+        for (id, p) in &np.placements {
+            if start.contains_key(id) {
+                start.insert(*id, *p);
+            }
+        }
+        self.solve(&SolveOptions { start: Some(start), locks: np.mate_values.clone(), ..Default::default() })
+    }
+
     /// Solve from the stored (or `opts.start`) placements.
     pub fn solve(&self, opts: &SolveOptions) -> Solved {
         let pose_of = |id: InstanceId, stored: &Placement| -> Frame {
@@ -370,6 +391,18 @@ impl Prepared {
                 }
                 _ => {}
             }
+            m.limits.clear();
+        }
+        for (mid, v) in &opts.locks {
+            let Some(i) = self.mates.iter().position(|(id, _, _)| id == mid) else { continue };
+            if matches!(self.mates[i].1, MateType::Fastened | MateType::Ball | MateType::Tangent | MateType::Width) {
+                continue;
+            }
+            // Every free value fixed: the mate becomes a fastened one at those values.
+            let m = &mut mates[i];
+            m.kind = MateType::Fastened;
+            m.rotation = v[0];
+            m.offset = DVec3::new(v[1], v[2], v[3]);
             m.limits.clear();
         }
         let mate_index: HashMap<MateId, usize> = self.mates.iter().enumerate().map(|(i, (id, _, _))| (*id, i)).collect();
@@ -455,6 +488,9 @@ pub struct AssemblyResult {
     pub pattern_errors: Vec<(MateId, String)>,
     pub prepared: Arc<Prepared>,
     pub eval_ms: f32,
+    /// Explode lines of the displayed exploded view: (start, end) of each
+    /// step's instance centers.
+    pub explode_trails: Vec<(DVec3, DVec3)>,
 }
 
 impl AssemblyResult {
@@ -473,13 +509,15 @@ impl AssemblyResult {
             let top = place.get(&o.top()).copied().unwrap_or(DMat4::IDENTITY);
             o.transform = top * o.inner;
         }
+        self.explode_trails.clear();
         if let Some((ev, progress)) = explode {
-            let steps = explode_matrices(self, ev, progress);
+            let (steps, trails) = explode_matrices(self, ev, progress);
             for o in &mut self.occurrences {
                 if let Some(m) = steps.get(&o.top()) {
                     o.transform = *m * o.transform;
                 }
             }
+            self.explode_trails = trails;
         }
         let inst: HashMap<InstanceId, Frame> = self.solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect();
         for c in &mut self.connectors {
@@ -564,6 +602,17 @@ impl AssemblyResult {
         Some(f)
     }
 
+    /// Current values of the mates a named position stores (all mates with
+    /// free values that can be imposed: not fastened, ball, tangent or width).
+    pub fn named_position_values(&self, asm: &Assembly) -> Vec<(MateId, [f64; 4])> {
+        asm.mates
+            .iter()
+            .filter(|m| !m.suppressed && !matches!(m.mate_type, MateType::Fastened | MateType::Ball | MateType::Tangent | MateType::Width))
+            .filter(|m| self.mates.iter().any(|s| s.id == m.id && s.ok && !s.inactive))
+            .filter_map(|m| self.solved.mate_values.get(&m.id).map(|v| (m.id, *v)))
+            .collect()
+    }
+
     /// Relation reference values (the current free values of its two mates)
     /// to store in [`Relation::base`] when a relation is created or edited.
     pub fn relation_base(&self, asm: &Assembly, kind: RelationType, mates: [MateId; 2]) -> Option<[f64; 2]> {
@@ -576,16 +625,34 @@ impl AssemblyResult {
     }
 }
 
-/// Per-instance display matrices of an exploded view played to `progress`.
+/// Bounds center of a top-level instance under an extra display matrix.
+fn instance_center(result: &AssemblyResult, id: InstanceId, pre: DMat4) -> Option<DVec3> {
+    let mut bb: Option<(DVec3, DVec3)> = None;
+    for o in result.occurrences.iter().filter(|o| o.top() == id) {
+        let Some((lo, hi)) = o.local_bounds else { continue };
+        let m = pre * o.transform;
+        for i in 0..8 {
+            let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+            let w = m.transform_point3(c);
+            bb = Some(bb.map(|(a, b)| (a.min(w), b.max(w))).unwrap_or((w, w)));
+        }
+    }
+    bb.map(|(a, b)| (a + b) * 0.5)
+}
+
+/// Per-instance display matrices of an exploded view played to `progress`,
+/// and the explode lines (instance center before / after each step).
 /// Steps compose in order; rotation pivots default to the current bounds
 /// center of the step's instances.
-fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -> HashMap<InstanceId, DMat4> {
+fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -> (HashMap<InstanceId, DMat4>, Vec<(DVec3, DVec3)>) {
     let mut acc: HashMap<InstanceId, DMat4> = HashMap::new();
+    let mut trails = Vec::new();
     for (k, step) in ev.steps.iter().enumerate() {
         let t = (progress - k as f64).clamp(0.0, 1.0);
         if t <= 0.0 {
             break;
         }
+        let before: Vec<(InstanceId, Option<DVec3>)> = step.instances.iter().map(|id| (*id, instance_center(result, *id, acc.get(id).copied().unwrap_or(DMat4::IDENTITY)))).collect();
         let mut m = DMat4::from_translation(DVec3::from(step.translation) * t);
         if let Some(axis) = step.rotation_axis {
             let pivot = match step.pivot {
@@ -610,8 +677,21 @@ fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -
             let e = acc.entry(*id).or_insert(DMat4::IDENTITY);
             *e = m * *e;
         }
+        for (id, c0) in before {
+            if let (Some(a), Some(b)) = (c0, instance_center(result, id, acc.get(&id).copied().unwrap_or(DMat4::IDENTITY)))
+                && a.distance(b) > 1e-12
+            {
+                trails.push((a, b));
+            }
+        }
     }
-    acc
+    (acc, trails)
+}
+
+/// Explode lines of an exploded view played to `progress` (for a result
+/// whose occurrence transforms are the assembled ones).
+pub fn explode_trails(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -> Vec<(DVec3, DVec3)> {
+    explode_matrices(result, ev, progress).1
 }
 
 struct StudioCacheEntry {
@@ -620,10 +700,85 @@ struct StudioCacheEntry {
     result: Arc<RegenResult>,
 }
 
+/// Cache key of a mirrored part: (tab, configuration, body, plane bits).
+type MirrorKey = (TabId, String, BodyId, [u64; 6]);
+
+/// A regenerated external Part Studio: (its tab in the pinned document, result).
+pub type ExternalStudio = (TabId, Arc<RegenResult>);
+
+/// Resolves Part Studios of other documents (version-pinned snapshots) for
+/// [`InstanceSource::External`] instances. Implemented by the app.
+pub trait ExternalStudios: Send + Sync {
+    /// The pinned document and the Part Studio tab a key refers to.
+    fn studio(&self, key: &str) -> Option<(Arc<Document>, TabId)>;
+}
+
 /// Evaluates assemblies; keeps Part Studio regenerations cached across calls.
 #[derive(Default)]
 pub struct AssemblyEvaluator {
     studios: HashMap<(TabId, String), StudioCacheEntry>,
+    /// Mirrored parts: (source regeneration, mirrored result).
+    mirrored: HashMap<MirrorKey, (Arc<RegenResult>, Arc<RegenResult>)>,
+    external: Option<Arc<dyn ExternalStudios>>,
+    /// Regenerated external Part Studios by (key, configuration); pinned
+    /// snapshots never change.
+    external_studios: HashMap<(String, String), Option<ExternalStudio>>,
+}
+
+/// Reflect a mesh across the plane through `p` with unit normal `n`
+/// (triangle winding reversed so faces stay front-facing).
+fn mirror_mesh(m: &MeshBuffers, p: DVec3, n: DVec3) -> MeshBuffers {
+    let rp = |q: &[f32; 3]| -> [f32; 3] {
+        let v = DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+        let w = v - n * (2.0 * (v - p).dot(n));
+        [w.x as f32, w.y as f32, w.z as f32]
+    };
+    let rv = |q: &[f32; 3]| -> [f32; 3] {
+        let v = DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+        let w = v - n * (2.0 * v.dot(n));
+        [w.x as f32, w.y as f32, w.z as f32]
+    };
+    let mut indices = m.indices.clone();
+    for t in indices.as_chunks_mut::<3>().0 {
+        t.swap(1, 2);
+    }
+    MeshBuffers {
+        positions: m.positions.iter().map(rp).collect(),
+        normals: m.normals.iter().map(rv).collect(),
+        indices,
+        face_ranges: m.face_ranges.clone(),
+        edges: m.edges.iter().map(|pl| pl.iter().map(rp).collect()).collect(),
+        vertices: m.vertices.iter().map(rp).collect(),
+    }
+}
+
+/// A regeneration result holding only `body`, mirrored across a plane
+/// (kernel mirror transform; face, edge and vertex names are kept).
+pub fn mirrored_result(src: &RegenResult, body: &BodyId, point: DVec3, normal: DVec3) -> Option<RegenResult> {
+    let n = normal.normalize_or_zero();
+    if n == DVec3::ZERO {
+        return None;
+    }
+    let b = src.context.body(body)?;
+    let shape = b.shape.transformed(&noshape_kernel::Transform::Mirror(noshape_kernel::Plane::from_normal(point, n))).ok()?;
+    let mut nb = b.renamed(b.name.clone());
+    nb.shape = shape;
+    let mut ctx: Context = (*src.context).clone();
+    ctx.bodies = vec![Arc::new(nb)];
+    let reflect = |v: DVec3| v - n * (2.0 * v.dot(n));
+    for c in &mut ctx.connectors {
+        c.origin = point + reflect(c.origin - point);
+        c.x = reflect(c.x);
+        c.z = reflect(c.z);
+    }
+    let mut display = src.display.clone();
+    display.bodies.retain(|d| &d.id == body);
+    for d in &mut display.bodies {
+        let mesh = mirror_mesh(&d.mesh, point, n);
+        d.bounds = mesh.positions.iter().map(|q| DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)).fold(None, |acc: Option<(DVec3, DVec3)>, v| Some(acc.map(|(a, b)| (a.min(v), b.max(v))).unwrap_or((v, v))));
+        d.mesh = Arc::new(mesh);
+    }
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx) })
 }
 
 fn hash_of<T: serde::Serialize>(v: &T) -> u64 {
@@ -788,9 +943,46 @@ impl AssemblyEvaluator {
         Some(entry.result.clone())
     }
 
+    /// Set the resolver for parts inserted from other documents.
+    pub fn set_external(&mut self, provider: Arc<dyn ExternalStudios>) {
+        self.external = Some(provider);
+    }
+
+    /// Regenerate a Part Studio of another document (cached per key and configuration).
+    pub fn external_studio(&mut self, key: &str, config: &ConfigValues) -> Option<ExternalStudio> {
+        let ck = (key.to_string(), serde_json::to_string(config).unwrap_or_default());
+        if let Some(r) = self.external_studios.get(&ck) {
+            return r.clone();
+        }
+        let provider = self.external.clone()?;
+        let r = provider.studio(key).and_then(|(doc, tab)| {
+            let TabContent::PartStudio(ps) = &doc.tab(tab)?.content else { return None };
+            let cfg = effective_config(&doc, tab, config);
+            let r = Regenerator::new().regenerate(ps, &cfg, &doc.settings.units, &RegenOptions::default());
+            Some((tab, Arc::new(r)))
+        });
+        self.external_studios.insert(ck, r.clone());
+        r
+    }
+
+    /// Mirrored version of one part of a regenerated studio (cached).
+    fn mirrored_studio(&mut self, tab: TabId, config: &ConfigValues, body: &BodyId, src: &Arc<RegenResult>, point: DVec3, normal: DVec3) -> Option<Arc<RegenResult>> {
+        let bits = [point.x.to_bits(), point.y.to_bits(), point.z.to_bits(), normal.x.to_bits(), normal.y.to_bits(), normal.z.to_bits()];
+        let key = (tab, serde_json::to_string(config).unwrap_or_default(), body.clone(), bits);
+        if let Some((s, r)) = self.mirrored.get(&key)
+            && Arc::ptr_eq(s, src)
+        {
+            return Some(r.clone());
+        }
+        let r = Arc::new(mirrored_result(src, body, point, normal)?);
+        self.mirrored.insert(key, (src.clone(), r.clone()));
+        Some(r)
+    }
+
     /// Drop cache entries for tabs that no longer exist.
     pub fn retain_tabs(&mut self, doc: &Document) {
         self.studios.retain(|(t, _), _| doc.tab(*t).is_some());
+        self.mirrored.retain(|(t, _, _, _), _| doc.tab(*t).is_some());
     }
 
     /// Full evaluation: prepare, solve, build display.
@@ -828,6 +1020,8 @@ impl AssemblyEvaluator {
                     hidden: leaf.hidden,
                     local_bounds: b.bounds,
                     context: leaf.regen.context.clone(),
+                    mirrored: leaf.mirrored,
+                    external: leaf.external.clone(),
                 });
             }
         }
@@ -880,7 +1074,7 @@ impl AssemblyEvaluator {
             n.dof = Some(if followers.contains(&id) { 0 } else { solved.instance_dof.get(&id).copied().unwrap_or(0) });
         }
         let pattern_errors = prepared.failed_patterns.clone();
-        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0 };
+        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0, explode_trails: Vec::new() };
         let ev = explode.and_then(|i| assembly.exploded_views.get(i));
         result.apply_placements(solved, ev);
         result.eval_ms = t0.elapsed().as_secs_f32() * 1000.0;
@@ -933,10 +1127,63 @@ impl AssemblyEvaluator {
                                     regen: r,
                                     name: inst.name.clone(),
                                     hidden: inst.hidden,
+                                    mirrored: false,
+                                    external: None,
                                 });
                             }
                         }
                         None => node.error = Some("Part Studio was deleted".into()),
+                    }
+                }
+                InstanceSource::MirroredPart { studio, body, config, point, normal } => {
+                    node.kind = NodeKind::Part;
+                    match self.studio(doc, *studio, config) {
+                        Some(r) => {
+                            if r.context.body(body).is_none() {
+                                node.error = Some("Part no longer exists in its Part Studio (or in this configuration)".into());
+                            } else if !suppressed {
+                                match self.mirrored_studio(*studio, config, body, &r, DVec3::from(*point), DVec3::from(*normal)) {
+                                    Some(m) => leaves.push(LeafInstance {
+                                        path: vec![inst.id],
+                                        inner: DMat4::IDENTITY,
+                                        studio: *studio,
+                                        body: Some(body.clone()),
+                                        config: config.clone(),
+                                        regen: m,
+                                        name: inst.name.clone(),
+                                        hidden: inst.hidden,
+                                        mirrored: true,
+                                        external: None,
+                                    }),
+                                    None => node.error = Some("The mirrored part could not be created".into()),
+                                }
+                            }
+                        }
+                        None => node.error = Some("Part Studio was deleted".into()),
+                    }
+                }
+                InstanceSource::External { key, body, config } => {
+                    node.kind = if body.is_some() { NodeKind::Part } else { NodeKind::PartStudio };
+                    match self.external_studio(key, config) {
+                        Some((tab, r)) => {
+                            if body.as_ref().is_some_and(|b| r.context.body(b).is_none()) {
+                                node.error = Some("Part no longer exists in this version of the other document".into());
+                            } else if !suppressed {
+                                leaves.push(LeafInstance {
+                                    path: vec![inst.id],
+                                    inner: DMat4::IDENTITY,
+                                    studio: tab,
+                                    body: body.clone(),
+                                    config: config.clone(),
+                                    regen: r,
+                                    name: inst.name.clone(),
+                                    hidden: inst.hidden,
+                                    mirrored: false,
+                                    external: Some(key.clone()),
+                                });
+                            }
+                        }
+                        None => node.error = Some("The other document or its Part Studio could not be read".into()),
                     }
                 }
                 InstanceSource::PartStudio { studio, config } => {
@@ -953,6 +1200,8 @@ impl AssemblyEvaluator {
                                     regen: r,
                                     name: inst.name.clone(),
                                     hidden: inst.hidden,
+                                    mirrored: false,
+                                    external: None,
                                 });
                             }
                         }
@@ -1214,7 +1463,7 @@ impl AssemblyEvaluator {
                         },
                         None => DVec3::ZERO,
                     };
-                    Box::new(move |index, _| {
+                    Box::new(move |index, _, _| {
                         let (i, j) = ((index & 0xffff) as f64, (index >> 16) as f64);
                         Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j, DQuat::IDENTITY))))
                     })
@@ -1235,9 +1484,9 @@ impl AssemblyEvaluator {
                     if *opposite {
                         step = -step;
                     }
-                    Box::new(move |index, _| Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * index as f64))))))
+                    Box::new(move |index, _, _| Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * index as f64))))))
                 }
-                PatternKind::Mirror { plane } => {
+                PatternKind::Mirror { plane, .. } => {
                     let (ab, al) = match follow_of(plane) {
                         Ok(x) => x,
                         Err(e) => {
@@ -1248,7 +1497,17 @@ impl AssemblyEvaluator {
                     let n_world = world_of(ab, &al).z();
                     let leaves_ref = &leaves;
                     let stored_ref = &stored;
-                    Box::new(move |_, seed| {
+                    let reflection_of = |id: InstanceId| match asm.instance(id).map(|i| &i.source) {
+                        Some(InstanceSource::MirroredPart { point, normal, .. }) => Some((DVec3::from(*point), DVec3::from(*normal))),
+                        _ => None,
+                    };
+                    Box::new(move |_, seed, copy| {
+                        // Opposite-handed copy (or seed): the part's own mirror
+                        // plane completes the reflection exactly.
+                        match (reflection_of(seed), reflection_of(copy)) {
+                            (Some((p, n)), None) | (None, Some((p, n))) => return Some((ab, al, FollowXform::Mirror { local_point: p, local_normal: n })),
+                            _ => {}
+                        }
                         // Seed's local symmetry plane: the bounds mid-plane whose normal
                         // is closest to the mirror normal (in the seed's coordinates).
                         let pose = stored_ref.get(&seed).copied().unwrap_or_default();
@@ -1284,7 +1543,7 @@ impl AssemblyEvaluator {
                 if sb == gb {
                     continue;
                 }
-                let Some((axis_body, axis_local, xform)) = make(g.index, g.seed) else { continue };
+                let Some((axis_body, axis_local, xform)) = make(g.index, g.seed, g.instance) else { continue };
                 let sm = SolverMate { a: sb, a_local: soff, b: gb, b_local: goff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
                 prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, sm));
             }
@@ -1331,7 +1590,7 @@ impl AssemblyEvaluator {
 
     /// Contact geometry for a tangent mate: (body a, body b, geometry in body coordinates).
     fn tangent_pair(&self, _asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
-        let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Frame), String> {
+        let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Vec<TangentFace>), String> {
             if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
                 return Err("Tangent mates take faces, edges or vertices (not mate connectors)".into());
             }
@@ -1342,20 +1601,24 @@ impl AssemblyEvaluator {
                 Reference::Implicit { on, .. } => (**on).clone(),
                 r => r.clone(),
             };
-            let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, spheres, straight edges or vertices)")?;
+            let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, cones, spheres, tori, straight or circular edges, or vertices)")?;
             let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
             let to_body = off.mul(&matrix_frame(&leaf.inner));
-            let world = stored.get(&prepared.reps[bi]).copied().unwrap_or_default().mul(&to_body);
-            Ok((bi, g.transformed(&to_body), world))
+            let chain = if m.tangent_propagation { tangent_chain(&leaf.regen.context, leaf.body.as_ref(), &entity, units) } else { Vec::new() };
+            // A single face needs no propagation.
+            let chain: Vec<TangentFace> = if chain.len() > 1 { chain.iter().map(|f| face_transformed(f, &to_body)).collect() } else { Vec::new() };
+            Ok((bi, g.transformed(&to_body), chain))
         };
-        let (a, ga, wa) = geom(&m.a)?;
-        let (b, gb, wb) = geom(&m.b)?;
+        let (a, ga, chain_a) = geom(&m.a)?;
+        let (b, gb, chain_b) = geom(&m.b)?;
         if a == b {
             return Err("Both entities are on the same rigid set".into());
         }
+        if !solver::tangent_supported(&ga, &gb) {
+            return Err("Tangent mates between these two surface types are not supported (cones and tori mate with planes, spheres and vertices)".into());
+        }
         // Internal contact when one curved surface currently encloses the other.
         let (wga, wgb) = (ga.transformed(&prepared_pose(stored, prepared, a)), gb.transformed(&prepared_pose(stored, prepared, b)));
-        let _ = (wa, wb);
         let internal = match (wga, wgb) {
             (TangentGeom::Cylinder { point: c1, axis, radius: r1 }, TangentGeom::Cylinder { point: c2, radius: r2, .. })
             | (TangentGeom::Cylinder { point: c1, axis, radius: r1 }, TangentGeom::Sphere { center: c2, radius: r2 })
@@ -1364,48 +1627,74 @@ impl AssemblyEvaluator {
                 (d - axis * d.dot(axis)).length() < r1.max(r2)
             }
             (TangentGeom::Sphere { center: c1, radius: r1 }, TangentGeom::Sphere { center: c2, radius: r2 }) => (c2 - c1).length() < r1.max(r2),
+            (g @ (TangentGeom::Cone { .. } | TangentGeom::Torus { .. }), TangentGeom::Sphere { center, .. }) | (TangentGeom::Sphere { center, .. }, g @ (TangentGeom::Cone { .. } | TangentGeom::Torus { .. })) => g.signed_distance(center) < 0.0,
             _ => false,
         };
-        Ok((a, b, TangentPair { a: ga, b: gb, internal }))
+        Ok((a, b, TangentPair { a: ga, b: gb, internal, chain_a, chain_b }))
     }
 }
 
-/// Pattern index + seed -> (axis body, axis frame, follower transform).
-type FollowMaker<'a> = dyn Fn(u32, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
+/// Pattern index + seed + copy -> (axis body, axis frame, follower transform).
+type FollowMaker<'a> = dyn Fn(u32, InstanceId, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
 
 fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
     stored.get(&prepared.reps[body]).copied().unwrap_or_default()
 }
 
-/// Analytic tangent-mate geometry of a face / edge / vertex (studio coordinates).
-pub fn tangent_geometry(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> Option<TangentGeom> {
+fn studio_eval_ctx<'a>(ctx: &Arc<Context>, body: Option<&BodyId>, units: &'a UnitPrefs, params: &'a ParamValues, vars: &'a BTreeMap<String, noshape_units::Quantity>) -> EvalCtx<'a> {
     let mut c: Context = (**ctx).clone();
     if let Some(b) = body {
         c.bodies.retain(|x| &x.id == b);
     }
+    EvalCtx::new(FeatureId(0), "", params, units, c, vars)
+}
+
+/// Analytic tangent geometry of a face shape (outward normal for planes).
+fn face_tangent_geometry(face: &noshape_kernel::Shape) -> Option<TangentGeom> {
+    match face.face_surface().ok()? {
+        noshape_kernel::Surface::Plane(_) => {
+            let p = face.centroid().ok()?;
+            let n = face.normal_at_point(p).ok()?;
+            Some(TangentGeom::Plane { point: p, normal: n.normalize() })
+        }
+        noshape_kernel::Surface::Cylinder { origin, axis, radius, .. } => {
+            // Axis point next to the face (keeps contact estimates local).
+            let a = axis.normalize();
+            let c = face.centroid().unwrap_or(origin);
+            Some(TangentGeom::Cylinder { point: origin + a * (c - origin).dot(a), axis: a, radius })
+        }
+        noshape_kernel::Surface::Sphere { center, radius, .. } => Some(TangentGeom::Sphere { center, radius }),
+        noshape_kernel::Surface::Cone { axis, half_angle, apex, .. } => {
+            // Axis from the apex into the cone (toward the face).
+            let mut a = axis.normalize();
+            if let Ok(c) = face.centroid()
+                && (c - apex).dot(a) < 0.0
+            {
+                a = -a;
+            }
+            Some(TangentGeom::Cone { apex, axis: a, half_angle: half_angle.abs() })
+        }
+        noshape_kernel::Surface::Torus { center, axis, major_radius, minor_radius } => Some(TangentGeom::Torus { center, axis: axis.normalize(), major: major_radius, minor: minor_radius }),
+        _ => None,
+    }
+}
+
+/// Analytic tangent-mate geometry of a face / edge / vertex (studio coordinates).
+pub fn tangent_geometry(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> Option<TangentGeom> {
     let params = ParamValues::default();
     let vars = BTreeMap::new();
-    let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
+    let ev = studio_eval_ctx(ctx, body, units, &params, &vars);
     match entity {
         Reference::Face(_) => {
             let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(entity)).first()?;
-            let face = ev.face_shape(bi, fi).ok()?;
-            match face.face_surface().ok()? {
-                noshape_kernel::Surface::Plane(_) => {
-                    let p = face.centroid().ok()?;
-                    let n = face.normal_at_point(p).ok()?;
-                    Some(TangentGeom::Plane { point: p, normal: n.normalize() })
-                }
-                noshape_kernel::Surface::Cylinder { origin, axis, radius, .. } => Some(TangentGeom::Cylinder { point: origin, axis: axis.normalize(), radius }),
-                noshape_kernel::Surface::Sphere { center, radius, .. } => Some(TangentGeom::Sphere { center, radius }),
-                _ => None,
-            }
+            face_tangent_geometry(&ev.face_shape(bi, fi).ok()?)
         }
         Reference::Edge(_) => {
             let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(entity)).first()?;
             let e = ev.edge_shape(bi, ei).ok()?;
             match e.edge_curve().ok()? {
                 noshape_kernel::Curve::Line { origin, direction } => Some(TangentGeom::Cylinder { point: origin, axis: direction.normalize(), radius: 0.0 }),
+                noshape_kernel::Curve::Circle { center, axis, radius, .. } => Some(TangentGeom::Torus { center, axis: axis.normalize(), major: radius, minor: 0.0 }),
                 _ => None,
             }
         }
@@ -1413,6 +1702,80 @@ pub fn tangent_geometry(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Refe
         Reference::Origin => Some(TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.0 }),
         _ => None,
     }
+}
+
+fn face_transformed(f: &TangentFace, t: &Frame) -> TangentFace {
+    let mut lo = DVec3::splat(f64::INFINITY);
+    let mut hi = DVec3::splat(f64::NEG_INFINITY);
+    for i in 0..8 {
+        let c = DVec3::new(if i & 1 == 0 { f.lo.x } else { f.hi.x }, if i & 2 == 0 { f.lo.y } else { f.hi.y }, if i & 4 == 0 { f.lo.z } else { f.hi.z });
+        let w = t.transform_point(c);
+        lo = lo.min(w);
+        hi = hi.max(w);
+    }
+    TangentFace { geom: f.geom.transformed(t), lo, hi, centroid: t.transform_point(f.centroid), concave: f.concave }
+}
+
+/// Faces of a body tangent-connected to a face (the face first), as tangent
+/// geometry with bounds (studio coordinates). Empty for edges / vertices or
+/// unsupported faces. At most 32 faces.
+pub fn tangent_chain(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> Vec<TangentFace> {
+    let Reference::Face(_) = entity else { return Vec::new() };
+    let params = ParamValues::default();
+    let vars = BTreeMap::new();
+    let ev = studio_eval_ctx(ctx, body, units, &params, &vars);
+    let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(entity)).first() else { return Vec::new() };
+    let Some(b) = ev.ctx.bodies.get(bi) else { return Vec::new() };
+    let shape = &b.shape;
+    let faces = shape.faces();
+    let edges = shape.edges();
+    let Ok(edge_faces) = shape.edge_faces() else { return Vec::new() };
+    let info = |i: usize| -> Option<TangentFace> {
+        let f = faces.get(i)?;
+        let geom = face_tangent_geometry(f)?;
+        let bb = f.bounding_box(true).ok()?;
+        let centroid = f.centroid().ok()?;
+        let concave = match geom {
+            TangentGeom::Plane { .. } => false,
+            g => {
+                // Outward normal pointing into the surface's inside: a concave face.
+                let n = f.normal_at_point(centroid).unwrap_or(DVec3::ZERO);
+                let q = g.closest_point(centroid);
+                let probe = q + n * 1e-6;
+                g.signed_distance(probe) < g.signed_distance(q) - 1e-9
+            }
+        };
+        Some(TangentFace { geom, lo: bb.min, hi: bb.max, centroid, concave })
+    };
+    let Some(first) = info(fi) else { return Vec::new() };
+    let mut out = vec![first];
+    let mut done = vec![fi];
+    let mut queue = vec![fi];
+    while let Some(f) = queue.pop() {
+        for (ei, adj) in edge_faces.iter().enumerate() {
+            if adj.len() != 2 || !adj.contains(&(f as u32)) {
+                continue;
+            }
+            let g = if adj[0] as usize == f { adj[1] as usize } else { adj[0] as usize };
+            if done.contains(&g) || out.len() >= 32 {
+                continue;
+            }
+            let Some(e) = edges.get(ei) else { continue };
+            let Ok(ei_info) = e.edge_info() else { continue };
+            let mid = e.point_at((ei_info.first_param + ei_info.last_param) * 0.5).unwrap_or((ei_info.start + ei_info.end) * 0.5);
+            let (Some(ff), Some(gf)) = (faces.get(f), faces.get(g)) else { continue };
+            let (Ok(n1), Ok(n2)) = (ff.normal_at_point(mid), gf.normal_at_point(mid)) else { continue };
+            if n1.normalize_or_zero().dot(n2.normalize_or_zero()) < 0.9995 {
+                continue;
+            }
+            done.push(g);
+            if let Some(t) = info(g) {
+                out.push(t);
+                queue.push(g);
+            }
+        }
+    }
+    out
 }
 
 fn prefix_paths(n: &mut InstanceNode, id: InstanceId) {

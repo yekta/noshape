@@ -204,6 +204,29 @@ fn flat_preview(flat: Arc<FlatPattern>) -> AnyElement {
                             window.paint_path(path, outline);
                         }
                     }
+                    // Form outlines with center marks.
+                    for f in &flat.forms {
+                        for l in f.loops.iter().filter(|l| l.len() >= 2) {
+                            let mut b = PathBuilder::stroke(px(1.));
+                            b.move_to(pt(l[0]));
+                            for q in &l[1..] {
+                                b.line_to(pt(*q));
+                            }
+                            b.close();
+                            if let Ok(path) = b.build() {
+                                window.paint_path(path, outline.opacity(0.7));
+                            }
+                        }
+                        let c = pt(f.center);
+                        let mut b = PathBuilder::stroke(px(1.));
+                        b.move_to(point(c.x - px(4.), c.y));
+                        b.line_to(point(c.x + px(4.), c.y));
+                        b.move_to(point(c.x, c.y - px(4.)));
+                        b.line_to(point(c.x, c.y + px(4.)));
+                        if let Ok(path) = b.build() {
+                            window.paint_path(path, outline.opacity(0.7));
+                        }
+                    }
                     for bl in &flat.bend_lines {
                         let mut b = PathBuilder::stroke(px(1.)).dash_array(&[px(4.), px(3.)]);
                         b.move_to(pt(bl.a));

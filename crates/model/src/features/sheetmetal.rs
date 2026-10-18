@@ -23,6 +23,8 @@ pub fn register(out: &mut Vec<FeatureType>) {
     out.push(modify_joint());
     out.push(sheet_metal_end());
     out.push(rip());
+    out.push(unfold());
+    out.push(refold());
     out.push(recognize());
 }
 
@@ -333,20 +335,27 @@ pub fn bend() -> FeatureType {
     FeatureType::new("sheetMetalBend", "Bend", Category::SheetMetal, p).icon("bend").describe("Bend a sheet metal wall along a line")
 }
 
-/// Jog. Not in the FeatureScript std mirror the specs were built from; ids
-/// of the jog-specific fields are descriptive (spec SM-06).
+/// Jog (sheetMetalJog): two opposite bends offsetting part of a wall.
 pub fn jog() -> FeatureType {
-    let bt = |v: &ParamValues, t: &str| v.is("boundingType", t);
-    let mut p = bend_top(359.9);
+    let bt = |v: &ParamValues, t: &str| v.is("offsetType", t);
+    let mut p = bend_top(179.0);
+    p.push(hidden(ParamSpec::bool("bendAngleSetProgrammatically", "Bend angle set programmatically", false)));
     p.extend(bend_radius_override(always, "bendRadius"));
     p.extend(k_factor_override(always));
     p.extend([
-        ParamSpec::enum_("boundingType", "Bounding type", &[("BLIND", "Blind"), ("UP_TO_ENTITY", "Up to entity"), ("THICKNESS", "Thickness")]),
-        ParamSpec::num("jogOffset", "Jog offset", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0)).visible(move |v| bt(v, "BLIND")),
-        ParamSpec::query1("limitEntity", "Up to entity", QueryFilter::ANY_FACE | QueryFilter::PLANE).visible(move |v| bt(v, "UP_TO_ENTITY")),
-        ParamSpec::num("offsetDistance", "Offset distance", NONNEGATIVE_ZERO_DEFAULT).visible(move |v| bt(v, "UP_TO_ENTITY")),
-        ParamSpec::num("thicknessFactor", "Thickness factor", NumSpec::real(1.0, 1e-5, 1e5)).visible(move |v| bt(v, "THICKNESS")),
-        ParamSpec::enum_("jogOffsetAnchor", "Jog offset anchor", &[("INSIDE", "Inside"), ("NOMINAL", "Nominal"), ("OUTSIDE", "Outside")]),
+        ParamSpec::enum_("offsetType", "Bounding type", &[("BLIND", "Blind"), ("UP_TO_ENTITY", "Up to entity"), ("THICKNESS", "Thickness")]),
+        ParamSpec::num("bendOffset", "Jog offset", NumSpec::length(10.0, 0.375).bounded(0.0, 500.0)).visible(move |v| bt(v, "BLIND")),
+        ParamSpec::query1("jogLimit", "Up to entity", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE | QueryFilter::EDGE)
+            .visible(move |v| bt(v, "UP_TO_ENTITY")),
+        ParamSpec::bool("jogLimitOffset", "Offset distance", false)
+            .hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW)
+            .visible(move |v| bt(v, "UP_TO_ENTITY")),
+        ParamSpec::num("jogLimitDistance", "Offset distance", NONNEGATIVE_ZERO_DEFAULT)
+            .hints(Hints::DISPLAY_SHORT)
+            .visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
+        ParamSpec::flip("jogLimitOppositeDirection", "Opposite direction").visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
+        ParamSpec::num("thicknessFactor", "Thickness factor", NumSpec::real(3.0, 1e-5, 1e5)).visible(move |v| bt(v, "THICKNESS")),
+        ParamSpec::enum_("bendOffsetAnchor", "Jog offset anchor", &[("INSIDE", "Inside"), ("NOMINAL", "Nominal"), ("OUTSIDE", "Outside")]),
         ParamSpec::bool("preserveMaterial", "Preserve material", true),
     ]);
     FeatureType::new("sheetMetalJog", "Jog", Category::SheetMetal, p).icon("jog").describe("Offset part of a wall with two opposite bends")
@@ -506,6 +515,25 @@ pub fn rip() -> FeatureType {
         ParamSpec::num("minimalClearance", "Minimal gap", SM_MINIMAL_CLEARANCE).visible(|v| !v.bool("useDefaultGap")),
     ];
     FeatureType::new("sheetMetalRip", "Rip", Category::SheetMetal, p).hidden().describe("Split a sheet metal wall between vertex pairs")
+}
+
+/// Unfold (sheetMetalUnfold): flatten bends in the model.
+pub fn unfold() -> FeatureType {
+    let all = |v: &ParamValues| v.bool("unfoldAll");
+    let p = vec![
+        ParamSpec::bool("unfoldAll", "Unfold all", true),
+        ParamSpec::query1("partToUnfold", "Sheet metal part", QueryFilter::SOLID_BODY | QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS).visible(all),
+        ParamSpec::query("entitiesToUnfold", "Bend or non-planar faces", QueryFilter::FACE | QueryFilter::CYLINDRICAL_FACE).visible(move |v| !all(v)),
+        ParamSpec::query1("holdEntity", "Wall face or bounding edge to hold", QueryFilter::PLANAR_FACE | QueryFilter::EDGE),
+    ];
+    FeatureType::new("sheetMetalUnfold", "Unfold", Category::SheetMetal, p).icon("unfold").describe("Flatten bends of a sheet metal part in place")
+}
+
+/// Refold (sheetMetalRefold): fold unfolded bends back.
+pub fn refold() -> FeatureType {
+    let p = vec![ParamSpec::query("toRefold", "Parts or bends", QueryFilter::SOLID_BODY | QueryFilter::FACE | QueryFilter::CYLINDRICAL_FACE | QueryFilter::PLANAR_FACE | QueryFilter::EDGE)
+        .hints(Hints::INITIAL_FOCUS)];
+    FeatureType::new("sheetMetalRefold", "Refold", Category::SheetMetal, p).icon("refold").describe("Fold unfolded bends back")
 }
 
 /// Internal: recognize sheet metal from constant-thickness bodies.

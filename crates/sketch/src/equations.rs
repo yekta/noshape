@@ -1003,6 +1003,14 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
             }
             K::Collinear { a, b } => self.collinear(*a, *b),
+            K::LengthRatio { a, b, ratio } => {
+                if !(ratio.is_finite() && *ratio > 0.0) {
+                    return Err("length ratio must be positive".into());
+                }
+                let (la, lb) = (self.line(*a)?, self.line(*b)?);
+                self.lin(Lin::new().dist(1.0, [la[0], la[1]], [la[2], la[3]]).dist(-ratio, [lb[0], lb[1]], [lb[2], lb[3]]));
+                Ok(())
+            }
             K::Curvature { a, b } => {
                 self.tangent(*a, *b, c)?;
                 let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);

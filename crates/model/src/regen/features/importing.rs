@@ -1,10 +1,11 @@
 //! Import features (Derived, Derived mirror, Import of CAD files) and the
-//! not-yet-supported Wrap / Decal.
+//! not-yet-supported Decal (Wrap lives in `surfacing_c`).
 
 use super::bshared::new_face_names;
 use crate::display::BodyKind;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, err};
-use glam::DVec3;
+use super::sheetmetal_form::frame_matrix;
+use glam::{DMat4, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::ShapeType;
 
@@ -30,26 +31,73 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             _ => None,
         })
         .collect();
-    let mut n = 0u32;
-    for b in &src.bodies {
-        if !wanted.is_empty() && !wanted.contains(&b.id) {
-            continue;
-        }
-        // Keep the source's persistent names so references into derived
-        // geometry follow the source's edits.
-        let id = crate::reference::BodyId { feature: ev.feature, index: n };
-        n += 1;
-        let color = ev.ctx.alloc_color();
-        let body = crate::regen::context::Body::new(id, b.name.clone(), b.kind, b.shape.clone(), b.faces.clone(), color, ev.feature);
-        ev.ctx.bodies.push(std::sync::Arc::new(body));
+    // Placement: each location (mate connector or point) receives an
+    // instance with the source origin, or the base mate connector, on it.
+    let mut frames: Vec<DMat4> = Vec::new();
+    for r in ev.query("location") {
+        let f = match ev.resolve_connector(r) {
+            Some(c) => frame_matrix(c.origin, c.x, c.z),
+            None => match ev.resolve_vertex_point(r) {
+                Some(p) => DMat4::from_translation(p),
+                None => return err("A selected location no longer exists"),
+            },
+        };
+        frames.push(f);
     }
-    if ev.bool("includeMateConnectors") {
-        for c in &src.connectors {
-            let mut c = c.clone();
-            if let crate::reference::Reference::MateConnector { index, .. } = c.reference {
-                c.reference = crate::reference::Reference::MateConnector { feature: ev.feature, index };
+    if frames.is_empty() {
+        frames.push(DMat4::IDENTITY);
+    }
+    let base = if ev.is("placement", "AT_MATE_CONNECTOR") {
+        let id = ev.params.text("mateConnectorId").trim().to_string();
+        let found = if id.is_empty() {
+            let i = ev.integer("mateConnectorIndex").unwrap_or(0).max(0) as usize;
+            src.connectors.get(i)
+        } else {
+            src.connectors.iter().find(|c| c.name == id)
+        };
+        match found {
+            Some(c) => frame_matrix(c.origin, c.x, c.z),
+            None if src.connectors.is_empty() => return err("The source Part Studio has no mate connectors to place by"),
+            None => return err(format!("The source Part Studio has no mate connector named \"{id}\"")),
+        }
+    } else {
+        DMat4::IDENTITY
+    };
+    let inv = base.inverse();
+    let mut n = 0u32;
+    for (inst, f) in frames.iter().enumerate() {
+        let m = *f * inv;
+        let moved = !m.abs_diff_eq(DMat4::IDENTITY, 1e-15);
+        for b in &src.bodies {
+            if !wanted.is_empty() && !wanted.contains(&b.id) {
+                continue;
             }
-            ev.ctx.connectors.push(c);
+            // Keep the source's persistent names so references into derived
+            // geometry follow the source's edits (further instances are copies).
+            let id = crate::reference::BodyId { feature: ev.feature, index: n };
+            n += 1;
+            let color = ev.ctx.alloc_color();
+            let shape = if moved { b.shape.transformed(&k::Transform::Matrix(m))? } else { b.shape.clone() };
+            let faces = if inst == 0 {
+                b.faces.clone()
+            } else {
+                b.faces.iter().map(|f| std::sync::Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance: inst as u32, of: f.clone() }))).collect()
+            };
+            let name = if inst == 0 { b.name.clone() } else { format!("{} ({})", b.name, inst + 1) };
+            let body = crate::regen::context::Body::new(id, name, b.kind, shape, faces, color, ev.feature);
+            ev.ctx.bodies.push(std::sync::Arc::new(body));
+        }
+        if ev.bool("includeMateConnectors") {
+            for c in &src.connectors {
+                let mut c = c.clone();
+                if let crate::reference::Reference::MateConnector { index, .. } = c.reference {
+                    c.reference = crate::reference::Reference::MateConnector { feature: ev.feature, index: index + inst as u32 * 10_000 };
+                }
+                c.origin = m.transform_point3(c.origin);
+                c.x = m.transform_vector3(c.x).normalize_or_zero();
+                c.z = m.transform_vector3(c.z).normalize_or_zero();
+                ev.ctx.connectors.push(c);
+            }
         }
     }
     if n == 0 {
@@ -111,10 +159,6 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     Ok(())
-}
-
-pub fn wrap(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Wrap is not supported yet")
 }
 
 pub fn decal(_ev: &mut EvalCtx) -> FResult<()> {

@@ -32,6 +32,7 @@ pub mod mesh;
 pub mod ops;
 pub mod props;
 pub mod shape;
+pub mod surfacing;
 pub mod transform;
 
 pub use boolean::{
@@ -51,6 +52,9 @@ pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tess
 pub use ops::*;
 pub use props::{Distance, MassProperties, angle_between, distance, linear_properties, surface_properties, volume_properties};
 pub use shape::{AncestorMap, Orientation, Shape, ShapeType};
+pub use surfacing::{
+    Developable, Placement2d, SurfaceFit, SurfaceFitOptions, bspline_surface_from_grid, fit_surface, isocline_curves, max_deviation, wrap_faces,
+};
 pub use transform::{Transform, transform};
 
 /// Re-export of the math types used in the API.

@@ -264,8 +264,12 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return err("Select edges for the ruled surface");
     }
-    if !ev.params.array("vertexOverrides").is_empty() {
-        return err("Vertex overrides are not supported yet");
+    // Vertex overrides: (vertex position, item) - applied at matching edge ends.
+    let mut overrides: Vec<(DVec3, crate::params::ParamValues)> = Vec::new();
+    for item in ev.params.array("vertexOverrides") {
+        let Some(r) = item.query("vertex").first() else { continue };
+        let Some(p) = ev.resolve_vertex_point(r) else { return err("A vertex override no longer exists") };
+        overrides.push((p, item.clone()));
     }
     let edge_refs: Vec<(Shape, Source)> = {
         let mut v = Vec::new();
@@ -350,11 +354,46 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
             dirs.push(dir_at(p, e.tangent_at(prm)?)?);
             pts.push(p);
         }
-        let constant = dirs.iter().all(|d| (*d - dirs[0]).length() < 1e-9);
+        // Ruling vectors, with vertex overrides blended in from the edge ends.
+        let mut vecs: Vec<DVec3> = dirs.iter().map(|d| *d * dist).collect();
+        let tangents = [e.tangent_at(info.first_param)?, e.tangent_at(info.last_param)?];
+        for (end, idx) in [0usize, n].into_iter().enumerate() {
+            let p = pts[idx];
+            let Some((_, item)) = overrides.iter().find(|(q, _)| (*q - p).length() < 1e-7) else { continue };
+            let t = tangents[end].normalize_or(DVec3::X);
+            let ovr = item.enum_("overrideType").to_string();
+            let target = if ovr == "UP_TO_VERTEX" {
+                let Some(b) = item.query("boundaryOverride").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select the vertex to rule up to") };
+                b - p
+            } else {
+                let d_len = ev.eval_num_in(item, "distanceOverride", crate::params::NumKind::Length)? * if item.bool("oppositeDirectionOverride") { -1.0 } else { 1.0 };
+                let dir = match ovr.as_str() {
+                    "ALIGNED_WITH_VECTOR" => {
+                        let Some(r) = item.query("axisOverride").first() else { return err("Select the override direction") };
+                        ev.resolve_direction(r).ok_or_else(|| FeatureError::new("The override direction no longer exists"))?.normalize()
+                    }
+                    _ => {
+                        let f = face.as_ref().cloned().or_else(|| super::surfaces::adjacent_face(ev, e)).ok_or_else(|| FeatureError::new("Normal and tangent overrides need a reference face"))?;
+                        let nrm = f.normal_at_point(p)?;
+                        let base = if ovr == "NORMAL" { nrm } else { nrm.cross(t).normalize_or(nrm) };
+                        let a = ev.eval_num_in(item, "angleOverride", crate::params::NumKind::Angle)? * if item.bool("oppositeAngleOverride") { -1.0 } else { 1.0 };
+                        (DQuat::from_axis_angle(t, a) * base).normalize()
+                    }
+                };
+                dir * d_len
+            };
+            let delta = target - vecs[idx];
+            for (i, v) in vecs.iter_mut().enumerate() {
+                let s = i as f64 / n as f64;
+                let w = if idx == 0 { 1.0 - s } else { s };
+                *v += delta * w;
+            }
+        }
+        let constant = vecs.iter().all(|d| (*d - vecs[0]).length() < 1e-12);
         let res = if constant {
-            k::extrude(e, dirs[0] * dist)?
+            k::extrude(e, vecs[0])?
         } else {
-            let far: Vec<DVec3> = pts.iter().zip(&dirs).map(|(p, d)| *p + *d * dist).collect();
+            let far: Vec<DVec3> = pts.iter().zip(&vecs).map(|(p, d)| *p + *d).collect();
             let far_edge = k::make_interpolated_spline(&far, &[], false)?;
             k::loft(&[k::make_wire(std::slice::from_ref(e))?, k::make_wire(&[far_edge])?], &k::LoftOptions { solid: false, ruled: true, closed: false, ..Default::default() })?
         };
@@ -494,6 +533,3 @@ fn side_groups(faces: &[Shape], cut: &Shape) -> Vec<Vec<usize>> {
     out
 }
 
-pub fn constrained_surface(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Constrained surface is not supported yet")
-}

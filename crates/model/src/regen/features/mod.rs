@@ -32,6 +32,13 @@ pub mod sheetmetal_flange;
 pub mod sheetmetal_ops;
 pub mod sheetmetal_util;
 // --- end batch SM modules ---
+// --- modules: batch C (jog, form, corner, sheet metal loft, wrap, isocline, constrained surface) ---
+pub mod sheetmetal_form;
+pub mod sheetmetal_jog;
+pub mod sheetmetal_loft;
+pub mod sheetmetal_unfold;
+pub mod surfacing_c;
+// --- end batch C modules ---
 
 pub type EvalFn = fn(&mut EvalCtx) -> FResult<()>;
 
@@ -85,7 +92,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "compositeCurve" => curves::composite_curve,
         "intersectionCurve" => curves::intersection_curve,
         "trimCurve" => curves::trim_curve,
-        "isocline" => curves::isocline,
+        "isocline" => surfacing_c::isocline,
         "offsetCurveOnFace" => curves::offset_curve,
         "isoparametricCurve" => curves::isoparametric_curve,
         "editCurve" => curves::edit_curve,
@@ -96,7 +103,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "boundarySurface" => surfaces::boundary_surface,
         "ruledSurface" => surfaces::ruled_surface,
         "mutualTrim" => surfaces::mutual_trim,
-        "constrainedSurface" => surfaces::constrained_surface,
+        "constrainedSurface" => surfacing_c::constrained_surface,
         "sheetMetalStart" => sheetmetal::sheet_metal_start,
         "sheetMetalEnd" => sheetmetal::sheet_metal_end,
         "sheetMetalFlange" => sheetmetal::flange,
@@ -113,10 +120,12 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "sheetMetalCornerBreak" => sheetmetal::corner_break,
         "sheetMetalRip" => sheetmetal::rip,
         "sheetMetalRecognize" => sheetmetal::recognize,
+        "sheetMetalUnfold" => sheetmetal::unfold,
+        "sheetMetalRefold" => sheetmetal::refold,
         "importDerived" => importing::import_derived,
         "derivedMirror" => importing::derived_mirror,
         "importForeign" => importing::import_foreign,
-        "wrap" => importing::wrap,
+        "wrap" => surfacing_c::wrap,
         "decal" => importing::decal,
         // --- end batch B dispatch ---
         // --- dispatch: batch SM ---

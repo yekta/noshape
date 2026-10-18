@@ -4273,7 +4273,6 @@ dependencies = [
  "serde",
  "serde_json",
  "trash",
- "ttf-parser",
 ]
 
 [[package]]
@@ -4338,6 +4337,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "thiserror 2.0.21",
+ "ttf-parser",
 ]
 
 [[package]]

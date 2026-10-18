@@ -364,6 +364,7 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
                     ref_inner,
                     inner_faces: vec![if ref_inner { path_name.clone() } else { off_name.clone() }],
                     outer_faces: vec![if ref_inner { off_name } else { path_name }],
+                    flat: false,
                 });
                 pending = Some(data.bends.len() - 1);
                 last_wall = None;
@@ -601,21 +602,27 @@ pub fn model_of(ctx: &crate::regen::context::Context, id: &crate::reference::Bod
     ctx.sheet_metal.get(id).cloned()
 }
 
-macro_rules! unsupported {
-    ($($f:ident => $name:literal),* $(,)?) => {
-        $(
-            pub fn $f(_ev: &mut EvalCtx) -> FResult<()> {
-                err(concat!($name, " is not supported yet"))
-            }
-        )*
-    };
+pub fn jog(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_jog::jog(ev)
 }
-
-unsupported! {
-    jog => "Jog",
-    form => "Form",
-    loft => "Sheet metal loft",
-    corner => "Corner (corner relief override)",
-    rip => "Rip",
-    recognize => "Recognize",
+pub fn form(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_form::form(ev)
+}
+pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_form::corner(ev)
+}
+pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_loft::loft(ev)
+}
+pub fn rip(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_unfold::rip(ev)
+}
+pub fn recognize(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_unfold::recognize(ev)
+}
+pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_unfold::unfold(ev)
+}
+pub fn refold(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_unfold::refold(ev)
 }

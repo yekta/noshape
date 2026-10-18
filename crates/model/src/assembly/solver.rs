@@ -144,6 +144,10 @@ pub enum TangentGeom {
     Cylinder { point: DVec3, axis: DVec3, radius: f64 },
     /// Sphere (radius 0: a point / vertex).
     Sphere { center: DVec3, radius: f64 },
+    /// Cone with its apex, unit axis pointing into the cone and half angle.
+    Cone { apex: DVec3, axis: DVec3, half_angle: f64 },
+    /// Torus (minor radius 0: a circular edge).
+    Torus { center: DVec3, axis: DVec3, major: f64, minor: f64 },
 }
 
 impl TangentGeom {
@@ -152,17 +156,107 @@ impl TangentGeom {
             TangentGeom::Plane { point, normal } => TangentGeom::Plane { point: f.transform_point(point), normal: f.rotation * normal },
             TangentGeom::Cylinder { point, axis, radius } => TangentGeom::Cylinder { point: f.transform_point(point), axis: f.rotation * axis, radius },
             TangentGeom::Sphere { center, radius } => TangentGeom::Sphere { center: f.transform_point(center), radius },
+            TangentGeom::Cone { apex, axis, half_angle } => TangentGeom::Cone { apex: f.transform_point(apex), axis: f.rotation * axis, half_angle },
+            TangentGeom::Torus { center, axis, major, minor } => TangentGeom::Torus { center: f.transform_point(center), axis: f.rotation * axis, major, minor },
+        }
+    }
+
+    /// Signed distance of a point to the surface (positive outside: on the
+    /// normal side of a plane, outside spheres, cylinders, cones and tori).
+    pub fn signed_distance(&self, q: DVec3) -> f64 {
+        match *self {
+            TangentGeom::Plane { point, normal } => (q - point).dot(normal),
+            TangentGeom::Sphere { center, radius } => (q - center).length() - radius,
+            TangentGeom::Cylinder { point, axis, radius } => {
+                let d = q - point;
+                (d - axis * d.dot(axis)).length() - radius
+            }
+            TangentGeom::Cone { apex, axis, half_angle } => {
+                let d = q - apex;
+                let h = d.dot(axis);
+                let rho = (d - axis * h).length();
+                rho * half_angle.cos() - h * half_angle.sin()
+            }
+            TangentGeom::Torus { center, axis, major, minor } => {
+                let d = q - center;
+                let h = d.dot(axis);
+                let rho = (d - axis * h).length();
+                ((rho - major).powi(2) + h * h).sqrt() - minor
+            }
+        }
+    }
+
+    /// Closest point of the (unbounded) surface to `q`.
+    pub fn closest_point(&self, q: DVec3) -> DVec3 {
+        let perp_dir = |d: DVec3, axis: DVec3| {
+            let p = d - axis * d.dot(axis);
+            if p.length_squared() > 1e-24 { p.normalize() } else { axis.any_orthonormal_vector() }
+        };
+        match *self {
+            TangentGeom::Plane { point, normal } => q - normal * (q - point).dot(normal),
+            TangentGeom::Sphere { center, radius } => {
+                let d = q - center;
+                center + if d.length_squared() > 1e-24 { d.normalize() * radius } else { DVec3::X * radius }
+            }
+            TangentGeom::Cylinder { point, axis, radius } => {
+                let d = q - point;
+                point + axis * d.dot(axis) + perp_dir(d, axis) * radius
+            }
+            TangentGeom::Cone { apex, axis, half_angle } => {
+                let d = q - apex;
+                let u = perp_dir(d, axis);
+                let g = axis * half_angle.cos() + u * half_angle.sin();
+                apex + g * d.dot(g).max(0.0)
+            }
+            TangentGeom::Torus { center, axis, major, minor } => {
+                let d = q - center;
+                let c = center + perp_dir(d, axis) * major;
+                let e = q - c;
+                c + if e.length_squared() > 1e-24 { e.normalize() * minor } else { axis * minor }
+            }
         }
     }
 }
 
+/// Whether a tangent mate between two geometry kinds is supported.
+pub fn tangent_supported(a: &TangentGeom, b: &TangentGeom) -> bool {
+    use TangentGeom::*;
+    matches!(
+        (a, b),
+        (Plane { .. } | Sphere { .. } | Cylinder { .. }, Plane { .. } | Sphere { .. } | Cylinder { .. }) | (Cone { .. } | Torus { .. }, Plane { .. } | Sphere { .. }) | (Plane { .. } | Sphere { .. }, Cone { .. } | Torus { .. })
+    )
+}
+
+/// One face of a tangent-propagation chain (body-local coordinates).
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TangentFace {
+    pub geom: TangentGeom,
+    /// Face bounds and centroid.
+    pub lo: DVec3,
+    pub hi: DVec3,
+    pub centroid: DVec3,
+    /// Concave curved face (hole, fillet groove): contact with it is internal.
+    pub concave: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct TangentPair {
     pub a: TangentGeom,
     pub b: TangentGeom,
     /// Internal contact (one curved surface inside the other) for
     /// cylinder/sphere pairs; decided from the initial positions.
     pub internal: bool,
+    /// Tangent propagation: faces tangent-connected to the selected ones
+    /// (including them). When either is non-empty the contact uses the face
+    /// pair whose contact point lies on both faces.
+    pub chain_a: Vec<TangentFace>,
+    pub chain_b: Vec<TangentFace>,
+}
+
+impl TangentPair {
+    pub fn new(a: TangentGeom, b: TangentGeom, internal: bool) -> Self {
+        Self { a, b, internal, chain_a: vec![], chain_b: vec![] }
+    }
 }
 
 /// Transform of a pattern / mirror follower relative to its axis frame.
@@ -303,6 +397,24 @@ fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: boo
     let sgn = if flip { -1.0 } else { 1.0 };
     let curved = |r1: f64, r2: f64| if internal { (r1 - r2).abs() } else { r1 + r2 };
     match (ga, gb) {
+        (Plane { point, normal }, Cone { apex, axis, half_angle }) | (Cone { apex, axis, half_angle }, Plane { point, normal }) => {
+            // The cone lies on the plane along a generator: apex on the plane,
+            // axis tilted by the half angle away from it.
+            out.push((apex - point).dot(normal));
+            out.push(axis.dot(normal) - sgn * half_angle.sin());
+        }
+        (Plane { point, normal }, Torus { center, axis, major, minor }) | (Torus { center, axis, major, minor }, Plane { point, normal }) => {
+            let n_perp = (normal - axis * axis.dot(normal)).length();
+            out.push((center - point).dot(normal) - sgn * (major * n_perp + minor));
+        }
+        (g @ (Cone { .. } | Torus { .. }), Sphere { center, radius }) | (Sphere { center, radius }, g @ (Cone { .. } | Torus { .. })) => {
+            let d = g.signed_distance(center);
+            out.push(if internal { d + radius } else { d - radius });
+        }
+        (Cone { .. } | Torus { .. }, _) | (_, Cone { .. } | Torus { .. }) => {
+            // Unsupported pair (rejected when the mate is prepared).
+            out.push(0.0);
+        }
         (Plane { point: pa, normal: na }, Plane { point: pb, normal: nb }) => {
             // Faces touch: normals opposed (agree when flipped), coplanar.
             let e = nb + na * sgn;
@@ -330,6 +442,70 @@ fn tangent_residuals(ga: TangentGeom, gb: TangentGeom, flip: bool, internal: boo
     }
 }
 
+/// Number of residual rows of a propagated tangent mate (fixed so the
+/// Jacobian keeps its shape when the contact moves to another face pair).
+const CHAIN_ROWS: usize = 4;
+
+/// Distance of a point outside an axis-aligned box (0 inside).
+fn box_excess(p: DVec3, lo: DVec3, hi: DVec3) -> f64 {
+    (lo - p).max(p - hi).max(DVec3::ZERO).length()
+}
+
+/// Approximate contact point between two surfaces (alternating projections
+/// starting from a point near the first face).
+pub fn contact_point(a: &TangentGeom, b: &TangentGeom, start: DVec3) -> DVec3 {
+    let mut x = a.closest_point(start);
+    let mut y = b.closest_point(x);
+    for _ in 0..3 {
+        x = a.closest_point(y);
+        y = b.closest_point(x);
+    }
+    (x + y) * 0.5
+}
+
+/// Residuals of a tangent mate with propagation: among all supported face
+/// pairs of the two chains, the pair whose contact point lies on both faces
+/// (else the one closest to doing so) with the smallest residual.
+fn chain_residuals(pa: &Frame, pb: &Frame, g: &TangentPair, flip: bool, out: &mut Vec<f64>) {
+    let single_a = [TangentFace { geom: g.a, lo: DVec3::splat(-1e30), hi: DVec3::splat(1e30), centroid: DVec3::ZERO, concave: false }];
+    let single_b = [TangentFace { geom: g.b, lo: DVec3::splat(-1e30), hi: DVec3::splat(1e30), centroid: DVec3::ZERO, concave: false }];
+    let ca: &[TangentFace] = if g.chain_a.is_empty() { &single_a } else { &g.chain_a };
+    let cb: &[TangentFace] = if g.chain_b.is_empty() { &single_b } else { &g.chain_b };
+    let (ia, ib) = (pa.inverse(), pb.inverse());
+    let mut best: Option<(f64, f64, Vec<f64>)> = None;
+    let mut rows = Vec::with_capacity(CHAIN_ROWS);
+    for fa in ca {
+        for fb in cb {
+            if !tangent_supported(&fa.geom, &fb.geom) {
+                continue;
+            }
+            let ga = fa.geom.transformed(pa);
+            let gb = fb.geom.transformed(pb);
+            let internal = if g.chain_a.is_empty() && g.chain_b.is_empty() { g.internal } else { fa.concave || fb.concave || (g.internal && fa.geom == g.a && fb.geom == g.b) };
+            let start = if g.chain_a.is_empty() { pb.transform_point(fb.centroid) } else { pa.transform_point(fa.centroid) };
+            let cp = contact_point(&ga, &gb, start);
+            let size = ((fa.hi - fa.lo).length() + (fb.hi - fb.lo).length()).clamp(1e-6, 1e6);
+            let tol = 1e-6 + 1e-3 * size;
+            let out_a = (box_excess(ia.transform_point(cp), fa.lo, fa.hi) - tol).max(0.0);
+            let out_b = (box_excess(ib.transform_point(cp), fb.lo, fb.hi) - tol).max(0.0);
+            rows.clear();
+            tangent_residuals(ga, gb, flip, internal, &mut rows);
+            let norm: f64 = rows.iter().map(|v| v * v).sum::<f64>().sqrt();
+            let outside = out_a + out_b;
+            let better = match &best {
+                None => true,
+                Some((o, n, _)) => outside < *o - 1e-12 || ((outside - *o).abs() <= 1e-12 && norm < *n),
+            };
+            if better {
+                best = Some((outside, norm, rows.clone()));
+            }
+        }
+    }
+    let mut r = best.map(|b| b.2).unwrap_or_default();
+    r.resize(CHAIN_ROWS, 0.0);
+    out.extend_from_slice(&r);
+}
+
 fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
     if let Some(f) = &m.follow {
         let seed = bodies[m.a].mul(&m.a_local);
@@ -343,6 +519,10 @@ fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
     if m.kind == MateType::Tangent
         && let Some(g) = &m.geom
     {
+        if !g.chain_a.is_empty() || !g.chain_b.is_empty() {
+            chain_residuals(&bodies[m.a], &bodies[m.b], g, m.flip_primary, out);
+            return;
+        }
         let ga = g.a.transformed(&bodies[m.a]);
         let gb = g.b.transformed(&bodies[m.b]);
         tangent_residuals(ga, gb, m.flip_primary, g.internal, out);
@@ -732,7 +912,7 @@ mod tests {
         // Ball (r = 10 mm) on a fixed plane z = 0 (normal +Z): center at z = 10 mm, 5 DOF left.
         let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.03, 0.01, 0.05), false)];
         let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
-        m.geom = Some(TangentPair { a: TangentGeom::Plane { point: DVec3::ZERO, normal: DVec3::Z }, b: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, internal: false });
+        m.geom = Some(TangentPair::new(TangentGeom::Plane { point: DVec3::ZERO, normal: DVec3::Z }, TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, false));
         let r = solve(&mut bodies, &[m.clone()], &[], &[]);
         assert!(r.converged, "{r:?}");
         assert!((bodies[1].pose.origin.z - 0.01).abs() < 1e-8, "{:?}", bodies[1].pose.origin);
@@ -745,10 +925,62 @@ mod tests {
         // Two balls (10 mm and 5 mm) touching externally: centers 15 mm apart.
         let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.05, 0.0, 0.0), false)];
         let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
-        m.geom = Some(TangentPair { a: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, b: TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.005 }, internal: false });
+        m.geom = Some(TangentPair::new(TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.01 }, TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.005 }, false));
         let r = solve(&mut bodies, &[m], &[], &[]);
         assert!(r.converged);
         assert!((bodies[1].pose.origin.length() - 0.015).abs() < 1e-8);
+    }
+
+    #[test]
+    fn tangent_cone_and_torus_residuals() {
+        // Cone (half angle 30°) lying on the plane z = 0: apex on the plane,
+        // axis tilted 30° up; 4 DOF left.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.01, 0.0, 0.03), false)];
+        let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
+        let half = 30f64.to_radians();
+        m.geom = Some(TangentPair::new(TangentGeom::Plane { point: DVec3::ZERO, normal: DVec3::Z }, TangentGeom::Cone { apex: DVec3::ZERO, axis: DVec3::new(1.0, 0.0, 1.0).normalize(), half_angle: half }, false));
+        let r = solve(&mut bodies, &[m], &[], &[]);
+        assert!(r.converged, "{r:?}");
+        let p = bodies[1].pose;
+        assert!(p.origin.z.abs() < 1e-8);
+        let axis = p.rotation * DVec3::new(1.0, 0.0, 1.0).normalize();
+        assert!((axis.z - half.sin()).abs() < 1e-7, "{axis:?}");
+        assert_eq!(r.body_dof[1], 4);
+        // Torus (R 10 mm, r 2 mm) lying flat on the plane: center 2 mm up; tilted: R sinθ + r.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.0, 0.0, 0.05), false)];
+        let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
+        m.geom = Some(TangentPair::new(TangentGeom::Plane { point: DVec3::ZERO, normal: DVec3::Z }, TangentGeom::Torus { center: DVec3::ZERO, axis: DVec3::new(0.0, 0.6, 0.8), major: 0.01, minor: 0.002 }, false));
+        let r = solve(&mut bodies, &[m], &[], &[]);
+        assert!(r.converged, "{r:?}");
+        let a = bodies[1].pose.rotation * DVec3::new(0.0, 0.6, 0.8);
+        let expect = 0.01 * (1.0 - a.z * a.z).sqrt() + 0.002;
+        assert!((bodies[1].pose.origin.z - expect).abs() < 1e-8);
+        // Ball (r 3 mm) in a circular edge (torus with minor 0, R 2 mm): seated 2.236 mm above.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.0, 0.0, 0.01), false)];
+        let mut m = mate(MateType::Tangent, 0, Frame::default(), 1, Frame::default());
+        m.geom = Some(TangentPair::new(TangentGeom::Torus { center: DVec3::ZERO, axis: DVec3::Z, major: 0.002, minor: 0.0 }, TangentGeom::Sphere { center: DVec3::ZERO, radius: 0.003 }, false));
+        let r = solve(&mut bodies, &[m], &[], &[]);
+        assert!(r.converged);
+        let o = bodies[1].pose.origin;
+        let g = TangentGeom::Torus { center: DVec3::ZERO, axis: DVec3::Z, major: 0.002, minor: 0.0 };
+        assert!((g.signed_distance(o) - 0.003).abs() < 1e-9);
+        // Unsupported pairs.
+        assert!(!tangent_supported(&TangentGeom::Cone { apex: DVec3::ZERO, axis: DVec3::Z, half_angle: 0.3 }, &TangentGeom::Cylinder { point: DVec3::ZERO, axis: DVec3::Z, radius: 0.01 }));
+    }
+
+    #[test]
+    fn closest_points_lie_on_surfaces() {
+        let q = DVec3::new(0.3, -0.2, 0.5);
+        for g in [
+            TangentGeom::Plane { point: DVec3::new(0.0, 0.0, 0.1), normal: DVec3::Z },
+            TangentGeom::Sphere { center: DVec3::X, radius: 0.2 },
+            TangentGeom::Cylinder { point: DVec3::ZERO, axis: DVec3::Y, radius: 0.1 },
+            TangentGeom::Cone { apex: DVec3::ZERO, axis: DVec3::Z, half_angle: 0.4 },
+            TangentGeom::Torus { center: DVec3::ZERO, axis: DVec3::Z, major: 0.3, minor: 0.05 },
+        ] {
+            let c = g.closest_point(q);
+            assert!(g.signed_distance(c).abs() < 1e-9, "{g:?}: {}", g.signed_distance(c));
+        }
     }
 
     #[test]
