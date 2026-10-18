@@ -38,7 +38,7 @@ Read this first, then `docs/handoff/*.md` (one file per workstream, written by t
 - **Features:** full CAD feature set, parity with Onshape's FeatureScript feature list (every
   feature has an evaluator), sheet metal, frames, custom features (Rhai Feature Studios), assemblies, drawings,
   versions/branches/merge/compare, derived parts across documents, start window, STL/OBJ import.
-- **Icons:** the Onshape-style icon set is committed (`44cdcd5`), and so is `docs/ONSHAPE_UI_SPEC.md`.
+- **Icons:** the Onshape-style icon set is committed (`44cdcd5`), and so is `docs/ONSHAPE_UI_SPEC.md`. The generator scripts that produced the icons were in /tmp and are gone, so edit the SVGs directly. Conventions: 24x24 viewBox, a `scale(1.2)` group on a 20-unit grid, colors #333333/#1651B0/#009400/#BD3039/#FAB601, mask-safe. See crates/app/assets/icons/README.md.
 - **Release:** v0.1.0 is published (macOS arm64 dmg, Windows zip, Linux tar.gz) at
   https://github.com/yekta/noshape/releases/tag/v0.1.0. It still has the old dark theme.
 - **CI** (`.github/workflows/ci.yml`): build, test and library clippy on all three OSes, with Node 24 actions.
@@ -79,7 +79,7 @@ cd /root/noshape && export GIT_INDEX_FILE=/tmp/wip-index && cp .git/index $GIT_I
 | Theme and layout restyle to Onshape (light theme, layout, dialogs, icons via `img()`) | `docs/handoff/theme-layout.md` | in progress |
 | Part Studio behaviour parity, pass 2 | `docs/handoff/part-studio-behaviour.md`, `docs/parity/part-studio.md` | 207 items: 164 done, 43 remaining |
 | Sketch behaviour parity, pass 2 | `docs/handoff/sketch-behaviour.md`, `docs/parity/sketch.md` | 200 items: 161 done, 39 remaining |
-| Assembly behaviour parity | `docs/handoff/assembly-behaviour.md`, `docs/parity/assembly.md` | in progress |
+| Assembly behaviour parity, pass 2 | `docs/handoff/assembly-behaviour.md`, `docs/parity/assembly.md` | 222 items: 175 done; next are flexible subassemblies, live mate values, standard content |
 | QA round 2 + renderer bugs | `docs/handoff/qa-round-2.md` | Fixing: pick depth bias for sketch regions on faces, dotted edges (z-fighting), stale frame after edits, zoom-to-fit ignoring planes, `#` autocomplete. Testing: configurations, assemblies, drawings, versions, import/export. |
 
 Not started yet:
