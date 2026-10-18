@@ -60,6 +60,19 @@ pub struct FeatureDialog {
     pub derived_sources: Vec<DerivedSource>,
     /// Preview the end of the history instead of rolling to this feature.
     pub show_final: bool,
+    /// "Other document…" chooser: the document, the selected version index.
+    ext_pick: Option<(crate::derived::ExternalDocInfo, usize)>,
+    /// Resolved external source: key, label, parts, newer version.
+    ext_info: Option<ExtInfo>,
+    ext_task: Option<Task<()>>,
+}
+
+#[derive(Clone)]
+struct ExtInfo {
+    key: String,
+    label: String,
+    parts: Vec<(noshape_model::BodyId, String)>,
+    newer: Option<crate::derived::VersionChoice>,
 }
 
 impl EventEmitter<DialogEvent> for FeatureDialog {}
@@ -96,6 +109,9 @@ impl FeatureDialog {
             renaming: None,
             derived_sources: Vec::new(),
             show_final: false,
+            ext_pick: None,
+            ext_info: None,
+            ext_task: None,
         };
         d.active_query = d.first_visible_query();
         d
@@ -716,7 +732,16 @@ impl FeatureDialog {
             _ => None,
         }).collect();
         let sources = self.derived_sources.clone();
-        let label = sources.iter().find(|s| s.tab == current).map(|s| s.name.clone()).unwrap_or_else(|| "Select a Part Studio".into());
+        let external = crate::derived::ExternalRef::parse(&current);
+        if let Some(r) = &external {
+            self.resolve_external(r.clone(), cx);
+        }
+        let ext_info = self.ext_info.clone().filter(|i| i.key == current);
+        let label = match (&external, &ext_info) {
+            (Some(_), Some(i)) => i.label.clone(),
+            (Some(_), None) => "Loading other document…".into(),
+            _ => sources.iter().find(|s| s.tab == current).map(|s| s.name.clone()).unwrap_or_else(|| "Select a Part Studio".into()),
+        };
         let view = cx.entity();
         let picker = Button::new("derived-src")
             .label(label)
@@ -739,10 +764,25 @@ impl FeatureDialog {
                             })
                         }));
                     }
-                    m
+                    let v = view.clone();
+                    m.separator().item(gpui_kit::component::menu::PopupMenuItem::new("Other document…").on_click(move |_, window, cx| {
+                        let v = v.clone();
+                        crate::files::request_open_path("Derive from document", "noshape documents", &["noshape"], window, cx, move |path, cx| {
+                            v.update(cx, |this, cx| {
+                                match crate::derived::external_doc_info(&path) {
+                                    Ok(info) => this.ext_pick = Some((info, 0)),
+                                    Err(e) => this.status = Some((FeatureStatus::Error, format!("Could not open {}: {e:#}", path.display()))),
+                                }
+                                cx.notify();
+                            });
+                        });
+                    }))
                 }
             });
-        let parts = sources.iter().find(|s| s.tab == current).map(|s| s.parts.clone()).unwrap_or_default();
+        let parts = match &ext_info {
+            Some(i) => i.parts.clone(),
+            None => sources.iter().find(|s| s.tab == current).map(|s| s.parts.clone()).unwrap_or_default(),
+        };
         let checks: Vec<AnyElement> = parts
             .into_iter()
             .map(|(id, name)| {
@@ -753,12 +793,11 @@ impl FeatureDialog {
                     .checked(on)
                     .small()
                     .on_click(cx.listener(move |this, v: &bool, _, cx| {
-                        let all: Vec<noshape_model::BodyId> = this
-                            .derived_sources
-                            .iter()
-                            .find(|s| s.tab == this.feature.params.text("partStudio"))
-                            .map(|s| s.parts.iter().map(|p| p.0.clone()).collect())
-                            .unwrap_or_default();
+                        let src = this.feature.params.text("partStudio").to_string();
+                        let all: Vec<noshape_model::BodyId> = match this.ext_info.as_ref().filter(|i| i.key == src) {
+                            Some(i) => i.parts.iter().map(|p| p.0.clone()).collect(),
+                            None => this.derived_sources.iter().find(|s| s.tab == src).map(|s| s.parts.iter().map(|p| p.0.clone()).collect()).unwrap_or_default(),
+                        };
                         let mut sel: Vec<noshape_model::BodyId> = this.feature.params.query("parts").iter().filter_map(|r| match r {
                             Reference::Body(b) => Some(b.clone()),
                             _ => None,
@@ -777,13 +816,114 @@ impl FeatureDialog {
                     .into_any_element()
             })
             .collect();
+        let update = ext_info.as_ref().and_then(|i| i.newer.clone()).zip(external.clone()).map(|(newer, r)| {
+            h_flex()
+                .gap_2()
+                .p_1p5()
+                .rounded_md()
+                .bg(with_alpha(pal.info, 0.12))
+                .text_xs()
+                .text_color(pal.info)
+                .child(div().flex_1().child(format!("Newer version available: {}", newer.label)))
+                .child(Button::new("derived-update").label("Update").xsmall().outline().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let to = crate::derived::ExternalRef { microversion: newer.microversion, ..r.clone() };
+                    this.set_value("partStudio", ParamValue::Text(to.key()), cx);
+                })))
+                .into_any_element()
+        });
+        let chooser = self.render_ext_chooser(cx);
         v_flex()
             .gap_1p5()
             .w_full()
             .child(div().text_xs().text_color(pal.text_muted).child("Part Studio"))
             .child(picker)
+            .children(chooser)
+            .children(update)
             .children(checks)
             .into_any_element()
+    }
+
+    /// Load the label, parts and update status of an external source in the background.
+    fn resolve_external(&mut self, r: crate::derived::ExternalRef, cx: &mut Context<Self>) {
+        let key = r.key();
+        if self.ext_info.as_ref().is_some_and(|i| i.key == key) || self.ext_task.is_some() {
+            return;
+        }
+        self.ext_task = Some(cx.spawn(async move |this, cx| {
+            let r2 = r.clone();
+            let info = cx
+                .background_spawn(async move {
+                    let label = crate::derived::describe_external(&r2);
+                    let parts = crate::derived::external_context(&r2).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
+                    let newer = crate::derived::newer_version(&r2);
+                    ExtInfo { key: r2.key(), label, parts, newer }
+                })
+                .await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                this.ext_info = Some(info);
+                this.ext_task = None;
+                cx.notify();
+            });
+        }));
+    }
+
+    /// Version and Part Studio chooser shown after picking another document.
+    fn render_ext_chooser(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (info, vi) = self.ext_pick.clone()?;
+        let pal = p();
+        let version = info.versions.get(vi)?.clone();
+        let studios: Vec<(String, String)> = crate::derived::external_snapshot(&info.path, version.microversion)
+            .map(|d| crate::derived::DocStudios::sources(&d))
+            .unwrap_or_default();
+        let view = cx.entity();
+        let versions = info.versions.clone();
+        let version_menu = Button::new("ext-version").label(version.label.clone()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+            for (i, v) in versions.iter().enumerate() {
+                let view = view.clone();
+                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(v.label.clone()).checked(i == vi).on_click(move |_, _, cx| {
+                    view.update(cx, |this, cx| {
+                        if let Some(p) = &mut this.ext_pick {
+                            p.1 = i;
+                        }
+                        cx.notify();
+                    })
+                }));
+            }
+            m
+        });
+        let rows: Vec<AnyElement> = studios
+            .into_iter()
+            .map(|(tab, name)| {
+                let r = crate::derived::ExternalRef { path: info.path.clone(), microversion: version.microversion, tab: tab.clone() };
+                div()
+                    .id(SharedString::from(format!("ext-{tab}")))
+                    .px_2()
+                    .py_1()
+                    .rounded_sm()
+                    .text_xs()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(name)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.ext_pick = None;
+                        this.feature.params.set("parts", ParamValue::Query(Vec::new()));
+                        this.set_value("partStudio", ParamValue::Text(r.key()), cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        let empty = rows.is_empty();
+        Some(
+            v_flex()
+                .gap_1()
+                .p_1p5()
+                .rounded_md()
+                .border_1()
+                .border_color(pal.border_strong)
+                .child(h_flex().gap_2().child(div().flex_1().text_xs().font_weight(FontWeight::SEMIBOLD).truncate().child(info.name.clone())).child(version_menu))
+                .when(empty, |d| d.child(div().text_xs().text_color(pal.text_faint).child("No Part Studios in this version")))
+                .children(rows)
+                .into_any_element(),
+        )
     }
 
     /// Input element for a numeric or text value.

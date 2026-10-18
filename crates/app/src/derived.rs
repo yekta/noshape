@@ -1,5 +1,10 @@
 //! Derived-part provider: regenerates other Part Studios of the document on
 //! demand (cached per tab) so Derived features can import their parts.
+//!
+//! Sources in other documents are pinned to a microversion (a named version
+//! or the state when inserted, like Onshape's version-pinned links) and keyed
+//! `ext:<microversion>|<tab>|<path>`. A pinned snapshot never changes, so its
+//! regenerated context is cached for the whole session.
 
 use noshape_model::Document;
 use noshape_model::TabContent;
@@ -45,8 +50,122 @@ impl DocStudios {
     }
 }
 
+/// A Part Studio in another document, pinned to a microversion.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExternalRef {
+    pub path: std::path::PathBuf,
+    pub microversion: noshape_store::MicroversionId,
+    pub tab: String,
+}
+
+impl ExternalRef {
+    pub fn key(&self) -> String {
+        format!("ext:{}|{}|{}", self.microversion, self.tab, self.path.display())
+    }
+
+    pub fn parse(key: &str) -> Option<Self> {
+        let rest = key.strip_prefix("ext:")?;
+        let mut it = rest.splitn(3, '|');
+        let microversion = it.next()?.parse().ok()?;
+        let tab = it.next()?.to_string();
+        let path = std::path::PathBuf::from(it.next()?);
+        Some(Self { path, microversion, tab })
+    }
+}
+
+/// One version a Derived feature can pin: a named version or the current state.
+#[derive(Clone, Debug)]
+pub struct VersionChoice {
+    pub label: String,
+    pub microversion: noshape_store::MicroversionId,
+}
+
+/// What another document offers as Derived sources.
+#[derive(Clone, Debug)]
+pub struct ExternalDocInfo {
+    pub path: std::path::PathBuf,
+    pub name: String,
+    /// Named versions, newest first, then "Current state".
+    pub versions: Vec<VersionChoice>,
+}
+
+type SnapshotKey = (std::path::PathBuf, noshape_store::MicroversionId);
+static SNAPSHOTS: std::sync::LazyLock<Mutex<HashMap<SnapshotKey, Arc<Document>>>> = std::sync::LazyLock::new(Default::default);
+static EXT_CONTEXTS: std::sync::LazyLock<Mutex<HashMap<String, Option<Arc<Context>>>>> = std::sync::LazyLock::new(Default::default);
+
+thread_local! {
+    /// Nesting depth of external regenerations (guards against pathological chains).
+    static EXT_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Read another document's state at a microversion (cached; snapshots are immutable).
+pub fn external_snapshot(path: &std::path::Path, mv: noshape_store::MicroversionId) -> anyhow::Result<Arc<Document>> {
+    let key = (path.to_path_buf(), mv);
+    if let Some(d) = SNAPSHOTS.lock().get(&key) {
+        return Ok(d.clone());
+    }
+    let store = noshape_store::Document::open_read_only(path)?;
+    let doc = Arc::new(Document::from_blobs(&store.read_all(mv)?)?);
+    SNAPSHOTS.lock().insert(key, doc.clone());
+    Ok(doc)
+}
+
+/// Versions of another document available for pinning.
+pub fn external_doc_info(path: &std::path::Path) -> anyhow::Result<ExternalDocInfo> {
+    let store = noshape_store::Document::open_read_only(path)?;
+    let graph = store.graph()?;
+    let mut versions: Vec<VersionChoice> = graph.versions.iter().rev().map(|v| VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
+    let head = store.head(store.default_branch()?)?;
+    versions.push(VersionChoice { label: "Current state".into(), microversion: head });
+    let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
+    Ok(ExternalDocInfo { path: path.to_path_buf(), name, versions })
+}
+
+/// The newest named version of a document, if it differs from `pinned`
+/// (Onshape's "update available").
+pub fn newer_version(r: &ExternalRef) -> Option<VersionChoice> {
+    let info = external_doc_info(&r.path).ok()?;
+    let newest = info.versions.first().filter(|v| v.label != "Current state")?;
+    (newest.microversion != r.microversion).then(|| newest.clone())
+}
+
+/// Human-readable description of an external source: "Doc · V2 · Part Studio 1".
+pub fn describe_external(r: &ExternalRef) -> String {
+    let info = external_doc_info(&r.path).ok();
+    let doc = info.as_ref().map(|i| i.name.clone()).unwrap_or_else(|| r.path.display().to_string());
+    let version = info
+        .as_ref()
+        .and_then(|i| i.versions.iter().find(|v| v.microversion == r.microversion && v.label != "Current state"))
+        .map(|v| v.label.clone())
+        .unwrap_or_else(|| format!("state {}", r.microversion.short()));
+    let tab = external_snapshot(&r.path, r.microversion).ok().and_then(|d| d.tabs.iter().find(|t| t.id.to_string() == r.tab).map(|t| t.name.clone())).unwrap_or_else(|| "missing Part Studio".into());
+    format!("{doc} · {version} · {tab}")
+}
+
+/// Regenerated context of a pinned external Part Studio (cached).
+pub fn external_context(r: &ExternalRef) -> Option<Arc<Context>> {
+    let key = r.key();
+    if let Some(c) = EXT_CONTEXTS.lock().get(&key) {
+        return c.clone();
+    }
+    if EXT_DEPTH.with(|d| d.get()) >= 8 {
+        return None;
+    }
+    EXT_DEPTH.with(|d| d.set(d.get() + 1));
+    let ctx = external_snapshot(&r.path, r.microversion).ok().and_then(|doc| {
+        let provider = DocStudios { doc, cache: Default::default(), active: Default::default() };
+        provider.context(&r.tab)
+    });
+    EXT_DEPTH.with(|d| d.set(d.get() - 1));
+    EXT_CONTEXTS.lock().insert(key, ctx.clone());
+    ctx
+}
+
 impl DerivedProvider for DocStudios {
     fn context(&self, tab: &str) -> Option<Arc<Context>> {
+        if let Some(r) = ExternalRef::parse(tab) {
+            return external_context(&r);
+        }
         let studio = self.studio(tab)?.clone();
         if !self.active.lock().insert(tab.to_string()) {
             return None; // circular reference
@@ -66,6 +185,11 @@ impl DerivedProvider for DocStudios {
 
     fn version(&self, tab: &str) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
+        if tab.starts_with("ext:") {
+            // Pinned: the key fully identifies the content.
+            tab.hash(&mut h);
+            return h.finish();
+        }
         if let Some(ps) = self.studio(tab) {
             serde_json::to_string(ps).unwrap_or_default().hash(&mut h);
             // Nested derived sources and variable studios also matter.
