@@ -20,6 +20,22 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         _ => Box::default(),
     };
     let mut sk = data.sketch.clone();
+    // Re-project used ("Use") 3D edges so they follow upstream changes.
+    let mut missing = 0;
+    for (eid, r) in &data.external_refs {
+        let edges = ev.resolve_edges(std::slice::from_ref(r));
+        let Some(&(bi, ei)) = edges.first() else {
+            missing += 1;
+            continue;
+        };
+        let Ok(edge) = ev.edge_shape(bi, ei) else { continue };
+        if let Some(c) = project_edge(&edge, &frame) {
+            update_external(&mut sk, noshape_sketch::EntityId(*eid), &c);
+        }
+    }
+    if missing > 0 {
+        ev.warnings.push(format!("{missing} projected edge(s) no longer exist"));
+    }
     // Expression-driven dimensions.
     let mut problems = Vec::new();
     for (cid, expr) in &data.dimension_exprs {
@@ -71,4 +87,62 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     ev.ctx.sketches.retain(|s| s.feature != ev.feature);
     ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, wires, dimension_text }));
     Ok(())
+}
+
+/// Project a 3D edge onto a sketch plane (orthogonal projection).
+pub fn project_edge(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<noshape_sketch::Curve2> {
+    use noshape_kernel as k;
+    use noshape_sketch::Curve2;
+    let info = edge.edge_info().ok()?;
+    match info.curve {
+        k::Curve::Line { .. } => Some(Curve2::Line { a: frame.to_local(info.start), b: frame.to_local(info.end) }),
+        k::Curve::Circle { center, axis, radius, .. } if axis.normalize().dot(frame.normal).abs() > 1.0 - 1e-9 => {
+            let c = frame.to_local(center);
+            if info.closed {
+                return Some(Curve2::Circle { center: c, radius });
+            }
+            let ang = |p: glam::DVec3| {
+                let d = frame.to_local(p) - c;
+                d.y.atan2(d.x)
+            };
+            // The edge runs CCW around its axis; seen from the sketch normal it is
+            // CCW when the axis agrees with the normal.
+            let (mut a0, mut a1) = (ang(info.start), ang(info.end));
+            if axis.dot(frame.normal) < 0.0 {
+                std::mem::swap(&mut a0, &mut a1);
+            }
+            let mut e = a1;
+            while e <= a0 {
+                e += std::f64::consts::TAU;
+            }
+            Some(Curve2::Arc { center: c, radius, start_angle: a0, end_angle: e })
+        }
+        _ => None,
+    }
+}
+
+/// Update an external entity's geometry in place from a projected curve.
+pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, c: &noshape_sketch::Curve2) {
+    use noshape_sketch::{Curve2, Geometry};
+    let Some(e) = sk.entity(id).cloned() else { return };
+    match (&e.geometry, c) {
+        (Geometry::Line { start, end }, Curve2::Line { a, b }) => {
+            let _ = sk.set_point(*start, *a);
+            let _ = sk.set_point(*end, *b);
+        }
+        (Geometry::Circle { center, .. }, Curve2::Circle { center: c2, radius }) => {
+            let _ = sk.set_point(*center, *c2);
+            if let Some(ent) = sk.entity_mut(id)
+                && let Geometry::Circle { radius: r, .. } = &mut ent.geometry
+            {
+                *r = *radius;
+            }
+        }
+        (Geometry::Arc { center, start, end }, Curve2::Arc { center: c2, radius, start_angle, end_angle }) => {
+            let _ = sk.set_point(*center, *c2);
+            let _ = sk.set_point(*start, *c2 + glam::DVec2::from_angle(*start_angle) * *radius);
+            let _ = sk.set_point(*end, *c2 + glam::DVec2::from_angle(*end_angle) * *radius);
+        }
+        _ => {}
+    }
 }

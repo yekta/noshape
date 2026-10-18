@@ -35,7 +35,7 @@ const DRAW_TOOLS: &[&[Tool]] = &[
     &[Tool::Ellipse],
 ];
 
-const EDIT_TOOLS: &[Tool] = &[Tool::Fillet, Tool::Trim, Tool::Extend, Tool::Split, Tool::Offset, Tool::Mirror];
+const EDIT_TOOLS: &[Tool] = &[Tool::Fillet, Tool::Trim, Tool::Extend, Tool::Split, Tool::Offset, Tool::Mirror, Tool::Use];
 
 impl PartStudioView {
     /// Id of the sketch feature being edited (if the dialog is a sketch).
@@ -158,6 +158,10 @@ impl PartStudioView {
                 false
             }
             ViewportEvent::ToolDown { position, modifiers, click_count } => {
+                if self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) {
+                    self.use_hovered(window, cx);
+                    return true;
+                }
                 let Some(p) = to_plane(self, *position, cx) else { return true };
                 let hovered = self.hovered_sketch_entity();
                 let (shift, dbl) = (modifiers.shift, *click_count >= 2);
@@ -205,6 +209,53 @@ impl PartStudioView {
             out.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().ignore_clip().layer(31));
         }
         out
+    }
+
+    /// Project the hovered model edge (or all edges of a hovered face).
+    fn use_hovered(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(r) = self.hover.clone() else { return };
+        let Some(ctx) = self.context.clone() else { return };
+        let Some(frame) = self.sketch.as_ref().map(|s| s.frame) else { return };
+        let mut refs: Vec<Reference> = Vec::new();
+        match &r {
+            Reference::Edge(_) => refs.push(r.clone()),
+            Reference::Face(_) => {
+                // All edges bounding the face.
+                if let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)) {
+                    let fi = b.face_refs.iter().position(|x| *x == r).unwrap_or(0);
+                    if let Some(body) = ctx.body(&b.id)
+                        && let Ok(face) = body.shape.sub_shape(noshape_kernel::ShapeType::Face, fi)
+                    {
+                        for e in face.edges() {
+                            if let Some(i) = body.shape.index_of(&e, noshape_kernel::ShapeType::Edge)
+                                && let Some(n) = body.edges.get(i)
+                            {
+                                refs.push(Reference::Edge((**n).clone()));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => return,
+        }
+        let mut changed = false;
+        for er in refs {
+            let shapes = noshape_model::regen::measure::resolve_shapes(&ctx, &er);
+            let Some(edge) = shapes.first() else { continue };
+            let Some(curve) = noshape_model::regen::features::sketch::project_edge(edge, &frame) else {
+                if let Some(ed) = &mut self.sketch {
+                    ed.message = Some("Only lines and circles parallel to the sketch can be projected so far".into());
+                }
+                continue;
+            };
+            if self.with_sketch(cx, |ed, data| ed.add_used(data, &curve, er.clone())) == Some(true) {
+                changed = true;
+            }
+        }
+        if changed {
+            self.regen_sync(window, cx);
+        }
+        cx.notify();
     }
 
     pub(super) fn sketch_cancel(&mut self, cx: &mut Context<Self>) {
@@ -488,6 +539,7 @@ impl PartStudioView {
             .on_action(cx.listener(|this, _: &SketchTrim, _, cx| this.set_tool(Tool::Trim, cx)))
             .on_action(cx.listener(|this, _: &SketchExtend, _, cx| this.set_tool(Tool::Extend, cx)))
             .on_action(cx.listener(|this, _: &SketchDimension, _, cx| this.set_tool(Tool::Dimension, cx)))
+            .on_action(cx.listener(|this, _: &SketchUse, _, cx| this.set_tool(Tool::Use, cx)))
             .on_action(cx.listener(|this, _: &SketchConstruction, window, cx| this.toggle_construction(window, cx)))
             .on_action(cx.listener(|this, _: &SketchTangentArcToggle, _, cx| {
                 let next = if this.sketch.as_ref().is_some_and(|s| s.tool == Tool::TangentArc) { Tool::Line } else { Tool::TangentArc };

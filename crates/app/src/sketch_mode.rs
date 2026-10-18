@@ -116,6 +116,7 @@ pub enum Tool {
     Split,
     Offset,
     Mirror,
+    Use,
     Dimension,
     Constraint(ConstraintTool),
 }
@@ -143,6 +144,7 @@ impl Tool {
             Tool::Split => "Split",
             Tool::Offset => "Offset (O)",
             Tool::Mirror => "Mirror",
+            Tool::Use => "Use / project edges (U)",
             Tool::Dimension => "Dimension (D)",
             Tool::Constraint(c) => c.label(),
         }
@@ -169,6 +171,7 @@ impl Tool {
             Tool::Split => "split-sketch",
             Tool::Offset => "offset",
             Tool::Mirror => "sketch-mirror",
+            Tool::Use => "use",
             Tool::Dimension => "dimension",
             Tool::Constraint(c) => c.icon(),
         }
@@ -317,6 +320,7 @@ impl SketchEditor {
             Tool::Trim => Some("Click the part of a curve to remove".into()),
             Tool::Extend => Some("Click near the end of a curve to extend it".into()),
             Tool::Dimension => Some("Select one or two entities, then click to place the dimension".into()),
+            Tool::Use => Some("Click model edges or faces to project them into the sketch".into()),
             Tool::Constraint(c) => Some(format!("Select {} entit{} for {}", c.arity(), if c.arity() == 1 { "y" } else { "ies" }, c.label())),
             _ => None,
         };
@@ -1251,4 +1255,23 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
         ConstraintTool::Pierce => ConstraintKind::Pierce { point: a, target: b? },
         ConstraintTool::Symmetric => ConstraintKind::Symmetric { a, b: b?, axis: pt(2)? },
     })
+}
+
+impl SketchEditor {
+    /// Add a projected (used) curve linked to a 3D reference.
+    pub fn add_used(&mut self, data: &mut SketchData, curve: &Curve2, reference: noshape_model::reference::Reference) -> bool {
+        match data.sketch.use_external(curve) {
+            Ok(r) => {
+                if let Some(&id) = r.created.last() {
+                    data.external_refs.insert(id.0, reference);
+                }
+                data.sketch.solve();
+                true
+            }
+            Err(e) => {
+                self.message = Some(format!("{e}"));
+                false
+            }
+        }
+    }
 }

@@ -157,10 +157,12 @@ impl Picks {
 }
 
 /// Placement of a view on its sheet.
-pub fn placement_of(sheet: &Sheet, g: &ViewGeometry) -> Option<ViewPlacement> {
-    let v = sheet.view(g.id)?;
-    let scale = views::view_scale(sheet, g.id);
-    let mut p = ViewPlacement { id: g.id, origin: g.origin, position: v.position, scale, min: [0.0; 2], max: [0.0; 2] };
+/// Placement of view `id` showing geometry `g` (geometry is shared through
+/// the cache between views with identical projections, so `g.id` may differ).
+pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewPlacement> {
+    let v = sheet.view(id)?;
+    let scale = views::view_scale(sheet, id);
+    let mut p = ViewPlacement { id, origin: g.origin, position: v.position, scale, min: [0.0; 2], max: [0.0; 2] };
     let a = p.to_sheet(g.min);
     let b = p.to_sheet(g.max);
     p.min = [a[0].min(b[0]), a[1].min(b[1])];
@@ -309,7 +311,7 @@ pub fn assemble_sheet(drawing: &Drawing, sheet: &Sheet, views: &HashMap<ViewId, 
     let mut placements: Vec<ViewPlacement> = Vec::new();
     for v in &sheet.views {
         let Some(geo) = views.get(&v.id) else { continue };
-        let Some(pl) = placement_of(sheet, geo) else { continue };
+        let Some(pl) = placement_of(sheet, v.id, geo) else { continue };
         placements.push(pl);
     }
     let place = |id: ViewId| placements.iter().find(|p| p.id == id).copied();
