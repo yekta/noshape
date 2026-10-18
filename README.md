@@ -1,3 +1,5 @@
+<img src="packaging/icons/noshape-256.png" alt="noshape" width="96">
+
 # noshape
 
 A fast, fully local, parametric feature-based CAD application for macOS, Linux and Windows.
