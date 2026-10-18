@@ -4,7 +4,7 @@
 use super::PartStudioView;
 use crate::theme::{p, with_alpha};
 use glam::DVec2;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::Button;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::reference::BodyId;

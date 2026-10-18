@@ -373,7 +373,9 @@ impl PartStudioView {
 
     /// Rebuild highlight state and push the scene to the viewport.
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
-        let Some(built) = &self.built else { return };
+        if self.built.is_none() {
+            return;
+        }
         let (mut selection, mut accent) = match &self.edit {
             Some(e) => {
                 let d = e.dialog.read(cx);

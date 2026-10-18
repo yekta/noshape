@@ -92,6 +92,16 @@ pub fn show(cx: &mut App) {
     }
 }
 
+/// Show the start window and ask for a new document's name (Ctrl+N from
+/// any window).
+pub fn show_and_create(cx: &mut App) {
+    show(cx);
+    let Some((handle, view)) = cx.try_global::<StartWindowGlobal>().map(|g| (g.handle, g.view.clone())) else { return };
+    let _ = handle.update(cx, |_, window, cx| {
+        let _ = view.update(cx, |v, cx| v.new_document(window, cx));
+    });
+}
+
 /// Re-read the library and redraw (e.g. after a document window closed).
 pub fn refresh(cx: &mut App) {
     if let Some(view) = cx.try_global::<StartWindowGlobal>().map(|g| g.view.clone()) {

@@ -99,9 +99,8 @@ fn main() {
         }
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {
-            if let Err(e) = files::open_document_window(files::new_document_path(), None, g2.clone(), cx) {
-                log::error!("new document failed: {e:#}");
-            }
+            let _ = &g2;
+            start_window::show_and_create(cx);
         });
         let g3 = gpu.clone();
         cx.on_action(move |_: &actions::OpenDocument, cx| files::prompt_open(g3.clone(), cx));
