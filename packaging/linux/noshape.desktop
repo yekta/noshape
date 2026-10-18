@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=noshape
+GenericName=Parametric CAD
+Comment=A fast, fully local, parametric CAD application
+Exec=noshape %f
+Terminal=false
+Categories=Graphics;Engineering;3DGraphics;
+MimeType=application/x-noshape;

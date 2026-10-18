@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  bundle:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-24.04 # validated image; ubuntu-latest moves to 26.04 from 2026-10-19
+            asset: linux-x86_64
+          - name: macOS arm64
+            os: macos-latest
+            asset: macos-arm64
+          - name: Windows x86_64
+            os: windows-latest
+            asset: windows-x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == tag ]] || v="0.0.0-${GITHUB_SHA::7}"
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja || true
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1
+
+      - name: Build (release)
+        run: cargo build --release --locked -p noshape
+
+      - name: Bundle (macOS .app in .dmg)
+        if: runner.os == 'macOS'
+        run: |
+          app=dist/noshape.app
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp target/release/noshape "$app/Contents/MacOS/noshape"
+          sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+          plutil -lint "$app/Contents/Info.plist"
+          # Ad-hoc signature so Apple Silicon will launch it (not notarized).
+          codesign --force --deep --sign - "$app"
+          ln -s /Applications dist/Applications
+          hdiutil create -volname noshape -srcfolder dist -ov -format UDZO \
+            "noshape-$VERSION-${{ matrix.asset }}.dmg"
+          echo "ASSET=noshape-$VERSION-${{ matrix.asset }}.dmg" >> "$GITHUB_ENV"
+
+      - name: Bundle (Linux tar.gz)
+        if: runner.os == 'Linux'
+        run: |
+          d="noshape-$VERSION-${{ matrix.asset }}"
+          mkdir -p "$d"
+          cp target/release/noshape "$d/"
+          strip "$d/noshape"
+          cp packaging/linux/noshape.desktop README.md "$d/"
+          tar czf "$d.tar.gz" "$d"
+          echo "ASSET=$d.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Bundle (Windows zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $d = "noshape-$env:VERSION-${{ matrix.asset }}"
+          New-Item -ItemType Directory -Force -Path $d | Out-Null
+          Copy-Item target/release/noshape.exe, README.md $d
+          Compress-Archive -Path $d -DestinationPath "$d.zip"
+          "ASSET=$d.zip" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  publish:
+    needs: bundle
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "noshape $GITHUB_REF_NAME" --generate-notes

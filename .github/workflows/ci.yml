@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main, ci]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-24.04 # validated image; ubuntu-latest moves to 26.04 from 2026-10-19
+            exe: noshape
+          - name: macOS arm64
+            os: macos-latest
+            exe: noshape
+          - name: Windows x86_64 (MSVC)
+            os: windows-latest
+            exe: noshape.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja || true
+          # GPUI compiles its Metal shaders at build time (xcrun metal).
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1
+
+      - name: Build (release)
+        run: cargo build --release --locked -p noshape
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: noshape-${{ runner.os }}-${{ runner.arch }}
+          path: target/release/${{ matrix.exe }}
+          if-no-files-found: error
+
+      - name: Test
+        run: cargo test --locked --workspace --exclude noshape
+
+      # Library crates must be warning-free. The app crate is still under heavy
+      # development (lots of not-yet-used code), so its lints are reported as
+      # warnings only; switch it to `-D warnings` once it settles.
+      - name: Clippy (libraries, -D warnings)
+        if: runner.os == 'Linux'
+        run: cargo clippy --locked --workspace --exclude noshape -- -D warnings
+
+      - name: Clippy (app, warnings only)
+        if: runner.os == 'Linux'
+        run: cargo clippy --locked -p noshape
