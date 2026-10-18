@@ -1,6 +1,7 @@
 //! Document window: title bar, active tab content and the bottom tab bar.
 
 use crate::actions::*;
+use crate::assembly_view::AssemblyView;
 use crate::assets::icon_path;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
@@ -21,6 +22,7 @@ use std::collections::HashMap;
 
 enum TabView {
     PartStudio(Entity<PartStudioView>),
+    Assembly(Entity<AssemblyView>),
     Placeholder(&'static str),
 }
 
@@ -82,7 +84,11 @@ impl Workspace {
                 let gpu = self.gpu.clone();
                 TabView::PartStudio(cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx)))
             }
-            Some("assembly") => TabView::Placeholder("Assembly"),
+            Some("assembly") => {
+                let doc = self.doc.clone();
+                let gpu = self.gpu.clone();
+                TabView::Assembly(cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx)))
+            }
             Some("drawing") => TabView::Placeholder("Drawing"),
             Some("variables") => TabView::Placeholder("Variable Studio"),
             _ => return,
@@ -94,6 +100,10 @@ impl Workspace {
         self.active = Some(tab);
         self.ensure_view(tab, window, cx);
         if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
+            let fh = v.read(cx).focus_handle(cx);
+            window.focus(&fh, cx);
+        }
+        if let Some(TabView::Assembly(v)) = self.views.get(&tab) {
             let fh = v.read(cx).focus_handle(cx);
             window.focus(&fh, cx);
         }
@@ -379,6 +389,7 @@ impl Render for Workspace {
         let tabs = self.render_tab_bar(cx);
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
+            Some(TabView::Assembly(v)) => v.clone().into_any_element(),
             Some(TabView::Placeholder(kind)) => div()
                 .size_full()
                 .flex()

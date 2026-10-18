@@ -20,7 +20,7 @@ use crate::viewport::{Viewport, ViewportEvent};
 use glam::{DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -1072,8 +1072,8 @@ impl AssemblyView {
                 self.context_menu = None;
                 self.pointer = *position;
                 let target = self.pick(*pick);
-                if let Some(s) = &self.mate {
-                    if s.dialog.read(cx).awaiting_pick() {
+                if let Some(dialog) = self.mate.as_ref().map(|s| s.dialog.clone()) {
+                    if dialog.read(cx).awaiting_pick() {
                         if let Some(t) = &target {
                             self.hover = Some(t.clone());
                             self.update_inference(cx);
@@ -1083,7 +1083,7 @@ impl AssemblyView {
                             && path == t.path
                         {
                             let c = MateConnectorRef { instance: path[0], path: path[1..].to_vec(), reference: r, flip: false, rotate_quarters: 0 };
-                            s.dialog.clone().update(cx, |d, cx| d.set_connector(c, cx));
+                            dialog.update(cx, |d, cx| d.set_connector(c, cx));
                         }
                     }
                 } else {
@@ -1243,7 +1243,7 @@ impl AssemblyView {
 
     fn tool(&self, id: &'static str, icon: &'static str, tip: &'static str, cx: &mut Context<Self>, f: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static) -> Button {
         let pal = p();
-        Button::new(id).icon(Icon::empty().path(icon_path(icon)).text_color(pal.text)).ghost().small().tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))
+        Button::new(id).icon(Icon::empty().path(icon_path(icon)).text_color(pal.text).with_size(px(18.))).ghost().with_size(px(30.)).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))
     }
 
     fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -1262,7 +1262,7 @@ impl AssemblyView {
         };
         let relations = {
             let view = view.clone();
-            Button::new("tb-relations").icon(Icon::empty().path(icon_path("gear-relation")).text_color(pal.text)).ghost().small().tooltip("Relations").dropdown_menu(move |mut menu, _, _| {
+            Button::new("tb-relations").icon(Icon::empty().path(icon_path("gear-relation")).text_color(pal.text).with_size(px(18.))).ghost().with_size(px(30.)).tooltip("Relations").dropdown_menu(move |mut menu, _, _| {
                 for (label, icon, kind) in [
                     ("Gear relation", "gear-relation", RelationType::Gear),
                     ("Rack and pinion relation", "rack-pinion", RelationType::RackAndPinion),
@@ -1278,7 +1278,7 @@ impl AssemblyView {
         let positions: Vec<String> = self.assembly(cx).map(|a| a.named_positions.iter().map(|n| n.name.clone()).collect()).unwrap_or_default();
         let named = {
             let view = view.clone();
-            Button::new("tb-named").icon(Icon::empty().path(icon_path("named-position")).text_color(pal.text)).ghost().small().tooltip("Named positions").dropdown_menu(move |mut menu, _, _| {
+            Button::new("tb-named").icon(Icon::empty().path(icon_path("named-position")).text_color(pal.text).with_size(px(18.))).ghost().with_size(px(30.)).tooltip("Named positions").dropdown_menu(move |mut menu, _, _| {
                 let v = view.clone();
                 menu = menu.item(PopupMenuItem::new("Save current position…").icon(IconName::Plus).on_click(move |_, window, cx| {
                     v.update(cx, |this, cx| {

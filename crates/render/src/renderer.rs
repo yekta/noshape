@@ -684,10 +684,12 @@ impl Renderer {
                 }
             };
             if pick {
+                // Transparent geometry (datum planes, sketch regions) first and
+                // without depth writes: opaque parts behind it win the pick.
+                draw(pass, &transparent, &pipelines.mesh_pick_transparent);
                 draw(pass, &opaque, &pipelines.mesh_pick);
                 draw(pass, &lines, &pipelines.line_pick);
                 draw(pass, &points, &pipelines.point_pick);
-                draw(pass, &transparent, &pipelines.mesh_pick_transparent);
             } else {
                 draw(pass, &opaque, &pipelines.mesh_opaque);
                 draw(pass, &transparent, &pipelines.mesh_transparent);

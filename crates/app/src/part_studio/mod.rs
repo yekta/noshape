@@ -1,6 +1,7 @@
 //! Part Studio tab: toolbar, feature list (with rollback bar), parts list,
 //! 3D viewport with selection, and feature dialogs with live preview.
 
+mod menus;
 mod sketch;
 
 use crate::actions::*;
@@ -122,6 +123,9 @@ pub struct PartStudioView {
     message: Option<(FeatureStatus, String)>,
     sketch: Option<SketchEditor>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
+    context_menu: Option<(Point<Pixels>, Entity<gpui_kit::component::menu::PopupMenu>, Subscription)>,
+    measure_cache: Option<(Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>)>,
+    show_mass: bool,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
@@ -171,6 +175,9 @@ impl PartStudioView {
             message: None,
             sketch: None,
             context: None,
+            context_menu: None,
+            measure_cache: None,
+            show_mass: false,
             dim_input: None,
             _subs: subs,
         };
@@ -368,7 +375,10 @@ impl PartStudioView {
                 }
                 self.refresh_scene(false, cx);
             }
-            ViewportEvent::ContextMenu { .. } => {}
+            ViewportEvent::ContextMenu { pick, position } => {
+                let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                self.open_context_menu(target, *position, window, cx);
+            }
             _ => {}
         }
         let _ = window;
@@ -1031,6 +1041,8 @@ impl Render for PartStudioView {
         let list = self.render_feature_list(cx);
         let mut overlay = self.render_viewport_overlay(cx);
         overlay.extend(self.render_sketch_labels(window, cx));
+        overlay.extend(self.render_measure_panel(cx));
+        overlay.extend(self.render_context_menu());
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()

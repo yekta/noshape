@@ -13,6 +13,7 @@ mod display;
 pub mod eval;
 pub mod features;
 pub mod implicit;
+pub mod measure;
 
 use crate::configuration::ConfigValues;
 use crate::display::{FeatureState, FeatureStatus, MeshBuffers, StudioDisplay};

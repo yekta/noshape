@@ -1,6 +1,9 @@
 //! noshape: a fast, fully local, parametric CAD application.
 
 mod actions;
+mod assembly_mate_dialog;
+mod assembly_scene;
+mod assembly_view;
 mod assets;
 mod doc_model;
 mod feature_dialog;
