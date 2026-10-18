@@ -37,3 +37,9 @@ and the Onshape research specs in `research/sections/` (what each feature must d
   `crates/app/assets/icons/` referenced with `assets::icon_path(name)`.
 * Performance matters: no blocking work on the UI thread (use `cx.background_spawn`), cache
   derived data, avoid per-frame allocation.
+
+## Live Onshape reference
+A real Onshape account is available through the environment variables `ONSHAPE_EMAIL` and `ONSHAPE_PASSWORD`
+(sourced from `/root/.config/noshape/onshape.env`). Use it with headless Chrome (`/usr/bin/google-chrome`) to look
+at and screenshot the real app, and to check how features behave. Never commit, log or print the values.
+Keep screenshots outside the repo (`/root/onshape-research/live/`).

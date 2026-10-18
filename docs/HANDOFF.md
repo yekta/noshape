@@ -23,9 +23,11 @@ Read this first, then `docs/handoff/*.md` (one file per workstream, written by t
 
 ## Constraints already decided
 
-- **No account workarounds.** Onshape blocks disposable emails at sign-up; we do not evade that.
-  If the user supplies a real account or inbox, use Chrome (`/usr/bin/google-chrome`, Node 24,
-  Playwright in `/tmp/pw`) to study the live app.
+- **Onshape account (provided by the user):** the credentials are in the environment variables
+  `ONSHAPE_EMAIL` and `ONSHAPE_PASSWORD`, set in `/root/.config/noshape/onshape.env` (mode 600) and
+  sourced from `~/.bashrc` and `~/.profile`. Never commit or print the values. Use them with Chrome
+  (`/usr/bin/google-chrome`, Node 24, Playwright in `/tmp/pw`) to study and screenshot the live Onshape app
+  and to verify behaviours. Don't create other accounts.
 - **No copied Onshape assets.** Don't put Onshape's own SVG or image assets in the public repo. The icons in
   `crates/app/assets/icons/` are redrawn on Onshape's 20-unit grid. Reference material lives outside the repo in
   `/root/onshape-research/` (help pages, 5,148 help images in `ui-ref/`, the public CSS tokens, and the
