@@ -273,14 +273,21 @@ impl Prepared {
             rels.push(SolverRelation { kind: *kind, mate_a: ia, mate_b: ib, ratio: *ratio, reverse: *reverse, base_a, base_b });
             rel_ids.push(*id);
         }
-        let drags: Vec<DragTarget> = opts
-            .drags
-            .iter()
-            .filter_map(|(id, local, target)| {
-                let (b, off) = self.body_of.get(id)?;
-                Some(DragTarget { body: *b, local_point: off.transform_point(*local), target: *target })
-            })
-            .collect();
+        // Unconstrained bodies follow a drag by pure translation (no solve).
+        let constrained = |b: usize| mates.iter().any(|m| m.a == b || m.b == b);
+        let mut drags: Vec<DragTarget> = Vec::new();
+        for (id, local, target) in &opts.drags {
+            let Some((b, off)) = self.body_of.get(id) else { continue };
+            let lp = off.transform_point(*local);
+            if !constrained(*b) {
+                if !bodies[*b].fixed {
+                    let cur = bodies[*b].pose.transform_point(lp);
+                    bodies[*b].pose.origin += *target - cur;
+                }
+                continue;
+            }
+            drags.push(DragTarget { body: *b, local_point: lp, target: *target });
+        }
         let r = solver::solve(&mut bodies, &mates, &rels, &drags);
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut out = Solved { converged: r.converged, dof: r.dof, ..Default::default() };

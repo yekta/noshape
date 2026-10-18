@@ -123,10 +123,25 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
         .detach();
         return;
     }
-    in_app_save_prompt(title, documents_dir().join(&default_name), window, cx, then);
+    in_app_save_prompt(title, "Save", documents_dir().join(&default_name), window, cx, then);
 }
 
-fn in_app_save_prompt(title: &'static str, default: PathBuf, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+/// Ask for a file to open, then call `then` with it.
+pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
+    if native_dialogs_available() {
+        cx.spawn(async move |cx| {
+            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
+            if let Some(p) = picked {
+                let _ = cx.update(|cx| then(p, cx));
+            }
+        })
+        .detach();
+        return;
+    }
+    in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, then);
+}
+
+fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: PathBuf, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::component::button::{Button, ButtonVariants as _};
     use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
@@ -149,7 +164,7 @@ fn in_app_save_prompt(title: &'static str, default: PathBuf, window: &mut Window
             })
             .detach();
     }
-    state.update(cx, |s, cx| s.focus(window, cx));
+    let focus_state = state.clone();
     window.open_dialog(cx, move |dialog, _, _| {
         let st = state.clone();
         let then = then.clone();
@@ -161,7 +176,7 @@ fn in_app_save_prompt(title: &'static str, default: PathBuf, window: &mut Window
                 DialogFooter::new()
                     .gap_2()
                     .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
-                    .child(DialogAction::new().child(Button::new("ok").label("Save").primary())),
+                    .child(DialogAction::new().child(Button::new("ok").label(ok_label).primary())),
             )
             .on_ok(move |_, _, cx| {
                 let path = PathBuf::from(st.read(cx).value().to_string());
@@ -170,6 +185,13 @@ fn in_app_save_prompt(title: &'static str, default: PathBuf, window: &mut Window
                 }
                 true
             })
+    });
+    // Focus the field once the dialog is mounted (opening it moves focus).
+    window.defer(cx, move |window, cx| {
+        focus_state.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        })
     });
 }
 

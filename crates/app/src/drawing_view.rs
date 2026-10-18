@@ -19,7 +19,7 @@ use crate::gpu::{FrameResult, Gpu};
 use crate::theme::p;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::v_flex;
 use gpui_kit::*;
 use glam::{DQuat, DVec3};
 use noshape_model::document::{TabContent, TabId};
@@ -519,6 +519,7 @@ impl DrawingEditor {
         [self.center[0] + (local[0] - s[0] / 2.0) / self.zoom, self.center[1] - (local[1] - s[1] / 2.0) / self.zoom]
     }
 
+    #[allow(dead_code)]
     pub fn to_screen(&self, p: [f64; 2]) -> [f64; 2] {
         let s = self.size_px();
         [(p[0] - self.center[0]) * self.zoom + s[0] / 2.0, -(p[1] - self.center[1]) * self.zoom + s[1] / 2.0]

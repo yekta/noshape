@@ -419,4 +419,9 @@ fn demo_assembly_is_mated() {
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
     assert_eq!(res.nodes[2].dof, Some(1));
     assert_eq!(bom(&res).len(), 2);
+    // The second plate sits on top of the first (12 mm plates), turned about Z only.
+    let p = res.solved.placement(InstanceId(2)).unwrap();
+    assert!((p.translation[2] - 0.012).abs() < 1e-6, "{p:?}");
+    let q = DQuat::from_xyzw(p.rotation[0], p.rotation[1], p.rotation[2], p.rotation[3]);
+    assert!((q * DVec3::Z).z > 0.999, "plate 2 stays horizontal");
 }

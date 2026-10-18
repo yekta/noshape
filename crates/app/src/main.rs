@@ -15,6 +15,7 @@ mod scene_builder;
 mod session;
 mod sketch_mode;
 mod theme;
+mod variable_studio;
 mod viewport;
 mod workspace;
 

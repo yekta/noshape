@@ -93,7 +93,17 @@ pub fn add_demo_assembly(doc: &mut Document) {
     let cfg = ConfigValues::default();
     let (Some(plate), Some(pin)) = (ev.studio(doc, plate_tab, &cfg), ev.studio(doc, pin_tab, &cfg)) else { return };
     let (Some(pb), Some(qb)) = (plate.context.bodies.first(), pin.context.bodies.first()) else { return };
-    let face_named = |b: &crate::regen::context::Body, needle: &str| b.faces.iter().find(|f| format!("{f:?}").contains(needle)).map(|f| Reference::Face((**f).clone()));
+    // Planar cap faces of the extrusion (not fillet blends whose names mention the caps).
+    let face_named = |b: &crate::regen::context::Body, needle: &str| {
+        b.faces
+            .iter()
+            .find(|f| match &***f {
+                crate::reference::TopoName::Face { role: crate::reference::Role::CapEnd(_), .. } => needle == "CapEnd",
+                crate::reference::TopoName::Face { role: crate::reference::Role::CapStart(_), .. } => needle == "CapStart",
+                _ => false,
+            })
+            .map(|f| Reference::Face((**f).clone()))
+    };
     let cylinder = |b: &crate::regen::context::Body, radius: f64| {
         b.faces.iter().enumerate().find_map(|(i, f)| {
             let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?;

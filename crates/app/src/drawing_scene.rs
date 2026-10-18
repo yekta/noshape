@@ -174,6 +174,7 @@ impl Overlay {
         });
         self.lines.push((pts.collect(), dashed));
     }
+    #[allow(dead_code)]
     pub fn rect(&mut self, a: [f64; 2], b: [f64; 2], dashed: bool) {
         self.lines.push((vec![a, [b[0], a[1]], b, [a[0], b[1]], a], dashed));
     }

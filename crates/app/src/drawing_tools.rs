@@ -504,11 +504,9 @@ impl DrawingEditor {
                     self.status = Some("Select a straight edge of a view".into());
                 }
             }
-            Tool::Section { parent, p0: None, .. } => {
+            Tool::Section { p0: None, .. } => {
                 let pick = self.snap_at(c).or_else(|| self.view_at(c).and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
-                if let Some(pp) = pick
-                    && parent.is_none_or(|p| p == pp.view)
-                {
+                if let Some(pp) = pick {
                     self.tool = Tool::Section { parent: Some(pp.view), p0: Some(pp.p), line: None };
                 }
             }
@@ -538,11 +536,9 @@ impl DrawingEditor {
                     self.selection = vec![Sel::View(id)];
                 }
             }
-            Tool::Detail { parent, center: None, .. } => {
+            Tool::Detail { center: None, .. } => {
                 let pick = self.snap_at(c).or_else(|| self.view_at(c).and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
-                if let Some(pp) = pick
-                    && parent.is_none_or(|p| p == pp.view)
-                {
+                if let Some(pp) = pick {
                     self.tool = Tool::Detail { parent: Some(pp.view), center: Some(pp.p), radius: None };
                 }
             }
@@ -618,6 +614,7 @@ impl DrawingEditor {
                     self.tool = Tool::Balloon { anchor: None };
                 }
             }
+            _ => {}
         }
         self.update_preview(cx);
     }

@@ -52,6 +52,7 @@ fn limit_label(key: &str) -> &'static str {
 pub struct MateDialog {
     pub id: MateId,
     pub name: String,
+    #[allow(dead_code)]
     pub is_new: bool,
     pub mate_type: MateType,
     pub a: Option<MateConnectorRef>,
@@ -268,9 +269,9 @@ impl Render for MateDialog {
         for mt in MateType::ALL {
             grid = grid.child(
                 Button::new(SharedString::from(format!("mt-{}", mt.name())))
-                    .icon(Icon::empty().path(mate_icon(mt)))
+                    .icon(Icon::empty().path(mate_icon(mt)).with_size(px(16.)))
                     .ghost()
-                    .small()
+                    .with_size(px(26.))
                     .selected(mt == t)
                     .tooltip(format!("{} mate", mt.name()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_type(mt, cx))),

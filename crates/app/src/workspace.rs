@@ -7,6 +7,7 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::history_panel::HistoryPanel;
 use crate::part_studio::PartStudioView;
+use crate::variable_studio::VariableStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
@@ -21,6 +22,7 @@ use noshape_model::variables::VariableStudio;
 use std::collections::HashMap;
 
 enum TabView {
+    Variables(Entity<VariableStudioView>),
     PartStudio(Entity<PartStudioView>),
     Assembly(Entity<AssemblyView>),
     Placeholder(&'static str),
@@ -90,7 +92,10 @@ impl Workspace {
                 TabView::Assembly(cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx)))
             }
             Some("drawing") => TabView::Placeholder("Drawing"),
-            Some("variables") => TabView::Placeholder("Variable Studio"),
+            Some("variables") => {
+                let doc = self.doc.clone();
+                TabView::Variables(cx.new(|cx| VariableStudioView::new(doc, tab, window, cx)))
+            }
             _ => return,
         };
         self.views.insert(tab, view);
@@ -247,6 +252,8 @@ impl Workspace {
                     }
                     m
                 });
+                let w4 = w.clone();
+                menu = menu.item(PopupMenuItem::new("Import into Part Studio…").on_click(move |_, window, cx| w4.update(cx, |t, cx| t.import(window, cx))));
                 let w3 = w.clone();
                 menu = menu.separator().submenu("Units", window, cx, move |mut m, _, _| {
                     for u in noshape_units::LengthUnit::ALL {
@@ -299,6 +306,49 @@ impl Workspace {
                     Err(e) => format!("Save failed: {e}"),
                 };
                 this.report(msg, cx);
+            });
+        });
+    }
+
+    fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(view) = self.active_studio() else {
+            self.report("Open a Part Studio tab to import into".into(), cx);
+            return;
+        };
+        let ws = cx.entity();
+        let tab = view.read(cx).tab;
+        crate::files::request_open_path("Import CAD file", "CAD files", &["step", "stp", "iges", "igs", "brep"], window, cx, move |path, cx| {
+            let result = (|| -> anyhow::Result<String> {
+                use noshape_kernel as k;
+                let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+                let shape = match ext.as_str() {
+                    "step" | "stp" => {
+                        let parts = k::read_step(&path, k::LengthUnit::Meter)?;
+                        k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
+                    }
+                    "iges" | "igs" => k::read_iges(&path, k::LengthUnit::Meter)?,
+                    "brep" => k::read_brep(&path)?,
+                    other => anyhow::bail!("Unsupported file type .{other}"),
+                };
+                Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
+            })();
+            ws.update(cx, |this, cx| match result {
+                Ok(brep) => {
+                    let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+                    let units = this.doc.read(cx).session.doc.settings.units.clone();
+                    this.doc.update(cx, |doc, cx| {
+                        doc.edit_studio(tab, &format!("Import {file}"), cx, |ps| {
+                            if let Some(mut f) = ps.new_feature("importForeign", &units) {
+                                f.name = format!("Import {file}");
+                                f.custom_name = true;
+                                f.params.set("blobData", noshape_model::ParamValue::Text(brep));
+                                f.params.set("foreignId", noshape_model::ParamValue::Text(file.clone()));
+                                ps.insert_at_rollback(f);
+                            }
+                        });
+                    });
+                }
+                Err(e) => this.report(format!("Import failed: {e:#}"), cx),
             });
         });
     }
@@ -389,6 +439,7 @@ impl Render for Workspace {
         let tabs = self.render_tab_bar(cx);
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
+            Some(TabView::Variables(v)) => v.clone().into_any_element(),
             Some(TabView::Assembly(v)) => v.clone().into_any_element(),
             Some(TabView::Placeholder(kind)) => div()
                 .size_full()

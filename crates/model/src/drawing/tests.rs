@@ -72,3 +72,42 @@ fn sheet_export_with_views_and_dimensions() {
     std::fs::write("/tmp/drw/demo.pdf", &pdf).unwrap();
     std::fs::write("/tmp/drw/demo.dxf", &dxf).unwrap();
 }
+
+#[test]
+fn dimensions_follow_model_changes() {
+    use crate::params::ParamValue;
+    use glam::DVec3;
+    use noshape_units::ExprValue;
+    let (mut doc, mut drawing) = demo();
+    let studio_tab = doc.tabs[0].id;
+    let sources = regenerate_sources(&doc, &drawing);
+    let ctx = sources[&studio_tab].context.clone();
+    // Front view: height of the straight part of the corner edge (12 mm
+    // plate minus the 2 mm top fillet).
+    let a = views::vertex_ref_near(&ctx, DVec3::new(-0.05, -0.03, 0.0), 1e-6).expect("bottom vertex");
+    let b = views::vertex_ref_near(&ctx, DVec3::new(-0.05, -0.03, 0.010), 1e-6).expect("vertex below the fillet");
+    let sheet = &mut drawing.sheets[0];
+    let id = sheet.next_annotation_id();
+    sheet.annotations.push(Annotation {
+        id,
+        kind: AnnotationKind::LinearDimension { view: ViewId(1), a: [0.0; 2], b: [0.0; 2], offset: -20.0, orientation: DimOrientation::Vertical, override_text: None },
+        position: [0.0; 2],
+        refs: vec![AnnotationRef { slot: 0, point: a }, AnnotationRef { slot: 1, point: b }],
+    });
+    let cache = ViewCache::new();
+    let text_of = |built: &build::BuiltSheet| {
+        let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+        built.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.text.clone()).unwrap()
+    };
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(text_of(&built), "10");
+    // Thicken the plate to 20 mm: the dimension now reads 18.
+    if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
+        let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
+        ex.params.set("depth", ParamValue::Expr(ExprValue::new("20 mm")));
+    }
+    let sources = regenerate_sources(&doc, &drawing);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.is_empty(), "{:?}", built.dangling);
+    assert_eq!(text_of(&built), "18");
+}

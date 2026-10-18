@@ -7,7 +7,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
-use gpui_kit::component::{Disableable as _, Icon, IconName, Selectable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{Disableable as _, Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
@@ -424,54 +424,45 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ export
 
-    /// Export the current sheet (exact hidden lines) with a native save
-    /// dialog; without a usable dialog (no desktop portal) the file is
-    /// written next to the user's documents.
+    /// Export the current sheet (exact hidden lines). The location comes
+    /// from the native save dialog, or the in-app prompt when no dialog is
+    /// available (headless/no desktop portal).
     pub fn export(&mut self, format: ExportFormat, window: &mut Window, cx: &mut Context<Self>) {
-        let drawing = self.drawing.clone();
-        let si = self.sheet;
-        let sources = self.sources.clone();
-        let cache = self.cache.clone();
         let (doc_name, tab_name) = {
             let d = self.doc.read(cx);
             (d.name(), d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into()))
         };
         let file_name = format!("{doc_name} - {tab_name}.{}", format.ext());
+        let this = cx.entity().downgrade();
+        crate::files::request_save_path("Export drawing", file_name, format.ext(), window, cx, move |path, cx| {
+            this.update(cx, |this, cx| this.write_export(format, path, cx)).ok();
+        });
+    }
+
+    /// Render the sheet with exact hidden lines and write it to `path`.
+    pub fn write_export(&mut self, format: ExportFormat, path: PathBuf, cx: &mut Context<Self>) {
+        let drawing = self.drawing.clone();
+        let si = self.sheet;
+        let sources = self.sources.clone();
+        let cache: Arc<ViewCache> = self.cache.clone();
         self.status = Some(format!("Exporting {}…", format.ext().to_uppercase()).into());
         cx.notify();
-        let _ = window;
         cx.spawn(async move |this, cx| {
-            let bytes = cx
+            let result: Result<PathBuf, String> = cx
                 .background_spawn(async move {
-                    let built = render_sheet(&drawing, si, &sources, &cache as &Arc<ViewCache>, true)?;
-                    Some(match format {
+                    let built = render_sheet(&drawing, si, &sources, &cache, true).ok_or("nothing to export")?;
+                    let bytes = match format {
                         ExportFormat::Pdf => export::to_pdf(&built.geometry),
                         ExportFormat::Svg => export::to_svg(&built.geometry).into_bytes(),
                         ExportFormat::Dxf => export::to_dxf(&built.geometry).into_bytes(),
-                    })
-                })
-                .await;
-            let Some(bytes) = bytes else { return };
-            let name = file_name.clone();
-            let result: Result<Option<PathBuf>, String> = cx
-                .background_spawn(async move {
-                    let fallback = || crate::files::documents_dir().join(&name);
-                    let no_dialog = std::env::var_os("NOSHAPE_NO_FILE_DIALOG").is_some() || (cfg!(target_os = "linux") && std::env::var_os("DBUS_SESSION_BUS_ADDRESS").is_none());
-                    let path = if no_dialog {
-                        Some(fallback())
-                    } else {
-                        rfd::FileDialog::new().set_file_name(&name).add_filter(format.ext().to_uppercase(), &[format.ext()]).save_file()
                     };
-                    match path {
-                        Some(p) => std::fs::write(&p, &bytes).map(|_| Some(p)).map_err(|e| e.to_string()),
-                        None => Ok(None),
-                    }
+                    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+                    Ok(path)
                 })
                 .await;
             this.update(cx, |this, cx| {
                 this.status = Some(match result {
-                    Ok(Some(p)) => format!("Exported {}", p.display()).into(),
-                    Ok(None) => "Export cancelled".into(),
+                    Ok(p) => format!("Exported {}", p.display()).into(),
                     Err(e) => format!("Export failed: {e}").into(),
                 });
                 cx.notify();
@@ -479,10 +470,6 @@ impl DrawingEditor {
             .ok();
         })
         .detach();
-    }
-
-    pub fn notify_status(&mut self, msg: &str, window: &mut Window, cx: &mut Context<Self>) {
-        window.push_notification(msg.to_string(), cx);
     }
 }
 

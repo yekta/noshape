@@ -149,6 +149,13 @@ impl PartStudioView {
         subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.schedule_regen(window, cx),
+            DocEvent::TabChanged(t) => {
+                // Variable Studio edits affect every Part Studio.
+                let is_vars = matches!(this.doc.read(cx).session.doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
+                if is_vars {
+                    this.schedule_regen(window, cx);
+                }
+            }
             DocEvent::Reloaded => {
                 this.cancel_edit(window, cx);
                 this.schedule_regen(window, cx)
@@ -225,6 +232,7 @@ impl PartStudioView {
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units.clone();
         let config = self.current_config(&studio);
+        let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
         let regen = self.regen.clone();
         self.regen_seq += 1;
         let seq = self.regen_seq;
@@ -235,7 +243,7 @@ impl PartStudioView {
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, ..Default::default() };
                     regen.lock().regenerate(&studio, &config, &units, &opts)
                 })
                 .await;

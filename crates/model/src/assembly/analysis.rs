@@ -100,38 +100,57 @@ pub fn bom(result: &AssemblyResult) -> Vec<BomRow> {
     rows
 }
 
-/// Radial exploded view: every top-level instance moves away from the
-/// assembly center by `factor` times its distance (min. a fraction of the size).
+/// Automatic exploded view: instances are spread along the axis in which
+/// their centers differ most (Z for coaxial stacks), ordered by position,
+/// `factor` times half the assembly size apart.
 pub fn auto_exploded_view(result: &AssemblyResult, name: &str, factor: f64) -> ExplodedView {
     let Some((lo, hi)) = result.bounds() else { return ExplodedView { name: name.into(), steps: vec![] } };
-    let center = (lo + hi) * 0.5;
     let size = (hi - lo).length().max(1e-3);
-    let mut tops: Vec<InstanceId> = Vec::new();
+    let mut tops: Vec<(InstanceId, DVec3)> = Vec::new();
+    let mut seen: Vec<InstanceId> = Vec::new();
     for o in &result.occurrences {
-        if !tops.contains(&o.top()) {
-            tops.push(o.top());
+        if seen.contains(&o.top()) {
+            continue;
         }
-    }
-    let mut steps = Vec::new();
-    for (n, id) in tops.iter().enumerate() {
+        seen.push(o.top());
         let mut acc: Option<(DVec3, DVec3)> = None;
-        for o in result.occurrences.iter().filter(|o| o.top() == *id) {
-            if let Some((a, b)) = o.world_bounds() {
+        for x in result.occurrences.iter().filter(|x| x.top() == o.top()) {
+            if let Some((a, b)) = x.world_bounds() {
                 acc = Some(match acc {
                     None => (a, b),
-                    Some((x, y)) => (x.min(a), y.max(b)),
+                    Some((p, q)) => (p.min(a), q.max(b)),
                 });
             }
         }
-        let Some((a, b)) = acc else { continue };
-        let c = (a + b) * 0.5;
-        let mut d = c - center;
-        if d.length() < size * 0.05 {
-            // Centered instances move along +Z in a stack.
-            d = DVec3::Z * size * 0.25 * (n as f64 + 1.0) / tops.len() as f64;
+        if let Some((a, b)) = acc {
+            tops.push((o.top(), (a + b) * 0.5));
         }
-        let t = d * factor;
-        steps.push(ExplodeStep { instances: vec![*id], translation: t.into(), rotation_axis: None, rotation_angle: 0.0 });
+    }
+    if tops.is_empty() {
+        return ExplodedView { name: name.into(), steps: vec![] };
+    }
+    let (mut cmin, mut cmax) = (tops[0].1, tops[0].1);
+    for (_, c) in &tops {
+        cmin = cmin.min(*c);
+        cmax = cmax.max(*c);
+    }
+    let spread = cmax - cmin;
+    let axis = if spread.max_element() < size * 1e-3 || (spread.z >= spread.x && spread.z >= spread.y) {
+        DVec3::Z
+    } else if spread.x >= spread.y {
+        DVec3::X
+    } else {
+        DVec3::Y
+    };
+    let mut order: Vec<usize> = (0..tops.len()).collect();
+    order.sort_by(|&a, &b| tops[a].1.dot(axis).partial_cmp(&tops[b].1.dot(axis)).unwrap_or(std::cmp::Ordering::Equal).then(a.cmp(&b)));
+    let n = tops.len() as f64;
+    let mut steps = Vec::new();
+    for (rank, &i) in order.iter().enumerate() {
+        let t = axis * (rank as f64 - (n - 1.0) * 0.5) * size * 0.5 * factor;
+        if t.length() > 0.0 {
+            steps.push(ExplodeStep { instances: vec![tops[i].0], translation: t.into(), rotation_axis: None, rotation_angle: 0.0 });
+        }
     }
     ExplodedView { name: name.into(), steps }
 }

@@ -104,7 +104,8 @@ impl PartStudioView {
         self.regen_seq += 1;
         let result = {
             let mut regen = self.regen.lock();
-            regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, ..Default::default() })
+            let document_variables = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+            regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, ..Default::default() })
         };
         self.regenerating = false;
         self.regen_task = None;

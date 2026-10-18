@@ -37,11 +37,13 @@ pub struct RegenOptions {
     pub relative_deflection: f64,
     /// Angular deflection (radians).
     pub angular_deflection: f64,
+    /// Variables from the document's Variable Studios (visible everywhere).
+    pub document_variables: BTreeMap<String, Quantity>,
 }
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 6e-4, angular_deflection: 0.3 }
+        Self { upto: None, editing_sketch: None, relative_deflection: 6e-4, angular_deflection: 0.3, document_variables: BTreeMap::new() }
     }
 }
 
@@ -80,7 +82,7 @@ impl Regenerator {
         let t0 = Instant::now();
         let upto = opts.upto.unwrap_or_else(|| studio.rollback_index()).min(studio.features.len());
         // Configuration variables are visible to every feature.
-        let mut outer_vars: BTreeMap<String, Quantity> = BTreeMap::new();
+        let mut outer_vars: BTreeMap<String, Quantity> = opts.document_variables.clone();
         for (name, kind, text) in studio.configuration.variable_exprs(config) {
             let dim = match kind {
                 crate::configuration::VariableKind::Length => noshape_units::Dim::LENGTH,
