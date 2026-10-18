@@ -1,0 +1,440 @@
+//! Flat pattern: unfold a sheet metal body into the plane of its base wall.
+
+use super::SheetMetalData;
+use crate::drawing::sheet::{Anchor, LineStyle, Polyline2, SheetGeometry, Text2};
+use crate::reference::BodyId;
+use crate::regen::context::{Body, Context};
+use glam::{DMat4, DVec2, DVec3};
+use noshape_kernel as k;
+use noshape_kernel::{Shape, ShapeType};
+use std::collections::VecDeque;
+
+/// A bend line of the flat pattern (center of the developed bend region).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatBendLine {
+    pub a: DVec2,
+    pub b: DVec2,
+    /// Bend toward the viewer (the flat is seen from the reference side).
+    pub up: bool,
+    pub angle: f64,
+    pub radius: f64,
+    pub k_factor: f64,
+    /// Developed length (width of the bend region in the flat).
+    pub allowance: f64,
+    /// Index into [`SheetMetalData::bends`].
+    pub bend: usize,
+}
+
+/// The unfolded part: outline loops and bend lines in the flat plane.
+#[derive(Clone, Debug)]
+pub struct FlatPattern {
+    /// Flat plane in model space (origin, viewing normal = reference side
+    /// outward normal of the base wall, X axis).
+    pub frame: k::Plane,
+    /// Closed outline loops in plane coordinates (meters); outer boundaries
+    /// and holes. The first loop has the largest extent.
+    pub loops: Vec<Vec<DVec2>>,
+    pub bend_lines: Vec<FlatBendLine>,
+    /// The flat region as planar face(s) in model space.
+    pub shape: Option<Shape>,
+    pub thickness: f64,
+    /// Non-fatal problems (closed loops, unresolved walls ...).
+    pub warnings: Vec<String>,
+}
+
+impl FlatPattern {
+    /// Bounding box of the outline (min, max) in plane coordinates.
+    pub fn bounds(&self) -> (DVec2, DVec2) {
+        let mut lo = DVec2::splat(f64::INFINITY);
+        let mut hi = DVec2::splat(f64::NEG_INFINITY);
+        for p in self.loops.iter().flatten() {
+            lo = lo.min(*p);
+            hi = hi.max(*p);
+        }
+        if lo.x > hi.x { (DVec2::ZERO, DVec2::ZERO) } else { (lo, hi) }
+    }
+
+    /// Overall size (x, y) of the flat.
+    pub fn size(&self) -> DVec2 {
+        let (a, b) = self.bounds();
+        b - a
+    }
+
+    /// Area of the flat region (outer loops minus holes).
+    pub fn area(&self) -> f64 {
+        if let Some(s) = &self.shape {
+            let a: f64 = s.faces().iter().filter_map(|f| f.area().ok()).sum();
+            if a > 0.0 {
+                return a;
+            }
+        }
+        // Fallback: signed areas (holes are oriented the other way only by
+        // chance), so use the largest loop minus the others.
+        let mut areas: Vec<f64> = self.loops.iter().map(|l| polygon_area(l).abs()).collect();
+        areas.sort_by(|a, b| b.total_cmp(a));
+        areas.first().copied().unwrap_or(0.0) - areas.iter().skip(1).sum::<f64>()
+    }
+
+    /// 2D sheet geometry (millimeters) for the drawing exporters: outline as
+    /// visible lines, bend lines dashed with "UP/DOWN angle R" labels.
+    pub fn to_sheet_geometry(&self) -> SheetGeometry {
+        let margin = 10.0;
+        let (lo, hi) = self.bounds();
+        let size = (hi - lo) * 1000.0;
+        let mut g = SheetGeometry::new(size.x + 2.0 * margin, size.y + 2.0 * margin);
+        let map = |p: DVec2| -> [f64; 2] {
+            let q = (p - lo) * 1000.0;
+            [q.x + margin, q.y + margin]
+        };
+        for l in &self.loops {
+            if l.len() < 2 {
+                continue;
+            }
+            g.lines.push(Polyline2 { points: l.iter().map(|p| map(*p)).collect(), style: LineStyle::Visible, closed: true, pick: 0 });
+        }
+        let text_h = (size.x.max(size.y) * 0.02).clamp(2.0, 5.0);
+        for b in &self.bend_lines {
+            let (pa, pb) = (map(b.a), map(b.b));
+            g.lines.push(Polyline2 { points: vec![pa, pb], style: LineStyle::Hidden, closed: false, pick: 0 });
+            let mid = [(pa[0] + pb[0]) * 0.5, (pa[1] + pb[1]) * 0.5];
+            let mut ang = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
+            if ang > std::f64::consts::FRAC_PI_2 + 1e-9 {
+                ang -= std::f64::consts::PI;
+            } else if ang < -std::f64::consts::FRAC_PI_2 + 1e-9 {
+                ang += std::f64::consts::PI;
+            }
+            let label = format!("{} {:.0}° R{}", if b.up { "UP" } else { "DOWN" }, b.angle.to_degrees(), trim_num(b.radius * 1000.0));
+            let off = text_h * 0.4;
+            let pos = [mid[0] - ang.sin() * off, mid[1] + ang.cos() * off];
+            g.texts.push(Text2 { pos, height: text_h, text: label, angle: ang, anchor: Anchor::BottomCenter, pick: 0 });
+        }
+        g
+    }
+}
+
+fn trim_num(v: f64) -> String {
+    let s = format!("{v:.3}");
+    let s = s.trim_end_matches('0').trim_end_matches('.');
+    s.to_string()
+}
+
+fn polygon_area(p: &[DVec2]) -> f64 {
+    let n = p.len();
+    (0..n).map(|i| p[i].perp_dot(p[(i + 1) % n])).sum::<f64>() * 0.5
+}
+
+/// Flat pattern of the sheet metal body with id `id` in a context.
+pub fn flat_pattern_for(ctx: &Context, id: &BodyId) -> Result<FlatPattern, String> {
+    let body = ctx.body(id).ok_or_else(|| "The part no longer exists".to_string())?;
+    let data = ctx.sheet_metal.get(id).ok_or_else(|| format!("{} is not a sheet metal part", body.name))?;
+    flat_pattern(body, data)
+}
+
+fn mat_transform(m: &DMat4) -> k::Transform {
+    k::Transform::Matrix(*m)
+}
+
+/// Unfold `body` using its sheet metal model.
+pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, String> {
+    let t = data.thickness;
+    let nw = data.walls.len();
+    // Resolve wall faces in the current body.
+    let wall_faces: Vec<Vec<Shape>> = data
+        .walls
+        .iter()
+        .map(|w| {
+            let mut v: Vec<usize> = w.faces.iter().flat_map(|n| body.find_faces(n)).collect();
+            v.sort_unstable();
+            v.dedup();
+            v.into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()).filter(|f| f.is_planar()).collect()
+        })
+        .collect();
+    let base = (0..nw).find(|&i| !wall_faces[i].is_empty()).ok_or_else(|| "The sheet metal part has no walls to flatten".to_string())?;
+    let base_face = &wall_faces[base][0];
+    let base_plane = base_face.face_plane().map_err(|e| e.to_string())?.ok_or_else(|| "Base wall is not planar".to_string())?;
+    let normal = base_plane.unit_normal();
+    // X axis: across the first bend of the base wall, else the longest edge.
+    let mut x = DVec3::ZERO;
+    for b in &data.bends {
+        if b.parent == base {
+            x = -b.dir_a;
+            break;
+        }
+        if b.child == Some(base) {
+            x = b.axis.cross(normal);
+            break;
+        }
+    }
+    if x.length() < 1e-9 {
+        let mut best = 0.0;
+        for e in base_face.edges() {
+            if let Ok((a, b)) = e.endpoints() {
+                let d = b - a;
+                if d.length() > best {
+                    best = d.length();
+                    x = d;
+                }
+            }
+        }
+    }
+    let x = (x - normal * x.dot(normal)).normalize_or_zero();
+    let x = if x.length() < 0.5 { base_plane.unit_x() } else { x };
+    let origin = base_face.centroid().unwrap_or(base_plane.origin);
+    let frame = k::Plane::new(origin, normal, x);
+
+    let mut warnings = Vec::new();
+    let mut xf: Vec<Option<DMat4>> = vec![None; nw];
+    let mut tree_bends: Vec<usize> = Vec::new();
+    let mut used = vec![false; data.bends.len()];
+    let mut pieces: Vec<Shape> = Vec::new();
+    let mut lines: Vec<FlatBendLine> = Vec::new();
+    let mut next_root = Some(base);
+    let mut comp_offset = 0.0f64;
+    let gap = (10.0 * t).max(0.005);
+    while let Some(root) = next_root {
+        // Root placement: the base wall stays; other components are moved
+        // into the base plane next to what is already laid out.
+        let root_m = if root == base {
+            DMat4::IDENTITY
+        } else {
+            let f = &wall_faces[root][0];
+            let Ok(Some(pl)) = f.face_plane() else {
+                break;
+            };
+            let from = k::Plane::new(f.centroid().unwrap_or(pl.origin), pl.unit_normal(), pl.unit_x());
+            let to = k::Plane::new(frame.origin, normal, x);
+            k::Transform::frame_to_frame(&from, &to).matrix()
+        };
+        xf[root] = Some(root_m);
+        let mut comp: Vec<usize> = vec![root];
+        let mut queue = VecDeque::from([root]);
+        while let Some(w) = queue.pop_front() {
+            let mw = xf[w].unwrap_or(DMat4::IDENTITY);
+            for (bi, b) in data.bends.iter().enumerate() {
+                if used[bi] {
+                    continue;
+                }
+                let unfold = b.unfold_matrix(t);
+                if b.parent == w {
+                    used[bi] = true;
+                    tree_bends.push(bi);
+                    if let Some(c) = b.child {
+                        if xf[c].is_some() {
+                            warnings.push("A closed loop of bends was left unflattened (add a rip)".into());
+                            tree_bends.pop();
+                            continue;
+                        }
+                        xf[c] = Some(mw * unfold);
+                        comp.push(c);
+                        queue.push_back(c);
+                    }
+                } else if b.child == Some(w) {
+                    used[bi] = true;
+                    if xf[b.parent].is_some() {
+                        warnings.push("A closed loop of bends was left unflattened (add a rip)".into());
+                        continue;
+                    }
+                    tree_bends.push(bi);
+                    xf[b.parent] = Some(mw * unfold.inverse());
+                    comp.push(b.parent);
+                    queue.push_back(b.parent);
+                }
+            }
+        }
+        // Pieces of this component.
+        let mut comp_pieces: Vec<Shape> = Vec::new();
+        for &w in &comp {
+            let m = xf[w].unwrap_or(DMat4::IDENTITY);
+            for f in &wall_faces[w] {
+                match f.transformed(&mat_transform(&m)) {
+                    Ok(s) => comp_pieces.push(s),
+                    Err(e) => warnings.push(format!("A wall could not be placed in the flat: {e}")),
+                }
+            }
+        }
+        for &bi in &tree_bends {
+            let b = &data.bends[bi];
+            if !comp.contains(&b.parent) || lines.iter().any(|l| l.bend == bi) {
+                continue;
+            }
+            let m = xf[b.parent].unwrap_or(DMat4::IDENTITY);
+            let ba = b.allowance(t);
+            let p0 = b.tangent_point(t, b.s0);
+            let p1 = b.tangent_point(t, b.s1);
+            let off = -b.dir_a * ba;
+            let quad = [p0, p1, p1 + off, p0 + off].map(|p| m.transform_point3(p));
+            if ba > 1e-12 {
+                match k::make_polyline(&quad, true).and_then(|w| k::make_face_from_wire(&w, true)) {
+                    Ok(f) => comp_pieces.push(f),
+                    Err(e) => warnings.push(format!("A bend region could not be built: {e}")),
+                }
+            }
+            let ca = m.transform_point3(p0 + off * 0.5);
+            let cb = m.transform_point3(p1 + off * 0.5);
+            lines.push(FlatBendLine {
+                a: frame.to_local(ca),
+                b: frame.to_local(cb),
+                up: b.is_up() != data.flip_direction_up,
+                angle: b.angle,
+                radius: b.radius,
+                k_factor: b.k_factor,
+                allowance: ba,
+                bend: bi,
+            });
+        }
+        // Shift the component so it does not overlap earlier ones.
+        if root != base && !comp_pieces.is_empty() {
+            let (lo, _) = local_bounds(&frame, &comp_pieces);
+            let shift = x * (comp_offset + gap - lo.x);
+            let sm = DMat4::from_translation(shift);
+            comp_pieces = comp_pieces.into_iter().filter_map(|p| p.transformed(&mat_transform(&sm)).ok()).collect();
+            let d2 = frame.to_local(frame.origin + shift) - frame.to_local(frame.origin);
+            for l in lines.iter_mut().filter(|l| comp.contains(&data.bends[l.bend].parent)) {
+                l.a += d2;
+                l.b += d2;
+            }
+            for &w in &comp {
+                if let Some(m) = xf[w].as_mut() {
+                    *m = sm * *m;
+                }
+            }
+        }
+        if !comp_pieces.is_empty() {
+            let (_, hi) = local_bounds(&frame, &comp_pieces);
+            comp_offset = comp_offset.max(hi.x);
+        }
+        pieces.extend(comp_pieces);
+        next_root = (0..nw).find(|&i| xf[i].is_none() && !wall_faces[i].is_empty());
+        if next_root.is_some() {
+            warnings.push("The part has walls not connected by bends; they are laid out separately".into());
+        }
+    }
+    warnings.dedup();
+    if pieces.is_empty() {
+        return Err("Nothing to flatten".into());
+    }
+    // Union of all planar pieces into one region.
+    let shape = match union_planar(&pieces) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            warnings.push(format!("The flat outline could not be merged ({e}); showing the pieces"));
+            None
+        }
+    };
+    let faces_src: Vec<Shape> = match &shape {
+        Some(s) => s.faces(),
+        None => pieces.clone(),
+    };
+    let mut loops: Vec<Vec<DVec2>> = Vec::new();
+    for f in &faces_src {
+        for w in f.wires() {
+            let l = wire_loop(&w, &frame);
+            if l.len() >= 3 {
+                loops.push(l);
+            }
+        }
+    }
+    loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+    Ok(FlatPattern { frame, loops, bend_lines: lines, shape, thickness: t, warnings })
+}
+
+fn extent(l: &[DVec2]) -> f64 {
+    let mut lo = DVec2::splat(f64::INFINITY);
+    let mut hi = DVec2::splat(f64::NEG_INFINITY);
+    for p in l {
+        lo = lo.min(*p);
+        hi = hi.max(*p);
+    }
+    (hi - lo).length()
+}
+
+fn local_bounds(frame: &k::Plane, shapes: &[Shape]) -> (DVec2, DVec2) {
+    let mut lo = DVec2::splat(f64::INFINITY);
+    let mut hi = DVec2::splat(f64::NEG_INFINITY);
+    for s in shapes {
+        for v in s.vertices() {
+            if let Ok(p) = v.vertex_point() {
+                let q = frame.to_local(p);
+                lo = lo.min(q);
+                hi = hi.max(q);
+            }
+        }
+    }
+    (lo, hi)
+}
+
+/// Fuse coplanar faces and merge them into maximal faces.
+fn union_planar(pieces: &[Shape]) -> Result<Shape, String> {
+    if pieces.len() == 1 {
+        return Ok(pieces[0].clone());
+    }
+    let opts = k::BooleanOptions { fuzzy: 1e-7, ..Default::default() };
+    let fused = k::fuse_all(pieces, &opts).map_err(|e| e.to_string())?;
+    // Sew the split faces into a shell so coplanar neighbors can be merged.
+    let faces = fused.shape.faces();
+    let sewn = k::sew(&faces, 1e-7, false).map(|r| r.shape).unwrap_or(fused.shape);
+    let unified = k::unify_same_domain(&sewn).map(|r| r.shape).unwrap_or(sewn);
+    let total_in: f64 = pieces.iter().filter_map(|p| p.area().ok()).sum();
+    let total_out: f64 = unified.faces().iter().filter_map(|f| f.area().ok()).sum();
+    // Overlapping pieces (collisions in the flat) shrink the area; keep the
+    // union anyway, it is still the flat outline.
+    if total_out <= 0.0 || total_out > total_in * (1.0 + 1e-6) {
+        return Err(format!("area {total_out} vs {total_in}, {} faces", unified.faces().len()));
+    }
+    Ok(unified)
+}
+
+/// Sample the edges of a wire into one closed polyline (plane coordinates).
+fn wire_loop(w: &Shape, frame: &k::Plane) -> Vec<DVec2> {
+    let mut segs: Vec<Vec<DVec3>> = Vec::new();
+    for e in w.edges() {
+        let Ok(info) = e.edge_info() else { continue };
+        if info.degenerated {
+            continue;
+        }
+        let pts = match info.curve {
+            k::Curve::Line { .. } => vec![info.start, info.end],
+            _ => {
+                let n = 32;
+                (0..=n).filter_map(|i| e.point_at(info.first_param + (info.last_param - info.first_param) * i as f64 / n as f64).ok()).collect()
+            }
+        };
+        if pts.len() >= 2 {
+            segs.push(pts);
+        }
+    }
+    chain_loop(segs).into_iter().map(|p| frame.to_local(p)).collect()
+}
+
+fn chain_loop(mut segs: Vec<Vec<DVec3>>) -> Vec<DVec3> {
+    if segs.is_empty() {
+        return Vec::new();
+    }
+    let scale = segs.iter().flatten().map(|p| p.length()).fold(1.0f64, f64::max);
+    let tol = 1e-6 * scale;
+    let mut out = segs.remove(0);
+    while !segs.is_empty() {
+        let end = *out.last().unwrap();
+        let mut found = None;
+        for (i, s) in segs.iter().enumerate() {
+            if (s[0] - end).length() < tol {
+                found = Some((i, false));
+                break;
+            }
+            if (s[s.len() - 1] - end).length() < tol {
+                found = Some((i, true));
+                break;
+            }
+        }
+        let Some((i, rev)) = found else { break };
+        let mut s = segs.remove(i);
+        if rev {
+            s.reverse();
+        }
+        out.extend(s.into_iter().skip(1));
+    }
+    if out.len() > 1 && (out[0] - out[out.len() - 1]).length() < tol {
+        out.pop();
+    }
+    out
+}

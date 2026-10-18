@@ -147,6 +147,7 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("alt-c", SearchTools, doc_mod),
         KeyBinding::new("s", ShortcutToolbar, doc),
         KeyBinding::new("shift-?", ToggleShortcutHelp, doc),
+        KeyBinding::new("?", ToggleShortcutHelp, doc),
         KeyBinding::new("alt-t", TabManager, doc_mod),
         KeyBinding::new("ctrl-space", SwitchRecentTab, doc_mod),
         KeyBinding::new("[", MeasureTool, doc),

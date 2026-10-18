@@ -1,13 +1,18 @@
 //! Sheet metal: `sheetMetalStart` builds the sheet metal part as a solid of
 //! the model thickness (Extrude: sketch lines/arcs with model-radius bends at
 //! line-line corners; Thicken: faces / sketch regions; Convert: shell solids
-//! and thicken surfaces). The flat pattern, bend table, reliefs and the other
-//! sheet metal features are not implemented yet and report clear errors.
+//! and thicken surfaces) and records the sheet metal model (walls, bends,
+//! parameters) in the context for later sheet metal features and the flat
+//! pattern (`crate::sheetmetal`). Flange/Hem live in `sheetmetal_flange`,
+//! joints, tab, bend, reliefs and corner breaks in `sheetmetal_ops`.
 
 use crate::display::BodyKind;
-use crate::reference::{FeatureId, Role, Source};
+use super::sheetmetal_util::{faces_named, model_from_params, put_data};
+use crate::reference::{FeatureId, Role, Source, TopoName};
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, Profile, err, kernel_plane, sweep_names};
-use glam::DVec2;
+use crate::sheetmetal::{Bend, BendKind, SheetMetalData, Wall};
+use glam::{DVec2, DVec3};
+use std::sync::Arc;
 use noshape_kernel as k;
 use noshape_kernel::ShapeType;
 use std::collections::BTreeMap;
@@ -281,7 +286,7 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
         return err("Sheet metal extrude currently supports only the Blind end type");
     }
     let depth = ev.length("depth")?;
-    let (a, b) = if ev.bool("symmetric") {
+    let (a, b): (DVec3, DVec3) = if ev.bool("symmetric") {
         (-dir * depth * 0.5, dir * depth * 0.5)
     } else if ev.bool("hasSecondDirection") {
         if !ev.is("secondDirectionBound", "BLIND") {
@@ -295,7 +300,85 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     };
     let res = if a.length() < 1e-12 { k::extrude(&profile.shape, b)? } else { k::extrude_between(&profile.shape, a, b, 0.0)? };
     let names = sweep_names(ev, &profile, &res, true, true);
-    ev.apply_operation(vec![NamedShape::new(res.shape, names)], "NEW", None, BodyKind::Solid)
+    let before = ev.ctx.bodies.len();
+    ev.apply_operation(vec![NamedShape::new(res.shape, names)], "NEW", None, BodyKind::Solid)?;
+    if ev.ctx.bodies.len() <= before {
+        return Ok(());
+    }
+    // Sheet metal model: one wall per line, one bend per arc.
+    let mut data = model_from_params(ev, t)?;
+    let bend_arcs: Vec<u32> = ev.query("bendArcs").iter().filter_map(|r| if let crate::reference::Reference::SketchEntity { entity, .. } = r { Some(*entity) } else { None }).collect();
+    let feature = ev.feature;
+    let name = |src: Source| Arc::new(TopoName::face(feature, Role::Side(src)));
+    let mut last_wall: Option<usize> = None;
+    let mut pending: Option<usize> = None;
+    for (e, s) in &full {
+        match *e {
+            Elem::Line { .. } => {
+                data.walls.push(Wall { feature, faces: vec![name(src_of(*s, false))], back: vec![name(src_of(*s, true))] });
+                let w = data.walls.len() - 1;
+                if let Some(b) = pending.take() {
+                    data.bends[b].child = Some(w);
+                }
+                last_wall = Some(w);
+            }
+            Elem::Arc { center, radius: r, start_angle, sweep } => {
+                let parent = match (last_wall, pending) {
+                    (Some(w), None) => w,
+                    _ => {
+                        data.walls.push(Wall { feature, faces: Vec::new(), back: Vec::new() });
+                        let w = data.walls.len() - 1;
+                        if let Some(b) = pending.take() {
+                            data.bends[b].child = Some(w);
+                        }
+                        w
+                    }
+                };
+                let n = frame.normal;
+                let axis = if sweep > 0.0 { n } else { -n };
+                let path_outer = (sweep > 0.0) == (side > 0.0);
+                let rin = if path_outer { r - t } else { r };
+                let rad = DVec2::from_angle(start_angle);
+                let tan = e.tangent(false);
+                let (kind, kf) = match s {
+                    Src::Entity(id) if !bend_arcs.contains(id) => (BendKind::Rolled, data.k_factor_rolled),
+                    _ => (BendKind::Bend, data.k_factor),
+                };
+                let (pa, pb) = (a.dot(axis), b.dot(axis));
+                let (path_name, off_name) = (name(src_of(*s, false)), name(src_of(*s, true)));
+                let ref_inner = !path_outer;
+                data.bends.push(Bend {
+                    feature,
+                    kind,
+                    parent,
+                    child: None,
+                    origin: frame.to_world(center),
+                    axis,
+                    angle: sweep.abs(),
+                    radius: rin,
+                    k_factor: kf,
+                    dir_a: -(frame.x * tan.x + frame.y * tan.y).normalize(),
+                    radial_a: (frame.x * rad.x + frame.y * rad.y).normalize(),
+                    s0: pa.min(pb),
+                    s1: pa.max(pb),
+                    ref_inner,
+                    inner_faces: vec![if ref_inner { path_name.clone() } else { off_name.clone() }],
+                    outer_faces: vec![if ref_inner { off_name } else { path_name }],
+                });
+                pending = Some(data.bends.len() - 1);
+                last_wall = None;
+            }
+        }
+    }
+    if closed
+        && let Some(b) = pending
+        && !data.walls.is_empty()
+    {
+        data.bends[b].child = Some(0);
+    }
+    let bi = ev.ctx.bodies.len() - 1;
+    put_data(ev, bi, data);
+    Ok(())
 }
 
 fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
@@ -303,11 +386,9 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     if refs.is_empty() {
         return err("Select faces or sketch regions to thicken");
     }
-    if !ev.query("bends").is_empty() {
-        ev.warnings.push("Selected bends are kept as sharp corners".into());
-    }
     let flip = ev.bool("oppositeDirection");
     let mut tools = Vec::new();
+    let mut walls: Vec<Wall> = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
         let planar = match r {
@@ -319,6 +400,11 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
                 let dir = if flip { -p.frame.normal } else { p.frame.normal };
                 let res = k::extrude(&p.shape, dir * t)?;
                 let names = sweep_names(ev, &p, &res, true, true);
+                let cap = |end: bool| {
+                    let role = if end { Role::CapEnd(Some(p.key.clone())) } else { Role::CapStart(Some(p.key.clone())) };
+                    Arc::new(TopoName::face(ev.feature, role))
+                };
+                walls.push(Wall { feature: ev.feature, faces: vec![cap(false)], back: vec![cap(true)] });
                 tools.push(NamedShape::new(res.shape, names));
             }
         } else {
@@ -335,7 +421,70 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     if tools.is_empty() {
         return err("Nothing to thicken");
     }
-    ev.apply_operation(tools, "NEW", None, BodyKind::Solid)
+    let before = ev.ctx.bodies.len();
+    ev.apply_operation(tools, "NEW", None, BodyKind::Solid)?;
+    let model = model_from_params(ev, t)?;
+    for bi in before..ev.ctx.bodies.len() {
+        let body = ev.ctx.bodies[bi].clone();
+        let mut data = model.clone();
+        data.walls = walls.iter().filter(|w| !faces_named(&body, &w.faces).is_empty()).cloned().collect();
+        put_data(ev, bi, data);
+        bend_edges(ev, bi)?;
+    }
+    Ok(())
+}
+
+/// Walls of a converted body: each planar face paired with its offset.
+fn convert_walls(body: &crate::regen::context::Body, feature: FeatureId) -> Vec<Wall> {
+    let mut walls = Vec::new();
+    for (fi, n) in body.faces.iter().enumerate() {
+        let (inner, wrap) = match &**n {
+            TopoName::Face { role: Role::Copy { of, .. }, .. } => (of.clone(), true),
+            _ => (n.clone(), false),
+        };
+        let TopoName::Face { role: Role::Offset(src), .. } = &*inner else { continue };
+        let src_name = if wrap { Arc::new(TopoName::face(feature, Role::Copy { instance: 0, of: src.clone() })) } else { src.clone() };
+        let planar = |i: usize| body.shape.sub_shape(ShapeType::Face, i).ok().is_some_and(|f| f.is_planar());
+        let refs = faces_named(body, std::slice::from_ref(&src_name));
+        if !planar(fi) || refs.is_empty() || !refs.iter().all(|&i| planar(i)) {
+            continue;
+        }
+        walls.push(Wall { feature, faces: vec![src_name], back: vec![n.clone()] });
+    }
+    walls
+}
+
+/// Convert / Thicken "Edges or cylinders to bend": sharp wall corners
+/// selected by edge become bends of the model radius.
+fn bend_edges(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
+    let refs = ev.query("bends").to_vec();
+    if refs.is_empty() {
+        return Ok(());
+    }
+    let mut data = (**ev.ctx.sheet_metal.get(&ev.ctx.bodies[bi].id).ok_or_else(|| FeatureError::new("Sheet metal model missing"))?).clone();
+    let mut corners: Vec<(usize, usize)> = Vec::new();
+    for r in &refs {
+        if let crate::reference::Reference::Edge(n) = r {
+            let body = &ev.ctx.bodies[bi];
+            for ei in body.find_edges(n) {
+                if let Some((a, b)) = super::sheetmetal_ops::walls_at_edge(body, &data, ei) {
+                    let c = (a.min(b), a.max(b));
+                    if !corners.contains(&c) {
+                        corners.push(c);
+                    }
+                }
+            }
+        }
+    }
+    if corners.is_empty() {
+        ev.warnings.push("Selected bend edges are not sharp corners between walls".into());
+    }
+    let (r, kf) = (data.radius, data.k_factor);
+    for (a, b) in corners {
+        super::sheetmetal_ops::bend_corner(ev, bi, &mut data, a, b, r, kf)?;
+    }
+    put_data(ev, bi, data);
+    Ok(())
 }
 
 fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
@@ -367,10 +516,16 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
             }
             _ => return err("Only parts and surfaces can be converted to sheet metal"),
         };
+        let model = model_from_params(ev, t)?;
         if keep {
             // New part next to the kept input.
             let names = names.iter().map(|n| std::sync::Arc::new(crate::reference::TopoName::face(ev.feature, Role::Copy { instance: 0, of: n.clone() }))).collect();
             ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, BodyKind::Solid)?;
+            let nbi = ev.ctx.bodies.len() - 1;
+            let mut data = model;
+            data.walls = convert_walls(&ev.ctx.bodies[nbi], ev.feature);
+            put_data(ev, nbi, data);
+            bend_edges(ev, nbi)?;
         } else {
             ev.replace_body(bi, shape, names);
             if body.kind == BodyKind::Surface {
@@ -378,41 +533,89 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
                 let new = crate::regen::context::Body::new(b.id.clone(), b.name.clone(), BodyKind::Solid, b.shape.clone(), b.faces.clone(), b.color, ev.feature);
                 ev.ctx.bodies[bi] = std::sync::Arc::new(new);
             }
+            let mut data = model;
+            data.walls = convert_walls(&ev.ctx.bodies[bi], ev.feature);
+            put_data(ev, bi, data);
+            bend_edges(ev, bi)?;
         }
     }
     Ok(())
 }
 
-/// Finish sheet metal model: the model is a plain solid already; nothing to do.
-pub fn sheet_metal_end(_ev: &mut EvalCtx) -> FResult<()> {
+/// Finish sheet metal model: the selected (or all) models become inactive;
+/// the parts stay as they are and keep their (frozen) flat pattern data.
+pub fn sheet_metal_end(ev: &mut EvalCtx) -> FResult<()> {
+    let refs = ev.query("sheetMetalParts");
+    let ids: Vec<crate::reference::BodyId> = if refs.is_empty() {
+        ev.ctx.sheet_metal.iter().filter(|(_, d)| d.active).map(|(id, _)| id.clone()).collect()
+    } else {
+        let idx = ev.resolve_bodies(refs);
+        if idx.is_empty() {
+            return err("Select sheet metal parts to finish");
+        }
+        idx.into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect()
+    };
+    let mut any = false;
+    for id in ids {
+        if let Some(d) = ev.ctx.sheet_metal.get_mut(&id)
+            && d.active
+        {
+            Arc::make_mut(d).active = false;
+            any = true;
+        }
+    }
+    if !any && !refs.is_empty() {
+        return err("The selected parts are not active sheet metal models");
+    }
     Ok(())
+}
+
+pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_flange::flange(ev)
+}
+pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_flange::hem(ev)
+}
+pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::tab(ev)
+}
+pub fn bend(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::bend(ev)
+}
+pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::make_joint(ev)
+}
+pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::modify_joint(ev)
+}
+pub fn bend_relief(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::bend_relief(ev)
+}
+pub fn corner_break(ev: &mut EvalCtx) -> FResult<()> {
+    super::sheetmetal_ops::corner_break(ev)
+}
+
+/// Data of the sheet metal model a feature created (for callers that hold
+/// only the context).
+pub fn model_of(ctx: &crate::regen::context::Context, id: &crate::reference::BodyId) -> Option<Arc<SheetMetalData>> {
+    ctx.sheet_metal.get(id).cloned()
 }
 
 macro_rules! unsupported {
     ($($f:ident => $name:literal),* $(,)?) => {
         $(
             pub fn $f(_ev: &mut EvalCtx) -> FResult<()> {
-                err(concat!($name, " is not supported yet (sheet metal models are built as plain solids; only Sheet metal model is available)"))
+                err(concat!($name, " is not supported yet"))
             }
         )*
     };
 }
 
-// Sheet metal features that need the sheet metal model (flat pattern, bend
-// table, joints), which is not implemented yet.
 unsupported! {
-    flange => "Flange",
-    hem => "Hem",
-    tab => "Tab",
-    bend => "Bend",
     jog => "Jog",
     form => "Form",
     loft => "Sheet metal loft",
-    make_joint => "Make joint",
-    corner => "Corner",
-    bend_relief => "Bend relief",
-    corner_break => "Corner break",
-    modify_joint => "Modify joint",
+    corner => "Corner (corner relief override)",
     rip => "Rip",
     recognize => "Recognize",
 }

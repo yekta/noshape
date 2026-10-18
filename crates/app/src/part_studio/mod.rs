@@ -4,6 +4,7 @@
 mod config_panel;
 mod menus;
 mod sketch;
+mod view_tools;
 
 use crate::actions::*;
 use crate::sketch_mode::SketchEditor;
@@ -132,6 +133,11 @@ pub struct PartStudioView {
     panel_subs: Vec<Subscription>,
     config_values: noshape_model::configuration::ConfigValues,
     needs_regen: bool,
+    palette: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    palette_query: String,
+    show_shortcuts: bool,
+    section_input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    renaming: Option<(FeatureId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
@@ -196,6 +202,11 @@ impl PartStudioView {
             panel_subs: Vec::new(),
             config_values: Default::default(),
             needs_regen: false,
+            palette: None,
+            palette_query: String::new(),
+            show_shortcuts: false,
+            section_input: None,
+            renaming: None,
             dim_input: None,
             _subs: subs,
         };
@@ -869,7 +880,10 @@ impl PartStudioView {
             .when(editing, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent))
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(feature_icon(&f.type_id)).size_4().text_color(if rolled_back || suppressed { pal.text_faint } else { pal.text_muted }))
-            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(f.name.clone()))
+            .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
+                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
+                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(f.name.clone()).into_any_element(),
+            })
             .when(status == FeatureStatus::Error && !rolled_back, |d| d.child(div().size(px(6.)).rounded_full().bg(pal.error)))
             .when_some(msg, |d, m| d.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(window, cx)))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
@@ -900,7 +914,9 @@ impl PartStudioView {
             let v2 = view.clone();
             let v3 = view.clone();
             let v4 = view.clone();
+            let v5 = view.clone();
             menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v.update(cx, |this, cx| this.edit_feature(id, window, cx))))
+                .item(PopupMenuItem::new("Rename").on_click(move |_, window, cx| v5.update(cx, |this, cx| this.start_rename(id, window, cx))))
                 .item(PopupMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_suppressed(vec![id], !suppressed, cx))))
                 .item(PopupMenuItem::new("Roll to here").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.set_rollback(Some(i + 1), cx))))
                 .separator()
@@ -985,6 +1001,7 @@ impl PartStudioView {
             .bg(with_alpha(pal.panel_raised, 0.85))
             .border_1()
             .border_color(pal.border)
+            .child(self.render_display_menu(cx))
             .child(btn("v-iso", "iso-view", "Isometric (Shift+7)", StandardView::Isometric, cx))
             .child(btn("v-front", "front-view", "Front (Shift+1)", StandardView::Front, cx))
             .child(btn("v-top", "top-view", "Top (Shift+5)", StandardView::Top, cx))
@@ -1101,6 +1118,9 @@ impl Render for PartStudioView {
         overlay.extend(self.render_sketch_labels(window, cx));
         overlay.extend(self.render_measure_panel(cx));
         overlay.extend(self.render_context_menu());
+        overlay.extend(self.render_section_panel(cx));
+        overlay.extend(self.render_palette(cx));
+        overlay.extend(self.render_shortcut_sheet(cx));
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()
@@ -1109,7 +1129,11 @@ impl Render for PartStudioView {
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
-                if !this.focus.contains_focused(window, cx) {
+                if this.palette.take().is_some() {
+                    // Clicking anywhere closes the tool search (items still get the click).
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                } else if !this.focus.contains_focused(window, cx) {
                     window.focus(&this.focus, cx);
                 }
             }))
@@ -1128,6 +1152,17 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(|this, _: &NewSketch, window, cx| this.start_feature("sketch", window, cx)))
+            .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_palette(window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, _, cx| {
+                this.show_shortcuts = !this.show_shortcuts;
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
+            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
+                if let Some(id) = this.selected_features.first().copied() {
+                    this.start_rename(id, window, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &Extrude, window, cx| this.start_feature("extrude", window, cx)))
             .on_action(cx.listener(|this, _: &Revolve, window, cx| this.start_feature("revolve", window, cx)))
             .on_action(cx.listener(|this, _: &Fillet, window, cx| this.start_feature("fillet", window, cx)))

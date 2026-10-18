@@ -223,6 +223,12 @@ pub struct Context {
     pub next_surface: usize,
     pub next_curve: usize,
     pub next_color: usize,
+    // --- batch SM: sheet metal models and frame members ---
+    /// Sheet metal models by body (see `crate::sheetmetal`).
+    pub sheet_metal: BTreeMap<BodyId, Arc<crate::sheetmetal::SheetMetalData>>,
+    /// Frame members (frame segments, gussets, end caps) by body, for cut lists.
+    pub frame_members: BTreeMap<BodyId, Arc<super::features::frames::FrameMember>>,
+    // --- end batch SM ---
 }
 
 impl Context {

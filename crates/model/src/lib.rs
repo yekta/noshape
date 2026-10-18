@@ -18,6 +18,7 @@ pub mod params;
 pub mod partstudio;
 pub mod reference;
 pub mod regen;
+pub mod sheetmetal;
 pub mod sketch_feature;
 pub mod variables;
 

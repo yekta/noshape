@@ -108,6 +108,39 @@ pub struct SceneOptions {
     pub editing_sketch: Option<FeatureId>,
     /// Bodies rendered dimmed (e.g. features below the rolled-back bar preview).
     pub transparent_bodies: bool,
+    pub display_mode: DisplayMode,
+    /// Section view clipping plane (normal, offset along normal).
+    pub section: Option<(glam::DVec3, f64)>,
+}
+
+/// Viewport render style (Onshape's display modes).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisplayMode {
+    #[default]
+    ShadedWithEdges,
+    Shaded,
+    HiddenLine,
+    Wireframe,
+}
+
+impl DisplayMode {
+    pub const ALL: [DisplayMode; 4] = [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Wireframe];
+    pub fn label(self) -> &'static str {
+        match self {
+            DisplayMode::ShadedWithEdges => "Shaded with edges",
+            DisplayMode::Shaded => "Shaded",
+            DisplayMode::HiddenLine => "Hidden line",
+            DisplayMode::Wireframe => "Wireframe",
+        }
+    }
+    pub fn icon(self) -> &'static str {
+        match self {
+            DisplayMode::ShadedWithEdges => "shaded-edges",
+            DisplayMode::Shaded => "shaded",
+            DisplayMode::HiddenLine => "hidden-lines",
+            DisplayMode::Wireframe => "wireframe",
+        }
+    }
 }
 
 pub struct BuiltScene {
@@ -147,10 +180,24 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             color[3] = color[3].min(if b.kind == BodyKind::Surface { 0.85 } else { 0.35 });
         }
         if b.kind != BodyKind::Wire {
-            scene.instances.push(Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).pick_base(face_base));
+            let mesh = Instance::new(Drawable::Mesh(cached.mesh.clone())).pick_base(face_base);
+            let mesh = match opts.display_mode {
+                DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color),
+                // Faces drawn in the background color hide what is behind them.
+                DisplayMode::HiddenLine => mesh.with_color(theme::lin(0x20242c)),
+                // Still pickable, but invisible.
+                DisplayMode::Wireframe => mesh.with_color([0.0, 0.0, 0.0, 0.0]).pick_only(),
+            };
+            scene.instances.push(mesh);
         }
-        let edge_color = if b.kind == BodyKind::Wire { theme::lin(0xd6dae2) } else { theme::lin(EDGE_COLOR) };
-        scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).layer(1));
+        let edge_color = match (b.kind, opts.display_mode) {
+            (BodyKind::Wire, _) => theme::lin(0xd6dae2),
+            (_, DisplayMode::HiddenLine | DisplayMode::Wireframe) => theme::lin(0xd6dae2),
+            _ => theme::lin(EDGE_COLOR),
+        };
+        let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).layer(1);
+        // Shaded mode hides edges visually but keeps them pickable.
+        scene.instances.push(if opts.display_mode == DisplayMode::Shaded { edges.pick_only() } else { edges });
         scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).pick_base(vert_base).pick_only().layer(2));
     }
 
@@ -245,6 +292,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().ignore_clip().layer(12));
     }
 
+    if let Some((n, d)) = opts.section {
+        scene.clip = Some(noshape_render::ClipPlane { normal: n.as_vec3(), d: d as f32 });
+    }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
     BuiltScene { scene, picks, static_instances }

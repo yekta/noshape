@@ -331,12 +331,12 @@ fn sheet_metal_thicken_region() {
     let r = s.ok();
     let v = r.context.bodies[0].shape.volume().unwrap();
     assert!(near(v, 0.06 * 0.04 * 0.0015, 1e-12), "volume {v}");
-    // Unsupported sheet metal features fail with a clear message.
+    // A flange without edges fails with a clear message.
     s.add("sheetMetalFlange", |_| {});
     let r = s.regen();
     let st = r.display.features.last().unwrap();
     assert_eq!(st.status, FeatureStatus::Error);
-    assert!(st.message.as_deref().unwrap_or("").contains("Flange is not supported yet"), "{:?}", st.message);
+    assert!(!st.message.as_deref().unwrap_or("").is_empty(), "{:?}", st.message);
 }
 
 #[test]

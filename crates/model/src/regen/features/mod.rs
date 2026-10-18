@@ -25,6 +25,13 @@ pub mod refgeom;
 pub mod sheetmetal;
 pub mod surfaces;
 // --- end batch B modules ---
+// --- modules: batch SM (sheet metal operations, frames) ---
+pub mod frames;
+pub mod frames_profiles;
+pub mod sheetmetal_flange;
+pub mod sheetmetal_ops;
+pub mod sheetmetal_util;
+// --- end batch SM modules ---
 
 pub type EvalFn = fn(&mut EvalCtx) -> FResult<()>;
 
@@ -112,6 +119,14 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "wrap" => importing::wrap,
         "decal" => importing::decal,
         // --- end batch B dispatch ---
+        // --- dispatch: batch SM ---
+        "frame" => frames::frame,
+        "frameTrim" => frames::frame_trim,
+        "gusset" => frames::gusset,
+        "endcap" => frames::end_cap,
+        "cutlist" => frames::cutlist,
+        "tag" => frames::tag,
+        // --- end batch SM dispatch ---
         _ => return None,
     })
 }
