@@ -73,6 +73,10 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
+    /// World-space manipulator handles (segments): pressing the left button
+    /// near one routes it to the tool events even when `tool_captures_left`
+    /// is false.
+    pub manipulators: Vec<(DVec3, DVec3)>,
     /// Pick ids that win ties in the pick radius (edges/points over faces).
     pub pick_priority: Arc<dyn Fn(u32) -> i32 + Send + Sync>,
     box_rect: Option<(DVec2, DVec2)>,
@@ -121,6 +125,7 @@ impl Viewport {
             last_pos: DVec2::ZERO,
             hover: None,
             tool_captures_left: false,
+            manipulators: Vec::new(),
             pick_priority: Arc::new(|_| 0),
             box_rect: None,
             anim: None,
@@ -163,6 +168,16 @@ impl Viewport {
     /// World-space ray through a viewport-local position.
     pub fn ray(&self, local: DVec2) -> (DVec3, DVec3) {
         self.camera.ray(local, self.size())
+    }
+
+    /// Whether a viewport-local position is on a manipulator handle.
+    pub fn manipulator_at(&self, p: DVec2) -> bool {
+        self.manipulators.iter().any(|&(a, b)| {
+            let (Some(a), Some(b)) = (self.project(a), self.project(b)) else { return false };
+            let d = b - a;
+            let u = ((p - a).dot(d) / d.length_squared().max(1e-9)).clamp(0.0, 1.0);
+            (a + d * u - p).length() < 8.0 || (b - p).length() < 14.0
+        })
     }
 
     /// Project a world point to viewport-local logical pixels.
@@ -363,7 +378,7 @@ impl Viewport {
         self.last_pos = p;
         self.anim = None;
         match e.button {
-            MouseButton::Left if self.tool_captures_left => {
+            MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) => {
                 self.drag = Drag::Tool;
                 cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
             }

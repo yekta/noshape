@@ -135,3 +135,31 @@ fn rollback_bar_limits_evaluation() {
     assert_eq!(r.display.bodies.len(), 0);
     assert_eq!(r.display.features[1].status, FeatureStatus::RolledBack);
 }
+
+#[test]
+fn paste_features_remaps_internal_references() {
+    let (mut ps, units) = studio_with_block();
+    let copied = ps.features.clone();
+    let ids = ps.paste_features(&copied, ps.features.len());
+    assert_eq!(ids.len(), 2);
+    assert_eq!(ps.features[2].name, "Sketch 2");
+    assert_eq!(ps.features[3].name, "Extrude 2");
+    // The pasted extrude uses the pasted sketch.
+    match &ps.features[3].params.query("entities")[0] {
+        Reference::SketchRegion { sketch, .. } => assert_eq!(*sketch, ids[0]),
+        r => panic!("unexpected {r:?}"),
+    }
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    for s in &r.display.features {
+        assert_eq!(s.status, FeatureStatus::Ok, "{:?}", s.message);
+    }
+    // Same profile in the same place: the second extrude is a second part.
+    assert_eq!(r.display.bodies.len(), 2);
+
+    let folder = ps.new_folder(&[ids[0], ids[1]], None);
+    assert_eq!(ps.folder(folder).unwrap().name, "Folder 1");
+    assert!(ps.features[2..].iter().all(|f| f.folder == Some(folder)));
+    ps.dissolve_folder(folder);
+    assert!(ps.features.iter().all(|f| f.folder.is_none()));
+}

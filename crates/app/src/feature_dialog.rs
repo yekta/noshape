@@ -170,6 +170,16 @@ impl FeatureDialog {
         cx.notify();
     }
 
+    /// Set a numeric field from outside (manipulator drag): updates the value
+    /// and the visible input text.
+    pub fn set_expr_text(&mut self, path: &str, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(st) = self.inputs.get(path).cloned() {
+            st.update(cx, |s, cx| s.set_value(text.to_string(), window, cx));
+        }
+        self.parse_errors.remove(path);
+        self.set_value(path, ParamValue::Expr(noshape_units::ExprValue::new(text)), cx);
+    }
+
     /// Add a picked reference to the active selection field. Returns false if
     /// no field is active.
     pub fn add_pick(&mut self, r: Reference, cx: &mut Context<Self>) -> bool {

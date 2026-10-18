@@ -152,8 +152,107 @@ impl PartStudio {
     pub fn reorder(&mut self, id: FeatureId, to: usize) -> bool {
         let Some(from) = self.index_of(id) else { return false };
         let to = to.min(self.features.len() - 1);
-        let f = self.features.remove(from);
+        let mut f = self.features.remove(from);
+        // Joining the folder of the feature it is dropped onto keeps folders contiguous.
+        f.folder = self.features.get(to).and_then(|n| n.folder);
         self.features.insert(to, f);
         true
+    }
+
+    /// Paste copies of `features` at `at`. Copies get new ids and names;
+    /// references between copied features are remapped to the copies, while
+    /// references to other geometry stay (Onshape copy/paste behavior).
+    /// Returns the new ids.
+    pub fn paste_features(&mut self, features: &[Feature], at: usize) -> Vec<FeatureId> {
+        let map: std::collections::HashMap<u64, u64> = features.iter().map(|f| (f.id.0, FeatureId::new_random().0)).collect();
+        let at = at.min(self.features.len());
+        let mut out = Vec::new();
+        for f in features {
+            let mut v = match serde_json::to_value(f) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            remap_ids(&mut v, &map);
+            let Ok(mut copy) = serde_json::from_value::<Feature>(v) else { continue };
+            copy.folder = None;
+            if let Some(ty) = copy.feature_type()
+                && !copy.custom_name
+            {
+                copy.name = self.next_name(ty);
+            } else {
+                copy.name = format!("{} (copy)", f.name);
+            }
+            out.push(copy.id);
+            self.features.insert(at + out.len() - 1, copy);
+        }
+        if let Some(r) = self.rollback
+            && at <= r
+        {
+            self.rollback = Some(r + out.len());
+        }
+        if self.rollback == Some(self.features.len()) {
+            self.rollback = None;
+        }
+        out
+    }
+
+    /// Put features into a new folder; returns its id.
+    pub fn new_folder(&mut self, ids: &[FeatureId], name: Option<String>) -> u32 {
+        self.next_folder_id = self.next_folder_id.max(self.folders.iter().map(|f| f.id + 1).max().unwrap_or(0));
+        let id = self.next_folder_id;
+        self.next_folder_id += 1;
+        let name = name.unwrap_or_else(|| {
+            let mut n = 1;
+            while self.folders.iter().any(|f| f.name == format!("Folder {n}")) {
+                n += 1;
+            }
+            format!("Folder {n}")
+        });
+        self.folders.push(Folder { id, name, collapsed: false });
+        // Folders hold a contiguous run: gather members after the first one.
+        let mut idx: Vec<usize> = ids.iter().filter_map(|i| self.index_of(*i)).collect();
+        idx.sort_unstable();
+        if let Some(&first) = idx.first() {
+            let moved: Vec<Feature> = idx.iter().rev().map(|&i| self.features.remove(i)).collect::<Vec<_>>().into_iter().rev().collect();
+            let mut at = first;
+            for mut f in moved {
+                f.folder = Some(id);
+                self.features.insert(at, f);
+                at += 1;
+            }
+        }
+        id
+    }
+
+    /// Remove a folder (its features stay in place).
+    pub fn dissolve_folder(&mut self, folder: u32) {
+        self.folders.retain(|f| f.id != folder);
+        for f in &mut self.features {
+            if f.folder == Some(folder) {
+                f.folder = None;
+            }
+        }
+    }
+
+    pub fn folder(&self, id: u32) -> Option<&Folder> {
+        self.folders.iter().find(|f| f.id == id)
+    }
+
+    pub fn folder_mut(&mut self, id: u32) -> Option<&mut Folder> {
+        self.folders.iter_mut().find(|f| f.id == id)
+    }
+}
+
+/// Replace feature ids (serialized as integers) found anywhere in `v`.
+fn remap_ids(v: &mut serde_json::Value, map: &std::collections::HashMap<u64, u64>) {
+    match v {
+        serde_json::Value::Number(n) => {
+            if let Some(new) = n.as_u64().and_then(|u| map.get(&u)) {
+                *n = (*new).into();
+            }
+        }
+        serde_json::Value::Array(a) => a.iter_mut().for_each(|x| remap_ids(x, map)),
+        serde_json::Value::Object(o) => o.values_mut().for_each(|x| remap_ids(x, map)),
+        _ => {}
     }
 }

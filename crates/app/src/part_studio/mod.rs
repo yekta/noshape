@@ -2,6 +2,8 @@
 //! 3D viewport with selection, and feature dialogs with live preview.
 
 mod config_panel;
+mod feature_ops;
+mod manipulators;
 mod menus;
 mod sketch;
 mod view_tools;
@@ -140,6 +142,8 @@ pub struct PartStudioView {
     section_input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     renaming: Option<(FeatureId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    manip_drag: Option<manipulators::ManipDrag>,
+    folder_renaming: Option<(u32, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -213,6 +217,8 @@ impl PartStudioView {
             section_input: None,
             renaming: None,
             dim_input: None,
+            manip_drag: None,
+            folder_renaming: None,
             _subs: subs,
         };
         this.schedule_regen(window, cx);
@@ -354,7 +360,9 @@ impl PartStudioView {
             }
             None => (self.selection.clone(), Vec::new()),
         };
-        let extra = self.sketch_overlay(&mut selection, &mut accent, cx);
+        let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
+        extra.extend(self.manipulator_overlay(cx));
+        self.sync_manipulator(cx);
         let built = self.built.as_ref().expect("built");
         let scene = scene_builder::with_highlights(built, &self.display, &selection, self.hover.as_ref(), &accent, extra, self.gpu.uploader());
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
@@ -392,6 +400,9 @@ impl PartStudioView {
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.sketch.is_some() && self.sketch_viewport_event(vp, ev, window, cx) {
+            return;
+        }
+        if self.sketch.is_none() && self.manipulator_event(ev, window, cx) {
             return;
         }
         match ev {
@@ -527,6 +538,7 @@ impl PartStudioView {
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.leave_sketch(cx);
         let Some(e) = self.edit.take() else { return };
+        self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
         let type_id = feature.type_id.clone();
         let name = feature.name.clone();
@@ -555,6 +567,7 @@ impl PartStudioView {
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.leave_sketch(cx);
         if self.edit.take().is_some() {
+            self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
             self.schedule_regen(window, cx);
             cx.notify();
@@ -757,6 +770,7 @@ impl PartStudioView {
 
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
+        let mut open_folder: Option<u32> = None;
         for (i, f) in studio.features.iter().enumerate() {
             if editing_new_at == Some(i) {
                 rows.push(self.render_editing_placeholder(cx));
@@ -764,7 +778,18 @@ impl PartStudioView {
             if i == rollback {
                 rows.push(self.render_rollback_bar(i, cx));
             }
-            rows.push(self.render_feature_row(i, f, i >= rollback, editing_id == Some(f.id), cx));
+            let folder = f.folder.and_then(|id| studio.folder(id));
+            if f.folder != open_folder {
+                open_folder = f.folder;
+                if let Some(fd) = folder {
+                    rows.push(self.render_folder_row(fd, cx));
+                }
+            }
+            if folder.is_some_and(|fd| fd.collapsed) && editing_id != Some(f.id) {
+                continue;
+            }
+            let row = self.render_feature_row(i, f, i >= rollback, editing_id == Some(f.id), cx);
+            rows.push(if folder.is_some() { div().pl_3().child(row).into_any_element() } else { row });
         }
         if editing_new_at.is_some_and(|i| i >= studio.features.len()) {
             rows.push(self.render_editing_placeholder(cx));
@@ -837,6 +862,45 @@ impl PartStudioView {
                     .child(v_flex().id("parts-list").p_1().overflow_y_scroll().children(parts)),
             )
             .into_any_element()
+    }
+
+    fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let id = fd.id;
+        let collapsed = fd.collapsed;
+        let row = h_flex()
+            .id(SharedString::from(format!("folder-{id}")))
+            .h(px(26.))
+            .px_2()
+            .gap_2()
+            .rounded_sm()
+            .text_sm()
+            .text_color(pal.text_muted)
+            .hover(|d| d.bg(pal.panel_hover))
+            .child(Icon::new(if collapsed { IconName::ChevronRight } else { IconName::ChevronDown }).size_3().text_color(pal.text_faint))
+            .child(svg().path(icon_path("folder")).size_4().text_color(pal.text_faint))
+            .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
+                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
+                None => div().flex_1().truncate().child(fd.name.clone()).into_any_element(),
+            })
+            .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                if ev.click_count() >= 2 {
+                    this.start_folder_rename(id, window, cx);
+                } else {
+                    this.toggle_folder(id, cx);
+                }
+            }));
+        let view = cx.entity();
+        row.context_menu(move |menu, _, _| {
+            let v = view.clone();
+            let v2 = view.clone();
+            let v3 = view.clone();
+            menu.item(PopupMenuItem::new(if collapsed { "Expand" } else { "Collapse" }).on_click(move |_, _, cx| v.update(cx, |this, cx| this.toggle_folder(id, cx))))
+                .item(PopupMenuItem::new("Rename folder").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_folder_rename(id, window, cx))))
+                .separator()
+                .item(PopupMenuItem::new("Remove folder").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.dissolve_folder(id, cx))))
+        })
+        .into_any_element()
     }
 
     fn render_editing_placeholder(&self, cx: &App) -> AnyElement {
@@ -938,10 +1002,29 @@ impl PartStudioView {
             let v3 = view.clone();
             let v4 = view.clone();
             let v5 = view.clone();
+            let v6 = view.clone();
+            let v7 = view.clone();
+            let v8 = view.clone();
             menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v.update(cx, |this, cx| this.edit_feature(id, window, cx))))
                 .item(PopupMenuItem::new("Rename").on_click(move |_, window, cx| v5.update(cx, |this, cx| this.start_rename(id, window, cx))))
                 .item(PopupMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_suppressed(vec![id], !suppressed, cx))))
                 .item(PopupMenuItem::new("Roll to here").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.set_rollback(Some(i + 1), cx))))
+                .separator()
+                .item(PopupMenuItem::new("Copy").on_click(move |_, _, cx| {
+                    v6.update(cx, |this, cx| {
+                        if !this.selected_features.contains(&id) {
+                            this.selected_features = vec![id];
+                        }
+                        this.copy_selected_features(cx);
+                    })
+                }))
+                .item(PopupMenuItem::new("Paste").on_click(move |_, _, cx| v7.update(cx, |this, cx| this.paste_features(cx))))
+                .item(PopupMenuItem::new("Add to new folder").on_click(move |_, _, cx| {
+                    v8.update(cx, |this, cx| {
+                        let ids = if this.selected_features.contains(&id) { this.selected_features.clone() } else { vec![id] };
+                        this.add_to_new_folder(ids, cx);
+                    })
+                }))
                 .separator()
                 .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.delete_features(vec![id], cx))))
         })
@@ -1161,6 +1244,16 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(Self::on_delete))
+            .on_action(cx.listener(|this, _: &Copy, _, cx| {
+                if this.sketch.is_none() {
+                    this.copy_selected_features(cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &Paste, _, cx| {
+                if this.sketch.is_none() && this.edit.is_none() {
+                    this.paste_features(cx);
+                }
+            }))
             .on_action(cx.listener(Self::on_clear_selection))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
                 if this.sketch.is_some() {
