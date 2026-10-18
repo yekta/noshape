@@ -64,7 +64,7 @@ cargo run --release -p noshape                    # start window
 cargo run --release -p noshape -- --demo /tmp/demo.noshape   # sample document
 ```
 
-See [docs/BUILDING.md](docs/BUILDING.md) for details, and
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for how to use it, [docs/BUILDING.md](docs/BUILDING.md) for build details, and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the crates fit together.
 
 ## Repository layout
