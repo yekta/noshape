@@ -468,7 +468,8 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ export
 
-    /// Export the current sheet (exact hidden lines). The location comes
+    /// Export the drawing (exact hidden lines): PDF gets every sheet, SVG and
+    /// DXF the current one. The location comes
     /// from the native save dialog, or the in-app prompt when no dialog is
     /// available (headless/no desktop portal).
     pub fn export(&mut self, format: ExportFormat, window: &mut Window, cx: &mut Context<Self>) {
@@ -495,11 +496,22 @@ impl DrawingEditor {
         cx.spawn(async move |this, cx| {
             let result: Result<PathBuf, String> = cx
                 .background_spawn(async move {
-                    let built = render_sheet_with(&drawing, si, &sources, &cache, true, &info).ok_or("nothing to export")?;
                     let bytes = match format {
-                        ExportFormat::Pdf => export::to_pdf(&built.geometry),
-                        ExportFormat::Svg => export::to_svg(&built.geometry).into_bytes(),
-                        ExportFormat::Dxf => export::to_dxf(&built.geometry).into_bytes(),
+                        // PDF holds every sheet, one page each (Onshape behavior).
+                        ExportFormat::Pdf => {
+                            let pages: Vec<_> = (0..drawing.sheets.len()).filter_map(|i| render_sheet_with(&drawing, i, &sources, &cache, true, &info).map(|b| b.geometry)).collect();
+                            if pages.is_empty() {
+                                return Err("nothing to export".into());
+                            }
+                            export::to_pdf_pages(&pages)
+                        }
+                        _ => {
+                            let built = render_sheet_with(&drawing, si, &sources, &cache, true, &info).ok_or("nothing to export")?;
+                            match format {
+                                ExportFormat::Svg => export::to_svg(&built.geometry).into_bytes(),
+                                _ => export::to_dxf(&built.geometry).into_bytes(),
+                            }
+                        }
                     };
                     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
                     Ok(path)
