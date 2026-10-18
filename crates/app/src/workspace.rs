@@ -2,7 +2,6 @@
 
 use crate::actions::*;
 use crate::assembly_view::AssemblyView;
-use crate::assets::icon_path;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::history_panel::HistoryPanel;
@@ -11,7 +10,7 @@ use crate::variable_studio::VariableStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
@@ -41,6 +40,10 @@ pub struct Workspace {
     recent: Vec<TabId>,
     /// Tab manager (Alt+T), docked left like Onshape's.
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
+    /// Tab being renamed (tab › Rename, double-click).
+    renaming_tab: Option<(TabId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// ☰ › Workspace units… panel.
+    units_panel: Option<(Entity<crate::doc_dialogs::WorkspaceUnits>, Subscription)>,
     /// Create Drawing dialog (see `drawing_create`).
     create_drawing: Option<(Entity<crate::drawing_create::CreateDrawingDialog>, Subscription)>,
     _thumbnailer: Entity<crate::start_thumbnail::Thumbnailer>,
@@ -67,7 +70,7 @@ impl Workspace {
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, create_drawing: None, _thumbnailer: thumbnailer, _subs: subs };
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, renaming_tab: None, units_panel: None, create_drawing: None, _thumbnailer: thumbnailer, _subs: subs };
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -218,23 +221,73 @@ impl Workspace {
         use gpui_kit::component::WindowExt as _;
         let tab_name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         let delete = std::rc::Rc::new(delete);
-        window.open_dialog(cx, move |dialog, _, _| {
+        window.open_dialog(cx, move |dialog, _, cx| {
             let delete = delete.clone();
-            dialog
-                .title("Delete tabs")
-                .w(px(420.))
-                .child(div().text_sm().child(format!("Deleting \"{tab_name}\" may cause errors in {} that use it: {}.", if users.len() == 1 { "the tab" } else { "the tabs" }, users.join(", "))))
+            // Onshape modal: title bar, message, blue Delete then gray Cancel.
+            crate::os_ui::modal(dialog, "Delete tabs", 460.)
+                .child(crate::os_ui::modal_body().child(format!("Deleting \"{tab_name}\" may cause errors in {} that use it: {}.", if users.len() == 1 { "the tab" } else { "the tabs" }, users.join(", "))))
                 .footer(
-                    gpui_kit::component::dialog::DialogFooter::new()
-                        .gap_2()
-                        .child(gpui_kit::component::dialog::DialogClose::new().child(gpui_kit::component::button::Button::new("cancel").label("Cancel").outline()))
-                        .child(gpui_kit::component::dialog::DialogAction::new().child(gpui_kit::component::button::Button::new("ok").label("Delete").primary())),
+                    crate::os_ui::modal_footer()
+                        .child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Delete")))
+                        .child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))),
                 )
                 .on_ok(move |_, window, cx| {
                     delete(window, cx);
                     true
                 })
         });
+    }
+
+    /// Tab › Rename: edit the name in the tab; Enter or leaving commits.
+    fn start_tab_rename(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) && this.renaming_tab.is_some() {
+                let name = st.read(cx).value().trim().to_string();
+                this.renaming_tab = None;
+                if !name.is_empty() {
+                    this.doc.update(cx, |d, cx| {
+                        d.edit_document(&format!("Rename tab : {name}"), cx, |doc| {
+                            if let Some(t) = doc.tab_mut(tab) {
+                                t.name = name.clone();
+                            }
+                        })
+                    });
+                }
+                cx.notify();
+            }
+        });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.renaming_tab = Some((tab, st, sub));
+        cx.notify();
+    }
+
+    /// Tab › Select as document thumbnail.
+    fn select_thumbnail(&mut self, tab: TabId, cx: &mut Context<Self>) {
+        self.doc.update(cx, |d, cx| {
+            let _ = d.session.store.set_meta("thumbnail_tab", Some(tab.0.to_string().as_bytes()));
+            cx.emit(DocEvent::HistoryChanged);
+        });
+    }
+
+    /// "+" › Paste <element>: the element copied with Copy to clipboard.
+    fn paste_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(t) = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.clone()) else { return };
+        let mut new_id = None;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document(&format!("Paste tab : {}", t.name), cx, |d| {
+                let name = if d.tabs.iter().any(|x| x.name == t.name) { d.next_tab_name(&t.name) } else { t.name.clone() };
+                new_id = Some(d.add_tab(&name, t.content.clone()));
+            });
+        });
+        if let Some(id) = new_id {
+            self.activate(id, window, cx);
+        }
     }
 
     fn duplicate_tab(&mut self, tab: TabId, cx: &mut Context<Self>) {
@@ -269,10 +322,14 @@ impl Workspace {
                     .child(
                         // Onshape: the logo block is 139 px wide with 14 px left padding.
                         h_flex()
+                            .id("navbar-logo")
                             .flex_none()
                             .w(px(139.))
                             .pl(px(14.))
                             .gap(px(6.))
+                            .cursor_pointer()
+                            // Onshape: the logo goes to the documents page.
+                            .on_click(|_, _, cx| crate::files::show_start_window(cx))
                             .child(crate::assets::icon("noshape-logo", 24., cx))
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
                     )
@@ -299,10 +356,14 @@ impl Workspace {
             .into_any_element()
     }
 
+    /// Onshape's ☰ document menu (live, document/32): a Bootstrap dropdown
+    /// under the button. Rename document, Move to…, Document details…,
+    /// Restore deleted workspaces… | Copy workspace…, Update workspace…,
+    /// Workspace units…, Workspace properties…, Switch to view only mode |
+    /// Close document.
     fn render_doc_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let ws = cx.entity();
-        let recent = crate::files::recent();
-        let units = self.doc.read(cx).session.doc.settings.units.length;
+        let view_only = self.doc.read(cx).session.view_only;
         Button::new("doc-menu")
             .custom(navbar_variant(cx))
             .child(crate::assets::icon("menu", 20., cx))
@@ -311,54 +372,48 @@ impl Workspace {
             .h(px(crate::ui::NAVBAR_H))
             .p_0()
             .rounded(px(0.))
-            .dropdown_menu(move |menu, window, cx| {
+            .on_click(move |e, window, cx| {
+                use crate::doc_dialogs as dd;
+                use crate::os_menu::OsMenuItem as I;
+                let doc = ws.read(cx).doc.clone();
+                let x = e.position().x;
+                let (d1, d2, d3, d4, d5, d6, d7, d8) = (doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone());
                 let w = ws.clone();
-                let mut menu = menu
-                    .item(PopupMenuItem::new("Documents").icon(IconName::LayoutDashboard).on_click(|_, _, cx| crate::files::show_start_window(cx)))
-                    .separator()
-                    .menu("New document", Box::new(NewDocument))
-                    .menu("Open…", Box::new(OpenDocument))
-                    .submenu("Open recent", window, cx, {
-                        let recent = recent.clone();
-                        move |mut m, _, _| {
-                            if recent.is_empty() {
-                                m = m.label("No recent documents");
-                            }
-                            for r in &recent {
-                                let path = r.clone();
-                                let label = r.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                                m = m.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                                    let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-                                    let _ = crate::files::open_document_window(path.clone(), None, gpu, cx);
-                                }));
-                            }
-                            m
-                        }
-                    })
-                    .separator();
-                let w1 = w.clone();
-                menu = menu.item(PopupMenuItem::new("Save a copy as…").on_click(move |_, window, cx| w1.update(cx, |t, cx| t.save_copy(window, cx))));
-                let w2 = w.clone();
-                menu = menu.submenu("Export active Part Studio", window, cx, move |mut m, _, _| {
-                    for f in crate::part_studio::ExportFormat::ALL {
-                        let w = w2.clone();
-                        m = m.item(PopupMenuItem::new(f.label()).on_click(move |_, window, cx| w.update(cx, |t, cx| t.export(f, window, cx))));
-                    }
-                    m
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    m.dropdown()
+                        .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
+                        .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))
+                        .item(I::new("Document details…").on_click(move |_, wi, cx| dd::document_details(d3.clone(), wi, cx)))
+                        .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
+                        .separator()
+                        .item(I::new("Copy workspace…").on_click(move |_, wi, cx| dd::copy_workspace(d5.clone(), wi, cx)))
+                        .item(I::new("Update workspace…").on_click(move |_, wi, cx| dd::update_workspace(d6.clone(), wi, cx)))
+                        .item(I::new("Workspace units…").on_click(move |_, _, cx| w.update(cx, |t, cx| t.open_units_panel(cx))))
+                        .item(I::new("Workspace properties…").on_click(move |_, wi, cx| dd::workspace_properties(d7.clone(), wi, cx)))
+                        .item(I::new(if view_only { "Switch to edit mode" } else { "Switch to view only mode" }).on_click(move |_, _, cx| {
+                            d8.update(cx, |d, cx| {
+                                d.session.view_only = !d.session.view_only;
+                                cx.notify();
+                            })
+                        }))
+                        .separator()
+                        .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()))
                 });
-                let w4 = w.clone();
-                menu = menu.item(PopupMenuItem::new("Import into Part Studio…").on_click(move |_, window, cx| w4.update(cx, |t, cx| t.import(window, cx))));
-                let w3 = w.clone();
-                menu = menu.separator().submenu("Units", window, cx, move |mut m, _, _| {
-                    for u in noshape_units::LengthUnit::ALL {
-                        let w = w3.clone();
-                        m = m.item(PopupMenuItem::new(format!("{u:?}")).checked(u == units).on_click(move |_, _, cx| w.update(cx, |t, cx| t.set_units(u, cx))));
-                    }
-                    m
-                });
-                menu.separator().menu("Close window", Box::new(CloseWindow))
+                crate::os_menu::open_anchored(point(x - px(16.), px(crate::ui::NAVBAR_H)), Anchor::TopLeft, menu, window, cx);
             })
             .into_any_element()
+    }
+
+    /// ☰ › Workspace units…: Onshape's panel at the feature dialog's place.
+    fn open_units_panel(&mut self, cx: &mut Context<Self>) {
+        let doc = self.doc.clone();
+        let panel = cx.new(|cx| crate::doc_dialogs::WorkspaceUnits::new(doc, cx));
+        let sub = cx.subscribe(&panel, |this: &mut Self, _, _: &crate::doc_dialogs::WorkspaceUnitsEvent, cx| {
+            this.units_panel = None;
+            cx.notify();
+        });
+        self.units_panel = Some((panel, sub));
+        cx.notify();
     }
 
     fn active_studio(&self) -> Option<Entity<PartStudioView>> {
@@ -372,12 +427,40 @@ impl Workspace {
         self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
     }
 
-    fn export(&mut self, format: crate::part_studio::ExportFormat, window: &mut Window, cx: &mut Context<Self>) {
+    /// Tab › Export…: Onshape's Export modal (live, drawing/40 layout): File
+    /// name, Format select; Export saves the file.
+    fn open_export(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::part_studio::ExportFormat;
+        self.activate(tab, window, cx);
+        match self.views.get(&tab) {
+            Some(TabView::Assembly(v)) => return v.update(cx, |v, cx| v.open_export_all(window, cx)),
+            // Onshape's "Export Drawing" modal (drawing_export).
+            Some(TabView::Drawing(v)) => return v.update(cx, |v, cx| v.open_export_dialog(window, cx)),
+            _ => {}
+        }
+        let ws = cx.entity();
+        let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(name));
+        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let (c, ws, file2) = (chosen.clone(), ws.clone(), file.clone());
+            let formats: Vec<String> = ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
+            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx)
+                .on_ok(move |_, window, cx| {
+                    let (ws, f) = (ws.clone(), ExportFormat::ALL[c.get()]);
+                    let name = file2.read(cx).value().trim().to_string();
+                    window.defer(cx, move |window, cx| ws.update(cx, |t, cx| t.export(f, Some(name), window, cx)));
+                    true
+                })
+        });
+    }
+
+    fn export(&mut self, format: crate::part_studio::ExportFormat, file_name: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(view) = self.active_studio() else {
             self.report("Open a Part Studio tab to export its parts".into(), cx);
             return;
         };
-        let name = view.read(cx).studio_name(cx);
+        let name = file_name.filter(|n| !n.is_empty()).unwrap_or_else(|| view.read(cx).studio_name(cx));
         let ws = cx.entity();
         crate::files::request_save_path("Export", format!("{name}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
             let r = view.read(cx).export(format, &path);
@@ -389,85 +472,30 @@ impl Workspace {
         });
     }
 
-    fn save_copy(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let name = self.doc.read(cx).name();
-        let ws = cx.entity();
-        crate::files::request_save_path("Save a copy", format!("{name} copy.noshape"), "noshape", window, cx, move |path, cx| {
-            ws.update(cx, |this, cx| {
-                let r = this.doc.read(cx).session.store.backup_to(&path);
-                let msg = match r {
-                    Ok(()) => format!("Saved a copy to {}", path.display()),
-                    Err(e) => format!("Save failed: {e}"),
-                };
-                this.report(msg, cx);
-            });
-        });
-    }
-
+    /// "+" › Import…: Onshape translates the file into a new Part Studio tab
+    /// named after the file and opens it.
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(view) = self.active_studio() else {
-            self.report("Open a Part Studio tab to import into".into(), cx);
-            return;
-        };
         let ws = cx.entity();
-        let tab = view.read(cx).tab;
-        // Mesh files carry no unit: read them in the document's length unit.
-        let mesh_unit = {
-            use noshape_kernel::LengthUnit as K;
-            use noshape_units::LengthUnit as U;
-            match self.doc.read(cx).session.doc.settings.units.length {
-                U::Centimeter => K::Centimeter,
-                U::Meter => K::Meter,
-                U::Inch => K::Inch,
-                U::Foot | U::Yard => K::Foot,
-                _ => K::Millimeter,
-            }
-        };
-        crate::files::request_open_path("Import CAD file", "CAD and mesh files", &["step", "stp", "iges", "igs", "brep", "stl", "obj"], window, cx, move |path, cx| {
-            let result = (|| -> anyhow::Result<String> {
-                use noshape_kernel as k;
-                let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-                let shape = match ext.as_str() {
-                    "step" | "stp" => {
-                        let parts = k::read_step(&path, k::LengthUnit::Meter)?;
-                        k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
-                    }
-                    "iges" | "igs" => k::read_iges(&path, k::LengthUnit::Meter)?,
-                    "brep" => k::read_brep(&path)?,
-                    // Small meshes get coplanar triangles merged into faces.
-                    "stl" | "obj" => k::read_mesh(&path, mesh_unit, 20_000)?,
-                    other => anyhow::bail!("Unsupported file type .{other}"),
-                };
-                Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
-            })();
-            ws.update(cx, |this, cx| match result {
-                Ok(brep) => {
-                    let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-                    let units = this.doc.read(cx).session.doc.settings.units;
-                    this.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(tab, &format!("Import {file}"), cx, |ps| {
-                            if let Some(mut f) = ps.new_feature("importForeign", &units) {
-                                f.name = format!("Import {file}");
-                                f.custom_name = true;
-                                f.params.set("blobData", noshape_model::ParamValue::Text(brep));
-                                f.params.set("foreignId", noshape_model::ParamValue::Text(file.clone()));
-                                ps.insert_at_rollback(f);
-                            }
-                        });
-                    });
-                }
-                Err(e) => this.report(format!("Import failed: {e:#}"), cx),
+        let handle = window.window_handle();
+        let units = self.doc.read(cx).session.doc.settings.units;
+        crate::files::request_open_path("Import files", "CAD and mesh files", IMPORT_EXTS, window, cx, move |path, cx| {
+            let brep = match read_foreign(&path, &units) {
+                Ok(b) => b,
+                Err(e) => return ws.update(cx, |this, cx| this.report(format!("Import failed: {e:#}"), cx)),
+            };
+            let (name, file) = import_names(&path);
+            let mut new_id = None;
+            ws.read(cx).doc.clone().update(cx, |doc, cx| {
+                doc.edit_document(&format!("Import {file}"), cx, |d| {
+                    let mut ps = PartStudio::new();
+                    add_import_feature(&mut ps, &file, brep, &units);
+                    let name = if d.tabs.iter().any(|t| t.name == name) { d.next_tab_name(&name) } else { name };
+                    new_id = Some(d.add_tab(&name, TabContent::PartStudio(ps)));
+                });
             });
-        });
-    }
-
-    fn set_units(&mut self, u: noshape_units::LengthUnit, cx: &mut Context<Self>) {
-        self.doc.update(cx, |doc, cx| {
-            doc.session.doc.settings.units.length = u;
-            if let Err(e) = doc.session.commit(&[], true, "Change workspace units") {
-                cx.emit(DocEvent::Error(format!("{e:#}")));
+            if let Some(id) = new_id {
+                let _ = handle.update(cx, |_, window, cx| ws.update(cx, |this, cx| this.activate(id, window, cx)));
             }
-            cx.emit(DocEvent::Reloaded);
         });
     }
 
@@ -503,17 +531,30 @@ impl Workspace {
             .child(crate::assets::icon("tab-search", 20., cx))
             .tooltip("Tab manager (Alt+T)")
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_tab_manager(window, cx)));
-        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(0x555555))).tooltip("Insert new tab").dropdown_menu(move |menu, _, _| {
-            let v1 = view.clone();
-            let v2 = view.clone();
-            let v3 = view.clone();
-            let v4 = view.clone();
-            let v5 = view.clone();
-            menu.item(PopupMenuItem::new("Part Studio").icon(Icon::empty().path(icon_path("part-studio"))).on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
-                .item(PopupMenuItem::new("Assembly").icon(Icon::empty().path(icon_path("assembly"))).on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
-                .item(PopupMenuItem::new("Create Drawing").icon(Icon::empty().path(icon_path("drawing"))).on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
-                .item(PopupMenuItem::new("Variable Studio").icon(Icon::empty().path(icon_path("variable-studio"))).on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
-                .item(PopupMenuItem::new("Feature Studio").icon(Icon::empty().path(icon_path("feature-studio"))).on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
+        // Onshape's "+" menu (live, document/01): a Bootstrap dropdown opening
+        // upward from the cell. Cloud items (Applications, CAM / PCB /
+        // Render Studio) are not part of noshape.
+        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(0x555555))).tooltip("Insert new tab").on_click(move |_, window, cx| {
+            let (v1, v2, v3, v4, v5, v6, v7) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+            let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.as_ref().map(|t| t.name.clone()));
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                use crate::os_menu::OsMenuItem as I;
+                let m = m.dropdown();
+                let m = match &copied {
+                    Some(n) => m.item(I::new(format!("Paste {n}")).icon_name("paste").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.paste_tab(w, cx)))).separator(),
+                    None => m,
+                };
+                m
+                    .item(I::new("Create Feature Studio").icon_name("feature-studio").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
+                    .separator()
+                    .item(I::new("Create Part Studio").icon_name("part-studio").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
+                    .item(I::new("Create Assembly").icon_name("assembly").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
+                    .item(I::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
+                    .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
+                    .item(I::new("Import…").icon_name("import").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))))
+            });
+            let h = window.viewport_size().height;
+            crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
         });
         let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(2.)).overflow_x_scroll();
         for (id, name, kind) in tabs {
@@ -538,14 +579,60 @@ impl Workspace {
                     .bg(if active { pal.panel } else { pal.tab_inactive })
                     .text_color(if active { pal.text } else { pal.text_muted })
                     .child(crate::assets::icon(tab_icon(kind), 20., cx))
-                    .child(div().truncate().child(name))
+                    .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
+                        // Tab › Rename / double-click: the name becomes a field.
+                        Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.))).into_any_element(),
+                        None => div().truncate().child(name).into_any_element(),
+                    })
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(id, window, cx)))
+                    .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                        // The first click activated the tab; a double-click renames it
+                        // (activating again would take the field's focus).
+                        if e.click_count() >= 2 {
+                            this.start_tab_rename(id, window, cx);
+                        } else {
+                            this.activate(id, window, cx);
+                        }
+                    }))
                     .os_context_menu(move |menu, _, _| {
-                        let v1 = view.clone();
-                        let v2 = view.clone();
-                        let v3 = view.clone();
-                        let menu = menu.item(crate::os_menu::OsMenuItem::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))));
+                        use crate::doc_dialogs as dd;
+                        use crate::os_menu::OsMenuItem as I;
+                        let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                        let (v5, v6, v7, v8, v9, v10, v11) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+                        // Onshape (live): Delete | Rename, Properties…, Show code |
+                        // Duplicate, Copy to clipboard | Select as document
+                        // thumbnail | Move to document…, Export….
+                        let menu = menu
+                            .item(I::new("Delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
+                            .separator()
+                            .item(I::new("Rename").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
+                            .item(I::new("Properties…").on_click(move |_, w, cx| {
+                                let doc = v6.read(cx).doc.clone();
+                                dd::tab_properties(doc, id, w, cx)
+                            }));
+                        let menu = if kind == "partstudio" {
+                            menu.item(I::new("Show code").on_click(move |_, w, cx| {
+                                let doc = v7.read(cx).doc.clone();
+                                dd::show_code(doc, id, w, cx)
+                            }))
+                        } else {
+                            menu
+                        };
+                        let menu = menu
+                            .separator()
+                            .item(I::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))))
+                            .item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
+                                let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
+                                cx.set_global(dd::CopiedTab(t));
+                            }))
+                            .separator()
+                            .item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v9.update(cx, |t, cx| t.select_thumbnail(id, cx))))
+                            .separator()
+                            .item(I::new("Move to document…").on_click(move |_, w, cx| {
+                                let doc = v10.read(cx).doc.clone();
+                                dd::move_to_document(doc, id, w, cx)
+                            }));
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
                         // Onshape: Part Studio and Assembly tabs offer "Create Drawing of <tab>…".
                         let menu = if matches!(kind, "partstudio" | "assembly") {
                             let n = tab_name.clone();
@@ -557,8 +644,7 @@ impl Workspace {
                         } else {
                             menu
                         };
-                        menu.separator()
-                            .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
+                        menu
                     }),
             );
         }
@@ -681,7 +767,16 @@ impl Render for Workspace {
                         Some((tm, _)) => Some(tm.clone().into_any_element()),
                         None => self.history.clone().map(|h| h.into_any_element()),
                     }.map(|panel| div().w(px(crate::history_panel::PANEL_W)).h_full().flex_none().border_r_1().border_color(pal.border).child(panel)))
-                    .child(div().flex_1().h_full().min_w_0().child(content)),
+                    .child(
+                        div()
+                            .flex_1()
+                            .h_full()
+                            .min_w_0()
+                            .relative()
+                            .child(content)
+                            // Onshape: at the feature dialog's place (below the toolbar, right of the list).
+                            .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::LEFT_PANEL_W)).child(p.clone()))),
+                    ),
             )
             .child(tabs)
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
@@ -754,9 +849,15 @@ impl Workspace {
                 });
                 let Some(id) = new_id else { return };
                 this.activate(id, window, cx);
-                if let (false, Some(s), Some(TabView::Drawing(v))) = (suggested, &source, this.views.get(&id)) {
-                    let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
-                    v.update(cx, |v, cx| v.set_tool(tool, cx));
+                if let (false, Some(TabView::Drawing(v))) = (suggested, this.views.get(&id)) {
+                    match &source {
+                        Some(s) => {
+                            let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
+                            v.update(cx, |v, cx| v.set_tool(tool, cx));
+                        }
+                        // From "+" › Create Drawing…: choose what to insert first.
+                        None => v.update(cx, |v, cx| v.open_insert_chooser(cx)),
+                    }
                 }
             });
         })
@@ -784,3 +885,54 @@ impl Workspace {
     }
 }
 
+
+/// File types "Import files…" translates.
+pub(crate) const IMPORT_EXTS: &[&str] = &["step", "stp", "iges", "igs", "brep", "stl", "obj"];
+
+/// Tab (and document) name of an imported file: the file name without its
+/// extension; and the full file name.
+pub(crate) fn import_names(path: &std::path::Path) -> (String, String) {
+    let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+    let stem = path.file_stem().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| file.clone());
+    (stem, file)
+}
+
+/// Read a CAD or mesh file as BREP text. Mesh files carry no unit: they are
+/// read in the document's length unit.
+pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPrefs) -> anyhow::Result<String> {
+    use noshape_kernel as k;
+    let mesh_unit = {
+        use noshape_units::LengthUnit as U;
+        match units.length {
+            U::Centimeter => k::LengthUnit::Centimeter,
+            U::Meter => k::LengthUnit::Meter,
+            U::Inch => k::LengthUnit::Inch,
+            U::Foot | U::Yard => k::LengthUnit::Foot,
+            _ => k::LengthUnit::Millimeter,
+        }
+    };
+    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let shape = match ext.as_str() {
+        "step" | "stp" => {
+            let parts = k::read_step(path, k::LengthUnit::Meter)?;
+            k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
+        }
+        "iges" | "igs" => k::read_iges(path, k::LengthUnit::Meter)?,
+        "brep" => k::read_brep(path)?,
+        // Small meshes get coplanar triangles merged into faces.
+        "stl" | "obj" => k::read_mesh(path, mesh_unit, 20_000)?,
+        other => anyhow::bail!("Unsupported file type .{other}"),
+    };
+    Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
+}
+
+/// Append the "Import <file>" feature holding `brep` to `ps`.
+pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str, brep: String, units: &noshape_units::UnitPrefs) {
+    if let Some(mut f) = ps.new_feature("importForeign", units) {
+        f.name = format!("Import {file}");
+        f.custom_name = true;
+        f.params.set("blobData", noshape_model::ParamValue::Text(brep));
+        f.params.set("foreignId", noshape_model::ParamValue::Text(file.to_string()));
+        ps.insert_at_rollback(f);
+    }
+}

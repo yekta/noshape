@@ -21,7 +21,7 @@ struct Fixture {
 impl Fixture {
     fn new(source: &str) -> Self {
         let mut doc = Document::new();
-        let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio { source: source.to_string() }));
+        let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(source)));
         // Compiling registers the custom feature schemas (new_feature needs them).
         let _ = DocumentScripts::from_document(&doc);
         Fixture { doc, fs, units: UnitPrefs::default() }

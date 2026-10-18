@@ -2,13 +2,68 @@
 //! Helvetica). All take a [`SheetGeometry`] in millimeters.
 
 use super::font;
-use super::sheet::{Anchor, LineStyle, SheetGeometry, Text2};
+use super::sheet::{Anchor, Fill2, LineStyle, Polyline2, SheetGeometry, Text2};
 use std::fmt::Write as _;
 
 /// Texts with characters outside the PDF/DXF base fonts (GD&T and other
 /// drawing symbols) are exported as strokes of the drawing font.
 pub fn needs_strokes(t: &Text2) -> bool {
     t.text.chars().any(|c| !(c.is_ascii() || "Ø°±×µ²³".contains(c)))
+}
+
+/// Export Drawing dialog settings that change the geometry.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExportOptions {
+    /// Every text as outlines (PDF Text "Normal", raster formats, DWG/DXF
+    /// "Explode all into polylines"): filled glyphs, or strokes when
+    /// `strokes` (DXF has no fills for text).
+    pub explode_all: bool,
+    pub strokes: bool,
+    /// DXF "Explode into polylines (notes)": these text indices only.
+    pub explode: Vec<usize>,
+    /// Overridden dimensions: "Show underlines".
+    pub underline_overrides: bool,
+    /// "Exclude off-sheet content" (DWG/DXF).
+    pub exclude_off_sheet: bool,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self { explode_all: false, strokes: false, explode: Vec::new(), underline_overrides: true, exclude_off_sheet: false }
+    }
+}
+
+/// The geometry an export writes, after [`ExportOptions`].
+pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
+    let mut out = g.clone();
+    if o.underline_overrides {
+        for &i in &g.overridden {
+            let Some(t) = g.texts.get(i) else { continue };
+            let b = font::text_box(t);
+            out.lines.push(Polyline2 { points: vec![b[0], b[1]], style: LineStyle::Thin, closed: false, pick: t.pick });
+        }
+    }
+    let texts = std::mem::take(&mut out.texts);
+    for (i, t) in texts.into_iter().enumerate() {
+        if !(o.explode_all || o.explode.contains(&i)) {
+            out.texts.push(t);
+            continue;
+        }
+        if !o.strokes && font::fill_supported(&t.text) {
+            let (pts, idx) = font::text_fill(&t);
+            out.fills.extend(idx.chunks(3).filter(|c| c.len() == 3).map(|c| Fill2 { points: c.iter().map(|&k| pts[k as usize]).collect() }));
+        } else {
+            out.lines.extend(font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2).map(|points| Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick }));
+        }
+    }
+    out.overridden.clear();
+    if o.exclude_off_sheet {
+        let inside = |p: &[f64; 2]| p[0] >= -1e-6 && p[1] >= -1e-6 && p[0] <= g.width + 1e-6 && p[1] <= g.height + 1e-6;
+        out.lines.retain(|l| l.points.iter().all(inside));
+        out.fills.retain(|f| f.points.iter().all(inside));
+        out.texts.retain(|t| font::text_box(t).iter().all(inside));
+    }
+    out
 }
 
 fn stroke_width(t: &Text2) -> f64 {
@@ -81,6 +136,37 @@ pub fn to_svg(g: &SheetGeometry) -> String {
 
 /// DXF R12 (AC1009): LINE/POLYLINE/TEXT/SOLID entities on per-style layers, in mm.
 pub fn to_dxf(g: &SheetGeometry) -> String {
+    to_dxf_units(g, 4)
+}
+
+/// DXF in a unit: `insunits` 1 inch, 2 foot, 4 mm, 5 cm, 6 m (Export
+/// Drawing › Units); coordinates and text heights are converted.
+pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
+    let k = match insunits {
+        1 => 1.0 / 25.4,
+        2 => 1.0 / 304.8,
+        5 => 0.1,
+        6 => 0.001,
+        _ => 1.0,
+    };
+    let scaled;
+    let g = if k == 1.0 {
+        g
+    } else {
+        let mut c = g.clone();
+        let f = |p: &mut [f64; 2]| {
+            p[0] *= k;
+            p[1] *= k;
+        };
+        c.lines.iter_mut().flat_map(|l| l.points.iter_mut()).for_each(f);
+        c.fills.iter_mut().flat_map(|l| l.points.iter_mut()).for_each(f);
+        for t in &mut c.texts {
+            f(&mut t.pos);
+            t.height *= k;
+        }
+        scaled = c;
+        &scaled
+    };
     let mut s = String::new();
     let pair = |s: &mut String, code: i32, v: &str| {
         let _ = writeln!(s, "{code:>3}\n{v}");
@@ -90,7 +176,7 @@ pub fn to_dxf(g: &SheetGeometry) -> String {
     pair(&mut s, 9, "$ACADVER");
     pair(&mut s, 1, "AC1009");
     pair(&mut s, 9, "$INSUNITS");
-    pair(&mut s, 70, "4");
+    pair(&mut s, 70, &insunits.to_string());
     pair(&mut s, 0, "ENDSEC");
     // Tables: line types and layers.
     pair(&mut s, 0, "SECTION");
@@ -298,6 +384,11 @@ pub fn to_pdf(g: &SheetGeometry) -> Vec<u8> {
 
 /// Multi-page vector PDF: one page per sheet.
 pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
+    to_pdf_pages_version(pages, "1.4")
+}
+
+/// [`to_pdf_pages`] with the header version (Export Drawing › Version).
+pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
     let pt = 72.0 / 25.4;
     let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
@@ -310,7 +401,8 @@ pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
         objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>", 5 + 2 * i));
         objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content));
     }
-    let mut out: Vec<u8> = b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n".to_vec();
+    let mut out: Vec<u8> = format!("%PDF-{version}\n").into_bytes();
+    out.extend_from_slice(b"%\xE2\xE3\xCF\xD3\n");
     let mut offsets = Vec::new();
     for (i, o) in objects.iter().enumerate() {
         offsets.push(out.len());
@@ -323,6 +415,65 @@ pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
     }
     let _ = write!(tail, "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1);
     out.extend_from_slice(tail.as_bytes());
+    out
+}
+
+/// A zip archive of stored (uncompressed) files: several sheets exported
+/// at once download as one zip.
+pub fn zip_store(files: &[(String, Vec<u8>)]) -> Vec<u8> {
+    fn crc32(data: &[u8]) -> u32 {
+        let mut c = !0u32;
+        for &b in data {
+            c ^= b as u32;
+            for _ in 0..8 {
+                c = if c & 1 != 0 { (c >> 1) ^ 0xEDB8_8320 } else { c >> 1 };
+            }
+        }
+        !c
+    }
+    let mut out = Vec::new();
+    let mut central = Vec::new();
+    for (name, data) in files {
+        let (crc, len, off) = (crc32(data), data.len() as u32, out.len() as u32);
+        let n = name.as_bytes();
+        let head = |sig: u32, central: bool| {
+            let mut h = Vec::new();
+            h.extend_from_slice(&sig.to_le_bytes());
+            if central {
+                h.extend_from_slice(&20u16.to_le_bytes());
+            }
+            // Version 2.0, UTF-8 names, stored, no time.
+            for v in [20u16, 0x0800, 0, 0, 0x21] {
+                h.extend_from_slice(&v.to_le_bytes());
+            }
+            for v in [crc, len, len] {
+                h.extend_from_slice(&v.to_le_bytes());
+            }
+            h.extend_from_slice(&(n.len() as u16).to_le_bytes());
+            h.extend_from_slice(&0u16.to_le_bytes());
+            if central {
+                for v in [0u16, 0, 0] {
+                    h.extend_from_slice(&v.to_le_bytes());
+                }
+                h.extend_from_slice(&0u32.to_le_bytes());
+                h.extend_from_slice(&off.to_le_bytes());
+            }
+            h.extend_from_slice(n);
+            h
+        };
+        out.extend(head(0x0403_4b50, false));
+        out.extend_from_slice(data);
+        central.extend(head(0x0201_4b50, true));
+    }
+    let (cd_off, cd_len) = (out.len() as u32, central.len() as u32);
+    out.extend(central);
+    out.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
+    for v in [0u16, 0, files.len() as u16, files.len() as u16] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&cd_len.to_le_bytes());
+    out.extend_from_slice(&cd_off.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
     out
 }
 
@@ -353,6 +504,33 @@ mod tests {
     fn dxf_has_sections_and_entities() {
         let d = to_dxf(&sample());
         assert!(d.contains("ENTITIES") && d.contains("LINE") && d.contains("TEXT") && d.trim_end().ends_with("EOF"));
+    }
+
+    #[test]
+    fn export_options_explode_underline_units() {
+        let mut g = sample();
+        g.overridden.push(g.texts.len() - 1);
+        let n_text = g.texts.len();
+        let p = prepare(&g, &ExportOptions { explode_all: true, strokes: true, ..Default::default() });
+        assert!(p.texts.is_empty() && p.lines.len() > g.lines.len() + n_text);
+        let u = prepare(&g, &ExportOptions::default());
+        assert_eq!(u.lines.len(), g.lines.len() + 1);
+        assert_eq!(u.texts.len(), n_text);
+        let d = to_dxf_units(&g, 1);
+        assert!(d.contains("$INSUNITS\n 70\n1"));
+        let pdf = to_pdf_pages_version(&[g], "1.5");
+        assert!(pdf.starts_with(b"%PDF-1.5\n"));
+    }
+
+    #[test]
+    fn zip_store_lists_files() {
+        let z = zip_store(&[("a.txt".into(), b"hello".to_vec()), ("b.txt".into(), b"world!".to_vec())]);
+        assert_eq!(&z[..4], b"PK\x03\x04");
+        // crc32("hello") = 0x3610a686, at offset 14 of the first header.
+        assert_eq!(u32::from_le_bytes(z[14..18].try_into().unwrap()), 0x3610_a686);
+        let end = z.len() - 22;
+        assert_eq!(&z[end..end + 4], b"PK\x05\x06");
+        assert_eq!(u16::from_le_bytes(z[end + 10..end + 12].try_into().unwrap()), 2);
     }
 
     #[test]

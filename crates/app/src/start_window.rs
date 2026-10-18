@@ -12,7 +12,7 @@ use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_menu::{OsContextMenuExt as _, OsMenu, OsMenuItem};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::notification::Notification;
+use crate::ui::AlertKind;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -134,6 +134,8 @@ enum Source {
     Recent,
     All,
     Folder(PathBuf),
+    /// Documents with this label (Onshape's Labels).
+    Label(String),
 }
 
 /// View choices remembered across sessions.
@@ -172,6 +174,9 @@ pub struct StartView {
     search: Entity<InputState>,
     query: String,
     selected: Option<PathBuf>,
+    /// Onshape's document labels and whether the nav section is expanded.
+    labels: lib::Labels,
+    labels_open: bool,
     /// Right panel (Details / Versions and history) and the details read for it.
     panel: Option<DocPanel>,
     details: Option<(PathBuf, i64, lib::DocDetails)>,
@@ -230,6 +235,8 @@ impl StartView {
             search,
             query: String::new(),
             selected: None,
+            labels: lib::Labels::load(),
+            labels_open: true,
             panel: None,
             details: None,
             folders_open: true,
@@ -292,6 +299,7 @@ impl StartView {
                 let f = f.canonicalize().unwrap_or_else(|_| f.clone());
                 d.path.starts_with(&f)
             }
+            Source::Label(l) => self.labels.has(&d.path, l),
         }
     }
 
@@ -360,15 +368,30 @@ impl StartView {
 
     // ------------------------------------------------------------- commands
 
-    fn notify(window: &mut Window, cx: &mut App, n: Notification) {
-        window.push_notification(n, cx);
+    /// Onshape's message bubble at the top center of the page (replaces the
+    /// previous one; closes with its × or after 8 s).
+    fn notify(window: &mut Window, cx: &mut App, kind: AlertKind, message: impl Into<String>) {
+        let id = cx.default_global::<StartToast>().1 + 1;
+        *cx.default_global::<StartToast>() = StartToast(Some((kind, message.into())), id);
+        window.refresh();
+        let handle = window.window_handle();
+        cx.spawn(async move |cx| {
+            cx.background_executor().timer(Duration::from_secs(8)).await;
+            let _ = cx.update(|cx| {
+                if cx.default_global::<StartToast>().1 == id {
+                    cx.default_global::<StartToast>().0 = None;
+                    let _ = handle.update(cx, |_, window, _| window.refresh());
+                }
+            });
+        })
+        .detach();
     }
 
     fn open_path(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
         match crate::files::open_document_window(path.clone(), None, gpu, cx) {
             Ok(()) => self.force_rescan(cx),
-            Err(e) => Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Could not open document")),
+            Err(e) => Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Could not open document", format!("{e:#}"))),
         }
     }
 
@@ -386,13 +409,13 @@ impl StartView {
         prompt_name(prompt, window, cx, move |name, window, cx| {
             let clean = lib::sanitize_name(&name);
             if clean.is_empty() {
-                Self::notify(window, cx, Notification::warning("Enter a name for the document"));
+                Self::notify(window, cx, AlertKind::Warning, "Enter a name for the document");
                 return false;
             }
             let dir = chosen.borrow().clone();
             let path = dir.join(format!("{clean}.{}", lib::EXT));
             if path.exists() {
-                Self::notify(window, cx, Notification::warning(format!("\"{clean}\" already exists in this folder")));
+                Self::notify(window, cx, AlertKind::Warning, format!("\"{clean}\" already exists in this folder"));
                 return false;
             }
             view.update(cx, |this, cx| {
@@ -403,34 +426,86 @@ impl StartView {
         });
     }
 
-    fn open_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// The folder new documents, folders and imports go to: the folder being
+    /// shown, else the documents folder.
+    fn current_place(&self) -> PathBuf {
+        match &self.source {
+            Source::Folder(f) => f.clone(),
+            _ => crate::files::documents_dir(),
+        }
+    }
+
+    /// Create ▾ › Import files…: a noshape document opens; a CAD or mesh file
+    /// becomes a new document named after it, with the file translated into a
+    /// Part Studio (Onshape's import from the documents page).
+    fn import_files(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        crate::files::request_open_path("Open noshape document", "noshape document", &["noshape"], window, cx, move |path, cx| {
+        let handle = window.window_handle();
+        let place = self.current_place();
+        const EXTS: &[&str] = &["noshape", "step", "stp", "iges", "igs", "brep", "stl", "obj"];
+        crate::files::request_open_path("Import files", "noshape documents, CAD and mesh files", EXTS, window, cx, move |path, cx| {
             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-            if let Err(e) = crate::files::open_document_window(path, None, gpu, cx) {
-                log::error!("open failed: {e:#}");
+            let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let result = if ext == lib::EXT {
+                crate::files::open_document_window(path, None, gpu, cx)
+            } else {
+                (|| {
+                    let mut doc = noshape_model::Document::new();
+                    let units = doc.settings.units;
+                    let brep = crate::workspace::read_foreign(&path, &units)?;
+                    let (name, file) = crate::workspace::import_names(&path);
+                    let mut ps = noshape_model::PartStudio::new();
+                    crate::workspace::add_import_feature(&mut ps, &file, brep, &units);
+                    doc.tabs.clear();
+                    doc.settings.tab_order.clear();
+                    doc.add_tab(&name, noshape_model::TabContent::PartStudio(ps));
+                    let clean = lib::sanitize_name(&name);
+                    let mut target = place.join(format!("{clean}.{}", lib::EXT));
+                    let mut n = 2;
+                    while target.exists() {
+                        target = place.join(format!("{clean} ({n}).{}", lib::EXT));
+                        n += 1;
+                    }
+                    crate::files::open_document_window(target, Some(doc), gpu, cx)
+                })()
+            };
+            if let Err(e) = result {
+                let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, format!("Import failed: {e:#}")));
             }
             view.update(cx, |this, cx| this.force_rescan(cx));
         });
     }
 
-    fn add_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Create ▾ › Folder…: a new folder in the current place.
+    fn new_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let place = self.current_place();
         let view = cx.entity();
-        crate::files::request_folder_path("Add a folder to noshape", window, cx, move |path, cx| {
-            if !path.is_dir() {
-                return;
+        let prompt = NamePrompt { title: "New folder", ok_label: "Create", label: "Folder name", default: "New folder".into(), hint: None, location: None };
+        prompt_name(prompt, window, cx, move |name, window, cx| {
+            let clean = lib::sanitize_name(&name);
+            if clean.is_empty() {
+                Self::notify(window, cx, AlertKind::Warning, "Enter a name for the folder");
+                return false;
+            }
+            let path = place.join(&clean);
+            if path.exists() {
+                Self::notify(window, cx, AlertKind::Warning, format!("\"{clean}\" already exists in this folder"));
+                return false;
+            }
+            if let Err(e) = std::fs::create_dir_all(&path) {
+                Self::notify(window, cx, AlertKind::Error, format!("Could not create the folder: {e}"));
+                return false;
             }
             let path = path.canonicalize().unwrap_or(path);
             let mut list = crate::files::watched_folders();
-            if !list.contains(&path) && path != crate::files::documents_dir() {
-                list.push(path.clone());
-                crate::files::set_watched_folders(&list);
-            }
+            list.push(path);
+            crate::files::set_watched_folders(&list);
             view.update(cx, |this, cx| {
                 this.folders = ScanInput::current().folders;
-                this.set_source(Source::Folder(path), cx);
+                this.folders_open = true;
                 this.force_rescan(cx);
             });
+            true
         });
     }
 
@@ -448,7 +523,7 @@ impl StartView {
 
     fn rename(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
         if crate::files::is_document_open(&d.path, cx) {
-            Self::notify(window, cx, Notification::warning("Close the document's window before renaming it").title(d.name.clone()));
+            Self::notify(window, cx, AlertKind::Warning, format!("{}: {}", d.name.clone(), "Close the document's window before renaming it"));
             return;
         }
         let view = cx.entity();
@@ -458,13 +533,15 @@ impl StartView {
             Ok(dest) => {
                 crate::files::replace_recent(&d.path, &dest);
                 view.update(cx, |this, cx| {
+                    this.labels.moved(&d.path, &dest);
+                    this.labels.save();
                     this.selected = Some(dest.canonicalize().unwrap_or(dest));
                     this.force_rescan(cx);
                 });
                 true
             }
             Err(e) => {
-                Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Rename failed"));
+                Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Rename failed", format!("{e:#}")));
                 false
             }
         });
@@ -480,7 +557,7 @@ impl StartView {
                     this.selected = Some(dest.canonicalize().unwrap_or(dest));
                     this.force_rescan(cx);
                 }
-                Err(e) => Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Duplicate failed")),
+                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Duplicate failed", format!("{e:#}"))),
             });
         })
         .detach();
@@ -488,13 +565,13 @@ impl StartView {
 
     fn reveal(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
         if let Err(e) = crate::files::reveal_in_file_manager(path) {
-            Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Could not open the file manager"));
+            Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Could not open the file manager", format!("{e:#}")));
         }
     }
 
     fn trash(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
         if crate::files::is_document_open(&d.path, cx) {
-            Self::notify(window, cx, Notification::warning("Close the document's window before moving it to the trash").title(d.name.clone()));
+            Self::notify(window, cx, AlertKind::Warning, format!("{}: {}", d.name.clone(), "Close the document's window before moving it to the trash"));
             return;
         }
         match lib::trash_document(&d.path) {
@@ -503,10 +580,10 @@ impl StartView {
                 if self.selected.as_ref() == Some(&d.path) {
                     self.selected = None;
                 }
-                Self::notify(window, cx, Notification::success(format!("Moved \"{}\" to the trash", d.name)));
+                Self::notify(window, cx, AlertKind::Info, format!("Moved \"{}\" to the trash", d.name));
                 self.force_rescan(cx);
             }
-            Err(e) => Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Could not move to trash")),
+            Err(e) => Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Could not move to trash", format!("{e:#}"))),
         }
     }
 
@@ -516,6 +593,142 @@ impl StartView {
     }
 
     // ------------------------------------------------------------- render
+
+    // ------------------------------------------------------------- labels
+
+    /// Create ▾ › Label… / "Create new label": Onshape's name prompt; the new
+    /// label is applied to `apply_to` when given.
+    fn create_label(&mut self, apply_to: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        let prompt = NamePrompt { title: "Create label", ok_label: "Create", label: "Label name", default: String::new(), hint: None, location: None };
+        prompt_name(prompt, window, cx, move |name, window, cx| {
+            let name = name.trim().to_string();
+            view.update(cx, |this, cx| {
+                if !this.labels.create(&name) {
+                    Self::notify(window, cx, AlertKind::Warning, format!("A label named \"{name}\" already exists"));
+                    return false;
+                }
+                if let Some(p) = &apply_to {
+                    this.labels.toggle(p, &name);
+                }
+                this.labels.save();
+                cx.notify();
+                true
+            })
+        });
+    }
+
+    fn toggle_label(&mut self, path: &Path, label: &str, cx: &mut Context<Self>) {
+        self.labels.toggle(path, label);
+        self.labels.save();
+        cx.notify();
+    }
+
+    /// Row menu › Labels…: check the document's labels.
+    fn labels_dialog(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let body = Self::label_checklist(&view, &d.path, cx);
+            os::modal(dialog, "Labels", 400.)
+                .child(os::modal_body().child(body))
+                .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
+        });
+    }
+
+    /// The labels as checkbox rows for `path`, and "Create new label".
+    fn label_checklist(view: &Entity<StartView>, path: &Path, cx: &App) -> AnyElement {
+        let pal = p();
+        let labels = view.read(cx).labels.clone();
+        let mut col = v_flex().gap(px(2.));
+        if labels.labels.is_empty() {
+            col = col.child(div().py(px(10.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
+        }
+        for (k, l) in labels.labels.iter().enumerate() {
+            let on = labels.has(path, l);
+            let (v, p2, l2) = (view.clone(), path.to_path_buf(), l.clone());
+            col = col.child(os::checkbox(("label-check", k), l.clone(), on).on_click(move |_, window, cx| {
+                v.update(cx, |t, cx| t.toggle_label(&p2, &l2, cx));
+                window.refresh();
+            }));
+        }
+        let (v, p2) = (view.clone(), path.to_path_buf());
+        col.child(
+            h_flex()
+                .id("label-create")
+                .h(px(30.))
+                .gap(px(6.))
+                .pl(px(20.))
+                .border_t_1()
+                .border_color(rgb(0xcccccc))
+                .cursor_pointer()
+                .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.text))
+                .child(div().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Create new label"))
+                .on_click(move |_, window, cx| v.update(cx, |t, cx| t.create_label(Some(p2.clone()), window, cx))),
+        )
+        .into_any_element()
+    }
+
+    /// The Labels section of the left nav: "Labels" with its caret and the
+    /// create-label button, then one row per label when expanded.
+    fn render_labels_nav(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let open = self.labels_open;
+        let mut col = v_flex().child(
+            h_flex()
+                .id("nav-labels")
+                .relative()
+                .h(px(32.))
+                .pl(px(6.))
+                .pr(px(8.))
+                .gap(px(4.))
+                .cursor_pointer()
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .hover(|d| d.bg(rgb(0xf5f5f5)))
+                .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 10., pal.text))
+                .child(os::glyph(os::GLYPH_LABEL, 18., pal.text))
+                .child(div().flex_1().child("Labels"))
+                .child(
+                    div()
+                        .id("nav-label-add")
+                        .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.accent))
+                        .tooltip(crate::ui::tooltip("Create label"))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.create_label(None, window, cx);
+                        })),
+                )
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.labels_open = !this.labels_open;
+                    cx.notify();
+                })),
+        );
+        if open {
+            for (k, l) in self.labels.labels.clone().into_iter().enumerate() {
+                let source = Source::Label(l.clone());
+                let active = self.source == source;
+                let color = if active { pal.accent } else { pal.text };
+                col = col.child(
+                    h_flex()
+                        .id(("nav-label", k))
+                        .relative()
+                        .h(px(30.))
+                        .pl(px(40.))
+                        .gap(px(7.))
+                        .cursor_pointer()
+                        .text_size(px(14.))
+                        .text_color(color)
+                        .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)))
+                        .when(!active, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
+                        .child(os::glyph(os::GLYPH_LABEL, 16., color))
+                        .child(div().truncate().child(l))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx))),
+                );
+            }
+        }
+        col.into_any_element()
+    }
+
 
     // ------------------------------------------------------------- right panels
 
@@ -605,6 +818,14 @@ impl StartView {
                 )
                 .child(section("Owner", vec!["me".into()]))
                 .child(section("Document description", if d.description.is_empty() { vec![] } else { vec![d.description.clone()] }))
+                .child(
+                    v_flex()
+                        .py(px(6.))
+                        .border_t_1()
+                        .border_color(rgb(0xcccccc))
+                        .child(div().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Document labels"))
+                        .child(div().mt(px(6.)).p(px(6.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), &e.path, cx))),
+                )
                 .child(section("Created by", vec![d.created_by.clone(), lib::format_onshape_time(d.created)]))
                 .child(section("Last modified by", vec![d.modified_by.clone(), lib::format_onshape_time(d.modified)]))
                 .into_any_element(),
@@ -676,7 +897,7 @@ impl StartView {
     /// "Move to…": Onshape's folder picker; moves the (closed) document.
     fn move_to(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
         if crate::files::is_document_open(&d.path, cx) {
-            Self::notify(window, cx, Notification::warning("Close the document's window before moving it").title(d.name.clone()));
+            Self::notify(window, cx, AlertKind::Warning, format!("{}: {}", d.name.clone(), "Close the document's window before moving it"));
             return;
         }
         let root = crate::files::documents_dir();
@@ -693,13 +914,15 @@ impl StartView {
                         Ok(dest) => {
                             crate::files::replace_recent(&d.path, &dest);
                             view.update(cx, |this, cx| {
+                                this.labels.moved(&d.path, &dest);
+                                this.labels.save();
                                 this.selected = Some(dest.canonicalize().unwrap_or(dest));
                                 this.force_rescan(cx);
                             });
                             true
                         }
                         Err(e) => {
-                            Self::notify(window, cx, Notification::error(format!("{e:#}")).title("Move failed"));
+                            Self::notify(window, cx, AlertKind::Error, format!("{}: {}", "Move failed", format!("{e:#}")));
                             false
                         }
                     }
@@ -729,6 +952,7 @@ impl StartView {
             .separator()
             .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
             .item(item("Versions and history", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Versions, cx)))
+            .item(item("Labels…", &view, &d, |t, d, w, cx| t.labels_dialog(d, w, cx)))
             .separator()
             .item(item("Move to…", &view, &d, |t, d, w, cx| t.move_to(d, w, cx)))
             .separator();
@@ -842,6 +1066,7 @@ impl StartView {
     fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let view = cx.entity();
+        let labels_nav = self.render_labels_nav(cx);
         let create = Button::new("create")
             .primary()
             .w(px(150.))
@@ -849,12 +1074,15 @@ impl StartView {
             .rounded(px(3.))
             .child(h_flex().gap(px(6.)).text_size(px(14.)).child("Create").child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0xffffff))))
             .dropdown_menu(move |menu, _, _| {
-                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                // Onshape: Document…, Folder… | Import files…, Import from ▸
+                // (cloud drives, not offered locally), Label….
+                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
                 menu.min_w(px(150.))
                     .item(os::menu_item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
-                    .item(os::menu_item(os::GLYPH_FOLDER, "Folder…").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.add_folder(window, cx))))
+                    .item(os::menu_item(os::GLYPH_FOLDER, "Folder…").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.new_folder(window, cx))))
                     .separator()
-                    .item(os::menu_item(os::GLYPH_OPEN, "Open file…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.open_dialog(window, cx))))
+                    .item(os::menu_item(os::GLYPH_OPEN, "Import files…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.import_files(window, cx))))
+                    .item(os::menu_item(os::GLYPH_LABEL, "Label…").on_click(move |_, window, cx| v4.update(cx, |t, cx| t.create_label(None, window, cx))))
             });
         v_flex()
             .w(px(220.))
@@ -868,7 +1096,8 @@ impl StartView {
                 v_flex()
                     .pt(px(15.))
                     .child(self.nav_item("nav-owned", os::GLYPH_OWNED, "Owned by me", Source::All, cx))
-                    .child(self.nav_item("nav-recent", os::GLYPH_RECENT, "Recently opened", Source::Recent, cx)),
+                    .child(self.nav_item("nav-recent", os::GLYPH_RECENT, "Recently opened", Source::Recent, cx))
+                    .child(labels_nav),
             )
             .into_any_element()
     }
@@ -878,6 +1107,7 @@ impl StartView {
             Source::Recent => "Recently opened".into(),
             Source::All => "Owned by me".into(),
             Source::Folder(f) => folder_label(f),
+            Source::Label(l) => l.clone(),
         }
     }
 
@@ -1137,10 +1367,13 @@ impl StartView {
             .flex_none()
             .border_b_1()
             .border_color(pal.border_strong)
-            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).flex_1().min_w(px(240.)))
+            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).w(px(350.)).flex_none())
             .child(self.list_header_cell("h-mod", "Modified", Some(SortKey::Modified), cx).w(px(200.)).flex_none())
-            .child(self.list_header_cell("h-folder", "Location", None, cx).w(px(220.)).flex_none())
-            .child(self.list_header_cell("h-size", "Size", None, cx).w(px(110.)).flex_none());
+            .child(self.list_header_cell("h-modby", "Modified by", None, cx).w(px(200.)).flex_none())
+            .child(self.list_header_cell("h-owner", "Owned by", None, cx).w(px(200.)).flex_none());
+        // Onshape writes the signed-in user as "me".
+        let me = noshape_store::local_user_name();
+        let who = move |name: &str| if name.is_empty() || name == me { "me".to_string() } else { name.to_string() };
         let rows: Vec<AnyElement> = docs
             .iter()
             .enumerate()
@@ -1164,17 +1397,18 @@ impl StartView {
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
                     .child(
                         h_flex()
-                            .flex_1()
-                            .min_w(px(240.))
-                            .pl(px(10.))
-                            .gap(px(10.))
-                            .child(self.thumbnail(d, 54.0, 36.0, false))
+                            .w(px(350.))
+                            .flex_none()
+                            .pl(px(16.))
+                            .pr(px(15.))
+                            .gap(px(14.))
+                            .child(self.thumbnail(d, 64.0, 36.0, false))
                             .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(d.name.clone()))
                             .when(open, |r| r.child(Self::open_badge())),
                     )
                     .child(cell(200.).child(lib::format_onshape_time(d.modified)))
-                    .child(cell(220.).text_color(pal.text_muted).child(display_path(d.folder())))
-                    .child(cell(110.).text_color(pal.text_muted).child(lib::format_size(d.size)))
+                    .child(cell(200.).child(who(&d.modified_by)))
+                    .child(cell(200.).child(who(&d.owner)))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.select(&p1, cx)))
                     .os_context_menu(move |menu, _, _| Self::doc_menu(v2.clone(), d2.clone(), menu))
@@ -1203,6 +1437,7 @@ impl StartView {
             match &self.source {
                 Source::Recent => "No recently opened documents.".into(),
                 Source::Folder(_) => "No documents in this folder.".into(),
+                Source::Label(_) => "No documents with this label.".into(),
                 Source::All => "No documents owned by you.".into(),
             }
         };
@@ -1262,7 +1497,7 @@ impl Render for StartView {
             .key_context(CONTEXT)
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &NewDocument, window, cx| this.new_document(window, cx)))
-            .on_action(cx.listener(|this, _: &OpenDocument, window, cx| this.open_dialog(window, cx)))
+            .on_action(cx.listener(|this, _: &OpenDocument, window, cx| this.import_files(window, cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
             .on_action(cx.listener(|this, _: &OpenSelected, window, cx| {
                 if let Some(d) = this.selected_entry() {
@@ -1303,8 +1538,28 @@ impl Render for StartView {
                     .child(strip),
             )
             .child(self.render_footer())
+            // Onshape right-click menus (`os_context_menu`).
+            .children(crate::os_menu::render_host(cx))
+            .children(cx.try_global::<StartToast>().and_then(|t| t.0.clone()).map(|(kind, msg)| {
+                div().absolute().top(px(crate::ui::NAVBAR_H + 9.)).left_0().right_0().flex().justify_center().child(os::message_bubble(
+                    "start-toast",
+                    kind,
+                    msg,
+                    |_, window, cx| {
+                        cx.default_global::<StartToast>().0 = None;
+                        window.refresh();
+                    },
+                    cx,
+                ))
+            }))
     }
 }
+
+/// The documents page's message bubble (kind, text) and its generation.
+#[derive(Default)]
+struct StartToast(Option<(AlertKind, String)>, u64);
+
+impl Global for StartToast {}
 
 /// The documents page's right panels.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1398,16 +1653,16 @@ fn display_path(p: &Path) -> String {
 
 /// Where a new document goes: the documents folder ("Owned by me") or one
 /// of the other folders shown in the start window.
-struct Location {
-    root: PathBuf,
-    others: Vec<PathBuf>,
-    chosen: Rc<RefCell<PathBuf>>,
+pub(crate) struct Location {
+    pub(crate) root: PathBuf,
+    pub(crate) others: Vec<PathBuf>,
+    pub(crate) chosen: Rc<RefCell<PathBuf>>,
 }
 
 impl Location {
     /// Onshape's "Document location" browser: a header with home, back and
     /// the current place, above the list of folders.
-    fn render(&self) -> AnyElement {
+    pub(crate) fn render(&self) -> AnyElement {
         let pal = p();
         let chosen = self.chosen.borrow().clone();
         let at_root = chosen == self.root;

@@ -1,6 +1,13 @@
 # QA round 3 handoff (qa3, after the Onshape restyle; main at e4b90e2)
 
-State: building in `/root/target-qa3`; sessions not started yet.
+State: all 5 sessions done on main e4b90e2 (worktree /root/noshape-qa3, target /root/target-qa3).
+Fixes 1 and 2 are on main (18cadb8). Fixes 3 (shell) and 4 (split-piece references) are in the shared tree,
+uncommitted: `crates/model/src/regen/features/detail.rs`, `crates/model/src/regen/context.rs` (only the
+`find_faces/find_edges/find_vertices` bodies + new `edges_related`; the other 37 changed lines there are another
+agent's), `crates/model/tests/qa_regressions.rs` (also removes 3 `clone_on_copy` lints). On 18cadb8 + these:
+`cargo test -p noshape-model` all green, `cargo clippy -p noshape-model --all-targets` clean, app verified.
+The "For other agents" items were found on e4b90e2; re-check them against 18cadb8 (restyle round 2) before
+forwarding.
 
 ## Sessions
 1. Bracket from scratch — DONE (/tmp/qa3/home/Documents/noshape/Bracket.noshape): sketch, dims, extrude, cut, fillet, chamfer, hole, feature pattern, feature mirror, edit Sketch 1 (80→100, all downstream regenerated), rollback drag, undo/redo x3, close/reopen. No crash, no regen error.
@@ -34,14 +41,62 @@ Rule (user, via lead): any difference from Onshape is a bug (except cloud-only a
    - Fix: `crates/app/src/files.rs::request_save_path` / `request_open_path` open the in-app prompt with
      `window.defer`, so every caller (Part Studio export, flat pattern export, …) is safe. Applied to the shared
      tree (those two functions were untouched there; ui is restyling `in_app_save_prompt` below them).
-   - Test: app-level (no unit test harness for dialogs); verified in the app — see "Verification".
+   - Test: app-level (no unit test harness for dialogs). Verified in the app (worktree build): part right-click
+     → Export… → Export shows the path prompt, writes the STEP, toast "Exported …"; Ctrl+O prompt still works.
+     Clippy: no lints in files.rs.
+
+3. **Shell silently gave bad or no geometry** on the bracket (Shell, top face removed, 2.5 mm): the app showed
+   "Shell failed: operation failed: shell failed (thickness too large?)".
+   - Cause (explored in `qa_regressions`): OCCT `BRepOffsetAPI_MakeThickSolid` depends on the join type.
+     Block + 3 mm corner fillets: Arc join returns the right geometry but a BRepCheck-invalid solid (the app
+     showed it as OK); Intersection fails. Block + fillets + 1 mm chamfer round the top: depending on thickness
+     it throws, returns garbage (957 mm³), or returns the **input unchanged** with the top face still there.
+   - Fix (`regen/features/detail.rs::valid_shell`): try Arc then Intersection; reject results that still
+     contain a face to remove (`still_has_faces`); keep the first valid one, else a ShapeFix-repaired one whose
+     faces are unchanged (`repaired_same_faces`, so names stay right); else fail with Onshape's "Could not shell
+     part with selections.". Empty field messages: "Select faces to remove." / "Select parts to hollow.".
+   - Still open, **for the lead (kernel limitation, Onshape succeeds)**: OCCT's offset fails outright when the
+     shelled walls would merge or overlap. Repro on the real bracket (features copied with Ctrl+C, then
+     `{"noshape_features": …}` into a test): 100x40x12 plate, 3 corner fillets (Width 5 mm), Ø10 hole about
+     10 mm from the front edge, Shell top face 2.5 mm → both joins fail, and so does the closed Hollow offset
+     (`BOPAlgo_AlertNullInputShapes`). Also a 1 mm chamfer round the removed face. Onshape (Parasolid) shells both.
+     Needs a more robust shell (e.g. per-face offset + boolean trimming of overlapping walls); the feature now
+     fails honestly instead of returning a wrong/invalid part.
+   - Test: `qa_regressions::shell_is_valid_and_real_or_fails`.
+
+4. **A mate broke when an unrelated upstream feature was suppressed** ("Revolute 1 has error: Mate connector
+   could not be resolved (missing geometry)" after suppressing Linear pattern 1 in the Part Studio).
+   - Cause: the pattern's (and the mirror's) holes cut the Ø10 hole's wall in two, so the rim edge the mate
+     sits on was named after a split piece `[cap, Split{parent: wall, by, ordinal}]`. With the pattern
+     suppressed the wall is whole (`[cap, wall]`); `Body::find_edges/find_faces/find_vertices` only accepted
+     candidates that *descend* from the referenced names, never their ancestors.
+   - Fix (`crates/model/src/regen/context.rs`): after the exact and descendant passes, fall back to faces that
+     are *ancestors* of the referenced split piece (`edges_related` helper; same for faces and vertices). Onshape
+     keeps such references.
+   - Test: `qa_regressions::reference_to_split_pieces_survives_when_the_split_goes_away` (fails without the fix).
+   - Verified in the app (18cadb8 + fix): Linear pattern 1, Mirror 1, Chamfer 1 suppressed → Revolute 1 resolves.
+   - Found by reproducing the real document: features copied with Ctrl+C from the app (clipboard JSON) and
+     regenerated in a test.
+
+Fix 1 verified in the app too: Chamfer 1 edited to 5 mm turns red, model falls back to the valid part, title
+tooltip "Chamfer 1 did not regenerate properly: Failed to chamfer selections." (Onshape's exact text).
 
 ## For other agents (not fixed by qa3; the lead forwards)
 
 Found on main e4b90e2 (private worktree /root/noshape-qa3, because the shared tree didn't compile at the time).
+**Re-checked on main 18cadb8** (worktree moved there): FIXED there — Enter/Enter commits (extrude/chamfer/fillet),
+Variable list name "#t = 12 mm", tool search (now Onshape's popover with description + toolbar highlight),
+feature-list toggle no longer clips the Extrude "Merge scope" chip. STILL PRESENT — fillet midpoint pick
+(`midpoint_pick` unchanged), Fillet dialog old layout,
+dropdowns without search/keyboard/highlight, Hole dialog (lone "Standard", bordered dropdowns, no spec title,
+sketch-in-list doesn't add points), + menu, see-through Create Drawing modal, no Insert view after Create
+Drawing. NEW: a new element tab is appended at the end; Onshape inserts it right after the active tab.
+Assembly items not re-checked.
 "Shared tree: unchanged" means I grepped the working-tree diff and the code is still the same.
 
 ### psb (Part Studio behaviour)
+- ~~Feature-row clicks are additive, so Delete removes all selected~~: **matches Onshape** (live check,
+  live/part-studio/110-114: plain click is additive, Delete removes all, one Ctrl+Z restores). Not a bug.
 - **Hole: clicking a sketch in the feature list doesn't add its points** while "Sketch points to place holes" is
   active (the row just gets selected). Onshape uses all the sketch's points (like Extrude takes all regions).
 - **Rolled-back features aren't italic gray while editing an earlier sketch** (double-click Sketch 1 with 9
@@ -129,6 +184,9 @@ Found on main e4b90e2 (private worktree /root/noshape-qa3, because the shared tr
   window). Onshape: Rename document, Move to…, Document details…, Workspace units…, Workspace properties…,
   Close document (local equivalents of New/Open can stay in the OS menu).
 - **Part export dialog**: format chips; Onshape: File name + Format ▾ + format options (STL units/resolution…).
+- **Keyboard focus is lost after a feature-row context menu** (18cadb8): right-click Chamfer 1 → Suppress, then
+  Alt+C "shell" Enter did nothing useful (keys went elsewhere: a Measure panel opened); works after clicking
+  the viewport.
 - **Keyboard focus is lost after an in-app prompt closes** (and/or after creating a tab from +): F/Shift+7 do
   nothing until the viewport is clicked. Onshape shortcuts work right after a dialog closes.
 - **Toolbar tooltips don't appear when moving directly from one button to the next** (only after entering the
@@ -139,12 +197,30 @@ Found on main e4b90e2 (private worktree /root/noshape-qa3, because the shared tr
 - **Variable feature**: title "Variable 1" (Onshape "#? = 0 in", then "#t = 12 mm", also the list name); no
   Assigned | Measured | From import tabs; default value 25 mm (Onshape 0); Name isn't focused on open.
 
+- **Toolbar has no overflow**: at 900x600 the Part Studio toolbar is just clipped after the Boolean tools.
+  Onshape collapses the extra tools into an overflow menu.
+
 ### ui2 (start window)
 - Create ▾ menu: "Document…, Folder…, Open file…". Onshape: Document…, Folder…, Import files…, Import from ▸,
   Label….
 - Document list columns: Name | Modified | Location | Size. Onshape: Name | Modified | Modified by | Owned by.
 
+## Performance (llvmpipe on Xvfb, so GPU-bound numbers are pessimistic)
+- Regeneration is fast: full bracket (15 features) refine 26–64 ms after an edit; first evaluation of Mirror 1
+  193 ms, Hole 1 40 ms, Linear pattern 1 64 ms; config switch ~400 ms preview + 64 ms refine.
+- Frame latency dominates: `v.submit_to_present` mean 220–350 ms, `w.gpu_wait` ~110 ms, `v.frame_to_present`
+  ~200 ms (UI thread late to take the frame; GPUI itself renders on llvmpipe). Mate animation runs ~3 steps/s
+  here because each step waits for a presented frame. Re-measure on a real GPU before optimising.
+- No stale-until-mouse-move frames seen in these sessions (view animations, undo/redo, config switch, drags).
+
 ## How to test
 - Build: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-qa3 nice cargo build -p noshape`.
+- Disk: after each build `find /root/target-qa3/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +60 -delete`
+  (never delete the proc-macro `.so` files; if they're gone, remove their `.fingerprint/<name>-<hash>` dirs so cargo
+  rebuilds them);
+  keep debug/incremental under 2 GB (build with CARGO_INCREMENTAL=0).
+- Worktree of main: `/root/noshape-qa3` (detached at e4b90e2 + my two fixes); build there with
+  `CARGO_INCREMENTAL=0` to save disk; the app binary is copied to `/tmp/qa3/noshape-main`.
 - Helpers in `/tmp/qa3/bin/`: `start.sh [args]` (DISPLAY=:106, HOME=/tmp/qa3/home, no native dialogs,
-  NOSHAPE_PERF=1, log in /tmp/qa3/app.log), `stop.sh`, `shot.sh name [crop]`, `x.sh` (xdotool on :106).
+  NOSHAPE_PERF=1, appends to /tmp/qa3/app.log, `NOSHAPE_BIN` picks the binary), `stop.sh` (kills by PID: a
+  `pkill -f` on the binary path also matches your own shell), `shot.sh name [crop]`, `x.sh` (xdotool on :106).

@@ -306,6 +306,34 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             let outside = candidates.iter().all(|&bi| !matches!(ev.ctx.bodies[bi].shape.classify_point(q, 1e-9), Ok(k::PointClass::Inside)));
             if outside { o } else { 0.0 }
         };
+        // The hole for drawing callouts.
+        {
+            let (pid, _) = ht::hole_table_param(ev.params);
+            let path = ev.params.lookup(pid);
+            let iso = !ev.params.is("unitsSystem", "INCH");
+            let thread = match path {
+                [t, _, size, pitch, ..] if t == "Tapped" => Some(if iso { format!("{size}x{pitch}") } else { format!("{size}-{pitch}") }),
+                _ => None,
+            };
+            let class_param = if iso { "isoThreadClassV2" } else { "ansiThreadClassV2" };
+            let thread_class = (ev.params.bool("showThreadClassV2")).then(|| ev.params.lookup(class_param).last().cloned()).flatten();
+            let tapped_depth = if ev.params.bool("showTappedDepth") && end != "THROUGH" { ev.length("tappedDepthV3").ok() } else { None };
+            ev.ctx.holes.push(crate::regen::context::HoleRecord {
+                feature: ev.feature,
+                start: s,
+                dir,
+                diameter: dims.diameter,
+                depth: (end != "THROUGH").then_some(h),
+                through: end == "THROUGH",
+                tap_drill: dims.tap_drill,
+                tapped_depth,
+                thread,
+                thread_class,
+                cbore: dims.cbore,
+                csink: dims.csink,
+                inch: !iso,
+            });
+        }
         let frame = k::Plane::new(s, -dir, perp(dir));
         let make_tool = |d: f64| -> FResult<NamedShape> {
             let pts = hole_profile(d, &dims, h, tip, over)?;

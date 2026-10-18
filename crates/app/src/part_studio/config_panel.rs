@@ -128,7 +128,7 @@ impl PartStudioView {
                 .border_l_1()
                 .border_color(pal.border)
                 .child(
-                    div().h(px(30.)).flex_none().pt(px(4.)).child(
+                    div().h(px(30.)).flex_none().pt(px(4.)).relative().child(
                         div()
                             .h(px(26.))
                             .flex()
@@ -140,7 +140,9 @@ impl PartStudioView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(pal.accent)
                             .child(title),
-                    ),
+                    )
+                    // Appearances: "Add face appearance" at the title's right (live).
+                    .when(panel == RightPanel::Appearance, |d| d.child(div().absolute().right(px(10.)).top(px(2.)).child(self.render_add_face_appearance(cx)))),
                 )
                 .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().child(body))
                 .child(
@@ -284,10 +286,99 @@ impl PartStudioView {
         crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)
     }
 
+    /// Add a configuration input of one of Onshape's kinds (List, Checkbox, Variable).
+    fn add_config_input(&mut self, label: &'static str, cx: &mut Context<Self>) {
+        self.edit_config("Add configuration input", cx, |ps| {
+            let n = ps.configuration.inputs.len() + 1;
+            let id = format!("in{}", noshape_rand());
+            let kind = match label {
+                "Checkbox" => ConfigInputKind::Checkbox { default: false },
+                "Variable" => ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None },
+                _ => ConfigInputKind::List {
+                    options: vec![ListOption { id: "default".into(), name: "Default".into() }, ListOption { id: format!("opt{}", noshape_rand()), name: "Configuration 2".into() }],
+                    default: "default".into(),
+                },
+            };
+            let name = if label == "List" && n == 1 { "Configuration".to_string() } else { format!("{label} {n}") };
+            ps.configuration.inputs.push(ConfigInput { id, name, kind, visible_when: None });
+        })
+    }
+
+    /// Onshape's Configurations panel before any input exists (live,
+    /// part-studio/77): a "Configure Part Studio ▾" split button, a large faint
+    /// illustration and the help text.
+    fn render_configurations_empty(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let border = gpui_kit::rgb(0xaaaaaa);
+        let view = cx.entity();
+        let main = div()
+            .id("cfg-configure")
+            .h(px(28.))
+            .px(px(10.))
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .cursor_pointer()
+            .hover(|d| d.bg(pal.panel_hover))
+            .child(crate::assets::icon("table", 16., cx))
+            .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Part Studio"))
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
+        let caret = Button::new("cfg-configure-more")
+            .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false))
+            .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+            .w(px(22.))
+            .h(px(28.))
+            .p_0()
+            .rounded(px(0.))
+            .border_l_1()
+            .border_color(border)
+            .dropdown_menu(move |mut m, _, _| {
+                for label in ["List", "Checkbox", "Variable"] {
+                    let v = view.clone();
+                    m = m.item(PopupMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(label, cx))));
+                }
+                m
+            });
+        v_flex()
+            .items_center()
+            .pt(px(4.))
+            .child(h_flex().rounded(px(3.)).border_1().border_color(border).bg(pal.panel).child(main).child(caret))
+            .child(div().mt(px(105.)).child(crate::assets::icon("config-illustration", 160., cx)))
+            .child({
+                // Onshape's text in its own four lines (the panel is as wide as
+                // live), the help link continuing the third line (bold,
+                // underlined, `#094174`).
+                let link = |id: &'static str, t: &'static str| {
+                    div()
+                        .id(id)
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(gpui_kit::rgb(0x094174))
+                        .underline()
+                        .cursor_pointer()
+                        .child(t)
+                        .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/configurations.htm"))
+                };
+                v_flex()
+                    .mt(px(18.))
+                    .items_center()
+                    .text_size(px(13.33))
+                    .line_height(px(20.))
+                    .text_color(pal.text_muted)
+                    .child("Add configurations to drive different design variants of a Part")
+                    .child("Studio using sketch dimensions of parts and surfaces, feature")
+                    .child(h_flex().child("parameters, or suppression states.\u{a0}").child(link("cfg-help-1", "Learn more about Part")))
+                    .child(link("cfg-help-2", "Studio configurations."))
+            })
+            .into_any_element()
+    }
+
     fn render_configurations(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
         let cfg = studio.configuration.clone();
+        if cfg.inputs.is_empty() {
+            return self.render_configurations_empty(cx);
+        }
         let mut col = v_flex().gap_3();
 
         // Current configuration selector.
@@ -449,29 +540,15 @@ impl PartStudioView {
             col = col.child(card);
         }
 
-        // Add input menu.
+        // Add input menu (Onshape's input kinds).
         let view = cx.entity();
         col = col.child(
-            Button::new("add-input").label("Add input").icon(IconName::Plus).outline().xsmall().dropdown_menu(move |m, _, _| {
-                let mk = |label: &'static str, kind: fn(usize) -> ConfigInputKind| {
+            Button::new("add-input").label("Add input").icon(IconName::Plus).outline().xsmall().dropdown_menu(move |mut m, _, _| {
+                for label in ["List", "Checkbox", "Variable"] {
                     let v = view.clone();
-                    PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                        v.update(cx, |this, cx| {
-                            this.edit_config("Add configuration input", cx, |ps| {
-                                let n = ps.configuration.inputs.len() + 1;
-                                let id = format!("in{}", noshape_rand());
-                                ps.configuration.inputs.push(ConfigInput { id, name: format!("{label} {n}"), kind: kind(n), visible_when: None });
-                            })
-                        })
-                    })
-                };
-                m.item(mk("List", |_| ConfigInputKind::List {
-                    options: vec![ListOption { id: "default".into(), name: "Default".into() }, ListOption { id: format!("opt{}", noshape_rand()), name: "Configuration 2".into() }],
-                    default: "default".into(),
-                }))
-                .item(mk("Checkbox", |_| ConfigInputKind::Checkbox { default: false }))
-                .item(mk("Variable", |_| ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }))
-                .item(mk("Text", |_| ConfigInputKind::Text { default: String::new() }))
+                    m = m.item(PopupMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(label, cx))));
+                }
+                m
             }),
         );
 

@@ -108,6 +108,14 @@ pub enum Tool {
     Note,
     Centermark,
     Centerline { first: Option<PickedPoint> },
+    /// Hole / thread callout: the picked hole circle, then the placement.
+    HoleCallout { circle: Option<(ViewId, [f64; 2], f64, Option<PointRef>)> },
+    /// Edge-to-edge centerline: one cylinder silhouette edge, or two edges.
+    EdgeCenterline { first: Option<(PickedPoint, PickedPoint)> },
+    /// Circle centerline through 3 points, or (`three` false) center + point.
+    CircleCenterline { three: bool, points: Vec<PickedPoint> },
+    /// Virtual sharp: two straight edges (with the first edge's reference).
+    VirtualSharp { first: Option<(PickedPoint, PickedPoint, Option<(noshape_model::BodyId, noshape_model::reference::TopoName)>)> },
     Balloon { anchor: Option<PickedPoint> },
     /// Jogged section: orthogonal cutting line points (parent view coords);
     /// `done` once the line is finished (Enter / double-click).
@@ -148,6 +156,11 @@ impl Tool {
             Tool::Note => "Note",
             Tool::Centermark => "Centermark",
             Tool::Centerline { .. } => "Centerline",
+            Tool::EdgeCenterline { .. } => "Edge to edge centerline",
+            Tool::HoleCallout { .. } => "Hole/thread callout",
+            Tool::CircleCenterline { three: true, .. } => "3 point circle centerline",
+            Tool::CircleCenterline { .. } => "2 point circle centerline",
+            Tool::VirtualSharp { .. } => "Virtual sharp",
             Tool::Balloon { .. } => "Callout",
             Tool::JoggedSection { .. } => "Jogged section view",
             Tool::AlignedSection { .. } => "Aligned section view",
@@ -194,6 +207,8 @@ pub enum Drag {
     MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
     /// Move one point of a section view's cutting line.
     MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
+    /// Drag annotation `0`'s inspection item onto another annotation.
+    MoveInspection(u64),
 }
 
 /// Inline property panels shown over the canvas.
@@ -224,17 +239,24 @@ pub type EditorAction = Rc<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<
 
 #[derive(Clone)]
 pub enum MenuEntry {
-    Item { label: SharedString, checked: bool, act: EditorAction },
+    Item { label: SharedString, checked: bool, act: EditorAction, icon: Option<&'static str> },
     Separator,
     Submenu(SharedString, Vec<MenuEntry>),
 }
 
 impl MenuEntry {
     pub fn item(label: impl Into<SharedString>, act: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> Self {
-        MenuEntry::Item { label: label.into(), checked: false, act: Rc::new(act) }
+        MenuEntry::Item { label: label.into(), checked: false, act: Rc::new(act), icon: None }
     }
     pub fn check(label: impl Into<SharedString>, checked: bool, act: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> Self {
-        MenuEntry::Item { label: label.into(), checked, act: Rc::new(act) }
+        MenuEntry::Item { label: label.into(), checked, act: Rc::new(act), icon: None }
+    }
+    /// The tool icon shown in Onshape's toolbar dropdowns.
+    pub fn with_icon(mut self, name: &'static str) -> Self {
+        if let MenuEntry::Item { icon, .. } = &mut self {
+            *icon = Some(name);
+        }
+        self
     }
 }
 
@@ -242,7 +264,7 @@ impl MenuEntry {
 pub fn fill_menu(mut menu: PopupMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<PopupMenu>) -> PopupMenu {
     for e in entries {
         match e {
-            MenuEntry::Item { label, checked, act } => {
+            MenuEntry::Item { label, checked, act, .. } => {
                 let ed = ed.clone();
                 let act = act.clone();
                 menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, window, cx| {
@@ -261,18 +283,28 @@ pub fn fill_menu(mut menu: PopupMenu, entries: &[MenuEntry], ed: &Entity<Drawing
     menu
 }
 
+/// A drawing toolbar dropdown (Onshape's editor list: 26 px rows, 18 px
+/// tool icons, 13.33 px text), opened under the toolbar from its caret.
+pub fn open_tool_menu(entries: &[MenuEntry], ed: &Entity<DrawingEditor>, e: &ClickEvent, window: &mut Window, cx: &mut App) {
+    let (entries, ed2) = (entries.to_vec(), ed.clone());
+    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, w, cx| fill_os_menu(m.toolbar_list(), &entries, &ed2, w, cx));
+    let x = e.position().x - px(34.);
+    crate::os_menu::open_anchored(point(x, px(crate::ui::NAVBAR_H + 36.)), Anchor::TopLeft, menu, window, cx);
+}
+
 /// [`fill_menu`] for Onshape's right-click menus ([`crate::os_menu`]).
 pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu {
     for e in entries {
         match e {
-            MenuEntry::Item { label, checked, act } => {
+            MenuEntry::Item { label, checked, act, icon } => {
                 let ed = ed.clone();
                 let act = act.clone();
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
                     ed.update(cx, |t, cx| act(t, window, cx));
                 });
-                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon: None, checked: *checked, disabled: false, handler: Some(handler) });
+                let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
+                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: false, handler: Some(handler), keys: Vec::new() });
             }
             MenuEntry::Separator => menu = menu.separator(),
             MenuEntry::Submenu(label, children) => {
@@ -365,6 +397,21 @@ pub struct DrawingEditor {
     pub snap_mid_quad: bool,
     /// Placement inference lines (sheet mm) while placing or dragging annotations.
     pub infer_lines: Vec<([f64; 2], [f64; 2])>,
+    /// `s` shortcut toolbar position (canvas px) and `[` Measure picks (see `drawing_keys`).
+    pub shortcut_toolbar: Option<[f64; 2]>,
+    /// Centermark dialog and Align centermark (see `drawing_centermark`).
+    pub centermark_dlg: Option<crate::drawing_centermark::CentermarkDlg>,
+    pub align_centermark: Option<u64>,
+    /// Format painter (see `drawing_painter`).
+    pub painter: Option<crate::drawing_painter::PainterState>,
+    /// Right-side panels (Inspection table, Styles, MBD status; see
+    /// `drawing_panels`) and the item a panel row cross-highlights.
+    pub right_panel: Option<crate::drawing_panels::RightPanel>,
+    pub panel_highlight: Option<Sel>,
+    pub insp_table: crate::drawing_panels::InspectionTableUi,
+    /// Inspection item dialog (see `drawing_inspection`).
+    pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
+    pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
     pub status: Option<SharedString>,
     pub _subs: Vec<Subscription>,
 }
@@ -460,6 +507,15 @@ impl DrawingEditor {
             section_dlg: None,
             snap_mid_quad: false,
             infer_lines: Vec::new(),
+            shortcut_toolbar: None,
+            centermark_dlg: None,
+            align_centermark: None,
+            painter: None,
+            inspection: None,
+            right_panel: None,
+            panel_highlight: None,
+            insp_table: Default::default(),
+            measure: None,
             status: None,
             _subs: subs,
         };
@@ -777,7 +833,7 @@ impl DrawingEditor {
             .enumerate()
             .filter(|(_, t)| match (sel, t) {
                 (Sel::View(v), t) => t.view() == Some(v),
-                (Sel::Annotation(a), PickTarget::Annotation(b)) => a == *b,
+                (Sel::Annotation(a), PickTarget::Annotation(b) | PickTarget::Inspection(b)) => a == *b,
                 (Sel::Table(a), PickTarget::Table(b)) => a == *b,
                 (Sel::Break(v, i), PickTarget::BreakLine { view, index }) => v == *view && i == *index,
                 _ => false,
@@ -790,7 +846,7 @@ impl DrawingEditor {
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         match self.built.as_ref()?.picks.get(pick as usize)? {
             PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) => Some(Sel::View(*v)),
-            PickTarget::Annotation(a) => Some(Sel::Annotation(*a)),
+            PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
             _ => None,
@@ -821,20 +877,101 @@ impl DrawingEditor {
         // Hover and selection highlight states.
         if let Some(b) = &self.built {
             scene.states = vec![0; b.picks.len()];
-            for s in &self.selection {
+            for s in self.selection.iter().chain(self.panel_highlight.iter()) {
                 for p in self.picks_of(*s) {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
             if let Some(h) = self.hover {
                 let single = matches!(self.tool, Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. });
-                let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
-                for p in group {
-                    scene.add_flag(p, state::HOVER);
+                match self.sel_of_pick(h) {
+                    // Onshape (drawing/14): a hovered annotation turns tan with
+                    // a tan label box and its grips, drawn on top below.
+                    Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_hover(&mut scene, b, &self.picks_of(s)),
+                    _ => {
+                        let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
+                        for p in group {
+                            scene.add_flag(p, state::HOVER);
+                        }
+                    }
                 }
             }
         }
         scene
+    }
+
+    /// Onshape's hovered-annotation look (live, drawing/14): its lines in
+    /// `#ccb292`, a `#ccb292` box behind its text, attachment points as
+    /// `#90cef1` dots, dimension-line ends as `#cc925c` dots and flip
+    /// handles as `#cc925c` diamonds.
+    fn push_annotation_hover(&self, scene: &mut Scene, built: &BuiltSheet, picks: &[u32]) {
+        use noshape_model::drawing::font;
+        use noshape_model::drawing::sheet::GripKind;
+        use noshape_render::{LineData, LineSegment, MeshData, PointData, PointSprite};
+        const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
+        const GRIP: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        const ORIGIN: [u8; 4] = [0x90, 0xce, 0xf1, 255];
+        let g = &built.geometry;
+        let mut lines = LineData::default();
+        for l in g.lines.iter().filter(|l| picks.contains(&l.pick)) {
+            let width = drawing_scene::px_width(l.style, self.zoom).max(1.5);
+            for w in l.points.windows(2) {
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
+            }
+        }
+        // Label boxes (behind the text, above the paper) and diamond grips.
+        let mut boxes = MeshData::default();
+        let mut diamonds = MeshData::default();
+        let quad = |m: &mut MeshData, c: [[f64; 2]; 4], z: f32| {
+            let base = m.positions.len() as u32;
+            for p in c {
+                m.positions.push([p[0] as f32, p[1] as f32, z]);
+                m.normals.push([0.0, 0.0, 1.0]);
+                m.pick_ids.push(0);
+            }
+            m.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        };
+        for t in g.texts.iter().filter(|t| picks.contains(&t.pick)) {
+            quad(&mut boxes, font::text_box(t), -0.5);
+        }
+        let mut points = PointData::default();
+        let r = 6.0 / self.zoom.max(1e-6);
+        // Onshape shows the grips instead of the arrowheads: cover the
+        // arrows that end at this annotation's dimension-line ends.
+        let ends: Vec<[f64; 2]> = g.grips.iter().filter(|gr| picks.contains(&gr.pick) && gr.kind == GripKind::End).map(|gr| gr.pos).collect();
+        let mut covers = MeshData::default();
+        for f in g.fills.iter().filter(|f| f.points.len() == 3 && ends.iter().any(|e| (e[0] - f.points[0][0]).abs() < 1e-6 && (e[1] - f.points[0][1]).abs() < 1e-6)) {
+            let base = covers.positions.len() as u32;
+            for p in &f.points {
+                covers.positions.push([p[0] as f32, p[1] as f32, 0.2]);
+                covers.normals.push([0.0, 0.0, 1.0]);
+                covers.pick_ids.push(0);
+            }
+            covers.indices.extend_from_slice(&[base, base + 1, base + 2]);
+        }
+        for gr in g.grips.iter().filter(|gr| picks.contains(&gr.pick)) {
+            let [x, y] = gr.pos;
+            match gr.kind {
+                GripKind::Handle => quad(&mut diamonds, [[x - r, y], [x, y - r], [x + r, y], [x, y + r]], 0.6),
+                kind => points.points.push(PointSprite { position: [x as f32, y as f32, 0.7], color: if kind == GripKind::Origin { ORIGIN } else { GRIP }, pick_id: 0, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 }),
+            }
+        }
+        let up = self.gpu.uploader();
+        if !boxes.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&boxes))).with_color(crate::theme::lin(0xccb292)).unlit().unpickable().layer(-4));
+        }
+        if !covers.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&covers))).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(19));
+        }
+        if !lines.segments.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(20));
+        }
+        if !diamonds.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&diamonds))).with_color(crate::theme::lin(0xcc925c)).unlit().unpickable().layer(21));
+        }
+        if !points.points.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().layer(22));
+        }
     }
 
     fn submit(&mut self, window: &mut Window) {
@@ -968,7 +1105,9 @@ impl DrawingEditor {
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sync_section_dlg(window, cx);
+        self.sync_centermark_dlg();
         self.sync_insert_inputs(window, cx);
+        self.sync_drawprops_inputs(window, cx);
         if !self.fitted && self.size_px()[0] > 10.0 {
             self.zoom_to_fit(cx);
         }
@@ -1015,9 +1154,16 @@ impl Render for DrawingEditor {
             .children(panel)
             .children(self.render_view_props(cx))
             .children(self.render_zoom_window())
+            .children(self.render_shortcut_toolbar(cx))
+            .children(self.render_measure())
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
             .children(self.render_section_dlg(cx))
+            .children(self.render_centermark_dlg(cx))
+            .children(self.render_painter(cx))
+            .children(self.render_inspection_dlg(cx))
+            .children(self.render_right_panel(cx))
+            .child(self.render_panel_strip(cx))
             .children(self.render_insert_view_panel(cx))
             .children(self.render_insert_chooser(cx))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
@@ -1037,6 +1183,8 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
             .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_views(None, cx)))
             .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.start_zoom_window(cx)))
+            .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_shortcut_toolbar(cx)))
+            .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
             .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_views(cx)))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))

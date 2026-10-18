@@ -242,7 +242,7 @@ impl DrawingEditor {
         let mut tabs = h_flex().absolute().top(px(5.)).left(px(4.)).gap(px(2.));
         // A dialog panel at the top left (Insert view, View properties)
         // covers the sheet tabs, as in Onshape.
-        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some() || self.sheet_props.is_some() || self.section_dlg.is_some();
+        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some() || self.sheet_props.is_some() || self.section_dlg.is_some() || self.centermark_dlg.is_some() || self.painter.is_some() || self.inspection.is_some();
         for (i, s) in self.drawing.sheets.iter().enumerate().filter(|_| !covered) {
             let active = i == self.sheet;
             tabs = tabs.child(

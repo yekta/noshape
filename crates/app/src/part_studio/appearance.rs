@@ -365,49 +365,108 @@ impl PartStudioView {
     }
 
     /// Appearance panel (right side): every custom appearance.
+    /// Onshape's Appearances panel (live, dom/panel-appearance.txt): tabs
+    /// "Parts and surfaces | Sketches and curves", then one row per part or
+    /// sketch: the name in bold 14 px on `#eaeaea` beside its swatch bar
+    /// (half the width each, 29 px, 1 px `#aaa`). Face and feature
+    /// appearances follow their part. Double-click a row to edit it.
     pub(super) fn render_appearance_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
         let names = self.labeler(cx);
-        let row = |id: SharedString, color: [f32; 4], label: String, kind: &'static str| {
-            let c = gpui_kit::Rgba { r: lin_to_srgb(color[0]) as f32 / 255.0, g: lin_to_srgb(color[1]) as f32 / 255.0, b: lin_to_srgb(color[2]) as f32 / 255.0, a: 1.0 };
+        let sketches_tab = self.ui.appearance_sketches;
+        let grid = rgb_u32(0xaaaaaa);
+        let swatch = |color: [f32; 4]| {
+            let c = gpui_kit::Rgba { r: lin_to_srgb(color[0]) as f32 / 255.0, g: lin_to_srgb(color[1]) as f32 / 255.0, b: lin_to_srgb(color[2]) as f32 / 255.0, a: color[3].clamp(0.0, 1.0) };
+            div()
+                .flex_1()
+                .h(px(29.))
+                .p(px(3.))
+                .bg(rgb_u32(0xeaeaea))
+                .border_t_1()
+                .border_r_1()
+                .border_b_1()
+                .border_color(grid)
+                .child(
+                    // Translucent colors show over a checkerboard (live `checkerboard-background`).
+                    div().size_full().rounded(px(4.)).border_1().border_color(grid).bg(rgb_u32(0xffffff)).child(div().size_full().rounded(px(3.)).bg(c)).when(c.a < 0.99, |d| {
+                        d.child(
+                            canvas(
+                                |_, _, _| {},
+                                |b, _, window, _| {
+                                    let cell = px(5.);
+                                    let (cols, rows) = ((b.size.width / cell).ceil() as i32, (b.size.height / cell).ceil() as i32);
+                                    for r in 0..rows {
+                                        for c in (r % 2..cols).step_by(2) {
+                                            let o = point(b.origin.x + cell * c as f32, b.origin.y + cell * r as f32);
+                                            window.paint_quad(fill(Bounds::new(o, size(cell, cell)).intersect(&b), rgb_u32(0xd7d7d7)));
+                                        }
+                                    }
+                                },
+                            )
+                            .absolute()
+                            .size_full(),
+                        )
+                    }),
+                )
+        };
+        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool| {
             h_flex()
                 .id(id)
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded_sm()
-                .hover(|d| d.bg(pal.panel_hover))
+                .w_full()
                 .cursor_pointer()
-                .child(div().size(px(14.)).rounded_sm().bg(c).border_1().border_color(pal.border))
-                .child(div().flex_1().truncate().text_sm().text_color(pal.text).child(label))
-                .child(div().text_xs().text_color(pal.text_faint).child(kind))
+                .child(
+                    div()
+                        .flex_1()
+                        .h(px(29.))
+                        .flex()
+                        .items_center()
+                        .pl(px(if indent { 18. } else { 4. }))
+                        .bg(rgb_u32(0xeaeaea))
+                        .border_1()
+                        .border_color(grid)
+                        .text_size(px(14.))
+                        .when(!indent, |d| d.font_weight(FontWeight::BOLD))
+                        .text_color(pal.text)
+                        .truncate()
+                        .child(label),
+                )
+                .child(swatch(color))
         };
         let mut rows: Vec<AnyElement> = Vec::new();
-        for (b, props) in studio.part_properties.iter().filter(|(_, p)| p.appearance.is_some()) {
-            let Some(app) = props.appearance else { continue };
-            let name = self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into());
-            let (b1, b2) = (b.clone(), b.clone());
-            let view = cx.entity();
-            rows.push(
-                row(SharedString::from(format!("ap-part-{b}")), app.color, name, "Part")
-                    .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
-                        if ev.click_count() >= 2 {
-                            this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
-                        }
-                    }))
-                    .os_context_menu(move |m, _, _| {
-                        let v = view.clone();
-                        let b = b2.clone();
-                        m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.reset_part_appearance(b.clone(), cx))))
-                    })
-                    .into_any_element(),
-            );
+        if !sketches_tab {
+            for body in self.display.bodies.iter().filter(|b| b.kind != noshape_model::display::BodyKind::Wire) {
+                let props = studio.part_properties.get(&body.id);
+                let color = props.and_then(|p| p.appearance).map(|a| a.color).unwrap_or(body.color);
+                let (b1, b2) = (body.id.clone(), body.id.clone());
+                let custom = props.is_some_and(|p| p.appearance.is_some());
+                let view = cx.entity();
+                rows.push(
+                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false)
+                        .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
+                            if ev.click_count() >= 2 {
+                                this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
+                            }
+                        }))
+                        .when(custom, |d| {
+                            d.os_context_menu(move |m, _, _| {
+                                let v = view.clone();
+                                let b = b2.clone();
+                                m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.reset_part_appearance(b.clone(), cx))))
+                            })
+                        })
+                        .into_any_element(),
+                );
+            }
         }
         for (i, a) in studio.appearances.iter().enumerate() {
-            let (label, kind, target) = match &a.target {
-                AppearanceTarget::Faces(f) => (format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" }), "Faces", EditTarget::Faces(f.clone(), Some(i))),
-                AppearanceTarget::Feature(f) => (names(&Reference::Feature(*f)), if self.display.sketches.iter().any(|s| s.feature == *f) { "Sketch" } else { "Feature" }, EditTarget::Feature(*f, Some(i))),
+            let is_sketch = matches!(&a.target, AppearanceTarget::Feature(f) if self.display.sketches.iter().any(|s| s.feature == *f));
+            if is_sketch != sketches_tab {
+                continue;
+            }
+            let (label, target) = match &a.target {
+                AppearanceTarget::Faces(f) => (format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" }), EditTarget::Faces(f.clone(), Some(i))),
+                AppearanceTarget::Feature(f) => (names(&Reference::Feature(*f)), EditTarget::Feature(*f, Some(i))),
             };
             let faces = match &a.target {
                 AppearanceTarget::Faces(f) => f.clone(),
@@ -415,7 +474,7 @@ impl PartStudioView {
             };
             let view = cx.entity();
             rows.push(
-                row(SharedString::from(format!("ap-face-{i}")), a.color, label, kind)
+                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch)
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Hovering a face appearance highlights its faces.
                         this.ui.appearance_hover = if *h { faces.clone() } else { Vec::new() };
@@ -433,20 +492,64 @@ impl PartStudioView {
                     .into_any_element(),
             );
         }
-        let empty = rows.is_empty();
+        if sketches_tab {
+            // Sketches without their own appearance, in the inactive sketch color.
+            let with_own: Vec<FeatureId> = studio.appearances.iter().filter_map(|a| if let AppearanceTarget::Feature(f) = a.target { Some(f) } else { None }).collect();
+            for sk in self.display.sketches.iter().filter(|s| !with_own.contains(&s.feature)) {
+                let f = sk.feature;
+                let color = sk.color.unwrap_or_else(|| crate::theme::lin(crate::theme::viewport::INACTIVE));
+                rows.push(
+                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false)
+                        .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
+                            if ev.click_count() >= 2 {
+                                this.edit_appearance(EditTarget::Feature(f, None), w, cx);
+                            }
+                        }))
+                        .into_any_element(),
+                );
+            }
+        }
+        let tab = |id: &'static str, label: &'static str, on: bool, sketches: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .flex_1()
+                .h(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_size(px(13.33))
+                .cursor_pointer()
+                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(pal.border))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.ui.appearance_sketches = sketches;
+                    cx.notify();
+                }))
+        };
         v_flex()
-            .gap_1()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .child(div().text_xs().text_color(pal.text_muted).child("Double-click to edit"))
-                    .child(Button::new("ap-add-face").icon(IconName::Plus).xsmall().ghost().tooltip("Add face appearance").on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
-                        let faces = this.selected_faces();
-                        this.edit_appearance(EditTarget::Faces(faces, None), w, cx);
-                    }))),
-            )
-            .when(empty, |d| d.child(div().px_2().text_xs().text_color(pal.text_faint).child("No custom appearances. Right-click a part or face > Edit/Add appearance.")))
-            .children(rows)
+            .child(h_flex().w_full().mt(px(-5.)).mx(px(-5.)).child(tab("ap-tab-parts", "Parts and surfaces", !sketches_tab, false, cx)).child(tab("ap-tab-sketches", "Sketches and curves", sketches_tab, true, cx)))
+            .child(v_flex().pt(px(10.)).children(rows))
+            .into_any_element()
+    }
+
+    /// The "Add face appearance" button at the right of the Appearances title.
+    pub(super) fn render_add_face_appearance(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id("ap-add-face")
+            .size(px(26.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(3.))
+            .cursor_pointer()
+            .hover(|d| d.bg(p().panel_hover))
+            .child(crate::assets::icon("add-appearance", 20., cx))
+            .tooltip(crate::ui::tooltip("Add face appearance"))
+            .on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
+                let faces = this.selected_faces();
+                this.edit_appearance(EditTarget::Faces(faces, None), w, cx);
+            }))
             .into_any_element()
     }
 }

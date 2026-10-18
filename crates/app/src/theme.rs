@@ -146,6 +146,8 @@ pub mod viewport {
     pub const PREHIGHLIGHT: u32 = 0xffc685;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).
     pub const SELECTION: u32 = 0xffa90a;
+    /// "Highlight boundary edges" (help: open edges in red).
+    pub const BOUNDARY_EDGE: u32 = 0xe00000;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).
     pub const ERROR: u32 = 0xbd3039;
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
@@ -159,15 +161,10 @@ pub mod viewport {
     pub const PLANE_TEXT: u32 = 0x1651b0;
     /// Origin and point bodies (`--os-origin-color`).
     pub const ORIGIN: u32 = 0x000000;
-    /// Sketch: under-defined (`--os-sketch-underconstrained-line-point-color`).
-    pub const SKETCH_UNDER: u32 = 0x0000d0;
     /// Sketch: fully defined (`--os-dimension-line-arrow-color`).
     pub const SKETCH_FULL: u32 = 0x000000;
     /// Sketch: over-defined (`--os-sketch-overconstrained-line-point-color`).
     pub const SKETCH_OVER: u32 = 0xcd0000;
-    /// Sketch: entities used from outside the sketch. A noshape convention
-    /// (Onshape draws them in the constraint-state color); `--os-accent-nonary`.
-    pub const SKETCH_EXTERNAL: u32 = 0x672f8f;
     /// Closed sketch regions of the sketch being edited, drawn at ~26%
     /// (`--os-sketch-region-fill-color` `#9aa5af33`; sampled live).
     pub const SKETCH_REGION: u32 = 0x9aa5af;

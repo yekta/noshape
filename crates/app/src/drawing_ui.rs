@@ -1,36 +1,15 @@
 //! Drawing editor chrome: toolbar, status bar, inline property panels
-//! (note text, title block, scales, labels) and export (PDF/SVG/DXF).
+//! (note text, title block, scales, labels). Export: `drawing_export`.
 
 use crate::drawing_view::*;
 use crate::theme::{p, with_alpha as theme_with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
-use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::build::render_sheet_with;
-use noshape_model::drawing::views::{self, ViewCache};
+use noshape_model::drawing::views;
 use noshape_model::drawing::*;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ExportFormat {
-    Pdf,
-    Svg,
-    Dxf,
-}
-
-impl ExportFormat {
-    pub fn ext(self) -> &'static str {
-        match self {
-            ExportFormat::Pdf => "pdf",
-            ExportFormat::Svg => "svg",
-            ExportFormat::Dxf => "dxf",
-        }
-    }
-}
 
 /// Parse "1:2", "2:1", "1/2", "0.5" into a scale factor.
 pub fn parse_scale(s: &str) -> Option<f64> {
@@ -69,18 +48,18 @@ impl DrawingEditor {
         // Onshape's Dimension dropdown (live, in order). The 2 point, point to
         // line and line to line tools use the smart linear dimension's picks.
         let dims_menu = vec![
-            MenuEntry::item("Dimension (d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
-            MenuEntry::item("Chamfer dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)),
-            MenuEntry::item("Maximum or minimum dimension (ctrl+m)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)),
-            MenuEntry::item("2 point linear dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
-            MenuEntry::item("Point to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
-            MenuEntry::item("Line to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
-            MenuEntry::item("Line to line angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx)),
-            MenuEntry::item("3 point angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle3, picks: vec![] }, cx)),
-            MenuEntry::item("Arc length dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
-            MenuEntry::item("Radial dimension (shift+r)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx)),
-            MenuEntry::item("Diameter dimension (shift+d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx)),
-            MenuEntry::item("Foreshorten dimension (shift+h)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)),
+            MenuEntry::item("Dimension (d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)).with_icon("linear-dim"),
+            MenuEntry::item("Chamfer dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)).with_icon("chamfer-dim"),
+            MenuEntry::item("Maximum or minimum dimension (ctrl+m)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)).with_icon("driven-dimension"),
+            MenuEntry::item("2 point linear dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)).with_icon("linear-dim"),
+            MenuEntry::item("Point to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)).with_icon("linear-dim"),
+            MenuEntry::item("Line to line dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)).with_icon("linear-dim"),
+            MenuEntry::item("Line to line angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx)).with_icon("angular-dim"),
+            MenuEntry::item("3 point angular dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle3, picks: vec![] }, cx)).with_icon("angular-dim"),
+            MenuEntry::item("Arc length dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)).with_icon("arc-length-dim"),
+            MenuEntry::item("Radial dimension (shift+r)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx)).with_icon("radial-dim"),
+            MenuEntry::item("Diameter dimension (shift+d)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx)).with_icon("diameter-dim"),
+            MenuEntry::item("Foreshorten dimension (shift+h)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)).with_icon("linear-dim"),
         ];
         let ed5 = ed.clone();
         let views_menu = vec![
@@ -122,16 +101,10 @@ impl DrawingEditor {
             v.push(MenuEntry::item("Edit title block…", |e, w, cx| e.open_title_panel(w, cx)));
             v
         };
-        let ed4 = ed.clone();
-        let export_menu = vec![
-            MenuEntry::item("PDF…", |e, w, cx| e.export(ExportFormat::Pdf, w, cx)),
-            MenuEntry::item("SVG…", |e, w, cx| e.export(ExportFormat::Svg, w, cx)),
-            MenuEntry::item("DXF…", |e, w, cx| e.export(ExportFormat::Dxf, w, cx)),
-        ];
         let up_to_date = !self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
         // Onshape's drawing toolbar, in its order (live DOM, 1.222): update |
         // views | dimensions | symbols | notes and tables | centerlines.
-        // Sheet setup, export and zoom to fit (elsewhere in Onshape) sit at
+        // Sheet setup and zoom to fit (elsewhere in Onshape) sit at
         // the right end.
         crate::ui::toolbar()
             .child(crate::ui::undo_redo(&self.doc, cx))
@@ -163,7 +136,7 @@ impl DrawingEditor {
                     window.focus(&this.focus, cx);
                     this.set_tool(Tool::Crop { parent: None, first: None, circle: false }, cx)
                 })),
-                crate::ui::tool_caret("dr-views-more", cx).tooltip("More view tools").dropdown_menu(move |m, w, cx| fill_menu(m, &views_menu, &ed5, w, cx)),
+                crate::ui::tool_caret("dr-views-more", cx).tooltip("More view tools").on_click(move |e, w, cx| open_tool_menu(&views_menu, &ed5, e, w, cx)),
             ))
             .child(sep())
             .child(crate::ui::tool_group(
@@ -172,9 +145,10 @@ impl DrawingEditor {
                     window.focus(&this.focus, cx);
                     this.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)
                 })),
-                crate::ui::tool_caret("dr-dim-more", cx).tooltip("Dimension (d)").dropdown_menu(move |m, w, cx| fill_menu(m, &dims_menu, &ed2, w, cx)),
+                crate::ui::tool_caret("dr-dim-more", cx).tooltip("Dimension (d)").on_click(move |e, w, cx| open_tool_menu(&dims_menu, &ed2, e, w, cx)),
             ))
             .child(self.tool_btn("dr-ord", "ordinate-dim", "Ordinate dimension", matches!(t, Tool::Ordinate { .. }), || Tool::Ordinate { origin: None, horizontal: None, group: None }, cx))
+            .child(self.tool_btn("dr-holecallout", "hole-callout", "Hole/thread callout", matches!(t, Tool::HoleCallout { .. }), || Tool::HoleCallout { circle: None }, cx))
             .child(sep())
             .child(self.tool_btn("dr-datum", "datum", "Datum", matches!(t, Tool::Datum { .. } | Tool::DatumTarget { .. }), || Tool::Datum { anchor: None }, cx))
             .child(self.tool_btn("dr-gdt", "gdt", "Geometric tolerance", matches!(t, Tool::Gdt), || Tool::Gdt, cx))
@@ -187,15 +161,41 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-holetable", "hole-table", "Hole table", matches!(t, Tool::Table { kind: TableTool::Hole, .. }), || Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx))
             .child(sep())
             .child(self.tool_btn("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }, cx))
+            .child(self.tool_btn("dr-ecline", "centerline-edge", "Edge to edge centerline", matches!(t, Tool::EdgeCenterline { .. }), || Tool::EdgeCenterline { first: None }, cx))
+            .child(self.tool_btn("dr-ccline3", "centerline-circle3", "3 point circle centerline", matches!(t, Tool::CircleCenterline { three: true, .. }), || Tool::CircleCenterline { three: true, points: vec![] }, cx))
+            .child(self.tool_btn("dr-ccline2", "centerline-circle2", "2 point circle centerline", matches!(t, Tool::CircleCenterline { three: false, .. }), || Tool::CircleCenterline { three: false, points: vec![] }, cx))
             .child(self.tool_btn("dr-cmark", "centermark", "Centermark", matches!(t, Tool::Centermark), || Tool::Centermark, cx))
+            .child(self.tool_btn("dr-vsharp", "virtual-sharp", "Virtual sharp", matches!(t, Tool::VirtualSharp { .. }), || Tool::VirtualSharp { first: None }, cx))
+            .child(sep())
+            .child(
+                crate::ui::tool_button("dr-painter", "format-painter", self.painter.is_some(), cx)
+                    .tooltip("Format painter")
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        window.focus(&this.focus, cx);
+                        this.toggle_format_painter(cx)
+                    })),
+            )
+            .child(sep())
+            .child(
+                crate::ui::tool_button("dr-inspection", "inspection-item", self.inspection.is_some(), cx)
+                    .tooltip("Inspection item")
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        window.focus(&this.focus, cx);
+                        this.open_inspection(cx)
+                    })),
+            )
+            .child(
+                crate::ui::tool_button("dr-inspection-hide", "inspection-hide", self.drawing.props.hide_inspection, cx)
+                    .tooltip("Hide inspection items")
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_hide_inspection(cx))),
+            )
             .child(div().flex_1())
             .child(
                 crate::ui::tool_button("dr-title", "title-block", false, cx)
                     .tooltip("Edit title block")
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_title_panel(window, cx))),
             )
-            .child(crate::ui::tool_group("drg-sheet", crate::ui::split_tool_button("dr-sheet", "sheet", false, cx).tooltip("Sheet properties"), crate::ui::tool_caret("dr-sheet-more", cx).tooltip("Sheet properties").dropdown_menu(move |m, w, cx| fill_menu(m, &sheet_menu, &ed3, w, cx))))
-            .child(crate::ui::tool_group("drg-export", crate::ui::split_tool_button("dr-export", "export", false, cx).tooltip("Export"), crate::ui::tool_caret("dr-export-more", cx).tooltip("Export").dropdown_menu(move |m, w, cx| fill_menu(m, &export_menu, &ed4, w, cx))))
+            .child(crate::ui::tool_group("drg-sheet", crate::ui::split_tool_button("dr-sheet", "sheet", false, cx).tooltip("Sheet properties"), crate::ui::tool_caret("dr-sheet-more", cx).tooltip("Sheet properties").on_click(move |e, w, cx| open_tool_menu(&sheet_menu, &ed3, e, w, cx))))
             .child(
                 crate::ui::tool_button("dr-fit", "zoom-fit", false, cx)
                     .tooltip("Zoom to fit (f)")
@@ -403,68 +403,6 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    // ------------------------------------------------------------ export
-
-    /// Export the drawing (exact hidden lines): PDF gets every sheet, SVG and
-    /// DXF the current one. The location comes
-    /// from the native save dialog, or the in-app prompt when no dialog is
-    /// available (headless/no desktop portal).
-    pub fn export(&mut self, format: ExportFormat, window: &mut Window, cx: &mut Context<Self>) {
-        let (doc_name, tab_name) = {
-            let d = self.doc.read(cx);
-            (d.name(), d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into()))
-        };
-        let file_name = format!("{doc_name} - {tab_name}.{}", format.ext());
-        let this = cx.entity().downgrade();
-        crate::files::request_save_path("Export drawing", file_name, format.ext(), window, cx, move |path, cx| {
-            this.update(cx, |this, cx| this.write_export(format, path, cx)).ok();
-        });
-    }
-
-    /// Render the sheet with exact hidden lines and write it to `path`.
-    pub fn write_export(&mut self, format: ExportFormat, path: PathBuf, cx: &mut Context<Self>) {
-        let drawing = self.drawing.clone();
-        let si = self.sheet;
-        let sources = self.sources.clone();
-        let cache: Arc<ViewCache> = self.cache.clone();
-        let info = self.info.clone();
-        self.status = Some(format!("Exporting {}…", format.ext().to_uppercase()).into());
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            let result: Result<PathBuf, String> = cx
-                .background_spawn(async move {
-                    let bytes = match format {
-                        // PDF holds every sheet, one page each (Onshape behavior).
-                        ExportFormat::Pdf => {
-                            let pages: Vec<_> = (0..drawing.sheets.len()).filter_map(|i| render_sheet_with(&drawing, i, &sources, &cache, true, &info).map(|b| b.geometry)).collect();
-                            if pages.is_empty() {
-                                return Err("nothing to export".into());
-                            }
-                            export::to_pdf_pages(&pages)
-                        }
-                        _ => {
-                            let built = render_sheet_with(&drawing, si, &sources, &cache, true, &info).ok_or("nothing to export")?;
-                            match format {
-                                ExportFormat::Svg => export::to_svg(&built.geometry).into_bytes(),
-                                _ => export::to_dxf(&built.geometry).into_bytes(),
-                            }
-                        }
-                    };
-                    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
-                    Ok(path)
-                })
-                .await;
-            this.update(cx, |this, cx| {
-                this.status = Some(match result {
-                    Ok(p) => format!("Exported {}", p.display()).into(),
-                    Err(e) => format!("Export failed: {e}").into(),
-                });
-                cx.notify();
-            })
-            .ok();
-        })
-        .detach();
-    }
 }
 
 #[cfg(test)]

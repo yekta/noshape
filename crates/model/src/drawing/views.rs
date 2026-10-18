@@ -1044,6 +1044,9 @@ fn bodies_diagonal(bodies: &[&Arc<Body>]) -> f64 {
 /// Resolve a point reference: projected position and, for circle centers,
 /// the radius.
 pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<([f64; 2], Option<f64>)> {
+    if let PointRef::Intersection { .. } = r {
+        return Some((intersection_in_view(ctx, frame, r)?, None));
+    }
     if let PointRef::Quadrant { k, .. } = r {
         let (c, radius) = resolve_point3(ctx, r)?;
         return Some((quadrant_of(frame.project(c), radius?, *k), None));
@@ -1063,8 +1066,24 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
                 _ => None,
             }
         }
-        PointRef::Midpoint { .. } | PointRef::Quadrant { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
+        PointRef::Midpoint { .. } | PointRef::Quadrant { .. } | PointRef::Intersection { .. } => resolve_point3(ctx, r).map(|(p, _)| (frame.project(p), None)),
     }
+}
+
+/// Projected endpoints of a straight edge.
+fn projected_line(ctx: &Context, frame: &ViewFrame, body: &BodyId, name: &crate::reference::TopoName) -> Option<([f64; 2], [f64; 2])> {
+    let b = ctx.body(body)?;
+    let i = *b.find_edges(name).first()?;
+    let (p, q) = b.shape.sub_shape(ShapeType::Edge, i).ok()?.endpoints().ok()?;
+    Some((frame.project(p), frame.project(q)))
+}
+
+/// Where two straight edges meet in a view (virtual sharp).
+fn intersection_in_view(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<[f64; 2]> {
+    let PointRef::Intersection { body, name, body2, name2 } = r else { return None };
+    let (a1, b1) = projected_line(ctx, frame, body, name)?;
+    let (a2, b2) = projected_line(ctx, frame, body2, name2)?;
+    super::AnnotationKind::line_intersection(a1, b1, a2, b2)
 }
 
 /// A quadrant point of a projected circle (0 right, 1 top, 2 left, 3 bottom).
@@ -1090,6 +1109,24 @@ pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>
                 _ => None,
             }
         }
+        // Intersections are resolved in a view (see `resolve_point`); in 3D
+        // the middle of the closest points of the two lines.
+        PointRef::Intersection { body, name, body2, name2 } => {
+            let line = |body: &BodyId, name: &crate::reference::TopoName| -> Option<(DVec3, DVec3)> {
+                let b = ctx.body(body)?;
+                let i = *b.find_edges(name).first()?;
+                b.shape.sub_shape(ShapeType::Edge, i).ok()?.endpoints().ok()
+            };
+            let ((p1, q1), (p2, q2)) = (line(body, name)?, line(body2, name2)?);
+            let (d1, d2, w) = (q1 - p1, q2 - p2, p1 - p2);
+            let (a, b, c, d, e) = (d1.dot(d1), d1.dot(d2), d2.dot(d2), d1.dot(w), d2.dot(w));
+            let den = a * c - b * b;
+            if den.abs() < 1e-18 {
+                return None;
+            }
+            let (s, t) = ((b * e - c * d) / den, (a * e - b * d) / den);
+            Some(((p1 + d1 * s + p2 + d2 * t) * 0.5, None))
+        }
         PointRef::Midpoint { body, name } => {
             let b = ctx.body(body)?;
             let i = *b.find_edges(name).first()?;
@@ -1111,6 +1148,9 @@ pub fn resolve_in_view(ctx: &Context, g: &ViewGeometry, r: &PointRef) -> Option<
     };
     if let PointRef::Quadrant { k, .. } = r {
         return Some((quadrant_of(frame.project(p), radius?, *k), None));
+    }
+    if let (PointRef::Intersection { .. }, None) = (r, &g.aligned) {
+        return Some((intersection_in_view(ctx, &frame, r)?, None));
     }
     Some((frame.project(p), radius))
 }

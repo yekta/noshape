@@ -96,6 +96,30 @@ pub struct SheetGeometry {
     pub lines: Vec<Polyline2>,
     pub texts: Vec<Text2>,
     pub fills: Vec<Fill2>,
+    /// Editing grips of annotations (Onshape shows them on a hovered or
+    /// selected dimension).
+    pub grips: Vec<Grip>,
+    /// Indices into `texts` of overridden dimension values (exports can
+    /// underline them).
+    pub overridden: Vec<usize>,
+}
+
+/// A grip of an annotation (sheet mm).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Grip {
+    pub pick: u32,
+    pub pos: [f64; 2],
+    pub kind: GripKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GripKind {
+    /// Where a dimension attaches to the geometry (Onshape: light-blue dot).
+    Origin,
+    /// End of a dimension line (orange dot).
+    End,
+    /// Arrow / flip handle on the dimension line (orange diamond).
+    Handle,
 }
 
 impl SheetGeometry {
@@ -261,11 +285,37 @@ impl SheetGeometry {
         self.line([circ_x - big - 1.0, y], [trap_x + len + 1.0, y], LineStyle::Centerline);
     }
 
+    /// An inspection item: the number in its border shape, up and left of
+    /// the annotation's text position.
+    fn inspection_bubble(&mut self, at: [f64; 2], n: u32, (shape, h, border): (super::InspectionShape, f64, f64), pick: u32) {
+        use super::InspectionShape as S;
+        let text = n.to_string();
+        let w = (text.chars().count() as f64 * h * 0.7).max(h);
+        let (rx, ry) = (w * 0.5 + border, h * 0.5 + border);
+        let c = [at[0] - rx - 4.8, at[1] + ry + 2.5];
+        let ring = |rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..32).map(|i| {
+            let t = i as f64 / 32.0 * std::f64::consts::TAU;
+            [c[0] + rx * t.cos(), c[1] + ry * t.sin()]
+        }).collect() };
+        let pts = match shape {
+            S::Circle => ring(rx.max(ry), rx.max(ry)),
+            S::Oval => ring(rx + 1.0, ry),
+            S::Rectangle => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
+            S::Triangle => vec![[c[0] - rx - 1.5, c[1] - ry], [c[0] + rx + 1.5, c[1] - ry], [c[0], c[1] + ry + 2.0]],
+            S::Flag => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx + 1.5, c[1]], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
+        };
+        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
+        self.texts.push(Text2 { pos: c, height: h, text, angle: 0.0, anchor: Anchor::Center, pick });
+    }
+
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
     /// View-relative coordinates are mapped through `env`.
     pub fn add_annotations(&mut self, sheet: &Sheet, env: &dyn AnnotationEnv) {
         for a in &sheet.annotations {
             let pick = (a.id & 0xFFFF_FFFF) as u32;
+            if let (Some(n), Some(style)) = (a.inspection, env.inspection_style()) {
+                self.inspection_bubble(a.position, n, style, inspection_pick(a.id));
+            }
             match &a.kind {
                 AnnotationKind::Note { text, height_mm } => {
                     let text = env.expand(text);
@@ -293,7 +343,11 @@ impl SheetGeometry {
                         Some(o) => DimText::plain(o.clone()),
                         None => env.text(a, model_len, false, ""),
                     };
+                    let first = self.texts.len();
                     self.linear_dimension_text(p, q, *offset, *orientation, &t, pick);
+                    if override_text.is_some() && self.texts.len() > first {
+                        self.overridden.push(first);
+                    }
                 }
                 AnnotationKind::RadialDimension { view, center, radius, diameter, angle } => {
                     let c = env.to_sheet(*view, *center);
@@ -343,10 +397,11 @@ impl SheetGeometry {
                     let t = env.text(a, a1 - a0, true, "");
                     self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, 3.5, pick);
                 }
-                AnnotationKind::Centermark { view, center, size } => {
+                AnnotationKind::Centermark { view, center, size, angle } => {
                     let c = env.to_sheet(*view, *center);
                     let s = size * env.scale(*view);
-                    let (u, w) = (rotate2([1.0, 0.0], env.rotation(*view)), rotate2([0.0, 1.0], env.rotation(*view)));
+                    let rot = env.rotation(*view) + angle;
+                    let (u, w) = (rotate2([1.0, 0.0], rot), rotate2([0.0, 1.0], rot));
                     self.lines.push(Polyline2 { points: vec![[c[0] - u[0] * s, c[1] - u[1] * s], [c[0] + u[0] * s, c[1] + u[1] * s]], style: LineStyle::Centerline, closed: false, pick });
                     self.lines.push(Polyline2 { points: vec![[c[0] - w[0] * s, c[1] - w[1] * s], [c[0] + w[0] * s, c[1] + w[1] * s]], style: LineStyle::Centerline, closed: false, pick });
                 }
@@ -354,6 +409,51 @@ impl SheetGeometry {
                     let p = env.to_sheet(*view, *pa);
                     let q = env.to_sheet(*view, *pb);
                     self.lines.push(Polyline2 { points: vec![p, q], style: LineStyle::Centerline, closed: false, pick });
+                }
+                AnnotationKind::CircleCenterline { view, points } => {
+                    if let Some((c, r)) = AnnotationKind::circle_centerline(points) {
+                        let c = env.to_sheet(*view, c);
+                        let r = r * env.scale(*view);
+                        let n = 96;
+                        let pts: Vec<[f64; 2]> = (0..n).map(|i| {
+                            let t = i as f64 / n as f64 * std::f64::consts::TAU;
+                            [c[0] + r * t.cos(), c[1] + r * t.sin()]
+                        }).collect();
+                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
+                    }
+                }
+                AnnotationKind::HoleCallout { view, center, radius } => {
+                    let c = env.to_sheet(*view, *center);
+                    let r = radius * env.scale(*view);
+                    let lines = env.hole_callout(a);
+                    let h = 3.5;
+                    let t = a.position;
+                    let d = [t[0] - c[0], t[1] - c[1]];
+                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+                    let u = [d[0] / l, d[1] / l];
+                    // Leader from the circle to a short shoulder at the text.
+                    let on = [c[0] + u[0] * r, c[1] + u[1] * r];
+                    let right = t[0] >= c[0];
+                    let shoulder = [t[0] + if right { -4.0 } else { 4.0 }, t[1]];
+                    self.lines.push(Polyline2 { points: vec![on, shoulder, t], style: LineStyle::Thin, closed: false, pick });
+                    self.arrow(on, [-u[0], -u[1]], 3.0);
+                    let w = lines.iter().map(|s| s.chars().count()).max().unwrap_or(0) as f64 * h * 0.62;
+                    let x0 = if right { t[0] + 1.0 } else { t[0] - 1.0 - w };
+                    let n = lines.len() as f64;
+                    for (i, line) in lines.iter().enumerate() {
+                        // Lines stacked around the shoulder (bottom-left anchored).
+                        let y = t[1] + (n - 1.0) * h * 0.75 - i as f64 * h * 1.5 - h * 0.5;
+                        self.texts.push(Text2 { pos: [x0, y], height: h, text: line.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    }
+                }
+                AnnotationKind::VirtualSharp { view, a1, b1, a2, b2 } => {
+                    // Onshape's default style: a small cross at the intersection.
+                    if let Some(x) = AnnotationKind::line_intersection(*a1, *b1, *a2, *b2) {
+                        let c = env.to_sheet(*view, x);
+                        let s = 1.5;
+                        self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] - s], [c[0] + s, c[1] + s]], style: LineStyle::Thin, closed: false, pick });
+                        self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] + s], [c[0] + s, c[1] - s]], style: LineStyle::Thin, closed: false, pick });
+                    }
                 }
                 AnnotationKind::Balloon { view, anchor, text } => {
                     let p = env.to_sheet(*view, *anchor);
@@ -781,6 +881,18 @@ impl SheetGeometry {
         let d = [dq[0] - dp[0], dq[1] - dp[1]];
         self.arrow(dp, [-d[0], -d[1]], 3.0);
         self.arrow(dq, d, 3.0);
+        let dl = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+        let du = [d[0] / dl, d[1] / dl];
+        for (pos, kind) in [
+            (p, GripKind::Origin),
+            (q, GripKind::Origin),
+            (dp, GripKind::End),
+            (dq, GripKind::End),
+            ([dp[0] + du[0] * 4.0, dp[1] + du[1] * 4.0], GripKind::Handle),
+            ([dq[0] - du[0] * 4.0, dq[1] - du[1] * 4.0], GripKind::Handle),
+        ] {
+            self.grips.push(Grip { pick, pos, kind });
+        }
         let mut angle = dir[1].atan2(dir[0]);
         if angle > std::f64::consts::FRAC_PI_2 + 1e-9 || angle < -std::f64::consts::FRAC_PI_2 - 1e-9 {
             angle += std::f64::consts::PI;
@@ -917,6 +1029,15 @@ pub trait AnnotationEnv {
     fn expand(&self, s: &str) -> String;
     /// Displayed text of a callout (BOM item when linked).
     fn balloon_text(&self, a: &Annotation, text: &str) -> String;
+    /// Inspection item bubbles: shape, text height and border size (mm),
+    /// None while hidden.
+    fn inspection_style(&self) -> Option<(super::InspectionShape, f64, f64)> {
+        Some((super::InspectionShape::Circle, 2.5, 1.2))
+    }
+    /// Lines of a hole / thread callout (from the Hole feature).
+    fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
+        vec!["⌀?".into()]
+    }
 }
 
 /// A simple environment for tests and free sheets: identity mapping per
@@ -963,4 +1084,10 @@ pub fn format_scale(s: f64) -> String {
 fn trim(x: f64) -> String {
     let s = format!("{x:.3}");
     s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+/// Pick id of an annotation's inspection item bubble (before the editor's
+/// pick table remaps it): the annotation's id with the top bit set.
+pub fn inspection_pick(id: u64) -> u32 {
+    ((id & 0x7FFF_FFFF) as u32) | 0x8000_0000
 }

@@ -16,6 +16,9 @@ struct Globals {
     select: vec4<f32>,
     accent: vec4<f32>,
     error: vec4<f32>,
+    specular: vec4<f32>,     // rgb specular color, w shininess 0..1 (Graphics preferences)
+    dash: vec4<f32>,         // construction lines: dash, gap, dash, gap (px)
+    room: vec4<f32>,         // zebra stripes room: center xyz, radius
 };
 
 struct Inst {
@@ -23,6 +26,7 @@ struct Inst {
     normal_m: mat4x4<f32>,
     color: vec4<f32>,
     params: vec4<u32>,       // x = per-primitive color, y = ignore clip, z = pickable, w = pick base
+    extra: vec4<f32>,        // x = line width scale
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
@@ -91,7 +95,7 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
 // A selected face or part, with half of the usual light contrast. Fitted
 // so the top face under a default plane reads `#e4b049` like live
 // (selection/04); alone it is about `#e9a100`.
-const FACE_SELECTED: vec3<f32> = vec3<f32>(0.78, 0.345, 0.0);
+const FACE_SELECTED: vec3<f32> = vec3<f32>(0.87, 0.385, 0.0);
 
 // ---------------------------------------------------------------- background
 
@@ -159,11 +163,38 @@ fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -
     // a broad highlight on the top face): one key light above and to the
     // right of the viewer, flat ambient, no fill light.
     let key = normalize(right * 0.52 + g.camera_up.xyz * 0.65 + v * 0.55);
-    let diff = max(dot(n, key), 0.0) * 0.82;
-    let ambient = 0.284;
+    // (Scaled by 0.745 when the default part color became the live
+    // `#9dcfed`; fitted against `#8ab5cf` before.)
+    let diff = max(dot(n, key), 0.0) * 0.611;
+    let ambient = 0.212;
     let h = normalize(key + v);
-    let spec = pow(max(dot(n, h), 0.0), 6.0) * 0.42;
-    return base * (diff + ambient) + vec3(spec);
+    // Shininess 3% (Onshape's default) gives a broad highlight (exponent 6);
+    // the default specular color #999 gives 0.42 of white.
+    let spec = pow(max(dot(n, h), 0.0), max(g.specular.w * 200.0, 1.0)) * g.specular.rgb * 1.32;
+    return base * (diff + ambient) + spec;
+}
+
+// Zebra stripes (Onshape's analysis tool): the reflection of a room with
+// black and white stripes around the viewer, horizontal unless flipped
+// (instance params.y bit 3); the count is in bits 8 and up.
+fn zebra(world: vec3<f32>, normal: vec3<f32>, front: bool) -> vec3<f32> {
+    var n = normalize(normal);
+    if (!front) { n = -n; }
+    var v: vec3<f32>;
+    if (g.camera_pos.w > 0.5) { v = normalize(g.camera_pos.xyz - world); } else { v = -g.camera_fwd.xyz; }
+    let r = reflect(-v, n);
+    // Where the reflected ray meets the room (a sphere around the scene).
+    let o = world - g.room.xyz;
+    let b = dot(o, r);
+    let t = -b + sqrt(max(b * b - dot(o, o) + g.room.w * g.room.w, 0.0));
+    let dir = normalize(o + r * t);
+    let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
+    var a = dot(dir, g.camera_up.xyz);
+    if ((inst.params.y & 8u) != 0u) { a = dot(dir, right); }
+    let s = asin(clamp(a, -1.0, 1.0)) / 3.14159265 + 0.5;
+    let count = f32(max(inst.params.y >> 8u, 1u));
+    if ((u32(floor(s * count)) & 1u) == 0u) { return vec3(0.0); }
+    return vec3(1.0);
 }
 
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
@@ -178,7 +209,10 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     // the hovered face instead (Onshape).
     let unlit = (inst.params.y & 2u) != 0u;
     var c = highlight(own, select(st & ~HOVER, st, unlit));
-    if (!unlit) {
+    if (!unlit && (inst.params.y & 4u) != 0u) {
+        c = zebra(i.world, i.normal, front);
+        if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
+    } else if (!unlit) {
         if ((st & SELECTED) != 0u && (st & ERROR) == 0u) {
             c = mix(FACE_SELECTED * 0.97, shade(i.world, i.normal, front, FACE_SELECTED), 0.45);
         } else {
@@ -307,7 +341,7 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
 
     let pick = global_pick(l.pick);
     let st = state_of(pick);
-    var width = l.width + g.viewport.w;
+    var width = l.width * inst.extra.x + g.viewport.w;
     if ((st & (HOVER | SELECTED)) != 0u) { width = width * 1.8 + 1.0; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
@@ -345,6 +379,12 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     if ((i.style & 4u) != 0u) {
         let t = fract(i.along / (16.0 * g.viewport.z));
         if (t > 0.55 && (t < 0.68 || t > 0.8)) { discard; }
+    }
+    // Construction lines: dash, gap, dash, gap (Graphics preferences).
+    if ((i.style & 8u) != 0u) {
+        let period = max(g.dash.x + g.dash.y + g.dash.z + g.dash.w, 1.0);
+        let t = fract(i.along / (period * g.viewport.z)) * period;
+        if ((t > g.dash.x && t < g.dash.x + g.dash.y) || t > g.dash.x + g.dash.y + g.dash.z) { discard; }
     }
     return i.color;
 }
@@ -410,6 +450,9 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     if (r2 > 1.0 || clipped(i.world)) { discard; }
     // Style bit 4: a ring with a center dot (the origin).
     if ((i.style & 4u) != 0u && r2 < 0.42 && r2 > 0.1) { discard; }
+    // Style bit 8: a hollow point (white inside a ring of the point color),
+    // Onshape's standalone sketch points and spline handles.
+    if ((i.style & 8u) != 0u && r2 < 0.3) { return vec4<f32>(1.0, 1.0, 1.0, i.color.a); }
     return i.color;
 }
 
@@ -480,4 +523,31 @@ fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
     let c = image_color(i);
     if (c.a <= 0.0) { discard; }
     return c;
+}
+
+// Reflection analysis: a mirror of an equirectangular environment map
+// (bound like an image). inst.extra: y = rotation (rad) about the up axis,
+// z = blur (mip level), w = 1 when locked to the camera (else the world,
+// Z up).
+@fragment
+fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    let base = mesh_color(i, front);
+    var n = normalize(i.normal);
+    if (!front) { n = -n; }
+    var v: vec3<f32>;
+    if (g.camera_pos.w > 0.5) { v = normalize(g.camera_pos.xyz - i.world); } else { v = -g.camera_fwd.xyz; }
+    var r = reflect(-v, n);
+    if (inst.extra.w > 0.5) {
+        // Camera frame: x right, y toward the viewer, z up.
+        let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
+        r = vec3(dot(r, right), -dot(r, g.camera_fwd.xyz), dot(r, g.camera_up.xyz));
+    }
+    let u = fract(atan2(r.y, r.x) / 6.2831853 + 0.5 + inst.extra.y / 6.2831853);
+    let w = acos(clamp(r.z, -1.0, 1.0)) / 3.14159265;
+    let env = textureSampleLevel(image_tex, image_sampler, vec2(u, w), inst.extra.z).rgb;
+    // Selection and hover still tint the mirror.
+    let st = state_of(i.pick);
+    var c = env;
+    if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
+    return vec4(c, base.a);
 }

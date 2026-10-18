@@ -580,3 +580,29 @@ fn edit_curve_moves_control_points() {
     assert!((after.poles[0] - before.poles[0]).length() < 1e-12);
     let _ = (fs, BodyId { feature: fs, index: 0 });
 }
+
+// ------------------------------------------------------------------ hole records (drawing callouts)
+
+#[test]
+fn hole_feature_records_holes_for_callouts() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+    let pl = t.top_plane("25 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(0.03, 0.02));
+    let p2 = sk.add_point(DVec2::new(0.07, 0.02));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }, Reference::SketchEntity { sketch: s, entity: p2.0 }]);
+    t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("C_BORE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("6 mm")), ("holeDepthV3", e("12 mm")), ("cBoreDiameterV3", e("11 mm")), ("cBoreDepthV3", e("4 mm"))]);
+    let res = t.ok();
+    let holes = &res.context.holes;
+    assert_eq!(holes.len(), 2);
+    let h = &holes[0];
+    assert!((h.diameter - 0.006).abs() < 1e-9 && h.cbore.is_some_and(|(d, dd)| (d - 0.011).abs() < 1e-9 && (dd - 0.004).abs() < 1e-9));
+    assert!(!h.through && h.depth.is_some_and(|d| (d - 0.012).abs() < 1e-9));
+    // The bore circle on the top face belongs to the hole; another radius does not.
+    let top = h.start;
+    assert!(h.matches_circle(top + h.dir * 0.004, 0.003, 1e-6));
+    assert!(h.matches_circle(top, 0.0055, 1e-6));
+    assert!(!h.matches_circle(top, 0.004, 1e-6));
+}

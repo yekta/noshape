@@ -2277,7 +2277,7 @@ impl AssemblyView {
                         let id = InstanceId(a.next_id());
                         let n = a.next_instance_name(&name);
                         let placement = Placement { translation: [k as f64 * 0.03, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
-                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
+                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
                         ids.push(id);
                     }
                     ids

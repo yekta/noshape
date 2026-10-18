@@ -12,6 +12,9 @@ mod menus;
 mod section;
 mod sketch;
 mod analysis_tools;
+mod environment_maps;
+mod reflection;
+mod thickness;
 mod shown_dims;
 mod toolbar_prefs;
 pub mod view_cube;
@@ -322,8 +325,27 @@ impl PartStudioView {
             ui: behaviors::UiState::new(cx),
             _subs: subs,
         };
+        // Graphics preferences apply live (camera and render options dialog).
+        this._subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsPrefs>(|this, cx| this.apply_graphics_prefs(cx)));
+        this.apply_graphics_prefs(cx);
         this.schedule_regen(window, cx);
         this
+    }
+
+    /// Apply the Graphics preferences: field of view, shading, line widths
+    /// and colors, construction line pattern.
+    pub(crate) fn apply_graphics_prefs(&mut self, cx: &mut Context<Self>) {
+        let g = crate::graphics_prefs::get(cx);
+        self.opts.graphics = g;
+        self.viewport.update(cx, |vp, cx| {
+            let s = crate::graphics_prefs::lin3(g.specular);
+            vp.style.specular = [s[0], s[1], s[2], g.shininess];
+            vp.style.construction_dash = g.construction;
+            vp.style.ambient_occlusion = g.ambient_occlusion;
+            vp.camera.fov_y = (g.fov_deg as f64).to_radians();
+            cx.notify();
+        });
+        self.rebuild_scene(cx);
     }
 
     fn studio<'a>(&self, cx: &'a App) -> Option<&'a PartStudio> {
@@ -437,6 +459,7 @@ impl PartStudioView {
 
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.apply_display");
+        let geometry_changed = !Arc::ptr_eq(&self.display, &display);
         self.display = display;
         // Before building: the scene draws the edited sketch in its editing
         // colors only once `opts.editing_sketch` is set (otherwise an
@@ -445,9 +468,15 @@ impl PartStudioView {
         self.ui.measure_lines = None;
         self.opts.vertex_colors = self.vertex_colors(cx);
         let shown = self.display_for_scene();
-        let built = scene_builder::build(&shown, &self.opts, &mut self.cache, self.gpu.uploader());
+        let opts = self.scene_options(cx);
+        let built = scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader());
         let prio = built.picks.priority_fn();
         self.built = Some(built);
+        self.ui.pick_filter = None;
+        // Thickness analysis follows every edit.
+        if geometry_changed && self.ui.thickness.as_ref().is_some_and(|t| !t.parts.is_empty()) {
+            self.recompute_thickness(cx);
+        }
         // Right-drag rotates about the geometry under the cursor.
         let disp = self.display.clone();
         let pivot: Arc<dyn Fn(glam::DVec3, glam::DVec3) -> Option<glam::DVec3> + Send + Sync> = Arc::new(move |o, d| {
@@ -488,6 +517,33 @@ impl PartStudioView {
     }
 
     /// Rebuild highlight state and push the scene to the viewport.
+    /// Scene options with the view state that isn't kept in `opts`: zebra
+    /// stripes (which can hide the edges).
+    fn scene_options(&mut self, cx: &App) -> SceneOptions {
+        let mut o = self.opts.clone();
+        o.replaced_meshes = self.thickness_meshes(cx);
+        let zebra = self.active_zebra();
+        o.zebra = zebra.map(|z| noshape_render::Zebra { stripes: z.stripes, flip: z.flip });
+        o.reflection = self.scene_reflection();
+        let hide_edges = zebra.is_some_and(|z| !z.show_edges) || self.active_reflection().is_some_and(|r| r.image.is_some() && !r.show_edges);
+        if hide_edges && o.display_mode == scene_builder::DisplayMode::ShadedWithEdges {
+            o.display_mode = scene_builder::DisplayMode::Shaded;
+        }
+        o
+    }
+
+    /// Rebuild the scene for changed view options (same display).
+    pub(super) fn rebuild_scene(&mut self, cx: &mut Context<Self>) {
+        if self.built.is_none() {
+            return;
+        }
+        let shown = self.display_for_scene();
+        let opts = self.scene_options(cx);
+        self.built = Some(scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader()));
+        self.refresh_scene(true, cx);
+        cx.notify();
+    }
+
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.refresh_scene");
         if self.built.is_none() {
@@ -515,6 +571,7 @@ impl PartStudioView {
         extra.extend(self.shown_dims_overlay(cx));
         extra.extend(self.analysis_tool_overlay());
         self.sync_manipulator(cx);
+        self.sync_pick_filter(cx);
         let built = self.built.as_ref().expect("built");
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, self.gpu.uploader());
         if let Some(q) = &self.ui.query_hover {
@@ -623,6 +680,9 @@ impl PartStudioView {
             sk.regions.iter().map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH) {
             vec![Reference::Sketch(id)]
+        } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
+            // Hole locations: every point of the sketch (Onshape).
+            sketch_points(sk)
         } else {
             Vec::new()
         };
@@ -767,9 +827,12 @@ impl PartStudioView {
                     Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, *position, modifiers.alt, cx),
                     other => other,
                 };
-                // Clicking near a hovered edge's midpoint picks the midpoint.
+                // Clicking near a hovered edge's midpoint picks the midpoint,
+                // unless the active field takes no points (Onshape: picks
+                // follow the field's filter).
+                let takes_points = self.active_field_filter(cx).is_none_or(|f| f.intersects(QueryFilter::POINT_LIKE));
                 let target = match target {
-                    Some(t) if t.kind == PickKind::Edge => Some(self.midpoint_pick(t, *position, cx)),
+                    Some(t) if t.kind == PickKind::Edge && takes_points => Some(self.midpoint_pick(t, *position, cx)),
                     other => other,
                 };
                 match target {
@@ -863,6 +926,8 @@ impl PartStudioView {
     }
 
     fn open_dialog(&mut self, feature: Feature, index: usize, is_new: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // The edited row shows as being edited, not selected.
+        self.selected_features.clear();
         let units = self.doc.read(cx).session.doc.settings.units;
         let labeler = self.labeler(cx);
         let is_derived = feature.type_id == "importDerived";
@@ -968,6 +1033,8 @@ impl PartStudioView {
         self.leave_sketch(cx);
         self.restore_after_sketch(cx);
         let Some(e) = self.edit.take() else { return };
+        // Nothing stays selected after a feature is accepted (Onshape).
+        self.selected_features.clear();
         self.ui.query_hover = None;
         self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
@@ -1345,7 +1412,7 @@ impl PartStudioView {
                     this.start_feature(id, window, cx);
                 }
             }));
-        let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, ty.description, main);
+        let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, crate::tool_text::description(id).unwrap_or(ty.description), main);
         if group.len() <= 1 {
             return main;
         }
@@ -1408,6 +1475,12 @@ impl PartStudioView {
         let pal = p();
         let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
         let rollback = studio.rollback_index();
+        // Editing a feature rolls the model to just after it: the rows
+        // below show rolled back (Onshape), unless "Final" is on.
+        let rollback = match &self.edit {
+            Some(e) if !e.is_new && !e.dialog.read(cx).show_final => rollback.min(e.index + 1),
+            _ => rollback,
+        };
         let filtered = noshape_model::interaction::filter_features(&studio, &self.display, &self.ui.filter_query);
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut dg_rows: Vec<AnyElement> = Vec::new();
@@ -2104,6 +2177,11 @@ impl PartStudioView {
                 if this.pick_feature_into_dialog(id, cx) {
                     return;
                 }
+                // A dialog field that can't take it: the row isn't selected.
+                if let Some(f) = this.active_field_filter(cx) {
+                    this.flash_info(behaviors::filter_description(f), cx);
+                    return;
+                }
                 this.click_feature(id, ev.modifiers().shift, cx);
                 // Onshape: after clicking a row, ↑/↓ move the rollback bar.
                 window.focus(&this.ui.list_focus, cx);
@@ -2301,6 +2379,10 @@ impl PartStudioView {
                 );
             }
         }
+        // Graphics preferences (Camera and render options), in the dialog place.
+        if let Some((d, _)) = &self.ui.graphics_dialog {
+            out.push(div().absolute().top(px(3.)).left(px(0.)).child(d.clone()).into_any_element());
+        }
         // Feature dialog.
         if let Some(e) = &self.edit {
             // Moved dialogs keep their place (Onshape lets you drag them).
@@ -2492,6 +2574,16 @@ fn edge_creator(n: &TopoName) -> Option<FeatureId> {
 }
 
 /// Whether a picked target fits a query filter.
+/// The points a sketch offers a point field (Hole locations): its sketch
+/// points, else every vertex (curve ends and centers).
+pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<Reference> {
+    let standalone: Vec<Reference> = sk.points.iter().filter(|p| p.standalone).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect();
+    if !standalone.is_empty() {
+        return standalone;
+    }
+    sk.points.iter().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
+}
+
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     let want = |q: QueryFilter| f.intersects(q);
     match kind {
@@ -2580,6 +2672,8 @@ impl Render for PartStudioView {
         overlay.extend(self.render_dependencies(cx));
         overlay.extend(self.render_shown_dims(cx));
         overlay.extend(self.render_analysis_tool(cx));
+        overlay.extend(self.render_thickness_legend(cx));
+        overlay.extend(self.render_thickness_progress());
         overlay.extend(self.render_select_other(cx));
         overlay.extend(self.render_mini_toolbar(cx));
         overlay.extend(self.render_selection_badge(cx));
@@ -2637,6 +2731,10 @@ impl Render for PartStudioView {
                     this.close_section_dialog(false, window, cx);
                     return;
                 }
+                if this.ui.env_picker.take().is_some() {
+                    cx.notify();
+                    return;
+                }
                 if this.close_analysis_tool(cx) {
                     return;
                 }
@@ -2667,6 +2765,9 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(|this, _: &Accept, window, cx| {
+                if this.accept_view_tool(cx) {
+                    return;
+                }
                 if this.ui.section_dialog.is_some() {
                     this.close_section_dialog(true, window, cx);
                 } else if this.ui.select_other.is_some() {

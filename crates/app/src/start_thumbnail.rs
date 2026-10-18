@@ -170,10 +170,14 @@ impl Thumbnailer {
             return None;
         }
         let doc = &session.doc;
-        let (tab, studio) = doc.ordered_tabs().iter().find_map(|t| match &t.content {
+        // Tab › Select as document thumbnail, else the first Part Studio.
+        let chosen = session.store.get_meta("thumbnail_tab").ok().flatten().and_then(|b| String::from_utf8_lossy(&b).parse::<u64>().ok());
+        let pick = |t: &&noshape_model::document::Tab| match &t.content {
             TabContent::PartStudio(ps) => Some((t.id, ps.clone())),
             _ => None,
-        })?;
+        };
+        let tabs = doc.ordered_tabs();
+        let (tab, studio) = tabs.iter().filter(|t| Some(t.id.0) == chosen).find_map(pick).or_else(|| tabs.iter().find_map(pick))?;
         Some(Job {
             config: studio.configuration.defaults(),
             studio,

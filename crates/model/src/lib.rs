@@ -6,6 +6,7 @@
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
 pub mod analysis;
+pub mod thickness;
 pub mod assembly;
 pub mod compare;
 pub mod configuration;

@@ -574,7 +574,7 @@ pub fn scripts() -> Arc<DocumentScripts> {
         let mut doc = Document::new();
         doc.tabs.clear();
         doc.settings.tab_order.clear();
-        let id = doc.add_tab("Standard content", TabContent::FeatureStudio(crate::custom::FeatureStudio { source: SOURCE.to_string() }));
+        let id = doc.add_tab("Standard content", TabContent::FeatureStudio(crate::custom::FeatureStudio::new(SOURCE)));
         if let Some(t) = doc.tab_mut(id) {
             t.id = STANDARD_TAB;
         }

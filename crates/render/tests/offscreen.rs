@@ -99,6 +99,28 @@ fn disk_mesh(center: [f32; 3], radius: f32, z_sign: f32, pick_id: u32) -> MeshDa
     m
 }
 
+/// A UV sphere around the origin (counter-clockwise from outside).
+fn sphere_mesh(radius: f32, n: u32) -> MeshData {
+    let mut m = MeshData::default();
+    for i in 0..=n {
+        let t = i as f32 / n as f32 * std::f32::consts::PI;
+        for j in 0..=n {
+            let ph = j as f32 / n as f32 * std::f32::consts::TAU;
+            let d = [t.sin() * ph.cos(), t.sin() * ph.sin(), t.cos()];
+            m.positions.push([d[0] * radius, d[1] * radius, d[2] * radius]);
+            m.normals.push(d);
+        }
+    }
+    m.pick_ids = vec![1; m.positions.len()];
+    let at = |i: u32, j: u32| i * (n + 1) + j;
+    for i in 0..n {
+        for j in 0..n {
+            m.indices.extend_from_slice(&[at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+        }
+    }
+    m
+}
+
 fn iso_camera() -> Camera {
     let mut cam = Camera::default();
     cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
@@ -354,6 +376,94 @@ fn section_caps_cover_the_cut() {
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }
 
+/// Zebra stripes: a shaded box face turns into black and white stripes
+/// whose count follows the instance setting; turning them off restores
+/// the normal shading.
+#[test]
+fn zebra_stripes_replace_shading() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (300u32, 300u32);
+    let mesh = r.upload_mesh(&sphere_mesh(0.05, 48));
+    let mut cam = iso_camera();
+    cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), 1.0);
+    let mut shot = |zebra: Option<Zebra>| {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).with_color([0.45, 0.6, 0.75, 1.0]).zebra(zebra));
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        // Black / white / other pixels in the middle of the sphere, and
+        // black-white changes along its vertical center line.
+        let px = |x: u32, y: u32| {
+            let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+            (p[2] as i32, p[1] as i32, p[0] as i32)
+        };
+        let (mut black, mut white, mut other) = (0, 0, 0);
+        for y in (h / 2 - 40)..(h / 2 + 40) {
+            for x in (w / 2 - 40)..(w / 2 + 40) {
+                match px(x, y) {
+                    (0..=10, 0..=10, 0..=10) => black += 1,
+                    (245.., 245.., 245..) => white += 1,
+                    _ => other += 1,
+                }
+            }
+        }
+        let column: Vec<bool> = ((h / 2 - 40)..(h / 2 + 40)).map(|y| px(w / 2, y).0 > 128).collect();
+        let changes = column.windows(2).filter(|c| c[0] != c[1]).count();
+        (black, white, other, changes)
+    };
+    let (b, wh, o, few) = shot(Some(Zebra { stripes: 10, flip: false }));
+    assert!(b > 500 && wh > 500 && o < 200, "not striped: {b} black, {wh} white, {o} other");
+    let (_, _, _, many) = shot(Some(Zebra { stripes: 40, flip: false }));
+    assert!(many > few && few > 0, "stripe count ignored: {few} vs {many} changes");
+    let (b, wh, _, _) = shot(None);
+    assert!(b < 50 && wh < 50, "shading not restored: {b} black, {wh} white");
+}
+
+/// Reflection analysis: a box mirrors a two-tone environment (white sky,
+/// black ground): its top face reflects the sky, its sides the ground.
+#[test]
+fn reflection_mirrors_the_environment() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (ew, eh) = (64u32, 32u32);
+    let rgba: Vec<u8> = (0..eh).flat_map(|y| std::iter::repeat_n(if y < eh / 2 { [255u8, 255, 255, 255] } else { [0, 0, 0, 255] }, ew as usize).flatten()).collect();
+    let env = r.upload_image(&ImageData { corners: [[0.0; 3]; 4], width: ew, height: eh, rgba });
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1));
+    let (w, h) = (300u32, 300u32);
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, -1.0, -1.0).normalize(), glam::DVec3::Z), ..Default::default() };
+    cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), 1.0);
+    let mut shot = |reflection: Option<Reflection>| {
+        let mut scene = Scene::default();
+        scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).with_color([0.45, 0.6, 0.75, 1.0]).reflection(reflection));
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        // The middle of the view, where the three visible faces meet.
+        let (mut white, mut black) = (0, 0);
+        for (y, x) in (h / 2 - 50..h / 2 + 50).flat_map(|y| (w / 2 - 50..w / 2 + 50).map(move |x| (y, x))) {
+            let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+            match (p[2], p[1], p[0]) {
+                (250.., 250.., 250..) => white += 1,
+                (0..=5, 0..=5, 0..=5) => black += 1,
+                _ => {}
+            }
+        }
+        (white, black)
+    };
+    let (white, black) = shot(Some(Reflection { environment: env.clone(), rotation: 0.0, blur: false, lock: false }));
+    assert!(white > 1500 && black > 1500, "not mirrored: {white} white, {black} black pixels");
+    let (_, black) = shot(None);
+    assert!(black < 100, "shaded box has {black} black pixels");
+}
+
 /// Sketch images: a textured quad facing the camera shows its texels the
 /// right way up, is depth tested against meshes in front of and behind it
 /// (transparent texels show what is behind), fades with the instance alpha,
@@ -480,4 +590,37 @@ fn image_with_odd_size_uploads_mips() {
     let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
     let px = &f.bgra[(((h / 2) * w + w / 2) * 4) as usize..][..3];
     assert!(px[2] > 220 && px[1] < 40 && px[0] < 40, "center should be red, got {px:?}");
+}
+
+/// `hidden_only` lines show only where geometry hides them (the active
+/// sketch's "underconstrained occluded" color).
+#[test]
+fn hidden_only_lines_show_only_behind_geometry() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1)))));
+    let mut line = LineData::default();
+    // Behind the box as seen from the front (the front view looks along +Y).
+    line.push_polyline(&[[-0.03, 0.02, 0.0], [0.03, 0.02, 0.0]], [255, 0, 0, 255], 0, 4.0, 0);
+    scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&line))).per_primitive_color().unpickable().hidden_only());
+    let mut cam = Camera { rotation: Camera::rotation_for(StandardView::Front), ..Default::default() };
+    cam.fit_sphere(glam::DVec3::ZERO, 0.035, 4.0 / 3.0);
+    let (w, h) = (400u32, 300u32);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let px = |p: glam::DVec3| {
+        let s = cam.project(p, vp, 0.05).unwrap();
+        let o = ((s.y as u32 * w + s.x as u32) * 4) as usize;
+        [f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]]
+    };
+    let hidden = px(glam::DVec3::new(0.0, 0.02, 0.0));
+    let visible = px(glam::DVec3::new(0.025, 0.02, 0.0));
+    assert!(hidden[0] > 200 && hidden[1] < 80, "the hidden part is drawn: {hidden:?}");
+    assert!(visible[0] > 200 && visible[1] > 200, "the visible part is not: {visible:?}");
 }

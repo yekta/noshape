@@ -59,3 +59,26 @@ migrating the drawing menus to `os_menu` (`fill_os_menu`): keep edits surgical, 
 - `/tmp/asb/bin/start.sh` (assembly demo on :104), then `/tmp/asb/bin/newdraw.sh` creates
   "Assembly 1 Drawing 1" with No views; `--demo-drawing-full` via `dstart.sh` opens the showcase.
 - Model: `cargo test -p noshape-model --lib drawing::`.
+
+## From ui2 (visual changes in your files, 18 Oct)
+- `model/drawing/sheet.rs`: Onshape sheet frame (`add_border_and_title_full`: edge line, inset frame, zone
+  dividers/labels in the band, ANSI zone counts) and **`SheetGeometry::grips`** (`Grip { pick, pos, kind:
+  Origin | End | Handle }`), emitted by `linear_dimension_text` (attachment points, dimension-line ends,
+  flip handles). `build.rs` remaps grip picks like lines/texts. Please emit grips from the other
+  dimension builders too (radial, angular, ordinate…) when you touch them.
+- `model/drawing/font.rs`: `text_fill` / `fill_supported` (filled Liberation Sans text on screen).
+- `drawing_view.rs`: paper unlit; `texts` meshes; `push_annotation_hover` = Onshape's hovered-annotation
+  look (tan `#ccb292` lines + label box, `#90cef1` / `#cc925c` grips, diamonds, arrowheads covered);
+  `MenuEntry::Item` has `icon: Option<&'static str>` (`.with_icon("…")`); `fill_os_menu`;
+  `open_tool_menu` (toolbar carets open `os_menu` lists in Onshape's drawing-toolbar style). The view
+  and sheet right-click menus use `fill_os_menu`.
+- `drawing_scene.rs`: black ink, thinner on-screen widths, text as filled meshes.
+- `drawing_extra.rs`: Sheets panel (closed by default, sheet chips, toggle tab, sort tabs).
+- `drawing_ui.rs`: the always-on status line is gone (prompts stay).
+- Still yours: the selected-dimension look (not captured yet), dimension editor, toolbar contents.
+- Drawing tab › Export… (workspace.rs `open_export`) now exists, as in Onshape's Drawing tab menu. Until your
+  "Export Drawing" modal lands it calls `DrawingEditor::export(ExportFormat::Pdf, …)`; please point it at your
+  modal (one line, marked "asb:" in `Workspace::open_export`). For the modal's look, `crate::os_ui::export_modal`
+  (File name + Format select, 600 px, Export / Cancel) and `os_ui::select_field` (Onshape form select that opens
+  an os_menu select list) are available; add the extra rows (Version, Overridden dimensions, Text, Color, Options,
+  ☐ Hide inspection items) as more `field_label` + `select_field` pairs.

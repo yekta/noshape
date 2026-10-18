@@ -61,7 +61,7 @@ pub(crate) fn auto_orientation(p: [f64; 2], q: [f64; 2], c: [f64; 2]) -> DimOrie
 }
 
 /// Intersection of two infinite 2D lines.
-fn intersect(a0: [f64; 2], a1: [f64; 2], b0: [f64; 2], b1: [f64; 2]) -> Option<[f64; 2]> {
+pub(crate) fn intersect(a0: [f64; 2], a1: [f64; 2], b0: [f64; 2], b1: [f64; 2]) -> Option<[f64; 2]> {
     let r = sub(a1, a0);
     let s = sub(b1, b0);
     let den = r[0] * s[1] - r[1] * s[0];
@@ -113,7 +113,7 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
-        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() {
+        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) {
             self.status = None;
             cx.notify();
             return;
@@ -131,6 +131,9 @@ impl DrawingEditor {
             self.tool = Tool::Select;
             self.overlay = Overlay::default();
             self.hover_snap = None;
+            // Onshape: Esc ends the tool and nothing stays selected (the
+            // base view of a projected-view chain is no longer orange).
+            self.selection.clear();
             self.set_preview(None, cx);
             self.redraw(cx);
             return;
@@ -185,6 +188,15 @@ impl DrawingEditor {
             Tool::Detail { center: None, .. } => "Click the center of the detail circle",
             Tool::Detail { radius: None, .. } => "Click to set the detail radius",
             Tool::Detail { .. } => "Click to place the detail view",
+            Tool::HoleCallout { circle: None } => "Select a circle of a hole or thread",
+            Tool::HoleCallout { .. } => "Drag to place the callout and click",
+            Tool::EdgeCenterline { first: None } => "Select a cylinder silhouette edge, or the first of two edges",
+            Tool::EdgeCenterline { .. } => "Select the second edge",
+            Tool::CircleCenterline { three: true, points } if points.len() < 3 => "Select three points on the circle (hole centers, end, mid or quad points)",
+            Tool::CircleCenterline { points, .. } if points.is_empty() => "Select the center of the circle",
+            Tool::CircleCenterline { .. } => "Select a point on the circle",
+            Tool::VirtualSharp { first: None } => "Select the first straight edge",
+            Tool::VirtualSharp { .. } => "Select the second straight edge",
             Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.is_empty() => "Select the chamfer edge",
             Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.len() == 1 => "Select the adjacent edge",
             Tool::Dimension { kind: DimTool::ArcLength, picks } if picks.is_empty() => "Select an arc",
@@ -192,8 +204,9 @@ impl DrawingEditor {
             Tool::Dimension { kind: DimTool::Angle, picks } if picks.len() < 2 => "Select two straight edges",
             Tool::Dimension { kind: DimTool::Angle3, picks } if picks.is_empty() => "Select the vertex of the angle",
             Tool::Dimension { kind: DimTool::Angle3, picks } if picks.len() < 3 => "Select a point on each side of the angle",
-            Tool::Dimension { picks, .. } if picks.is_empty() => "Select a point or a straight edge",
-            Tool::Dimension { picks, .. } if picks.len() == 1 && matches!(picks[0], Pick::Point(_)) => "Select the second point",
+            Tool::Dimension { picks, .. } if picks.is_empty() => "Select a circle, arc, line, circle center or point",
+            Tool::Dimension { picks, .. } if picks.len() == 1 && matches!(picks[0], Pick::Point(_)) => "Select a second entity",
+            Tool::Dimension { kind: DimTool::Linear, picks } if picks.len() == 1 => "Click to place the dimension, or select a second entity",
             Tool::Dimension { .. } => "Click to place the dimension",
             Tool::Note => "Click to place the note",
             Tool::Centermark => "Select a circle or arc",
@@ -261,6 +274,21 @@ impl DrawingEditor {
                 let d = if sn.kind == SnapKind::Center { d + 0.01 } else { d };
                 if best.as_ref().is_none_or(|(bd, _)| d < *bd) {
                     best = Some((d, PickedPoint { view: pl.id, p: sn.p, r: sn.point.clone() }));
+                }
+            }
+            // Construction annotations: virtual sharps and circle centerline
+            // centers (and their quadrants) are snap points too.
+            for a in self.current_sheet().annotations.iter().filter(|a| a.kind.view() == Some(pl.id)) {
+                let cand: Option<([f64; 2], Option<PointRef>)> = match &a.kind {
+                    AnnotationKind::VirtualSharp { a1, b1, a2, b2, .. } => AnnotationKind::line_intersection(*a1, *b1, *a2, *b2).map(|x| (x, a.refs.iter().find(|r| r.slot == 4).map(|r| r.point.clone()))),
+                    AnnotationKind::CircleCenterline { points, .. } => AnnotationKind::circle_centerline(points).map(|(cc, _)| (cc, None)),
+                    _ => None,
+                };
+                if let Some((p, r)) = cand {
+                    let d = len(sub(p, vp)) * pl.scale * 1000.0;
+                    if len(sub(p, vp)) <= tol && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
+                        best = Some((d, PickedPoint { view: pl.id, p, r }));
+                    }
                 }
             }
             // Shift+Q: edge midpoints and circle quadrant points.
@@ -335,8 +363,17 @@ impl DrawingEditor {
         let g = self.geoms.get(&view)?;
         let vp = pl.to_view(s);
         let tol = self.tol_mm(6.0) / (pl.scale * 1000.0);
+        // Circle centerlines (bolt circles) can be dimensioned too.
+        let construction: Vec<([f64; 2], f64, Option<PointRef>)> = self
+            .current_sheet()
+            .annotations
+            .iter()
+            .filter(|a| a.kind.view() == Some(view))
+            .filter_map(|a| if let AnnotationKind::CircleCenterline { points, .. } = &a.kind { AnnotationKind::circle_centerline(points).map(|(c, r)| (c, r, None)) } else { None })
+            .collect();
         g.circles()
             .into_iter()
+            .chain(construction)
             .filter(|(c, r, _)| (len(sub(vp, *c)) - r).abs() < tol)
             .min_by(|a, b| (len(sub(vp, a.0)) - a.1).abs().total_cmp(&(len(sub(vp, b.0)) - b.1).abs()))
             .map(|(center, radius, r)| Pick::Circle { view, center, radius, r })
@@ -376,8 +413,12 @@ impl DrawingEditor {
             Tool::Dimension { kind: DimTool::Linear, picks } => {
                 let (a, b) = match picks.as_slice() {
                     [Pick::Line { a, b }] => (a.clone(), b.clone()),
-                    [Pick::Point(a), Pick::Point(b)] => (a.clone(), b.clone()),
-                    _ => return None,
+                    [Pick::Point(a), Pick::Point(b)] if a.view == b.view => (a.clone(), b.clone()),
+                    // The smart Dimension (d): the picks decide the kind (drawing_smart).
+                    _ => {
+                        let (kind, refs) = self.smart_dimension(picks)?;
+                        return Some(ann(kind, refs));
+                    }
                 };
                 let (ps, qs) = (self.pick_sheet(&a)?, self.pick_sheet(&b)?);
                 // Horizontal / vertical / aligned follows the cursor (Onshape).
@@ -409,31 +450,11 @@ impl DrawingEditor {
             }
             Tool::Dimension { kind: DimTool::Angle, picks } => {
                 let [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] = picks.as_slice() else { return None };
-                if a1.view != a2.view {
-                    return None;
-                }
-                let v = intersect(a1.p, b1.p, a2.p, b2.p)?;
-                let far = |a: &PickedPoint, b: &PickedPoint| if len(sub(a.p, v)) > len(sub(b.p, v)) { a.clone() } else { b.clone() };
-                let near = |a: &PickedPoint, b: &PickedPoint| if len(sub(a.p, v)) > len(sub(b.p, v)) { b.clone() } else { a.clone() };
-                let (mut pa, mut pb) = (far(a1, b1), far(a2, b2));
-                let ang = |p: [f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]);
-                let mut sweep = ang(pb.p) - ang(pa.p);
-                while sweep < 0.0 {
-                    sweep += std::f64::consts::TAU;
-                }
-                if sweep > std::f64::consts::PI {
-                    std::mem::swap(&mut pa, &mut pb);
-                }
-                let pl = self.placement(a1.view)?;
-                let radius = len(sub(c, pl.to_sheet(v))).max(3.0);
-                let (n1, n2) = (near(a1, b1), near(a2, b2));
-                let vref = match (&n1.r, &n2.r) {
-                    (Some(x), Some(y)) if x == y && len(sub(n1.p, v)) < 1e-7 => Some(x.clone()),
-                    _ => None,
-                };
-                let refs = if vref.is_some() { vec![(0, vref), (1, pa.r.clone()), (2, pb.r.clone())] } else { vec![] };
-                Some(ann(AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius }, refs))
+                let (kind, refs) = self.angular_from_lines(a1, b1, a2, b2)?;
+                Some(ann(kind, refs))
             }
+
+            Tool::HoleCallout { circle: Some((view, center, radius, r)) } => Some(ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius }, vec![(0, r.clone())])),
             Tool::Balloon { anchor: Some(a) } => {
                 // In assembly views a callout on a part shows its BOM item (empty text = linked).
                 let linked = views::view_source(self.current_sheet(), a.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) && a.r.is_some();
@@ -534,6 +555,7 @@ impl DrawingEditor {
             | Tool::DatumTarget { anchor: None }
             | Tool::GdtLeader { .. }
             | Tool::Centerline { .. }
+            | Tool::CircleCenterline { .. }
             | Tool::Balloon { anchor: None }
             | Tool::Section { p0: None, .. }
             | Tool::Detail { center: None, .. }
@@ -578,6 +600,24 @@ impl DrawingEditor {
                     overlay.lines.push((vec![sa, self.hover_snap.unwrap_or(c)], true));
                 }
             }
+            Tool::CircleCenterline { three, points } if !points.is_empty() => {
+                let at = self.hover_snap.unwrap_or(c);
+                let mut pts: Vec<[f64; 2]> = points.iter().filter_map(|p| self.pick_sheet(p)).collect();
+                overlay.points.extend(pts.iter().copied());
+                pts.push(at);
+                if (*three && pts.len() == 3) || (!*three && pts.len() == 2) {
+                    if let Some((cc, r)) = AnnotationKind::circle_centerline(&pts) {
+                        overlay.circle(cc, r, true);
+                    }
+                } else if pts.len() == 2 {
+                    overlay.lines.push((pts, true));
+                }
+            }
+            Tool::EdgeCenterline { first: Some((a, b)) } | Tool::VirtualSharp { first: Some((a, b, _)) } => {
+                if let (Some(sa), Some(sb)) = (self.pick_sheet(a), self.pick_sheet(b)) {
+                    overlay.lines.push((vec![sa, sb], false));
+                }
+            }
             Tool::Section { parent: Some(pid), p0: Some(p0), line: None, .. } => {
                 if let Some(pl) = self.placement(*pid) {
                     let a = pl.to_sheet(*p0);
@@ -617,6 +657,9 @@ impl DrawingEditor {
             preview = Some(d);
         }
         overlay.infer = self.infer_lines.clone();
+        for (c, r) in self.centermark_overlay() {
+            overlay.circle(c, r, false);
+        }
         self.overlay = overlay;
         let had_preview = self.preview.is_some();
         if preview.is_some() || had_preview {
@@ -652,6 +695,10 @@ impl DrawingEditor {
     }
 
     fn tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Centermark dialog: Single places at once, Circular / Linear collect circles.
+        if matches!(self.tool, Tool::Centermark) && self.centermark_click(cx) {
+            return;
+        }
         let c = self.cursor;
         if self.extra_tool_click(window, cx) {
             self.update_preview(cx);
@@ -694,7 +741,15 @@ impl DrawingEditor {
                 }
             }
             Tool::Section { p0: None, partial, .. } => {
-                let pick = self.snap_at(c).or_else(|| self.view_at(c).and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
+                // A click just outside a view still cuts it (8 mm around it).
+                let near = self.view_at(c).or_else(|| {
+                    let b = self.built.as_ref()?;
+                    b.placements.iter().filter(|p| p.contains(c, 8.0)).min_by(|x, y| x.dist_to(c).total_cmp(&y.dist_to(c))).map(|p| p.id)
+                });
+                let pick = self.snap_at(c).or_else(|| near.and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
+                if pick.is_none() {
+                    self.status = Some("Select a view to section".into());
+                }
                 if let Some(pp) = pick {
                     // Section view dialog › Vertical / Horizontal: one click places the whole line.
                     let axis_line = self.section_axis().filter(|_| !partial).and_then(|e| self.placement(pp.view).and_then(|pl| self.extend_cut(pp.view, pl.to_sheet(pp.p), e)));
@@ -746,7 +801,10 @@ impl DrawingEditor {
                 }
             }
             Tool::Dimension { kind, mut picks } => {
-                if let Some(a) = self.pending_annotation() {
+                // Smart Dimension: a click on another entity adds it (a second
+                // pick) instead of placing; on a picked edge it deselects it.
+                let more = kind == DimTool::Linear && picks.len() == 1 && self.smart_takes(c, &picks[0]);
+                if !more && let Some(a) = self.pending_annotation() {
                     self.edit_sheet(kind.name(), cx, |s| s.annotations.push(a));
                     self.tool = Tool::Dimension { kind, picks: vec![] };
                 } else {
@@ -772,30 +830,122 @@ impl DrawingEditor {
                                 picks.push(Pick::Point(p));
                             }
                         }
-                        _ => {
-                            if let Some(p) = self.snap_at(c) {
-                                if picks.first().is_some_and(|f| matches!(f, Pick::Point(a) if a.view != p.view)) {
-                                    picks.clear();
-                                }
-                                picks.push(Pick::Point(p));
-                            } else if picks.is_empty()
-                                && let Some(l) = self.line_pick()
-                            {
-                                picks.push(l);
-                            }
-                        }
+                        _ => self.smart_click(c, &mut picks),
                     }
                     self.tool = Tool::Dimension { kind, picks };
                 }
             }
-            Tool::Note => self.open_note_panel(None, c, window, cx),
-            Tool::Centermark => {
+            Tool::HoleCallout { circle: None } => {
                 if let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(c) {
-                    let id = self.current_sheet().next_annotation_id();
-                    let refs = r.map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default();
-                    self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25 }, position: c, refs, ..Default::default() }));
+                    self.tool = Tool::HoleCallout { circle: Some((view, center, radius, r)) };
                 }
             }
+            Tool::HoleCallout { circle: Some(_) } => {
+                if let Some(a) = self.pending_annotation() {
+                    self.edit_sheet("Hole callout", cx, |s| s.annotations.push(a));
+                    self.tool = Tool::HoleCallout { circle: None };
+                }
+            }
+            Tool::EdgeCenterline { first } => {
+                let Some(Pick::Line { a, b }) = self.line_pick() else {
+                    self.status = Some("Select a straight edge".into());
+                    return;
+                };
+                match first {
+                    None => {
+                        // A cylinder / cone silhouette: its axis (the view's axis line parallel to it).
+                        let dir = norm(sub(b.p, a.p));
+                        let axis = self.geoms.get(&a.view).and_then(|g| {
+                            g.axes
+                                .iter()
+                                .filter(|ax| (dot(norm(sub(ax[1], ax[0])), dir)).abs() > 1.0 - 1e-6)
+                                .min_by(|x, y| {
+                                    let d = |ax: &[[f64; 2]; 2]| {
+                                        let n = [-dir[1], dir[0]];
+                                        dot(sub(ax[0], a.p), n).abs()
+                                    };
+                                    d(x).total_cmp(&d(y))
+                                })
+                                .copied()
+                        });
+                        let edge_len = len(sub(b.p, a.p));
+                        match axis.filter(|ax| {
+                            let n = [-dir[1], dir[0]];
+                            dot(sub(ax[0], a.p), n).abs() < edge_len.max(1e-6) * 2.0
+                        }) {
+                            Some(ax) => {
+                                // Span the silhouette edge along the axis.
+                                let o = ax[0];
+                                let t0 = dot(sub(a.p, o), dir);
+                                let t1 = dot(sub(b.p, o), dir);
+                                let (p, q) = ([o[0] + dir[0] * t0, o[1] + dir[1] * t0], [o[0] + dir[0] * t1, o[1] + dir[1] * t1]);
+                                let id = self.current_sheet().next_annotation_id();
+                                self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: p, b: q }, position: c, ..Default::default() }));
+                            }
+                            None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
+                        }
+                    }
+                    Some((a1, b1)) => {
+                        if a.view != a1.view {
+                            self.status = Some("Select an edge in the same view".into());
+                            return;
+                        }
+                        // The middle line of the two edges (ends paired along the first edge).
+                        let dir = norm(sub(b1.p, a1.p));
+                        let (a2, b2) = if dot(sub(b.p, a.p), dir) >= 0.0 { (a.p, b.p) } else { (b.p, a.p) };
+                        let mid = |p: [f64; 2], q: [f64; 2]| [(p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5];
+                        let (p, q) = (mid(a1.p, a2), mid(b1.p, b2));
+                        let id = self.current_sheet().next_annotation_id();
+                        self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: p, b: q }, position: c, ..Default::default() }));
+                        self.tool = Tool::EdgeCenterline { first: None };
+                    }
+                }
+            }
+            Tool::CircleCenterline { three, mut points } => {
+                if let Some(p) = self.snap_at(c).filter(|p| points.first().is_none_or(|f| f.view == p.view)) {
+                    points.push(p);
+                }
+                let need = if three { 3 } else { 2 };
+                if points.len() >= need {
+                    let view = points[0].view;
+                    let refs: Vec<AnnotationRef> = points.iter().enumerate().filter_map(|(k, p)| p.r.clone().map(|point| AnnotationRef { slot: k as u8, point })).collect();
+                    let pts: Vec<[f64; 2]> = points.iter().map(|p| p.p).collect();
+                    if AnnotationKind::circle_centerline(&pts).is_some() {
+                        let id = self.current_sheet().next_annotation_id();
+                        let name = if three { "3 point circle centerline" } else { "2 point circle centerline" };
+                        self.edit_sheet(name, cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::CircleCenterline { view, points: pts }, position: c, refs, ..Default::default() }));
+                    }
+                    points.clear();
+                }
+                self.tool = Tool::CircleCenterline { three, points };
+            }
+            Tool::VirtualSharp { first } => {
+                let Some((view, me)) = self.hovered_edge() else { return };
+                let Some(Pick::Line { a, b }) = self.line_pick() else {
+                    self.status = Some("Select a straight edge".into());
+                    return;
+                };
+                let edge = Some((me.body.clone(), (*me.name).clone()));
+                match first {
+                    None => self.tool = Tool::VirtualSharp { first: Some((a, b, edge)) },
+                    Some((a1, b1, e1)) if a1.view == view => {
+                        if AnnotationKind::line_intersection(a1.p, b1.p, a.p, b.p).is_none() {
+                            self.status = Some("The edges are parallel".into());
+                            return;
+                        }
+                        let mut refs: Vec<AnnotationRef> = [(0u8, &a1.r), (1, &b1.r), (2, &a.r), (3, &b.r)].into_iter().filter_map(|(slot, r)| r.clone().map(|point| AnnotationRef { slot, point })).collect();
+                        // Slot 4: the intersection itself, for associative dimensions to it.
+                        if let (Some((body, name)), Some((body2, name2))) = (e1, edge) {
+                            refs.push(AnnotationRef { slot: 4, point: PointRef::Intersection { body, name, body2, name2 } });
+                        }
+                        let id = self.current_sheet().next_annotation_id();
+                        self.edit_sheet("Virtual sharp", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::VirtualSharp { view, a1: a1.p, b1: b1.p, a2: a.p, b2: b.p }, position: c, refs, ..Default::default() }));
+                        self.tool = Tool::VirtualSharp { first: None };
+                    }
+                    Some(_) => self.status = Some("Select an edge in the same view".into()),
+                }
+            }
+            Tool::Note => self.open_note_panel(None, c, window, cx),
             Tool::Centerline { first: None } => {
                 if let Some(p) = self.snap_at(c) {
                     self.tool = Tool::Centerline { first: Some(p) };
@@ -835,8 +985,26 @@ impl DrawingEditor {
             self.menu = None;
             cx.notify();
         }
+        if self.shortcut_toolbar.take().is_some() {
+            cx.notify();
+        }
+        if e.button == MouseButton::Left && self.painter.is_some() && self.painter_click(cx) {
+            cx.stop_propagation();
+            return;
+        }
+        if e.button == MouseButton::Left && self.inspection.is_some() && self.inspection_click(window, cx) {
+            cx.stop_propagation();
+            return;
+        }
+        if e.button == MouseButton::Left && self.measure_click(cx) {
+            cx.stop_propagation();
+            return;
+        }
         if e.button == MouseButton::Left && self.zoom_window_down(lp, cx) {
             cx.stop_propagation();
+            return;
+        }
+        if e.button == MouseButton::Left && self.align_centermark.is_some() && self.align_centermark_click(cx) {
             return;
         }
         if e.button == MouseButton::Left && self.rotate_to_edge.is_some() && self.rotate_to_edge_click(cx) {
@@ -925,8 +1093,10 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
+            Drag::MoveInspection(_) => self.update_hover(cx),
             _ => {
                 self.update_hover(cx);
+                self.inspection_hover(cx);
                 if !matches!(self.tool, Tool::Select) {
                     // Placing a dimension or annotation: align with the others
                     // (Shift turns inferencing off).
@@ -997,6 +1167,7 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
+            Drag::MoveInspection(id) => self.drop_inspection(id, cx),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } => {
                 let name = match drag {
                     Drag::MoveTable { .. } => "Move table",
@@ -1135,6 +1306,9 @@ impl DrawingEditor {
         if let Some(d) = self.extra_start_drag(pick, start) {
             return d;
         }
+        if let Some(id) = self.inspection_at(pick) {
+            return Drag::MoveInspection(id);
+        }
         let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
         if !self.selection.contains(&sel) {
             self.selection = vec![sel];
@@ -1232,6 +1406,7 @@ impl DrawingEditor {
         let Some(h) = self.hover else { return };
         match self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned() {
             Some(PickTarget::TitleBlock) => self.open_title_panel(window, cx),
+            Some(PickTarget::Inspection(id)) => self.edit_inspection(id, window, cx),
             Some(PickTarget::Annotation(id)) => {
                 let note = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 match note {
@@ -1282,6 +1457,7 @@ impl DrawingEditor {
             Some(Sel::Annotation(id)) => {
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 if let Some(a) = &a {
+                    out.extend(self.inspection_entries(a));
                     if let AnnotationKind::Note { .. } = a.kind {
                         let pos = a.position;
                         out.push(MenuEntry::item("Edit note…", move |t, w, cx| t.open_note_panel(Some(id), pos, w, cx)));

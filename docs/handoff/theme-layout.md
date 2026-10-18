@@ -4,11 +4,24 @@ Goal: the Part Studio must look exactly like Onshape (live reference in
 /root/onshape-research/live/, spec in docs/ONSHAPE_UI_SPEC.md). Build dir
 /root/target-ui, display :101. Side-by-side shots go to /tmp/ui-shots/.
 
-## State (2026-10-18 18:15 UTC)
+## State (2026-10-18 20:10 UTC)
 
-Lead's list (selection colors, count cursor, row states, rollback label, tool search, tooltips,
-display modes, right panels, measure / mass properties, Depth alignment, menu switch) is done
-and verified on X11; see "Round 3". Open: the Wayland count cursor (see "Open for the lead").
+**For the lead:** the new disk rule `find …/debug/deps -maxdepth 1 -type f -executable -mmin +60
+-delete` also deletes proc-macro `.so` files (they are executable), which forces a rebuild of
+every dependency (gpui, rhai, nalgebra…) in that target dir. Use `… -executable ! -name '*.so'
+-mmin +60 -delete` instead.
+
+Round 4 (lead's list after the Wayland decision): Wayland count cursor done and tested; Appearance
+and Configurations bodies, Graphics preferences (dialog + live settings), Highlight boundary
+edges, tool search name matching + Onshape ranking, full tool descriptions: done (see "Round 4").
+Open: section interference color, underconstrained-occluded sketch color and mesh line width are
+in the dialog but not rendered yet; Measure unit lists wait for a live capture (REQUESTS.md).
+The documents-page menus were already switched by ui2 (with `list_no_icons()`).
+
+The shared tree didn't compile for most of this round (other agents' half-done session.rs,
+workspace.rs export dialog, reflection.rs, analysis_tools.rs); I built and tested in a private
+copy (/root/noshape-ui, rsync of the tree + local fixes of those errors only). All my edits are
+in the shared tree.
 
 ## Done this round (uncommitted)
 
@@ -210,6 +223,48 @@ and verified on X11; see "Round 3". Open: the Wayland count cursor (see "Open fo
   `m.submenu_with_icon(Some(icon), …)`. A menu opened from a button:
   `os_menu::open_anchored(point, Anchor::TopRight, OsMenu::build(window, cx, f), window, cx)`.
 
+## Round 4 (18:20-20:10)
+
+- **Tool search**: matches tool **names** only, letters in order (Onshape: "fil" → Fillet, Fill,
+  Finish flex PCB model, Finish sheet metal model, 3D fit spline, Modify fillet), ranked by the
+  first matched letter, then the span of the match, then catalog order; nothing until something is
+  typed ("Start typing to search tools", italic "Search tools" placeholder). Views and display
+  modes are no longer search results (Onshape lists tools only). final-tool-search.png.
+- **Tool descriptions** (`tool_text.rs`): every Part Studio tool, after the live tooltip and the
+  help icon glossary, in our own words; used by the expanded toolbar tooltip and the tool search
+  pane (fallback: the model's description).
+- **Appearances panel**: tabs "Parts and surfaces | Sketches and curves", one row per part / sketch
+  (bold name on `#eaeaea` | swatch bar, checkerboard under translucent colors), face/feature
+  appearances after them, double-click edits, "Add face appearance" icon (`add-appearance.svg`)
+  in the title row. Default part color is now live's `#9dcfed` (model regen/display.rs
+  `PART_COLORS[0]`); the shader's diffuse/ambient were scaled by 0.745 so the shaded part looks
+  the same as before (render tests pass). The other 7 rotation colors still come from the help
+  page; live capture requested. final-appearance.png.
+- **Configurations panel** (empty state = live): "Configure Part Studio ▾" split button (main adds a
+  List input "Configuration"; ▾: List, Checkbox, Variable; "Text" removed, Onshape has no such
+  input kind), gray illustration (`config-illustration.svg`), Onshape's text in its four lines with
+  the help link (opens the Onshape help page). With inputs, the older editor still shows (live
+  capture of the configured panel requested). final-configurations.png.
+- **Highlight boundary edges** (camera menu, checked item): laminar edges (only one face's
+  triangles contain all their points; `scene_builder::laminar_edges`, cached per mesh) in red
+  `#e00000`, 2 px solid plus 1.5 px dashed on top for the hidden parts.
+- **Graphics preferences…** (camera menu, gear icon): `graphics_prefs.rs` (global, saved to
+  `<config>/noshape/graphics.json`, Onshape defaults sampled from the help images) and
+  `graphics_prefs_dialog.rs` (feature-dialog frame, General | Sketch tabs, collapsible groups,
+  value + slider rows, color swatches with a picker, ⓘ hints, Reset to default; live preview, ✓
+  saves, ✕ restores). Applied live via `PartStudioView::apply_graphics_prefs` (observes the
+  global): field of view, edge line width (new per-instance `Instance::line_scale` in the
+  renderer), shininess + specular color (new `Style::specular` uniform), phantom tangent edge
+  width/color, active sketch line width / constrained / underconstrained colors, inactive sketch
+  width/color, construction line dash/gap pattern (new `LineSegment::CONSTRUCTION` style and
+  `Style::construction_dash`), ambient occlusion (new screen-space pass `crates/render/src/ao.rs`
+  + `ao.wgsl`: after the color pass, reads the depth buffer (now `TEXTURE_BINDING`, stored only
+  when AO is on), 12-sample spiral, multiplied into the resolved image; `Style::ambient_occlusion`).
+  Not yet rendered: section interference color, underconstrained occluded color (needs a
+  hidden-only line pass), mesh line width (no mesh bodies yet). final-graphics-prefs.png, final-graphics-prefs-sketch.png.
+- Removed the Wireframe display mode (Onshape has none) and the unused `DisplayMode`
+  ALL/label/icon, `theme::SKETCH_UNDER`.
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting
@@ -235,6 +290,8 @@ and verified on X11; see "Round 3". Open: the Wayland count cursor (see "Open fo
 - /tmp/ui-shots/final-feature-list.png: suppressed / selected / hover rows.
 - /tmp/ui-shots/final-tool-search.png, final-camera-menu.png, final-right-panel.png.
 - /tmp/ui-shots/final-measure.png, final-mass.png.
+- /tmp/ui-shots/final-appearance.png, final-configurations.png, final-graphics-prefs.png,
+  final-graphics-prefs-sketch.png, final-tool-search.png (updated: "fil").
 - (older, by the previous agent) /tmp/ui-shots/new-doc-side-by-side.png: new document.
 
 ## Measured facts (live 1920x1080 screenshot, viewport 1673x973)
@@ -260,6 +317,9 @@ and verified on X11; see "Round 3". Open: the Wayland count cursor (see "Open fo
 - Left rail and right strip icon sets vs live (Onshape has 6 rail and 5 strip buttons).
 
 ## Gotchas
+
+- Private build copies: `rsync -a` keeps file times, so cargo can miss changed files (it compares
+  them with the last build); `touch` the copied sources before building.
 
 - Never run a private worktree build with the same CARGO_TARGET_DIR as the main tree when you
   change a crate there: cargo reused the worktree's noshape-render (with an experimental edit) for

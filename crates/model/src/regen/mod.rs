@@ -11,6 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
+pub use display::tessellate_shape;
 pub mod eval;
 pub mod features;
 pub mod implicit;

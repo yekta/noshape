@@ -414,6 +414,18 @@ impl PartStudioView {
         view_cube(rotation, self.ui.cube_hover, menu, hooks, cx)
     }
 
+    /// Open Onshape's Graphics preferences dialog.
+    pub(super) fn open_graphics_prefs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let dialog = cx.new(crate::graphics_prefs_dialog::GraphicsPrefsDialog::new);
+        let sub = cx.subscribe(&dialog, |this: &mut Self, _, _: &crate::graphics_prefs_dialog::GraphicsPrefsEvent, cx| {
+            this.ui.graphics_dialog = None;
+            cx.notify();
+        });
+        window.focus(&dialog.focus_handle(cx), cx);
+        self.ui.graphics_dialog = Some((dialog, sub));
+        cx.notify();
+    }
+
     /// Onshape's "Camera and render options" dropdown (under the cube).
     fn render_camera_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let view = cx.entity();
@@ -426,6 +438,7 @@ impl PartStudioView {
         let hidden_edges = self.opts.hidden_edges_visible;
         let tangent = self.opts.tangent_edges;
         let high_quality = self.ui.high_quality;
+        let boundary = self.opts.highlight_boundary;
         // Onshape: the view-mode cube icon with a ▾ under the cube.
         let pal = p();
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
@@ -459,6 +472,8 @@ impl PartStudioView {
                 for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
                     m = m.item(item(label, Box::new(move |this, _, cx| this.view(sv, cx))));
                 }
+                m = m.separator();
+                m = m.item(item("Graphics preferences…", Box::new(|this, w, cx| this.open_graphics_prefs(w, cx))).icon_name("settings"));
                 m = m.separator();
                 m = m.item(item("Named views…", Box::new(|this, w, cx| this.toggle_named_views(w, cx))));
                 m = m.item(item("Previous view", Box::new(|this, _, cx| this.previous_view(cx))).disabled(!has_history));
@@ -528,6 +543,16 @@ impl PartStudioView {
                     let v = view.clone();
                     move |_, w, cx| v.update(cx, |this, cx| this.toggle_high_quality(w, cx))
                 }));
+                m = m.item(crate::os_menu::OsMenuItem::new("Highlight boundary edges").checked(boundary).on_click({
+                    let v = view.clone();
+                    move |_, w, cx| {
+                        v.update(cx, |this, cx| {
+                            this.opts.highlight_boundary = !this.opts.highlight_boundary;
+                            let d = this.display.clone();
+                            this.apply_display(d, w, cx);
+                        })
+                    }
+                }));
                 m = m.separator();
                 m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))))
                 });
@@ -544,7 +569,6 @@ fn display_label(m: DisplayMode) -> &'static str {
         DisplayMode::Shaded => "Shaded without edges",
         DisplayMode::HiddenLine => "Unshaded",
         DisplayMode::Translucent => "Translucent",
-        DisplayMode::Wireframe => "Wireframe",
     }
 }
 

@@ -420,6 +420,9 @@ impl DrawingEditor {
     pub fn annotation_more_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         let id = a.id;
+        if matches!(a.kind, AnnotationKind::Centermark { .. }) {
+            out.push(MenuEntry::item("Align centermark", move |t, _, cx| t.start_align_centermark(id, cx)));
+        }
         let set_kind = move |t: &mut DrawingEditor, name: &str, kind: AnnotationKind, cx: &mut Context<DrawingEditor>| {
             t.edit_sheet(name, cx, |s| {
                 if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {

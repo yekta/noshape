@@ -4,6 +4,7 @@
 //! [`Camera`] into an sRGB BGRA8 [`Frame`] (ready for a GPUI `RenderImage`)
 //! and optionally a [`PickBuffer`] of per-pixel pick ids.
 
+mod ao;
 pub mod camera;
 pub mod perf;
 pub mod primitives;

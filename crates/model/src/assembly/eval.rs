@@ -837,7 +837,13 @@ pub struct AssemblyEvaluator {
     external_studios: HashMap<(String, String), Option<ExternalStudio>>,
     /// Generated standard content parts (never change).
     standard: HashMap<super::standard::StandardSpec, Result<Arc<RegenResult>, String>>,
+    /// Finest meshes of bodies drawn with "Use best available tessellation",
+    /// by shape hash.
+    fine_meshes: HashMap<u64, Arc<MeshBuffers>>,
 }
+
+/// Chord-tolerance factor of "Use best available tessellation".
+pub const BEST_TESSELLATION: f64 = 0.1;
 
 /// Reflect a mesh across the plane through `p` with unit normal `n`
 /// (triangle winding reversed so faces stay front-facing).
@@ -1405,6 +1411,8 @@ impl AssemblyEvaluator {
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         let solved = prepared.solve(opts);
         let mut occurrences = Vec::new();
+        let best: std::collections::HashSet<InstanceId> = assembly.instances.iter().filter(|i| i.best_tessellation).map(|i| i.id).collect();
+        let mut used_fine = std::collections::HashSet::new();
         for leaf in &leaves {
             for b in &leaf.regen.display.bodies {
                 if let Some(id) = &leaf.body
@@ -1424,7 +1432,24 @@ impl AssemblyEvaluator {
                     body_name: b.name.clone(),
                     kind: b.kind,
                     color: b.color,
-                    mesh: b.mesh.clone(),
+                    mesh: match leaf.path.first().filter(|p| best.contains(p)).and_then(|_| leaf.regen.context.body(&b.id)) {
+                        Some(body) => {
+                            let key = body.shape.hash_code();
+                            used_fine.insert(key);
+                            match self.fine_meshes.get(&key) {
+                                Some(m) => m.clone(),
+                                None => match crate::regen::tessellate_shape(&body.shape, BEST_TESSELLATION) {
+                                    Some(m) => {
+                                        let m = Arc::new(m);
+                                        self.fine_meshes.insert(key, m.clone());
+                                        m
+                                    }
+                                    None => b.mesh.clone(),
+                                },
+                            }
+                        }
+                        None => b.mesh.clone(),
+                    },
                     inner: leaf.inner,
                     transform: leaf.inner,
                     face_refs: b.face_refs.clone(),
@@ -1455,6 +1480,7 @@ impl AssemblyEvaluator {
             };
             mates.push(MateStatus { id: m.id, ok: ok || inactive, inactive, message, frame_a: None, frame_b: None, values: [0.0; 4] });
         }
+        self.fine_meshes.retain(|k, _| used_fine.contains(k));
         let relations = assembly
             .relations
             .iter()

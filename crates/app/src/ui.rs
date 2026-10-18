@@ -6,7 +6,7 @@ use crate::assets;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -118,49 +118,40 @@ pub struct RichTooltip {
     title: SharedString,
     description: SharedString,
     expanded: bool,
-    /// The tool's bounds and where gpui puts the tooltip's top-left (the
-    /// pointer + 1 px, flipped at the window's right edge), to center the
-    /// tooltip under the tool like Onshape.
+    /// The tool's bounds: the tooltip is centered under it.
     anchor: Bounds<Pixels>,
-    origin: Point<Pixels>,
 }
 
 /// Width of the expanded tooltip (live).
 const RICH_TOOLTIP_W: f32 = 400.;
 
 impl Render for RichTooltip {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        // Live (part-studio/10, 11): the title box sits 9 px under the tool,
-        // the expanded one 3 px; both centered on it. The root is a 400 px
-        // transparent strip at gpui's origin; the content is shifted into place.
-        let gap = if self.expanded { 3. } else { 9. };
-        let left = self.anchor.center().x - px(RICH_TOOLTIP_W * 0.5) - self.origin.x;
-        let top = self.anchor.bottom() + px(gap) - self.origin.y;
-        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }];
-        let title = div().px(px(8.)).h(px(if self.expanded { 26. } else { 21. })).flex().items_center().bg(pal.tooltip).font_weight(FontWeight::SEMIBOLD).child(self.title.clone());
-        div().w(px(RICH_TOOLTIP_W)).child(
-            div()
-                .relative()
-                .left(left)
-                .top(top)
+        // Live (part-studio/10, 11; dom/hover-states.json): both states sit
+        // 3 px under the tool, centered on it; a 26 px title row, 12 px / 500,
+        // 4 px padding; the description 12 px on 18 px lines, 4 px padding.
+        // Placed in window coordinates (`anchored`), so gpui's pointer-based
+        // tooltip origin doesn't matter. Tooltips are drawn outside the
+        // window's element tree, so the UI font is set here.
+        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
+        let title = div().px(px(4.)).h(px(26.)).flex().items_center().bg(pal.tooltip).font_weight(FontWeight::MEDIUM).whitespace_nowrap().child(self.title.clone());
+        let body = if self.expanded {
+            v_flex()
                 .w(px(RICH_TOOLTIP_W))
-                .flex()
-                .justify_center()
-                .text_size(px(12.))
-                .text_color(pal.text)
-                .child(if self.expanded {
-                    v_flex()
-                        .w(px(RICH_TOOLTIP_W))
-                        .bg(gpui_kit::rgb(0xffffff))
-                        .shadow(shadow)
-                        .child(title)
-                        .child(div().px(px(8.)).pt(px(7.)).pb(px(8.)).line_height(px(17.5)).child(self.description.clone()))
-                        .into_any_element()
-                } else {
-                    div().shadow(shadow).child(title).into_any_element()
-                }),
-        )
+                .bg(gpui_kit::rgb(0xffffff))
+                .child(title)
+                .child(div().p(px(4.)).line_height(px(18.)).child(self.description.clone()))
+                .into_any_element()
+        } else {
+            title.into_any_element()
+        };
+        let content = div().font_family(cx.theme().font_family.clone()).text_size(px(12.)).text_color(pal.text).shadow(shadow).child(body);
+        let a = self.anchor;
+        // The title-only box's width isn't known before layout: center it
+        // with a 400 px strip whose content is centered.
+        let at = point(a.center().x - px(RICH_TOOLTIP_W * 0.5), a.bottom() + px(3.));
+        div().child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content)))
     }
 }
 
@@ -169,14 +160,7 @@ impl Render for RichTooltip {
 pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<SharedString>, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let title: SharedString = title.into();
     let description: SharedString = description.into();
-    move |window, cx| {
-        // gpui's placement (window.rs prepaint_tooltip): pointer + 1 px, or to
-        // the pointer's left when the tooltip would leave the window.
-        let mouse = window.mouse_position();
-        let mut origin = mouse + point(px(1.), px(1.));
-        if origin.x + px(RICH_TOOLTIP_W) > window.viewport_size().width {
-            origin.x = (mouse.x - px(RICH_TOOLTIP_W) - px(1.)).max(Pixels::ZERO);
-        }
+    move |_, cx| {
         let anchor = anchor.get();
         let view = cx.new(|cx| {
             if !description.is_empty() {
@@ -189,7 +173,7 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
                 })
                 .detach();
             }
-            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor, origin }
+            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor }
         });
         view.into()
     }
@@ -265,6 +249,36 @@ pub fn with_tooltip(id: impl Into<ElementId>, text: impl Into<SharedString>, el:
     div().id(id).flex_none().tooltip(tooltip(text)).child(el).into_any_element()
 }
 
+/// A tool tooltip title as Onshape writes it (live dom/toolbar-sketch.txt,
+/// dropdowns-sketch.json): Onshape's tool names and lowercase shortcuts,
+/// "Line (l)", "Sketch fillet (shift+f)", "Use (Project/Convert) (u)".
+pub fn onshape_title(title: &str) -> String {
+    let (name, shortcut) = match title.rfind(" (") {
+        Some(i) if title.ends_with(')') => (&title[..i], Some(title[i + 2..title.len() - 1].to_lowercase())),
+        _ => (title, None),
+    };
+    let name = match name {
+        "Center rectangle" => "Center point rectangle",
+        "Use / project edges" => "Use (Project/Convert)",
+        n => n,
+    };
+    match shortcut {
+        Some(k) => format!("{name} ({k})"),
+        None => name.to_string(),
+    }
+}
+
+/// A sketch toolbar tool's tooltip: the title, expanding with the tool's
+/// description when there is one (see `tool_text`).
+pub fn with_tool_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
+    let title: SharedString = onshape_title(&title.into()).into();
+    let name = title.split(" (").next().unwrap_or_default().to_string();
+    match crate::tool_text::sketch_description(&name) {
+        Some(d) => with_rich_tooltip(id, title, d, el),
+        None => with_tooltip(id, title, el),
+    }
+}
+
 /// Wrap a toolbar tool so it shows the title now and the description after 2 s.
 pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, description: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -275,7 +289,7 @@ pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString
         .relative()
         .tooltip(rich_tooltip(title, description, anchor))
         .child(el)
-        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().size_full())
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .into_any_element()
 }
 
@@ -315,8 +329,9 @@ pub fn search_tools_toggle(id: impl Into<ElementId>, open: bool) -> Stateful<Div
 pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyElement {
     let d = doc.read(cx);
     let (can_undo, can_redo) = (d.session.can_undo(), d.session.can_redo());
-    let undo_tip: SharedString = d.session.undo_description().map(|t| format!("Undo {t} (Ctrl+Z)")).unwrap_or_else(|| "Undo (Ctrl+Z)".into()).into();
-    let redo_tip: SharedString = d.session.redo_description().map(|t| format!("Redo {t} (Ctrl+Y)")).unwrap_or_else(|| "Redo (Ctrl+Y)".into()).into();
+    // Onshape's titles (live dom/toolbar-partstudio.txt).
+    let undo_tip: SharedString = "Undo (cmd+z/ctrl+z)".into();
+    let redo_tip: SharedString = "Redo (ctrl+y/shift+cmd+z)".into();
     let (d1, d2) = (doc.clone(), doc.clone());
     h_flex()
         .flex_none()

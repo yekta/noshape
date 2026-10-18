@@ -1074,6 +1074,24 @@ impl Document {
         Ok(())
     }
 
+    /// Brings back a deleted branch (Onshape's "Restore deleted
+    /// workspaces…").
+    pub fn restore_branch(&mut self, id: BranchId) -> Result<()> {
+        self.writable()?;
+        let b = self.branch(id)?;
+        if !b.deleted {
+            return Ok(());
+        }
+        if let Some(other) = self.branch_by_name(&b.name)?
+            && other.id != id
+        {
+            return Err(StoreError::BranchNameTaken(b.name));
+        }
+        self.conn
+            .execute("UPDATE branches SET deleted = 0 WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Versions
     // -----------------------------------------------------------------------
@@ -1166,6 +1184,12 @@ impl Document {
         })
     }
 
+    /// The documents page's "Owned by" and "Modified by": the author of the
+    /// first and of the latest microversion.
+    pub fn owner_and_last_author(&self) -> Result<(String, String)> {
+        Ok(owner_and_last_author(&self.conn)?)
+    }
+
     pub fn set_name(&mut self, name: &str) -> Result<()> {
         self.set_meta("name", Some(name.as_bytes()))
     }
@@ -1217,4 +1241,14 @@ fn load_manifest_cached(
         .ok_or(StoreError::UnknownMicroversion(mv))?;
     let bytes = get_blob(conn, hash)?.ok_or(StoreError::MissingBlob(hash))?;
     Ok(Arc::new(manifest::decode(&bytes)?))
+}
+
+/// `Document::owner_and_last_author` on a raw (e.g. immutable) connection.
+pub fn owner_and_last_author(conn: &Connection) -> rusqlite::Result<(String, String)> {
+    let q = |order: &str| -> rusqlite::Result<String> {
+        conn.query_row(&format!("SELECT author FROM microversions ORDER BY seq {order} LIMIT 1"), [], |r| r.get(0))
+            .optional()
+            .map(Option::unwrap_or_default)
+    };
+    Ok((q("ASC")?, q("DESC")?))
 }

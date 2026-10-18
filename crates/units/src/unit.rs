@@ -250,7 +250,25 @@ pub struct UnitPrefs {
     pub length_precision: u8,
     /// Decimal places shown for angles.
     pub angle_precision: u8,
+    /// Onshape's other workspace units, in [`OTHER_UNITS`] order: (index of
+    /// the default unit in its option list, display decimals).
+    pub other: [(u8, u8); 9],
 }
+
+/// The other quantities of Onshape's Workspace units dialog: (label, group,
+/// unit names, metric default, imperial default). Group 0 = Length, 1 =
+/// Angle, 2 = Mechanical.
+pub const OTHER_UNITS: [(&str, u8, &[&str], u8, u8); 9] = [
+    ("Linear acceleration", 0, &["Meter per second squared", "Millimeter per second squared", "Centimeter per second squared", "Inch per second squared", "Foot per second squared"], 1, 3),
+    ("Angular velocity", 1, &["Degree per second", "Radian per second", "Revolution per minute"], 0, 0),
+    ("Mass", 2, &["Kilogram", "Gram", "Pound", "Ounce"], 0, 2),
+    ("Density", 2, &["Kilogram per cubic meter", "Gram per cubic centimeter", "Pound per cubic inch", "Pound per cubic foot"], 0, 2),
+    ("Force", 2, &["Newton", "Kilonewton", "Pound-force"], 0, 2),
+    ("Frequency", 2, &["Hertz", "Kilohertz"], 0, 0),
+    ("Moment", 2, &["Newton-meter", "Newton-millimeter", "Inch-pound", "Foot-pound"], 0, 2),
+    ("Pressure", 2, &["Pascal", "Kilopascal", "Megapascal", "Pound per square inch"], 0, 3),
+    ("Energy", 2, &["Joule", "Kilojoule", "Foot-pound force", "Inch-pound force"], 0, 2),
+];
 
 impl Default for UnitPrefs {
     fn default() -> Self {
@@ -259,6 +277,7 @@ impl Default for UnitPrefs {
             angle: AngleUnit::Degree,
             length_precision: 3,
             angle_precision: 3,
+            other: OTHER_UNITS.map(|o| (o.3, 3)),
         }
     }
 }
@@ -275,8 +294,15 @@ impl UnitPrefs {
     pub fn imperial() -> Self {
         UnitPrefs {
             length: LengthUnit::Inch,
+            other: OTHER_UNITS.map(|o| (o.4, 3)),
             ..Default::default()
         }
+    }
+
+    /// Name of the default unit of `OTHER_UNITS[i]`.
+    pub fn other_unit_name(&self, i: usize) -> &'static str {
+        let (_, _, names, d, _) = OTHER_UNITS[i];
+        names.get(self.other[i].0 as usize).or(names.get(d as usize)).copied().unwrap_or("")
     }
 }
 

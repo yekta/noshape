@@ -135,7 +135,7 @@ fn bolt_circle(ctx, p) {
 /// Add the demo Feature Studio and a "Flange" Part Studio using its
 /// features (Flange, then Bolt circle on the hub's top face).
 pub fn add_demo_feature_studio(doc: &mut Document) {
-    let fs = doc.add_tab("Custom features", TabContent::FeatureStudio(crate::custom::FeatureStudio { source: DEMO_FEATURE_STUDIO.to_string() }));
+    let fs = doc.add_tab("Custom features", TabContent::FeatureStudio(crate::custom::FeatureStudio::new(DEMO_FEATURE_STUDIO)));
     let scripts = crate::custom::DocumentScripts::from_document(doc);
     let units = UnitPrefs::default();
     let mut ps = PartStudio::new();
@@ -246,6 +246,7 @@ pub fn add_demo_assembly(doc: &mut Document) {
         suppressed: false,
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
+        best_tessellation: false,
     };
     let mate = |id: u64, name: &str, t: MateType, a, b| Mate::new(MateId(id), name.into(), t, a, b);
     let mut fastened = mate(4, "Fastened 1", MateType::Fastened, mc(1, top, Inference::Centroid), mc(2, bottom, Inference::Centroid));

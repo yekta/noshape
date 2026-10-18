@@ -1,40 +1,106 @@
 //! Feature Studio tab: a script editor for the document's custom features
-//! (noshape's FeatureScript equivalent), with compile diagnostics and the
-//! list of features the source declares. Edits are committed to the
-//! document after a short pause; Part Studios using the features
-//! regenerate.
+//! (noshape's FeatureScript equivalent). As in Onshape, edits are saved as
+//! you type but only Commit (ctrl+s; Commit all: shift+ctrl+s) applies them
+//! to the document's Part Studios. Toolbar: undo/redo, the Commit split
+//! button, Search tools…; above the code: Module outline ▾, back/forward
+//! and the Search Feature Studios button (the search pane is the
+//! workspace's, under the tab bar: `fs_search.rs`).
 
 use crate::doc_model::{DocEvent, DocModel};
+use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Editor, EditorState, HighlightStyleResolver, InputEvent, InputHighlighter, Position, TabSize};
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
+use gpui_kit::component::input::{Editor, EditorState, HighlightStyleResolver, Input, InputEvent, InputHighlighter, InputState, Position, TabSize};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
-use noshape_model::custom::{CompiledStudio, DeclKind, Severity};
+use noshape_model::custom::{CompiledStudio, Severity};
 use noshape_model::document::TabId;
 use std::ops::Range;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// Pause after the last keystroke before the source is committed.
-const COMMIT_DELAY: Duration = Duration::from_millis(700);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios]);
+
+/// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt).
+pub fn bind_keys(cx: &mut App) {
+    let c = Some("FeatureStudio");
+    cx.bind_keys([
+        KeyBinding::new("secondary-s", Commit, c),
+        KeyBinding::new("secondary-shift-s", CommitAll, c),
+        KeyBinding::new("secondary-shift-f", SearchStudios, c),
+    ]);
+}
+
+/// Pause after the last keystroke before the text is saved (not committed).
+const SAVE_DELAY: Duration = Duration::from_millis(700);
+
+/// Requests for the workspace.
+pub enum FeatureStudioEvent {
+    /// Open (or focus) the Search Feature Studios pane.
+    OpenSearch,
+}
+
+/// Search matches to highlight in each Feature Studio (set by the search
+/// pane; read by the highlighter).
+static MATCHES: Mutex<Vec<(TabId, Vec<Range<usize>>)>> = Mutex::new(Vec::new());
+
+pub fn set_matches(tab: TabId, ranges: Vec<Range<usize>>) {
+    let mut m = MATCHES.lock().unwrap_or_else(|e| e.into_inner());
+    m.retain(|(t, _)| *t != tab);
+    if !ranges.is_empty() {
+        m.push((tab, ranges));
+    }
+}
+
+fn matches_of(tab: TabId) -> Vec<Range<usize>> {
+    MATCHES.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(t, _)| *t == tab).map(|(_, r)| r.clone()).unwrap_or_default()
+}
+
+/// A function in the Module outline: name, parameter list, 1-based line.
+#[derive(Clone)]
+struct Symbol {
+    name: String,
+    params: String,
+    line: usize,
+}
+
+fn outline(src: &str) -> Vec<Symbol> {
+    src.lines()
+        .enumerate()
+        .filter_map(|(i, l)| {
+            let t = l.trim_start();
+            let t = t.strip_prefix("private ").unwrap_or(t);
+            let rest = t.strip_prefix("fn ")?;
+            let open = rest.find('(')?;
+            let close = rest[open..].find(')').map(|c| open + c).unwrap_or(rest.len());
+            Some(Symbol { name: rest[..open].trim().to_string(), params: rest[open + 1..close].trim().to_string(), line: i + 1 })
+        })
+        .collect()
+}
 
 pub struct FeatureStudioView {
     tab: TabId,
     doc: Entity<DocModel>,
     editor: Entity<EditorState>,
-    /// Source as last committed to / loaded from the document.
+    /// Text as last saved to / loaded from the document.
     synced: String,
     compiled: Option<Arc<CompiledStudio>>,
     compiling: bool,
-    commit_task: Option<Task<()>>,
+    save_task: Option<Task<()>>,
     compile_task: Option<Task<()>>,
+    /// Module outline popover: its "Search symbols…" field.
+    outline: Option<Entity<InputState>>,
+    /// Cursor positions visited by jumps (back / forward).
+    nav: Vec<Position>,
+    nav_at: usize,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
 }
+
+impl EventEmitter<FeatureStudioEvent> for FeatureStudioView {}
 
 impl Focusable for FeatureStudioView {
     fn focus_handle(&self, _: &App) -> FocusHandle {
@@ -44,7 +110,7 @@ impl Focusable for FeatureStudioView {
 
 impl FeatureStudioView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let source = source_of(&doc, tab, cx).unwrap_or_default();
+        let source = text_of(&doc, tab, cx).unwrap_or_default();
         let editor = cx.new(|cx| {
             let mut st = EditorState::new(window, cx)
                 .language("rhai")
@@ -52,23 +118,23 @@ impl FeatureStudioView {
                 .soft_wrap(false)
                 .tab_size(TabSize { tab_size: 4, hard_tabs: false })
                 .default_value(source.clone());
-            st.set_highlighter_factory(Rc::new(|_| Some(Box::new(RhaiHighlighter::default()) as Box<dyn InputHighlighter>)), cx);
+            st.set_highlighter_factory(Rc::new(move |_| Some(Box::new(RhaiHighlighter { tab, ..Default::default() }) as Box<dyn InputHighlighter>)), cx);
             st
         });
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&editor, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::Change) {
-                this.schedule_commit(window, cx);
+                this.schedule_save(window, cx);
             } else if matches!(ev, InputEvent::Blur) {
-                this.commit(cx);
+                this.save(cx);
             }
         }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.sync_from_doc(window, cx),
-            DocEvent::Reloaded => this.sync_from_doc(window, cx),
+            DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), compiled: None, compiling: false, commit_task: None, compile_task: None, focus: cx.focus_handle(), _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), compiled: None, compiling: false, save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -77,17 +143,27 @@ impl FeatureStudioView {
         self.editor.read(cx).focus_handle(cx)
     }
 
+    pub fn tab(&self) -> TabId {
+        self.tab
+    }
+
+    /// Repaint the code (search highlights changed).
+    pub fn refresh_highlights(&self, cx: &mut App) {
+        self.editor.update(cx, |_, cx| cx.notify());
+    }
+
     fn read_only(&self, cx: &App) -> bool {
         self.doc.read(cx).session.read_only()
     }
 
-    /// Undo/redo or history browsing replaced the source.
+    /// Undo/redo or history browsing replaced the text.
     fn sync_from_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(src) = source_of(&self.doc, self.tab, cx) else { return };
+        let Some(src) = text_of(&self.doc, self.tab, cx) else { return };
         if src == self.synced {
+            cx.notify();
             return;
         }
-        self.commit_task = None;
+        self.save_task = None;
         self.synced = src.clone();
         if self.editor.read(cx).value().as_ref() != src {
             self.editor.update(cx, |e, cx| e.set_value(src.clone(), window, cx));
@@ -95,16 +171,18 @@ impl FeatureStudioView {
         self.recompile(src, cx);
     }
 
-    fn schedule_commit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.commit_task = Some(cx.spawn_in(window, async move |this, cx| {
-            cx.background_executor().timer(COMMIT_DELAY).await;
-            let _ = this.update(cx, |this: &mut Self, cx| this.commit(cx));
+    fn schedule_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.save_task = Some(cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor().timer(SAVE_DELAY).await;
+            let _ = this.update(cx, |this: &mut Self, cx| this.save(cx));
         }));
+        cx.notify();
     }
 
-    /// Write the editor's source into the document (one microversion).
-    fn commit(&mut self, cx: &mut Context<Self>) {
-        self.commit_task = None;
+    /// Save the editor's text into the document (Onshape saves as you type;
+    /// Part Studios keep using the committed source).
+    fn save(&mut self, cx: &mut Context<Self>) {
+        self.save_task = None;
         let src = self.editor.read(cx).value().to_string();
         if src == self.synced || self.read_only(cx) {
             return;
@@ -115,11 +193,49 @@ impl FeatureStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab(tab, "Edit Feature Studio", cx, move |c| {
                 if let TabContent::FeatureStudio(f) = c {
-                    f.source = value;
+                    f.save(value);
                 }
             });
         });
         self.recompile(src, cx);
+    }
+
+    /// Commit: apply this Feature Studio's text throughout the document.
+    pub fn commit(&mut self, cx: &mut Context<Self>) {
+        self.save(cx);
+        let tab = self.tab;
+        if !self.uncommitted(cx) {
+            return;
+        }
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_tab(tab, "Commit Feature Studio", cx, |c| {
+                if let TabContent::FeatureStudio(f) = c {
+                    f.commit();
+                }
+            });
+            let _ = doc.custom_features();
+        });
+        cx.notify();
+    }
+
+    /// Commit all: every Feature Studio with uncommitted changes.
+    fn commit_all(&mut self, cx: &mut Context<Self>) {
+        self.save(cx);
+        commit_all(&self.doc, cx);
+        cx.notify();
+    }
+
+    fn uncommitted(&self, cx: &App) -> bool {
+        match self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
+            Some(TabContent::FeatureStudio(f)) => f.has_uncommitted() || self.editor.read(cx).value().as_ref() != f.source,
+            _ => false,
+        }
+    }
+
+    /// Feature Studios with uncommitted changes ("Commit all (n)").
+    fn uncommitted_count(&self, cx: &App) -> usize {
+        let doc = &self.doc.read(cx).session.doc;
+        doc.tabs.iter().filter(|t| matches!(&t.content, TabContent::FeatureStudio(f) if f.has_uncommitted() || (t.id == self.tab && self.editor.read(cx).value().as_ref() != f.source))).count()
     }
 
     fn recompile(&mut self, src: String, cx: &mut Context<Self>) {
@@ -130,155 +246,230 @@ impl FeatureStudioView {
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.compiling = false;
                 this.compiled = Some(compiled);
-                // Register the new schemas (toolbars of open Part Studios).
-                this.doc.update(cx, |d, cx| {
-                    let _ = d.custom_features();
-                    cx.notify();
-                });
                 cx.notify();
             });
         }));
         cx.notify();
     }
 
-    fn goto_line(&mut self, line: usize, column: usize, window: &mut Window, cx: &mut Context<Self>) {
+    /// Jump to a 1-based line and column, remembering where we were.
+    pub fn goto_line(&mut self, line: usize, column: usize, window: &mut Window, cx: &mut Context<Self>) {
         if line == 0 {
             return;
         }
+        let here = self.editor.read(cx).cursor_position();
+        self.nav.truncate(self.nav_at);
+        self.nav.push(here);
+        let to = Position { line: (line - 1) as u32, character: column.saturating_sub(1) as u32 };
+        self.nav.push(to);
+        self.nav_at = self.nav.len() - 1;
+        self.move_cursor(to, window, cx);
+    }
+
+    fn move_cursor(&mut self, to: Position, window: &mut Window, cx: &mut Context<Self>) {
         self.editor.update(cx, |e, cx| {
-            e.set_cursor_position(Position { line: (line - 1) as u32, character: column.saturating_sub(1) as u32 }, window, cx);
+            e.set_cursor_position(to, window, cx);
             e.focus(window, cx);
         });
+        cx.notify();
     }
 
-    fn render_diagnostics(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn navigate(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
+        let at = self.nav_at as isize + delta;
+        if at < 0 || at as usize >= self.nav.len() {
+            return;
+        }
+        self.nav_at = at as usize;
+        self.move_cursor(self.nav[self.nav_at], window, cx);
+    }
+
+    fn toggle_outline(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.outline.take().is_none() {
+            let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search symbols..."));
+            st.update(cx, |s, cx| s.focus(window, cx));
+            self.outline = Some(st);
+        }
+        cx.notify();
+    }
+
+    /// Commit ▾ (help: "Commit" ctrl s, "Commit all (n)" shift ctrl s).
+    fn open_commit_menu(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let n = self.uncommitted_count(cx);
+        let (v1, v2) = (cx.entity(), cx.entity());
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+            use crate::os_menu::OsMenuItem as I;
+            let all = if n > 0 { format!("Commit all ({n})") } else { "Commit all".to_string() };
+            m.dropdown()
+                .item(I::new("Commit").keys(&["ctrl", "s"]).on_click(move |_, _, cx| v1.update(cx, |t, cx| t.commit(cx))))
+                .item(I::new(all).keys(&["shift", "ctrl", "s"]).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.commit_all(cx))))
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+
+    /// The blue Commit split button.
+    fn render_commit(&self, cx: &mut Context<Self>) -> AnyElement {
+        let dirty = self.uncommitted(cx);
+        let blue = ButtonCustomVariant::new(cx).color(rgb(0x1651b0).into()).foreground(rgb(0xffffff).into()).hover(rgb(0x0e3f8c).into()).active(rgb(0x0e3f8c).into()).shadow(false);
+        let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let probe = anchor.clone();
+        h_flex()
+            .relative()
+            .flex_none()
+            .mx(px(4.))
+            .child(
+                Button::new("fs-commit")
+                    .custom(blue)
+                    .h(px(30.))
+                    .px(px(10.5))
+                    .rounded_l(px(5.25))
+                    .rounded_r(px(0.))
+                    .child(div().text_size(px(14.)).child("Commit"))
+                    .opacity(if dirty { 1. } else { 0.65 })
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
+            )
+            .child(div().w(px(1.)).h(px(30.)).bg(rgb(0x0e3f8c)))
+            .child(
+                Button::new("fs-commit-menu")
+                    .custom(blue)
+                    .h(px(30.))
+                    .w(px(24.))
+                    .p_0()
+                    .rounded_r(px(5.25))
+                    .rounded_l(px(0.))
+                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., rgb(0xffffff)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        let b = anchor.get();
+                        this.open_commit_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
+                    })),
+            )
+            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().size_full())
+            .into_any_element()
+    }
+
+    /// Search tools… (alt+c): the Feature Studio's commands.
+    fn open_tools(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let (v1, v2, v3, v4) = (cx.entity(), cx.entity(), cx.entity(), cx.entity());
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+            use crate::os_menu::OsMenuItem as I;
+            m.dropdown()
+                .item(I::new("Commit").keys(&["ctrl", "s"]).on_click(move |_, _, cx| v1.update(cx, |t, cx| t.commit(cx))))
+                .item(I::new("Commit all").keys(&["shift", "ctrl", "s"]).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.commit_all(cx))))
+                .item(I::new("Search Feature Studios").keys(&["shift", "ctrl", "f"]).on_click(move |_, _, cx| v3.update(cx, |_, cx| cx.emit(FeatureStudioEvent::OpenSearch))))
+                .item(I::new("Module outline").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.toggle_outline(w, cx))))
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+
+    /// Module outline ▾ popover: "Search symbols…", "n symbols", the list.
+    fn render_outline(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let field = self.outline.clone()?;
         let pal = p();
-        let mut rows: Vec<AnyElement> = Vec::new();
-        let status: (SharedString, Rgba) = match &self.compiled {
-            _ if self.compiling => ("Compiling…".into(), pal.text_faint),
-            None => ("".into(), pal.text_faint),
-            Some(c) if c.has_errors() => (format!("{} problem(s)", c.diagnostics.iter().filter(|d| d.severity == Severity::Error).count()).into(), pal.error),
-            Some(c) => (format!("Compiled: {} feature(s)", c.features.len()).into(), pal.success),
-        };
-        if let Some(c) = &self.compiled {
-            for (i, d) in c.diagnostics.iter().enumerate() {
+        let q = field.read(cx).value().to_lowercase();
+        let symbols: Vec<Symbol> = outline(self.editor.read(cx).value().as_ref()).into_iter().filter(|s| q.is_empty() || s.name.to_lowercase().contains(&q)).collect();
+        let count = format!("{} symbol{}", symbols.len(), if symbols.len() == 1 { "" } else { "s" });
+        let rows: Vec<AnyElement> = symbols
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let line = s.line;
+                h_flex()
+                    .id(SharedString::from(format!("sym-{i}")))
+                    .h(px(34.))
+                    .px(px(8.))
+                    .gap(px(8.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(rgb(0xdef1fb)))
+                    .child(os::glyph(os::GLYPH_FUNCTION, 16., pal.text))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(format!("{}({})", s.name, s.params)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.outline = None;
+                        this.goto_line(line, 1, window, cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            deferred(
+                v_flex()
+                    .id("fs-outline")
+                    .occlude()
+                    .absolute()
+                    .top(px(34.))
+                    .left(px(4.))
+                    .w(px(254.))
+                    .max_h(px(420.))
+                    .bg(rgb(0xffffff))
+                    .border_1()
+                    .border_color(rgb(0xd7d7d7))
+                    .rounded(px(5.25))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                    .p(px(8.))
+                    .gap(px(6.))
+                    .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        this.outline = None;
+                        cx.notify();
+                    }))
+                    .child(Input::new(&field).h(px(30.)).text_size(px(14.)))
+                    .child(div().text_size(px(12.)).text_color(pal.text_muted).child(count))
+                    .child(v_flex().id("fs-outline-list").overflow_y_scroll().children(rows)),
+            )
+            .with_priority(2)
+            .into_any_element(),
+        )
+    }
+
+    /// FeatureScript notices: the compile problems of the saved text.
+    fn render_notices(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let pal = p();
+        let c = self.compiled.clone()?;
+        if c.diagnostics.is_empty() {
+            return None;
+        }
+        let rows: Vec<AnyElement> = c
+            .diagnostics
+            .iter()
+            .enumerate()
+            .map(|(i, d)| {
                 let (line, col) = (d.line, d.column);
-                let color = if d.severity == Severity::Error { pal.error } else { pal.warning };
-                rows.push(
-                    h_flex()
-                        .id(SharedString::from(format!("diag-{i}")))
-                        .gap_2()
-                        .px_2()
-                        .py_0p5()
-                        .rounded_sm()
-                        .text_xs()
-                        .cursor_pointer()
-                        .hover(|s| s.bg(pal.panel_hover))
-                        .child(div().w(px(8.)).h(px(8.)).rounded_full().bg(color))
-                        .child(div().w(px(64.)).text_color(pal.text_faint).child(if line > 0 { format!("Line {line}") } else { String::new() }))
-                        .child(div().flex_1().text_color(pal.text).child(d.message.clone()))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.goto_line(line, col, window, cx)))
-                        .into_any_element(),
-                );
-            }
-        }
-        v_flex()
-            .h(px(120.))
-            .flex_none()
-            .border_t_1()
-            .border_color(pal.border)
-            .bg(pal.panel)
-            .child(
+                let icon = if d.severity == Severity::Error { "msg-error" } else { "msg-warning" };
                 h_flex()
+                    .id(SharedString::from(format!("diag-{i}")))
                     .h(px(26.))
-                    .px_2()
-                    .gap_2()
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("PROBLEMS"))
-                    .child(div().text_xs().text_color(status.1).child(status.0)),
-            )
-            .child(v_flex().id("diagnostics").flex_1().overflow_y_scroll().p_1().children(rows))
-            .into_any_element()
-    }
-
-    fn render_features(&mut self) -> AnyElement {
-        let pal = p();
-        let mut list: Vec<AnyElement> = Vec::new();
-        if let Some(c) = &self.compiled {
-            for f in &c.features {
-                let params: Vec<String> = f
-                    .params
-                    .iter()
-                    .map(|d| {
-                        let kind = match &d.kind {
-                            DeclKind::Query { .. } => "selection",
-                            DeclKind::Length { .. } => "length",
-                            DeclKind::Angle { .. } => "angle",
-                            DeclKind::Real { .. } => "number",
-                            DeclKind::Int { .. } => "integer",
-                            DeclKind::Bool { .. } => "check box",
-                            DeclKind::Enum { .. } => "choice",
-                            DeclKind::Text { .. } => "text",
-                        };
-                        format!("{} ({kind})", d.label)
-                    })
-                    .collect();
-                list.push(
-                    v_flex()
-                        .gap_1()
-                        .p_2()
-                        .rounded_md()
-                        .bg(pal.panel_raised)
-                        .border_1()
-                        .border_color(pal.border)
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(svg().path(crate::assets::icon_path(&f.icon)).size_4().text_color(pal.accent))
-                                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(f.name.clone())),
-                        )
-                        .when(!f.description.is_empty(), |d| d.child(div().text_xs().text_color(pal.text_muted).child(f.description.clone())))
-                        .children(params.into_iter().map(|t| div().pl_6().text_xs().text_color(pal.text_faint).child(t)))
-                        .into_any_element(),
-                );
-            }
-        }
-        if list.is_empty() {
-            list.push(div().p_2().text_xs().text_color(pal.text_faint).child("No features declared yet.").into_any_element());
-        }
-        v_flex()
-            .w(px(280.))
-            .flex_none()
-            .h_full()
-            .border_l_1()
-            .border_color(pal.border)
-            .bg(pal.panel)
-            .child(
-                h_flex()
-                    .h(px(26.))
-                    .px_2()
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("FEATURES")),
-            )
-            .child(v_flex().id("fs-features").flex_1().overflow_y_scroll().p_2().gap_2().children(list))
-            .child(
-                div()
-                    .p_2()
-                    .border_t_1()
-                    .border_color(pal.border)
-                    .text_xs()
-                    .text_color(pal.text_faint)
-                    .child("Features appear in every Part Studio's toolbar (Custom features) and in tool search (Alt+C). Script API: docs/custom-features.md"),
-            )
-            .into_any_element()
+                    .px(px(10.))
+                    .gap(px(8.))
+                    .cursor_pointer()
+                    .text_size(px(13.))
+                    .hover(|s| s.bg(rgb(0xdef1fb)))
+                    .child(crate::assets::icon(icon, 16., cx))
+                    .child(div().flex_1().min_w_0().truncate().text_color(pal.text).child(d.message.clone()))
+                    .child(div().text_color(pal.text_muted).child(if line > 0 { format!("Line {line}, Column {col}") } else { String::new() }))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.goto_line(line, col, window, cx)))
+                    .into_any_element()
+            })
+            .collect();
+        Some(v_flex().id("fs-notices").max_h(px(130.)).flex_none().overflow_y_scroll().border_t_1().border_color(rgb(0xd7d7d7)).bg(rgb(0xffffff)).py(px(2.)).children(rows).into_any_element())
     }
 }
 
-fn source_of(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
+/// Commit every Feature Studio of the document that has uncommitted changes
+/// (each a change of its tab, so the Part Studios using it regenerate).
+pub fn commit_all(doc: &Entity<DocModel>, cx: &mut App) {
+    let tabs: Vec<TabId> = doc.read(cx).session.doc.tabs.iter().filter(|t| matches!(&t.content, TabContent::FeatureStudio(f) if f.has_uncommitted())).map(|t| t.id).collect();
+    doc.update(cx, |doc, cx| {
+        for tab in tabs {
+            doc.edit_tab(tab, "Commit Feature Studio", cx, |c| {
+                if let TabContent::FeatureStudio(f) = c {
+                    f.commit();
+                }
+            });
+        }
+        let _ = doc.custom_features();
+    });
+}
+
+fn text_of(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
     match &doc.read(cx).session.doc.tab(tab)?.content {
-        TabContent::FeatureStudio(f) => Some(f.source.clone()),
+        TabContent::FeatureStudio(f) => Some(f.text().to_string()),
         _ => None,
     }
 }
@@ -287,42 +478,76 @@ impl Render for FeatureStudioView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let read_only = self.read_only(cx);
-        let dirty = self.commit_task.is_some();
-        let diagnostics = self.render_diagnostics(cx);
-        let features = self.render_features();
+        let notices = self.render_notices(cx);
+        let outline = self.render_outline(cx);
+        let tools_anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let tools_probe = tools_anchor.clone();
+        let header_btn = |id: &'static str| {
+            h_flex().id(id).flex_none().h(px(28.)).px(px(6.)).gap(px(4.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border))
+        };
+        let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
+        let toolbar = crate::ui::toolbar()
+            .child(crate::ui::undo_redo(&self.doc, cx))
+            .child(crate::ui::tool_separator())
+            .child(self.render_commit(cx))
+            .child(
+                div()
+                    .relative()
+                    .child(crate::ui::search_tools_toggle("fs-search-tools", false).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        let b = tools_anchor.get();
+                        this.open_tools(point(b.left(), b.bottom() + px(2.)), window, cx);
+                    })))
+                    .child(canvas(move |b, _, _| tools_probe.set(b), |_, _, _, _| {}).absolute().size_full()),
+            );
+        let header = h_flex()
+            .relative()
+            .h(px(36.))
+            .flex_none()
+            .px(px(4.))
+            .gap(px(4.))
+            .bg(rgb(0xffffff))
+            .border_b_1()
+            .border_color(rgb(0xd7d7d7))
+            .child(
+                header_btn("fs-outline-btn")
+                    .when(self.outline.is_some(), |d| d.bg(pal.border))
+                    .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
+                    .child(div().text_size(px(14.)).text_color(pal.text).child("Module outline"))
+                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_outline(window, cx))),
+            )
+            .child(
+                header_btn("fs-back")
+                    .opacity(if can_back { 1. } else { 0.4 })
+                    .child(os::glyph(os::GLYPH_ARROW_LEFT, 20., pal.text_muted))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(-1, window, cx))),
+            )
+            .child(
+                header_btn("fs-forward")
+                    .opacity(if can_fwd { 1. } else { 0.4 })
+                    .child(os::glyph(os::GLYPH_ARROW_RIGHT, 20., pal.text_muted))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
+            )
+            .child(div().flex_1())
+            .child(
+                header_btn("fs-search")
+                    .tooltip(crate::ui::tooltip("Search Feature Studios"))
+                    .child(os::glyph(os::GLYPH_SEARCH, 18., pal.text))
+                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(FeatureStudioEvent::OpenSearch))),
+            )
+            .children(outline);
         v_flex()
             .size_full()
+            .key_context("FeatureStudio")
             .track_focus(&self.focus)
-            .bg(pal.app_bg)
-            .child(
-                h_flex()
-                    .h(px(40.))
-                    .px_3()
-                    .gap_2()
-                    .bg(pal.panel)
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(svg().path(crate::assets::icon_path("feature-studio")).size_4().text_color(pal.accent))
-                    .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Feature Studio"))
-                    .child(div().text_xs().text_color(pal.text_faint).child("Custom features in Rhai script. Lengths in meters (mm(5)), angles in radians (deg(30))."))
-                    .child(div().flex_1())
-                    .when(dirty, |d| d.child(div().text_xs().text_color(pal.text_faint).child("Unsaved edits…")))
-                    .child(
-                        Button::new("fs-commit")
-                            .label("Commit")
-                            .primary()
-                            .small()
-                            .tooltip("Save the source now (otherwise saved automatically after a pause)")
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
-                    ),
-            )
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .child(v_flex().flex_1().min_w_0().h_full().child(div().flex_1().min_h_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full())).child(diagnostics))
-                    .child(features),
-            )
+            .on_action(cx.listener(|this, _: &Commit, _, cx| this.commit(cx)))
+            .on_action(cx.listener(|this, _: &CommitAll, _, cx| this.commit_all(cx)))
+            .on_action(cx.listener(|_, _: &SearchStudios, _, cx| cx.emit(FeatureStudioEvent::OpenSearch)))
+            .bg(rgb(0xffffff))
+            .child(toolbar)
+            .child(header)
+            .child(div().flex_1().min_h_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full()))
+            .children(notices)
     }
 }
 
@@ -340,10 +565,16 @@ enum Tok {
 }
 
 /// A small lexer-based highlighter for Rhai.
-#[derive(Default)]
 struct RhaiHighlighter {
+    tab: TabId,
     tokens: Vec<(Range<usize>, Tok)>,
     len: usize,
+}
+
+impl Default for RhaiHighlighter {
+    fn default() -> Self {
+        Self { tab: TabId::new_random(), tokens: Vec::new(), len: 0 }
+    }
 }
 
 const KEYWORDS: &[&str] = &[
@@ -468,7 +699,29 @@ impl InputHighlighter for RhaiHighlighter {
         if at < range.end {
             out.push((at..range.end, HighlightStyle::default()));
         }
-        out
+        // Search pane matches: Onshape's yellow mark over the token colors.
+        let marks = matches_of(self.tab);
+        if marks.is_empty() {
+            return out;
+        }
+        let mut split = Vec::with_capacity(out.len());
+        for (r, st) in out {
+            let mut at = r.start;
+            for m in marks.iter().filter(|m| m.start < r.end && m.end > r.start) {
+                let (s, e) = (m.start.max(r.start), m.end.min(r.end));
+                if s > at {
+                    split.push((at..s, st));
+                }
+                let mut hl = st;
+                hl.background_color = Some(rgb(0xfff1a8).into());
+                split.push((s..e, hl));
+                at = e;
+            }
+            if at < r.end {
+                split.push((at..r.end, st));
+            }
+        }
+        split
     }
 
     fn fold_ranges(&self, _text: &gpui_kit::component::input::Rope) -> Vec<gpui_kit::component::input::FoldRange> {

@@ -81,7 +81,13 @@ impl PickMap {
         self.targets.len()
     }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        let prio: Vec<i32> = self.targets.iter().map(|t| t.kind.priority()).collect();
+        self.priority_fn_filtered(|_| true)
+    }
+
+    /// Like [`Self::priority_fn`], but kinds `allow` rejects are never
+    /// picked or hovered (a dialog field's selection filter, Onshape).
+    pub fn priority_fn_filtered(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
+        let prio: Vec<i32> = self.targets.iter().map(|t| if allow(t.kind) { t.kind.priority() } else { i32::MIN }).collect();
         Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(0) })
     }
 }
@@ -105,7 +111,13 @@ pub struct GpuCache {
     tangent: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, TangentLines)>,
     /// Sketch image textures keyed by their (shared) encoded data.
     images: HashMap<usize, (std::sync::Weak<str>, Option<ImageHandle>)>,
+    /// Boundary (laminar) edges for "Highlight boundary edges": solid and
+    /// dashed-on-top lines, keyed by mesh pointer (`None`: the body has none).
+    boundary: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Option<BoundaryLines>)>,
 }
+
+/// Boundary edges: solid (visible) and dashed on top (hidden) lines.
+type BoundaryLines = (LinesHandle, LinesHandle);
 
 #[derive(Clone)]
 struct TangentLines {
@@ -156,6 +168,18 @@ pub struct SceneOptions {
     pub tangent_edges: TangentEdges,
     /// Parts the section view leaves whole.
     pub section_skip: Vec<noshape_model::BodyId>,
+    /// Onshape's "Highlight boundary edges": laminar edges in red, solid
+    /// where visible and dashed where hidden.
+    pub highlight_boundary: bool,
+    /// Graphics preferences (line widths, sketch colors).
+    pub graphics: crate::graphics_prefs::GraphicsPrefs,
+    /// Zebra stripes on the parts (analysis tool).
+    pub zebra: Option<noshape_render::Zebra>,
+    /// Reflection analysis: the parts mirror an environment map.
+    pub reflection: Option<noshape_render::Reflection>,
+    /// Meshes drawn instead of a part's (Thickness analysis: refined and
+    /// colored per vertex, with the part's face pick ids).
+    pub replaced_meshes: Option<Arc<HashMap<noshape_model::BodyId, noshape_render::MeshHandle>>>,
 }
 
 /// Viewport render style (Onshape's display modes).
@@ -165,31 +189,8 @@ pub enum DisplayMode {
     ShadedWithEdges,
     Shaded,
     HiddenLine,
-    Wireframe,
     /// Onshape "Translucent": every part see-through.
     Translucent,
-}
-
-impl DisplayMode {
-    pub const ALL: [DisplayMode; 5] = [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Wireframe, DisplayMode::Translucent];
-    pub fn label(self) -> &'static str {
-        match self {
-            DisplayMode::ShadedWithEdges => "Shaded with edges",
-            DisplayMode::Shaded => "Shaded without edges",
-            DisplayMode::HiddenLine => "Unshaded",
-            DisplayMode::Wireframe => "Wireframe",
-            DisplayMode::Translucent => "Translucent",
-        }
-    }
-    pub fn icon(self) -> &'static str {
-        match self {
-            DisplayMode::ShadedWithEdges => "shaded-edges",
-            DisplayMode::Shaded => "shaded",
-            DisplayMode::HiddenLine => "hidden-lines",
-            DisplayMode::Wireframe => "wireframe",
-            DisplayMode::Translucent => "transparency",
-        }
-    }
 }
 
 pub struct BuiltScene {
@@ -235,7 +236,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         }
         if b.kind != BodyKind::Wire {
             let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
+            let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
             let mesh = match colors {
+                _ if replaced.is_some() => Instance::new(Drawable::Mesh(replaced.cloned().expect("checked"))).pick_base(face_base).per_primitive_color(),
                 Some(c) => {
                     let ckey = (key, Arc::as_ptr(c) as usize);
                     let handle = match cache.colored.get(&ckey) {
@@ -252,24 +255,22 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 None => Instance::new(Drawable::Mesh(cached.mesh.clone())).pick_base(face_base),
             };
             let mesh = match opts.display_mode {
-                DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color),
+                DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())),
                 // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
                 // which is ~0.48 in the renderer's linear blending.
                 DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
                 // Faces drawn in the background color hide what is behind them.
                 DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)),
-                // Still pickable, but invisible.
-                DisplayMode::Wireframe => mesh.with_color([0.0, 0.0, 0.0, 0.0]).pick_only(),
             };
             // Parts excluded from the section view are not cut.
             scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
         }
         let edge_color = match (b.kind, opts.display_mode) {
             (BodyKind::Wire, _) => theme::lin(theme::viewport::EDGE),
-            (_, DisplayMode::HiddenLine | DisplayMode::Wireframe) => theme::lin(theme::viewport::EDGE_UNSHADED),
+            (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
             _ => theme::lin(EDGE_COLOR),
         };
-        let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).layer(1);
+        let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
         let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
         // Shaded mode hides edges visually but keeps them pickable.
         let tangent = (opts.tangent_edges != TangentEdges::Visible && b.kind != BodyKind::Wire && opts.display_mode != DisplayMode::Shaded).then(|| {
@@ -296,9 +297,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // tangent ones dash-dot); all of them stay pickable.
             Some(t) => {
                 scene.instances.push(edges.pick_only());
-                scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).layer(1));
+                scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1));
                 if opts.tangent_edges == TangentEdges::Phantom {
-                    scene.instances.push(Instance::new(Drawable::Lines(t.phantom)).with_color(edge_color).unpickable().layer(1));
+                    // Phantom edges: Graphics preferences width (0.5 px default) and color.
+                    let c = theme::lin(opts.graphics.phantom_color);
+                    scene.instances.push(Instance::new(Drawable::Lines(t.phantom)).with_color(c).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
                 }
             }
             None => scene.instances.push(if opts.display_mode == DisplayMode::Shaded { edges.pick_only() } else { edges }),
@@ -318,6 +321,27 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 }
             };
             scene.instances.push(Instance::new(Drawable::Lines(handle)).per_primitive_color().unpickable().layer(1));
+        }
+        if opts.highlight_boundary && b.kind != BodyKind::Wire {
+            let lines = match cache.boundary.get(&key) {
+                Some((_, l)) => l.clone(),
+                None => {
+                    let laminar = laminar_edges(&b.mesh);
+                    let (mut solid, mut dashed) = (LineData::default(), LineData::default());
+                    for (pl, _) in b.mesh.edges.iter().zip(&laminar).filter(|(_, l)| **l) {
+                        solid.push_polyline(pl, [0, 0, 0, 255], 0, 2.0, 0);
+                        dashed.push_polyline(pl, [0, 0, 0, 255], 0, 1.5, LineSegment::DASHED | LineSegment::ON_TOP);
+                    }
+                    let l = (!solid.segments.is_empty()).then(|| (up.upload_lines(&solid), up.upload_lines(&dashed)));
+                    cache.boundary.insert(key, (Arc::downgrade(&b.mesh), l.clone()));
+                    l
+                }
+            };
+            if let Some((solid, dashed)) = lines {
+                let red = theme::lin(theme::viewport::BOUNDARY_EDGE);
+                scene.instances.push(Instance::new(Drawable::Lines(solid)).with_color(red).unpickable().layer(3));
+                scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
+            }
         }
     }
 
@@ -371,10 +395,12 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // Custom sketch appearance (Edit sketch appearance) when not editing.
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
-                    None => sketch_color(c.state, c.construction, editing, c.external),
+                    None => sketch_color(&opts.graphics, c.state, c.construction, editing, c.external),
                 };
-                let style = if c.construction { LineSegment::DASHED } else { 0 };
-                lines.push_polyline(&c.points, color, id, if editing { 2.0 } else { 1.5 }, style);
+                let style = if c.construction { LineSegment::CONSTRUCTION } else { 0 };
+                // Graphics preferences: active 2 px, inactive 1 px by default.
+                let width = if editing { opts.graphics.sketch_line_width } else { 1.5 * opts.graphics.inactive_line_width };
+                lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
             for p in &sk.points {
@@ -385,10 +411,12 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 });
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
-                    None => sketch_color(p.state, false, editing, false),
+                    None => sketch_color(&opts.graphics, p.state, false, editing, false),
                 };
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 3.5 } else { 5.5 };
-                points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style: 0, _pad: 0 });
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { 5.5 };
+                // Standalone points and spline handles are hollow (live sketch/100, Point tool).
+                let style = if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
+                points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {
                 let color: [u8; 4] = theme::rgb8(if d.driven { theme::viewport::DIM_DRIVEN } else { theme::viewport::SKETCH_FULL });
@@ -417,6 +445,25 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().layer(10));
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().layer(11));
+            // Graphics preferences "Underconstrained occluded color": the parts of
+            // the edited sketch's underconstrained geometry hidden behind parts.
+            if editing {
+                let oc = theme::rgb8(opts.graphics.sketch_under_occluded);
+                let mut hidden = LineData::default();
+                for c in sk.curves.iter().filter(|c| c.state == SketchEntityState::Under && !c.external) {
+                    let style = if c.construction { LineSegment::CONSTRUCTION } else { 0 };
+                    hidden.push_polyline(&c.points, oc, 0, opts.graphics.sketch_line_width, style);
+                }
+                let hidden_pts = PointData {
+                    points: sk.points.iter().filter(|p| p.state == SketchEntityState::Under).map(|p| PointSprite { position: p.position, color: oc, pick_id: 0, size: if p.standalone { 7.0 } else if p.handle { 3.5 } else { 5.5 }, style: 0, _pad: 0 }).collect(),
+                };
+                if !hidden.segments.is_empty() {
+                    scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&hidden))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(10));
+                }
+                if !hidden_pts.points.is_empty() {
+                    scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&hidden_pts))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(11));
+                }
+            }
             // Regions: invisible, pickable; highlight overlay added on hover/selection.
             // All regions of a sketch share one mesh (vertices carry their region's
             // pick id), so a sketch with hundreds of regions is one draw call.
@@ -466,18 +513,21 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     BuiltScene { scene, picks, static_instances }
 }
 
-fn sketch_color(st: SketchEntityState, construction: bool, editing: bool, external: bool) -> [u8; 4] {
+fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState, construction: bool, editing: bool, external: bool) -> [u8; 4] {
     use theme::viewport as v;
+    // Constrained / underconstrained / inactive colors come from the Graphics preferences.
     let hex = if !editing {
-        v::INACTIVE
+        g.inactive_color
     } else if external {
-        v::SKETCH_EXTERNAL
+        // Used (projected) geometry is fixed by its Use constraint: Onshape
+        // draws it in the constrained color (live sketch/202).
+        g.sketch_constrained
     } else {
         match st {
-            SketchEntityState::Under => v::SKETCH_UNDER,
-            SketchEntityState::Full => v::SKETCH_FULL,
+            SketchEntityState::Under => g.sketch_under,
+            SketchEntityState::Full => g.sketch_constrained,
             SketchEntityState::Over => v::SKETCH_OVER,
-            SketchEntityState::Inactive => v::INACTIVE,
+            SketchEntityState::Inactive => g.inactive_color,
         }
     };
     let a = if construction { 200 } else { 255 };
@@ -598,6 +648,38 @@ pub fn log_regen_perf(label: &str, display: &StudioDisplay, studio: &noshape_mod
     }
     let tris: usize = display.bodies.iter().map(|b| b.mesh.indices.len() / 3).sum();
     log::info!(target: "perf", "regen[{label}]: total {:.1} ms, {tris} triangles; feature eval times (cached ones keep their last time): [{}]", display.regen_ms, parts.join(", "));
+}
+
+/// Per edge: whether only one face of the body touches it (a laminar or
+/// boundary edge: the open edges of surfaces, gaps in imported parts). An
+/// edge's points are vertices of the triangles of the faces it bounds.
+fn laminar_edges(m: &noshape_model::display::MeshBuffers) -> Vec<bool> {
+    let q = |p: &[f32; 3]| [(p[0] * 1e5).round() as i64, (p[1] * 1e5).round() as i64, (p[2] * 1e5).round() as i64];
+    let mut faces_at: HashMap<[i64; 3], Vec<u32>> = HashMap::new();
+    for (f, &(first, count)) in m.face_ranges.iter().enumerate() {
+        for &i in m.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]) {
+            if let Some(p) = m.positions.get(i as usize) {
+                let e = faces_at.entry(q(p)).or_default();
+                if e.last() != Some(&(f as u32)) && !e.contains(&(f as u32)) {
+                    e.push(f as u32);
+                }
+            }
+        }
+    }
+    m.edges
+        .iter()
+        .map(|pl| {
+            let mut common: Option<Vec<u32>> = None;
+            for p in pl {
+                let at = faces_at.get(&q(p)).cloned().unwrap_or_default();
+                common = Some(match common {
+                    None => at,
+                    Some(c) => c.into_iter().filter(|f| at.contains(f)).collect(),
+                });
+            }
+            common.is_some_and(|c| c.len() == 1)
+        })
+        .collect()
 }
 
 /// The edges bounding a body face: those whose polyline points are all

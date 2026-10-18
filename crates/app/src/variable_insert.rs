@@ -84,7 +84,7 @@ struct DialogState {
 
 /// .noshape documents besides `current`: recently opened, the documents
 /// folder and the watched folders.
-fn other_documents(current: &std::path::Path) -> Vec<std::path::PathBuf> {
+pub(crate) fn other_documents(current: &std::path::Path) -> Vec<std::path::PathBuf> {
     let canon = |p: &std::path::Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
     let me = canon(current);
     let mut out: Vec<std::path::PathBuf> = Vec::new();
@@ -421,7 +421,6 @@ pub fn create_studio(doc: &Entity<DocModel>, element: TabId, cx: &mut App) {
 /// has Create Variable Studio and Insert Variable Studio.
 pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyElement {
     use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-    use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
     let pal = p();
     let variant = ButtonCustomVariant::new(cx).color(rgb(0xffffff).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
     let d1 = doc.clone();
@@ -449,10 +448,14 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
                 .border_l_0()
                 .border_color(rgb(0xaaaaaa))
                 .child(os::glyph(os::GLYPH_CARET_UP, 7., pal.text))
-                .dropdown_menu_with_anchor(Anchor::BottomRight, move |m, _, _| {
+                .on_click(move |e, window, cx| {
                     let (d2, d3) = (doc.clone(), doc.clone());
-                    m.item(PopupMenuItem::new("Create Variable Studio").on_click(move |_, _, cx| create_studio(&d2, element, cx)))
-                        .item(PopupMenuItem::new("Insert Variable Studio").on_click(move |_, window, cx| open(d3.clone(), InsertTarget::Element(element), window, cx)))
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                        m.dropdown()
+                            .item(crate::os_menu::OsMenuItem::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, _, cx| create_studio(&d2, element, cx)))
+                            .item(crate::os_menu::OsMenuItem::new("Insert Variable Studio").icon_name("variable-studio").on_click(move |_, window, cx| open(d3.clone(), InsertTarget::Element(element), window, cx)))
+                    });
+                    crate::os_menu::open_anchored(point(e.position().x + px(13.), e.position().y - px(18.)), Anchor::BottomRight, menu, window, cx);
                 }),
         )
         .into_any_element()
@@ -465,7 +468,6 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
 /// and the reference's "…" menu.
 pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRef, k: usize, n: usize, cx: &App) -> Option<AnyElement> {
     use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-    use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
     const COL_W: f32 = 140.;
     const RULE: u32 = 0xaaaaaa;
     const HEAD_BG: u32 = 0xeaeaea;
@@ -517,23 +519,28 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
         .h(px(22.))
         .p_0()
         .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"))
-        .dropdown_menu_with_anchor(Anchor::TopRight, move |m, _, _| {
+        .on_click(move |e, window, cx| {
+            let (d, ext, name) = (d.clone(), ext.clone(), name.clone());
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
             let (d1, d2, d3, d4) = (d.clone(), d.clone(), d.clone(), d.clone());
+            let m = m.dropdown();
             let m = match &ext {
                 // Onshape: Open linked document / Update linked document.
                 Some(e) => {
                     let (p1, e2) = (e.path.clone(), e.clone());
-                    m.item(PopupMenuItem::new("Open linked document").on_click(move |_, _, cx| {
+                    m.item(crate::os_menu::OsMenuItem::new("Open linked document").on_click(move |_, _, cx| {
                         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
                         let _ = crate::files::open_document_window(p1.clone(), None, gpu, cx);
                     }))
-                        .item(PopupMenuItem::new("Update linked document").on_click(move |_, window, cx| open_at_document(d4.clone(), target, e2.path.clone(), window, cx)))
+                        .item(crate::os_menu::OsMenuItem::new("Update linked document").on_click(move |_, window, cx| open_at_document(d4.clone(), target, e2.path.clone(), window, cx)))
                 }
-                None => m.item(PopupMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(studio_id, window, cx))),
+                None => m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(studio_id, window, cx))),
             };
-            let m = if k > 0 { m.item(PopupMenuItem::new("Move up").on_click(move |_, _, cx| move_ref(&d1, target, studio_id, false, cx))) } else { m };
-            let m = if k + 1 < n { m.item(PopupMenuItem::new("Move down").on_click(move |_, _, cx| move_ref(&d2, target, studio_id, true, cx))) } else { m };
-            m.item(PopupMenuItem::new("Remove reference").on_click(move |_, _, cx| set_ref(&d3, target, studio_id, None, cx)))
+            let m = if k > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| move_ref(&d1, target, studio_id, false, cx))) } else { m };
+            let m = if k + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| move_ref(&d2, target, studio_id, true, cx))) } else { m };
+            m.item(crate::os_menu::OsMenuItem::new("Remove reference").on_click(move |_, _, cx| set_ref(&d3, target, studio_id, None, cx)))
+        });
+            crate::os_menu::open_anchored(point(e.position().x + px(12.), e.position().y + px(12.)), Anchor::TopRight, menu, window, cx);
         });
     Some(
         v_flex()

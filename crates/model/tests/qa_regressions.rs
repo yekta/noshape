@@ -209,7 +209,7 @@ fn blend_over_smaller_fillets_is_valid_or_fails() {
         .map(|i| Reference::Edge((*body.edges[i]).clone()))
         .expect("top edge");
     for (ty, size, ok) in [("chamfer", "1 mm", true), ("chamfer", "5 mm", false), ("chamfer", "8 mm", false), ("fillet", "1 mm", true), ("fillet", "5 mm", false)] {
-        let mut t2 = T { ps: t.ps.clone(), units: t.units.clone(), reg: Regenerator::new() };
+        let mut t2 = T { ps: t.ps.clone(), units: t.units, reg: Regenerator::new() };
         let size_param = if ty == "chamfer" { "width" } else { "radius" };
         let f = t2.add(ty, &[("entities", q(vec![top.clone()])), (size_param, e(size)), ("tangentPropagation", ParamValue::Bool(true))]);
         let (st, msg) = t2.status(f);
@@ -224,3 +224,100 @@ fn blend_over_smaller_fillets_is_valid_or_fails() {
         assert!(r.context.bodies[0].shape.is_valid(), "{ty} {size}: invalid solid");
     }
 }
+
+/// QA3: Shell (top face removed) of a block with 3 mm corner fillets returned
+/// an invalid solid (Arc join; right geometry, ShapeFix repairs it). With a
+/// 1 mm chamfer around the top, OCCT fails, returns garbage or returns the
+/// part unshelled ("OK" with the top face still there). The Shell feature now
+/// keeps only a valid result that really removed the faces (trying both join
+/// types and ShapeFix); otherwise it fails with Onshape's message.
+#[test]
+fn shell_is_valid_and_real_or_fails() {
+    fn edges_where(t: &mut T, f: impl Fn(&noshape_kernel::EdgeInfo) -> bool) -> Vec<Reference> {
+        let r = t.regen();
+        let b = &r.context.bodies[0];
+        b.shape.edges().iter().enumerate().filter(|(_, e)| f(&e.edge_info().unwrap())).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect()
+    }
+    let mut t = T::new();
+    t.block();
+    let vertical = edges_where(&mut t, |i| (i.start.z - i.end.z).abs() > 1e-6);
+    t.add("fillet", &[("entities", q(vertical)), ("radius", e("3 mm"))]);
+    for chamfer in [false, true] {
+        if chamfer {
+            let top = edges_where(&mut t, |i| i.start.z > 0.0099 && i.end.z > 0.0099 && matches!(i.curve, noshape_kernel::Curve::Line { .. }) && i.length > 0.02);
+            t.add("chamfer", &[("entities", q(vec![top[0].clone()])), ("width", e("1 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+        }
+        let r = t.regen();
+        let b = &r.context.bodies[0];
+        let fi = b.shape.faces().iter().position(|f| f.centroid().unwrap().z > 0.0099 && f.area().unwrap() > 1e-4).unwrap();
+        let top_face = Reference::Face((*b.faces[fi]).clone());
+        let volume_before = noshape_kernel::volume_properties(&b.shape).unwrap().mass;
+        for th in ["1 mm", "2.5 mm"] {
+            let mut t2 = T { ps: t.ps.clone(), units: t.units, reg: Regenerator::new() };
+            let s = t2.add("shell", &[("entities", q(vec![top_face.clone()])), ("thickness", e(th))]);
+            let (st, msg) = t2.status(s);
+            if chamfer && st == FeatureStatus::Error {
+                // OCCT can't shell this one (Onshape can); never a silent wrong result.
+                assert_eq!(msg.as_deref(), Some("Could not shell part with selections."));
+                continue;
+            }
+            assert_eq!(st, FeatureStatus::Ok, "chamfer={chamfer} {th}: {msg:?}");
+            let r = t2.regen();
+            let shape = &r.context.bodies[0].shape;
+            assert!(shape.is_valid(), "chamfer={chamfer} {th}: invalid solid");
+            let v = noshape_kernel::volume_properties(shape).unwrap().mass;
+            assert!(v > 0.0 && v < volume_before * 0.8, "chamfer={chamfer} {th}: volume {v} vs {volume_before}");
+        }
+    }
+    // Nothing selected: Onshape's prompt.
+    let mut t3 = T { ps: t.ps.clone(), units: t.units, reg: Regenerator::new() };
+    let s = t3.add("shell", &[]);
+    assert_eq!(t3.status(s).1.as_deref(), Some("Select faces to remove."));
+}
+
+
+
+/// QA3: a mate on the rim of a hole broke ("Mate connector could not be
+/// resolved (missing geometry)") when a linear pattern whose hole cut into
+/// that rim was suppressed: the reference held split face names
+/// (Split{parent, by: pattern}) and the now-whole faces only match their
+/// parents. References to split pieces now fall back to the whole face when
+/// the splitting feature no longer splits it (Onshape keeps such mates).
+#[test]
+fn reference_to_split_pieces_survives_when_the_split_goes_away() {
+    fn cut_circles(t: &mut T, circles: &[(DVec2, f64)]) -> FeatureId {
+        let mut sk = noshape_sketch::Sketch::new();
+        for (c, r) in circles {
+            sk.add_circle(*c, *r);
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let rr = t.regen();
+        let keys: Vec<_> = rr.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        t.add("extrude", &[("entities", q(keys)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE"))])
+    }
+    let mut t = T::new();
+    t.block();
+    cut_circles(&mut t, &[(DVec2::new(0.010, 0.010), 0.005)]);
+    // Two small holes cutting the Ø10 hole on both sides split its wall in two.
+    let second = cut_circles(&mut t, &[(DVec2::new(0.0045, 0.010), 0.002), (DVec2::new(0.0155, 0.010), 0.002)]);
+    let r = t.regen();
+    let b = &r.context.bodies[0];
+    // One of the Ø10 hole's top rim arcs, named after a split piece of the wall.
+    let rim = b.shape.edges().iter().position(|e| {
+        let i = e.edge_info().unwrap();
+        i.start.z > 0.0099 && matches!(i.curve, noshape_kernel::Curve::Circle { radius, .. } if (radius - 0.005).abs() < 1e-7)
+    }).expect("rim");
+    let rim_name = b.edges[rim].clone();
+    let noshape_model::reference::TopoName::Edge { faces, .. } = &*rim_name else { panic!("{rim_name:?}") };
+    let wall_name = faces.iter().find(|f| matches!(&***f, noshape_model::reference::TopoName::Split { .. })).expect("rim names a split wall piece").clone();
+    // Suppress the second hole: the rim is a full circle again.
+    t.ps.feature_mut(second).unwrap().suppressed = true;
+    let r = t.regen();
+    let b = &r.context.bodies[0];
+    let found = b.find_edges(&rim_name);
+    assert_eq!(found.len(), 1, "rim edge not resolved");
+    let info = b.shape.edges()[found[0]].edge_info().unwrap();
+    assert!(matches!(info.curve, noshape_kernel::Curve::Circle { radius, .. } if (radius - 0.005).abs() < 1e-7) && info.start.z > 0.0099);
+    assert_eq!(b.find_faces(&wall_name).len(), 1, "hole wall not resolved");
+}
+

@@ -136,6 +136,57 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     Ok(())
 }
 
+/// OCCT's thick-solid offset depends on the join type: on a filleted part the
+/// Arc join returns a solid that fails BRepCheck (right geometry, small
+/// tolerance defects that ShapeFix repairs) while Intersection fails; around
+/// chamfers either may throw, build garbage or return the input unchanged.
+/// Returns the operation (for naming) and the solid to keep: the first valid
+/// result that removed the faces, else a repaired one; otherwise Onshape's
+/// "Could not shell part with selections.".
+fn valid_shell(shape: &k::Shape, faces: &[k::Shape], t: f64, side: k::ShellSide) -> FResult<(k::OpResult, k::Shape)> {
+    let mut invalid = Vec::new();
+    for join in [k::JoinType::Arc, k::JoinType::Intersection] {
+        match k::shell(shape, faces, t, side, join) {
+            // On some parts (a chamfer running round the removed face) OCCT
+            // "succeeds" by returning the input unchanged.
+            Ok(r) if still_has_faces(&r.shape, faces) => log::debug!("shell ({join:?} join): faces to remove are still there"),
+            Ok(r) if r.shape.is_valid() => {
+                let s = r.shape.clone();
+                return Ok((r, s));
+            }
+            Ok(r) => invalid.push(r),
+            Err(e) => log::debug!("shell ({join:?} join): {e}"),
+        }
+    }
+    for r in invalid {
+        if let Some(fixed) = repaired_same_faces(&r.shape) {
+            return Ok((r, fixed));
+        }
+        // An input that is invalid already can't give a valid shell: keep what OCCT built.
+        if !shape.is_valid() {
+            let s = r.shape.clone();
+            return Ok((r, s));
+        }
+    }
+    Err(blend_failed("Could not shell part with selections.", "no join type gave a valid solid"))
+}
+
+/// Whether `shape` still has a face like one of `faces` (same centroid and area).
+fn still_has_faces(shape: &k::Shape, faces: &[k::Shape]) -> bool {
+    let key = |f: &k::Shape| Some((f.centroid().ok()?, f.area().ok()?));
+    let have: Vec<_> = shape.faces().iter().filter_map(key).collect();
+    faces.iter().filter_map(key).any(|(c, a)| have.iter().any(|(c2, a2)| c.distance(*c2) < 1e-7 && (a - a2).abs() <= 1e-9 * a.max(1e-12)))
+}
+
+/// `shape` repaired by ShapeFix, if that makes it valid without changing its
+/// faces (same count, order and centroids), so names computed on `shape` still apply.
+fn repaired_same_faces(shape: &k::Shape) -> Option<k::Shape> {
+    let fixed = shape.fixed(1e-6).ok().filter(k::Shape::is_valid)?;
+    let (a, b) = (shape.faces(), fixed.faces());
+    let same = a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| matches!((x.centroid(), y.centroid()), (Ok(p), Ok(q)) if p.distance(q) < 1e-7));
+    same.then_some(fixed)
+}
+
 pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
     let t = ev.length("thickness")?;
     if t <= 0.0 {
@@ -153,16 +204,16 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if groups.is_empty() {
-        return err("Select faces to remove or parts to hollow");
+        return err(if ev.bool("isHollow") { "Select parts to hollow." } else { "Select faces to remove." });
     }
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let shapes: Vec<k::Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        let res = k::shell(&body.shape, &shapes, t, side, k::JoinType::Arc).map_err(|e| crate::regen::eval::FeatureError::new(format!("Shell failed: {e}")))?;
+        let (res, solid) = valid_shell(&body.shape, &shapes, t, side)?;
         let names = body.shape_names();
         let offset_role = |n: &Name| Role::Offset(n.clone());
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
-        ev.replace_body(bi, res.shape, face_names);
+        ev.replace_body(bi, solid, face_names);
     }
     Ok(())
 }

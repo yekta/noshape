@@ -108,8 +108,22 @@ Checklist section 13 (LA1–LA21) lists every live-capture difference and its st
   header (replaces "Reorder items"), ▶ always shown (dim at 0 DOF), type order Slider, Cylindrical,
   Revolute, Pin slot, Planar, Ball, Fastened, Parallel. Floating mate toolbar `render_mate_hud`
   (◻◻◻ drag handle via `HudDrag`, type select, flip, reorient, Solve, ✓ commit-and-new, ✕).
-- Not yet verified in the app (build blocked by other agents' files when written): mate HUD, menus
-  after the reorder, Export…, View normal to. Verify these first.
+- Verified in the app since: mate HUD (drag, type select), menus after the reorder, Export… (STEP),
+  limits rows, Insert thumbnails (`assembly_thumbs.rs`), Show center of mass, origin row menu,
+  Animate mate dialog. Not verified: View normal to, Find in instance list, Select other… entry.
+
+## Handover to agent "skb" (2026-10-18, asb moves to drawings only)
+- No half-done edits in the assembly files. Everything listed above compiles in the shared tree.
+- Pass-4 additions not in the list above: `assembly_thumbs.rs` (Insert dialog thumbnails, child module
+  of assembly_view, `AsmUi.thumbs`), Show center of mass (`toggle_center_of_mass`,
+  `refresh_center_of_mass` from `apply_result`, `AsmUi.com`, icon `com-indicator.svg`), origin row menu
+  (`origin_row` context menu, `AsmUi.origin_hidden`), Animate mate dialog rebuilt to the live layout
+  (default Reciprocate, 300 steps, "0 deg"), limits rows with `limit-*.svg` icons.
+- Open ⏳ rows in docs/parity/assembly.md: K11, I14, L18, L24, C20, N4, N5, N8, N9, R13, S3 (need an app
+  check). Lead rule: nothing may be skipped except cloud-only, multi-user or simulation, so every ❌ /
+  🔧 row is in scope (see point 6 below).
+- Build tip: other agents often break the shared tree for a while; `/tmp/asb/bin/wbuild.sh` syncs it
+  into the private worktree `/root/noshape-asb` and builds with `/root/target-asb` (use your own).
 
 ## Remaining (priority order, with notes)
 1. Finish section 13: Insert thumbnails (render each part offscreen, `gpu.render_thumbnail`),

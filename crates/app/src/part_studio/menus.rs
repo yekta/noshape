@@ -563,39 +563,21 @@ impl PartStudioView {
     /// Onshape "Export…" on parts: choose a format, then where to save.
     pub(super) fn open_export_dialog(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        let chosen = std::sync::Arc::new(parking_lot::Mutex::new(super::ExportFormat::Step));
         let base = match bodies.as_slice() {
             [b] => self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into()),
             _ => self.studio_name(cx),
         };
-        let pal = p();
-        window.open_dialog(cx, move |dialog, _, _| {
-            let current = *chosen.lock();
-            let formats = super::ExportFormat::ALL.iter().map(|f| {
-                let (f, c) = (*f, chosen.clone());
-                Button::new(SharedString::from(format!("exp-{}", f.ext())))
-                    .label(f.label())
-                    .xsmall()
-                    .when_selected(f == current)
-                    .on_click(move |_, window, _| {
-                        *c.lock() = f;
-                        window.refresh();
-                    })
-            });
-            let (v, c, bodies, base) = (view.clone(), chosen.clone(), bodies.clone(), base.clone());
-            dialog
-                .title("Export")
-                .w(px(420.))
-                .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
-                .footer(
-                    DialogFooter::new()
-                        .gap_2()
-                        .child(DialogClose::new().child(Button::new("cancel").label("Cancel").outline()))
-                        .child(DialogAction::new().child(Button::new("ok").label("Export").primary())),
-                )
-                .on_ok(move |_, window, cx| {
-                    let format = *c.lock();
-                    let (v, bodies) = (v.clone(), bodies.clone());
+        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(base));
+        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
+        // Onshape's Export modal (shared with the tab menu's Export…).
+        window.open_dialog(cx, move |dialog, _, cx| {
+            let formats: Vec<String> = super::ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
+            let (v, c, bodies, file2) = (view.clone(), chosen.clone(), bodies.clone(), file.clone());
+            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx).on_ok(move |_, window, cx| {
+                let format = super::ExportFormat::ALL[c.get()];
+                let base = file2.read(cx).value().trim().to_string();
+                let (v, bodies) = (v.clone(), bodies.clone());
+                window.defer(cx, move |window, cx| {
                     crate::files::request_save_path("Export", format!("{base}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
                         v.update(cx, |this, cx| {
                             let msg = match this.export_bodies(format, &path, &bodies) {
@@ -605,8 +587,9 @@ impl PartStudioView {
                             this.flash_info(msg, cx);
                         });
                     });
-                    true
-                })
+                });
+                true
+            })
         });
     }
 
@@ -653,6 +636,7 @@ impl PartStudioView {
         let mass_on = self.show_mass;
         let btn = |id: &'static str, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
         let view = cx.entity();
+        let thickness_on = self.ui.thickness.is_some();
         h_flex()
             .id("eval-tools")
             .occlude()
@@ -672,10 +656,15 @@ impl PartStudioView {
                 })),
             )
             // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
-            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some(), cx).tooltip("Show analysis tools").dropdown_menu(move |m, _, _| {
-                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).tooltip("Show analysis tools").dropdown_menu(move |m, _, _| {
+                let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+                let v11 = view.clone();
                 m.item(PopupMenuItem::new("Curve/surface analysis").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx))))
+                    .item(PopupMenuItem::new("Deviation analysis").on_click(move |_, w, cx| v5.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Deviation, w, cx))))
+                    .item(PopupMenuItem::new("Connection analysis").on_click(move |_, w, cx| v6.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Connection, w, cx))))
                     .item(PopupMenuItem::new("Dihedral analysis").on_click(move |_, w, cx| v2.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Dihedral, w, cx))))
+                    .item(PopupMenuItem::new("Zebra stripes").on_click(move |_, w, cx| v7.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Zebra, w, cx))))
+                    .item(PopupMenuItem::new("Reflection analysis").on_click(move |_, w, cx| v8.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Reflection, w, cx))))
                     .item(PopupMenuItem::new("Curvature color map").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
                     .item(PopupMenuItem::new("Draft analysis").on_click(move |_, w, cx| {
                         v4.update(cx, |this, cx| {
@@ -683,6 +672,12 @@ impl PartStudioView {
                             this.toggle_analysis(a, w, cx)
                         })
                     }))
+                    // Thickness analysis: once on, the menu edits or turns it off.
+                    .when(!thickness_on, |m| m.item(PopupMenuItem::new("Thickness analysis").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx)))))
+                    .when(thickness_on, |m| {
+                        m.item(PopupMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx))))
+                            .item(PopupMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
+                    })
             }))
             .child(
                 btn("eval-mass", "mass-properties", mass_on, cx).tooltip("Mass properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

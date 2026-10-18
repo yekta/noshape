@@ -214,12 +214,14 @@ pub enum PointRef {
     /// A quadrant point of a circular edge in the view: 0 right, 1 top,
     /// 2 left, 3 bottom (Shift+Q snaps).
     Quadrant { body: BodyId, name: TopoName, k: u8 },
+    /// Where two straight edges meet in the view (a virtual sharp).
+    Intersection { body: BodyId, name: TopoName, body2: BodyId, name2: TopoName },
 }
 
 impl PointRef {
     pub fn body(&self) -> &BodyId {
         match self {
-            PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } => body,
+            PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } => body,
         }
     }
 }
@@ -359,8 +361,25 @@ pub enum AnnotationKind {
     LinearDimension { view: ViewId, a: [f64; 2], b: [f64; 2], offset: f64, orientation: DimOrientation, override_text: Option<String> },
     RadialDimension { view: ViewId, center: [f64; 2], radius: f64, diameter: bool, angle: f64 },
     AngularDimension { view: ViewId, vertex: [f64; 2], a: [f64; 2], b: [f64; 2], radius: f64 },
-    Centermark { view: ViewId, center: [f64; 2], size: f64 },
+    /// `angle`: the mark's rotation in the view (radians; Align centermark,
+    /// pattern centermarks).
+    Centermark {
+        view: ViewId,
+        center: [f64; 2],
+        size: f64,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        angle: f64,
+    },
     Centerline { view: ViewId, a: [f64; 2], b: [f64; 2] },
+    /// Circular centerline (bolt circle): through three points, or (two
+    /// points) center then a point on the circle. View coordinates.
+    CircleCenterline { view: ViewId, points: Vec<[f64; 2]> },
+    /// Hole / thread callout on a hole circle (`center`, `radius` in view
+    /// coordinates; slot 0 = the circle's center reference). The text comes
+    /// from the Hole feature; the leader runs from the circle to `position`.
+    HoleCallout { view: ViewId, center: [f64; 2], radius: f64 },
+    /// Virtual sharp: where two straight edges (`a1`-`b1`, `a2`-`b2`) meet.
+    VirtualSharp { view: ViewId, a1: [f64; 2], b1: [f64; 2], a2: [f64; 2], b2: [f64; 2] },
     Balloon { view: ViewId, anchor: [f64; 2], text: String },
     SurfaceFinish { anchor: [f64; 2], value: String },
     /// Feature control frame with its lower-left corner at `anchor` (sheet
@@ -850,11 +869,14 @@ pub struct Annotation {
     /// Dimension display settings (precision, units, tolerance, text).
     #[serde(default, skip_serializing_if = "DimFormat::is_default")]
     pub format: DimFormat,
+    /// Inspection item number (Onshape's numbered bubble on the annotation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection: Option<u32>,
 }
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::Note { text: String::new(), height_mm: 3.5 }, position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default() }
+        Self { id: 0, kind: AnnotationKind::Note { text: String::new(), height_mm: 3.5 }, position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None }
     }
 }
 
@@ -869,6 +891,35 @@ impl ViewKind {
 }
 
 impl AnnotationKind {
+    /// Center and radius of a circle centerline (view coordinates).
+    pub fn circle_centerline(points: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
+        match points {
+            [c, p] => Some((*c, ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt())),
+            [a, b, c] => {
+                let d = 2.0 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]));
+                if d.abs() < 1e-18 {
+                    return None;
+                }
+                let sq = |p: &[f64; 2]| p[0] * p[0] + p[1] * p[1];
+                let ux = (sq(a) * (b[1] - c[1]) + sq(b) * (c[1] - a[1]) + sq(c) * (a[1] - b[1])) / d;
+                let uy = (sq(a) * (c[0] - b[0]) + sq(b) * (a[0] - c[0]) + sq(c) * (b[0] - a[0])) / d;
+                Some(([ux, uy], ((a[0] - ux).powi(2) + (a[1] - uy).powi(2)).sqrt()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Where the lines `a1`-`b1` and `a2`-`b2` meet (None when parallel).
+    pub fn line_intersection(a1: [f64; 2], b1: [f64; 2], a2: [f64; 2], b2: [f64; 2]) -> Option<[f64; 2]> {
+        let (r, s) = ([b1[0] - a1[0], b1[1] - a1[1]], [b2[0] - a2[0], b2[1] - a2[1]]);
+        let den = r[0] * s[1] - r[1] * s[0];
+        if den.abs() < 1e-18 {
+            return None;
+        }
+        let t = ((a2[0] - a1[0]) * s[1] - (a2[1] - a1[1]) * s[0]) / den;
+        Some([a1[0] + r[0] * t, a1[1] + r[1] * t])
+    }
+
     /// Mutable access to the view an annotation is attached to.
     pub fn view_mut(&mut self) -> Option<&mut ViewId> {
         match self {
@@ -877,6 +928,9 @@ impl AnnotationKind {
             | AnnotationKind::AngularDimension { view, .. }
             | AnnotationKind::Centermark { view, .. }
             | AnnotationKind::Centerline { view, .. }
+            | AnnotationKind::CircleCenterline { view, .. }
+            | AnnotationKind::VirtualSharp { view, .. }
+            | AnnotationKind::HoleCallout { view, .. }
             | AnnotationKind::Balloon { view, .. }
             | AnnotationKind::OrdinateDimension { view, .. }
             | AnnotationKind::ChamferDimension { view, .. }
@@ -898,6 +952,9 @@ impl AnnotationKind {
             | AnnotationKind::AngularDimension { view, .. }
             | AnnotationKind::Centermark { view, .. }
             | AnnotationKind::Centerline { view, .. }
+            | AnnotationKind::CircleCenterline { view, .. }
+            | AnnotationKind::VirtualSharp { view, .. }
+            | AnnotationKind::HoleCallout { view, .. }
             | AnnotationKind::Balloon { view, .. }
             | AnnotationKind::OrdinateDimension { view, .. }
             | AnnotationKind::ChamferDimension { view, .. }
@@ -937,6 +994,9 @@ impl AnnotationKind {
             AnnotationKind::AngularDimension { .. } => "Angular dimension",
             AnnotationKind::Centermark { .. } => "Centermark",
             AnnotationKind::Centerline { .. } => "Centerline",
+            AnnotationKind::CircleCenterline { .. } => "Circle centerline",
+            AnnotationKind::VirtualSharp { .. } => "Virtual sharp",
+            AnnotationKind::HoleCallout { .. } => "Hole callout",
             AnnotationKind::Balloon { .. } => "Callout",
             AnnotationKind::SurfaceFinish { .. } => "Surface finish",
             AnnotationKind::Gdt { .. } => "Geometric tolerance",
@@ -1158,15 +1218,68 @@ pub struct DrawingProps {
     pub tolerance_leading_zeros: bool,
     #[serde(default = "yes")]
     pub tolerance_trailing_zeros: bool,
+    /// Inspection: bubble shape, hide all (toolbar toggle), leave callouts
+    /// out of automatic numbering.
+    #[serde(default)]
+    pub inspection_shape: InspectionShape,
+    #[serde(default)]
+    pub hide_inspection: bool,
+    #[serde(default)]
+    pub inspection_exclude_callouts: bool,
+    /// Inspection › Item parsing: Row (one item per callout) instead of
+    /// Parameter (hole callouts and chamfers split into parameters).
+    #[serde(default)]
+    pub inspection_row_parsing: bool,
+    /// Inspection › Text height and Border size (mm).
+    #[serde(default = "inspection_text")]
+    pub inspection_text_height: f64,
+    #[serde(default = "inspection_border")]
+    pub inspection_border_size: f64,
+}
+
+fn inspection_text() -> f64 {
+    2.5
+}
+
+fn inspection_border() -> f64 {
+    1.2
+}
+
+/// Border shape of inspection items (Drawing properties › Inspection).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum InspectionShape {
+    #[default]
+    Circle,
+    Oval,
+    Rectangle,
+    Triangle,
+    Flag,
+}
+
+impl InspectionShape {
+    pub const ALL: [InspectionShape; 5] = [InspectionShape::Circle, InspectionShape::Oval, InspectionShape::Rectangle, InspectionShape::Triangle, InspectionShape::Flag];
+    pub fn name(self) -> &'static str {
+        match self {
+            InspectionShape::Circle => "Circle",
+            InspectionShape::Oval => "Oval",
+            InspectionShape::Rectangle => "Rectangle",
+            InspectionShape::Triangle => "Triangle",
+            InspectionShape::Flag => "Flag",
+        }
+    }
 }
 
 fn yes() -> bool {
     true
 }
 
+fn is_zero(x: &f64) -> bool {
+    *x == 0.0
+}
+
 impl Default for DrawingProps {
     fn default() -> Self {
-        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true }
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2 }
     }
 }
 
@@ -1359,6 +1472,8 @@ pub mod create;
 pub mod export;
 pub mod font;
 pub mod format;
+pub mod inspection;
+pub mod painter;
 pub mod sheet;
 pub mod showcase;
 pub mod tables;

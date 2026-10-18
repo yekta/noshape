@@ -21,7 +21,10 @@ pub struct DocEntry {
     pub name: String,
     /// Last change (unix ms): the store's `modified`, else the file mtime.
     pub modified: i64,
-    pub size: u64,
+    /// Author of the latest change ("Modified by").
+    pub modified_by: String,
+    /// Author of the first change ("Owned by").
+    pub owner: String,
     pub thumbnail: Option<Arc<RenderImage>>,
     /// Position in the recent list.
     pub recent_rank: Option<usize>,
@@ -40,6 +43,8 @@ struct Cached {
     stamp: (Option<SystemTime>, Option<SystemTime>, u64),
     name: String,
     modified: i64,
+    modified_by: String,
+    owner: String,
     thumbnail: Option<Arc<RenderImage>>,
     broken: bool,
 }
@@ -169,7 +174,8 @@ impl Library {
             docs.push(DocEntry {
                 name: cached.name.clone(),
                 modified: cached.modified,
-                size: md.len() + std::fs::metadata(wal_path(&path)).map(|m| m.len()).unwrap_or(0),
+                modified_by: cached.modified_by.clone(),
+                owner: cached.owner.clone(),
                 thumbnail: cached.thumbnail.clone(),
                 recent_rank: recent.iter().position(|r| *r == path),
                 broken: cached.broken,
@@ -192,6 +198,8 @@ impl Library {
 struct MetaRead {
     name: String,
     modified: i64,
+    owner: String,
+    modified_by: String,
     thumbnail: Option<Vec<u8>>,
 }
 
@@ -201,8 +209,9 @@ struct MetaRead {
 /// behind); an open document goes through a regular read-only store handle.
 fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     if wal_path(path).exists() {
-        let meta = noshape_store::Document::open_read_only(path)?.meta()?;
-        return Ok(MetaRead { name: meta.name, modified: meta.modified, thumbnail: meta.thumbnail });
+        let doc = noshape_store::Document::open_read_only(path)?;
+        let (meta, (owner, modified_by)) = (doc.meta()?, doc.owner_and_last_author()?);
+        return Ok(MetaRead { name: meta.name, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
     }
     use rusqlite::{Connection, OpenFlags, OptionalExtension as _};
     let mut uri = url_escape(&path.to_string_lossy());
@@ -215,7 +224,8 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     }
     let get = |key: &str| -> anyhow::Result<Option<Vec<u8>>> { Ok(conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?) };
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
-    Ok(MetaRead { name: text(get("name")?), modified: text(get("modified")?).parse().unwrap_or(0), thumbnail: get("thumbnail")? })
+    let (owner, modified_by) = noshape_store::owner_and_last_author(&conn)?;
+    Ok(MetaRead { name: text(get("name")?), modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
 }
 
 /// Percent-encode the characters that are special in SQLite URIs.
@@ -238,12 +248,14 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
             stamp,
             name: if meta.name.trim().is_empty() { stem } else { meta.name },
             modified: if meta.modified > 0 { meta.modified } else { fallback_ms },
+            modified_by: meta.modified_by,
+            owner: meta.owner,
             thumbnail: meta.thumbnail.as_deref().and_then(decode_thumbnail),
             broken: false,
         },
         Err(e) => {
             log::warn!("cannot read {}: {e}", path.display());
-            Cached { stamp, name: stem, modified: fallback_ms, thumbnail: None, broken: true }
+            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), thumbnail: None, broken: true }
         }
     }
 }
@@ -389,6 +401,22 @@ pub fn duplicate_document(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
     Ok(dest)
 }
 
+/// Copy a document under `name` next to it (☰ › Copy workspace…).
+pub fn copy_document_named(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
+    let dir = path.parent().context("document has no folder")?;
+    let clean = sanitize_name(name);
+    if clean.is_empty() {
+        bail!("Enter a name");
+    }
+    let dest = unique_path(dir, &clean);
+    let src = noshape_store::Document::open_read_only(path)?;
+    src.backup_to(&dest)?;
+    drop(src);
+    let mut copy = noshape_store::Document::open(&dest)?;
+    copy.set_name(name.trim())?;
+    Ok(dest)
+}
+
 /// Move a (closed) document to the system trash.
 pub fn trash_document(path: &Path) -> anyhow::Result<()> {
     let _ = settle(path);
@@ -416,14 +444,6 @@ pub fn format_onshape_time(ms: i64) -> String {
     }
 }
 
-pub fn format_size(bytes: u64) -> String {
-    match bytes {
-        0..=1023 => format!("{bytes} B"),
-        1024..=1_048_575 => format!("{:.0} KB", bytes as f64 / 1024.0),
-        _ => format!("{:.1} MB", bytes as f64 / 1_048_576.0),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,5 +454,67 @@ mod tests {
         let now = to_ms(SystemTime::now());
         assert!(format_onshape_time(now).ends_with(" Today"));
         assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
+    }
+}
+
+/// Onshape's document labels (per user, kept in the config dir): the label
+/// names and the labels of each document (by canonical path).
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct Labels {
+    pub labels: Vec<String>,
+    pub assign: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+impl Labels {
+    fn file() -> PathBuf {
+        crate::files::config_dir().join("labels.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read(Self::file()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let _ = std::fs::write(Self::file(), serde_json::to_vec_pretty(self).unwrap_or_default());
+    }
+
+    fn key(path: &Path) -> String {
+        path.canonicalize().unwrap_or_else(|_| path.to_path_buf()).to_string_lossy().to_string()
+    }
+
+    pub fn of(&self, path: &Path) -> Vec<String> {
+        self.assign.get(&Self::key(path)).cloned().unwrap_or_default()
+    }
+
+    pub fn has(&self, path: &Path, label: &str) -> bool {
+        self.assign.get(&Self::key(path)).is_some_and(|l| l.iter().any(|x| x == label))
+    }
+
+    /// Create a label (names are unique, case-insensitively).
+    pub fn create(&mut self, name: &str) -> bool {
+        let name = name.trim();
+        if name.is_empty() || self.labels.iter().any(|l| l.eq_ignore_ascii_case(name)) {
+            return false;
+        }
+        self.labels.push(name.to_string());
+        self.labels.sort_by_key(|l| l.to_lowercase());
+        true
+    }
+
+    pub fn toggle(&mut self, path: &Path, label: &str) {
+        let list = self.assign.entry(Self::key(path)).or_default();
+        match list.iter().position(|l| l == label) {
+            Some(i) => {
+                list.remove(i);
+            }
+            None => list.push(label.to_string()),
+        }
+    }
+
+    /// Keep labels when a document moves or is renamed.
+    pub fn moved(&mut self, from: &Path, to: &Path) {
+        if let Some(l) = self.assign.remove(&Self::key(from)) {
+            self.assign.insert(Self::key(to), l);
+        }
     }
 }

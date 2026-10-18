@@ -1088,6 +1088,9 @@ impl PartStudioView {
             let r = ed.apply_dimension(data, cid, text, &units, &vars);
             if r.is_ok() {
                 ed.dim_edit = None;
+                // Live Onshape: the just-applied dimension stays selected (tan box, sketch/148).
+                ed.selection.clear();
+                ed.selected_constraints = vec![cid];
             }
             r
         });
@@ -2101,7 +2104,6 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// Decoded image of a sketch image (cached).
     // ------------------------------------------------------------ bezier degree
 
     fn open_degree_edit(&mut self, id: noshape_sketch::EntityId, deg: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -2990,6 +2992,13 @@ impl PartStudioView {
             );
         }
 
+        // ---- live values of the shape being drawn (live: `#449ccd`, 13 px, no box)
+        for (pos, text) in ed.preview_values(&data, &units) {
+            let Some((x, y)) = project(pos) else { continue };
+            let w = crate::sketch_mode::label_width_px(&text) as f32 * 13.0 / 14.0;
+            out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 9.0)).text_size(px(13.)).text_color(rgb(0x449ccd)).whitespace_nowrap().child(text).into_any_element());
+        }
+
         // ---- value of the dimension being placed (follows the cursor)
         if let Some((kind, pos, v)) = ed.dimension_preview(&data)
             && let Some((x, y)) = project(pos)
@@ -3109,7 +3118,7 @@ impl PartStudioView {
         let data = self.sketch_data(cx);
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
         let tool_btn = |tool: Tool, cx: &mut Context<Self>| {
-            crate::ui::with_tooltip(
+            crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{tool:?}")),
                 tool.label(),
                 crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
@@ -3138,12 +3147,12 @@ impl PartStudioView {
             bar
         };
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {
-            crate::ui::with_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
+            crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
         };
         let mut bar = h_flex().flex_1().min_w_0().overflow_hidden().gap(px(2.));
         bar = bar
-            .child(action_btn("sk-undo", "undo", "Undo (Ctrl+Z)", Box::new(Undo), cx))
-            .child(action_btn("sk-redo", "redo", "Redo (Ctrl+Y)", Box::new(Redo), cx))
+            .child(action_btn("sk-undo", "undo", "Undo (cmd+z/ctrl+z)", Box::new(Undo), cx))
+            .child(action_btn("sk-redo", "redo", "Redo (ctrl+y/shift+cmd+z)", Box::new(Redo), cx))
             .child(sep())
             // Extrude / Revolve accept the sketch and pre-select all its regions.
             .child(action_btn("sk-extrude", "extrude", "Extrude (Shift+E)", Box::new(Extrude), cx))
@@ -3156,7 +3165,7 @@ impl PartStudioView {
         for g in USE_TOOLS {
             bar = group(bar, g, cx);
         }
-        bar = bar.child(crate::ui::with_tooltip(
+        bar = bar.child(crate::ui::with_tool_tooltip(
             "sk-construction-tt",
             "Construction (Q)",
             crate::ui::tool_button("sk-construction", "construction", construction, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_construction(window, cx))),
@@ -3173,7 +3182,7 @@ impl PartStudioView {
             let tool = Tool::Constraint(*c);
             let enabled = selection.is_empty() || data.as_ref().is_some_and(|d| crate::sketch_mode::constraint_applicable(&d.sketch, *c, &selection));
             // Not applicable to the selection: Onshape dims the tool to 40%.
-            bar = bar.child(crate::ui::with_tooltip(
+            bar = bar.child(crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{tool:?}")),
                 tool.label(),
                 crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx)

@@ -118,6 +118,12 @@ struct Globals {
     select: [f32; 4],
     accent: [f32; 4],
     error: [f32; 4],
+    /// rgb = specular color (linear), a = shininess 0..1.
+    specular: [f32; 4],
+    /// Construction line dash, gap, dash, gap (px).
+    dash: [f32; 4],
+    /// Zebra stripes room: center xyz and radius (around the scene).
+    room: [f32; 4],
 }
 
 #[repr(C)]
@@ -127,7 +133,9 @@ struct InstUniform {
     normal_m: [[f32; 4]; 4],
     color: [f32; 4],
     params: [u32; 4],
-    _pad: [f32; 24],
+    /// x = line width scale.
+    extra: [f32; 4],
+    _pad: [f32; 20],
 }
 
 /// A rendered frame. `bgra` is tightly packed sRGB BGRA8, row-major, top row first.
@@ -198,7 +206,11 @@ impl PickBuffer {
                 if id == 0 {
                     continue;
                 }
+                // `i32::MIN`: never picked (filtered out by the caller).
                 let key = (priority(id), -d2, id);
+                if key.0 == i32::MIN {
+                    continue;
+                }
                 if best.is_none_or(|b| (key.0, key.1) > (b.0, b.1)) {
                     best = Some(key);
                 }
@@ -357,8 +369,13 @@ struct DrawLists {
     /// for their mostly opaque texels) and faded ones (blend only).
     images: Vec<usize>,
     images_faded: Vec<usize>,
+    /// Color pass only: opaque meshes mirroring an environment map.
+    reflective: Vec<usize>,
     lines: Vec<usize>,
     points: Vec<usize>,
+    /// Color pass only: `hidden_only` lines and points.
+    lines_hidden: Vec<usize>,
+    points_hidden: Vec<usize>,
     culled: usize,
 }
 
@@ -370,8 +387,11 @@ impl DrawLists {
         self.pick_priority.clear();
         self.images.clear();
         self.images_faded.clear();
+        self.reflective.clear();
         self.lines.clear();
         self.points.clear();
+        self.lines_hidden.clear();
+        self.points_hidden.clear();
         self.culled = 0;
         // Screen-space margin for wide lines, points and the pick widening.
         let margin = |px: f32| (2.0 * px * dpr / width as f32, 2.0 * px * dpr / height as f32);
@@ -385,6 +405,9 @@ impl DrawLists {
                     continue;
                 }
             } else if inst.pick_only {
+                continue;
+            }
+            if pick && inst.hidden_only {
                 continue;
             }
             let (bounds, m) = match &inst.drawable {
@@ -416,10 +439,13 @@ impl DrawLists {
             }
             match &inst.drawable {
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
+                Drawable::Mesh(_) if !pick && inst.reflection.is_some() && inst.color[3] >= 0.999 => self.reflective.push(i),
                 Drawable::Mesh(_) if inst.color[3] >= 0.999 => self.opaque.push(i),
                 Drawable::Mesh(_) => self.transparent.push(i),
                 Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
                 Drawable::Image(_) => self.images_faded.push(i),
+                Drawable::Lines(_) if inst.hidden_only => self.lines_hidden.push(i),
+                Drawable::Points(_) if inst.hidden_only => self.points_hidden.push(i),
                 Drawable::Lines(_) => self.lines.push(i),
                 Drawable::Points(_) => self.points.push(i),
             }
@@ -432,10 +458,11 @@ impl DrawLists {
             if o.skip_meshes {
                 self.opaque.clear();
                 self.transparent.clear();
+                self.reflective.clear();
             }
         }
         let inst = &scene.instances;
-        for v in [&mut self.opaque, &mut self.transparent, &mut self.pick_priority, &mut self.images, &mut self.images_faded, &mut self.lines, &mut self.points] {
+        for v in [&mut self.opaque, &mut self.transparent, &mut self.pick_priority, &mut self.images, &mut self.images_faded, &mut self.reflective, &mut self.lines, &mut self.points, &mut self.lines_hidden, &mut self.points_hidden] {
             // Stable by index within a layer (instances are already in index order).
             v.sort_by_key(|&i| inst[i].layer);
         }
@@ -473,6 +500,9 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             pass.set_bind_group(1, bind_inst, &[(i as u64 * INST_STRIDE) as u32]);
             match &inst.drawable {
                 Drawable::Mesh(m) => {
+                    if let Some(r) = inst.reflection.as_ref().filter(|_| !pick) {
+                        pass.set_bind_group(2, &r.environment.0.bind_group, &[]);
+                    }
                     pass.set_vertex_buffer(0, m.0.vertices.slice(..));
                     pass.set_index_buffer(m.0.indices.slice(..), wgpu::IndexFormat::Uint32);
                     pass.draw_indexed(0..m.0.index_count, 0, 0..1);
@@ -507,6 +537,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
         draw(pass, &lists.opaque, if section { &pipelines.mesh_section } else { &pipelines.mesh_opaque });
+        draw(pass, &lists.reflective, &pipelines.mesh_reflect);
         // Images before transparent meshes: their opaque texels write depth,
         // so datum planes / region fills behind them are hidden and those
         // in front blend over them.
@@ -516,6 +547,8 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.transparent, &pipelines.mesh_transparent);
         draw(pass, &lists.lines, &pipelines.line);
         draw(pass, &lists.points, &pipelines.point);
+        draw(pass, &lists.lines_hidden, &pipelines.line_hidden);
+        draw(pass, &lists.points_hidden, &pipelines.point_hidden);
     }
 }
 
@@ -550,8 +583,8 @@ fn msaa_of(style: &Style) -> u32 {
 }
 
 fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f32, s: &Style) -> Globals {
-    let scene_radius = scene
-        .bounds()
+    let bounds = scene.bounds();
+    let scene_radius = bounds
         .map(|(lo, hi)| {
             let c = (lo + hi) * 0.5;
             ((hi - lo).length() as f64 * 0.5) + (c.as_dvec3() - camera.target).length()
@@ -584,6 +617,9 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         hover: s.hover_color,
         select: s.select_color,
         accent: s.accent_color,
+        specular: s.specular,
+        dash: s.construction_dash,
+        room: room_of(bounds),
         error: s.error_color,
     }
 }
@@ -594,8 +630,14 @@ struct Pipelines {
     /// Opaque meshes while a section view cuts: draws the caps.
     mesh_section: wgpu::RenderPipeline,
     mesh_transparent: wgpu::RenderPipeline,
+    /// Opaque meshes mirroring an environment map (image bind group 2).
+    mesh_reflect: wgpu::RenderPipeline,
     line: wgpu::RenderPipeline,
     point: wgpu::RenderPipeline,
+    /// Lines and points of `hidden_only` instances: drawn where something is
+    /// in front of them (depth test Less, no depth write).
+    line_hidden: wgpu::RenderPipeline,
+    point_hidden: wgpu::RenderPipeline,
     mesh_pick: wgpu::RenderPipeline,
     mesh_pick_transparent: wgpu::RenderPipeline,
     mesh_pick_priority: wgpu::RenderPipeline,
@@ -623,6 +665,8 @@ pub struct Renderer {
     image_pipeline_layout: wgpu::PipelineLayout,
     image_sampler: wgpu::Sampler,
     pipelines: Option<Pipelines>,
+    /// Ambient occlusion pass (built for the current MSAA count when used).
+    ao: Option<crate::ao::AoPass>,
     globals_color: wgpu::Buffer,
     globals_pick: wgpu::Buffer,
     states: wgpu::Buffer,
@@ -810,6 +854,7 @@ impl Renderer {
             image_pipeline_layout,
             image_sampler,
             pipelines: None,
+            ao: None,
             globals_color,
             globals_pick,
             states,
@@ -948,12 +993,15 @@ impl Renderer {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             mesh_section: make(P { label: "mesh-section", vs: "vs_mesh", fs: "fs_mesh_section", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            mesh_reflect: make_in(image_layout, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
             mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }),
             line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
+            line_hidden: make(P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: none, samples: msaa }),
             point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
+            point_hidden: make(P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: none, samples: msaa }),
             mesh_pick: make(P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
             mesh_pick_transparent: make(P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }),
             mesh_pick_priority: make(P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }),
@@ -1048,8 +1096,12 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1), inst.pickable as u32, inst.pick_base],
-                _pad: [0.0; 24],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
+                extra: match &inst.reflection {
+                    Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
+                    None => [inst.line_scale, 0.0, 0.0, 0.0],
+                },
+                _pad: [0.0; 20],
             };
             let off = i * INST_STRIDE as usize;
             bytes[off..off + std::mem::size_of::<InstUniform>()].copy_from_slice(bytemuck::bytes_of(&u));
@@ -1135,10 +1187,14 @@ impl Renderer {
             perf::record_ms("r.culled_instances", lists.culled as f32);
         }
         self.prepare_target(target, width, height, msaa);
+        let ao_strength = req.style.ambient_occlusion;
+        if ao_strength > 0.001 && self.ao.as_ref().is_none_or(|a| a.msaa != msaa) {
+            self.ao = Some(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
+        }
         drop(t_prep);
 
         let t_encode = perf::scope("r.encode_submit");
-        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, .. } = self;
+        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, ao, .. } = self;
         let pipelines = pipelines.as_ref().expect("pipelines");
         let ts = targets.get_mut(&target).expect("target");
         if req.invalidate_pick {
@@ -1170,7 +1226,8 @@ impl Renderer {
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &tex.depth,
-                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Discard }),
+                    // Kept for the ambient occlusion pass.
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
                     stencil_ops: None,
                 }),
                 timestamp_writes: None,
@@ -1183,6 +1240,12 @@ impl Renderer {
             pass.set_pipeline(&pipelines.background);
             pass.draw(0..3, 0..1);
             draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, bind_inst, false, req.scene.clip.is_some());
+        }
+        if ao_strength > 0.001
+            && let Some(ao) = ao.as_ref()
+        {
+            let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength };
+            ao.encode(device, queue, &mut encoder, &tex.depth, &tex.resolve_view, frame);
         }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: &tex.resolve, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
@@ -1446,7 +1509,8 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     let color_msaa = (msaa > 1).then(|| tex("color-msaa", COLOR_FORMAT, msaa, att).create_view(&Default::default()));
     let resolve = tex("color", COLOR_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
     let resolve_view = resolve.create_view(&Default::default());
-    let depth = tex("depth", DEPTH_FORMAT, msaa, att).create_view(&Default::default());
+    // Also sampled by the ambient occlusion pass.
+    let depth = tex("depth", DEPTH_FORMAT, msaa, att | wgpu::TextureUsages::TEXTURE_BINDING).create_view(&Default::default());
     let pick = tex("pick", PICK_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
     let pick_view = pick.create_view(&Default::default());
     let pick_depth = tex("pick-depth", DEPTH_FORMAT, 1, att).create_view(&Default::default());
@@ -1690,6 +1754,25 @@ impl Uploader {
             (!points.points.is_empty()).then_some((lo, hi))
         };
         PointsHandle(Arc::new(GpuPoints { buffer, count: points.points.len() as u32, bounds }))
+    }
+}
+
+
+/// Instance flag bits of zebra stripes: bit 2 on, bit 3 flipped, bits 8..
+/// the stripe count.
+fn zebra_bits(z: Option<crate::scene::Zebra>) -> u32 {
+    z.map_or(0, |z| 4 | ((z.flip as u32) << 3) | (z.stripes.min(0xff_ffff) << 8))
+}
+
+/// The striped room zebra stripes reflect: a sphere around the scene, big
+/// enough that flat faces show a few broad stripes.
+fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
+    match bounds {
+        Some((lo, hi)) => {
+            let c = (lo + hi) * 0.5;
+            [c.x, c.y, c.z, ((hi - lo).length() * 1.5).max(1e-6)]
+        }
+        None => [0.0, 0.0, 0.0, 1.0],
     }
 }
 

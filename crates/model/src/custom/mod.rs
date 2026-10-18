@@ -40,13 +40,47 @@ use serde::{Deserialize, Serialize};
 /// Content of a Feature Studio tab.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FeatureStudio {
+    /// Committed source: what Part Studios use.
     pub source: String,
+    /// Onshape saves edits as you type but applies them only on Commit: the
+    /// saved, not yet committed text (None: same as `source`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft: Option<String>,
 }
 
 impl FeatureStudio {
     /// Source of a new Feature Studio: a small working example.
     pub fn template() -> Self {
-        Self { source: TEMPLATE.to_string() }
+        Self::new(TEMPLATE)
+    }
+
+    pub fn new(source: &str) -> Self {
+        Self { source: source.to_string(), draft: None }
+    }
+
+    /// The text the editor shows: the draft, else the committed source.
+    pub fn text(&self) -> &str {
+        self.draft.as_deref().unwrap_or(&self.source)
+    }
+
+    /// Save `text` as typed (a draft unless it equals the committed source).
+    pub fn save(&mut self, text: String) {
+        self.draft = (text != self.source).then_some(text);
+    }
+
+    /// Commit the draft. Returns whether anything changed.
+    pub fn commit(&mut self) -> bool {
+        match self.draft.take() {
+            Some(d) => {
+                self.source = d;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn has_uncommitted(&self) -> bool {
+        self.draft.is_some()
     }
 }
 

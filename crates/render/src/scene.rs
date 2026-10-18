@@ -52,6 +52,9 @@ impl LineSegment {
     pub const ON_TOP: u32 = 2;
     /// Dash-dot (phantom) pattern.
     pub const DASH_DOT: u32 = 4;
+    /// Construction line: the dash / gap / dash / gap pattern of
+    /// [`Style::construction_dash`] (Onshape's Graphics preferences).
+    pub const CONSTRUCTION: u32 = 8;
 }
 
 impl LineData {
@@ -80,7 +83,8 @@ pub struct PointSprite {
     pub pick_id: u32,
     /// Diameter in logical pixels.
     pub size: f32,
-    /// Bit 1: always on top.
+    /// Bit 1: always on top. Bit 2: ring with a center dot. Bit 3
+    /// ([`PointSprite::HOLLOW`]): white center inside a colored ring.
     pub style: u32,
     pub _pad: u32,
 }
@@ -104,6 +108,11 @@ impl ImageData {
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
         bounds_of(self.corners.iter().copied())
     }
+}
+
+impl PointSprite {
+    /// A hollow point: white center, ring in the point color.
+    pub const HOLLOW: u32 = 8;
 }
 
 pub(crate) fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
@@ -185,11 +194,40 @@ pub struct Instance {
     pub unlit: bool,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
+    /// Line width multiplier for line instances (Graphics preferences line widths).
+    pub line_scale: f32,
+    /// Lines / points drawn only where geometry hides them (color pass
+    /// only): the active sketch's "underconstrained occluded" color.
+    pub hidden_only: bool,
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
     /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
     pub pick_base: u32,
+    /// Zebra stripes instead of shading (Onshape's analysis tool).
+    pub zebra: Option<Zebra>,
+    /// A mirror reflecting an environment map (Reflection analysis).
+    pub reflection: Option<Reflection>,
+}
+
+/// Reflection analysis: an equirectangular environment image (uploaded
+/// with [`crate::Uploader::upload_image`]; its corners don't matter) turned
+/// by `rotation` radians about the up axis, optionally blurred, and either
+/// fixed in the world (Z up) or locked to the camera.
+#[derive(Clone)]
+pub struct Reflection {
+    pub environment: ImageHandle,
+    pub rotation: f32,
+    pub blur: bool,
+    pub lock: bool,
+}
+
+/// Zebra stripes: the reflection of a striped room, `stripes` stripes
+/// across the reflected half-space; `flip` turns them 90°.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Zebra {
+    pub stripes: u32,
+    pub flip: bool,
 }
 
 impl Instance {
@@ -206,9 +244,24 @@ impl Instance {
             ignore_clip: false,
             unlit: false,
             layer: 0,
+            line_scale: 1.0,
+            hidden_only: false,
             pick_only: false,
             pick_base: 0,
+            zebra: None,
+            reflection: None,
         }
+    }
+    /// Draw only the parts hidden behind other geometry (lines and points).
+    pub fn hidden_only(mut self) -> Self {
+        self.hidden_only = true;
+        self
+    }
+
+    /// Multiply the widths of this line instance.
+    pub fn line_scale(mut self, scale: f32) -> Self {
+        self.line_scale = scale;
+        self
     }
     pub fn pick_base(mut self, base: u32) -> Self {
         self.pick_base = base;
@@ -248,6 +301,18 @@ impl Instance {
         self.unlit = true;
         self
     }
+
+    /// Shade as a mirror of an environment map.
+    pub fn reflection(mut self, reflection: Option<Reflection>) -> Self {
+        self.reflection = reflection;
+        self
+    }
+
+    /// Shade with zebra stripes.
+    pub fn zebra(mut self, zebra: Option<Zebra>) -> Self {
+        self.zebra = zebra;
+        self
+    }
 }
 
 /// Per-pick-id state flags (bitfield written to the GPU state buffer).
@@ -274,6 +339,13 @@ pub struct Style {
     pub accent_color: [f32; 4],
     pub error_color: [f32; 4],
     pub edge_color: [f32; 4],
+    /// Construction line pattern in px: dash, gap, dash, gap.
+    pub construction_dash: [f32; 4],
+    /// Ambient occlusion intensity, 0..1 (Graphics preferences); 0 = off.
+    pub ambient_occlusion: f32,
+    /// Specular color (linear rgb) and shininess (a, 0..1): Onshape's
+    /// Graphics preferences "Specular color" / "Shininess".
+    pub specular: [f32; 4],
     /// Draw B-rep edges on shaded bodies.
     pub show_edges: bool,
     /// 1, 2, 4 or 8.
@@ -292,6 +364,10 @@ impl Default for Style {
             accent_color: srgb(0xff, 0xc2, 0x0e),
             error_color: srgb(0xbd, 0x30, 0x39),
             edge_color: srgb(0x00, 0x00, 0x00),
+            construction_dash: [4.0, 6.0, 30.0, 6.0],
+            ambient_occlusion: 0.0,
+            // Onshape's defaults: specular #999999, shininess 3%.
+            specular: { let c = srgb(0x99, 0x99, 0x99); [c[0], c[1], c[2], 0.03] },
             show_edges: true,
             msaa: 4,
         }
@@ -369,6 +445,8 @@ impl Scene {
                     && a.pickable == b.pickable
                     && a.ignore_clip == b.ignore_clip
                     && a.unlit == b.unlit
+                    && a.line_scale == b.line_scale
+                    && a.hidden_only == b.hidden_only
                     && a.layer == b.layer
                     && a.pick_only == b.pick_only
                     && a.pick_base == b.pick_base

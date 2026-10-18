@@ -55,14 +55,23 @@ pub enum MenuIcon {
 
 /// One row of an [`OsMenu`].
 pub enum OsMenuItem {
-    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler> },
+    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString> },
     Separator,
     Submenu { label: SharedString, icon: Option<MenuIcon>, menu: Entity<OsMenu> },
 }
 
 impl OsMenuItem {
     pub fn new(label: impl Into<SharedString>) -> Self {
-        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None }
+        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new() }
+    }
+
+    /// Shortcut key chips at the right ("shift", "ctrl", "s"), as Onshape's
+    /// Feature Studio Commit menu.
+    pub fn keys(mut self, chips: &[&str]) -> Self {
+        if let Self::Item { keys, .. } = &mut self {
+            *keys = chips.iter().map(|k| SharedString::from(k.to_string())).collect();
+        }
+        self
     }
 
     /// A single-color kit icon at the left.
@@ -123,6 +132,16 @@ pub struct OsMenu {
     /// Onshape's icon-less list menus (documents page, Bootstrap
     /// `list-no-icons`): 13 px text 17 px from the edge.
     plain: bool,
+    /// Onshape's select lists (e.g. Variable type): this width, 26 px rows,
+    /// 14 px `#666` text 10 px in; the hovered (else the checked) row is
+    /// `#1651b0` with white text.
+    select: Option<f32>,
+    /// Onshape's drawing toolbar lists: 26 px rows, 18 px icons 4 px in,
+    /// 13.33 px text 30 px in.
+    toolbar: bool,
+    /// Onshape's Bootstrap dropdowns (the "+" add-element menu): 14 px `#555`
+    /// text 43 px in, 27 px rows, 20 px icons 20 px in, radius 5.25, `#d7d7d7`.
+    dropdown: bool,
 }
 
 impl EventEmitter<DismissEvent> for OsMenu {}
@@ -136,7 +155,25 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, plain: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, plain: false, select: None, toolbar: false, dropdown: false }, window, cx))
+    }
+
+    /// Select-list style, `width` wide (the field's width).
+    pub fn select_list(mut self, width: f32) -> Self {
+        self.select = Some(width);
+        self
+    }
+
+    /// Drawing toolbar dropdown style.
+    pub fn toolbar_list(mut self) -> Self {
+        self.toolbar = true;
+        self
+    }
+
+    /// Bootstrap dropdown style ("+" menu).
+    pub fn dropdown(mut self) -> Self {
+        self.dropdown = true;
+        self
     }
 
     /// Icon-less list style (13 px text, 17 px inset), as on the documents page.
@@ -238,6 +275,21 @@ impl OsMenu {
 impl Render for OsMenu {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        let dropdown = self.dropdown;
+        let select = self.select;
+        let no_hover = self.hovered.is_none();
+        let any_icon = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { icon: Some(_), .. } | OsMenuItem::Submenu { icon: Some(_), .. }));
+        let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if dropdown {
+            (27., 20., 20., if any_icon { 43. } else { 20. }, 14.)
+        } else if self.select.is_some() {
+            (26., 4., 18., 10., 14.)
+        } else if self.toolbar {
+            (26., 4., 18., 30., 13.33)
+        } else if self.plain {
+            (ROW_H, ICON_X, ICON, 17., 13.)
+        } else {
+            (ROW_H, ICON_X, ICON, TEXT_X, TEXT)
+        };
         let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
@@ -248,11 +300,11 @@ impl Render for OsMenu {
             .iter()
             .scan(2.0f32, |y, i| {
                 let top = *y;
-                *y += if matches!(i, OsMenuItem::Separator) { 1. } else { ROW_H };
+                *y += if matches!(i, OsMenuItem::Separator) { if dropdown { 15. } else { 1. } } else { row_h };
                 Some(top)
             })
             .collect();
-        let plain = self.plain;
+
         let rows: Vec<AnyElement> = self
             .items
             .iter()
@@ -261,19 +313,19 @@ impl Render for OsMenu {
                 let hovered = self.hovered == Some(ix);
                 let icon_el = |icon: &Option<MenuIcon>, cx: &App| -> Option<AnyElement> {
                     icon.as_ref().map(|i| match i {
-                        MenuIcon::Named(n) => crate::assets::icon(n, ICON, cx).into_any_element(),
-                        MenuIcon::Kit(k) => div().size(px(ICON)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
+                        MenuIcon::Named(n) => crate::assets::icon(n, icon_sz, cx).into_any_element(),
+                        MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
                     })
                 };
                 let row = |id: usize| {
                     h_flex()
                         .id(id)
                         .relative()
-                        .h(px(ROW_H))
+                        .h(px(row_h))
                         .w_full()
-                        .pl(px(if plain { 17. } else { TEXT_X }))
+                        .pl(px(text_x))
                         .pr(px(12.))
-                        .text_size(px(if plain { 13. } else { TEXT }))
+                        .text_size(px(text_sz))
                         .whitespace_nowrap()
                         .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                             if *h && this.hovered != Some(ix) {
@@ -283,15 +335,21 @@ impl Render for OsMenu {
                         }))
                 };
                 match item {
-                    OsMenuItem::Separator => div().h(px(1.)).w_full().bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
-                    OsMenuItem::Item { label, icon, checked, disabled, .. } => row(ix)
-                        .text_color(if *disabled { pal.text_faint } else { pal.text })
-                        .when(hovered && !*disabled, |d| d.bg(hover_bg))
-                        .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(ICON_X)).top(px((ROW_H - ICON) * 0.5)).size(px(ICON)).child(i)))
-                        .when(*checked && icon.is_none(), |d| {
-                            d.child(div().absolute().left(px(ICON_X)).top(px((ROW_H - ICON) * 0.5)).size(px(ICON)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
+                    // Bootstrap dropdown dividers have 7 px margins.
+                    OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
+                    OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
+                        .text_color(if *disabled { pal.text_faint } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() { gpui_kit::rgb(0x666666) } else { pal.text })
+                        .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
+                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)))
+                        .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
+                        .when(*checked && icon.is_none() && select.is_none(), |d| {
+                            d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
                         })
                         .child(label.clone())
+                        .when(!keys.is_empty(), |d| {
+                            let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
+                            d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
+                        })
                         .when(!*disabled, |d| {
                             d.cursor_pointer().on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(ix, window, cx)))
                         })
@@ -299,7 +357,7 @@ impl Render for OsMenu {
                     OsMenuItem::Submenu { label, icon, menu } => row(ix)
                         .text_color(pal.text)
                         .when(hovered, |d| d.bg(hover_bg))
-                        .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(ICON_X)).top(px((ROW_H - ICON) * 0.5)).size(px(ICON)).child(i)))
+                        .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .child(div().flex_1().child(label.clone()))
                         // The small ▸ at the right (live: a 4 px black triangle).
                         .child(div().ml(px(16.)).child(crate::ui::glyph("ui-caret-right", 8., pal.text)))
@@ -351,8 +409,10 @@ impl Render for OsMenu {
             .p(px(1.))
             .bg(gpui_kit::rgb(0xffffff))
             .border_1()
-            .border_color(gpui_kit::rgb(0xcccccc))
-            .rounded(px(4.))
+            .border_color(gpui_kit::rgb(if dropdown { 0xd7d7d7 } else { 0xcccccc }))
+            .rounded(px(if dropdown { 5.25 } else { 4. }))
+            .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
+            .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .children(rows)

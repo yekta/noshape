@@ -56,7 +56,7 @@ pub(crate) fn fill_menu(mut m: OsMenu, entries: Vec<MenuEntry>, view: Entity<Ass
                         cx.notify();
                     })
                 });
-                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler) };
+                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler), keys: Vec::new() };
                 if let Some(i) = icon {
                     it = it.icon_name(i);
                 }
@@ -670,6 +670,10 @@ impl AssemblyView {
         m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
         let tg = targets.clone();
         m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
+        // Use best available tessellation (finest meshes for these instances).
+        let best = inst.best_tessellation;
+        let tg = targets.clone();
+        m.push(item(if best { "✓ Use best available tessellation" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
         if is_asm || multi {
             let tg = targets.clone();
             m.push(item("Check interference…", move |t, _, cx| {
@@ -679,7 +683,8 @@ impl AssemblyView {
         }
         // Show mates (instances with mates).
         let mated = asm.mates.iter().any(|mt| mt.instances().contains(&top));
-        if mated {
+        if mated && !graphics {
+            m.push(MenuEntry::Sep);
             m.push(item("Show mates", move |t, _, cx| {
                 t.show_mates_mode = true;
                 t.mates_pinned = Some(top);
@@ -825,8 +830,7 @@ impl AssemblyView {
     }
 
     /// Source-specific instance entries: Lock/follow position (subassemblies),
-    /// Edit standard content, Change configuration, Select instances with the
-    /// same part and configuration.
+    /// Edit standard content, Change configuration.
     fn instance_source_entries(&self, inst: &Instance, multi: bool, cx: &App) -> Vec<MenuEntry> {
         let mut m = Vec::new();
         let top = inst.id;
@@ -863,13 +867,6 @@ impl AssemblyView {
             if configured && !matches!(inst.source, InstanceSource::Standard { .. }) {
                 m.push(item("Change configuration…", move |t, w, cx| t.open_config(top, w, cx)));
             }
-            let same = inst.source.clone();
-            m.push(item("Select instances with same part and same configuration", move |t, _, cx| {
-                let ids: Vec<InstanceId> = t.assembly(cx).map(|a| a.instances.iter().filter(|i| i.source == same).map(|i| i.id).collect()).unwrap_or_default();
-                t.selected = ids;
-                t.ui.scroll_to_selection = true;
-                t.refresh_scene(false, cx);
-            }));
         }
         m
     }
@@ -1217,7 +1214,7 @@ impl AssemblyView {
             let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
             let id = InstanceId(parent.next_id());
             let n = parent.next_instance_name(&name);
-            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
+            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
             new_id = Some(id);
         });
         if let Some(id) = new_id {
@@ -2911,48 +2908,40 @@ impl AssemblyView {
         use crate::part_studio::ExportFormat;
         use gpui_kit::component::WindowExt as _;
         let view = cx.entity();
-        let chosen = Arc::new(Mutex::new(ExportFormat::Step));
         let base = match ids.as_deref() {
             Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
             _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
         };
+        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(base));
+        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
         window.open_dialog(cx, move |dialog, _, cx| {
-            let current = *chosen.lock();
-            let formats = ExportFormat::ALL.iter().map(|f| {
-                let (f, c) = (*f, chosen.clone());
-                Button::new(SharedString::from(format!("asm-exp-{}", f.ext()))).label(f.label()).xsmall().selected(f == current).on_click(move |_, window, _| {
-                    *c.lock() = f;
-                    window.refresh();
-                })
-            });
-            let (v, c, ids, base) = (view.clone(), chosen.clone(), ids.clone(), base.clone());
-            // Onshape modal: title bar, body, blue Export then gray Cancel.
-            crate::os_ui::modal(dialog, "Export", 460.)
-                .child(crate::os_ui::modal_body().child(crate::os_ui::field_label("Format")).child(h_flex().gap_1().flex_wrap().children(formats)))
-                .footer(
-                    crate::os_ui::modal_footer()
-                        .child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export")))
-                        .child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))),
-                )
-                .on_ok(move |_, window, cx| {
-                    let format = *c.lock();
-                    let (v, ids, name) = (v.clone(), ids.clone(), format!("{base}.{}", format.ext()));
-                    // After this dialog closes (an in-app save prompt is a dialog too).
-                    window.defer(cx, move |window, cx| {
-                        crate::files::request_save_path("Export", name, format.ext(), window, cx, move |path, cx| {
-                            v.update(cx, |this, cx| {
-                                let msg = match this.export_occurrences(format, &path, ids.as_deref()) {
-                                    Ok(n) => (false, format!("Exported {n} parts to {}", path.display())),
-                                    Err(e) => (true, format!("Export failed: {e:#}")),
-                                };
-                                this.message = Some(msg);
-                                cx.notify();
-                            });
+            let formats: Vec<String> = ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
+            let (v, c, ids, file2) = (view.clone(), chosen.clone(), ids.clone(), file.clone());
+            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx).on_ok(move |_, window, cx| {
+                let format = ExportFormat::ALL[c.get()];
+                let base = file2.read(cx).value().trim().to_string();
+                let (v, ids, name) = (v.clone(), ids.clone(), format!("{base}.{}", format.ext()));
+                // After this dialog closes (an in-app save prompt is a dialog too).
+                window.defer(cx, move |window, cx| {
+                    crate::files::request_save_path("Export", name, format.ext(), window, cx, move |path, cx| {
+                        v.update(cx, |this, cx| {
+                            let msg = match this.export_occurrences(format, &path, ids.as_deref()) {
+                                Ok(n) => (false, format!("Exported {n} parts to {}", path.display())),
+                                Err(e) => (true, format!("Export failed: {e:#}")),
+                            };
+                            this.message = Some(msg);
+                            cx.notify();
                         });
                     });
-                    true
-                })
+                });
+                true
+            })
         });
+    }
+
+    /// Tab › Export… of an Assembly tab: the whole assembly.
+    pub fn open_export_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_asm_export(None, window, cx);
     }
 
     /// Write the visible parts of `ids` (None: every instance) at their

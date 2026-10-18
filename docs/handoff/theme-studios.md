@@ -52,9 +52,12 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 - /tmp/ui2-shots/final-drawing.png, final-drawing-sheets-panel.png
 - /tmp/ui2-shots/final-variable-studio.png
 - /tmp/ui2-shots/final-versions.png, final-version-dialogs.png (ours above Onshape)
-- /tmp/ui2-shots/final-tab-manager.png
+- /tmp/ui2-shots/final-tab-manager.png (with real thumbnails)
+- /tmp/ui2-shots/final-workspace-units.png, final-document-menu.png
+- /tmp/ui2-shots/final-drawing-dimension-hover.png (ours above Onshape), final-drawing-toolbar-dropdown.png
 - /tmp/ui2-shots/final-assembly-triad-glyph.png (triad top, mate glyph bottom), final-assembly-menu.png
-- /tmp/ui2-shots/final-documents.png (Recently opened, Onshape time stamps)
+- /tmp/ui2-shots/final-documents.png (Recently opened, Onshape time stamps), final-documents-menu.png,
+  final-documents-details.png
 - /tmp/ui2-shots/final-sketch.png (16 px dimension values, region fill)
 
 ### Sketch (sketch_mode.rs, part_studio/sketch.rs, scene_builder.rs; surgical)
@@ -108,6 +111,13 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
   with a 4 px blue bar and a `#90cef1` bottom line. New icons `sheet-page.svg`, `sheet-insert.svg`.
 - The always-on status text (sheet · size · scale · cursor x/y) is gone; tool prompts / computing / out of
   date / dangling still show bottom-left when present.
+- Hovered annotation = Onshape's look (drawing/14): tan `#ccb292` lines and label box, `#90cef1`
+  attachment dots, `#cc925c` end dots and flip diamonds, arrowheads covered (`push_annotation_hover`;
+  grips from `SheetGeometry::grips`, emitted for linear dimensions so far). Selected look not captured.
+- Toolbar dropdowns open `os_menu` lists in the drawing-toolbar style (`OsMenu::toolbar_list()`, 26 px
+  rows, 18 px tool icons via `MenuEntry::with_icon`).
+- Sketch 14.38 (skb): used geometry is drawn in the constrained color (black), not purple;
+  `SKETCH_EXTERNAL` removed.
 
 - Sheets panel nests derived views under their parent (20 px per level), like Onshape.
 
@@ -164,6 +174,93 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 - Drawing right-click menus (canvas, sheet rows) open `os_menu` menus (`drawing_view::fill_os_menu`);
   toolbar/panel dropdowns still use the kit `fill_menu` (they are dropdowns, not context menus).
 
+### Documents page (second pass)
+- Row and folder right-click menus are `os_menu` menus in Onshape's icon-less list style
+  (`OsMenu::list_no_icons()`: 13 px text, 17 px inset; added to ui's os_menu.rs). Row menu = Onshape's
+  minus cloud items: Open, Rename, Copy workspace… | Details, Versions and history | Move to… | Remove from
+  recently opened, Send to trash. The start window root now draws `os_menu::render_host`.
+- Right strip (Details, Versions and history) and 340 px panels: Details (name, thumbnail, Owner "me",
+  Document description, Created by, Last modified by; empty state "Select a document or folder…"),
+  Versions and history (workspaces/versions/Start, author + time) from `start_library::doc_details`.
+- "Move to…": Onshape modal with the folder browser (`Location`), `start_library::move_document`.
+- **Still to do here:** Document labels (Details section + nav "Labels"), the toasts (kit `Notification`
+  → `os_ui::message_bubble`), user menu name/avatar done.
+
+### Documents page (QA round 3, 18 Oct evening)
+- Create ▾ is Onshape's: Document…, Folder… | Import files…, Label…. "Import from ▸" lists cloud drives
+  (Dropbox, Google Drive…), so it's left out as a cloud-only feature. "Open file…" is gone: **Import files…** opens a
+  `.noshape` file, and turns a STEP/IGES/BREP/STL/OBJ file into a new document (named after the file, in the
+  folder being shown) with one Part Studio holding the import feature. Ctrl+O = Import files….
+- Folder… now creates a named folder in the current place (Onshape) instead of picking an existing
+  directory; it's added to the folder tiles.
+- List columns: Name (350) | Modified | Modified by | Owned by (200 each), as live documents-list DOM; the
+  user is written "me". Authors come from the store: new `Document::owner_and_last_author()` /
+  `noshape_store::owner_and_last_author(conn)` (first and last microversion author).
+- Not yet verified in the app (build waiting on ui's in-progress analysis_tools/thickness edits).
+
+### Import / Export (workspace.rs, os_ui.rs, assembly_behaviors.rs, part_studio/menus.rs)
+- "+" › Import… creates a new Part Studio tab named after the file and opens it (Onshape), instead of
+  importing into the active Part Studio. Helpers `workspace::{read_foreign, import_names,
+  add_import_feature, IMPORT_EXTS}` are shared with the documents page.
+- `os_ui::export_modal`: Onshape's Export modal (600 px, File name, Format select, Export / Cancel). It's used by the tab
+  menu Export… (Part Studio and Assembly tabs; Assembly via `AssemblyView::open_export_all`), the
+  assembly instance Export… and the Part Studio part Export… (ui's menus.rs, surgical). The file name is
+  carried into the save dialog. Drawing tab › Export… calls the PDF export until asb's "Export Drawing" modal
+  lands (asb is building it; told in drawing-behaviour.md). Format-specific option rows (STEP version, STL
+  resolution…) wait for the capture requested in live/REQUESTS.md line 68.
+
+### Document ☰ menu and workspace dialogs (workspace.rs, doc_dialogs.rs new)
+- ☰ = Onshape's Bootstrap dropdown (`OsMenu::dropdown()`; icon-less → text 20 px in): Rename document,
+  Move to…, Document details…, Restore deleted workspaces… | Copy workspace…, Update workspace…,
+  Workspace units…, Workspace properties…, Switch to view only mode / Switch to edit mode | Close document.
+  Each is implemented (doc_dialogs.rs): rename (store name), move (close, move file, reopen), details
+  (name + description in the store, owner, created / modified), restore deleted branches
+  (`Document::restore_branch`, new in the store), copy (new document, opened;
+  `start_library::copy_document_named`), update (external Derived / Variable Studio references with newer
+  versions), units (panel below), workspace properties (branch name + description in store meta
+  `workspace_description:<branch>`), view only (`Session::view_only`; `read_only()` covers it).
+- Our old ☰ items moved to Onshape's places: logo click → documents page; Export… → Part Studio tab menu
+  (Export dialog with the format list); Import… → "+" menu. New/Open/recent are on the documents page
+  (Ctrl+N / Ctrl+O still work).
+- **Workspace units panel** (`doc_dialogs::WorkspaceUnits`): Onshape's 338 px feature-dialog-style panel
+  at the feature dialog's place: Length (length, linear acceleration), Angle (angle, angular velocity),
+  Mechanical (mass, density, force, frequency, moment, pressure, energy); default unit + Display decimals
+  (0 … 0.12345678); ✓ commits, ✕ cancels. `UnitPrefs` gained `other: [(unit index, decimals); 9]` over
+  `noshape_units::OTHER_UNITS` (serde default; `UnitPrefs::other_unit_name`). Option lists requested.
+  **For ui:** mass properties could display in `other_unit_name(2)` (mass) etc.
+- "+" menu = Onshape's dropdown (253 px, 14 px `#555`, 27 px rows, icons): Create Feature Studio | Create
+  Part Studio, Create Assembly, Create Variable Studio, Create Drawing…, Import…. **To do:** Create
+  Material Library and Create folder (tab folders) need new element types — not started.
+
+### Element tab menu (workspace.rs, doc_dialogs.rs)
+- Onshape's order: Delete | Rename, Properties…, Show code (Part Studios) | Duplicate, Copy to clipboard |
+  Select as document thumbnail | Move to document…, Export… (Part Studios) — plus asb's "Create Drawing of
+  <tab>…" (not in the live tab menu; asb's call).
+- Rename = inline field in the tab (also double-click); Properties… = name + description (store meta
+  `tab_description:<id>`); Show code = FeatureScript-style listing of the features (read-only modal; our
+  features aren't FeatureScript, so this is a generated approximation — **lead: confirm acceptable**);
+  Copy to clipboard → "+" shows "Paste <name>"; Select as document thumbnail → store meta `thumbnail_tab`
+  (start_thumbnail uses it); Move to document… → another (closed) document gets the tab, deleted here.
+- **To do:** Export… for Assembly (asb's `open_asm_export`) and Drawing tabs.
+
+### Tab manager thumbnails
+- Part Studios and Assemblies render real pictures (rows 70x40, preview 340x170) off the UI thread with an
+  `AssemblyEvaluator`, cached per content hash (`Thumbs` in tab_manager.rs); type icons only for
+  Variable / Feature Studios. **To do:** drawings (sheet picture).
+
+### Author name (store, start_window)
+- `noshape_store::local_user_name()` = Preferences name (`set_default_author`, from
+  `~/.config/noshape/user.json`), else the OS full name (`os_user_name`: GECOS / `id -F` / `net user`), else
+  the login. Documents page top-right: Onshape's account button (avatar, name ▾) → Preferences… (Name).
+  New name applies to documents opened afterwards.
+
+### Menus (os_menu styles added in ui's os_menu.rs, all opt-in)
+- `list_no_icons()` (documents page), `dropdown()` (Bootstrap: "+", ☰, Variable Studio "…" / `?▾`,
+  Variable table footer ▴; icon-less → text 20 px in; 7 px divider margins), `toolbar_list()` (drawing
+  toolbar dropdowns), `select_list(width)` (Onshape select lists: Variable type).
+- The Variable type select opens under its cell (bounds probed with a canvas).
+- Workspace "Delete tabs" warning uses the Onshape modal.
+
 ### Dialogs
 - Assembly Export and the in-app file path prompt (files.rs, used with NOSHAPE_NO_NATIVE_DIALOGS) use the
   Onshape modal (`os_ui::modal` + body + footer: blue primary, gray Cancel).
@@ -195,6 +292,8 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 ## Requests to other agents
 
 - ui: (done) the Sketch dialog checkboxes and the reusable view cube — thanks; the assembly uses the cube.
+- ui: surgical edit in your part_studio/menus.rs: `open_export_dialog` now builds Onshape's Export modal
+  through `os_ui::export_modal` (same as the tab menu's Export…); the export logic is unchanged.
 - ui: the Part Studio toast could use `os_ui::message_bubble` (Onshape's bubble: icon, 14 px, bold × ).
 - asb: clippy in your files: `drawing_ui.rs:170` redundant pattern matching, unused `TabContent` import in
   drawing_ui.rs, and `model/src/drawing/clipboard.rs:78/89` loop counters (these stop

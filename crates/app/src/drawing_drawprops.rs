@@ -1,12 +1,14 @@
 //! Drawing editor: Onshape's Drawing properties panel (empty-sheet menu ›
 //! Drawing properties…), docked at the right: eight tab icons; Units and
 //! precision (Primary units, decimal separator, precisions; leading and
-//! trailing zeros) edits [`DrawingProps`].
+//! trailing zeros) and Inspection (item parsing, text height, border
+//! shape and size, exclude callouts) edit [`DrawingProps`].
 
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -14,11 +16,13 @@ use gpui_kit::*;
 use noshape_model::drawing::format::default_digits;
 use noshape_model::drawing::*;
 
-/// Drawing properties panel: open and the selected tab.
-#[derive(Clone, Copy, Debug, Default)]
+/// Drawing properties panel: open, the selected tab and the Inspection
+/// tab's number fields (text height, border size).
+#[derive(Default)]
 pub struct DrawingPropsUi {
     pub open: bool,
     pub tab: usize,
+    pub inspection_inputs: Option<[(Entity<InputState>, Subscription); 2]>,
 }
 
 /// Onshape's tabs (tooltip, icon).
@@ -43,7 +47,33 @@ type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
 impl DrawingEditor {
     pub fn open_drawing_props(&mut self, cx: &mut Context<Self>) {
         self.drawing_props.open = true;
+        self.right_panel = None;
         cx.notify();
+    }
+
+    /// The Inspection tab's fields (made from render; Enter / blur applies).
+    pub fn sync_drawprops_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.drawing_props.open || self.drawing_props.tab != 7 {
+            self.drawing_props.inspection_inputs = None;
+            return;
+        }
+        if self.drawing_props.inspection_inputs.is_some() {
+            return;
+        }
+        let p = &self.drawing.props;
+        let field = |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
+            let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} mm", noshape_model::drawing::format::format_number(v, None, 2))));
+            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
+                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur)
+                    && let Some(v) = st.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.0)
+                {
+                    this.set_drawing_prop(&move |p| set(p, v), cx);
+                }
+            });
+            (st, sub)
+        };
+        let (h, b) = (p.inspection_text_height, p.inspection_border_size);
+        self.drawing_props.inspection_inputs = Some([field(h, |p, v| p.inspection_text_height = v, window, cx), field(b, |p, v| p.inspection_border_size = v, window, cx)]);
     }
 
     fn set_drawing_prop(&mut self, f: &dyn Fn(&mut DrawingProps), cx: &mut Context<Self>) {
@@ -130,6 +160,32 @@ impl DrawingEditor {
                 .child(check("dp-tz", "Length trailing zeros", props.trailing_zeros, |p, v| p.trailing_zeros = v, cx))
                 .child(check("dp-tlz", "Length tolerance leading zeros", props.tolerance_leading_zeros, |p, v| p.tolerance_leading_zeros = v, cx))
                 .child(check("dp-ttz", "Length tolerance trailing zeros", props.tolerance_trailing_zeros, |p, v| p.tolerance_trailing_zeros = v, cx));
+        } else if self.drawing_props.tab == 7 {
+            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    let v = *v;
+                    this.set_drawing_prop(&move |p| f(p, v), cx);
+                })))
+            };
+            let parse_items: Vec<(String, bool, Act)> = vec![
+                ("Parameter".into(), !props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = false) as Act),
+                ("Row".into(), props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = true) as Act),
+            ];
+            let shape_items: Vec<(String, bool, Act)> = InspectionShape::ALL.iter().map(|&s| (s.name().to_string(), s == props.inspection_shape, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_shape = s) as Act)).collect();
+            let field = |i: usize| match &self.drawing_props.inspection_inputs {
+                Some(f) => div().w(px(160.)).child(Input::new(&f[i].0).small()).into_any_element(),
+                None => div().into_any_element(),
+            };
+            body = body
+                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Inspection"))
+                .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
+                .child(section("Text"))
+                .child(row("Text height", field(0)))
+                .child(section("Border"))
+                .child(row("Border shape", select("dp-ishape", props.inspection_shape.name().into(), shape_items)))
+                .child(row("Border size", field(1)))
+                .child(section("Automatic"))
+                .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
         } else {
             body = body
                 .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child(TABS[self.drawing_props.tab].0))

@@ -44,7 +44,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 1.23 | Ctrl+M opens the Mate connector dialog | keyboard_shortcuts | 🔧 |
 | 1.24 | K shows/hides mate connectors | keyboard_shortcuts | 🔧 (toggles the Mate connector features' visibility) |
 | 1.25 | A flips the primary axis, Q reorients the secondary axis while editing a mate connector | keyboard_shortcuts | ✅ |
-| 1.26 | Shift+C curvature map, Shift+D draft analysis (per-vertex color maps with legend; draft angle and pull direction adjustable) | keyboard_shortcuts | 🔧 (Onshape's Shift+D is dihedral analysis; draft per coordinator; dihedral ❌) |
+| 1.26 | Shift+C Curve/surface analysis (curvature combs on edges, face U/V isocurves, sketch curves; inflection points, minimum radius, extend across face, control point grids, scale), Shift+D Dihedral analysis (combs, Max/Min, thresholds, scale); Analysis tools menu | keyboard_shortcuts; View__curve_surface_analysis; View__dihedral_analysis; View__analysis_tools | ⏳ (Curve/surface, Deviation, Connection, Dihedral, Zebra stripes, Reflection, Curvature color map, Draft analysis ✅ verified in the app; Reflection's library maps are procedural stand-ins until live/env-maps is captured and its "Other documents" tab is empty (no image tabs yet); Thickness, Flatten surface ❌ — in progress) |
 | 1.27 | Alt/⌥+T tab manager (search, open), Ctrl+Space switches to the previously active tab | keyboard_shortcuts | 🔧 |
 | 1.28 | Ctrl+U feedback, Ctrl+Shift+F FeatureScript search | keyboard_shortcuts | ❌ (out of scope) |
 | 1.29 | Bare-letter shortcuts do not fire while typing in an input | (Onshape behaviour) | ✅ |
@@ -229,7 +229,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 8.1 | Right-click without drag opens the menu; right-drag rotates | A §4 | ✅ |
 | 8.2 | Empty space: Show all | (Clear selection) | Zoom to fit, Isometric | live | ✅ (live also has Select ▸ here; contents unknown) |
 | 8.3 | Face: Edit <feature>…, Edit <sketch>…, Show dimensions, Show dependencies of <feature>… | New sketch…, Offset plane…, Extrude…, Revolve… (planar) | Hide <part>, Isolate…, Make transparent…, Section view… | Copy <part> | Create Drawing of <part>…, Export as DXF/DWG… (planar), Export… | (Clear selection) Select ▸, Select other… | Zoom to fit, Zoom to selection, View normal to | Delete <part>…, Delete <feature> | Assign material…, Edit appearance…, Add appearance to N faces… | live | ✅ (Add comment n/a; Copy part + Ctrl+V in another Part Studio opens a prefilled Derived, in the same one a Transform copy) |
-| 8.4 | Edge: same groups with Fillet…, Chamfer… and Align view with vertical axis (straight edges) | live | ✅ (Curve/surface analysis ❌) |
+| 8.4 | Edge: same groups with Fillet…, Chamfer… and Align view with vertical axis (straight edges) | live | ✅ (Curve/surface analysis… added) |
 | 8.5 | Plane: New sketch…, Offset plane… | Hide <plane>, Hide other planes, Hide all planes, Section view… | Select ▸, Select other… | Zoom to fit, Zoom to selection, View normal to | live | ✅ |
 | 8.6 | Sketch region/curve: Edit <sketch>…, Show dependencies… | Extrude…, Revolve… (region) | Hide, Section view… | Export as DXF/DWG… | Select other… | Zoom to fit, Zoom to selection, View normal to | Delete <sketch> | Edit sketch appearance… | live (dom/context-menus-ps-sketch-entities.txt) | ✅ (New sketch/Offset plane on a region, Copy sketch entities, Show dimensions ❌) |
 | 8.7 | The right-clicked entity stays highlighted while its menu is open | live (menus/rmb-ps-face.png) | ✅ |

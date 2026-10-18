@@ -115,6 +115,7 @@ fn part_instance(id: u64, name: &str, studio: TabId, body: BodyId, at: DVec3, fi
         suppressed: false,
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
+        best_tessellation: false,
     }
 }
 
@@ -316,6 +317,7 @@ fn sub_assembly_and_nested_mate() {
                 suppressed: false,
                 lock: SubassemblyLock::Flexible,
                 nested: Vec::new(),
+                best_tessellation: false,
             },
         ],
         mates: vec![mate(
@@ -1328,7 +1330,7 @@ fn instances_from_other_documents() {
     let mut asm = Assembly {
         instances: vec![
             part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true),
-            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() },
+            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false },
         ],
         mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
         ..Default::default()
@@ -2024,4 +2026,31 @@ fn hole_connectors_through_a_filleted_rim() {
         assert!((p.frame.origin.z - 0.012).abs() < 1e-9 && p.frame.z().z > 0.999, "{:?} {:?}", p.frame.origin, p.frame.z());
     }
     assert_eq!(cylinders, 2);
+}
+
+#[test]
+fn best_available_tessellation_refines_only_flagged_instances() {
+    let f = doc_with(vec![pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (pin, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Pin <1>", f.studios[0], pin.clone(), DVec3::ZERO, true),
+            part_instance(2, "Pin <2>", f.studios[0], pin, DVec3::new(0.05, 0.0, 0.0), false),
+        ],
+        ..Default::default()
+    };
+    let tris = |r: &eval::AssemblyResult, i: usize| r.occurrences[i].mesh.indices.len() / 3;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let normal = tris(&res, 0);
+    assert_eq!(normal, tris(&res, 1));
+    asm.instances[1].best_tessellation = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(tris(&res, 0), normal, "other instances keep the regular mesh");
+    assert!(tris(&res, 1) > normal, "best available tessellation is finer: {} vs {normal}", tris(&res, 1));
+    // The flag round-trips and is omitted when off.
+    let json = serde_json::to_string(&asm.instances[0]).unwrap();
+    assert!(!json.contains("best_tessellation"));
+    let back: Instance = serde_json::from_str(&serde_json::to_string(&asm.instances[1]).unwrap()).unwrap();
+    assert!(back.best_tessellation);
 }

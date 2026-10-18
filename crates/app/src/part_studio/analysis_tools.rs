@@ -8,25 +8,58 @@
 use super::PartStudioView;
 use crate::theme::p;
 use glam::DVec3;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::analysis::Comb;
+use noshape_model::analysis::{Comb, Continuity};
 use noshape_model::reference::Reference;
 use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToolKind {
     CurveSurface,
+    Deviation,
+    Connection,
     Dihedral,
+    Zebra,
+    Reflection,
+    Thickness,
+}
+
+impl ToolKind {
+    /// Tools that change how the parts are drawn: ✓ keeps them on, ✗ (or
+    /// Esc) turns them off.
+    pub fn is_view_mode(self) -> bool {
+        matches!(self, ToolKind::Zebra | ToolKind::Reflection | ToolKind::Thickness)
+    }
+}
+
+/// Zebra stripes settings (they stay on after the dialog is accepted).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ZebraSettings {
+    pub stripes: u32,
+    pub flip: bool,
+    pub show_edges: bool,
+}
+
+impl Default for ZebraSettings {
+    fn default() -> Self {
+        Self { stripes: 35, flip: false, show_edges: true }
+    }
 }
 
 impl ToolKind {
     pub fn title(self) -> &'static str {
         match self {
             ToolKind::CurveSurface => "Curve/surface analysis",
+            ToolKind::Deviation => "Deviation analysis",
+            ToolKind::Connection => "Connection analysis",
             ToolKind::Dihedral => "Dihedral analysis",
+            ToolKind::Zebra => "Zebra stripes",
+            ToolKind::Reflection => "Reflection analysis",
+            ToolKind::Thickness => "Thickness analysis",
         }
     }
 }
@@ -50,11 +83,18 @@ pub struct ToolOptions {
     pub low_deg: f64,
     /// Comb length factor (scale slider).
     pub scale: f32,
+    /// Deviation: Surface tab (else Curve).
+    pub surface: bool,
+    /// Connection: which classes are shown (No connection, G0…G3).
+    pub show_class: [bool; 5],
+    pub tolerances: noshape_model::analysis::ContinuityTolerances,
+    pub zebra: ZebraSettings,
+    pub reflection: super::reflection::ReflectionSettings,
 }
 
 impl Default for ToolOptions {
     fn default() -> Self {
-        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: true, min_radius: false, extend: false, control_points: false, show_max: true, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3 }
+        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: true, min_radius: false, extend: false, control_points: false, show_max: true, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
     }
 }
 
@@ -71,15 +111,27 @@ pub struct ToolResult {
     pub min_radius: Option<(f64, DVec3)>,
     /// Dihedral min / max angle (degrees).
     pub dihedral: Option<(f64, f64)>,
+    /// Deviation minimum and maximum (distance, point on 1, point on 2).
+    pub deviation: Option<(noshape_model::analysis::Extremum, noshape_model::analysis::Extremum)>,
+    /// Connection: curve endpoints, face edge segments and the boundaries
+    /// of faces that connect to nothing.
+    pub joints: Vec<(DVec3, Continuity)>,
+    pub faces: noshape_model::analysis::FaceConnections,
 }
 
 pub struct AnalysisTool {
     pub kind: ToolKind,
     pub selection: Vec<Reference>,
+    /// Deviation: the second chain / surface, and whether its field is active.
+    pub selection2: Vec<Reference>,
+    pub second_active: bool,
     pub options: ToolOptions,
     pub result: Option<ToolResult>,
     slider: Entity<SliderState>,
     _slider_sub: Subscription,
+    /// Connection: the G1, G2 and G3 tolerance fields; Zebra: stripe count.
+    tolerance_inputs: Vec<Entity<InputState>>,
+    _input_subs: Vec<Subscription>,
 }
 
 /// Selections of each tool, kept for the next time it opens.
@@ -94,6 +146,25 @@ const ENVELOPE: [u8; 4] = [210, 40, 200, 255];
 const U_CURVES: [u8; 4] = [220, 50, 40, 255];
 const V_CURVES: [u8; 4] = [40, 90, 220, 255];
 
+/// Connection analysis colors (Onshape): (main, light) per class, from
+/// No connection to G3.
+const CONTINUITY: [([u8; 4], [u8; 4]); 5] = [
+    ([0x93, 0x22, 0x29, 255], [0x93, 0x22, 0x29, 255]),
+    ([0x98, 0x71, 0x07, 255], [0xfc, 0xda, 0x7f, 255]),
+    ([0x02, 0x85, 0x02, 255], [0xa2, 0xdb, 0x7d, 255]),
+    ([0x44, 0x01, 0x54, 255], [0xb6, 0x89, 0xbe, 255]),
+    ([0x46, 0x7b, 0xb6, 255], [0xd0, 0xdb, 0xe5, 255]),
+];
+
+/// Edge color of a class: G0 edges are drawn in the light yellow, the
+/// others in their main color (Onshape).
+fn continuity_edge_color(c: Continuity) -> [u8; 4] {
+    match c {
+        Continuity::G0 => CONTINUITY[1].1,
+        c => CONTINUITY[c as usize].0,
+    }
+}
+
 impl PartStudioView {
     /// Open a tool (or close it when it is the open one, like Shift+C/D).
     pub(super) fn toggle_analysis_tool(&mut self, kind: ToolKind, window: &mut Window, cx: &mut Context<Self>) {
@@ -104,8 +175,15 @@ impl PartStudioView {
         self.close_analysis_tool(cx);
         let key = kind.title();
         // A preselection replaces the remembered selection.
-        let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).cloned().collect();
+        let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).filter_map(|r| self.tool_entity(kind, r)).collect();
         let mut selection = if pre.is_empty() { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() } else { pre };
+        if kind == ToolKind::Thickness {
+            // Edit thickness analysis: the analyzed parts.
+            let t = self.ui.thickness.get_or_insert_with(Default::default);
+            if !t.parts.is_empty() {
+                selection = t.parts.iter().map(|b| Reference::Body(b.clone())).collect();
+            }
+        }
         // In a sketch, Shift+C takes every curve of the sketch.
         if kind == ToolKind::CurveSurface
             && let Some(sk) = self.sketch.as_ref().map(|s| s.feature)
@@ -113,7 +191,19 @@ impl PartStudioView {
         {
             selection = sd.curves.iter().map(|c| Reference::SketchEntity { sketch: sk, entity: c.entity }).collect();
         }
-        let options = self.ui.tool_memory.options.get(key).cloned().unwrap_or_default();
+        let mut options = self.ui.tool_memory.options.get(key).cloned().unwrap_or_default();
+        if kind == ToolKind::Zebra {
+            options.zebra = self.ui.zebra.unwrap_or(options.zebra);
+            // Zebra stripes and the curvature color map replace each other.
+            if matches!(self.ui.analysis, Some(super::analysis::Analysis::Curvature)) {
+                self.ui.analysis = None;
+            }
+            self.ui.reflection = None;
+        }
+        if kind == ToolKind::Reflection {
+            options.reflection = self.ui.reflection.clone().unwrap_or(options.reflection);
+            self.ui.zebra = None;
+        }
         let slider = cx.new(|_| SliderState::new().min(0.05).max(1.0).step(0.01).default_value(options.scale));
         let sub = cx.subscribe_in(&slider, window, |this: &mut Self, _, ev: &SliderEvent, _, cx| {
             let (SliderEvent::Change(v) | SliderEvent::Release(v)) = ev;
@@ -123,12 +213,103 @@ impl PartStudioView {
             this.refresh_scene(false, cx);
             cx.notify();
         });
-        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, options, result: None, slider, _slider_sub: sub });
+        // Deviation with two curves preselected: one per chain (Onshape).
+        let mut selection2 = Vec::new();
+        if kind == ToolKind::Deviation && selection.len() == 2 {
+            selection2 = vec![selection.remove(1)];
+        }
+        let second_active = kind == ToolKind::Deviation && !selection.is_empty() && selection2.is_empty();
+        let (mut tolerance_inputs, mut input_subs) = (Vec::new(), Vec::new());
+        if kind == ToolKind::Zebra {
+            let st = cx.new(|cx| InputState::new(window, cx).default_value(options.zebra.stripes.to_string()));
+            input_subs.push(cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
+                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                    return;
+                }
+                let text = st.read(cx).value().to_string();
+                match text.trim().parse::<u32>() {
+                    Ok(n) if (1..=100).contains(&n) => {
+                        if let Some(t) = &mut this.ui.analysis_tool {
+                            t.options.zebra.stripes = n;
+                        }
+                        this.rebuild_scene(cx);
+                    }
+                    _ => this.flash_info("Enter a whole number from 1 to 100".into(), cx),
+                }
+            }));
+            tolerance_inputs.push(st);
+        }
+        if kind == ToolKind::Reflection {
+            let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} deg", options.reflection.rotation_deg)));
+            input_subs.push(cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                    return;
+                }
+                let text = st.read(cx).value().to_string();
+                match text.trim().trim_end_matches("deg").trim().parse::<f64>() {
+                    Ok(v) => {
+                        if let Some(t) = &mut this.ui.analysis_tool {
+                            t.options.reflection.rotation_deg = v;
+                        }
+                        // Shown with its unit, like Onshape's fields.
+                        let shown = format!("{v} deg");
+                        if text != shown {
+                            st.update(cx, |s, cx| s.set_value(shown, window, cx));
+                        }
+                        this.rebuild_scene(cx);
+                    }
+                    Err(_) => this.flash_info("Enter an angle".into(), cx),
+                }
+            }));
+            tolerance_inputs.push(st);
+        }
+        if kind == ToolKind::Connection {
+            let t = options.tolerances;
+            for (i, v) in [format!("{} deg", t.g1_deg), t.g2.to_string(), t.g3.to_string()].into_iter().enumerate() {
+                let st = cx.new(|cx| InputState::new(window, cx).default_value(v));
+                input_subs.push(cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                    if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                        return;
+                    }
+                    let text = st.read(cx).value().to_string();
+                    let Some(t) = &mut this.ui.analysis_tool else { return };
+                    match text.trim().trim_end_matches("deg").trim().parse::<f64>() {
+                        Ok(v) if v > 0.0 => {
+                            let tol = &mut t.options.tolerances;
+                            *[&mut tol.g1_deg, &mut tol.g2, &mut tol.g3][i] = v;
+                            let shown = if i == 0 { format!("{v} deg") } else { v.to_string() };
+                            if text != shown {
+                                st.update(cx, |s, cx| s.set_value(shown, window, cx));
+                            }
+                            this.recompute_analysis_tool(cx);
+                        }
+                        _ => this.flash_info("Enter a positive value".into(), cx),
+                    }
+                }));
+                tolerance_inputs.push(st);
+            }
+        }
+        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs });
         self.recompute_analysis_tool(cx);
+        if kind.is_view_mode() {
+            self.rebuild_scene(cx);
+        }
     }
 
+    /// Close the open tool (✗, Esc, another tool); closing Zebra stripes
+    /// this way turns the stripes off.
     pub(super) fn close_analysis_tool(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(t) = self.ui.analysis_tool.take() else { return false };
+        self.ui.env_picker = None;
+        match t.kind {
+            ToolKind::Zebra => self.ui.zebra = None,
+            ToolKind::Reflection => self.ui.reflection = None,
+            ToolKind::Thickness => self.ui.thickness = None,
+            _ => {}
+        }
+        if t.kind.is_view_mode() {
+            self.rebuild_scene(cx);
+        }
         let key = t.kind.title();
         self.ui.tool_memory.selection.insert(key, t.selection);
         self.ui.tool_memory.options.insert(key, t.options);
@@ -137,27 +318,78 @@ impl PartStudioView {
         true
     }
 
+    /// ✓ / Enter in the Zebra stripes or Reflection analysis dialog: the
+    /// view stays that way.
+    pub(super) fn accept_view_tool(&mut self, cx: &mut Context<Self>) -> bool {
+        if !self.ui.analysis_tool.as_ref().is_some_and(|t| t.kind.is_view_mode()) {
+            return false;
+        }
+        let Some(t) = self.ui.analysis_tool.take() else { return false };
+        match t.kind {
+            ToolKind::Zebra => self.ui.zebra = Some(t.options.zebra),
+            ToolKind::Reflection => self.ui.reflection = Some(t.options.reflection.clone()),
+            _ => {}
+        }
+        self.ui.env_picker = None;
+        self.ui.tool_memory.options.insert(t.kind.title(), t.options);
+        self.rebuild_scene(cx);
+        true
+    }
+
+    /// The zebra stripes on display: the open dialog's, else accepted ones.
+    pub(super) fn active_zebra(&self) -> Option<ZebraSettings> {
+        match &self.ui.analysis_tool {
+            Some(t) if t.kind == ToolKind::Zebra => Some(t.options.zebra),
+            _ => self.ui.zebra,
+        }
+    }
+
     fn analysis_accepts(&self, kind: ToolKind, r: &Reference) -> bool {
+        let surface = self.ui.analysis_tool.as_ref().is_some_and(|t| t.options.surface);
         match kind {
             ToolKind::CurveSurface => matches!(r, Reference::Edge(_) | Reference::Face(_) | Reference::SketchEntity { .. }),
+            ToolKind::Deviation if surface => matches!(r, Reference::Face(_)),
+            ToolKind::Deviation => matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. }),
+            ToolKind::Connection => matches!(r, Reference::Edge(_) | Reference::Face(_) | Reference::SketchEntity { .. }),
             ToolKind::Dihedral => matches!(r, Reference::Edge(_)),
+            ToolKind::Zebra | ToolKind::Reflection => false,
+            ToolKind::Thickness => matches!(r, Reference::Body(_) | Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)),
         }
+    }
+
+    /// What a pick puts in the tool's field: Thickness analysis takes the
+    /// whole part.
+    fn tool_entity(&self, kind: ToolKind, r: &Reference) -> Option<Reference> {
+        if kind != ToolKind::Thickness || matches!(r, Reference::Body(_)) {
+            return Some(r.clone());
+        }
+        self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| Reference::Body(b.id.clone()))
     }
 
     /// A viewport pick while a tool is open toggles the entity in its field.
     pub(super) fn analysis_pick(&mut self, r: &Reference, cx: &mut Context<Self>) -> bool {
         let Some(kind) = self.ui.analysis_tool.as_ref().map(|t| t.kind) else { return false };
-        eprintln!("PSBDBG analysis pick {r:?}");
         if !self.analysis_accepts(kind, r) {
-            self.flash_info(if kind == ToolKind::Dihedral { "Select edges".into() } else { "Select edges, faces or sketch curves".into() }, cx);
+            let msg = match kind {
+                ToolKind::Dihedral => "Select edges",
+                ToolKind::Deviation if self.ui.analysis_tool.as_ref().is_some_and(|t| t.options.surface) => "Select faces",
+                ToolKind::Deviation => "Select curves",
+                ToolKind::CurveSurface => "Select edges, faces or sketch curves",
+                ToolKind::Connection => "Select curves or faces",
+                ToolKind::Thickness => "Select parts",
+                ToolKind::Zebra | ToolKind::Reflection => return false,
+            };
+            self.flash_info(msg.into(), cx);
             return true;
         }
+        let Some(r) = &self.tool_entity(kind, r) else { return true };
         if let Some(t) = &mut self.ui.analysis_tool {
-            match t.selection.iter().position(|x| x == r) {
+            let list = if t.second_active { &mut t.selection2 } else { &mut t.selection };
+            match list.iter().position(|x| x == r) {
                 Some(i) => {
-                    t.selection.remove(i);
+                    list.remove(i);
                 }
-                None => t.selection.push(r.clone()),
+                None => list.push(r.clone()),
             }
         }
         self.recompute_analysis_tool(cx);
@@ -168,7 +400,7 @@ impl PartStudioView {
     /// here only, not per frame).
     pub(super) fn recompute_analysis_tool(&mut self, cx: &mut Context<Self>) {
         let Some(t) = &self.ui.analysis_tool else { return };
-        let (kind, sel, o) = (t.kind, t.selection.clone(), t.options.clone());
+        let (kind, sel, sel2, o) = (t.kind, t.selection.clone(), t.selection2.clone(), t.options.clone());
         let mut res = ToolResult::default();
         if let Some(ctx) = self.context.clone() {
             let samples = 32;
@@ -226,6 +458,39 @@ impl PartStudioView {
                         }
                     }
                 }
+                ToolKind::Deviation if o.surface => {
+                    let pts: Vec<DVec3> = sel.iter().flat_map(|r| self.face_triangles(r)).flatten().collect();
+                    let tris: Vec<[DVec3; 3]> = sel2.iter().flat_map(|r| self.face_triangles(r)).collect();
+                    res.deviation = noshape_model::analysis::surface_deviation(&pts, &tris);
+                }
+                ToolKind::Deviation => {
+                    let a = densify(&sel.iter().flat_map(|r| self.curve_points(r)).collect::<Vec<_>>(), 400);
+                    let b: Vec<DVec3> = sel2.iter().flat_map(|r| self.curve_points(r)).collect();
+                    res.deviation = noshape_model::analysis::curve_deviation(&a, &b);
+                }
+                ToolKind::Connection => {
+                    // Curves meet at their endpoints; faces along shared edges.
+                    let curves: Vec<Vec<DVec3>> = sel
+                        .iter()
+                        .filter_map(|r| match r {
+                            Reference::Edge(_) => noshape_model::analysis::edge_polyline(&ctx, r, 64),
+                            Reference::SketchEntity { .. } => Some(self.curve_points(r)),
+                            _ => None,
+                        })
+                        .collect();
+                    res.joints = noshape_model::analysis::curve_connections(&curves, &o.tolerances);
+                    let faces: Vec<Reference> = sel.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
+                    res.faces = noshape_model::analysis::face_connections(&ctx, &faces, samples, &o.tolerances);
+                }
+                ToolKind::Zebra | ToolKind::Reflection => {}
+                ToolKind::Thickness => {
+                    let parts: Vec<noshape_model::reference::BodyId> = sel.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
+                    let t = self.ui.thickness.get_or_insert_with(Default::default);
+                    if t.parts != parts {
+                        t.parts = parts;
+                        self.recompute_thickness(cx);
+                    }
+                }
                 ToolKind::Dihedral => {
                     let (mut lo, mut hi) = (f64::MAX, f64::MIN);
                     for r in &sel {
@@ -278,9 +543,47 @@ impl PartStudioView {
             let pts: Vec<[f32; 3]> = pl.iter().map(|p| f(*p)).collect();
             lines.push_polyline(&pts, ENVELOPE, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
         }
+        // Deviation: minimum (blue) and maximum (red) between the two.
+        let mut dev_pts = Vec::new();
+        if let Some((min, max)) = res.deviation {
+            for ((_, a, b), c) in [(min, V_CURVES), (max, U_CURVES)] {
+                lines.push_polyline(&[f(a), f(b)], c, 0, 2.0, LineSegment::ON_TOP);
+                dev_pts.push((a, c));
+                dev_pts.push((b, c));
+            }
+        }
+        // Connection: edges colored by continuity, unconnected faces outlined.
+        let shown = |c: Continuity| t.options.show_class[c as usize];
+        for ([a, b], c) in res.faces.segments.iter().filter(|s| shown(s.1)) {
+            lines.push_polyline(&[f(*a), f(*b)], continuity_edge_color(*c), 0, 3.0, LineSegment::ON_TOP);
+        }
+        if shown(Continuity::None) {
+            for pl in &res.faces.unconnected {
+                let pts: Vec<[f32; 3]> = pl.iter().map(|p| f(*p)).collect();
+                lines.push_polyline(&pts, CONTINUITY[0].0, 0, 3.0, LineSegment::ON_TOP);
+            }
+        }
         let up = self.gpu.uploader();
         let mut out = vec![Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(35)];
+        // Curve joints: a dark ring around a light center; free ends a small red dot.
+        let (mut rings, mut centers) = (PointData::default(), PointData::default());
+        for (p, c) in res.joints.iter().filter(|j| shown(j.1)) {
+            let (main, light) = CONTINUITY[*c as usize];
+            let ring = if *c == Continuity::None { 7.0 } else { 11.0 };
+            rings.points.push(PointSprite { position: f(*p), color: main, pick_id: 0, size: ring, style: LineSegment::ON_TOP, _pad: 0 });
+            if *c != Continuity::None {
+                centers.points.push(PointSprite { position: f(*p), color: if *c == Continuity::G1 { main } else { light }, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
+            }
+        }
+        for (data, layer) in [(rings, 37), (centers, 38)] {
+            if !data.points.is_empty() {
+                out.push(Instance::new(Drawable::Points(up.upload_points(&data))).per_primitive_color().unpickable().ignore_clip().layer(layer));
+            }
+        }
         let mut pts = PointData::default();
+        for (p, c) in dev_pts {
+            pts.points.push(PointSprite { position: f(p), color: c, pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+        }
         for p in &res.inflections {
             pts.points.push(PointSprite { position: f(*p), color: [0, 0, 0, 255], pick_id: 0, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         }
@@ -330,48 +633,106 @@ impl PartStudioView {
                 .child(div().min_w(px(40.)).flex().justify_center().text_color(pal.text).child(value))
                 .child(btn(format!("{id}-p"), "+", 1, cx))
         };
-        let rows: Vec<AnyElement> = t
-            .selection
-            .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                let r2 = r.clone();
-                h_flex()
-                    .id(SharedString::from(format!("at-sel-{i}")))
-                    .group("atrow")
-                    .h(px(23.))
-                    .px(px(6.))
+        // A selection field: rows with × on hover; clicking it makes it the
+        // field picks go to (Deviation has two).
+        let field = |id: &'static str, caption: &'static str, list: &[Reference], second: bool, active: bool, cx: &mut Context<Self>| {
+            let rows: Vec<AnyElement> = list
+                .iter()
+                .enumerate()
+                .map(|(i, r)| {
+                    let r2 = r.clone();
+                    h_flex()
+                        .id(SharedString::from(format!("{id}-{i}")))
+                        .group("atrow")
+                        .h(px(23.))
+                        .px(px(6.))
+                        .text_size(px(12.))
+                        .text_color(pal.text)
+                        .child(div().flex_1().truncate().child(labeler(r)))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("{id}-x-{i}")))
+                                .invisible()
+                                .group_hover("atrow", |d| d.visible())
+                                .cursor_pointer()
+                                .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(t) = &mut this.ui.analysis_tool {
+                                        t.selection.retain(|x| *x != r2);
+                                        t.selection2.retain(|x| *x != r2);
+                                    }
+                                    this.recompute_analysis_tool(cx);
+                                })),
+                        )
+                        .into_any_element()
+                })
+                .collect();
+            let empty = rows.is_empty();
+            v_flex()
+                .id(id)
+                .min_h(px(26.))
+                .rounded(px(2.))
+                .border_1()
+                .border_color(if active { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
+                .bg(if active { gpui_kit::rgb(0xdef1fb) } else { gpui_kit::rgb(0xffffff) })
+                .cursor_pointer()
+                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
+                .children(rows)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(t) = &mut this.ui.analysis_tool {
+                        t.second_active = second;
+                    }
+                    cx.notify();
+                }))
+        };
+        let mut body = v_flex().p(px(4.)).gap(px(6.));
+        if kind == ToolKind::Deviation {
+            // Curve | Surface tabs.
+            let tab = |label: &'static str, surface: bool, on: bool, cx: &mut Context<Self>| {
+                div()
+                    .id(label)
+                    .flex_1()
+                    .h(px(26.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .text_size(px(12.))
-                    .text_color(pal.text)
-                    .child(div().flex_1().truncate().child(labeler(r)))
-                    .child(
-                        div()
-                            .id(SharedString::from(format!("at-x-{i}")))
-                            .invisible()
-                            .group_hover("atrow", |d| d.visible())
-                            .cursor_pointer()
-                            .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(t) = &mut this.ui.analysis_tool {
-                                    t.selection.retain(|x| *x != r2);
-                                }
-                                this.recompute_analysis_tool(cx);
-                            })),
-                    )
-                    .into_any_element()
-            })
-            .collect();
-        let empty = rows.is_empty();
-        let caption = if kind == ToolKind::Dihedral { "Edges to analyze" } else { "Entities to analyze" };
-        let field = v_flex()
-            .min_h(px(26.))
-            .rounded(px(2.))
-            .border_1()
-            .border_color(pal.accent)
-            .bg(gpui_kit::rgb(0xdef1fb))
-            .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
-            .children(rows);
-        let mut body = v_flex().p(px(4.)).gap(px(6.)).child(field);
+                    .cursor_pointer()
+                    .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_1().border_color(pal.accent))
+                    .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                    .child(label)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(t) = &mut this.ui.analysis_tool
+                            && t.options.surface != surface
+                        {
+                            t.options.surface = surface;
+                            t.selection.clear();
+                            t.selection2.clear();
+                            t.second_active = false;
+                        }
+                        this.recompute_analysis_tool(cx);
+                    }))
+            };
+            let (c1, c2) = if o.surface { ("Surface 1", "Surface 2") } else { ("Chain 1", "Chain 2") };
+            body = body
+                .child(h_flex().child(tab("Curve", false, !o.surface, cx)).child(tab("Surface", true, o.surface, cx)))
+                .child(field("at-sel", c1, &t.selection, false, !t.second_active, cx))
+                .child(field("at-sel2", c2, &t.selection2, true, t.second_active, cx));
+            if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+                body = body
+                    .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Min: {}", fmt_len(min.0))))
+                    .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Max: {}", fmt_len(max.0))));
+            }
+        } else if !matches!(kind, ToolKind::Zebra | ToolKind::Reflection) {
+            let caption = match kind {
+                ToolKind::Dihedral => "Edges to analyze",
+                ToolKind::Connection => "Entities",
+                ToolKind::Thickness => "Parts to analyze",
+                _ => "Entities to analyze",
+            };
+            body = body.child(field("at-sel", caption, &t.selection, false, true, cx));
+        }
         match kind {
             ToolKind::CurveSurface => {
                 body = body
@@ -389,6 +750,110 @@ impl PartStudioView {
                 {
                     body = body.child(div().text_size(px(12.)).text_color(pal.text).child(format!("Minimum radius: {}", fmt_len(r))));
                 }
+            }
+            ToolKind::Deviation | ToolKind::Thickness => {}
+            ToolKind::Connection => {
+                // A row per class: checkbox, swatch, name and (G1–G3) tolerance.
+                let names = ["No connection", "G0", "G1", "G2", "G3"];
+                let icons = ["connectivity-analysis-no-connection", "connectivity-analysis-g0", "connectivity-analysis-g1", "connectivity-analysis-g2", "connectivity-analysis-g3"];
+                for i in 0..5 {
+                    let on = o.show_class[i];
+                    let mut row = h_flex()
+                        .h(px(26.))
+                        .gap(px(6.))
+                        .text_size(px(12.))
+                        .child(gpui_kit::component::checkbox::Checkbox::new(SharedString::from(format!("at-class-{i}"))).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                            if let Some(t) = &mut this.ui.analysis_tool {
+                                t.options.show_class[i] = *v;
+                            }
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })))
+                        .child(div().w(px(32.)).h(px(24.)).flex().items_center().justify_center().child(crate::assets::icon(icons[i], 24., cx)))
+                        .child(div().w(px(if i == 0 { 100. } else { 22. })).text_color(if i == 0 { pal.text } else { pal.text_muted }).child(names[i]));
+                    if let Some(st) = i.checked_sub(2).and_then(|k| t.tolerance_inputs.get(k)) {
+                        row = row.child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)));
+                    }
+                    body = body.child(row);
+                }
+            }
+            ToolKind::Zebra => {
+                let z = o.zebra;
+                let set = |f: fn(&mut ZebraSettings, bool)| {
+                    move |this: &mut Self, v: &bool, _: &mut Window, cx: &mut Context<Self>| {
+                        if let Some(t) = &mut this.ui.analysis_tool {
+                            f(&mut t.options.zebra, *v);
+                        }
+                        this.rebuild_scene(cx);
+                    }
+                };
+                if let Some(st) = t.tolerance_inputs.first() {
+                    body = body.child(
+                        h_flex()
+                            .h(px(26.))
+                            .gap_2()
+                            .text_size(px(12.))
+                            .child(div().text_color(pal.text_muted).child("Stripe count"))
+                            .child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7))),
+                    );
+                }
+                body = body
+                    .child(gpui_kit::component::checkbox::Checkbox::new("at-zflip").label("Flip stripes").checked(z.flip).on_click(cx.listener(set(|z, v| z.flip = v))))
+                    .child(gpui_kit::component::checkbox::Checkbox::new("at-zedges").label("Show edges").checked(z.show_edges).on_click(cx.listener(set(|z, v| z.show_edges = v))));
+            }
+            ToolKind::Reflection => {
+                let r = o.reflection.clone();
+                let set = |f: fn(&mut super::reflection::ReflectionSettings, bool)| {
+                    move |this: &mut Self, v: &bool, _: &mut Window, cx: &mut Context<Self>| {
+                        if let Some(t) = &mut this.ui.analysis_tool {
+                            f(&mut t.options.reflection, *v);
+                        }
+                        this.rebuild_scene(cx);
+                    }
+                };
+                let picking = self.ui.env_picker.is_some();
+                body = body.child(div().text_size(px(12.)).text_color(pal.text_muted).child("Environment")).child(
+                    h_flex()
+                        .id("at-env")
+                        .h(px(28.))
+                        .px(px(6.))
+                        .gap(px(6.))
+                        .border_1()
+                        .rounded(px(2.))
+                        .border_color(if picking { pal.accent } else { gpui_kit::rgb(0xbdbdbd) })
+                        .cursor_pointer()
+                        .child(crate::assets::icon("image", 16., cx))
+                        .child(div().flex_1().truncate().text_size(px(13.)).text_color(if r.image.is_some() { pal.text } else { pal.text_muted }).child(r.image.as_ref().map_or("Select image…".to_string(), |i| i.name().to_string())))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_env_picker(window, cx))),
+                );
+                if let Some(st) = t.tolerance_inputs.first() {
+                    body = body.child(
+                        h_flex()
+                            .h(px(26.))
+                            .gap_2()
+                            .text_size(px(12.))
+                            .child(div().text_color(pal.text_muted).child("Rotation angle"))
+                            .child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                            .child(
+                                div()
+                                    .id("at-rot-opp")
+                                    .cursor_pointer()
+                                    .rounded(px(2.))
+                                    .when(r.opposite, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                                    .child(crate::assets::icon("flip-circular", 18., cx))
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        if let Some(t) = &mut this.ui.analysis_tool {
+                                            t.options.reflection.opposite = !t.options.reflection.opposite;
+                                        }
+                                        this.rebuild_scene(cx);
+                                    })),
+                            ),
+                    );
+                }
+                body = body
+                    .child(gpui_kit::component::checkbox::Checkbox::new("at-redges").label("Show edges").checked(r.show_edges).on_click(cx.listener(set(|r, v| r.show_edges = v))))
+                    .child(gpui_kit::component::checkbox::Checkbox::new("at-rblur").label("Blur environment").checked(r.blur).on_click(cx.listener(set(|r, v| r.blur = v))))
+                    .child(gpui_kit::component::checkbox::Checkbox::new("at-rlock").label("Lock environment").checked(r.lock).on_click(cx.listener(set(|r, v| r.lock = v))));
             }
             ToolKind::Dihedral => {
                 let (lo, hi) = t.result.as_ref().and_then(|r| r.dihedral).unwrap_or((0.0, 0.0));
@@ -409,7 +874,9 @@ impl PartStudioView {
                 }
             }
         }
-        body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
+        if kind != ToolKind::Connection && !kind.is_view_mode() {
+            body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
+        }
         let dialog = v_flex()
             .id("analysis-tool")
             .occlude()
@@ -427,6 +894,23 @@ impl PartStudioView {
                     .border_b_1()
                     .border_color(pal.border)
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(kind.title()))
+                    // Zebra stripes has ✓ (keep them on) and ✗ (turn them off).
+                    .when(kind.is_view_mode(), |d| {
+                        d.child(
+                            div()
+                                .id("at-accept")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .bg(gpui_kit::rgb(0x2b9d3a))
+                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.accept_view_tool(cx);
+                                })),
+                        )
+                    })
                     .child(
                         div()
                             .id("at-close")
@@ -445,6 +929,18 @@ impl PartStudioView {
             .child(body)
             .into_any_element();
         let mut out = vec![dialog];
+        // "Min: …" / "Max: …" beside the deviation lines; the scale slider
+        // moves them away from the curves (Onshape).
+        if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+            let vp = self.viewport.read(cx);
+            for ((d, a, b), label, color) in [(min, "Min", 0x2858dcu32), (max, "Max", 0xdc3228)] {
+                let mid = (a + b) * 0.5;
+                if let Some(sp) = vp.project(mid) {
+                    let off = 10.0 + 120.0 * o.scale;
+                    out.push(div().absolute().left(px(sp.x as f32 + off)).top(px(sp.y as f32 - 10.)).px(px(3.)).bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(color)).text_size(px(12.)).text_color(pal.text).child(format!("{label}: {}", fmt_len(d))).into_any_element());
+                }
+            }
+        }
         // "R 12.5 mm" beside the minimum-radius point.
         if o.min_radius
             && kind == ToolKind::CurveSurface
@@ -453,6 +949,7 @@ impl PartStudioView {
         {
             out.push(div().absolute().left(px(s.x as f32 + 8.)).top(px(s.y as f32 - 8.)).px(px(3.)).bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xd228c8)).text_size(px(12.)).text_color(pal.text).child(format!("R {}", fmt_len(r))).into_any_element());
         }
+        out.extend(self.render_env_picker(cx));
         out
     }
 }
@@ -485,4 +982,55 @@ fn edge_poles(ctx: &noshape_model::regen::context::Context, r: &Reference) -> Op
         let s = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, e).ok()?;
         s.edge_bspline().ok().map(|d| d.poles)
     })
+}
+
+/// Points evenly spread along a polyline (at least `n` of them).
+fn densify(pl: &[DVec3], n: usize) -> Vec<DVec3> {
+    let total: f64 = pl.windows(2).map(|w| w[0].distance(w[1])).sum();
+    if pl.len() < 2 || total <= 0.0 {
+        return pl.to_vec();
+    }
+    let step = total / n.max(1) as f64;
+    let mut out = vec![pl[0]];
+    for w in pl.windows(2) {
+        let l = w[0].distance(w[1]);
+        let k = (l / step).ceil().max(1.0) as usize;
+        for i in 1..=k {
+            out.push(w[0].lerp(w[1], i as f64 / k as f64));
+        }
+    }
+    out
+}
+
+impl PartStudioView {
+    /// Polyline of a part edge or sketch curve (display tessellation).
+    fn curve_points(&self, r: &Reference) -> Vec<DVec3> {
+        let p3 = |p: &[f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+        match r {
+            Reference::SketchEntity { sketch, entity } => self
+                .display
+                .sketches
+                .iter()
+                .find(|s| s.feature == *sketch)
+                .and_then(|s| s.curves.iter().find(|c| c.entity == *entity))
+                .map(|c| c.points.iter().map(p3).collect())
+                .unwrap_or_default(),
+            _ => self.display.bodies.iter().find_map(|b| b.edge_refs.iter().position(|x| x == r).and_then(|i| b.mesh.edges.get(i)).map(|pl| pl.iter().map(p3).collect())).unwrap_or_default(),
+        }
+    }
+
+    /// Triangles of a part face (display tessellation).
+    fn face_triangles(&self, r: &Reference) -> Vec<[DVec3; 3]> {
+        let p3 = |p: [f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+        self.display
+            .bodies
+            .iter()
+            .find_map(|b| {
+                let fi = b.face_refs.iter().position(|x| x == r)?;
+                let &(first, count) = b.mesh.face_ranges.get(fi)?;
+                let idx = b.mesh.indices.get(first as usize..(first + count) as usize)?;
+                Some(idx.as_chunks::<3>().0.iter().filter_map(|t| Some([p3(*b.mesh.positions.get(t[0] as usize)?), p3(*b.mesh.positions.get(t[1] as usize)?), p3(*b.mesh.positions.get(t[2] as usize)?)])).collect())
+            })
+            .unwrap_or_default()
+    }
 }

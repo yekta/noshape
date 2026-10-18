@@ -13,6 +13,8 @@ use gpui_kit::component::dialog::{Dialog, DialogClose};
 use gpui_kit::component::{Icon, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use std::cell::Cell;
+use std::rc::Rc;
 
 /// Modal outline and header/footer dividers (Bootstrap's `#dee2e6`, as
 /// Onshape's modals render).
@@ -34,6 +36,10 @@ pub const GLYPH_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewB
 pub const GLYPH_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 5.75h8L4 1.75z"/></svg>"#;
 pub const GLYPH_CHEVRON_DOWN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 7.75 4.5 4.5 4.5-4.5"/></svg>"#;
 pub const GLYPH_CHEVRON_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.75 5.5 4.5 4.5-4.5 4.5"/></svg>"#;
+/// Label (tag) glyph for the documents page's Labels.
+pub const GLYPH_LABEL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.7 4.7h10.6l4 5.3-4 5.3H2.7z"/><circle cx="12.6" cy="10" r="1.2"/></svg>"#;
+/// Create-label glyph (tag with a plus).
+pub const GLYPH_LABEL_ADD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M6.7 5.7h7.6l3.4 4.3-3.4 4.3H6.7z"/><path d="M1.5 10h5M4 7.5v5" stroke-linecap="round"/></svg>"#;
 pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 11 11M15.5 4.5l-11 11"/></svg>"#;
 pub const GLYPH_LIST_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 3.1h4.3l1.5 1.5v4.3H2.6zM2.6 11.1h4.3l1.5 1.5v4.3H2.6z" stroke-linejoin="round"/><path d="M10.5 5h7M10.5 7.5h5M10.5 13h7M10.5 15.5h5"/></svg>"#;
 pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 2.6h6.3v6.3H2.6zM11.1 2.6h6.3v6.3h-6.3zM2.6 11.1h6.3v6.3H2.6zM11.1 11.1h6.3v6.3h-6.3z"/></svg>"#;
@@ -307,3 +313,77 @@ pub fn message_bubble(id: impl Into<ElementId>, kind: crate::ui::AlertKind, mess
                 .on_click(on_close),
         )
 }
+
+/// Onshape's form select (Bootstrap `form-control` select, live DOM): full
+/// width, 34 px, 1 px `#aaa`, radius 5.25, 14 px text 11 px in, a caret at
+/// the right; opens an `os_menu` select list under it.
+pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    let pal = p();
+    let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
+    let on_select = Rc::new(on_select);
+    let label = options.get(current).cloned().unwrap_or_default();
+    let probe = bounds.clone();
+    div()
+        .id(id)
+        .relative()
+        .h(px(34.))
+        .w_full()
+        .flex()
+        .items_center()
+        .pl(px(11.))
+        .pr(px(10.))
+        .rounded(px(5.25))
+        .border_1()
+        .border_color(rgb(0xaaaaaa))
+        .bg(rgb(0xffffff))
+        .cursor_pointer()
+        .text_size(px(14.))
+        .text_color(pal.text)
+        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().size_full())
+        .child(div().flex_1().truncate().child(label))
+        .child(glyph(GLYPH_CARET, 8., pal.text))
+        .on_click(move |_, window, cx| {
+            let (options, on_select, b) = (options.clone(), on_select.clone(), bounds.get());
+            let width = f32::from(b.size.width);
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                m = m.select_list(width);
+                for (i, o) in options.iter().enumerate() {
+                    let f = on_select.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).on_click(move |_, window, cx| {
+                        f(i, window, cx);
+                        window.refresh();
+                    }));
+                }
+                m
+            });
+            crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
+        })
+}
+
+/// Onshape's Export modal (live dom/dialog-export-drawing.txt): 600 px;
+/// "File name" field, then a "Format" select; Export / Cancel. The caller
+/// adds `on_ok`, reading `file` and `chosen` (index into `formats`).
+pub fn export_modal(dialog: Dialog, title: &'static str, file: &Entity<gpui_kit::component::input::InputState>, formats: Vec<String>, chosen: Rc<Cell<usize>>, cx: &App) -> Dialog {
+    let pick = chosen.clone();
+    modal(dialog, title, 600.)
+        .child(
+            modal_body()
+                .gap(px(6.))
+                .child(field_label("File name"))
+                .child(gpui_kit::component::input::Input::new(file).h(px(34.)).text_size(px(14.)))
+                .child(div().pt(px(8.)).child(field_label("Format")))
+                .child(select_field("export-format", formats, chosen.get(), move |i, _, _| pick.set(i))),
+        )
+        .footer(modal_footer().child(modal_ok(primary_button("ok", "Export"))).child(modal_cancel(cancel_button("cancel", "Cancel", cx))))
+}
+
+// Feature Studio toolbar and search pane glyphs (our own drawings).
+pub const GLYPH_ARROW_LEFT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 10h-13M8.5 5 3.5 10l5 5"/></svg>"#;
+pub const GLYPH_ARROW_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h13M11.5 5l5 5-5 5"/></svg>"#;
+pub const GLYPH_OUTLINE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.6" y="2.6" width="14.8" height="14.8" rx="1.5"/><path d="M5.5 6h4M7.5 6v6M5.5 12h4M12 8.5l3 3M15 8.5l-3 3" stroke-linecap="round"/></svg>"#;
+pub const GLYPH_TEXT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 3.5h13v3.2h-1.6V5.1h-4.1v10.3h1.8V17H7.4v-1.6h1.8V5.1H5.1v1.6H3.5z"/></svg>"#;
+pub const GLYPH_SYMBOL_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.2 5.2c1.4 0 2.2.8 2.8 2.2l.7 1.6 2.6-3.6h2.1l-3.9 5.3 1.3 3c.3.7.6 1 1.1 1 .3 0 .6-.1.9-.3l.4 1.3c-.5.3-1 .5-1.7.5-1.3 0-2-.8-2.6-2.1l-.7-1.6-2.8 3.8H4.4l4.1-5.5-1.2-2.8c-.3-.7-.6-1-1.1-1-.3 0-.6.1-.9.3l-.4-1.3c.5-.4 1-.6 1.3-.6z"/></svg>"#;
+pub const GLYPH_IMPORT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5c-1.6 0-2 .8-2 2v2.3c0 1.1-.6 2.2-1.6 2.2 1 0 1.6 1.1 1.6 2.2v2.3c0 1.2.4 2 2 2M14 3.5c1.6 0 2 .8 2 2v2.3c0 1.1.6 2.2 1.6 2.2-1 0-1.6 1.1-1.6 2.2v2.3c0 1.2-.4 2-2 2"/><circle cx="10" cy="10" r="2" fill="currentColor" stroke="none"/></svg>"#;
+pub const GLYPH_FUNCTION: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M10 5v10"/><ellipse cx="10" cy="10" rx="3.6" ry="3"/></svg>"#;
+pub const GLYPH_EXPAND_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M3 7h14M3 13h14M7 4l3-2.5L13 4M7 16l3 2.5 3-2.5"/></svg>"#;
+pub const GLYPH_COLLAPSE_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M7 2.5l3 3 3-3M7 17.5l3-3 3 3"/></svg>"#;

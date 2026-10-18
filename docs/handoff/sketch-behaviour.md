@@ -377,3 +377,12 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
 * Remaining ⏳: 3.13 (shortcut prefs GUI), 6.14 (model vertex/edge snaps), 8.8 (pierce),
   11.20 (Use hover preview), 14.3, 14.4, 14.10 — all implemented with tests, need GUI.
   Empty-space Select ▸ items in a sketch still await live capture (REQUESTS.md).
+* Disk hygiene (TEAM-RULES): the lead's `find …/debug/deps -maxdepth 1 -type f -executable
+  -mmin +60 -delete` also deletes proc-macro `*.so` files (they are executable) and breaks
+  the target dir ("extern location for bytemuck_derive does not exist"). Use
+  `! -name '*.so'`. Repair: remove `.fingerprint/*-<hash>` for every deps/*.d whose
+  outputs are gone (done once on 2026-10-18).
+* Verified in GUI today as well: 6.14 vertex snap on a face, 11.20 Use hover preview, 8.8
+  Pierce, 14.3 Shift, 14.10 fast trim, 14.37 use glyph + unlink. Left: 3.13 (match the
+  live "Customize keyboard shortcuts" page once captured), 14.38 (used geometry colour,
+  ui2), Select ▸ items with nothing selected (live capture pending).

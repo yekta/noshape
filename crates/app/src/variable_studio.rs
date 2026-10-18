@@ -5,7 +5,6 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -239,9 +238,13 @@ impl VariableStudioView {
                     .border_l_0()
                     .border_color(rgb(RULE))
                     .child(h_flex().gap(px(4.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 7., pal.text)))
-                    .dropdown_menu_with_anchor(Anchor::BottomRight, |m, _, _| {
-                        m.item(PopupMenuItem::new("Checked: the variables can be used in every Part Studio and Assembly of the workspace.").disabled(true))
-                            .item(PopupMenuItem::new("Unchecked: only where the studio is inserted (keep it unchecked while the variables are a draft).").disabled(true))
+                    .on_click(|e, window, cx| {
+                        let menu = crate::os_menu::OsMenu::build(window, cx, |m, _, _| {
+                            m.dropdown()
+                                .item(crate::os_menu::OsMenuItem::new("Checked: the variables can be used in every Part Studio and Assembly of the workspace.").disabled(true))
+                                .item(crate::os_menu::OsMenuItem::new("Unchecked: only where the studio is inserted (keep it unchecked while the variables are a draft).").disabled(true))
+                        });
+                        crate::os_menu::open_anchored(point(e.position().x + px(20.), e.position().y - px(20.)), Anchor::BottomRight, menu, window, cx);
                     }),
             )
             .into_any_element()
@@ -336,6 +339,7 @@ impl Render for VariableStudioView {
                     .into_any_element(),
             };
             let kind = v.kind.unwrap_or(VarKind::Any);
+            let cell_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
             let kinds = view.clone();
             let menu_view = view.clone();
             rows.push(
@@ -348,7 +352,15 @@ impl Render for VariableStudioView {
                     .text_color(pal.text)
                     .child(cell_div().child(cell_input(&name)))
                     .child(
-                        cell_div().relative().child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text))).child(
+                        cell_div()
+                            .relative()
+                            .child({
+                                // The cell's painted bounds place the select list under it.
+                                let b = cell_bounds.clone();
+                                canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().size_full()
+                            })
+                            .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
+                            .child(
                             Button::new(("vs-kind", i))
                                 .custom(plain)
                                 .size_full()
@@ -357,20 +369,27 @@ impl Render for VariableStudioView {
                                 .pl(px(7.))
                                 .pt(px(2.))
                                 .child(div().text_size(px(14.)).child(format!("{kind:?}")))
-                                .dropdown_menu_with_anchor(Anchor::TopLeft, move |mut m, _, _| {
-                                    for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any] {
-                                        let v = kinds.clone();
-                                        m = m.item(PopupMenuItem::new(format!("{k:?}")).checked(k == kind).on_click(move |_, _, cx| {
-                                            v.update(cx, |this, cx| {
-                                                this.edit("Change variable type", cx, |s| {
-                                                    if let Some(var) = s.variables.get_mut(i) {
-                                                        var.kind = Some(k);
-                                                    }
+                                .on_click(move |_, window, cx| {
+                                    let kinds = kinds.clone();
+                                    let b = cell_bounds.get();
+                                    // Onshape's select list (live, document/16).
+                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                                        m = m.select_list(COL_W);
+                                        for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any] {
+                                            let v = kinds.clone();
+                                            m = m.item(crate::os_menu::OsMenuItem::new(format!("{k:?}")).checked(k == kind).on_click(move |_, _, cx| {
+                                                v.update(cx, |this, cx| {
+                                                    this.edit("Change variable type", cx, |s| {
+                                                        if let Some(var) = s.variables.get_mut(i) {
+                                                            var.kind = Some(k);
+                                                        }
+                                                    })
                                                 })
-                                            })
-                                        }));
-                                    }
-                                    m
+                                            }));
+                                        }
+                                        m
+                                    });
+                                    crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
                                 }),
                         ),
                     )
@@ -439,20 +458,24 @@ impl Render for VariableStudioView {
                             .h(px(22.))
                             .p_0()
                             .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"))
-                            .dropdown_menu_with_anchor(Anchor::TopRight, move |m, _, _| {
+                            .on_click(move |e, window, cx| {
+                                let (more_view, host_menu) = (more_view.clone(), host_menu.clone());
+                                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                                 let (v, v2) = (more_view.clone(), more_view.clone());
-                                let m = m.item(PopupMenuItem::new("Copy table").on_click(move |_, _, cx| v.update(cx, |t, cx| t.copy_table(cx))));
+                                let m = m.dropdown().item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v.update(cx, |t, cx| t.copy_table(cx))));
                                 match host_menu.clone() {
                                     // In a Part Studio / Assembly panel: the reference's menu.
                                     Some((doc, host, me, name, k, n)) => {
                                         let (d1, d2, d3) = (doc.clone(), doc.clone(), doc.clone());
-                                        let m = m.item(PopupMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(me, window, cx)));
-                                        let m = if k > 0 { m.item(PopupMenuItem::new("Move up").on_click(move |_, _, cx| crate::variable_insert::move_table(&d1, host, me, false, cx))) } else { m };
-                                        let m = if k + 1 < n { m.item(PopupMenuItem::new("Move down").on_click(move |_, _, cx| crate::variable_insert::move_table(&d2, host, me, true, cx))) } else { m };
-                                        m.item(PopupMenuItem::new("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, crate::variable_insert::InsertTarget::Element(host), me, None, cx)))
+                                        let m = m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(me, window, cx)));
+                                        let m = if k > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| crate::variable_insert::move_table(&d1, host, me, false, cx))) } else { m };
+                                        let m = if k + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| crate::variable_insert::move_table(&d2, host, me, true, cx))) } else { m };
+                                        m.item(crate::os_menu::OsMenuItem::new("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, crate::variable_insert::InsertTarget::Element(host), me, None, cx)))
                                     }
-                                    None => m.item(PopupMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.start_rename(window, cx)))),
+                                    None => m.item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.start_rename(window, cx)))),
                                 }
+                            });
+                                crate::os_menu::open_anchored(point(e.position().x + px(12.), e.position().y + px(12.)), Anchor::TopRight, menu, window, cx);
                             }),
                     ),
             )

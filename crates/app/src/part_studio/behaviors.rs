@@ -85,6 +85,10 @@ pub struct UiState {
     /// Search tools: name and description of the hovered result.
     /// Tool search: the highlighted result and "Highlight tool in toolbar".
     pub palette_sel: usize,
+    /// Appearances panel: the "Sketches and curves" tab is open.
+    pub appearance_sketches: bool,
+    /// The open Graphics preferences dialog.
+    pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
     pub palette_no_highlight: bool,
     /// When the tool search last closed (a click on its toggle closes it
     /// through the outside click; the click itself must not reopen it).
@@ -181,6 +185,17 @@ pub struct UiState {
     /// tool had selected last time.
     pub analysis_tool: Option<super::analysis_tools::AnalysisTool>,
     pub tool_memory: super::analysis_tools::ToolMemory,
+    /// Zebra stripes left on after their dialog was accepted.
+    pub zebra: Option<super::analysis_tools::ZebraSettings>,
+    /// Reflection analysis left on after its dialog was accepted, its
+    /// uploaded environment and the open "Select image" dialog.
+    pub reflection: Option<super::reflection::ReflectionSettings>,
+    pub env_gpu: Option<(String, noshape_render::ImageHandle)>,
+    pub env_picker: Option<super::reflection::EnvPicker>,
+    /// Thickness analysis (stays on after its dialog is accepted).
+    pub thickness: Option<super::thickness::ThicknessState>,
+    /// Pick kinds last given to the viewport (`Some(None)`: all).
+    pub pick_filter: Option<Option<Vec<PickKind>>>,
 }
 
 impl UiState {
@@ -204,6 +219,8 @@ impl UiState {
             measure_pinned: false,
             toolbar_faces: Default::default(),
             palette_sel: 0,
+            appearance_sketches: false,
+            graphics_dialog: None,
             palette_no_highlight: false,
             palette_closed: None,
             var_hover: None,
@@ -253,6 +270,12 @@ impl UiState {
             dg_renaming: None,
             plane_dependencies: None,
             configure_pick: None,
+            zebra: None,
+            reflection: None,
+            env_gpu: None,
+            env_picker: None,
+            thickness: None,
+            pick_filter: None,
             analysis_tool: None,
             tool_memory: Default::default(),
         }
@@ -339,6 +362,10 @@ impl PartStudioView {
         }
         for f in &self.selected_features {
             out.extend(self.feature_geometry(*f));
+        }
+        // An analysis tool's active field highlights its entities (Onshape).
+        if let Some(t) = &self.ui.analysis_tool {
+            out.extend(if t.second_active { &t.selection2 } else { &t.selection }.iter().cloned());
         }
         out
     }
@@ -463,6 +490,63 @@ impl PartStudioView {
     }
 
     /// The part of a face/edge/vertex when `filter` takes parts but not that kind.
+    /// The active dialog field's selection filter.
+    pub(super) fn active_field_filter(&self, cx: &App) -> Option<QueryFilter> {
+        self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter().map(|(_, f, _)| f))
+    }
+
+    /// Which pick kinds the graphics area offers: what the active dialog
+    /// field or analysis tool can take (Onshape: only acceptable entities
+    /// highlight and get picked), `None` for everything.
+    fn pick_kinds(&self, cx: &App) -> Option<Vec<PickKind>> {
+        const ALL: [PickKind; 9] = [PickKind::Face, PickKind::Edge, PickKind::Vertex, PickKind::Plane, PickKind::Origin, PickKind::SketchCurve, PickKind::SketchPoint, PickKind::SketchRegion, PickKind::Connector];
+        if self.sketch.is_some() {
+            return None;
+        }
+        if let Some(f) = self.active_field_filter(cx) {
+            let dummy = Reference::Origin;
+            return Some(
+                ALL.into_iter()
+                    .filter(|k| {
+                        kind_matches(*k, &dummy, f)
+                            // A curve picks the region it bounds; part geometry picks its part.
+                            || (*k == PickKind::SketchCurve && f.intersects(QueryFilter::SKETCH_REGION))
+                            || (matches!(k, PickKind::Face | PickKind::Edge | PickKind::Vertex) && f.intersects(QueryFilter::BODY))
+                    })
+                    .collect(),
+            );
+        }
+        let t = self.ui.analysis_tool.as_ref().filter(|_| self.edit.is_none())?;
+        use super::analysis_tools::ToolKind as T;
+        Some(match t.kind {
+            T::CurveSurface | T::Connection => vec![PickKind::Edge, PickKind::Face, PickKind::SketchCurve],
+            T::Deviation if t.options.surface => vec![PickKind::Face],
+            T::Deviation => vec![PickKind::Edge, PickKind::SketchCurve],
+            T::Dihedral => vec![PickKind::Edge],
+            T::Thickness => vec![PickKind::Face, PickKind::Edge, PickKind::Vertex],
+            T::Zebra | T::Reflection => return None,
+        })
+    }
+
+    /// Give the viewport the pick priorities for the current filter (only
+    /// when it changes).
+    pub(super) fn sync_pick_filter(&mut self, cx: &mut Context<Self>) {
+        let kinds = self.pick_kinds(cx);
+        if self.ui.pick_filter.as_ref() == Some(&kinds) {
+            return;
+        }
+        let Some(built) = &self.built else { return };
+        let prio = match &kinds {
+            Some(k) => {
+                let k = k.clone();
+                built.picks.priority_fn_filtered(move |kind| k.contains(&kind))
+            }
+            None => built.picks.priority_fn(),
+        };
+        self.ui.pick_filter = Some(kinds);
+        self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
+    }
+
     pub(super) fn part_for_field(&self, r: &Reference, filter: QueryFilter) -> Option<Reference> {
         if !filter.intersects(QueryFilter::BODY) || !matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) {
             return None;
@@ -560,6 +644,8 @@ impl PartStudioView {
                     out.push(Reference::Sketch(id));
                 } else if wants(QueryFilter::SKETCH_EDGE) {
                     out.extend(sk.curves.iter().map(|c| Reference::SketchEntity { sketch: id, entity: c.entity }));
+                } else if wants(QueryFilter::SKETCH_POINT) {
+                    out.extend(super::sketch_points(sk));
                 }
             } else if let Some(pl) = self.display.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)) {
                 out.push(pl.reference.clone());

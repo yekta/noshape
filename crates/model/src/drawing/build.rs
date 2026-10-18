@@ -22,6 +22,8 @@ pub enum PickTarget {
     /// A projected edge of a view (index into `ViewGeometry::edges`).
     Edge { view: ViewId, edge: u32 },
     Annotation(u64),
+    /// The inspection item bubble of an annotation.
+    Inspection(u64),
     /// Cutting line drawn in the parent of section view `0`.
     SectionLine(ViewId),
     /// Detail circle drawn in the parent of detail view `0`.
@@ -151,6 +153,12 @@ impl ViewPlacement {
     pub fn contains(&self, s: [f64; 2], margin: f64) -> bool {
         s[0] >= self.min[0] - margin && s[0] <= self.max[0] + margin && s[1] >= self.min[1] - margin && s[1] <= self.max[1] + margin
     }
+    /// Distance from a sheet point to the view box (0 inside).
+    pub fn dist_to(&self, s: [f64; 2]) -> f64 {
+        let dx = (self.min[0] - s[0]).max(s[0] - self.max[0]).max(0.0);
+        let dy = (self.min[1] - s[1]).max(s[1] - self.max[1]).max(0.0);
+        (dx * dx + dy * dy).sqrt()
+    }
 }
 
 /// Document-level data for property fields.
@@ -194,7 +202,7 @@ impl BuiltSheet {
                 return;
             }
             let bias = match self.picks.get(pick as usize) {
-                Some(PickTarget::Annotation(_)) => -tol * 0.5,
+                Some(PickTarget::Annotation(_) | PickTarget::Inspection(_)) => -tol * 0.5,
                 Some(PickTarget::TitleBlock) => tol * 0.25,
                 _ => 0.0,
             };
@@ -369,6 +377,21 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                 }
                 (AnnotationKind::Centerline { a: pa, .. }, 0) => *pa = p,
                 (AnnotationKind::Centerline { b: pb, .. }, 1) => *pb = p,
+                (AnnotationKind::HoleCallout { center, radius: rr, .. }, 0) => {
+                    *center = p;
+                    if let Some(r) = radius {
+                        *rr = r;
+                    }
+                }
+                (AnnotationKind::CircleCenterline { points, .. }, k) => {
+                    if let Some(x) = points.get_mut(k as usize) {
+                        *x = p;
+                    }
+                }
+                (AnnotationKind::VirtualSharp { a1: x, .. }, 0)
+                | (AnnotationKind::VirtualSharp { b1: x, .. }, 1)
+                | (AnnotationKind::VirtualSharp { a2: x, .. }, 2)
+                | (AnnotationKind::VirtualSharp { b2: x, .. }, 3) => *x = p,
                 (AnnotationKind::Balloon { anchor, .. }, 0) => *anchor = p,
                 (AnnotationKind::OrdinateDimension { origin, .. }, 0) => *origin = p,
                 (AnnotationKind::OrdinateDimension { point, .. }, 1) => *point = p,
@@ -515,6 +538,46 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
     })
 }
 
+/// Onshape-style hole / thread callout text for the hole a callout points
+/// at: "2X ⌀6.6 THRU", "⌴ ⌀11 ↧ 6.5", "⌵ ⌀12.4 X 90°", tapped "M6x1.0 ↧ 10"
+/// over "⌀5 ↧ 12".
+pub fn hole_callout_lines(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &Annotation) -> Option<Vec<String>> {
+    let view = a.kind.view()?;
+    let (key, _) = views::view_source(sheet, view)?;
+    let ctx = &sources.get(&key)?.context;
+    let r = a.refs.iter().find(|r| r.slot == 0)?;
+    let (c, radius) = views::resolve_point3(ctx, &r.point)?;
+    let radius = radius?;
+    let tol = radius * 1e-3 + 1e-7;
+    let hole = ctx.holes.iter().find(|h| h.matches_circle(c, radius, tol))?;
+    let same = ctx.holes.iter().filter(|h| h.feature == hole.feature && (h.diameter - hole.diameter).abs() < 1e-9 && h.depth.map(|d| (d * 1e6).round()) == hole.depth.map(|d| (d * 1e6).round())).count();
+    let len = |m: f64| format::format_len(drawing, &a.format, m);
+    let count = if same > 1 { format!("{same}X ") } else { String::new() };
+    let depth = |d: Option<f64>| match (hole.through, d) {
+        (true, _) => " THRU".to_string(),
+        (false, Some(d)) => format!(" ↧ {}", len(d)),
+        _ => String::new(),
+    };
+    let mut out = Vec::new();
+    match &hole.thread {
+        Some(t) => {
+            let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
+            out.push(format!("{count}{t}{class}{}", depth(hole.tapped_depth.or(hole.depth))));
+            if let Some(td) = hole.tap_drill {
+                out.push(format!("⌀{}{}", len(td), depth(hole.depth)));
+            }
+        }
+        None => out.push(format!("{count}⌀{}{}", len(hole.diameter), depth(hole.depth))),
+    }
+    if let Some((d, dd)) = hole.cbore {
+        out.push(format!("⌴ ⌀{} ↧ {}", len(d), len(dd)));
+    }
+    if let Some((d, ang)) = hole.csink {
+        out.push(format!("⌵ ⌀{} X {}°", len(d), format::format_number(ang.to_degrees(), None, 1)));
+    }
+    Some(out)
+}
+
 struct Env<'a> {
     drawing: &'a Drawing,
     sheet: &'a Sheet,
@@ -541,6 +604,13 @@ impl AnnotationEnv for Env<'_> {
     }
     fn expand(&self, s: &str) -> String {
         format::expand_fields(s, self.fields)
+    }
+    fn inspection_style(&self) -> Option<(super::InspectionShape, f64, f64)> {
+        let p = &self.drawing.props;
+        (!p.hide_inspection).then_some((p.inspection_shape, p.inspection_text_height, p.inspection_border_size))
+    }
+    fn hole_callout(&self, a: &Annotation) -> Vec<String> {
+        hole_callout_lines(self.drawing, self.sheet, self.sources, a).unwrap_or_else(|| vec!["⌀?".into()])
     }
     fn balloon_text(&self, a: &Annotation, text: &str) -> String {
         let t = text.trim();
@@ -795,18 +865,24 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
 
     // Annotations with resolved references.
     let (resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
-    let (ml, mt) = (g.lines.len(), g.texts.len());
+    let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
     let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields };
     g.add_annotations(&resolved, &env);
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
         remap.insert((a.id & 0xFFFF_FFFF) as u32, picks.id(PickTarget::Annotation(a.id)));
+        if a.inspection.is_some() {
+            remap.insert(super::sheet::inspection_pick(a.id), picks.id(PickTarget::Inspection(a.id)));
+        }
     }
     for l in &mut g.lines[ml..] {
         l.pick = remap.get(&l.pick).copied().unwrap_or(0);
     }
     for t in &mut g.texts[mt..] {
         t.pick = remap.get(&t.pick).copied().unwrap_or(0);
+    }
+    for gr in &mut g.grips[mg..] {
+        gr.pick = remap.get(&gr.pick).copied().unwrap_or(0);
     }
 
     // Tables (and hole tags in their views).

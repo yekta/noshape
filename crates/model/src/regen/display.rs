@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// Default part colors (linear RGBA): Onshape's eight-color rotation
 /// ("Customizing appearances" help page), in order.
 pub const PART_COLORS: [[f32; 4]; 8] = [
-    [0.254, 0.462, 0.624, 1.0], // light blue #8ab5cf
+    [0.337, 0.624, 0.846, 1.0], // light blue #9dcfed (live: the Appearances swatch of a new part)
     [0.323, 0.323, 0.323, 1.0], // gray #9a9a9a
     [0.076, 0.159, 0.474, 1.0], // dark blue #4e6fb7
     [0.831, 0.831, 0.831, 1.0], // white #ebebeb
@@ -31,6 +31,25 @@ pub fn perf_enabled() -> bool {
 
 fn f3(p: DVec3) -> [f32; 3] {
     [p.x as f32, p.y as f32, p.z as f32]
+}
+
+/// Tessellates one body shape at a chord-tolerance factor relative to the
+/// default (smaller = finer), e.g. for an assembly instance's "Use best
+/// available tessellation".
+pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<MeshBuffers> {
+    let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
+    let defaults = RegenOptions::default();
+    let lin = (diag * defaults.relative_deflection * quality).max(1e-6);
+    let ang = defaults.angular_deflection * quality.clamp(0.4, 1.0);
+    let t = noshape_kernel::tessellate(shape, lin, ang, true).ok()?;
+    Some(MeshBuffers {
+        face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
+        edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
+        positions: t.positions,
+        normals: t.normals,
+        indices: t.indices,
+        vertices: t.vertices,
+    })
 }
 
 /// Build the display; returns whether any body only has a preview mesh.

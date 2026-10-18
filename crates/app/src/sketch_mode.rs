@@ -3597,6 +3597,129 @@ impl SketchEditor {
     // ------------------------------------------------------------ overlay
 
     /// Preview geometry, inference guides, picks, box selection and dimension
+    /// Live values next to the rubber-band preview while drawing (live
+    /// Onshape: line length, rectangle width and height, circle `Ø`, arc `R`,
+    /// 13 px light blue, no box). Positions are sketch coordinates.
+    pub fn preview_values(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(DVec2, String)> {
+        let Some(c) = self.snapped().map(|s| s.0) else { return Vec::new() };
+        let anchors: Vec<DVec2> = self.clicks.iter().map(|k| k.pos).collect();
+        let px = self.world_per_px;
+        let e0 = EntityId(0);
+        let len = |v: f64| dim_value_text(&ConstraintKind::Length { curve: e0, value: v }, v, units);
+        let dia = |v: f64| dim_value_text(&ConstraintKind::Diameter { curve: e0, value: v }, v, units);
+        let rad = |v: f64| dim_value_text(&ConstraintKind::Radius { curve: e0, value: v }, v, units);
+        // A label beside a segment's midpoint (on the side away from `away`).
+        let beside = |a: DVec2, b: DVec2, away: Option<DVec2>| -> DVec2 {
+            let m = (a + b) * 0.5;
+            let mut n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
+            if let Some(o) = away
+                && n.dot(m - o) < 0.0
+            {
+                n = -n;
+            }
+            m + n * px * 16.0
+        };
+        let valid = |v: f64| v > px * 0.5;
+        let mut out = Vec::new();
+        match self.tool {
+            Tool::Line | Tool::TangentArc if self.tangent_mode || self.tool == Tool::TangentArc => {
+                if let Some(from) = self.chain_end {
+                    let mut tmp = data.sketch.clone();
+                    if let Ok(ids) = tmp.tangent_arc(from, c)
+                        && let Some(Curve2::Arc { center, radius, .. }) = ids.curves.first().and_then(|e| tmp.curve(*e))
+                    {
+                        out.push((center + (c - center).try_normalize().unwrap_or(DVec2::X) * radius * 0.5, rad(radius)));
+                    }
+                }
+            }
+            Tool::Line => {
+                if let Some(a) = self.anchor_pos(&data.sketch)
+                    && valid((c - a).length())
+                {
+                    out.push((beside(a, c, None), len((c - a).length())));
+                }
+            }
+            Tool::MidpointLine => {
+                if let Some(m) = anchors.first()
+                    && valid((c - *m).length())
+                {
+                    out.push((beside(*m * 2.0 - c, c, None), len((c - *m).length() * 2.0)));
+                }
+            }
+            Tool::CornerRect | Tool::CenterRect => {
+                if let Some(a) = anchors.first() {
+                    let (lo, hi) = if self.tool == Tool::CornerRect { (a.min(c), a.max(c)) } else { let d = (c - *a).abs(); (*a - d, *a + d) };
+                    let mid = (lo + hi) * 0.5;
+                    let (w, h) = (hi.x - lo.x, hi.y - lo.y);
+                    if valid(w) {
+                        out.push((beside(DVec2::new(lo.x, hi.y), DVec2::new(hi.x, hi.y), Some(mid)), len(w)));
+                    }
+                    if valid(h) {
+                        out.push((beside(DVec2::new(hi.x, lo.y), DVec2::new(hi.x, hi.y), Some(mid)), len(h)));
+                    }
+                }
+            }
+            Tool::AlignedRect => match anchors.len() {
+                1 if valid((c - anchors[0]).length()) => out.push((beside(anchors[0], c, None), len((c - anchors[0]).length()))),
+                2 => {
+                    let (a, b) = (anchors[0], anchors[1]);
+                    let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
+                    let h = (c - a).dot(n);
+                    if valid(h.abs()) {
+                        out.push((beside(b, b + n * h, Some((a + b) * 0.5 + n * h * 0.5)), len(h.abs())));
+                    }
+                }
+                _ => {}
+            },
+            Tool::Circle | Tool::Polygon | Tool::CircumPolygon => {
+                if let Some(a) = anchors.first() {
+                    let r = (anchors.get(1).copied().unwrap_or(c) - *a).length();
+                    if valid(r) {
+                        out.push((beside(*a, *a + (c - *a).normalize_or_zero() * r, None), dia(r * 2.0)));
+                    }
+                }
+            }
+            Tool::ThreePointCircle => match anchors.len() {
+                1 if valid((c - anchors[0]).length()) => out.push((beside(anchors[0], c, None), dia((c - anchors[0]).length()))),
+                2 => {
+                    if let Some((ctr, r)) = noshape_sketch::shapes::circle_through(anchors[0], anchors[1], c) {
+                        out.push((ctr + (c - ctr).normalize_or_zero() * r + (c - ctr).normalize_or_zero() * px * 18.0, dia(r * 2.0)));
+                    }
+                }
+                _ => {}
+            },
+            Tool::Arc3 => {
+                if anchors.len() == 2
+                    && let Some((ctr, r)) = noshape_sketch::shapes::circle_through(anchors[0], c, anchors[1])
+                {
+                    out.push((c + (c - ctr).normalize_or_zero() * px * 18.0, rad(r)));
+                }
+            }
+            Tool::CenterArc | Tool::EllipticalArc | Tool::Ellipse if anchors.len() == 1 => {
+                let r = (c - anchors[0]).length();
+                if valid(r) {
+                    let text = if self.tool == Tool::CenterArc { rad(r) } else { dia(r * 2.0) };
+                    out.push((beside(anchors[0], c, None), text));
+                }
+            }
+            Tool::CenterArc if anchors.len() == 2 => {
+                let r = (anchors[1] - anchors[0]).length();
+                out.push((anchors[0] + (c - anchors[0]).normalize_or_zero() * (r + px * 18.0), rad(r)));
+            }
+            Tool::Ellipse | Tool::EllipticalArc if anchors.len() == 2 => {
+                let major = anchors[1] - anchors[0];
+                let u = major.try_normalize().unwrap_or(DVec2::X);
+                let minor = (c - anchors[0]).dot(u.perp()).abs();
+                if valid(minor) {
+                    let end = anchors[0] + u.perp() * (c - anchors[0]).dot(u.perp());
+                    out.push((beside(anchors[0], end, None), dia(minor * 2.0)));
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
     /// graphics (world space).
     pub fn overlay(&self, data: &SketchData, units: &UnitPrefs) -> (LineData, PointData) {
         let mut lines = LineData::default();
@@ -5407,6 +5530,25 @@ mod tests {
         assert!(d.external_refs.is_empty());
         assert!(!d.sketch.entity(line).unwrap().external, "unlinked: regular sketch geometry");
         assert!(ed.constraint_glyphs(&d).iter().all(|g| g.icon != "use"));
+    }
+
+    #[test]
+    fn rubber_band_shows_live_values() {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        let u = UnitPrefs::default();
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.03, 0.02), true, false);
+        let vals: Vec<String> = ed.preview_values(&d, &u).into_iter().map(|x| x.1).collect();
+        assert_eq!(vals, vec!["30".to_string(), "20".to_string()], "width and height");
+        let (mut ed, mut d) = editor(Tool::Circle);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.01, 0.0), true, false);
+        let vals: Vec<String> = ed.preview_values(&d, &u).into_iter().map(|x| x.1).collect();
+        assert_eq!(vals, vec!["Ø20".to_string()]);
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.0, 0.015), true, false);
+        assert_eq!(ed.preview_values(&d, &u).into_iter().map(|x| x.1).collect::<Vec<_>>(), vec!["15".to_string()]);
     }
 
     #[test]

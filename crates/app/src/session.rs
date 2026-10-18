@@ -18,6 +18,8 @@ pub struct Session {
     pub viewing: Option<MicroversionId>,
     /// Tab whose edits Ctrl+Z / Ctrl+Y revert (Onshape: undo is per tab).
     pub active_tab: Option<TabId>,
+    /// Onshape's "Switch to view only mode" (☰ menu).
+    pub view_only: bool,
 }
 
 impl Session {
@@ -29,7 +31,7 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None })
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -40,7 +42,7 @@ impl Session {
         let doc = Document::from_blobs(&store.read_all(head)?)?;
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None })
+        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false })
     }
 
     pub fn name(&self) -> String {
@@ -51,8 +53,9 @@ impl Session {
         Ok(self.store.head(self.branch)?)
     }
 
+    /// No edits: viewing a point in history, or Onshape's "view only mode".
     pub fn read_only(&self) -> bool {
-        self.viewing.is_some()
+        self.viewing.is_some() || self.view_only
     }
 
     /// Commit changed tabs (and settings) as one microversion.
@@ -125,12 +128,6 @@ impl Session {
             Some(scope) => self.undo.can_redo_in(&self.store, &scope),
             None => self.undo.can_redo(),
         }
-    }
-    pub fn undo_description(&self) -> Option<String> {
-        self.undo.undo_description().map(str::to_string)
-    }
-    pub fn redo_description(&self) -> Option<String> {
-        self.undo.redo_description().map(str::to_string)
     }
 
     pub fn undo(&mut self) -> Result<bool> {

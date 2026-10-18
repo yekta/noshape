@@ -109,6 +109,13 @@ impl PartStudioView {
     pub(super) fn toggle_analysis(&mut self, a: Analysis, window: &mut Window, cx: &mut Context<Self>) {
         let same = std::mem::discriminant(&a) == self.ui.analysis.as_ref().map(std::mem::discriminant).unwrap_or(std::mem::discriminant(&Analysis::Curvature)) && self.ui.analysis.is_some();
         self.ui.analysis = if same { None } else { Some(a) };
+        // The curvature color map turns zebra stripes off (Onshape).
+        if matches!(self.ui.analysis, Some(Analysis::Curvature)) {
+            if self.ui.analysis_tool.as_ref().is_some_and(|t| t.kind == super::analysis_tools::ToolKind::Zebra) {
+                self.close_analysis_tool(cx);
+            }
+            self.ui.zebra = None;
+        }
         let d = self.display.clone();
         self.apply_display(d, window, cx);
     }

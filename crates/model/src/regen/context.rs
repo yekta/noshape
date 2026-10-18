@@ -115,7 +115,13 @@ impl Body {
         if let Some(i) = map.get(n) {
             return vec![*i];
         }
-        self.faces.iter().enumerate().filter(|(_, f)| f.descends_from(n)).map(|(i, _)| i).collect()
+        let pieces: Vec<usize> = self.faces.iter().enumerate().filter(|(_, f)| f.descends_from(n)).map(|(i, _)| i).collect();
+        if !pieces.is_empty() {
+            return pieces;
+        }
+        // A piece of a face that is whole again (the feature that split it
+        // was suppressed or changed): the whole face, like Onshape.
+        self.faces.iter().enumerate().filter(|(_, f)| n.descends_from(f)).map(|(i, _)| i).collect()
     }
 
     pub fn find_edges(&self, n: &TopoName) -> Vec<usize> {
@@ -123,14 +129,26 @@ impl Body {
         if let Some(i) = map.get(n) {
             return vec![*i];
         }
-        // Fuzzy: an edge whose adjacent faces descend from the referenced faces.
+        // Fuzzy: an edge whose adjacent faces descend from the referenced
+        // faces; else (faces split when the reference was made are whole
+        // again) one whose faces are their ancestors.
+        let pieces = self.edges_related(n, |cand, refd| cand.descends_from(refd));
+        if !pieces.is_empty() {
+            return pieces;
+        }
+        self.edges_related(n, |cand, refd| refd.descends_from(cand))
+    }
+
+    /// Edges whose adjacent faces relate (`rel(candidate face, referenced face)`)
+    /// to those of the edge name `n`.
+    fn edges_related(&self, n: &TopoName, rel: impl Fn(&TopoName, &TopoName) -> bool) -> Vec<usize> {
         match n {
             TopoName::Edge { faces: [a, b], .. } => self
                 .edges
                 .iter()
                 .enumerate()
                 .filter(|(_, e)| match &***e {
-                    TopoName::Edge { faces: [c, d], .. } => (c.descends_from(a) && d.descends_from(b)) || (c.descends_from(b) && d.descends_from(a)),
+                    TopoName::Edge { faces: [c, d], .. } => (rel(c, a) && rel(d, b)) || (rel(c, b) && rel(d, a)),
                     _ => false,
                 })
                 .map(|(i, _)| i)
@@ -139,7 +157,7 @@ impl Body {
                 .edges
                 .iter()
                 .enumerate()
-                .filter(|(_, e)| matches!(&***e, TopoName::Boundary { face: f, .. } if f.descends_from(face)))
+                .filter(|(_, e)| matches!(&***e, TopoName::Boundary { face: f, .. } if rel(f, face)))
                 .map(|(i, _)| i)
                 .collect(),
             _ => Vec::new(),
@@ -151,19 +169,24 @@ impl Body {
         if let Some(i) = map.get(n) {
             return vec![*i];
         }
-        match n {
-            TopoName::Vertex { faces, .. } => self
-                .vertices
+        let TopoName::Vertex { faces, .. } = n else { return Vec::new() };
+        let related = |rel: &dyn Fn(&TopoName, &TopoName) -> bool| -> Vec<usize> {
+            self.vertices
                 .iter()
                 .enumerate()
                 .filter(|(_, v)| match &***v {
-                    TopoName::Vertex { faces: fs, .. } => fs.len() == faces.len() && faces.iter().all(|a| fs.iter().any(|b| b.descends_from(a))),
+                    TopoName::Vertex { faces: fs, .. } => fs.len() == faces.len() && faces.iter().all(|a| fs.iter().any(|b| rel(b, a))),
                     _ => false,
                 })
                 .map(|(i, _)| i)
-                .collect(),
-            _ => Vec::new(),
+                .collect()
+        };
+        // As for edges: split pieces first, else the faces they were split from.
+        let pieces = related(&|cand, refd| cand.descends_from(refd));
+        if !pieces.is_empty() {
+            return pieces;
         }
+        related(&|cand, refd| refd.descends_from(cand))
     }
 
     pub fn shape_names(&self) -> crate::naming::ShapeNames {
@@ -243,6 +266,43 @@ pub struct Context {
     /// Form tools tagged by Tag features (purpose Form), for sheet metal Form.
     pub form_tools: Vec<crate::sheetmetal::FormTool>,
     // --- end batch SM ---
+    /// Holes made by Hole features (drawings' hole / thread callouts).
+    pub holes: Vec<HoleRecord>,
+}
+
+/// One hole of a Hole feature: where it starts, its direction into the
+/// material and its sizes (meters, radians).
+#[derive(Clone, Debug, PartialEq)]
+pub struct HoleRecord {
+    pub feature: FeatureId,
+    pub start: DVec3,
+    pub dir: DVec3,
+    pub diameter: f64,
+    /// Blind depth (None: through all / up to).
+    pub depth: Option<f64>,
+    pub through: bool,
+    pub tap_drill: Option<f64>,
+    pub tapped_depth: Option<f64>,
+    /// Thread designation ("M6x1.0", "#10-24") and thread class ("6H").
+    pub thread: Option<String>,
+    pub thread_class: Option<String>,
+    /// Counterbore (diameter, depth), countersink (diameter, angle).
+    pub cbore: Option<(f64, f64)>,
+    pub csink: Option<(f64, f64)>,
+    /// Inch hole standard (callout values in inches).
+    pub inch: bool,
+}
+
+impl HoleRecord {
+    /// Is a circle of `radius` centered at `center` part of this hole
+    /// (on its axis, with one of its diameters)?
+    pub fn matches_circle(&self, center: DVec3, radius: f64, tol: f64) -> bool {
+        let v = center - self.start;
+        let off = (v - self.dir * v.dot(self.dir)).length();
+        let d = radius * 2.0;
+        let sizes = [Some(self.diameter), self.tap_drill, self.cbore.map(|c| c.0), self.csink.map(|c| c.0)];
+        off < tol && sizes.iter().flatten().any(|s| (s - d).abs() < tol.max(1e-7))
+    }
 }
 
 impl Context {

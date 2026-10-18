@@ -159,15 +159,13 @@ pub(super) fn shortcut_matches(key: &str, what: &str, query: &str) -> bool {
 #[derive(Clone)]
 pub(super) enum PaletteItem {
     Feature(&'static str),
-    View(noshape_render::StandardView, &'static str),
-    Display(DisplayMode),
     /// A sketch tool (only while a sketch is open).
     SketchTool(crate::sketch_mode::Tool),
 }
 
 impl PartStudioView {
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
+        let st = cx.new(|cx| InputState::new(window, cx));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 this.palette_query = st.read(cx).value().to_string();
@@ -218,56 +216,70 @@ impl PartStudioView {
         }
     }
 
-    fn palette_items(&self, _cx: &App) -> Vec<PaletteItem> {
-        let q = self.palette_query.to_lowercase();
-        let mut out: Vec<PaletteItem> = Vec::new();
-        // In a sketch, its tools come first (Onshape searches sketch tools there).
-        if self.sketch.is_some() && !q.is_empty() {
+    /// Onshape's tool search (live, menus/tool-search-*.png): nothing until
+    /// something is typed; then the tools whose **names** contain the typed
+    /// letters in order ("fil" finds Fillet, Fill, Finish flex PCB model,
+    /// Finish sheet metal model, 3D fit spline, Modify fillet), ranked by
+    /// where the first letter matches, then how tightly the letters sit,
+    /// then catalog order. In a sketch, its tools are searched too.
+    fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
+        let q: Vec<char> = self.palette_query.trim().to_lowercase().chars().collect();
+        if q.is_empty() {
+            return Vec::new();
+        }
+        // (first matched index, span of the match) for the in-order match of `q` in `name`.
+        let score = |name: &str| -> Option<(usize, usize)> {
+            let chars: Vec<char> = name.to_lowercase().chars().collect();
+            let mut best: Option<(usize, usize)> = None;
+            for start in 0..chars.len() {
+                if chars[start] != q[0] {
+                    continue;
+                }
+                let mut k = 1;
+                let mut end = start;
+                for (i, c) in chars.iter().enumerate().skip(start + 1) {
+                    if k == q.len() {
+                        break;
+                    }
+                    if *c == q[k] {
+                        k += 1;
+                        end = i;
+                    }
+                }
+                if k == q.len() {
+                    let cand = (start, end - start);
+                    if best.is_none_or(|b| cand < b) {
+                        best = Some(cand);
+                    }
+                }
+            }
+            best
+        };
+        let mut found: Vec<((usize, usize, usize), PaletteItem)> = Vec::new();
+        let mut order = 0usize;
+        if self.sketch.is_some() {
             for t in super::sketch::all_sketch_tools() {
-                if sketch_tool_name(t).to_lowercase().contains(&q) {
-                    out.push(PaletteItem::SketchTool(t));
+                order += 1;
+                if let Some((f, span)) = score(sketch_tool_name(t)) {
+                    found.push(((f, span, order), PaletteItem::SketchTool(t)));
                 }
             }
         }
-        // Custom features of this document first (they are few and specific).
-        for t in self.doc.read(_cx).custom_features().feature_types() {
-            if q.is_empty() || t.name.to_lowercase().contains(&q) {
-                out.push(PaletteItem::Feature(t.id));
+        let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
+        for t in features::all().chain(custom) {
+            order += 1;
+            if let Some((f, span)) = score(t.name) {
+                found.push(((f, span, order), PaletteItem::Feature(t.id)));
             }
         }
-        // With no query, recently used tools come first (Onshape).
-        if q.is_empty() {
-            out.extend(self.ui.recent_tools.iter().map(|id| PaletteItem::Feature(id)));
-        }
-        for t in features::all() {
-            if q.is_empty() && self.ui.recent_tools.contains(&t.id) {
-                continue;
-            }
-            if q.is_empty() || t.name.to_lowercase().contains(&q) || t.id.to_lowercase().contains(&q) {
-                out.push(PaletteItem::Feature(t.id));
-            }
-        }
-        use noshape_render::StandardView as V;
-        for (v, n) in [(V::Isometric, "Isometric view"), (V::Front, "Front view"), (V::Top, "Top view"), (V::Right, "Right view"), (V::Back, "Back view"), (V::Left, "Left view"), (V::Bottom, "Bottom view")] {
-            if !q.is_empty() && n.to_lowercase().contains(&q) {
-                out.push(PaletteItem::View(v, n));
-            }
-        }
-        for m in DisplayMode::ALL {
-            if !q.is_empty() && m.label().to_lowercase().contains(&q) {
-                out.push(PaletteItem::Display(m));
-            }
-        }
-        out.truncate(14);
-        out
+        found.sort_by_key(|(k, _)| *k);
+        found.into_iter().map(|(_, i)| i).collect()
     }
 
     fn run_palette(&mut self, item: PaletteItem, window: &mut Window, cx: &mut Context<Self>) {
         self.palette = None;
         match item {
             PaletteItem::Feature(id) => self.start_feature(id, window, cx),
-            PaletteItem::View(v, _) => self.view(v, cx),
-            PaletteItem::Display(m) => self.set_display_mode(m, window, cx),
             PaletteItem::SketchTool(t) => self.activate_tool(t, window, cx),
         }
         cx.notify();
@@ -288,10 +300,8 @@ impl PartStudioView {
             match item {
                 PaletteItem::Feature(id) => {
                     let t = features::get(id);
-                    (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), t.map(|t| t.description.to_string()).unwrap_or_default())
+                    (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), crate::tool_text::description(id).or(t.map(|t| t.description)).unwrap_or_default().to_string())
                 }
-                PaletteItem::View(_, n) => ("iso-view".into(), n.to_string(), None, String::new()),
-                PaletteItem::Display(m) => (m.icon().into(), m.label().to_string(), None, String::new()),
                 PaletteItem::SketchTool(t) => (t.icon().into(), sketch_tool_name(*t).to_string(), None, String::new()),
             }
         };
@@ -363,9 +373,23 @@ impl PartStudioView {
                     div()
                         .bg(gpui_kit::rgb(0xffffff))
                         .p(px(6.))
-                        .child(div().rounded(px(2.)).border_1().border_color(pal.focus).child(Input::new(&st).appearance(false).cleanable(true).text_size(px(14.)))),
+                        // The placeholder is italic gray (live), drawn over the empty input.
+                        .child(
+                            div()
+                                .relative()
+                                .rounded(px(2.))
+                                .border_1()
+                                .border_color(pal.focus)
+                                .child(Input::new(&st).appearance(false).cleanable(true).text_size(px(14.)))
+                                .when(self.palette_query.is_empty(), |d| {
+                                    d.child(div().absolute().left(px(8.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Search tools"))
+                                }),
+                        ),
                 )
-                .child(
+                .when(self.palette_query.trim().is_empty(), |d| {
+                    d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools"))
+                })
+                .when(!self.palette_query.trim().is_empty(), |d| d.child(
                     h_flex()
                         .items_start()
                         .px(px(10.))
@@ -373,7 +397,7 @@ impl PartStudioView {
                         .child(v_flex().w(px(198.)).flex_none().gap(px(2.)).children(rows))
                         .child(div().w(px(1.)).ml(px(12.)).h(px(142.)).bg(gpui_kit::rgb(0xcccccc)))
                         .children(detail),
-                )
+                ))
                 .child(
                     h_flex()
                         .h(px(34.))

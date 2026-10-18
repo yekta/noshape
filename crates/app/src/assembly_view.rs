@@ -927,7 +927,7 @@ impl AssemblyView {
             let same = a.instances.iter().filter(|i| i.source == source).count();
             let placement = Placement { translation: [same as f64 * (width + 0.01), 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
             let name = a.next_instance_name(&base);
-            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
+            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
             id
         })
     }
@@ -972,7 +972,7 @@ impl AssemblyView {
         let id = self.edit(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
-            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
+            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
             id
         });
         if let Some(id) = id {
@@ -1087,6 +1087,17 @@ impl AssemblyView {
             for id in &ids {
                 if let Some(i) = a.instance_mut(*id) {
                     i.fixed = fixed;
+                }
+            }
+        });
+    }
+
+    /// Instance menu "Use best available tessellation" (toggle).
+    pub(super) fn set_best_tessellation(&mut self, ids: Vec<InstanceId>, on: bool, cx: &mut Context<Self>) {
+        self.edit("Use best available tessellation", cx, |a| {
+            for id in &ids {
+                if let Some(i) = a.instance_mut(*id) {
+                    i.best_tessellation = on;
                 }
             }
         });

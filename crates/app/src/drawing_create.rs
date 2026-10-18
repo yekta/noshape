@@ -245,7 +245,8 @@ impl CreateDrawingDialog {
                     .px(px(10.))
                     .text_size(px(13.))
                     .cursor_pointer()
-                    .when(sel, |d| d.bg(pal.accent_soft).font_weight(FontWeight::SEMIBOLD))
+                    // Live (drawing/01): the chosen row is `#b2ddf6`.
+                    .when(sel, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.row_hover)))
                     .child(div().w(px(209.)).truncate().child(r.file))
                     .child(div().w(px(209.)).pr_2().truncate().child(r.document))

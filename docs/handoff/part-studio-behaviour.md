@@ -69,10 +69,36 @@ the help docs.
   `redo_in`, `Session.active_tab`); Versions and history > Restore to Main brings it back.
   Verified in the app.
 
+- QA round 3 (psb section) fixes:
+  - picks follow the active field's filter (`behaviors.rs::pick_kinds` / `sync_pick_filter`;
+    the viewport priority returns `i32::MIN` for kinds the field can't take, and the render
+    pick skips those), so a short edge's vertex or midpoint no longer swallows a Fillet click,
+    and a datum plane no longer blocks a face for analysis tools; the midpoint snap only
+    applies when the field takes points;
+  - Hole: a sketch clicked in the list (or preselected) gives all its points (`sketch_points`);
+  - rows after the edited feature show rolled back while it's open (unless Final);
+  - the row selection is cleared when a dialog opens and when it's accepted, and a list click
+    the active field can't take flashes the filter message instead of selecting the row.
+- Thickness analysis (`part_studio/thickness.rs`, geometry in `model::thickness`: refined
+  samples, BVH ray casts, rolling ball by occupied-cell search, gradients) with the color bar
+  (Colors, Dim color scale, Method, editable / draggable bounds, movable legend), progress
+  messages, Edit / Turn off in the menu.
+
 ## Next (priority order) — no deviations from Onshape are accepted
 
-1. Analysis tools menu with Onshape's 11 tools; Shift+C = Curve/surface analysis (combs),
-   Shift+D = Dihedral analysis (today Shift+C/Shift+D are curvature map/draft: wrong).
+1. Analysis tools (`part_studio/analysis_tools.rs`, geometry in `model::analysis`): Curve/surface
+   (Shift+C), Deviation, Connection (G0–G3 on face edges / curve joints, Onshape's colors and
+   dialog, `analysis::face_connections` / `curve_connections`), Dihedral (Shift+D), Zebra
+   stripes (instance flag → `zebra()` in shaders.wgsl, striped "room" sphere `Globals.room`)
+   and Reflection (`part_studio/reflection.rs`: Select image dialog, procedural library maps
+   in `environment_maps.rs`, `fs_mesh_reflect` with the map bound as an image) are done and
+   verified in the app; offscreen tests `zebra_stripes_replace_shading`,
+   `reflection_mirrors_the_environment`. Zebra / Reflection have ✓ (stay on) and ✗ (off).
+   Still to do: Thickness (ray-cast per-vertex colors, background thread), Flatten surface;
+   convert the Curvature color map / Draft analysis legend panels into Onshape-style dialogs;
+   swap the procedural maps for live/env-maps once captured (requested in REQUESTS.md).
+   Also seen: clicks on entities the active field doesn't accept (a datum plane in front of a
+   face) should pass through to the geometry behind, as in Onshape.
 2. Remaining ❌ rows in the checklist (Highlight boundary edges, Graphics preferences…, region
    New sketch/Offset plane, multi-feature Section view…, Create Drawing of Sketch,
    sketch-curve midpoints, :partnumber/:revision filters, FeatureScript search, fit tolerances).
@@ -87,6 +113,9 @@ the help docs.
   applies sed patches for those transient breaks **in the copy only**, and
   builds with `CARGO_TARGET_DIR=/root/target-psb`. Drop patches that no longer
   apply.
+- `sync.sh` copies with `rsync --checksum` without keeping times (changed files get a fresh
+  mtime, so cargo rebuilds them) and deletes stale test binaries but not proc-macro `.so`
+  files (deleting those forces a full dependency rebuild).
 - `/tmp/psb/start.sh` starts the app on `:102` (900 s timeout);
   `/tmp/psb/x.sh <name> [xdotool args]` acts and screenshots.
 - The first double-click after launch is often missed (slow first frame). Open
