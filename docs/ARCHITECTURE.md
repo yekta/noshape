@@ -13,11 +13,11 @@ as the B-rep kernel.
 |---|---|---|---|
 | `noshape-units` | crates/units | – | Lengths/angles/unitless quantities, unit parsing (`mm`, `in`, `deg`...), expression language (`#var * 2 + 3 mm`, functions, conditionals), variable scopes. Pure Rust. |
 | `noshape-sketch` | crates/sketch | – | 2D sketch entities, constraints, dimensions and the geometric constraint solver (Newton/LM, DOF analysis, drag solving), region (profile) detection, trim/extend/offset/fillet helpers. Pure Rust. |
-| `noshape-kernel` | crates/kernel | (C++ OCCT) | Safe Rust wrapper over a `cxx` bridge to OCCT: shapes, topology exploration, primitive/feature operations, booleans, fillets, offsets, sweeps, lofts, tessellation, HLR projection, STEP/IGES/STL/OBJ/glTF I/O, mass properties, measurement. Knows nothing about features. |
+| `noshape-kernel` | crates/kernel | (C++ OCCT) | Safe Rust wrapper over a `cxx` bridge to OCCT: shapes, topology exploration, primitive/feature operations, booleans, fillets, offsets, sweeps, lofts, tessellation, HLR projection, STEP/IGES/BREP I/O plus STL/OBJ mesh import and export, mass properties, measurement. Knows nothing about features. |
 | `noshape-model` | crates/model | units, sketch, kernel | The CAD document model: Part Studio feature list & regeneration engine, persistent topological naming, feature definitions (extrude, revolve, ...), variables, configurations, assemblies & mate solver, drawings model. Deterministic, headless, fully testable. |
 | `noshape-store` | crates/store | – | Local persistence: single-file document (`.noshape`, SQLite) with content-addressed snapshots, microversion history (undo/redo across sessions), named versions, branches, merges. Generic over opaque blobs. |
 | `noshape-render` | crates/render | – | wgpu renderer: GPU meshes for faces/edges/vertices, sketch overlay, grid, triad, picking via an ID buffer, highlight/selection states, section planes, offscreen rendering with BGRA readback for GPUI. Its own scene types; no OCCT. |
-| `noshape` | crates/app | all | GPUI application: document browser, tabs, feature list, toolbars, feature dialogs, sketch tools, selection, mouse/keyboard interaction, viewport element. |
+| `noshape` | crates/app | all | GPUI application: start window (document library), document windows with tabs, feature list, toolbars, feature dialogs, sketch tools, selection, mouse/keyboard interaction, viewport element. |
 
 Dependency direction is strictly downward. `model` never depends on GPUI or wgpu.
 `render` never depends on `model`; the app converts model output into render scenes.
@@ -80,3 +80,39 @@ string plus its evaluated SI value; the document has default units.
   per shape; meshes are uploaded once and reused.
 * No allocation per frame in the render loop; scene diffs only.
 * The UI thread never blocks on the kernel.
+
+## Application structure (crates/app)
+
+* **Windows.** `start_window.rs` is the document library: recent documents,
+  folders, thumbnails rendered by `start_thumbnail.rs`. Each open document is
+  a `Workspace` window (`workspace.rs`) holding a `DocModel` entity
+  (`doc_model.rs`, wrapping the store `Session`) and one view per tab:
+  * `part_studio/` for Part Studios;
+  * `assembly_view.rs` for Assemblies;
+  * `drawing_view.rs` for Drawings;
+  * `variable_studio.rs` for Variable Studios;
+  * `feature_studio.rs` for Feature Studios.
+
+  Every edit goes through `DocModel::edit_studio`/`edit_tab` and becomes one
+  microversion.
+* **Feature dialogs.** `feature_dialog.rs` renders any feature from its
+  `ParamSpec` schema. Built-in features have static schemas. Custom features
+  (`crates/model/src/custom`, Rhai scripts in Feature Studios) register schemas
+  at runtime under `custom:<tab>:<name>`. Dialog edits regenerate a preview
+  rolled to the edited feature (or the finished model with "Final").
+* **Part Studio extras.**
+  * `part_studio/manipulators.rs`: drag handles that write back to dialog
+    fields (extrude depth arrow, revolve angle arc).
+  * `feature_ops.rs`: copy/paste of features through the system clipboard as
+    `{"noshape_features": [...]}` JSON. Ids are remapped, so paste works across
+    documents. Also feature folders.
+  * `fab_panel.rs`: the sheet metal flat pattern and bend table, and the frame
+    cut list.
+  * `config_panel.rs`: variables and configurations.
+  * `view_tools.rs`: tool search, display modes, section view, named views.
+* **History.** `history_panel.rs` shows the version graph. It supports
+  restore, branch, merge, read-only viewing, and "compare with current", backed
+  by `noshape_model::compare`.
+* **Derived parts.** `derived.rs` provides other Part Studios' regenerated
+  contexts to Derived features, with caching and cycle detection.
+
