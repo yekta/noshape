@@ -45,8 +45,11 @@ rhai = { version = "1.26.1", features = ["sync"] }
 
 [profile.dev]
 opt-level = 1
+# Line tables keep backtraces useful at a fraction of the disk space.
+debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 3
+debug = false
 
 [profile.release]
 lto = "thin"

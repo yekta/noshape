@@ -31,7 +31,7 @@ jobs:
             os: windows-latest
             asset: windows-x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Version
         shell: bash
@@ -58,9 +58,13 @@ jobs:
 
       - name: MSVC developer environment (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
+        shell: pwsh
+        run: |
+          # Load vcvars64 into the job environment (cl, link, INCLUDE, LIB...).
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
 
       - name: OpenCascade
         uses: ./.github/actions/setup-occt
@@ -84,10 +88,13 @@ jobs:
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
+          strip -x "$app/Contents/MacOS/noshape"
           # Ad-hoc signature so Apple Silicon will launch it (not notarized).
           codesign --force --deep --sign - "$app"
           ln -s /Applications dist/Applications
-          hdiutil create -volname noshape -srcfolder dist -ov -format UDZO \
+          # hdiutil underestimates the image size for large binaries; size it explicitly.
+          size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
+          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO \
             "noshape-$VERSION-${{ matrix.asset }}.dmg"
           echo "ASSET=noshape-$VERSION-${{ matrix.asset }}.dmg" >> "$GITHUB_ENV"
 
@@ -114,7 +121,7 @@ jobs:
           Compress-Archive -Path $d -DestinationPath "$d.zip"
           "ASSET=$d.zip" >> $env:GITHUB_ENV
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: ${{ env.ASSET }}
@@ -125,7 +132,7 @@ jobs:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true

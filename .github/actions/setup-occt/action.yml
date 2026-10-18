@@ -27,7 +27,7 @@ runs:
 
     - name: Restore OCCT cache
       id: cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ${{ steps.paths.outputs.prefix }}
         key: occt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh') }}
@@ -52,7 +52,7 @@ runs:
     # throw away a 30-60 minute OCCT build.
     - name: Save OCCT cache
       if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ${{ steps.paths.outputs.prefix }}
         key: ${{ steps.cache.outputs.cache-primary-key }}

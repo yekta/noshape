@@ -34,7 +34,7 @@ jobs:
             os: windows-latest
             exe: noshape.exe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
@@ -55,9 +55,13 @@ jobs:
 
       - name: MSVC developer environment (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
+        shell: pwsh
+        run: |
+          # Load vcvars64 into the job environment (cl, link, INCLUDE, LIB...).
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
 
       - name: OpenCascade
         uses: ./.github/actions/setup-occt
@@ -75,7 +79,7 @@ jobs:
         run: cargo build --release --locked -p noshape
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: noshape-${{ runner.os }}-${{ runner.arch }}
           path: target/release/${{ matrix.exe }}
@@ -84,13 +88,6 @@ jobs:
       - name: Test
         run: cargo test --locked --workspace --exclude noshape
 
-      # Library crates must be warning-free. The app crate is still under heavy
-      # development (lots of not-yet-used code), so its lints are reported as
-      # warnings only; switch it to `-D warnings` once it settles.
       - name: Clippy (libraries, -D warnings)
         if: runner.os == 'Linux'
         run: cargo clippy --locked --workspace --exclude noshape -- -D warnings
-
-      - name: Clippy (app, warnings only)
-        if: runner.os == 'Linux'
-        run: cargo clippy --locked -p noshape
