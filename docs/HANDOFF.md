@@ -74,18 +74,22 @@ cd /root/noshape && export GIT_INDEX_FILE=/tmp/wip-index && cp .git/index $GIT_I
 
   Commit it only once the whole workspace is warning-free.
 
-**In progress** (each agent keeps `docs/handoff/<name>.md` current):
+**In progress** (started 2026-10-18 by the second lead; rules for all agents: `docs/handoff/TEAM-RULES.md`).
+Agents run on different accounts through Motile (`list_accounts` / `start_agent`); reach them with `message_agent`.
 
-| Workstream | Handoff file | Status |
-|---|---|---|
-| Theme and layout restyle to Onshape (light theme, layout, dialogs, icons via `img()`) | `docs/handoff/theme-layout.md` | in progress |
-| Part Studio behaviour parity, pass 2 | `docs/handoff/part-studio-behaviour.md`, `docs/parity/part-studio.md` | 207 items: 164 done, 43 remaining |
-| Sketch behaviour parity, pass 2 | `docs/handoff/sketch-behaviour.md`, `docs/parity/sketch.md` | 200 items: 161 done, 39 remaining |
-| Assembly behaviour parity, pass 2 | `docs/handoff/assembly-behaviour.md`, `docs/parity/assembly.md` | 222 items: 175 done; next are flexible subassemblies, live mate values, standard content |
-| QA round 2 + renderer bugs | `docs/handoff/qa-round-2.md` | Fixing: pick depth bias for sketch regions on faces, dotted edges (z-fighting), stale frame after edits, zoom-to-fit ignoring planes, `#` autocomplete. Testing: configurations, assemblies, drawings, versions, import/export. |
+| Agent | Motile id | Account / model | Display, target | Handoff |
+|---|---|---|---|---|
+| ui: Part Studio chrome, dialogs, viewport | 4c87ff1e-dd12-48ad-8a96-aceea272ca85 | Unbind / Fable 5.1 | :101, target-ui | `docs/handoff/theme-layout.md` |
+| ui2: sketch/assembly/drawing/start-window visuals | 1ab28110-dc74-4006-8e5b-552669f57d0d | Unbind / Opus 5.5 | :105, target-ui2 | `docs/handoff/theme-studios.md` |
+| live: captures real Onshape into `/root/onshape-research/live/` | 2fdb41b3-d693-47fb-9eb8-8e69bcca552f | Motile / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
+| psb: Part Studio behaviour | b98a1037-8119-4552-9514-fba9ad39e0d0 | Motile / Opus 5.5 | :102, target-psb | `docs/handoff/part-studio-behaviour.md` |
+| skb: sketch behaviour | 0da86aed-871a-4059-a99b-800eaac48d5e | Codex / gpt-6.1-sol | :103, target-skb | `docs/handoff/sketch-behaviour.md` |
+| asb: assembly, then drawing behaviour | 8dd0feca-ba9f-4968-8546-e57efb6ce793 | Unbind / Opus 5.5 | :104, target-asb | `docs/handoff/assembly-behaviour.md`, `drawing-behaviour.md` |
+
+Accounts: "Ngyekta" (Claude) hit its weekly limit (resets 2026-10-19 04:00 UTC); the "Yekta" account's login expired.
+QA round 2 finished and is integrated; another QA round is due once the restyle lands.
 
 Not started yet:
-- **Drawing behaviour parity:** same method as the others, writing `docs/parity/drawing.md`.
 - **Release v0.2.0:** once the restyle and parity work land on main and CI is green with strict
   warnings.
 
