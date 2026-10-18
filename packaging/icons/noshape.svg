@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23232f"/>
+      <stop offset="1" stop-color="#121218"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <!-- isometric block: top, left, right faces -->
+  <path d="M512 228 L792 390 L512 552 L232 390 Z" fill="#a99dff"/>
+  <path d="M232 390 L512 552 L512 812 L232 650 Z" fill="#6f5fe6"/>
+  <path d="M792 390 L512 552 L512 812 L792 650 Z" fill="#8b7cff"/>
+  <!-- through hole on the top face -->
+  <ellipse cx="512" cy="390" rx="104" ry="60" fill="#1d1840"/>
+  <!-- far inner wall of the hole -->
+  <path d="M408 390 A104 60 0 0 1 616 390 L616 432 A104 60 0 0 0 408 432 Z" fill="#4c3fb8"/>
+  <ellipse cx="512" cy="390" rx="104" ry="60" fill="none" stroke="#ece9ff" stroke-opacity="0.55" stroke-width="8"/>
+  <!-- crisp edges -->
+  <path d="M512 228 L792 390 L792 650 L512 812 L232 650 L232 390 Z M232 390 L512 552 L792 390 M512 552 L512 812" fill="none" stroke="#ece9ff" stroke-opacity="0.55" stroke-width="10" stroke-linejoin="round"/>
+</svg>

@@ -9,6 +9,9 @@ description = "A fast, fully local, parametric CAD application."
 name = "noshape"
 path = "src/main.rs"
 
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
 [dependencies]
 noshape-render.workspace = true
 noshape-model.workspace = true

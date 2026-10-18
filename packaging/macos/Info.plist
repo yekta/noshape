@@ -8,6 +8,8 @@
   <string>noshape</string>
   <key>CFBundleIdentifier</key>
   <string>com.github.yekta.noshape</string>
+  <key>CFBundleIconFile</key>
+  <string>noshape</string>
   <key>CFBundleExecutable</key>
   <string>noshape</string>
   <key>CFBundlePackageType</key>

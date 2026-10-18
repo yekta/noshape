@@ -81,6 +81,7 @@ jobs:
           app=dist/noshape.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp target/release/noshape "$app/Contents/MacOS/noshape"
+          cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           # Ad-hoc signature so Apple Silicon will launch it (not notarized).
@@ -98,6 +99,8 @@ jobs:
           cp target/release/noshape "$d/"
           strip "$d/noshape"
           cp packaging/linux/noshape.desktop README.md "$d/"
+          cp packaging/icons/noshape-512.png "$d/noshape.png"
+          cp packaging/icons/noshape.svg "$d/noshape.svg"
           tar czf "$d.tar.gz" "$d"
           echo "ASSET=$d.tar.gz" >> "$GITHUB_ENV"
 
