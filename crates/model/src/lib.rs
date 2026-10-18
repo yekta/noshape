@@ -6,6 +6,7 @@
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
 pub mod assembly;
+pub mod compare;
 pub mod configuration;
 pub mod demo;
 pub mod display;

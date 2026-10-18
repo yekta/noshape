@@ -25,6 +25,8 @@ pub struct HistoryPanel {
     doc: Entity<DocModel>,
     graph: Option<VersionGraph>,
     prompt: Prompt,
+    /// Result of "Compare with current": (description of the older point, diff).
+    compare: Option<(String, Vec<noshape_model::compare::TabDiff>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -34,7 +36,7 @@ impl HistoryPanel {
             this.graph = None;
             cx.notify();
         })];
-        Self { doc, graph: None, prompt: Prompt::None, _subs: subs }
+        Self { doc, graph: None, prompt: Prompt::None, compare: None, _subs: subs }
     }
 
     fn graph(&mut self, cx: &App) -> VersionGraph {
@@ -61,6 +63,83 @@ impl HistoryPanel {
             Ok(()) => self.after_change(cx),
             Err(e) => self.error(e, cx),
         }
+    }
+
+    /// Compare a point in history with the current branch head.
+    fn compare_with_current(&mut self, mv: MicroversionId, label: String, cx: &mut Context<Self>) {
+        let r = (|| -> anyhow::Result<Vec<noshape_model::compare::TabDiff>> {
+            let s = &self.doc.read(cx).session;
+            let old = noshape_model::document::Document::from_blobs(&s.store.read_all(mv)?)?;
+            let new = noshape_model::document::Document::from_blobs(&s.store.read_all(s.head()?)?)?;
+            Ok(noshape_model::compare::compare_documents(&old, &new))
+        })();
+        match r {
+            Ok(d) => self.compare = Some((label, d)),
+            Err(e) => self.error(e, cx),
+        }
+        cx.notify();
+    }
+
+    fn render_compare(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use noshape_model::compare::ChangeKind;
+        let (label, diffs) = self.compare.as_ref()?;
+        let pal = p();
+        let color = |k: &ChangeKind| match k {
+            ChangeKind::Added => pal.success,
+            ChangeKind::Removed => pal.error,
+            ChangeKind::Modified => pal.warning,
+        };
+        let sign = |k: &ChangeKind| match k {
+            ChangeKind::Added => "+",
+            ChangeKind::Removed => "−",
+            ChangeKind::Modified => "~",
+        };
+        let mut body: Vec<AnyElement> = Vec::new();
+        if diffs.is_empty() {
+            body.push(div().text_xs().text_color(pal.text_faint).child("No differences.").into_any_element());
+        }
+        for d in diffs {
+            body.push(
+                h_flex()
+                    .gap_1p5()
+                    .pt_1()
+                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(color(&d.status)).child(sign(&d.status)))
+                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(d.tab.clone()))
+                    .child(div().text_xs().text_color(pal.text_faint).child(d.kind_name))
+                    .into_any_element(),
+            );
+            for c in &d.changes {
+                body.push(
+                    h_flex()
+                        .pl_3()
+                        .gap_1p5()
+                        .items_start()
+                        .child(div().text_xs().text_color(color(&c.kind)).child(sign(&c.kind)))
+                        .child(div().text_xs().text_color(pal.text_muted).child(c.text.clone()))
+                        .into_any_element(),
+                );
+            }
+        }
+        Some(
+            v_flex()
+                .max_h(px(320.))
+                .border_b_1()
+                .border_color(pal.border)
+                .child(
+                    h_flex()
+                        .px_2()
+                        .pt_2()
+                        .justify_between()
+                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("COMPARE WITH CURRENT"))
+                        .child(Button::new("cmp-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.compare = None;
+                            cx.notify();
+                        }))),
+                )
+                .child(div().px_2().text_xs().text_color(pal.text_faint).truncate().child(format!("From: {label}")))
+                .child(v_flex().id("cmp-body").px_2().pb_2().overflow_y_scroll().children(body))
+                .into_any_element(),
+        )
     }
 
     fn restore(&mut self, mv: MicroversionId, cx: &mut Context<Self>) {
@@ -205,6 +284,7 @@ impl Render for HistoryPanel {
             let is_viewing = viewing == Some(mv.id);
             let id = mv.id;
             let view2 = view.clone();
+            let label = mv.description.clone();
             let row = h_flex()
                 .id(SharedString::from(format!("mv-{}", mv.id.short())))
                 .w_full()
@@ -231,9 +311,12 @@ impl Render for HistoryPanel {
                     let v1 = view2.clone();
                     let v2 = view2.clone();
                     let v3 = view2.clone();
+                    let v4 = view2.clone();
+                    let label = label.clone();
                     menu.item(PopupMenuItem::new("View this point (read-only)").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(id), cx))))
                         .item(PopupMenuItem::new("Restore to here").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.restore(id, cx))))
                         .item(PopupMenuItem::new("Branch from here…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.start_prompt_branch(id, window, cx))))
+                        .item(PopupMenuItem::new("Compare with current").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.compare_with_current(id, label.clone(), cx))))
                 });
             rows.push(row.into_any_element());
         }
@@ -291,6 +374,7 @@ impl Render for HistoryPanel {
                     }),
             )
             .children(prompt)
+            .children(self.render_compare(cx))
             .child(v_flex().id("history-rows").flex_1().p_1().gap_px().overflow_y_scroll().children(rows))
     }
 }
