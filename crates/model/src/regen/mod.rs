@@ -39,17 +39,22 @@ pub struct RegenOptions {
     pub angular_deflection: f64,
     /// Variables from the document's Variable Studios (visible everywhere).
     pub document_variables: BTreeMap<String, Quantity>,
+    /// Coarse meshes for immediate feedback; a later `Final` pass refines.
+    pub preview_meshes: bool,
 }
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 6e-4, angular_deflection: 0.3, document_variables: BTreeMap::new() }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false }
     }
 }
 
 #[derive(Clone, Default)]
 pub struct RegenResult {
     pub display: StudioDisplay,
+    /// Some bodies only have preview-quality meshes; regenerate with
+    /// `preview_meshes: false` to refine them.
+    pub needs_refine: bool,
     /// Final context (bodies with kernel shapes), for export and assemblies.
     pub context: Arc<Context>,
 }
@@ -63,7 +68,7 @@ struct CacheEntry {
 #[derive(Default)]
 pub struct Regenerator {
     entries: HashMap<FeatureId, CacheEntry>,
-    meshes: HashMap<u64, (u64, Arc<MeshBuffers>)>,
+    meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
 }
 
 fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
@@ -174,10 +179,10 @@ impl Regenerator {
             states.push(state);
         }
         self.entries.retain(|id, _| live.contains(id));
-        let mut display = display::build(&ctx, studio, opts, &mut self.meshes);
+        let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        RegenResult { display, context: ctx }
+        RegenResult { display, needs_refine, context: ctx }
     }
 }

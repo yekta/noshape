@@ -234,6 +234,7 @@ impl PartStudioView {
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
         let regen = self.regen.clone();
+        let regen2 = self.regen.clone();
         self.regen_seq += 1;
         let seq = self.regen_seq;
         self.regenerating = true;
@@ -243,10 +244,13 @@ impl PartStudioView {
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, ..Default::default() };
-                    regen.lock().regenerate(&studio, &config, &units, &opts)
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, ..Default::default() };
+                    let r = regen.lock().regenerate(&studio, &config, &units, &opts);
+                    (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
                 .await;
+            let (result, studio, config, units, upto, editing_sketch, doc_vars) = result;
+            let refine = result.needs_refine;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 if seq != this.regen_seq {
                     return;
@@ -255,6 +259,23 @@ impl PartStudioView {
                 this.context = Some(result.context.clone());
                 this.apply_display(Arc::new(result.display), window, cx);
             });
+            // Progressive meshing: refine preview meshes in the background.
+            if refine {
+                let regen2 = regen2;
+                let fine = cx
+                    .background_spawn(async move {
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, ..Default::default() };
+                        regen2.lock().regenerate(&studio, &config, &units, &opts)
+                    })
+                    .await;
+                let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                    if seq != this.regen_seq {
+                        return;
+                    }
+                    this.context = Some(fine.context.clone());
+                    this.apply_display(Arc::new(fine.display), window, cx);
+                });
+            }
         }));
         cx.notify();
     }

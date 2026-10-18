@@ -715,6 +715,13 @@ impl FeatureDialog {
             }
         }
         self.set_value(path, ParamValue::Lookup(full), cx);
+        if self.feature.type_id == "hole" {
+            // Copy the standard's sizes into the numeric fields (Onshape behavior)
+            // and rebuild the inputs so they show the new values.
+            noshape_model::features::hole_tables::apply_table_to_params(&mut self.feature.params);
+            self.inputs.clear();
+            cx.emit(DialogEvent::Changed);
+        }
     }
 }
 

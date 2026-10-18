@@ -26,7 +26,9 @@ fn f3(p: DVec3) -> [f32; 3] {
     [p.x as f32, p.y as f32, p.z as f32]
 }
 
-pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, Arc<MeshBuffers>)>) -> StudioDisplay {
+/// Build the display; returns whether any body only has a preview mesh.
+pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> (StudioDisplay, bool) {
+    let mut needs_refine = false;
     let t_all = std::time::Instant::now();
     let mut d = StudioDisplay::defaults();
     let mut used = std::collections::HashSet::new();
@@ -34,14 +36,20 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let key = b.shape.hash_code();
         let nfaces = b.faces.len() as u64;
         used.insert(key);
-        let mesh = match meshes.get(&key) {
-            Some((n, m)) if *n == nfaces => m.clone(),
+        let cached = meshes.get(&key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)).map(|(_, p, m)| (*p, m.clone()));
+        let mesh = match cached {
+            Some((preview, m)) => {
+                needs_refine |= preview;
+                m
+            }
             _ => {
                 let bb = b.shape.bounding_box(false).ok();
                 let diag = bb.map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
-                let lin = (diag * opts.relative_deflection).max(1e-6);
+                // Preview meshes are ~4x coarser for instant feedback.
+                let (rel, ang) = if opts.preview_meshes { (opts.relative_deflection * 4.0, (opts.angular_deflection * 1.8).min(0.9)) } else { (opts.relative_deflection, opts.angular_deflection) };
+                let lin = (diag * rel).max(1e-6);
                 let tt = std::time::Instant::now();
-                let tess = noshape_kernel::tessellate(&b.shape, lin, opts.angular_deflection, true);
+                let tess = noshape_kernel::tessellate(&b.shape, lin, ang, true);
                 log::debug!("tessellate {}: {:?} (linear {lin:.2e})", b.name, tt.elapsed());
                 let m = match tess {
                     Ok(t) => Arc::new(MeshBuffers {
@@ -57,7 +65,8 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                         Arc::new(MeshBuffers::default())
                     }
                 };
-                meshes.insert(key, (nfaces, m.clone()));
+                meshes.insert(key, (nfaces, opts.preview_meshes, m.clone()));
+                needs_refine |= opts.preview_meshes;
                 m
             }
         };
@@ -99,7 +108,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             p.half_height = half;
         }
     }
-    d
+    (d, needs_refine)
 }
 
 pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> SketchDisplay {
