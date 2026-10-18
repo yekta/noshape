@@ -670,6 +670,33 @@ pub fn table_values(table: &str, path: &[String]) -> Option<HoleSpec> {
     }
 }
 
+/// Initialise a new Hole like Onshape: the units system follows the
+/// document's length unit (ISO for metric documents, ANSI for imperial ones)
+/// and the default Standard path's values fill the numeric fields, so the
+/// dialog's drill size and diameter agree from the start.
+pub fn init_new_hole(params: &mut ParamValues, units: &noshape_units::UnitPrefs) {
+    use noshape_units::LengthUnit;
+    let imperial = matches!(units.length, LengthUnit::Inch | LengthUnit::Foot | LengthUnit::Yard);
+    params.set("unitsSystem", ParamValue::Enum(if imperial { "INCH" } else { "METRIC" }.into()));
+    sync_hole_standard(params);
+    // The fields now hold the table values, but the hole is not marked as
+    // synced: until the user edits it, a Standard path set later (by code, or
+    // by a dialog that skips the edit logic) still takes the table's values.
+    params.set(TABLE_SYNCED_PARAM, ParamValue::Bool(false));
+}
+
+/// Hole edit logic after the units system or style changed: the Standard
+/// that becomes visible gets its default path if it has none, and its values
+/// are copied into the numeric fields (so switching Metric to Inch does not
+/// leave a metric diameter behind). Returns whether values were applied.
+pub fn sync_hole_standard(params: &mut ParamValues) -> bool {
+    let (pid, table) = hole_table_param(params);
+    if params.lookup(pid).is_empty() {
+        params.set(pid, ParamValue::Lookup(default_path(table)));
+    }
+    apply_table_to_params(params)
+}
+
 /// Path obtained by following every level's default from the top.
 pub fn default_path(table: &str) -> Vec<String> {
     let mut path = Vec::new();

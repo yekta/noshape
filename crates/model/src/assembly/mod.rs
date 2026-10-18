@@ -108,6 +108,39 @@ pub struct Instance {
     pub hidden: bool,
     #[serde(default)]
     pub suppressed: bool,
+    /// Subassembly instances: flexible (Onshape's default), locked at the
+    /// current position, or following one of the subassembly's named positions.
+    #[serde(default, skip_serializing_if = "SubassemblyLock::is_flexible")]
+    pub lock: SubassemblyLock,
+    /// Flexible subassemblies: positions of the subassembly's instances in
+    /// this assembly (relative to the subassembly instance), overriding the
+    /// subassembly's own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nested: Vec<(InstanceId, Placement)>,
+}
+
+impl Instance {
+    pub fn new(id: InstanceId, name: String, source: InstanceSource, placement: Placement) -> Self {
+        Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() }
+    }
+}
+
+/// How a subassembly instance solves in its parent (Onshape "Lock/follow position to").
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum SubassemblyLock {
+    /// Its mates are solved with the parent's: its parts can be dragged.
+    #[default]
+    Flexible,
+    /// Locked at the current position (one rigid body).
+    Current,
+    /// Locked at one of its named positions.
+    Named(String),
+}
+
+impl SubassemblyLock {
+    pub fn is_flexible(&self) -> bool {
+        matches!(self, SubassemblyLock::Flexible)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,20 +218,26 @@ pub struct MateConnectorRef {
     /// owner ([`InstanceId::ORIGIN`] for connectors on the assembly origin).
     #[serde(default)]
     pub connector: Option<MateId>,
+    /// Entity whose direction gives the connector's primary axis at its
+    /// origin (Onshape's inference points on a hovered face or edge: a
+    /// vertex or edge midpoint of a planar face points along the face
+    /// normal, an edge end along the edge).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub align: Option<Box<Reference>>,
 }
 
 impl MateConnectorRef {
     /// Connector at the assembly origin (world frame).
     pub fn origin() -> Self {
-        Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None }
+        Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None, align: None }
     }
     /// Reference to an assembly mate connector owned by `owner`.
     pub fn assembly_connector(id: MateId, owner: InstanceId) -> Self {
-        Self { instance: owner, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: Some(id) }
+        Self { instance: owner, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: Some(id), align: None }
     }
     /// Entity reference on an occurrence (implicit inference or bare entity).
     pub fn on(instance: InstanceId, path: Vec<InstanceId>, reference: Reference) -> Self {
-        Self { instance, path, reference, flip: false, rotate_quarters: 0, connector: None }
+        Self { instance, path, reference, flip: false, rotate_quarters: 0, connector: None, align: None }
     }
     pub fn is_origin(&self) -> bool {
         self.instance == InstanceId::ORIGIN && self.connector.is_none()
@@ -267,6 +306,9 @@ pub struct Mate {
     pub offset_y: Option<ExprValue>,
     #[serde(default)]
     pub rotation: Option<ExprValue>,
+    /// Axis of the rotation offset (0 = X, 1 = Y, 2 = Z).
+    #[serde(default = "default_rot_axis")]
+    pub rotation_axis: u8,
     #[serde(default)]
     pub flip_primary: bool,
     #[serde(default)]
@@ -283,6 +325,9 @@ pub struct Mate {
     /// the selected ones (Onshape "Tangent propagation", on by default).
     #[serde(default = "default_true")]
     pub tangent_propagation: bool,
+    /// Mate indicator hidden in the graphics area (eye icon / Hide).
+    #[serde(default)]
+    pub hidden: bool,
 }
 
 fn default_true() -> bool {
@@ -301,12 +346,14 @@ impl Mate {
             offset_x: None,
             offset_y: None,
             rotation: None,
+            rotation_axis: 2,
             flip_primary: false,
             reorient_secondary: 0,
             limits: vec![],
             suppressed: false,
             extra: vec![],
             tangent_propagation: true,
+            hidden: false,
         }
     }
     /// All connectors of the mate.
@@ -528,9 +575,51 @@ pub struct Assembly {
     /// Linear / circular patterns, mirrors, part patterns and replicates.
     #[serde(default)]
     pub patterns: Vec<InstancePattern>,
+    /// Folders of the instance list and of the Mate features list.
+    #[serde(default)]
+    pub folders: Vec<ListFolder>,
+    /// Display states: named visibility of instances, mates and mate connectors.
+    #[serde(default)]
+    pub display_states: Vec<DisplayState>,
+}
+
+/// A folder in the instance list (`instances`) or in the Mate features
+/// list (`features`: mates, mate connectors, relations, groups). Deleting a
+/// folder deletes its contents; Unpack keeps them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ListFolder {
+    pub id: MateId,
+    pub name: String,
+    #[serde(default)]
+    pub instances: Vec<InstanceId>,
+    #[serde(default)]
+    pub features: Vec<MateId>,
+}
+
+impl ListFolder {
+    /// Folder of the Mate features list (else of the instance list).
+    pub fn is_mate_folder(&self) -> bool {
+        !self.features.is_empty() && self.instances.is_empty()
+    }
+}
+
+/// Display state: what is hidden (Onshape captures the visibility of parts,
+/// subassemblies, mates and mate connectors).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DisplayState {
+    pub name: String,
+    #[serde(default)]
+    pub hidden_instances: Vec<InstanceId>,
+    #[serde(default)]
+    pub hidden_features: Vec<MateId>,
+    /// Instances and features that existed when the state was captured
+    /// (later ones keep their defaults when the state is applied).
+    #[serde(default)]
+    pub known: Vec<u64>,
 }
 pub mod analysis;
 pub mod eval;
+pub mod ops;
 pub mod solver;
 
 impl Assembly {
@@ -569,6 +658,7 @@ impl Assembly {
             .chain(self.groups.iter().map(|g| g.id.0))
             .chain(self.connectors.iter().map(|c| c.id.0))
             .chain(self.patterns.iter().map(|p| p.id.0))
+            .chain(self.folders.iter().map(|f| f.id.0))
             .max()
             .unwrap_or(0);
         m + 1
@@ -600,7 +690,8 @@ impl Assembly {
                 || self.relations.iter().any(|r| r.name == name)
                 || self.groups.iter().any(|g| g.name == name)
                 || self.connectors.iter().any(|c| c.name == name)
-                || self.patterns.iter().any(|p| p.name == name);
+                || self.patterns.iter().any(|p| p.name == name)
+                || self.folders.iter().any(|f| f.name == name);
             if !taken {
                 return name;
             }
@@ -654,10 +745,14 @@ impl Assembly {
             PatternKind::Mirror { plane, .. } => !Self::uses_dead_connector(plane, &dead_conn) && plane.instance != id,
             PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => !dead.contains(mate),
         });
+        for f in &mut self.folders {
+            f.instances.retain(|i| *i != id);
+        }
         for g in &mut self.groups {
             g.instances.retain(|i| *i != id);
         }
-        self.groups.retain(|g| g.instances.len() > 1);
+        // Like Onshape, a group goes away with its last member.
+        self.groups.retain(|g| !g.instances.is_empty());
         for np in &mut self.named_positions {
             np.placements.retain(|(i, _)| *i != id);
         }
@@ -670,6 +765,9 @@ impl Assembly {
     /// Remove a mate, relation, group, connector or pattern (patterns take
     /// their generated instances and mates with them).
     pub fn remove_mate(&mut self, id: MateId) {
+        for f in &mut self.folders {
+            f.features.retain(|x| *x != id);
+        }
         if let Some(p) = self.patterns.iter().find(|p| p.id == id).cloned() {
             self.patterns.retain(|x| x.id != id);
             for g in &p.generated {
@@ -776,7 +874,7 @@ impl Assembly {
             let Some(src) = self.instance(seed).cloned() else { continue };
             let nid = InstanceId(self.next_id());
             let name = self.next_instance_name(Self::base_name(&src.name));
-            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false });
+            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
             let mut mate_id = None;
             if let (Some(sm), Some(t)) = (&seed_mate, &target) {
                 let mid = MateId(self.next_id());

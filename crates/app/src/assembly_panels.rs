@@ -62,6 +62,8 @@ pub(crate) struct McSession {
     pub hidden: bool,
     /// X / Y / Z translation and rotation angle.
     pub inputs: [Entity<InputState>; 4],
+    /// Opened from a mate dialog's connector field (the mate keeps it).
+    pub for_mate: Option<usize>,
     _subs: Vec<Subscription>,
 }
 
@@ -174,6 +176,49 @@ impl AssemblyView {
 
     pub(super) fn open_mc(&mut self, existing: Option<AsmMateConnector>, window: &mut Window, cx: &mut Context<Self>) {
         self.close_mate(window, cx);
+        self.open_mc_inner(existing, None, window, cx);
+    }
+
+    /// Mate dialog: the mate connector icon of a field opens its mate
+    /// connector for editing (an implicit one becomes an assembly mate
+    /// connector on the same entity); the mate dialog stays open.
+    pub(super) fn edit_dialog_connector(&mut self, field: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.mate.as_ref().and_then(|m| m.dialog.read(cx).field(field).cloned()) else { return };
+        if c.is_origin() {
+            return;
+        }
+        let existing = match c.connector {
+            Some(id) => self.assembly(cx).and_then(|a| a.connector(id).cloned()),
+            None => {
+                let Some(asm) = self.assembly(cx) else { return };
+                let mut on = c.clone();
+                on.flip = false;
+                on.rotate_quarters = 0;
+                let mut mc = AsmMateConnector::new(MateId(asm.next_id()), asm.next_feature_name("Mate connector"), on);
+                mc.flip_primary = c.flip;
+                mc.reorient = c.rotate_quarters;
+                self.open_mc_inner(None, Some(field), window, cx);
+                if let Some(m) = &mut self.mc {
+                    m.id = mc.id;
+                    m.name = mc.name.clone();
+                    m.on = Some(mc.on.clone());
+                    m.active = false;
+                    m.flip = mc.flip_primary;
+                    m.reorient = mc.reorient;
+                }
+                self.schedule_eval(window, cx);
+                return;
+            }
+        };
+        if existing.is_some() {
+            self.open_mc_inner(existing, Some(field), window, cx);
+        } else {
+            self.message = Some((false, "Mate connectors from Part Studios or subassemblies are edited where they were created.".into()));
+            cx.notify();
+        }
+    }
+
+    fn open_mc_inner(&mut self, existing: Option<AsmMateConnector>, for_mate: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
         self.mc = None;
         let Some(asm) = self.assembly(cx) else { return };
         let (id, name, editing) = match &existing {
@@ -210,6 +255,7 @@ impl AssemblyView {
             rot_axis: existing.as_ref().map(|c| c.rotation_axis).unwrap_or(2),
             hidden: existing.as_ref().is_some_and(|c| c.hidden),
             inputs,
+            for_mate,
             _subs: subs,
         });
         self.insert_open = false;
@@ -236,8 +282,14 @@ impl AssemblyView {
             return;
         };
         let editing = s.editing;
+        let for_mate = s.for_mate;
         self.mc = None;
         let desc = if editing { format!("Edit : {}", c.name) } else { format!("Insert : {}", c.name) };
+        if let (Some(field), Some(d)) = (for_mate, self.mate.as_ref().map(|m| m.dialog.clone())) {
+            // The mate now uses the (edited) assembly mate connector.
+            let r = MateConnectorRef::assembly_connector(c.id, c.owner());
+            d.update(cx, |d, cx| d.replace_field(field, r, cx));
+        }
         self.edit(&desc, cx, |a| {
             // Mates that use the connector follow its owner.
             for m in &mut a.mates {
@@ -401,9 +453,9 @@ impl AssemblyView {
                 cx.notify();
             }));
         let view = cx.entity();
-        row.context_menu(move |menu, _, _| {
-            let (v1, v2) = (view.clone(), view.clone());
-            menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.edit_mate(id, window, cx)))).separator().item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.delete_mate(id, cx))))
+        row.context_menu(move |menu, window, cx| {
+            let entries = view.read(cx).connector_menu(id, cx);
+            fill_menu(menu, entries, view.clone(), window, cx)
         })
         .into_any_element()
     }
@@ -901,7 +953,7 @@ impl AssemblyView {
             let targets = Self::manip_targets_for(mv.handle, mv.axis, mv.center, v, &mv.start);
             let mut start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
             start.extend(mv.start.iter().map(|(k, p)| (*k, *p)));
-            let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(start), ..Default::default() });
+            let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
             let name = self.assembly(cx).and_then(|a| mv.ids.first().and_then(|id| a.instance(*id)).map(|i| i.name.clone())).unwrap_or_default();
             self.apply_solved(solved, cx);
             self.edit(&format!("Move : {name}"), cx, |_| {});
@@ -1448,8 +1500,6 @@ pub(crate) enum TriadAction {
     AlignZ(usize, bool),
     /// Rotate about triad axis k by an angle (radians).
     Rotate(usize, f64),
-    /// Put the manipulator back at its default position.
-    Reset,
 }
 
 /// Explode step being dragged in the panel (reorder).
@@ -1467,7 +1517,7 @@ impl Render for ExplodeStepDrag {
 }
 
 /// Möller–Trumbore ray / triangle intersection (ray parameter).
-fn ray_triangle(o: DVec3, d: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64> {
+pub(super) fn ray_triangle(o: DVec3, d: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64> {
     let e1 = b - a;
     let e2 = c - a;
     let p = d.cross(e2);
@@ -1585,8 +1635,8 @@ impl AssemblyView {
             && let Some(o) = self.result.occurrences.get(hit.occ)
         {
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            for (_, f) in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
-                consider(t.mul(&f), 1.0);
+            for p in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
+                consider(t.mul(&p.frame), 1.0);
             }
             let rot = self.manipulator(cx).map(|f| f.rotation).unwrap_or_default();
             for v in &o.mesh.vertices {
@@ -1599,12 +1649,6 @@ impl AssemblyView {
 
     pub(super) fn triad_action(&mut self, action: TriadAction, cx: &mut Context<Self>) {
         self.triad_menu = None;
-        if action == TriadAction::Reset {
-            self.triad = None;
-            self.refresh_scene(false, cx);
-            cx.notify();
-            return;
-        }
         let Some(f) = self.manipulator(cx) else { return };
         let ids = self.manip_targets(cx);
         let axes = [f.x(), f.y(), f.z()];
@@ -1618,7 +1662,6 @@ impl AssemblyView {
                 let r = glam::DQuat::from_axis_angle(axes[k].normalize(), a);
                 Frame::new(f.origin - r * f.origin, r)
             }
-            TriadAction::Reset => return,
         };
         let start: HashMap<InstanceId, Placement> = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p))).collect();
         if self.explode_edit {
@@ -1629,7 +1672,6 @@ impl AssemblyView {
                     let (axis, angle) = m.rotation.to_axis_angle();
                     ExplodeStep::rotate(ids.clone(), axis.into(), angle, f.origin.into())
                 }
-                TriadAction::Reset => return,
             };
             self.push_explode_step(step, cx);
             self.reapply_display(cx);
@@ -1637,7 +1679,7 @@ impl AssemblyView {
         }
         let targets = Self::moved_placements(&m, &start);
         let all: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
-        let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(all), ..Default::default() });
+        let solved = self.result.prepared.solve(&SolveOptions { targets, start: Some(all), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
         let name = self.assembly(cx).and_then(|a| ids.first().and_then(|id| a.instance(*id)).map(|i| i.name.clone())).unwrap_or_default();
         let what = match action {
             TriadAction::MoveToOrigin => "Move to origin",
@@ -1664,24 +1706,22 @@ impl AssemblyView {
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.triad_action(a, cx)))
         };
-        let names = ["X", "Y", "Z"];
         let mut menu = v_flex().id("triad-menu").occlude().w(px(210.)).p_1().rounded_md().border_1().border_color(pal.border_strong).bg(pal.panel_raised).shadow_lg().text_color(pal.text);
-        menu = menu.child(item("tm-origin".into(), "Move to origin".into(), cx, TriadAction::MoveToOrigin));
-        let align_axis = match handle {
-            ManipHandle::Axis(k) | ManipHandle::Plane(k) => k,
-            _ => 2,
-        };
-        menu = menu
-            .child(item("tm-align".into(), format!("Align {} with Z", names[align_axis]), cx, TriadAction::AlignZ(align_axis, false)))
-            .child(item("tm-anti".into(), format!("Anti-align {} with Z", names[align_axis]), cx, TriadAction::AlignZ(align_axis, true)))
-            .child(div().h(px(1.)).my_1().bg(pal.border));
-        for (k, n) in names.iter().enumerate() {
-            menu = menu.child(item(SharedString::from(format!("tm-rot-{k}")), format!("Rotate 90° about {n}"), cx, TriadAction::Rotate(k, std::f64::consts::FRAC_PI_2)));
+        // Onshape's manipulator menus: the center offers Move to origin, an
+        // axis arrow Align / Anti-align with Z, a rotation arc Rotate 90 / 180 degrees.
+        match handle {
+            ManipHandle::Axis(k) => {
+                menu = menu.child(item("tm-align".into(), "Align with Z".into(), cx, TriadAction::AlignZ(k, false))).child(item("tm-anti".into(), "Anti-align with Z".into(), cx, TriadAction::AlignZ(k, true)));
+            }
+            ManipHandle::Ring(k) => {
+                menu = menu
+                    .child(item("tm-rot90".into(), "Rotate 90 degrees".into(), cx, TriadAction::Rotate(k, std::f64::consts::FRAC_PI_2)))
+                    .child(item("tm-rot180".into(), "Rotate 180 degrees".into(), cx, TriadAction::Rotate(k, std::f64::consts::PI)));
+            }
+            ManipHandle::Center | ManipHandle::Plane(_) => {
+                menu = menu.child(item("tm-origin".into(), "Move to origin".into(), cx, TriadAction::MoveToOrigin));
+            }
         }
-        if let ManipHandle::Ring(k) = handle {
-            menu = menu.child(item("tm-rot180".into(), format!("Rotate 180° about {}", names[k]), cx, TriadAction::Rotate(k, std::f64::consts::PI)));
-        }
-        menu = menu.child(div().h(px(1.)).my_1().bg(pal.border)).child(item("tm-reset".into(), "Reset manipulator position".into(), cx, TriadAction::Reset));
         Some(deferred(anchored().position(pos).snap_to_window().child(menu)).with_priority(3).into_any_element())
     }
 
@@ -1701,8 +1741,8 @@ impl AssemblyView {
         }
         let target = self.hover.clone()?;
         self.update_inference(cx);
-        let (path, r) = self.infer.as_ref().zip(self.infer_choice).and_then(|((k, c), i)| c.get(i).map(|x| (k.0.clone(), x.0.clone())))?;
-        (path == target.path).then(|| MateConnectorRef::on(path[0], path[1..].to_vec(), r))
+        let (path, c) = self.infer.as_ref().zip(self.infer_choice).and_then(|(((path, _), _, c), i)| c.get(i).map(|x| (path.clone(), x.connector(path))))?;
+        (path == target.path).then_some(c)
     }
 
     pub(super) fn start_snap_drag(&mut self, position: DVec2, cx: &mut Context<Self>) {
@@ -1735,8 +1775,8 @@ impl AssemblyView {
             }
         }
         if let Some(o) = self.result.occurrences.get(t.occ) {
-            for (r, _) in inference_candidates(&o.context, Some(&o.body), &t.reference, &units) {
-                sources.push(MateConnectorRef::on(top, t.path[1..].to_vec(), r));
+            for p in inference_candidates(&o.context, Some(&o.body), &t.reference, &units) {
+                sources.push(p.connector(&t.path));
             }
         }
         let mut uniq: Vec<MateConnectorRef> = Vec::new();
@@ -1756,7 +1796,7 @@ impl AssemblyView {
     /// Target connector near the cursor on another instance: assembly mate
     /// connectors and the origin within a few pixels, else the nearest
     /// inference point of the face under the cursor.
-    fn snap_target(&self, position: DVec2, top: InstanceId, cx: &App) -> Option<MateConnectorRef> {
+    pub(super) fn snap_target(&self, position: DVec2, top: InstanceId, cx: &App) -> Option<MateConnectorRef> {
         let vp = self.viewport.read(cx);
         let near = |w: DVec3| vp.project(w).map(|s| s.distance(position)).filter(|d| *d < 16.0);
         let mut best: Option<(f64, MateConnectorRef)> = None;
@@ -1778,17 +1818,17 @@ impl AssemblyView {
         let o = self.result.occurrences.get(hit.occ)?;
         let units = self.units(cx);
         let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-        let mut best: Option<(f64, Reference)> = None;
-        for (r, f) in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
-            let w = t.mul(&f).origin;
+        let mut best: Option<(f64, MateConnectorRef)> = None;
+        for p in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
+            let w = t.mul(&p.frame).origin;
             if let Some(s) = vp.project(w) {
                 let d = s.distance(position);
                 if best.as_ref().is_none_or(|(b, _)| d < *b) {
-                    best = Some((d, r));
+                    best = Some((d, p.connector(&hit.path)));
                 }
             }
         }
-        best.map(|(_, r)| MateConnectorRef::on(hit.path[0], hit.path[1..].to_vec(), r))
+        best.map(|(_, c)| c)
     }
 
     /// Placement of the dragged instance for the current source / target.
@@ -1833,7 +1873,7 @@ impl AssemblyView {
         self.refresh_snap_preview(cx);
     }
 
-    fn refresh_snap_preview(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn refresh_snap_preview(&mut self, cx: &mut Context<Self>) {
         let Some(top) = self.snap_drag.as_ref().map(|s| s.top) else { return };
         let Some(p) = self.snap_preview_placement(self.pointer, cx) else { return };
         let mut solved = self.result.solved.clone();
@@ -1849,6 +1889,9 @@ impl AssemblyView {
 
     /// Ctrl: next connector on the dragged instance.
     pub(super) fn cycle_snap_source(&mut self, cx: &mut Context<Self>) {
+        if self.cycle_insert_source(cx) {
+            return;
+        }
         let Some(s) = &mut self.snap_drag else { return };
         if !s.started || s.sources.len() < 2 {
             return;
@@ -2138,7 +2181,7 @@ impl AssemblyView {
                         let id = InstanceId(a.next_id());
                         let n = a.next_instance_name(&name);
                         let placement = Placement { translation: [k as f64 * 0.03, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
-                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false });
+                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
                         ids.push(id);
                     }
                     ids

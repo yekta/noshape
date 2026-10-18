@@ -7,26 +7,33 @@ use crate::scene_builder::DisplayMode;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::features;
-use noshape_model::reference::{FeatureId, Reference};
+use noshape_model::reference::FeatureId;
 
 /// Shortcut sheet content (Onshape-compatible defaults).
 const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
-    ("General", &[("Ctrl/⌘+Z", "Undo"), ("Ctrl+Y / ⇧⌘Z", "Redo"), ("Enter", "Accept dialog"), ("Shift+Enter", "Accept and repeat"), ("Esc", "Cancel / exit tool"), ("Space", "Clear selection"), ("Delete", "Delete selection"), ("Shift+N", "Rename feature"), ("Alt+C", "Search tools"), ("Alt+H", "Versions & history"), ("Shift+?", "This sheet")]),
-    ("Part Studio", &[("Shift+S", "New sketch"), ("Shift+E", "Extrude"), ("Shift+W", "Revolve"), ("Shift+F", "Fillet"), ("Shift+H", "Show/hide sketches"), ("↑ / ↓", "Move rollback bar (feature list)")]),
-    ("3D view", &[("Shift+1…7", "Front, Back, Left, Right, Top, Bottom, Isometric"), ("N", "View normal to"), ("F", "Zoom to fit"), ("Z / Shift+Z", "Zoom out / in"), ("Arrows", "Rotate 15° (Ctrl: 5°, Shift: 90°)"), ("Ctrl+Shift+Arrows", "Pan"), ("P", "Show/hide planes"), ("O", "Orthographic / perspective"), ("Shift+X", "Section view"), ("Right drag", "Rotate"), ("Middle / Ctrl+right drag", "Pan"), ("Scroll", "Zoom at cursor")]),
+    ("General", &[("Ctrl/⌘+Z", "Undo"), ("Ctrl+Y / ⇧⌘Z", "Redo"), ("Enter", "Accept dialog / edit selected feature"), ("Shift+Enter", "Accept and repeat"), ("Esc", "Cancel / exit tool"), ("Space", "Clear selection"), ("Delete", "Delete selection"), ("Ctrl/⌘+C / V", "Copy / paste features"), ("Shift+N", "Rename feature"), ("Alt+C", "Search tools"), ("S", "Shortcut toolbar at the cursor"), ("` / Shift+`", "Select other (next / previous)"), ("[", "Measure"), ("Ctrl+M", "Mate connector"), ("K", "Show/hide mate connectors"), ("Alt+H", "Versions & history"), ("Shift+?", "This sheet")]),
+    ("Part Studio", &[("Shift+S", "New sketch"), ("Shift+E", "Extrude"), ("Shift+W", "Revolve"), ("Shift+F", "Fillet"), ("Shift+H", "Show/hide sketches"), ("↑ / ↓", "Move rollback bar (bar selected)"), ("Double-click", "Edit feature / sketch")]),
+    ("3D view", &[("Shift+1…7", "Front, Back, Left, Right, Top, Bottom, Isometric"), ("N", "View normal to (again: reverse)"), ("F", "Zoom to fit"), ("W", "Zoom to window"), ("Z / Shift+Z", "Zoom out / in"), ("Arrows", "Rotate 15° (Ctrl: 5°, Shift: 90°)"), ("Ctrl+Shift+Arrows", "Pan"), ("P", "Show/hide planes"), ("Shift+P", "Hide all construction geometry"), ("Y / Shift+Y", "Hide / show"), ("Shift+I", "Isolate"), ("Shift+T", "Make transparent"), ("O", "Orthographic / perspective"), ("Shift+X", "Section view"), ("Shift+V", "Named views"), ("Right drag", "Rotate"), ("Middle / Ctrl+right drag", "Pan"), ("Scroll", "Zoom at cursor"), ("Double middle click", "Zoom to fit")]),
     ("Sketch", &[("L", "Line"), ("G / R", "Corner / center rectangle"), ("C", "Circle"), ("A", "3-point arc"), ("Shift+S", "Point"), ("D", "Dimension"), ("Q", "Construction"), ("M", "Trim"), ("X", "Extend"), ("O", "Offset"), ("U", "Use (project)"), ("Shift+F", "Fillet"), ("I H V B T E", "Coincident, Horizontal, Vertical, Parallel, Tangent, Equal"), ("Shift+L / Shift+M / Shift+Q", "Perpendicular / Midpoint / Symmetric"), ("Shift", "Hold to suppress inference")]),
 ];
+
+/// Shortcut rows matching a search (key or description, case-insensitive).
+pub(super) fn shortcut_matches(key: &str, what: &str, query: &str) -> bool {
+    let q = query.trim().to_lowercase();
+    q.is_empty() || key.to_lowercase().contains(&q) || what.to_lowercase().contains(&q)
+}
 
 #[derive(Clone)]
 pub(super) enum PaletteItem {
     Feature(&'static str),
     View(noshape_render::StandardView, &'static str),
     Display(DisplayMode),
+    /// A sketch tool (only while a sketch is open).
+    SketchTool(crate::sketch_mode::Tool),
 }
 
 impl PartStudioView {
@@ -57,13 +64,28 @@ impl PartStudioView {
     fn palette_items(&self, _cx: &App) -> Vec<PaletteItem> {
         let q = self.palette_query.to_lowercase();
         let mut out: Vec<PaletteItem> = Vec::new();
+        // In a sketch, its tools come first (Onshape searches sketch tools there).
+        if self.sketch.is_some() && !q.is_empty() {
+            for t in super::sketch::all_sketch_tools() {
+                if sketch_tool_name(t).to_lowercase().contains(&q) {
+                    out.push(PaletteItem::SketchTool(t));
+                }
+            }
+        }
         // Custom features of this document first (they are few and specific).
         for t in self.doc.read(_cx).custom_features().feature_types() {
             if q.is_empty() || t.name.to_lowercase().contains(&q) {
                 out.push(PaletteItem::Feature(t.id));
             }
         }
+        // With no query, recently used tools come first (Onshape).
+        if q.is_empty() {
+            out.extend(self.ui.recent_tools.iter().map(|id| PaletteItem::Feature(id)));
+        }
         for t in features::all() {
+            if q.is_empty() && self.ui.recent_tools.contains(&t.id) {
+                continue;
+            }
             if q.is_empty() || t.name.to_lowercase().contains(&q) || t.id.to_lowercase().contains(&q) {
                 out.push(PaletteItem::Feature(t.id));
             }
@@ -89,6 +111,7 @@ impl PartStudioView {
             PaletteItem::Feature(id) => self.start_feature(id, window, cx),
             PaletteItem::View(v, _) => self.view(v, cx),
             PaletteItem::Display(m) => self.set_display_mode(m, window, cx),
+            PaletteItem::SketchTool(t) => self.activate_tool(t, window, cx),
         }
         cx.notify();
     }
@@ -106,10 +129,26 @@ impl PartStudioView {
                 }
                 PaletteItem::View(_, n) => (crate::assets::icon_path("iso-view"), n.to_string(), String::new()),
                 PaletteItem::Display(m) => (crate::assets::icon_path(m.icon()), m.label().to_string(), String::new()),
+                PaletteItem::SketchTool(t) => {
+                    let hint = t.label().rsplit_once(" (").map(|(_, k)| k.trim_end_matches(')').to_string()).unwrap_or_default();
+                    (crate::assets::icon_path(t.icon()), sketch_tool_name(*t).to_string(), hint)
+                }
             };
             let it = item.clone();
+            let desc = match &item {
+                PaletteItem::Feature(id) => features::get(id).map(|t| t.description.to_string()).unwrap_or_default(),
+                _ => String::new(),
+            };
+            let hover_info = (label.clone(), desc);
             h_flex()
                 .id(SharedString::from(format!("pal-{label}")))
+                // Onshape shows the hovered tool's description beside the list.
+                .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                    if *h && this.ui.palette_hover.as_ref() != Some(&hover_info) {
+                        this.ui.palette_hover = Some(hover_info.clone());
+                        cx.notify();
+                    }
+                }))
                 .gap_2()
                 .px_2()
                 .py_1()
@@ -138,7 +177,7 @@ impl PartStudioView {
                 }))
                 .child(
                     v_flex()
-                        .w(px(420.))
+                        .w(px(620.))
                         .p_2()
                         .gap_1()
                         .rounded_lg()
@@ -147,7 +186,20 @@ impl PartStudioView {
                         .border_color(pal.border_strong)
                         .shadow_lg()
                         .child(Input::new(&st).prefix(Icon::new(IconName::Search).small()))
-                        .children(rows),
+                        .child(
+                            h_flex()
+                                .items_start()
+                                .gap_2()
+                                .child(v_flex().flex_1().gap_1().children(rows))
+                                .children(self.ui.palette_hover.clone().filter(|(_, d)| !d.is_empty()).map(|(name, d)| {
+                                    v_flex()
+                                        .w(px(180.))
+                                        .p_2()
+                                        .gap_1()
+                                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name))
+                                        .child(div().text_xs().text_color(pal.text_muted).child(d))
+                                })),
+                        ),
                 )
                 .into_any_element(),
         )
@@ -158,12 +210,15 @@ impl PartStudioView {
             return None;
         }
         let pal = p();
-        let cols = SHORTCUTS.iter().map(|(title, rows)| {
+        let query = self.ui.shortcut_query.clone();
+        let search = self.ui.shortcut_filter.as_ref().map(|(st, _)| st.clone());
+        let cols = SHORTCUTS.iter().filter(|(_, rows)| rows.iter().any(|(k, v)| shortcut_matches(k, v, &query))).map(|(title, rows)| {
+            let query = query.clone();
             v_flex()
                 .w(px(262.))
                 .gap_1()
                 .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.accent_hover).mb_1().child(title.to_uppercase()))
-                .children(rows.iter().map(|(k, v)| {
+                .children(rows.iter().filter(move |(k, v)| shortcut_matches(k, v, &query)).map(|(k, v)| {
                     h_flex()
                         .gap_2()
                         .child(div().w(px(112.)).flex_none().child(div().px_1p5().rounded_sm().bg(pal.app_bg).border_1().border_color(pal.border).text_xs().text_color(pal.text).child(*k)))
@@ -179,108 +234,66 @@ impl PartStudioView {
                 .items_center()
                 .justify_center()
                 .bg(with_alpha(pal.overlay_shadow, 0.5))
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.show_shortcuts = false;
-                    cx.notify();
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    if ev.keystroke.key == "escape" {
+                        this.toggle_shortcut_sheet(window, cx);
+                    }
+                }))
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    if this.show_shortcuts {
+                        this.toggle_shortcut_sheet(window, cx);
+                    }
                 }))
                 .child(
                     v_flex()
+                        .id("shortcut-panel")
                         .p_4()
                         .gap_3()
                         .rounded_lg()
                         .bg(pal.panel_raised)
                         .border_1()
                         .border_color(pal.border_strong)
-                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Keyboard shortcuts"))
+                        // Clicks inside the sheet (search box) keep it open.
+                        .on_click(|_, _, cx| cx.stop_propagation())
+                        .child(
+                            h_flex()
+                                .gap_4()
+                                .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Keyboard shortcuts"))
+                                .children(search.map(|st| div().w(px(220.)).child(Input::new(&st).small().prefix(Icon::new(IconName::Search).small())))),
+                        )
                         .child(h_flex().items_start().gap_6().children(cols)),
                 )
                 .into_any_element(),
         )
     }
 
+    /// Shift+/ toggles the shortcut map; it opens with a search box.
+    pub(super) fn toggle_shortcut_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_shortcuts = !self.show_shortcuts;
+        self.ui.shortcut_query.clear();
+        if self.show_shortcuts {
+            let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search shortcuts"));
+            let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    this.ui.shortcut_query = st.read(cx).value().to_string();
+                    cx.notify();
+                }
+            });
+            // Typing goes to the search box right away (and bare-letter
+            // shortcuts stay quiet while the map is open).
+            st.update(cx, |s, cx| s.focus(window, cx));
+            self.ui.shortcut_filter = Some((st, sub));
+        } else {
+            self.ui.shortcut_filter = None;
+            window.focus(&self.focus, cx);
+        }
+        cx.notify();
+    }
+
     pub(super) fn set_display_mode(&mut self, m: DisplayMode, window: &mut Window, cx: &mut Context<Self>) {
         self.opts.display_mode = m;
         let d = self.display.clone();
         self.apply_display(d, window, cx);
-    }
-
-    pub(super) fn render_display_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let view = cx.entity();
-        let current = self.opts.display_mode;
-        Button::new("display-mode")
-            .icon(Icon::empty().path(crate::assets::icon_path(current.icon())))
-            .ghost()
-            .xsmall()
-            .tooltip("Display mode")
-            .dropdown_menu(move |mut m, _, _| {
-                for mode in DisplayMode::ALL {
-                    let v = view.clone();
-                    m = m.item(PopupMenuItem::new(mode.label()).icon(Icon::empty().path(crate::assets::icon_path(mode.icon()))).checked(mode == current).on_click(move |_, w, cx| v.update(cx, |t, cx| t.set_display_mode(mode, w, cx))));
-                }
-                m
-            })
-            .into_any_element()
-    }
-
-    // ------------------------------------------------------------ section view
-
-    pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.opts.section.take().is_some() {
-            self.section_input = None;
-        } else {
-            // Section through the selected plane/planar face, else the Front plane.
-            let frame = self
-                .selection
-                .iter()
-                .find_map(|r| match r {
-                    Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
-                    _ => None,
-                })
-                .unwrap_or(noshape_model::display::PlaneFrame::FRONT);
-            let n = frame.normal;
-            self.opts.section = Some((n, n.dot(frame.origin)));
-            let st = cx.new(|cx| InputState::new(window, cx).default_value("0 mm"));
-            let base = n.dot(frame.origin);
-            let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Change) {
-                    let text = st.read(cx).value().to_string();
-                    let units = this.doc.read(cx).session.doc.settings.units.clone();
-                    if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope)
-                        && let Some((n, _)) = this.opts.section
-                    {
-                        this.opts.section = Some((n, base + q.value));
-                        let d = this.display.clone();
-                        this.apply_display(d, window, cx);
-                    }
-                }
-            });
-            self.section_input = Some((st, sub));
-        }
-        let d = self.display.clone();
-        self.apply_display(d, window, cx);
-    }
-
-    pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (st, _) = self.section_input.as_ref()?;
-        let pal = p();
-        Some(
-            h_flex()
-                .absolute()
-                .top_3()
-                .left(px(340.))
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded_md()
-                .bg(with_alpha(pal.panel_raised, 0.95))
-                .border_1()
-                .border_color(pal.accent)
-                .child(div().text_xs().text_color(pal.accent_hover).child("SECTION VIEW"))
-                .child(div().text_xs().text_color(pal.text_muted).child("Offset"))
-                .child(div().w(px(90.)).child(Input::new(st).xsmall()))
-                .child(Button::new("section-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_section(w, cx))))
-                .into_any_element(),
-        )
     }
 
     // ------------------------------------------------------------ rename
@@ -350,6 +363,7 @@ impl PartStudioView {
             rotation: cam.rotation.to_array(),
             distance: cam.distance,
             perspective: cam.projection == noshape_render::Projection::Perspective,
+            section: super::section::encode(&self.ui.section),
         };
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, &format!("Save view : {name}"), cx, |ps| {
@@ -359,7 +373,12 @@ impl PartStudioView {
         });
     }
 
-    fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, cx: &mut Context<Self>) {
+    fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, window: &mut Window, cx: &mut Context<Self>) {
+        // Named views restore the section state too (Onshape).
+        if !v.section.is_empty() || !self.ui.section.is_empty() {
+            self.restore_section(&v.section, window, cx);
+        }
+        self.push_camera_history(cx);
         self.viewport.update(cx, |vp, cx| {
             let mut to = vp.camera;
             to.target = glam::DVec3::from_array(v.target);
@@ -396,7 +415,7 @@ impl PartStudioView {
                             doc.edit_studio(this.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
                         });
                     })))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.apply_named_view(&v, cx)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.apply_named_view(&v, window, cx)))
                     .into_any_element()
             })
             .collect();
@@ -404,9 +423,10 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("named-views")
+                .occlude()
                 .absolute()
-                .top(px(44.))
-                .right(px(52.))
+                .top(px(12.))
+                .right(px(170.))
                 .w(px(220.))
                 .p_2()
                 .gap_1()
@@ -436,5 +456,32 @@ impl PartStudioView {
                 )
                 .into_any_element(),
         )
+    }
+}
+
+
+/// A sketch tool's name without its shortcut ("Line (L)" -> "Line").
+fn sketch_tool_name(t: crate::sketch_mode::Tool) -> &'static str {
+    let l = t.label();
+    l.rsplit_once(" (").map_or(l, |(name, _)| name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // The glob import brings GPUI's `test` attribute; use the built-in one.
+    use std::prelude::v1::test;
+
+    #[test]
+    fn shortcut_search_matches_keys_and_descriptions() {
+        assert!(shortcut_matches("Shift+I", "Isolate", "isol"));
+        assert!(shortcut_matches("Shift+I", "Isolate", "shift+i"));
+        assert!(shortcut_matches("W", "Zoom to window", ""));
+        assert!(!shortcut_matches("W", "Zoom to window", "fillet"));
+        // Every shortcut the Part Studio binds is listed.
+        let all: Vec<&str> = SHORTCUTS.iter().flat_map(|(_, r)| r.iter().map(|(k, _)| *k)).collect();
+        for k in ["Y / Shift+Y", "Shift+I", "Shift+T", "W", "S", "` / Shift+`", "[", "Shift+P"] {
+            assert!(all.contains(&k), "{k} missing from the shortcut sheet");
+        }
     }
 }

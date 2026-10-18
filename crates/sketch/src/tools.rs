@@ -546,6 +546,68 @@ impl Sketch {
         self.fillet(users[0], users[1], radius)
     }
 
+    /// Sketch chamfer between two lines sharing a corner: both lines are cut
+    /// back by `d1` / `d2` from the corner and joined by a new line. The
+    /// corner stays as a construction "virtual sharp" carrying the two
+    /// distance dimensions.
+    pub fn chamfer(&mut self, a: EntityId, b: EntityId, d1: f64, d2: f64) -> Result<EditResult> {
+        if d1 <= 0.0 || d2 <= 0.0 {
+            return Err(SketchError::OperationFailed("chamfer distances must be positive".into()));
+        }
+        if self.kind(a) != Some(EntityKind::Line) || self.kind(b) != Some(EntityKind::Line) {
+            return Err(SketchError::OperationFailed("sketch chamfer needs two lines".into()));
+        }
+        let ((sa, fa), (sb, fb)) = (self.endpoints(a).unwrap(), self.endpoints(b).unwrap());
+        let corner = [sa, fa].into_iter().find(|p| *p == sb || *p == fb).ok_or_else(|| SketchError::OperationFailed("lines do not share a corner".into()))?;
+        let far_a = if sa == corner { fa } else { sa };
+        let far_b = if sb == corner { fb } else { sb };
+        let v = self.point(corner).unwrap();
+        let (qa, qb) = (self.point(far_a).unwrap(), self.point(far_b).unwrap());
+        let (ua, ub) = ((qa - v).normalize_or_zero(), (qb - v).normalize_or_zero());
+        if ua.perp_dot(ub).abs() < 1e-9 {
+            return Err(SketchError::OperationFailed("cannot chamfer parallel lines".into()));
+        }
+        if d1 >= (qa - v).length() - 1e-12 || d2 >= (qb - v).length() - 1e-12 {
+            return Err(SketchError::OperationFailed("chamfer is too large for the corner".into()));
+        }
+        let mut res = EditResult::default();
+        let pa = self.add_point(v + ua * d1);
+        let pb = self.add_point(v + ub * d2);
+        res.created.extend([pa, pb]);
+        for (id, new) in [(a, pa), (b, pb)] {
+            if let Some(ent) = self.entity_mut(id) {
+                ent.replace_point(corner, new);
+            }
+            res.modified.push(id);
+            self.drop_shape_constraints(id, &mut res);
+        }
+        let line = self.add_line_between(pa, pb)?;
+        res.created.push(line);
+        // The old corner becomes the virtual sharp.
+        if self.users_of_point(corner).is_empty() {
+            let _ = self.set_construction(corner, true);
+            self.add_c(&mut res, ConstraintKind::Coincident { a: corner, b: a });
+            self.add_c(&mut res, ConstraintKind::Coincident { a: corner, b });
+            res.modified.push(corner);
+        }
+        self.add_c(&mut res, ConstraintKind::Distance { a: corner, b: pa, value: d1, mode: crate::constraints::DistanceMode::Center });
+        self.add_c(&mut res, ConstraintKind::Distance { a: corner, b: pb, value: d2, mode: crate::constraints::DistanceMode::Center });
+        Ok(res)
+    }
+
+    /// Chamfer at a corner point shared by exactly two lines.
+    pub fn chamfer_corner(&mut self, point: EntityId, d1: f64, d2: f64) -> Result<EditResult> {
+        let users: Vec<EntityId> = self
+            .entities()
+            .filter(|e| e.endpoints().is_some_and(|(s, en)| s == point || en == point))
+            .map(|e| e.id)
+            .collect();
+        if users.len() != 2 {
+            return Err(SketchError::OperationFailed("corner must join exactly two lines".into()));
+        }
+        self.chamfer(users[0], users[1], d1, d2)
+    }
+
     /// Copies entities, mapping every defining point through `f` (shared
     /// points stay shared). Returns the point map and created entities.
     fn copy_entities(
@@ -613,7 +675,10 @@ impl Sketch {
                     knots: knots.clone(),
                     weights: weights.clone(),
                 },
-                Geometry::FitSpline { points } => Geometry::FitSpline { points: points.iter().map(|p| map_pt(self, *p, res)).collect() },
+                Geometry::FitSpline { points, handles } => Geometry::FitSpline {
+                    points: points.iter().map(|p| map_pt(self, *p, res)).collect(),
+                    handles: handles.map(|(a, b)| (map_pt(self, a, res), map_pt(self, b, res))),
+                },
                 Geometry::Conic { start, control, end, rho } => Geometry::Conic {
                     start: map_pt(self, *start, res),
                     control: map_pt(self, *control, res),
@@ -660,27 +725,49 @@ impl Sketch {
     /// Linear pattern: `count - 1` copies, each offset by `step`.
     pub fn linear_pattern(&mut self, ids: &[EntityId], step: DVec2, count: usize) -> Result<EditResult> {
         let mut res = EditResult::default();
-        for k in 1..count {
-            let off = step * k as f64;
-            self.copy_entities(ids, &move |p| p + off, &|v| v, false, &|_| false, &mut res)?;
+        for g in self.linear_pattern_groups(ids, step, count)? {
+            res.created.extend(g);
         }
         Ok(res)
+    }
+
+    /// Linear pattern returning the created entities of each instance.
+    pub fn linear_pattern_groups(&mut self, ids: &[EntityId], step: DVec2, count: usize) -> Result<Vec<Vec<EntityId>>> {
+        let mut out = Vec::new();
+        for k in 1..count {
+            let off = step * k as f64;
+            let mut res = EditResult::default();
+            self.copy_entities(ids, &move |p| p + off, &|v| v, false, &|_| false, &mut res)?;
+            out.push(res.created);
+        }
+        Ok(out)
     }
 
     /// Circular pattern: `count` instances spread over `total_angle` (use 2pi
     /// for a full circle) around `center`.
     pub fn circular_pattern(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64) -> Result<EditResult> {
         let mut res = EditResult::default();
+        for g in self.circular_pattern_groups(ids, center, count, total_angle)? {
+            res.created.extend(g);
+        }
+        Ok(res)
+    }
+
+    /// Circular pattern returning the created entities of each instance.
+    pub fn circular_pattern_groups(&mut self, ids: &[EntityId], center: DVec2, count: usize, total_angle: f64) -> Result<Vec<Vec<EntityId>>> {
+        let mut out = Vec::new();
         if count < 2 {
-            return Ok(res);
+            return Ok(out);
         }
         let full = (total_angle.abs() - TAU).abs() < 1e-9;
         let step = if full { total_angle / count as f64 } else { total_angle / (count - 1) as f64 };
         for k in 1..count {
             let t = Transform::Rotate { center, angle: step * k as f64 };
+            let mut res = EditResult::default();
             self.copy_entities(ids, &move |p| t.apply(p), &move |v| t.apply_vec(v), false, &|_| false, &mut res)?;
+            out.push(res.created);
         }
-        Ok(res)
+        Ok(out)
     }
 
     /// Transforms entities in place (external geometry is not moved). Fix
@@ -791,6 +878,85 @@ impl Sketch {
         Ok(res)
     }
 
+    /// Slots around connected chains of centerline curves (Onshape Slot on a
+    /// chain selection): both sides are offsets of the chain by half the
+    /// width, joined at open ends by semicircular caps centered on the chain
+    /// ends. Curves not connected to others get their own slot. Returns the
+    /// created curves and the caps (for the shared width dimension).
+    pub fn slot_chains(&mut self, ids: &[EntityId], width: f64) -> Result<(Vec<EntityId>, Vec<EntityId>)> {
+        if width <= 0.0 {
+            return Err(SketchError::InvalidGeometry("slot width must be positive".into()));
+        }
+        let h = width * 0.5;
+        let mut curves = Vec::new();
+        let mut caps = Vec::new();
+        for (items, closed) in self.chains(ids) {
+            if items.len() == 1 && !closed {
+                let s = self.slot_around(items[0].0, width)?;
+                caps.extend(s.curves.iter().copied().filter(|c| self.kind(*c) == Some(EntityKind::Arc) && self.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| self.entity(items[0].0).is_some_and(|x| x.point_refs().contains(&ctr)))));
+                curves.extend(s.curves);
+                continue;
+            }
+            let chain: Vec<EntityId> = items.iter().map(|x| x.0).collect();
+            let left = self.offset(&chain, h)?;
+            let right = self.offset(&chain, -h)?;
+            let mut made: Vec<EntityId> = left.created.iter().chain(right.created.iter()).copied().filter(|e| self.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
+            if !closed {
+                // Chain end points in traversal order.
+                let (first, ffwd) = items[0];
+                let (last, lfwd) = items[items.len() - 1];
+                let (fs, fe) = self.endpoints(first).unwrap();
+                let (ls, le) = self.endpoints(last).unwrap();
+                let start = if ffwd { fs } else { fe };
+                let end = if lfwd { le } else { ls };
+                for (centre, at_start) in [(start, true), (end, false)] {
+                    let c = self.point(centre).unwrap();
+                    // the two offset curve ends nearest to this chain end
+                    let mut ends: Vec<(f64, EntityId)> = made
+                        .iter()
+                        .filter_map(|e| self.endpoints(*e))
+                        .flat_map(|(a, b)| [a, b])
+                        .filter_map(|p| self.point(p).map(|q| (((q - c).length() - h).abs(), p)))
+                        .filter(|(d, _)| *d <= h * 1e-6 + 1e-9)
+                        .collect();
+                    ends.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    ends.dedup_by_key(|e| e.1);
+                    if ends.len() < 2 {
+                        continue;
+                    }
+                    let (p, q) = (ends[0].1, ends[1].1);
+                    // Cap bulges away from the chain: CCW from the right side to the left side at the end.
+                    let tangent = {
+                        let (id, fwd) = if at_start { items[0] } else { items[items.len() - 1] };
+                        let cv = self.curve(id).unwrap();
+                        let (a, b) = cv.domain();
+                        let t = if at_start == fwd { cv.tangent(a) } else { -cv.tangent(b) };
+                        if at_start { t } else { -t }
+                    };
+                    let out_dir = -tangent.normalize_or_zero();
+                    let (pp, qq) = (self.point(p).unwrap(), self.point(q).unwrap());
+                    let mid_ccw = {
+                        let a0 = (pp - c).to_angle();
+                        let sw = crate::geom::ccw_sweep(a0, (qq - c).to_angle());
+                        DVec2::from_angle(a0 + sw * 0.5)
+                    };
+                    let cap = if mid_ccw.dot(out_dir) >= 0.0 { self.add_arc_between(centre, p, q)? } else { self.add_arc_between(centre, q, p)? };
+                    made.push(cap);
+                    caps.push(cap);
+                }
+                if caps.len() >= 2 {
+                    let n = caps.len();
+                    let _ = self.add_constraint(ConstraintKind::Equal { a: caps[n - 2], b: caps[n - 1] });
+                }
+            }
+            for id in &chain {
+                self.set_construction(*id, true)?;
+            }
+            curves.extend(made);
+        }
+        Ok((curves, caps))
+    }
+
     /// Groups curves into chains: (items (id, forward), closed).
     fn chains(&self, ids: &[EntityId]) -> Vec<(Vec<(EntityId, bool)>, bool)> {
         let tol = self.tool_tol() * 4.0;
@@ -884,7 +1050,7 @@ impl Sketch {
                         let mut ids: Vec<EntityId> = pts.iter().map(|q| self.add_point(*q)).collect();
                         res.created.extend(ids.iter().copied());
                         ids.push(ids[0]);
-                        let nid = self.add_entity(Geometry::FitSpline { points: ids }, false, false)?;
+                        let nid = self.add_entity(Geometry::FitSpline { points: ids, handles: None }, false, false)?;
                         res.created.push(nid);
                     }
                 }
@@ -1081,7 +1247,7 @@ impl Sketch {
                         ids.push(p);
                     }
                     ids.push(ep);
-                    let id = self.add_entity(Geometry::FitSpline { points: ids }, false, false)?;
+                    let id = self.add_entity(Geometry::FitSpline { points: ids, handles: None }, false, false)?;
                     res.created.push(id);
                     id
                 }
@@ -1174,13 +1340,6 @@ impl Sketch {
         ids.iter().filter_map(|i| self.entity_bbox(*i)).fold(BBox::EMPTY, |a, b| a.union(&b))
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn nurbs_of(&self, id: EntityId) -> Option<Nurbs> {
-        match self.curve(id)? {
-            Curve2::Nurbs(n) => Some(n),
-            _ => None,
-        }
-    }
 }
 
 /// Offset of a conic approximated by a conic: the ends move along their

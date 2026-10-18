@@ -36,7 +36,9 @@ impl Session {
         let branch = store.default_branch()?;
         let head = store.head(branch)?;
         let doc = Document::from_blobs(&store.read_all(head)?)?;
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None })
+        // Undo works across sessions: rebuild the stack from the history.
+        let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
+        Ok(Self { path, store, doc, branch, undo, viewing: None })
     }
 
     pub fn name(&self) -> String {

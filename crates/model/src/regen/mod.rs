@@ -121,7 +121,19 @@ impl Regenerator {
             })
             .collect();
         for (i, f) in studio.features.iter().enumerate() {
-            let (params, suppressed) = (&effective[i].params, effective[i].suppressed);
+            let (params, mut suppressed) = (&effective[i].params, effective[i].suppressed);
+            // Boolean expressions (dynamic suppression, checkboxes converted
+            // to expressions) see the variables defined upstream.
+            let scope = noshape_units::LayeredScope { inner: &ctx.variables, outer: &outer_vars };
+            let mut expr_error: Option<String> = None;
+            if let Some(e) = f.suppression_expr.as_deref().filter(|e| !e.trim().is_empty()) {
+                match eval_bool(e, &scope) {
+                    Ok(b) => suppressed |= b,
+                    Err(msg) => expr_error = Some(format!("Suppression expression: {msg}")),
+                }
+            }
+            let converted = f.feature_type().and_then(|t| resolve_bool_exprs(params, &t.params, &scope, &mut expr_error));
+            let params = converted.as_ref().unwrap_or(params);
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
             // Derived features depend on another Part Studio's state.
@@ -149,7 +161,10 @@ impl Regenerator {
             }
             let ft = Instant::now();
             let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0 };
-            if suppressed {
+            if let Some(msg) = expr_error.take() {
+                state.status = FeatureStatus::Error;
+                state.message = Some(msg);
+            } else if suppressed {
                 state.status = FeatureStatus::Suppressed;
             } else {
                 match features::evaluator(&f.type_id) {
@@ -167,7 +182,11 @@ impl Regenerator {
                         ev.derived = opts.derived.clone();
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
-                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eval_fn(&mut ev)));
+                        let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            ev.check_bounds(specs)?;
+                            eval_fn(&mut ev)
+                        }));
                         match result {
                             Ok(Ok(())) => {
                                 if !ev.warnings.is_empty() {
@@ -204,4 +223,30 @@ impl Regenerator {
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
         RegenResult { display, needs_refine, context: ctx }
     }
+}
+
+/// Truth value of a boolean expression (`#a > 3 in`, `#flag && #b < 2`):
+/// any non-zero result is true.
+pub fn eval_bool(text: &str, scope: &dyn noshape_units::VariableScope) -> Result<bool, String> {
+    noshape_units::evaluate(text, scope).map(|q| q.value != 0.0).map_err(|e| e.to_string())
+}
+
+/// Checkbox parameters holding an expression (Onshape "Convert to
+/// expression") evaluated to booleans; `None` when there are none.
+fn resolve_bool_exprs(params: &crate::params::ParamValues, specs: &[crate::params::ParamSpec], scope: &dyn noshape_units::VariableScope, error: &mut Option<String>) -> Option<crate::params::ParamValues> {
+    use crate::params::{ParamKind, ParamValue};
+    let mut out: Option<crate::params::ParamValues> = None;
+    for s in specs.iter().filter(|s| matches!(s.kind, ParamKind::Bool { .. })) {
+        if let Some(ParamValue::Expr(e)) = params.get(s.id) {
+            let b = match eval_bool(&e.text, scope) {
+                Ok(b) => b,
+                Err(msg) => {
+                    error.get_or_insert(format!("{}: {msg}", s.label));
+                    false
+                }
+            };
+            out.get_or_insert_with(|| params.clone()).set(s.id, ParamValue::Bool(b));
+        }
+    }
+    out
 }

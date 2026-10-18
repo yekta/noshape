@@ -71,6 +71,25 @@ impl Configuration {
         self.inputs.is_empty()
     }
 
+    /// Short description of the values that differ from the defaults, in
+    /// input order (list option names, checked checkboxes by name,
+    /// `name = value` otherwise), e.g. "Large, Checkbox 2"; empty for the
+    /// default configuration. Used to tell configured instances apart (BOM).
+    pub fn describe(&self, values: &ConfigValues) -> String {
+        let defaults = self.defaults();
+        let mut parts = Vec::new();
+        for i in &self.inputs {
+            let Some(v) = values.0.get(&i.id).filter(|v| defaults.0.get(&i.id) != Some(*v)) else { continue };
+            parts.push(match &i.kind {
+                ConfigInputKind::List { options, .. } => options.iter().find(|o| &o.id == v).map_or_else(|| v.clone(), |o| o.name.clone()),
+                ConfigInputKind::Checkbox { .. } if v == "true" => i.name.clone(),
+                ConfigInputKind::Checkbox { .. } => format!("no {}", i.name),
+                _ => format!("{} = {v}", i.name),
+            });
+        }
+        parts.join(", ")
+    }
+
     /// Values with every input at its default.
     pub fn defaults(&self) -> ConfigValues {
         let mut v = ConfigValues::default();
@@ -130,4 +149,27 @@ impl Configuration {
 pub struct ConfigVariable {
     pub name: String,
     pub value: Quantity,
+}
+
+#[cfg(test)]
+mod describe_tests {
+    use super::*;
+
+    #[test]
+    fn describes_non_default_values() {
+        let cfg = Configuration {
+            inputs: vec![
+                ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None },
+                ConfigInput { id: "c".into(), name: "Fillet".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None },
+                ConfigInput { id: "t".into(), name: "Label".into(), kind: ConfigInputKind::Text { default: "x".into() }, visible_when: None },
+            ],
+            configured: vec![],
+        };
+        assert_eq!(cfg.describe(&cfg.defaults()), "");
+        let mut v = cfg.defaults();
+        v.0.insert("s".into(), "b".into());
+        v.0.insert("c".into(), "true".into());
+        v.0.insert("t".into(), "y".into());
+        assert_eq!(cfg.describe(&v), "Large, Fillet, Label = y");
+    }
 }

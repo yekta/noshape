@@ -132,11 +132,10 @@ pub fn reveal_in_file_manager(path: &Path) -> anyhow::Result<()> {
 /// Open (or create) a document in a new window. If it is already open, its
 /// window is brought to the front instead.
 pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Document>, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
-    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) {
-        if h.update(cx, |_, window, _| window.activate_window()).is_ok() {
+    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied())
+        && h.update(cx, |_, window, _| window.activate_window()).is_ok() {
             return Ok(());
         }
-    }
     let session = if path.exists() {
         session::Session::open(&path)?
     } else {
@@ -156,7 +155,13 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         let doc = cx.new(|_| doc_model::DocModel::new(session));
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
         let fh = ws.read(cx).focus_handle(cx);
-        window.defer(cx, move |window, cx| fh.focus(window, cx));
+        // The workspace focuses its active tab view (so Part Studio shortcuts
+        // work right away); only fall back to the workspace itself.
+        window.defer(cx, move |window, cx| {
+            if window.focused(cx).is_none() {
+                fh.focus(window, cx);
+            }
+        });
         ws
     })?;
     if cx.has_global::<OpenDocs>() {
@@ -165,18 +170,31 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
     Ok(())
 }
 
-/// Ask for a document to open (native dialog) and open it.
+/// Ask for a document to open and open it: the native dialog when available,
+/// otherwise the in-app path prompt in the active window (Linux without an
+/// XDG desktop portal), like [`request_open_path`].
 pub fn prompt_open(gpu: Gpu, cx: &mut App) {
+    let open = move |path: PathBuf, cx: &mut App| {
+        if let Err(e) = open_document_window(path, None, gpu, cx) {
+            log::error!("open failed: {e:#}");
+        }
+    };
+    if !native_dialogs_available()
+        && let Some(handle) = cx.active_window().or_else(|| cx.windows().into_iter().next())
+    {
+        // Deferred: the action is dispatched while that window is being
+        // updated, so it can't be borrowed right now.
+        cx.defer(move |cx| {
+            let _ = handle.update(cx, |_, window, cx| request_open_path("Open noshape document", "noshape document", &["noshape"], window, cx, open));
+        });
+        return;
+    }
     let dir = documents_dir();
     cx.spawn(async move |cx| {
         let file = rfd::AsyncFileDialog::new().set_title("Open noshape document").set_directory(&dir).add_filter("noshape document", &["noshape"]).pick_file().await;
         if let Some(f) = file {
             let path = f.path().to_path_buf();
-            let _ = cx.update(|cx| {
-                if let Err(e) = open_document_window(path, None, gpu, cx) {
-                    log::error!("open failed: {e:#}");
-                }
-            });
+            cx.update(|cx| open(path, cx));
         }
     })
     .detach();
@@ -211,7 +229,7 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
                 .await
                 .map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
-                let _ = cx.update(|cx| then(p, cx));
+                cx.update(|cx| then(p, cx));
             }
         })
         .detach();
@@ -226,7 +244,7 @@ pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &
         cx.spawn(async move |cx| {
             let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
-                let _ = cx.update(|cx| then(p, cx));
+                cx.update(|cx| then(p, cx));
             }
         })
         .detach();
@@ -235,13 +253,16 @@ pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &
     in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, then);
 }
 
+/// The continuation of a path prompt, taken once when the user confirms.
+type PendingPath = std::rc::Rc<std::cell::RefCell<Option<Box<dyn FnOnce(PathBuf, &mut App)>>>>;
+
 fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: PathBuf, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::component::button::{Button, ButtonVariants as _};
     use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
     use gpui_kit::component::input::{Input, InputEvent, InputState};
     let state = cx.new(|cx| InputState::new(window, cx).default_value(default.to_string_lossy().to_string()));
-    let then: std::rc::Rc<std::cell::RefCell<Option<Box<dyn FnOnce(PathBuf, &mut App)>>>> = std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(then))));
+    let then: PendingPath = std::rc::Rc::new(std::cell::RefCell::new(Some(Box::new(then))));
     // Enter in the field confirms.
     {
         let then = then.clone();
@@ -296,7 +317,7 @@ pub fn request_folder_path(title: &'static str, window: &mut Window, cx: &mut Ap
         cx.spawn(async move |cx| {
             let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).pick_folder().await.map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
-                let _ = cx.update(|cx| then(p, cx));
+                cx.update(|cx| then(p, cx));
             }
         })
         .detach();
@@ -304,16 +325,4 @@ pub fn request_folder_path(title: &'static str, window: &mut Window, cx: &mut Ap
     }
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
     in_app_save_prompt(title, "Add", home, window, cx, then);
-}
-
-/// Async variant used where no window is at hand (native dialog only).
-pub async fn prompt_save(title: &str, default_name: &str, ext: &str) -> Option<PathBuf> {
-    rfd::AsyncFileDialog::new()
-        .set_title(title)
-        .set_directory(documents_dir())
-        .set_file_name(default_name)
-        .add_filter(ext.to_uppercase(), &[ext])
-        .save_file()
-        .await
-        .map(|f| f.path().to_path_buf())
 }

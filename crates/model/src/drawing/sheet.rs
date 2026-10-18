@@ -5,7 +5,7 @@
 
 use super::font;
 use super::format::DimText;
-use super::{Annotation, AnnotationKind, DimOrientation, Drawing, Sheet, ViewId};
+use super::{Annotation, AnnotationKind, ArcCondition, DatumTargetArea, DimOrientation, Drawing, Projection, Sheet, TitleBlockStyle, ViewId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LineStyle {
@@ -124,8 +124,14 @@ impl SheetGeometry {
         self.add_border_and_title_with(sheet, &|s| s.to_string());
     }
 
-    /// Border and title block with property fields expanded by `expand`.
+    /// Border and title block with property fields expanded by `expand`
+    /// (third angle projection symbol).
     pub fn add_border_and_title_with(&mut self, sheet: &Sheet, expand: &dyn Fn(&str) -> String) {
+        self.add_border_and_title_full(sheet, Projection::ThirdAngle, expand);
+    }
+
+    /// Border frame, zone markers and the sheet's title block layout.
+    pub fn add_border_and_title_full(&mut self, sheet: &Sheet, projection: Projection, expand: &dyn Fn(&str) -> String) {
         let (w, h) = (self.width, self.height);
         let m = 10.0;
         self.rect(m, m, w - m, h - m, LineStyle::Border);
@@ -151,26 +157,88 @@ impl SheetGeometry {
             let letter = (b'A' + (ny - 1 - j) as u8) as char;
             self.text([m - 2.0, y], 2.5, letter.to_string(), Anchor::Center);
         }
-        // Title block (180 x 40 mm) in the lower-right corner.
-        let (tw, th) = (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil());
-        let (x0, y0) = (w - m - tw, m);
-        self.rect(x0, y0, w - m, y0 + th, LineStyle::Border);
-        let rows = sheet.title_block.fields.len().div_ceil(2).max(1);
-        for (i, (k, v)) in sheet.title_block.fields.iter().enumerate() {
-            let col = i % 2;
-            let row = i / 2;
-            let cx = x0 + col as f64 * tw / 2.0;
-            let cy = y0 + th - (row as f64 + 1.0) * th / rows as f64;
-            if col == 1 {
-                self.line([cx, cy], [cx, cy + th / rows as f64], LineStyle::Thin);
+        let value_of = |k: &str, v: &str| -> String {
+            match k {
+                "Scale" if v.is_empty() => format_scale(sheet.scale),
+                "Size" if v.is_empty() => sheet.size.label().to_string(),
+                _ => expand(v),
             }
-            if row > 0 && col == 0 {
-                self.line([x0, cy + th / rows as f64], [w - m, cy + th / rows as f64], LineStyle::Thin);
+        };
+        match sheet.title_style {
+            TitleBlockStyle::None => {}
+            TitleBlockStyle::Simple => {
+                // Two columns of fields, 180 mm wide, in the lower-right corner.
+                let (tw, th) = (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil());
+                let (x0, y0) = (w - m - tw, m);
+                self.rect(x0, y0, w - m, y0 + th, LineStyle::Border);
+                let rows = sheet.title_block.fields.len().div_ceil(2).max(1);
+                for (i, (k, v)) in sheet.title_block.fields.iter().enumerate() {
+                    let col = i % 2;
+                    let row = i / 2;
+                    let cx = x0 + col as f64 * tw / 2.0;
+                    let cy = y0 + th - (row as f64 + 1.0) * th / rows as f64;
+                    if col == 1 {
+                        self.line([cx, cy], [cx, cy + th / rows as f64], LineStyle::Thin);
+                    }
+                    if row > 0 && col == 0 {
+                        self.line([x0, cy + th / rows as f64], [w - m, cy + th / rows as f64], LineStyle::Thin);
+                    }
+                    self.text([cx + 1.5, cy + th / rows as f64 - 3.2], 1.8, k.to_uppercase(), Anchor::BottomLeft);
+                    self.text([cx + 1.5, cy + 1.2], 3.0, value_of(k, v), Anchor::BottomLeft);
+                }
             }
-            self.text([cx + 1.5, cy + th / rows as f64 - 3.2], 1.8, k.to_uppercase(), Anchor::BottomLeft);
-            let value = if k == "Scale" && v.is_empty() { format_scale(sheet.scale) } else { expand(v) };
-            self.text([cx + 1.5, cy + 1.2], 3.0, value, Anchor::BottomLeft);
+            style => {
+                let Some([x0, y0, x1, y1]) = title_block_rect(sheet) else { return };
+                self.rect(x0, y0, x1, y1, LineStyle::Border);
+                for &(key, cx, cy, cw, ch) in title_cells(style) {
+                    let (x, y) = (x0 + cx, y0 + cy);
+                    self.rect(x, y, x + cw, y + ch, LineStyle::Thin);
+                    if key == PROJECTION_CELL {
+                        self.projection_symbol([x + cw / 2.0, y + ch / 2.0], projection);
+                        continue;
+                    }
+                    self.text([x + 1.2, y + ch - 2.6], 1.8, key.to_uppercase(), Anchor::BottomLeft);
+                    let v = sheet.title_field(key).unwrap_or("");
+                    let value = value_of(key, v);
+                    let lines: Vec<&str> = value.lines().collect();
+                    if lines.len() > 1 {
+                        let th = 2.0;
+                        for (i, l) in lines.iter().enumerate() {
+                            self.text([x + 1.2, y + ch - 6.2 - i as f64 * th * 1.4], th, l.to_string(), Anchor::BottomLeft);
+                        }
+                        continue;
+                    }
+                    let mut th = ((ch - 3.6) * 0.8).clamp(2.0, 5.0);
+                    let tw = font::text_width(&value, th);
+                    if tw > cw - 2.4 && tw > 0.0 {
+                        th = (th * (cw - 2.4) / tw).max(1.2);
+                    }
+                    self.text([x + 1.2, y + 1.0], th, value, Anchor::BottomLeft);
+                }
+            }
         }
+    }
+
+    /// First / third angle projection symbol (a truncated cone) centered at `c`.
+    pub fn projection_symbol(&mut self, c: [f64; 2], projection: Projection) {
+        let (big, small, len) = (3.0, 1.5, 8.0);
+        // Third angle: end view left of the side view; first angle: right.
+        let (circ_x, trap_x) = match projection {
+            Projection::ThirdAngle => (c[0] - 6.5, c[0] - 1.0),
+            Projection::FirstAngle => (c[0] + 6.5, c[0] - 9.5),
+        };
+        let y = c[1];
+        let n = 32;
+        for r in [big, small] {
+            let pts = (0..n).map(|i| {
+                let t = i as f64 / n as f64 * std::f64::consts::TAU;
+                [circ_x + r * t.cos(), y + r * t.sin()]
+            });
+            self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick: 0 });
+        }
+        // Narrow end on the left in both conventions.
+        self.lines.push(Polyline2 { points: vec![[trap_x, y - small], [trap_x + len, y - big], [trap_x + len, y + big], [trap_x, y + small]], style: LineStyle::Thin, closed: true, pick: 0 });
+        self.line([circ_x - big - 1.0, y], [trap_x + len + 1.0, y], LineStyle::Centerline);
     }
 
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
@@ -295,7 +363,7 @@ impl SheetGeometry {
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], [p[0] + 3.0, p[1] + 5.0]], style: LineStyle::Thin, closed: false, pick });
                     self.texts.push(Text2 { pos: [p[0] + 6.5, p[1] + 10.8], height: 2.5, text: env.expand(value), angle: 0.0, anchor: Anchor::BottomLeft, pick });
                 }
-                AnnotationKind::Gdt { anchor, frame } => {
+                AnnotationKind::Gdt { anchor, frame, leaders } => {
                     let mut x = anchor[0];
                     let y = anchor[1];
                     let h = 3.0;
@@ -304,6 +372,19 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: vec![[x, y], [x + w, y], [x + w, y + 7.0], [x, y + 7.0]], style: LineStyle::Thin, closed: true, pick });
                         self.texts.push(Text2 { pos: [x + w / 2.0, y + 3.5], height: h, text: cell.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         x += w;
+                    }
+                    // Leaders leave the nearer short side through a shoulder.
+                    let (x0, x1, ym) = (anchor[0], x, y + 3.5);
+                    for l in leaders {
+                        let t = match l.view {
+                            Some(v) => env.to_sheet(v, l.point),
+                            None => l.point,
+                        };
+                        let right = t[0] > (x0 + x1) / 2.0;
+                        let start = if right { [x1, ym] } else { [x0, ym] };
+                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
+                        self.lines.push(Polyline2 { points: vec![start, sh, t], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
                     }
                 }
                 AnnotationKind::Datum { anchor, label } => {
@@ -400,6 +481,198 @@ impl SheetGeometry {
                     let tm = a0 + sweep / 2.0;
                     let t = env.text(a, radius * sweep.abs(), false, "⌒");
                     self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, 3.5, pick);
+                }
+                AnnotationKind::OrdinateGroup { view, origin, points, horizontal } => {
+                    let rot = env.rotation(*view);
+                    // u: measured axis on the sheet; n: leader direction.
+                    let u = rotate2(if *horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
+                    let n = rotate2(if *horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
+                    let dot = |p: [f64; 2], d: [f64; 2]| p[0] * d[0] + p[1] * d[1];
+                    let at = |s: f64, l: f64| [u[0] * s + n[0] * l, u[1] * s + n[1] * l];
+                    let level = dot(a.position, n);
+                    let sheet_pts: Vec<[f64; 2]> = points.iter().map(|p| env.to_sheet(*view, *p)).collect();
+                    if sheet_pts.is_empty() {
+                        continue;
+                    }
+                    let mean = sheet_pts.iter().map(|p| dot(*p, n)).sum::<f64>() / sheet_pts.len() as f64;
+                    let sg = if level >= mean { 1.0 } else { -1.0 };
+                    let along: Vec<f64> = sheet_pts.iter().map(|p| dot(*p, u)).collect();
+                    let text_pos = ordinate_text_positions(&along, 3.5 + 1.5);
+                    let mut ang = n[1].atan2(n[0]);
+                    let mut halign = if sg > 0.0 { 0.0 } else { 1.0 };
+                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
+                        ang += std::f64::consts::PI;
+                        halign = 1.0 - halign;
+                    }
+                    for (i, p) in points.iter().enumerate() {
+                        let value = if *horizontal { (p[0] - origin[0]).abs() } else { (p[1] - origin[1]).abs() };
+                        let t = env.text(a, value, false, "");
+                        let (s0, s1) = (along[i], text_pos[i]);
+                        let l0 = dot(sheet_pts[i], n) + sg * 1.0;
+                        let pts = if (s1 - s0).abs() < 1e-6 {
+                            vec![at(s0, l0), at(s0, level)]
+                        } else {
+                            // Jog: straight, slanted over to the text, straight again.
+                            let k1 = level - sg * 6.0;
+                            let k2 = level - sg * 3.0;
+                            let k1 = if (k1 - l0) * sg < 0.0 { l0 } else { k1 };
+                            vec![at(s0, l0), at(s0, k1), at(s1, k2), at(s1, level)]
+                        };
+                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                        self.dim_label(at(s1, level + sg * 1.0), ang, halign, true, &t, 3.5, pick);
+                    }
+                }
+                AnnotationKind::MaxMinDimension { view, a: pa, ra, ca, b: pb, rb, cb, offset, orientation } => {
+                    let (sa, sb) = (env.to_sheet(*view, *pa), env.to_sheet(*view, *pb));
+                    let rot = env.rotation(*view);
+                    let k = env.scale(*view);
+                    let (dir, va) = match orientation {
+                        DimOrientation::Aligned => {
+                            let d = [sb[0] - sa[0], sb[1] - sa[1]];
+                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+                            let m = [pb[0] - pa[0], pb[1] - pa[1]];
+                            let lm = (m[0] * m[0] + m[1] * m[1]).sqrt().max(1e-300);
+                            ([d[0] / l, d[1] / l], [m[0] / lm, m[1] / lm])
+                        }
+                        o => {
+                            let axis = if *o == DimOrientation::Horizontal { [1.0, 0.0] } else { [0.0, 1.0] };
+                            (axis, rotate2(axis, -rot))
+                        }
+                    };
+                    let m = [pb[0] - pa[0], pb[1] - pa[1]];
+                    let base = m[0] * va[0] + m[1] * va[1];
+                    let s = if base < 0.0 { -1.0 } else { 1.0 };
+                    // Signed shift of each end along the a -> b direction.
+                    let shift = |r: f64, c: ArcCondition, toward: f64| match c {
+                        _ if r <= 0.0 => 0.0,
+                        ArcCondition::Center => 0.0,
+                        ArcCondition::Min => r * toward,
+                        ArcCondition::Max => -r * toward,
+                    };
+                    let (da, db) = (shift(*ra, *ca, 1.0), shift(*rb, *cb, -1.0));
+                    let value = base.abs() - da + db;
+                    let qa = [sa[0] + dir[0] * s * da * k, sa[1] + dir[1] * s * da * k];
+                    let qb = [sb[0] + dir[0] * s * db * k, sb[1] + dir[1] * s * db * k];
+                    let t = env.text(a, value.abs(), false, "");
+                    self.linear_dimension_text(qa, qb, *offset, *orientation, &t, pick);
+                }
+                AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog } => {
+                    let c = env.to_sheet(*view, *center);
+                    let r = radius * env.scale(*view);
+                    let dir = [angle.cos(), angle.sin()];
+                    let tip = [c[0] + dir[0] * r, c[1] + dir[1] * r];
+                    let f = env.to_sheet(*view, *jog);
+                    let leg = (r * 0.4).clamp(3.0, 12.0);
+                    let q = [tip[0] - dir[0] * leg, tip[1] - dir[1] * leg];
+                    let t0 = ((q[0] - f[0]) * dir[0] + (q[1] - f[1]) * dir[1]) * 0.55;
+                    let b = [f[0] + dir[0] * t0.max(0.0), f[1] + dir[1] * t0.max(0.0)];
+                    self.lines.push(Polyline2 { points: vec![f, b, q, tip], style: LineStyle::Thin, closed: false, pick });
+                    self.arrow(tip, dir, 3.0);
+                    // A short cross marks the false center.
+                    let w = [-dir[1], dir[0]];
+                    self.line([f[0] - w[0] * 1.5, f[1] - w[1] * 1.5], [f[0] + w[0] * 1.5, f[1] + w[1] * 1.5], LineStyle::Thin);
+                    if let Some(l) = self.lines.last_mut() {
+                        l.pick = pick;
+                    }
+                    let t = env.text(a, *radius, false, "R");
+                    let mut ang = dir[1].atan2(dir[0]);
+                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
+                        ang += std::f64::consts::PI;
+                    }
+                    let mid = [(f[0] + b[0]) / 2.0, (f[1] + b[1]) / 2.0];
+                    let up = [-ang.sin(), ang.cos()];
+                    self.dim_label([mid[0] + up[0] * 1.2, mid[1] + up[1] * 1.2], ang, 0.5, false, &t, 3.5, pick);
+                }
+                AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
+                    let (a0, a1) = (env.to_sheet(*view, axis[0]), env.to_sheet(*view, axis[1]));
+                    let d = [a1[0] - a0[0], a1[1] - a0[1]];
+                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                    if l < 1e-9 {
+                        continue;
+                    }
+                    let u = [d[0] / l, d[1] / l];
+                    let n = [-u[1], u[0]];
+                    let dot = |p: [f64; 2], q: [f64; 2]| p[0] * q[0] + p[1] * q[1];
+                    let e = env.to_sheet(*view, *edge);
+                    let off = dot([e[0] - a0[0], e[1] - a0[1]], n);
+                    let sg = if off < 0.0 { -1.0 } else { 1.0 };
+                    let t = dot([a.position[0] - a0[0], a.position[1] - a0[1]], u);
+                    let on_axis = [a0[0] + u[0] * t, a0[1] + u[1] * t];
+                    let pe = [on_axis[0] + n[0] * off, on_axis[1] + n[1] * off];
+                    // Extension line from the edge point to the dimension line.
+                    let ev = [pe[0] - e[0], pe[1] - e[1]];
+                    let el = (ev[0] * ev[0] + ev[1] * ev[1]).sqrt();
+                    if el > 1.0 {
+                        let w = [ev[0] / el, ev[1] / el];
+                        self.lines.push(Polyline2 { points: vec![[e[0] + w[0], e[1] + w[1]], [pe[0] + w[0] * 2.0, pe[1] + w[1] * 2.0]], style: LineStyle::Thin, closed: false, pick });
+                    }
+                    let far = if *direct { [on_axis[0] - n[0] * off, on_axis[1] - n[1] * off] } else { [on_axis[0] - n[0] * sg * 6.0, on_axis[1] - n[1] * sg * 6.0] };
+                    self.lines.push(Polyline2 { points: vec![pe, far], style: LineStyle::Thin, closed: false, pick });
+                    self.arrow(pe, [n[0] * sg, n[1] * sg], 3.0);
+                    if *direct {
+                        self.arrow(far, [-n[0] * sg, -n[1] * sg], 3.0);
+                    }
+                    let model_off = {
+                        let (m0, m1) = (axis[0], axis[1]);
+                        let md = [m1[0] - m0[0], m1[1] - m0[1]];
+                        let ml = (md[0] * md[0] + md[1] * md[1]).sqrt().max(1e-300);
+                        ((edge[0] - m0[0]) * -md[1] / ml + (edge[1] - m0[1]) * md[0] / ml).abs()
+                    };
+                    let txt = env.text(a, model_off * 2.0, false, "Ø");
+                    let mut ang = n[1].atan2(n[0]);
+                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
+                        ang += std::f64::consts::PI;
+                    }
+                    let up = [-ang.sin(), ang.cos()];
+                    let mid = [(pe[0] + on_axis[0]) / 2.0 + up[0] * 1.2, (pe[1] + on_axis[1]) / 2.0 + up[1] * 1.2];
+                    self.dim_label(mid, ang, 0.5, false, &txt, 3.5, pick);
+                }
+                AnnotationKind::DatumTarget { view, anchor, label, area } => {
+                    let p = env.to_sheet(*view, *anchor);
+                    let k = env.scale(*view);
+                    let rot = env.rotation(*view);
+                    let size = match area {
+                        DatumTargetArea::Point => {
+                            for d in [[1.0, 1.0], [1.0, -1.0]] {
+                                self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * 1.6, p[1] - d[1] * 1.6], [p[0] + d[0] * 1.6, p[1] + d[1] * 1.6]], style: LineStyle::Visible, closed: false, pick });
+                            }
+                            String::new()
+                        }
+                        DatumTargetArea::Circle { diameter } => {
+                            let r = diameter / 2.0 * k;
+                            let pts = (0..48).map(|i| {
+                                let t = i as f64 / 48.0 * std::f64::consts::TAU;
+                                [p[0] + r * t.cos(), p[1] + r * t.sin()]
+                            });
+                            self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Centerline, closed: true, pick });
+                            env.text(a, *diameter, false, "Ø").flat()
+                        }
+                        DatumTargetArea::Rectangle { width, height } => {
+                            let (hx, hy) = (rotate2([width / 2.0 * k, 0.0], rot), rotate2([0.0, height / 2.0 * k], rot));
+                            let c = |sx: f64, sy: f64| [p[0] + hx[0] * sx + hy[0] * sy, p[1] + hx[1] * sx + hy[1] * sy];
+                            self.lines.push(Polyline2 { points: vec![c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)], style: LineStyle::Centerline, closed: true, pick });
+                            format!("{}×{}", env.text(a, *width, false, "").flat(), env.text(a, *height, false, "").flat())
+                        }
+                    };
+                    // Callout bubble: size above, label below the divider.
+                    let c = a.position;
+                    let r = 5.5;
+                    let pts = (0..40).map(|i| {
+                        let t = i as f64 / 40.0 * std::f64::consts::TAU;
+                        [c[0] + r * t.cos(), c[1] + r * t.sin()]
+                    });
+                    self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick });
+                    self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick });
+                    self.texts.push(Text2 { pos: [c[0], c[1] - 2.6], height: 2.8, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    if !size.is_empty() {
+                        let h = (2.4f64).min(8.5 / font::text_width(&size, 1.0).max(1e-9));
+                        self.texts.push(Text2 { pos: [c[0], c[1] + 2.6], height: h, text: size, angle: 0.0, anchor: Anchor::Center, pick });
+                    }
+                    let d = [p[0] - c[0], p[1] - c[1]];
+                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                    if l > r + 0.5 {
+                        self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
+                    }
                 }
             }
         }
@@ -502,6 +775,103 @@ impl SheetGeometry {
             self.dim_label(mid, angle, 0.5, false, text, 3.5, pick);
         }
     }
+}
+
+/// Text positions (along the measured axis) of ordinate values at `along`,
+/// at least `gap` apart: overlapping runs are spread around their mean.
+pub fn ordinate_text_positions(along: &[f64], gap: f64) -> Vec<f64> {
+    let mut order: Vec<usize> = (0..along.len()).collect();
+    order.sort_by(|a, b| along[*a].total_cmp(&along[*b]));
+    // Clusters of (indices in order, positions).
+    let mut clusters: Vec<(Vec<usize>, f64)> = Vec::new();
+    for &i in &order {
+        clusters.push((vec![i], along[i]));
+        // Merge while the last two clusters overlap.
+        while clusters.len() >= 2 {
+            let n = clusters.len();
+            let (ref a, sa) = clusters[n - 2];
+            let (ref b, sb) = clusters[n - 1];
+            let end_a = sa + (a.len() as f64 - 1.0) * gap;
+            if sb >= end_a + gap - 1e-9 {
+                break;
+            }
+            let mut idx = a.clone();
+            idx.extend(b.iter().copied());
+            let mean = idx.iter().map(|k| along[*k]).sum::<f64>() / idx.len() as f64;
+            let start = mean - (idx.len() as f64 - 1.0) * gap / 2.0;
+            clusters.truncate(n - 2);
+            clusters.push((idx, start));
+        }
+    }
+    let mut out = vec![0.0; along.len()];
+    for (idx, start) in clusters {
+        for (j, i) in idx.into_iter().enumerate() {
+            out[i] = start + j as f64 * gap;
+        }
+    }
+    out
+}
+
+/// Marker key of the projection symbol cell in title block layouts.
+pub const PROJECTION_CELL: &str = "<projection>";
+
+/// Cells (field key, x, y, width, height in mm from the block's lower-left
+/// corner) of the fixed title block layouts.
+pub fn title_cells(style: TitleBlockStyle) -> &'static [(&'static str, f64, f64, f64, f64)] {
+    match style {
+        TitleBlockStyle::Iso => &[
+            ("Legal owner", 0.0, 18.0, 60.0, 18.0),
+            (PROJECTION_CELL, 0.0, 9.0, 25.0, 9.0),
+            ("Scale", 25.0, 9.0, 35.0, 9.0),
+            ("Material", 0.0, 0.0, 60.0, 9.0),
+            ("Document type", 60.0, 27.0, 60.0, 9.0),
+            ("Document status", 60.0, 18.0, 30.0, 9.0),
+            ("Date", 90.0, 18.0, 30.0, 9.0),
+            ("Drawn by", 60.0, 9.0, 60.0, 9.0),
+            ("Approved by", 60.0, 0.0, 60.0, 9.0),
+            ("Title", 120.0, 18.0, 60.0, 18.0),
+            ("Supplementary title", 120.0, 9.0, 60.0, 9.0),
+            ("Part number", 120.0, 0.0, 30.0, 9.0),
+            ("Revision", 150.0, 0.0, 12.0, 9.0),
+            ("Sheet", 162.0, 0.0, 18.0, 9.0),
+        ],
+        TitleBlockStyle::Ansi => &[
+            ("Tolerances", 0.0, 14.0, 70.0, 26.0),
+            ("Material", 0.0, 7.0, 70.0, 7.0),
+            ("Finish", 0.0, 0.0, 70.0, 7.0),
+            ("Drawn by", 70.0, 30.0, 40.0, 10.0),
+            ("Drawn date", 110.0, 30.0, 30.0, 10.0),
+            ("Checked by", 70.0, 20.0, 40.0, 10.0),
+            ("Checked date", 110.0, 20.0, 30.0, 10.0),
+            ("Eng approval", 70.0, 10.0, 40.0, 10.0),
+            ("Eng date", 110.0, 10.0, 30.0, 10.0),
+            ("Mfg approval", 70.0, 0.0, 40.0, 10.0),
+            ("Mfg date", 110.0, 0.0, 30.0, 10.0),
+            ("Company", 140.0, 28.0, 110.0, 12.0),
+            ("Title", 140.0, 14.0, 110.0, 14.0),
+            ("Size", 140.0, 7.0, 14.0, 7.0),
+            ("CAGE code", 154.0, 7.0, 26.0, 7.0),
+            ("Part number", 180.0, 7.0, 56.0, 7.0),
+            ("Revision", 236.0, 7.0, 14.0, 7.0),
+            ("Scale", 140.0, 0.0, 40.0, 7.0),
+            ("Weight", 180.0, 0.0, 35.0, 7.0),
+            ("Sheet", 215.0, 0.0, 35.0, 7.0),
+        ],
+        TitleBlockStyle::Simple | TitleBlockStyle::None => &[],
+    }
+}
+
+/// Sheet rectangle [x0, y0, x1, y1] (mm) of a sheet's title block.
+pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
+    let (w, _) = sheet.size.size_mm();
+    let m = 10.0;
+    let (bw, bh) = match sheet.title_style {
+        TitleBlockStyle::None => return None,
+        TitleBlockStyle::Simple => (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil()),
+        TitleBlockStyle::Iso => (180.0, 36.0),
+        TitleBlockStyle::Ansi => (250.0, 40.0),
+    };
+    Some([w - m - bw, m, w - m, m + bh])
 }
 
 /// Where a ray from the center of a `hw` x `hh` (half sizes) box in

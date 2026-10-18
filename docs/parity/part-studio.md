@@ -75,7 +75,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.20 | Shift+X section view | keyboard_shortcuts | 🔧 (up to 3 planes) |
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
 | 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 |
-| 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | ❌ |
+| 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | 🔧 (isolate/transparent and translucent part appearances) |
 | 2.24 | O toggles orthographic/perspective (noshape extra; Onshape uses the camera menu) | View__perspective_view | ✅ |
 
 ## 3. Selection (Home__selection, Home__select_other, A §5)
@@ -91,7 +91,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 3.7 | Box selection with a dialog open fills the active field (filtered) | A §5.4 | 🔧 |
 | 3.8 | Selected entities show quick values in the Measure readout | A §5.1 | ✅ |
 | 3.9 | Cursor badge with the selection count (up to 5+) | Home__selection | 🔧 (re-render throttled to ~30 Hz) |
-| 3.10 | Midpoints of edges/sketch curves show on hover and can be picked | Home__selection | ❌ |
+| 3.10 | Midpoints of edges show on hover and can be picked (measure, planes) | Home__selection | 🔧 (part edges; sketch-curve midpoints ❌) |
 | 3.11 | Select other lists faces and edges under the cursor nearest first; hovering a row highlights it; click/Enter picks; list closes | Home__select_other | 🔧 |
 | 3.12 | Select other picks go to the active dialog field | Home__select_other | 🔧 |
 | 3.13 | Select other from the face/edge context menu | Home__select_other | 🔧 |
@@ -147,14 +147,14 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 5.22 | Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1 (integers ±1), clamped to the field range | Home__numeric_fields | 🔧 |
 | 5.23 | Field shows the converted value after accepting, the original text when focused | Home__numeric_fields | 🔧 |
 | 5.24 | Final button previews the end of the history; absent for new features and the last feature | Home__dialogs | 🔧 (was always shown) |
-| 5.25 | Preview opacity slider | Home__dialogs | ❌ |
+| 5.25 | Preview opacity slider (blends the model before and after the feature) | Home__dialogs | 🔧 |
 | 5.26 | Rename the feature from the dialog title | Home__dialogs | ✅ (double-click the title) |
-| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ❌ |
+| 5.27 | Dialog movable and resizable; help (?) icon | Home__dialogs | ⏳ (drag the title to move 🔧; ? shows the description 🔧; resizing ❌) |
 | 5.28 | Boolean "Convert to expression" / "Convert to checkbox" (evaluated at regeneration with upstream variables) | feature_basics | 🔧 |
-| 5.29 | Tolerance options on tolerant quantities | Home__tolerance_options | ❌ |
+| 5.29 | Tolerance options on tolerant quantities (± icon: type, deviation/limits, precision) | Home__tolerance_options | 🔧 (stored as `<param>__tolerance`; fit tolerances ❌) |
 | 5.30 | Extrude/Revolve from a part face (or a sketch on one) defaults to Add with that part as the merge scope | (Onshape behaviour, A §7) | 🔧 |
 | 5.31 | Choosing Remove/Intersect on such a feature points it into the part | (Onshape behaviour) | 🔧 |
-| 5.32 | Drag handles for depth/angle (extrude arrow, revolve arc) | A §7.7 | ⏳ (extrude, revolve) |
+| 5.32 | Drag handles for depth/angle/distance (extrude arrow, revolve arc, plane offset, shell thickness, fillet radius, chamfer distance) | A §7.7 | 🔧 |
 | 5.33 | Editing a feature rolls the model back to it | Home__dialogs | ✅ |
 
 ## 6. Feature list (PartStudio__features_and_parts_lists, A §3)
@@ -208,7 +208,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 6.35 | Add selection to folder | features_and_parts_lists | ✅ |
 | 6.36 | Expand/collapse a folder | features_and_parts_lists | ✅ |
 | 6.37 | Folder menu: Rename, Suppress/Unsuppress (all contents), Unpack folder | features_and_parts_lists | 🔧 (Suppress added, "Remove" renamed) |
-| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | ⏳ (Expand/Collapse all 🔧; no nesting) |
+| 6.38 | Nested folders; Expand all / Collapse all | features_and_parts_lists | 🔧 |
 
 ## 7. Parts list (features_and_parts_lists §Parts list, A §3.9)
 
@@ -256,7 +256,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 9.12 | Orient normal to sketch on edit (camera menu toggle); the previous view returns when the sketch closes | View__orient_normal_to_sketch_on_edit | 🔧 (not persisted across sessions) |
 | 9.13 | Named views store orientation/zoom/projection; save, restore, delete | View__named_views | ✅ |
 | 9.14 | Named views store the section state | View__named_views | 🔧 |
-| 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | ❌ |
+| 9.15 | Rotation inertia; rotate about the point under the cursor | A §6.1 | 🔧 |
 
 ## 10. Visibility, isolate, transparency, section (View__hide_show, View__isolate, View__make_transparent, View__section_view)
 
@@ -267,7 +267,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 10.3 | Isolate keeps chosen parts opaque, others transparent | View__isolate | 🔧 |
 | 10.4 | Make transparent makes chosen parts transparent | View__make_transparent | 🔧 |
 | 10.5 | Isolate/transparent panel with transparency control and × to exit; Esc exits | View__isolate | 🔧 |
-| 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | ❌ (transparent parts are skipped by Select other) |
+| 10.6 | Select transparent geometry checkbox; Expand by distance | View__isolate | 🔧 |
 | 10.7 | Section view by plane with offset | View__section_view | 🔧 (offset, flip, remove per plane) |
 | 10.8 | Section by faces/mate connectors, several planes, manipulator, caps | View__section_view | ⏳ (faces/MCs/up to 3 planes 🔧; drag manipulator and caps ❌) |
 
@@ -277,9 +277,9 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 11.1 | Measure readout for the selection (length, area, radius, distance, angle, ΔX/ΔY/ΔZ) | View__measure_tool | ✅ |
 | 11.2 | Measure/Mass properties buttons at the bottom right; [ opens Measure with a prompt when nothing is selected | A §1, §6.10 | 🔧 |
-| 11.3 | Measure graphics (dotted min distance, axes) and measure type selector | View__measure_tool | ❌ |
+| 11.3 | Measure graphics (dotted min distance with X/Y/Z components) and measure type selector | View__measure_tool | 🔧 |
 | 11.4 | Mass properties: volume, surface area, mass (with material), center of mass | View__mass_properties_tool | ✅ |
-| 11.5 | Moments of inertia about the center of mass; Face tab, reference mate connector, override mass | View__mass_properties_tool | ⏳ (inertia 🔧; the rest ❌) |
+| 11.5 | Moments of inertia about the center of mass; Face tab; reference mate connector; override mass | View__mass_properties_tool | 🔧 |
 | 11.6 | Part appearance colour, transparency, tessellation quality (Appearance editor) | customizing_appearances | 🔧 (material still in Part properties) |
 | 11.7 | Appearance panel, face/feature/sketch appearances | customizing_appearances | 🔧 (no custom-color tiles / mixer tab) |
 

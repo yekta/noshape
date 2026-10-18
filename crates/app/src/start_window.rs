@@ -153,7 +153,7 @@ struct Prefs {
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None }
+        Self { view: ViewMode::List, sort: SortKey::Modified, descending: true, source: None }
     }
 }
 
@@ -545,21 +545,36 @@ impl StartView {
         cx.notify();
     }
 
-    fn render_title_bar(&self) -> AnyElement {
+    /// Onshape documents page top bar: 40 px `#eaeaea`, logo, search box.
+    fn render_title_bar(&self, cx: &App) -> AnyElement {
         let pal = p();
         TitleBar::new()
+            .h(px(crate::ui::NAVBAR_H))
+            .bg(pal.panel_inactive)
+            .border_b_0()
             .child(
                 h_flex()
                     .w_full()
-                    .gap_2()
-                    .child(div().size(px(14.)).rounded_sm().bg(pal.accent))
-                    .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(pal.text).child("noshape"))
-                    .child(div().w(px(1.)).h(px(16.)).bg(pal.border))
-                    .child(div().text_sm().text_color(pal.text_muted).child("Documents")),
+                    .h_full()
+                    .gap(px(5.))
+                    .pl(px(4.))
+                    .child(crate::assets::icon("noshape-logo", 22., cx))
+                    .child(div().text_size(px(19.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape"))
+                    .child(div().w(px(24.)))
+                    .child(
+                        div().w(px(360.)).child(
+                            Input::new(&self.search)
+                                .small()
+                                .h(px(28.))
+                                .prefix(Icon::new(IconName::Search).size(px(14.)).text_color(pal.text_muted))
+                                .cleanable(true),
+                        ),
+                    ),
             )
             .into_any_element()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sidebar_item(&self, id: &str, ic: Icon, label: String, count: Option<usize>, source: Source, tooltip: Option<String>, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
         let active = self.source == source;
@@ -568,12 +583,12 @@ impl StartView {
             .h(px(30.))
             .px_2()
             .gap_2()
-            .rounded_md()
             .cursor_pointer()
-            .text_sm()
-            .when(active, |d| d.bg(pal.accent_soft).text_color(pal.text))
-            .when(!active, |d| d.text_color(pal.text_muted).hover(|d| d.bg(pal.panel_hover).text_color(pal.text)))
-            .child(ic.size(px(15.)).text_color(if active { pal.accent_hover } else { pal.text_faint }))
+            .text_size(px(14.))
+            .text_color(pal.text)
+            .when(active, |d| d.bg(pal.accent_soft))
+            .when(!active, |d| d.hover(|d| d.bg(pal.row_hover)))
+            .child(ic.size(px(16.)).text_color(if active { pal.accent } else { pal.text_muted }))
             .child(div().flex_1().min_w_0().truncate().child(label))
             .when_some(count, |d, n| d.child(div().text_xs().text_color(if active { pal.text_muted } else { pal.text_faint }).child(n.to_string())))
             .when_some(tooltip, |d, t| d.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(t.clone()).build(window, cx)))
@@ -583,7 +598,7 @@ impl StartView {
     fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let docs_dir = crate::files::documents_dir();
-        let section = |label: &'static str| div().px_2().pt_4().pb_1().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_faint).child(label);
+        let section = |label: &'static str| div().px_2().pt_4().pb_1().text_size(px(12.)).text_color(pal.text_muted).child(label);
         let mut folders = v_flex().gap_0p5();
         for (i, f) in self.folders.clone().into_iter().enumerate() {
             let is_default = f == docs_dir;
@@ -609,16 +624,16 @@ impl StartView {
             .w(px(236.))
             .h_full()
             .flex_none()
-            .bg(pal.panel)
+            .bg(pal.rail)
             .border_r_1()
             .border_color(pal.border)
-            .px_3()
+            .px_2()
             .py_3()
             .child(
                 v_flex()
                     .gap_2()
                     .child(
-                        accent_button("new-doc", "New document", true)
+                        accent_button("new-doc", "Create", true)
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.new_document(window, cx))),
                     )
                     .child(
@@ -630,7 +645,7 @@ impl StartView {
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_dialog(window, cx))),
                     ),
             )
-            .child(section("LIBRARY"))
+            .child(section("Library"))
             .child(
                 v_flex()
                     .gap_0p5()
@@ -638,7 +653,7 @@ impl StartView {
                     .child(self.sidebar_item("all", icon(ICON_LIBRARY), "All documents".into(), Some(self.docs.len()), Source::All, None, cx)),
             )
             .child(
-                h_flex().justify_between().child(section("FOLDERS")).child(
+                h_flex().justify_between().child(section("Folders")).child(
                     div().pt_3().child(
                         Button::new("add-folder")
                             .icon(icon(ICON_FOLDER_PLUS))
@@ -687,9 +702,9 @@ impl StartView {
             Source::All => Some("Recent documents and every document in your folders".into()),
         };
         h_flex()
-            .px_6()
-            .pt_5()
-            .pb_4()
+            .px_4()
+            .pt_3()
+            .pb_3()
             .gap_3()
             .child(
                 v_flex()
@@ -699,18 +714,10 @@ impl StartView {
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(div().text_xl().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(self.source_title()))
-                            .child(div().px_1p5().rounded_md().bg(pal.panel_hover).text_xs().text_color(pal.text_muted).child(shown.to_string())),
+                            .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(self.source_title()))
+                            .child(div().text_size(px(14.)).text_color(pal.text_faint).child(format!("({shown})"))),
                     )
                     .when_some(subtitle, |d, s| d.child(div().text_xs().text_color(pal.text_faint).truncate().child(s))),
-            )
-            .child(
-                div().w(px(260.)).child(
-                    Input::new(&self.search)
-                        .small()
-                        .prefix(Icon::new(IconName::Search).size(px(14.)).text_color(pal.text_faint))
-                        .cleanable(true),
-                ),
             )
             .child(
                 Button::new("sort")
@@ -768,11 +775,8 @@ impl StartView {
 
     fn thumbnail(&self, d: &DocEntry, w: f32, h: f32, big: bool) -> AnyElement {
         let pal = p();
-        let base = div().w(px(w)).h(px(h)).flex_none().overflow_hidden().bg(gpui_kit::linear_gradient(
-            180.,
-            gpui_kit::linear_color_stop(rgb(0x2a2f3a), 0.),
-            gpui_kit::linear_color_stop(rgb(0x181b22), 1.),
-        ));
+        // Onshape document thumbnails: the model on white.
+        let base = div().w(px(w)).h(px(h)).flex_none().overflow_hidden().bg(pal.panel);
         match &d.thumbnail {
             Some(img) => base.child(gpui_kit::img(img.clone()).size_full()).into_any_element(),
             None => {
@@ -813,13 +817,13 @@ impl StartView {
         v_flex()
             .id(SharedString::from(format!("card-{ix}")))
             .w(px(CARD_W))
-            .rounded_lg()
+            .rounded(px(4.))
             .overflow_hidden()
             .border_1()
             .bg(pal.panel)
             .cursor_pointer()
-            .when(selected, |c| c.border_color(pal.accent).shadow_md())
-            .when(!selected, |c| c.border_color(pal.border).hover(|c| c.border_color(pal.border_strong).bg(pal.panel_raised)))
+            .when(selected, |c| c.border_color(pal.accent))
+            .when(!selected, |c| c.border_color(pal.border).hover(|c| c.border_color(pal.field_outline)))
             .child(
                 div()
                     .relative()
@@ -862,7 +866,7 @@ impl StartView {
             .id("doc-grid")
             .size_full()
             .overflow_y_scrollbar()
-            .child(div().px_6().pb_6().flex().flex_wrap().gap_4().children(cards))
+            .child(div().px_4().pb_6().flex().flex_wrap().gap_4().children(cards))
             .into_any_element()
     }
 
@@ -872,9 +876,8 @@ impl StartView {
         h_flex()
             .id(id)
             .gap_1()
-            .text_xs()
-            .font_weight(FontWeight::SEMIBOLD)
-            .text_color(if active { pal.text_muted } else { pal.text_faint })
+            .text_size(px(12.))
+            .text_color(if active { pal.text } else { pal.text_muted })
             .child(label)
             .when(active, |d| d.child(Icon::new(if self.descending { IconName::ChevronDown } else { IconName::ChevronUp }).size(px(12.))))
             .when_some(key, |d, k| d.cursor_pointer().hover(|d| d.text_color(pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_sort(k, cx))))
@@ -884,16 +887,17 @@ impl StartView {
         let pal = p();
         let header = h_flex()
             .h(px(30.))
-            .mx_6()
+            .mx_4()
             .px_3()
             .gap_3()
+            .bg(pal.panel_inactive)
             .border_b_1()
             .border_color(pal.border)
             .child(div().w(px(52.)))
-            .child(self.list_header_cell("h-name", "NAME", Some(SortKey::Name), cx).flex_1().min_w_0())
-            .child(self.list_header_cell("h-folder", "FOLDER", None, cx).w(px(260.)))
-            .child(self.list_header_cell("h-mod", "MODIFIED", Some(SortKey::Modified), cx).w(px(120.)))
-            .child(self.list_header_cell("h-size", "SIZE", None, cx).w(px(70.)))
+            .child(self.list_header_cell("h-name", "Name", Some(SortKey::Name), cx).flex_1().min_w_0())
+            .child(self.list_header_cell("h-folder", "Folder", None, cx).w(px(260.)))
+            .child(self.list_header_cell("h-mod", "Modified", Some(SortKey::Modified), cx).w(px(120.)))
+            .child(self.list_header_cell("h-size", "Size", None, cx).w(px(70.)))
             .child(div().w(px(28.)));
         let rows: Vec<AnyElement> = docs
             .iter()
@@ -910,11 +914,12 @@ impl StartView {
                     .h(px(48.))
                     .px_3()
                     .gap_3()
-                    .rounded_md()
                     .cursor_pointer()
-                    .text_sm()
+                    .text_size(px(14.))
+                    .border_b_1()
+                    .border_color(pal.border)
                     .when(selected, |r| r.bg(pal.accent_soft))
-                    .when(!selected, |r| r.hover(|r| r.bg(pal.panel_hover)))
+                    .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
                     .child(div().rounded_sm().overflow_hidden().border_1().border_color(pal.border).child(self.thumbnail(d, 50.0, 36.0, false)))
                     .child(
                         h_flex()
@@ -945,7 +950,7 @@ impl StartView {
         v_flex()
             .size_full()
             .child(header)
-            .child(div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().px_6().py_1().gap_0p5().children(rows)))
+            .child(div().id("doc-list").flex_1().min_h_0().overflow_y_scrollbar().child(v_flex().px_4().children(rows)))
             .into_any_element()
     }
 
@@ -1021,7 +1026,7 @@ impl Render for StartView {
             .on_action(cx.listener(|this, _: &SelectNext, _, cx| this.move_selection(1, cx)))
             .on_action(cx.listener(|this, _: &SelectPrev, _, cx| this.move_selection(-1, cx)))
             .on_action(cx.listener(|this, _: &FocusSearch, window, cx| this.search.update(cx, |s, cx| s.focus(window, cx))))
-            .child(self.render_title_bar())
+            .child(self.render_title_bar(cx))
             .child(
                 h_flex()
                     .flex_1()
@@ -1047,7 +1052,7 @@ fn seg_button(id: &'static str, ic: Icon, tip: &'static str, selected: bool) -> 
         .cursor_pointer()
         .when(selected, |d| d.bg(pal.panel_active))
         .when(!selected, |d| d.hover(|d| d.bg(pal.panel_hover)))
-        .child(ic.size(px(15.)).text_color(if selected { pal.accent_hover } else { pal.text_faint }))
+        .child(ic.size(px(15.)).text_color(if selected { pal.accent } else { pal.text_muted }))
         .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
 }
 
@@ -1060,13 +1065,12 @@ fn accent_button(id: &'static str, label: &'static str, full_width: bool) -> Sta
         .px_4()
         .gap_2()
         .justify_center()
-        .rounded_md()
+        .rounded(px(4.))
         .cursor_pointer()
         .bg(pal.accent)
-        .text_color(rgb(0x0f0d1f))
-        .text_sm()
-        .font_weight(FontWeight::SEMIBOLD)
-        .shadow_sm()
+        .text_color(gpui_kit::rgb(0xffffff))
+        .text_size(px(14.))
+        .font_weight(FontWeight::MEDIUM)
         .hover(|d| d.bg(pal.accent_hover))
         .active(|d| d.opacity(0.85))
         .when(full_width, |d| d.w_full())

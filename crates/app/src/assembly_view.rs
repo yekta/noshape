@@ -29,11 +29,11 @@ use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex,
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::analysis::{self, Interference};
-use noshape_model::assembly::eval::{AssemblyEvaluator, AssemblyResult, InstanceNode, NodeKind, SolveOptions, frame_to_placement, inference_candidates, placement_to_frame};
+use noshape_model::assembly::eval::{AssemblyEvaluator, AssemblyResult, InferencePoint, InstanceNode, NodeKind, SolveOptions, frame_to_placement, inference_candidates, placement_to_frame};
 use noshape_model::assembly::solver::Frame;
 use noshape_model::assembly::{
     AsmMateConnector, Assembly, ExplodeStep, ExplodedView, Group, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateConnectorRef, MateId, MateType, NamedPosition, PatternKind, Placement,
-    Relation, RelationType,
+    Relation, RelationType, SubassemblyLock,
 };
 use noshape_model::configuration::ConfigValues;
 use noshape_model::display::BodyKind;
@@ -48,9 +48,8 @@ use std::time::Duration;
 
 /// A part offered by the Insert panel: (body, name, bounds).
 type CatalogPart = (BodyId, String, Option<(DVec3, DVec3)>);
-/// Inference candidates for a hovered entity: ((path, entity), [(implicit reference, frame)]).
-type InferCache = ((Vec<InstanceId>, Reference), Vec<(Reference, Frame)>);
-type MenuAction = Box<dyn Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>)>;
+/// Inference candidates for a hovered entity: ((path, entity), occurrence index, points).
+type InferCache = ((Vec<InstanceId>, Reference), usize, Vec<InferencePoint>);
 
 /// Resolves parts inserted from other documents (version-pinned snapshots).
 struct AppExternal;
@@ -82,6 +81,10 @@ struct MateSession {
     dialog: Entity<MateDialog>,
     /// Index of the mate being edited (None for a new mate).
     editing: Option<MateId>,
+    /// Solve pressed: previews solve every mate (no stationary side held).
+    solve_all: bool,
+    /// Heads-up checkmark position (viewport-local) once both connectors are picked.
+    hud: Option<DVec2>,
     _sub: Subscription,
 }
 
@@ -97,6 +100,10 @@ struct RelationSession {
 #[path = "assembly_panels.rs"]
 mod panels;
 pub(crate) use panels::*;
+
+#[path = "assembly_behaviors.rs"]
+mod behaviors;
+pub(crate) use behaviors::*;
 
 struct DragState {
     top: InstanceId,
@@ -125,6 +132,8 @@ struct DragState {
     triad_preview: Option<Frame>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
+    /// Free drag of a part of a flexible subassembly (the subassembly's child).
+    nested: Option<InstanceId>,
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -144,6 +153,22 @@ struct SnapDrag {
     normal: DVec3,
 }
 
+/// A row of the Mate features list.
+struct FeatureRow {
+    id: MateId,
+    icon: SharedString,
+    name: String,
+    ok: bool,
+    inactive: bool,
+    message: Option<String>,
+    has_limits: bool,
+    /// Mate indicator hidden (None: no eye icon).
+    hidden: Option<bool>,
+    tooltip: Option<String>,
+    /// Implicit mate connectors listed under the mate (label, connector).
+    implicit: Vec<(String, MateConnectorRef)>,
+}
+
 /// Explode step edit dialog.
 pub(crate) struct StepEdit {
     pub view: usize,
@@ -152,25 +177,6 @@ pub(crate) struct StepEdit {
     /// Translation X / Y / Z, rotation angle.
     pub inputs: [Entity<InputState>; 4],
     pub rotation: bool,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Playback {
-    Loop,
-    Reciprocate,
-}
-
-struct AnimState {
-    mate: MateId,
-    start: f64,
-    end: f64,
-    t: f64,
-    dir: f64,
-    playing: bool,
-    playback: Playback,
-    angular: bool,
-    busy: bool,
-    task: Option<Task<()>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -221,7 +227,8 @@ pub struct AssemblyView {
     isolate: Option<HashSet<InstanceId>>,
     show_mates: bool,
     show_connectors: bool,
-    context_menu: Option<(Point<Pixels>, InstanceId)>,
+    /// Onshape behaviours state (menus, filter, rename, transparency...).
+    ui: AsmUi,
     expanded: HashSet<Vec<InstanceId>>,
     message: Option<(bool, String)>,
     naming_position: Option<Entity<InputState>>,
@@ -265,6 +272,8 @@ pub struct AssemblyView {
     pattern_resync: bool,
     step_edit: Option<StepEdit>,
     ctrl_down: bool,
+    /// Shift held while picking: lock mate inference to the hovered entity.
+    infer_locked: bool,
     /// Insert from another document: the document's versions and the chosen one.
     ext_pick: Option<(crate::derived::ExternalDocInfo, usize)>,
     /// Newer version of each external reference (None: up to date), and keys being checked.
@@ -275,22 +284,18 @@ pub struct AssemblyView {
     _subs: Vec<Subscription>,
 }
 
+/// Requests from the assembly view to the document window.
+pub enum AssemblyViewEvent {
+    /// Switch to another tab (instance menu > Switch to Part Studio / Assembly).
+    ActivateTab(TabId),
+}
+
+impl EventEmitter<AssemblyViewEvent> for AssemblyView {}
+
 impl Focusable for AssemblyView {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus.clone()
     }
-}
-
-fn wrap_angle(a: f64) -> f64 {
-    let t = std::f64::consts::TAU;
-    let mut a = a % t;
-    if a > std::f64::consts::PI {
-        a -= t;
-    }
-    if a < -std::f64::consts::PI {
-        a += t;
-    }
-    a
 }
 
 /// Does assembly `tab` (transitively) contain assembly `target`?
@@ -344,6 +349,10 @@ impl AssemblyView {
                 this.message = Some((true, msg.clone()));
                 cx.notify();
             }
+            DocEvent::Info(msg) => {
+                this.message = Some((false, msg.clone()));
+                cx.notify();
+            }
             _ => {}
         }));
         let mut this = Self {
@@ -387,7 +396,7 @@ impl AssemblyView {
             isolate: None,
             show_mates: false,
             show_connectors: false,
-            context_menu: None,
+            ui: AsmUi::default(),
             expanded: HashSet::new(),
             message: None,
             naming_position: None,
@@ -416,6 +425,7 @@ impl AssemblyView {
             pattern_resync: false,
             step_edit: None,
             ctrl_down: false,
+            infer_locked: false,
             ext_pick: None,
             ext_updates: HashMap::new(),
             ext_checking: HashSet::new(),
@@ -448,8 +458,9 @@ impl AssemblyView {
             && let Some(m) = s.dialog.read(cx).to_mate(cx)
         {
             let fixed = |id: InstanceId| asm.instance(id).is_some_and(|i| i.fixed);
-            // The second connector's instance stays put unless the first is fixed.
-            if !fixed(m.a.instance) && !fixed(m.b.instance) {
+            // The second connector's instance stays put unless the first is fixed
+            // (until Solve solves every mate).
+            if !s.solve_all && !fixed(m.a.instance) && !fixed(m.b.instance) {
                 opts.hold.push(m.b.instance);
             }
             // After a snap drag the dragged instance starts at its snapped placement.
@@ -558,6 +569,15 @@ impl AssemblyView {
 
     fn scene_options(&self) -> AsmSceneOptions {
         let mut o = AsmSceneOptions { isolate: self.isolate.clone(), ..Default::default() };
+        if let Some(t) = &self.ui.transparent {
+            o.ghost_tops.extend(t.iter().copied());
+        }
+        if let Some(s) = &self.ui.section {
+            o.section.push(s.clip());
+        }
+        if self.isolate.is_some() || self.ui.transparent.is_some() {
+            o.dim_alpha = self.ui.transparency;
+        }
         if let Some(s) = &self.snap_drag
             && s.started
         {
@@ -632,9 +652,21 @@ impl AssemblyView {
             }
         }
         if self.show_mates {
-            for ms in self.result.mates.iter().filter(|m| !m.inactive) {
+            let hidden: HashSet<MateId> = self.assembly(cx).map(|a| a.mates.iter().filter(|m| m.hidden).map(|m| m.id).collect()).unwrap_or_default();
+            for ms in self.result.mates.iter().filter(|m| !m.inactive && !hidden.contains(&m.id)) {
                 mate_glyph(&mut h, ms, false, 0.6);
             }
+        }
+        // Instance row hovered in the list: highlighted in the graphics area.
+        if let Some(top) = self.ui.list_hover {
+            h.accent_tops.push(top);
+        }
+        if let Some(m) = &self.ui.measure {
+            h.selected_entities = m.clone();
+        }
+        // Group dialog: its instances are shown selected.
+        if let Some((_, ids)) = &self.ui.group {
+            h.selected_tops = ids.clone();
         }
         // Show mates mode: the hovered (or pinned) instance's mates.
         if self.show_mates_mode {
@@ -682,6 +714,34 @@ impl AssemblyView {
             }
         }
         self.overlay_connectors = overlay_connectors;
+        // Mate indicators (pickable): displayed mates, plus the hovered /
+        // selected one; not while a dialog field takes picks.
+        let mut overlay_mates = Vec::new();
+        if !picking && let Some(asm) = self.assembly(cx) {
+            let shown_mode: Vec<MateId> = match (self.show_mates_mode, self.mates_pinned.or_else(|| self.hover.as_ref().map(|t| t.path[0]))) {
+                (true, Some(top)) => asm.mates.iter().filter(|m| m.uses_instance(top)).map(|m| m.id).collect(),
+                _ => Vec::new(),
+            };
+            for ms in &self.result.mates {
+                let Some(m) = asm.mate(ms.id) else { continue };
+                let visible = (self.show_mates && !m.hidden && !ms.inactive) || self.selected_mate == Some(m.id) || self.list_hover_mate == Some(m.id) || shown_mode.contains(&m.id);
+                let Some(f) = ms.frame_b.or(ms.frame_a) else { continue };
+                if visible {
+                    let i = overlay_mates.len();
+                    let hl = hovered_overlay == Some(OverlayPick::Mate(i)) || self.selected_mate == Some(m.id);
+                    let st = if ms.inactive || m.suppressed {
+                        assembly_scene::MateGlyphState::Inactive
+                    } else if !ms.ok {
+                        assembly_scene::MateGlyphState::Error
+                    } else {
+                        assembly_scene::MateGlyphState::Ok
+                    };
+                    h.mate_glyphs.push((f.origin, hl, st));
+                    overlay_mates.push(m.id);
+                }
+            }
+        }
+        self.ui.overlay_mates = overlay_mates;
         // Dialog connectors + inference preview.
         let mut chosen: Vec<MateConnectorRef> = Vec::new();
         if let Some(s) = &self.mate {
@@ -710,13 +770,18 @@ impl AssemblyView {
         }
         if picking
             && self.pick_mode(cx) == Some(PickMode::Inference)
-            && let (Some(((path, _), cands)), Some(hov)) = (&self.infer, &self.hover)
-            && let Some(o) = self.result.occurrences.get(hov.occ)
+            && let Some(((_, entity), occ, cands)) = &self.infer
+            && let Some(o) = self.result.occurrences.get(*occ)
+            && (self.infer_locked || self.hover.as_ref().is_some_and(|h| h.occ == *occ))
         {
+            if self.infer_locked {
+                // Shift: the locked entity stays highlighted.
+                h.hover_entity = Some((o.path.clone(), entity.clone()));
+            }
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            for (i, (_, f)) in cands.iter().enumerate() {
-                let w = t.mul(f);
-                if Some(i) == self.infer_choice && *path == hov.path {
+            for (i, p) in cands.iter().enumerate() {
+                let w = t.mul(&p.frame);
+                if Some(i) == self.infer_choice {
                     h.triads.push(Triad { frame: w, size, strong: true });
                 } else {
                     h.dots.push(w.origin);
@@ -748,7 +813,7 @@ impl AssemblyView {
 
     /// Instances the manipulator moves.
     fn manip_targets(&self, cx: &App) -> Vec<InstanceId> {
-        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() {
+        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() || self.ui.group.is_some() {
             return vec![];
         }
         let Some(asm) = self.assembly(cx) else { return vec![] };
@@ -796,6 +861,8 @@ impl AssemblyView {
     /// Commit a change to the assembly, folding in the latest solved placements.
     fn edit<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
         let solved = self.result.solved.placements.clone();
+        let nested = self.result.solved.nested.clone();
+        let flexible = self.result.prepared.flexible.clone();
         let tab = self.tab;
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab(tab, desc, cx, |c| {
@@ -803,6 +870,12 @@ impl AssemblyView {
                     for (id, p) in &solved {
                         if let Some(i) = a.instance_mut(*id) {
                             i.placement = *p;
+                            // Flexible subassemblies keep their parts' positions here.
+                            if flexible.contains(id) {
+                                let mut n: Vec<(InstanceId, Placement)> = nested.iter().filter(|((s, _), _)| s == id).map(|((_, c), q)| (*c, *q)).collect();
+                                n.sort_by_key(|(c, _)| *c);
+                                i.nested = n;
+                            }
                         }
                     }
                     Some(f(a))
@@ -820,17 +893,19 @@ impl AssemblyView {
             Some((_, n, _)) => format!("Insert : {n}"),
             None => format!("Insert : {studio_name}"),
         };
+        // Configuration chosen in the Insert dialog (Onshape: set it before clicking the item).
+        let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
         self.edit(&desc, cx, |a| {
             let id = InstanceId(a.next_id());
             let (source, base, width) = match body {
-                Some((b, n, bb)) => (InstanceSource::Part { studio, body: b, config: ConfigValues::default() }, n, bb.map(|(lo, hi)| hi.x - lo.x).unwrap_or(0.02)),
-                None => (InstanceSource::PartStudio { studio, config: ConfigValues::default() }, studio_name.clone(), 0.05),
+                Some((b, n, bb)) => (InstanceSource::Part { studio, body: b, config }, n, bb.map(|(lo, hi)| hi.x - lo.x).unwrap_or(0.02)),
+                None => (InstanceSource::PartStudio { studio, config }, studio_name.clone(), 0.05),
             };
             // Later instances of the same item are offset so they don't overlap.
             let same = a.instances.iter().filter(|i| i.source == source).count();
             let placement = Placement { translation: [same as f64 * (width + 0.01), 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
             let name = a.next_instance_name(&base);
-            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false });
+            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
             id
         })
     }
@@ -842,6 +917,8 @@ impl AssemblyView {
         }
         self.placing = Some(ids);
         self.placing_point = None;
+        self.ui.place_snap = None;
+        self.ui.place_src_ix = 0;
         self.selected.clear();
         self.message = Some((false, "Click to place the inserted instance (Esc keeps it where it is).".into()));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
@@ -870,7 +947,7 @@ impl AssemblyView {
         let id = self.edit(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
-            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false });
+            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new() });
             id
         });
         if let Some(id) = id {
@@ -911,6 +988,12 @@ impl AssemblyView {
     /// Move the instances being placed so their bounds' bottom center sits at the cursor point.
     fn update_placing(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(ids) = self.placing.clone() else { return false };
+        // Snap mode: an inserted instance with explicit mate connectors snaps
+        // onto mate connectors of the others (Onshape "Insert and drag to snap").
+        if self.snap.is_some() && ids.len() == 1 && self.update_insert_snap(ids[0], cx) {
+            return true;
+        }
+        self.ui.place_snap = None;
         let Some(p) = self.cursor_world_point(cx) else { return false };
         self.placing_point = Some(p);
         let mut bb: Option<(DVec3, DVec3)> = None;
@@ -941,7 +1024,19 @@ impl AssemblyView {
         self.message = None;
         if commit {
             let name = self.assembly(cx).and_then(|a| a.instance(ids[0]).map(|i| i.name.clone())).unwrap_or_default();
-            self.edit(&format!("Place : {name}"), cx, |_| {});
+            match self.ui.place_snap.take() {
+                // Snapped: a Fastened mate between the two mate connectors.
+                Some((src, dst)) => {
+                    self.edit(&format!("Insert : Fastened ({name})"), cx, |a| {
+                        let id = MateId(a.next_id());
+                        let n = a.next_feature_name("Fastened");
+                        a.mates.push(Mate::new(id, n, MateType::Fastened, src, dst));
+                    });
+                }
+                None => {
+                    self.edit(&format!("Place : {name}"), cx, |_| {});
+                }
+            }
             self.selected = ids;
         } else {
             self.schedule_eval(window, cx);
@@ -1010,12 +1105,6 @@ impl AssemblyView {
         self.selected.retain(|i| !ids.contains(i));
     }
 
-    fn isolate(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
-        self.isolate = if ids.is_empty() || self.isolate.is_some() { None } else { Some(ids.into_iter().collect()) };
-        self.rebuild_scene(false, cx);
-        cx.notify();
-    }
-
     fn delete_mate(&mut self, id: MateId, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.mate(id).map(|m| m.name.clone()).or_else(|| a.relations.iter().find(|r| r.id == id).map(|r| r.name.clone())).or_else(|| a.groups.iter().find(|g| g.id == id).map(|g| g.name.clone())));
         self.edit(&format!("Delete : {}", name.unwrap_or_default()), cx, |a| a.remove_mate(id));
@@ -1038,18 +1127,38 @@ impl AssemblyView {
         });
     }
 
+    /// Group tool: opens the Group dialog with the selection as preselection.
     fn create_group(&mut self, cx: &mut Context<Self>) {
-        let ids = self.selected.clone();
+        let ids: Vec<InstanceId> = self.assembly(cx).map(|a| self.selected.iter().copied().filter(|id| a.generated_by(*id).is_none()).collect()).unwrap_or_default();
+        self.open_group(None, ids, cx);
+    }
+
+    fn accept_group(&mut self, cx: &mut Context<Self>) {
+        let Some((editing, ids)) = self.ui.group.take() else { return };
         if ids.len() < 2 {
             self.message = Some((false, "Select at least two instances to group.".into()));
+            self.ui.group = Some((editing, ids));
             cx.notify();
             return;
         }
-        self.edit("Insert : Group", cx, |a| {
-            let id = MateId(a.next_id());
-            let name = a.next_feature_name("Group");
-            a.groups.push(Group { id, name, instances: ids, suppressed: false });
-        });
+        match editing {
+            Some(gid) => {
+                self.edit("Edit : Group", cx, |a| {
+                    if let Some(g) = a.groups.iter_mut().find(|g| g.id == gid) {
+                        g.instances = ids;
+                    }
+                });
+            }
+            None => {
+                self.edit("Insert : Group", cx, |a| {
+                    let id = MateId(a.next_id());
+                    let name = a.next_feature_name("Group");
+                    a.groups.push(Group { id, name, instances: ids, suppressed: false });
+                });
+            }
+        }
+        self.update_capture(cx);
+        cx.notify();
     }
 
     // ------------------------------------------------------------ mate dialog
@@ -1112,6 +1221,10 @@ impl AssemblyView {
             self.open_pattern_edit(p, window, cx);
             return;
         }
+        if let Some(g) = self.assembly(cx).and_then(|a| a.groups.iter().find(|g| g.id == id).cloned()) {
+            self.open_group(Some(g.id), g.instances, cx);
+            return;
+        }
         if let Some(r) = self.assembly(cx).and_then(|a| a.relations.iter().find(|r| r.id == id).cloned()) {
             self.open_relation(r.relation_type, Some(r), window, cx);
             return;
@@ -1130,10 +1243,19 @@ impl AssemblyView {
                 this.refresh_scene(false, cx);
             }
             MateDialogEvent::Accept => this.accept_mate(window, cx),
+            MateDialogEvent::AcceptAndNew => this.accept_mate_and_new(window, cx),
+            MateDialogEvent::Animate => this.toggle_mate_preview(window, cx),
+            MateDialogEvent::EditConnector(field) => this.edit_dialog_connector(*field, window, cx),
+            MateDialogEvent::Solve => {
+                if let Some(s) = &mut this.mate {
+                    s.solve_all = true;
+                }
+                this.schedule_eval(window, cx);
+            }
             MateDialogEvent::Cancel => this.close_mate(window, cx),
         });
         dialog.update(cx, |d, cx| window.focus(&d.focus_handle(cx), cx));
-        self.mate = Some(MateSession { dialog, editing, _sub: sub });
+        self.mate = Some(MateSession { dialog, editing, solve_all: false, hud: None, _sub: sub });
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
         self.schedule_eval(window, cx);
         cx.notify();
@@ -1149,6 +1271,9 @@ impl AssemblyView {
         let editing = s.editing;
         self.mate = None;
         self.snap_start = None;
+        if self.anim.as_ref().is_some_and(|a| a.preview) {
+            self.anim = None;
+        }
         let desc = if editing.is_some() { format!("Edit : {}", m.name) } else { format!("Insert : {}", m.name) };
         // Solved placements of the preview (which includes this mate) are folded in.
         self.edit(&desc, cx, |a| match editing.and_then(|id| a.mates.iter().position(|x| x.id == id)) {
@@ -1160,7 +1285,21 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Shift+Enter / heads-up checkmark: commit the mate and start a new one
+    /// of the same type (the dialog stays open).
+    fn accept_mate_and_new(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(t) = self.mate.as_ref().map(|s| s.dialog.read(cx).mate_type) else { return };
+        let ok = self.mate.as_ref().is_some_and(|s| s.dialog.read(cx).to_mate(cx).is_some());
+        self.accept_mate(window, cx);
+        if ok {
+            self.start_mate(t, window, cx);
+        }
+    }
+
     fn close_mate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.anim.as_ref().is_some_and(|a| a.preview) {
+            self.anim = None;
+        }
         self.snap_start = None;
         if self.mate.take().is_some() {
             window.focus(&self.focus, cx);
@@ -1179,11 +1318,13 @@ impl AssemblyView {
             RelationType::Screw => "1 mm".into(),
         });
         let ratio = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let mates: Vec<MateId> = self.assembly(cx).map(|a| a.mates.iter().filter(|m| m.mate_type.dof() > 0).map(|m| m.id).collect()).unwrap_or_default();
+        // A new relation starts empty (a selected mate is the preselection);
+        // mates are then picked in the list or the graphics area.
+        let pre = self.selected_mate.filter(|id| self.assembly(cx).and_then(|a| a.mate(*id)).is_some_and(|m| m.mate_type.dof() > 0));
         self.relation = Some(RelationSession {
             kind: existing.as_ref().map(|r| r.relation_type).unwrap_or(kind),
-            a: existing.as_ref().map(|r| r.mates[0]).or(mates.first().copied()),
-            b: existing.as_ref().map(|r| r.mates[1]).or(mates.get(1).copied()),
+            a: existing.as_ref().map(|r| r.mates[0]).or(pre),
+            b: existing.as_ref().map(|r| r.mates[1]),
             ratio,
             reverse: existing.as_ref().is_some_and(|r| r.reverse),
             editing: existing.map(|r| r.id),
@@ -1445,99 +1586,6 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ animation
 
-    fn start_animation(&mut self, cx: &mut Context<Self>) {
-        let Some(asm) = self.assembly(cx) else { return };
-        let pick = self.selected_mate.and_then(|id| asm.mate(id)).filter(|m| matches!(m.mate_type, MateType::Revolute | MateType::Slider | MateType::Cylindrical)).or_else(|| {
-            asm.mates.iter().find(|m| !m.suppressed && matches!(m.mate_type, MateType::Revolute | MateType::Slider | MateType::Cylindrical))
-        });
-        let Some(m) = pick.cloned() else {
-            self.message = Some((false, "Animate needs a revolute, slider or cylindrical mate (select it in the list).".into()));
-            cx.notify();
-            return;
-        };
-        let angular = m.mate_type != MateType::Slider;
-        let units = self.units(cx);
-        let key = if angular { "rz" } else { "z" };
-        let lim = m.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone());
-        let dim = if angular { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
-        let ev = |e: &Option<ExprValue>| e.as_ref().and_then(|e| noshape_units::evaluate_as(&e.text, dim, &units, &noshape_units::EmptyScope).ok()).map(|q| q.value);
-        let cur = self.result.solved.mate_values.get(&m.id).copied().unwrap_or([0.0; 4]);
-        let cur_v = if angular { cur[0] } else { cur[3] };
-        let size = self.result.bounds().map(|(a, b)| (b - a).length()).unwrap_or(0.1);
-        let (start, end) = match (lim.as_ref().and_then(|l| ev(&l.min)), lim.as_ref().and_then(|l| ev(&l.max))) {
-            (Some(a), Some(b)) => (a, b),
-            _ if angular => (cur_v, cur_v + std::f64::consts::TAU),
-            _ => (cur_v, cur_v + size * 0.5),
-        };
-        self.selected_mate = Some(m.id);
-        self.anim = Some(AnimState { mate: m.id, start, end, t: 0.0, dir: 1.0, playing: false, playback: if angular && lim.is_none() { Playback::Loop } else { Playback::Reciprocate }, angular, busy: false, task: None });
-        self.play_animation(cx);
-    }
-
-    fn play_animation(&mut self, cx: &mut Context<Self>) {
-        let Some(a) = &mut self.anim else { return };
-        a.playing = true;
-        a.task = Some(cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor().timer(Duration::from_millis(33)).await;
-                let job = this.update(cx, |this: &mut Self, _| {
-                    let a = this.anim.as_mut()?;
-                    if !a.playing || a.busy {
-                        return a.playing.then_some(None);
-                    }
-                    let step = 1.0 / 90.0;
-                    a.t += a.dir * step;
-                    if a.t > 1.0 || a.t < 0.0 {
-                        match a.playback {
-                            Playback::Loop => a.t = a.t.rem_euclid(1.0),
-                            Playback::Reciprocate => {
-                                a.dir = -a.dir;
-                                a.t = a.t.clamp(0.0, 1.0);
-                            }
-                        }
-                    }
-                    let mut v = a.start + (a.end - a.start) * a.t;
-                    if a.angular {
-                        v = wrap_angle(v);
-                    }
-                    a.busy = true;
-                    let start: HashMap<InstanceId, Placement> = this.result.solved.placements.iter().cloned().collect();
-                    Some(Some((this.result.prepared.clone(), SolveOptions { drive: Some((a.mate, v)), start: Some(start), ..Default::default() })))
-                });
-                let Ok(Some(job)) = job else { break };
-                let Some((prepared, opts)) = job else { continue };
-                let solved = cx.background_spawn(async move { prepared.solve(&opts) }).await;
-                let ok = this.update(cx, |this: &mut Self, cx| {
-                    if let Some(a) = &mut this.anim {
-                        a.busy = false;
-                    }
-                    this.apply_solved(solved, cx);
-                    this.rebuild_scene(true, cx);
-                    cx.notify();
-                });
-                if ok.is_err() {
-                    break;
-                }
-            }
-        }));
-        cx.notify();
-    }
-
-    fn stop_animation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(a) = &mut self.anim {
-            a.playing = false;
-            a.task = None;
-        }
-        cx.notify();
-        let _ = window;
-    }
-
-    fn close_animation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.anim = None;
-        // Return to the document's positions.
-        self.schedule_eval(window, cx);
-    }
-
     // ------------------------------------------------------------ interference
 
     fn run_interference(&mut self, cx: &mut Context<Self>) {
@@ -1588,23 +1636,28 @@ impl AssemblyView {
             self.infer_choice = None;
             return old.is_some();
         }
-        let Some(h) = self.hover.clone() else {
-            self.infer_choice = None;
-            return old.is_some();
-        };
-        let key = (h.path.clone(), h.reference.clone());
-        if self.infer.as_ref().is_none_or(|(k, _)| *k != key) {
-            let units = self.units(cx);
-            let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
-            self.infer = Some((key, cands));
-            self.infer_choice = None;
+        // Shift (lock mate inference) keeps the current entity's points while
+        // the cursor moves elsewhere; the nearest one is chosen.
+        let locked = self.infer_locked && self.infer.is_some();
+        if !locked {
+            let Some(h) = self.hover.clone() else {
+                self.infer_choice = None;
+                return old.is_some();
+            };
+            let key = (h.path.clone(), h.reference.clone());
+            if self.infer.as_ref().is_none_or(|(k, occ, _)| *k != key || *occ != h.occ) {
+                let units = self.units(cx);
+                let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
+                self.infer = Some((key, h.occ, cands));
+                self.infer_choice = None;
+            }
         }
-        let Some((_, cands)) = &self.infer else { return false };
-        let Some(o) = self.result.occurrences.get(h.occ) else { return false };
+        let Some((_, occ, cands)) = &self.infer else { return false };
+        let Some(o) = self.result.occurrences.get(*occ) else { return false };
         let vp = self.viewport.read(cx);
         let mut best: Option<(usize, f64)> = None;
-        for (i, (_, f)) in cands.iter().enumerate() {
-            let w = o.transform.transform_point3(f.origin);
+        for (i, p) in cands.iter().enumerate() {
+            let w = o.transform.transform_point3(p.frame.origin);
             if let Some(s) = vp.project(w) {
                 let d = s.distance(self.pointer);
                 if best.is_none_or(|(_, bd)| d < bd) {
@@ -1617,7 +1670,7 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode;
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
@@ -1633,8 +1686,13 @@ impl AssemblyView {
                 let c = self.result.connectors.iter().find(|c| c.id == id)?;
                 return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
             }
-            Some(OverlayPick::Manip(_)) => return None,
+            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) => return None,
             None => {}
+        }
+        if self.pick_mode(cx) == Some(PickMode::Inference) && self.infer_locked {
+            // Shift held: the locked entity's chosen point, wherever the click lands.
+            self.update_inference(cx);
+            return self.infer.as_ref().zip(self.infer_choice).and_then(|(((path, _), _, c), i)| c.get(i).map(|x| x.connector(path)));
         }
         let target = self.pick(pick)?;
         if self.pick_mode(cx) == Some(PickMode::Entity) {
@@ -1642,8 +1700,8 @@ impl AssemblyView {
         }
         self.hover = Some(target.clone());
         self.update_inference(cx);
-        let (path, r) = self.infer.as_ref().zip(self.infer_choice).and_then(|((k, c), i)| c.get(i).map(|x| (k.0.clone(), x.0.clone())))?;
-        (path == target.path).then(|| MateConnectorRef::on(path[0], path[1..].to_vec(), r))
+        let (path, c) = self.infer.as_ref().zip(self.infer_choice).and_then(|(((path, _), _, c), i)| c.get(i).map(|x| (path.clone(), x.connector(path))))?;
+        (path == target.path).then_some(c)
     }
 
     /// Feed a picked connector to whatever is waiting for one.
@@ -1655,7 +1713,15 @@ impl AssemblyView {
                 self.message = Some((false, "Tangent mates take faces, edges or vertices.".into()));
                 return;
             }
+            let is_new = self.mate.as_ref().is_some_and(|s| s.editing.is_none());
             dialog.update(cx, |d, cx| d.set_connector(c, cx));
+            // Both connectors picked: the heads-up checkmark appears at the cursor.
+            if is_new && !dialog.read(cx).awaiting_pick() {
+                let at = self.pointer;
+                if let Some(s) = &mut self.mate {
+                    s.hud = Some(at);
+                }
+            }
             return;
         }
         if let Some(m) = &mut self.mc
@@ -1761,8 +1827,10 @@ impl AssemblyView {
                     self.refresh_scene(false, cx);
                 }
             }
-            ViewportEvent::PointerMove { position, .. } => {
+            ViewportEvent::PointerMove { position, modifiers } => {
                 self.pointer = *position;
+                // Shift (hold) locks mate inference to the entity under the cursor.
+                self.infer_locked = modifiers.shift;
                 if self.placing.is_some() {
                     if self.update_placing(cx) {
                         self.rebuild_scene(true, cx);
@@ -1776,7 +1844,10 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::Click { pick, position, modifiers, .. } => {
-                self.context_menu = None;
+                self.focus_from_viewport(window, cx);
+                self.ui.select_other = None;
+                self.ui.ctx_menu = None;
+                self.ui.mini_toolbar = None;
                 self.triad_menu = None;
                 self.pointer = *position;
                 if self.placing.is_some() {
@@ -1788,7 +1859,17 @@ impl AssemblyView {
                     }
                     return;
                 }
-                if self.pick_mode(cx).is_some() {
+                if self.ui.measure.is_some() {
+                    // Measure tool: clicked entities are measured.
+                    if let Some(t) = self.pick(*pick) {
+                        self.measure_pick(t, cx);
+                    }
+                } else if self.ui.group.is_some() {
+                    // Group dialog: clicking an instance adds or removes it.
+                    if let Some(top) = self.pick(*pick).map(|t| t.path[0]) {
+                        self.toggle_group_member(top, cx);
+                    }
+                } else if self.pick_mode(cx).is_some() {
                     if let Some(c) = self.chosen_connector(*pick, cx) {
                         self.deliver_connector(c, window, cx);
                     }
@@ -1796,6 +1877,16 @@ impl AssemblyView {
                     let top = self.pick(*pick).map(|t| t.path[0]);
                     self.mates_pinned = if top == self.mates_pinned { None } else { top };
                     self.selected = top.into_iter().collect();
+                } else if let Some(OverlayPick::Mate(i)) = self.overlay(*pick) {
+                    // Clicking a mate indicator selects the mate (highlighted in the
+                    // list), or fills the relation dialog's next mate field.
+                    let id = self.ui.overlay_mates.get(i).copied();
+                    if let (Some(id), true) = (id, self.relation.is_some()) {
+                        self.pick_relation_mate(id, cx);
+                    } else {
+                        self.selected_mate = id;
+                        self.selected.clear();
+                    }
                 } else if let Some(OverlayPick::Connector(i)) = self.overlay(*pick) {
                     // Select an assembly mate connector (highlights it in the list).
                     self.selected_mate = self.overlay_connectors.get(i).copied();
@@ -1803,12 +1894,15 @@ impl AssemblyView {
                 } else {
                     let target = self.pick(*pick);
                     self.select_target(target, modifiers.shift || modifiers.secondary(), cx);
+                    self.ui.scroll_to_selection = true;
                 }
                 self.refresh_scene(false, cx);
                 cx.notify();
             }
             ViewportEvent::ToolDown { position, .. } => {
-                self.context_menu = None;
+                self.focus_from_viewport(window, cx);
+                self.ui.ctx_menu = None;
+                self.ui.mini_toolbar = None;
                 self.triad_menu = None;
                 if let (Some(h), Some(f)) = (self.manip_hover, self.manipulator(cx)) {
                     let ids = self.manip_targets(cx);
@@ -1842,6 +1936,7 @@ impl AssemblyView {
                         offset: DVec3::ZERO,
                         triad_preview: None,
                         explode: self.explode_edit,
+                        nested: None,
                     });
                     return;
                 }
@@ -1851,12 +1946,22 @@ impl AssemblyView {
                 }
                 let Some(t) = self.hover.clone() else { return };
                 let top = t.path[0];
+                // A part of a flexible subassembly is dragged on its own (Onshape).
+                let nested = (t.path.len() > 1 && self.result.prepared.is_flexible_child(top, t.path[1])).then(|| t.path[1]);
                 let (origin, dir) = self.viewport.read(cx).ray(*position);
                 // Grab point: closest point on the ray to the instance's bounds center.
-                let center = self.result.instance_bounds(top).map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO);
+                let center = match nested {
+                    Some(c) => self.result.occurrences.iter().filter(|o| o.path.len() > 1 && o.path[0] == top && o.path[1] == c).filter_map(|o| o.world_bounds()).fold(None, |acc: Option<(DVec3, DVec3)>, (a, b)| Some(acc.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)))),
+                    None => self.result.instance_bounds(top),
+                }
+                .map(|(a, b)| (a + b) * 0.5)
+                .unwrap_or(DVec3::ZERO);
                 let tt = (center - origin).dot(dir);
                 let grab = origin + dir * tt;
-                let pose = self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default();
+                let pose = match nested {
+                    Some(c) => self.result.solved.nested_world(top, c).unwrap_or_default(),
+                    None => self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default(),
+                };
                 let local = pose.inverse().transform_point(grab);
                 let normal = self.viewport.read(cx).camera.forward();
                 self.drag = Some(DragState {
@@ -1877,6 +1982,7 @@ impl AssemblyView {
                     offset: DVec3::ZERO,
                     triad_preview: None,
                     explode: false,
+                    nested,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -1886,7 +1992,13 @@ impl AssemblyView {
                 }
                 let Some(d) = &self.drag else { return };
                 if !d.started && position.distance(d.press) > 3.0 {
+                    let (top, explode) = (d.top, d.explode);
                     self.drag.as_mut().unwrap().started = true;
+                    // A fixed instance does not move: say so right away.
+                    if !explode && let Some(i) = self.assembly(cx).and_then(|a| a.instance(top)).filter(|i| i.fixed) {
+                        self.message = Some((false, format!("{} is fixed and cannot be dragged.", i.name)));
+                        cx.notify();
+                    }
                 }
                 let Some(d) = &self.drag else { return };
                 if !d.started {
@@ -1997,15 +2109,52 @@ impl AssemblyView {
                 } else if d.handle.is_none() {
                     let t = self.hover.clone();
                     self.select_target(t, modifiers.shift || modifiers.secondary(), cx);
+                    self.ui.scroll_to_selection = true;
                     self.refresh_scene(false, cx);
                 }
                 cx.notify();
             }
+            ViewportEvent::BoxSelect { ids, modifiers } => {
+                // Box selection selects the instances it touches (Shift/Ctrl adds).
+                if self.pick_mode(cx).is_some() || self.placing.is_some() {
+                    return;
+                }
+                let mut tops: Vec<InstanceId> = Vec::new();
+                for t in ids.iter().filter_map(|id| self.pick(Some(*id))) {
+                    if !tops.contains(&t.path[0]) {
+                        tops.push(t.path[0]);
+                    }
+                }
+                if !(modifiers.shift || modifiers.secondary()) {
+                    self.selected.clear();
+                }
+                for t in tops {
+                    if !self.selected.contains(&t) {
+                        self.selected.push(t);
+                    }
+                }
+                self.selected_mate = None;
+                self.ui.scroll_to_selection = true;
+                if self.triad.as_ref().is_some_and(|(ids, _)| *ids != self.selected) {
+                    self.triad = None;
+                }
+                self.refresh_scene(false, cx);
+                cx.notify();
+            }
             ViewportEvent::ContextMenu { pick, position } => {
                 if let Some(OverlayPick::Manip(h)) = self.overlay(*pick) {
-                    self.context_menu = None;
+                    self.ui.ctx_menu = None;
                     self.triad_menu = Some((*position, h));
                     cx.notify();
+                    return;
+                }
+                if let Some(OverlayPick::Mate(i)) = self.overlay(*pick)
+                    && let Some(id) = self.ui.overlay_mates.get(i).copied()
+                {
+                    // Mate indicator context menu (Edit, Animate...).
+                    self.selected_mate = Some(id);
+                    self.selected.clear();
+                    self.open_mate_menu(id, *position, window, cx);
                     return;
                 }
                 self.triad_menu = None;
@@ -2014,11 +2163,12 @@ impl AssemblyView {
                         let top = t.path[0];
                         if !self.selected.contains(&top) {
                             self.selected = vec![top];
+                            self.selected_mate = None;
                         }
-                        self.context_menu = Some((*position, top));
                         self.refresh_scene(false, cx);
+                        self.open_graphics_menu(Some(top), *position, window, cx);
                     }
-                    None => self.context_menu = None,
+                    None => self.open_graphics_menu(None, *position, window, cx),
                 }
                 cx.notify();
             }
@@ -2118,13 +2268,16 @@ impl AssemblyView {
         let prepared = self.result.prepared.clone();
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
         let opts = match d.handle {
-            Some(h @ ManipHandle::Ring(_)) => SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), ..Default::default() },
+            Some(h @ ManipHandle::Ring(_)) => SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             Some(h @ (ManipHandle::Axis(_) | ManipHandle::Plane(_))) if self.result.solved.instance_dof.get(&d.top).copied() == Some(6) => {
                 // Free instance: exact translation from the drag start.
                 let m = Self::manip_motion(h, d.plane_normal, d.plane_point, d.value, d.offset);
-                SolveOptions { targets: Self::moved_placements(&m, &d.start), start: Some(start), ..Default::default() }
+                SolveOptions { targets: Self::moved_placements(&m, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
-            _ => SolveOptions { drags: vec![(d.top, d.local, target)], start: Some(start), ..Default::default() },
+            _ => match d.nested {
+                Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+                None => SolveOptions { drags: vec![(d.top, d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+            },
         };
         cx.spawn(async move |this, cx| {
             let solved = cx.background_spawn(async move { prepared.solve(&opts) }).await;
@@ -2150,17 +2303,17 @@ impl AssemblyView {
     // ------------------------------------------------------------ render: toolbar
 
     fn tool(&self, id: &'static str, icon: &'static str, tip: &'static str, cx: &mut Context<Self>, f: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static) -> Button {
-        let pal = p();
-        Button::new(id).icon(Icon::empty().path(icon_path(icon)).text_color(pal.text).with_size(px(18.))).ghost().with_size(px(30.)).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))
+        // Onshape toolbar button: 30 px cell, 20 px full-color icon (§3.2).
+        crate::ui::tool_button(id, icon, false, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))
     }
 
     fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let sep = || div().w(px(1.)).h(px(22.)).mx_1().bg(pal.border);
+        let sep = crate::ui::tool_separator;
         let view = cx.entity();
         let mate_more = {
             let view = view.clone();
-            Button::new("tb-mate-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).dropdown_menu(move |mut menu, _, _| {
+            crate::ui::tool_caret("tb-mate-more", cx).dropdown_menu(move |mut menu, _, _| {
                 for t in MateType::ALL {
                     let v = view.clone();
                     menu = menu.item(PopupMenuItem::new(format!("{} mate", t.name())).icon(Icon::empty().path(mate_icon(t))).on_click(move |_, window, cx| v.update(cx, |this, cx| this.start_mate(t, window, cx))));
@@ -2170,7 +2323,7 @@ impl AssemblyView {
         };
         let relations = {
             let view = view.clone();
-            Button::new("tb-relations").icon(Icon::empty().path(icon_path("gear-relation")).text_color(pal.text).with_size(px(18.))).ghost().with_size(px(30.)).tooltip("Relations").dropdown_menu(move |mut menu, _, _| {
+            crate::ui::tool_button("tb-relations", "gear-relation", false, cx).w(px(crate::ui::TOOL_CELL + 12.)).child(crate::ui::glyph("ui-chevron-down", 9., pal.text)).tooltip("Relations").dropdown_menu(move |mut menu, _, _| {
                 for (label, icon, kind) in [
                     ("Gear relation", "gear-relation", RelationType::Gear),
                     ("Rack and pinion relation", "rack-pinion", RelationType::RackAndPinion),
@@ -2185,7 +2338,7 @@ impl AssemblyView {
         };
         let patterns = {
             let view = view.clone();
-            Button::new("tb-pattern-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).dropdown_menu(move |mut menu, _, _| {
+            crate::ui::tool_caret("tb-pattern-more", cx).dropdown_menu(move |mut menu, _, _| {
                 for (label, icon, kind) in [
                     ("Linear pattern", "linear-pattern", PatternDialogKind::Linear),
                     ("Circular pattern", "circular-pattern", PatternDialogKind::Circular),
@@ -2200,18 +2353,10 @@ impl AssemblyView {
             })
         };
         let exploded = self.explode.is_some();
-        h_flex()
-            .h(px(40.))
-            .px_2()
-            .gap_1()
-            .bg(pal.panel)
-            .border_b_1()
-            .border_color(pal.border)
-            .overflow_hidden()
-            .child(self.tool("tb-insert", "insert", "Insert parts and assemblies (I)", cx, |this, _, cx| {
-                this.insert_open = !this.insert_open;
-                cx.notify();
-            }).selected(self.insert_open))
+        crate::ui::toolbar()
+            .child(crate::ui::undo_redo(&self.doc, cx))
+            .child(sep())
+            .child(self.tool("tb-insert", "insert", "Insert parts and assemblies (I)", cx, |this, w, cx| this.toggle_insert(w, cx)).selected(self.insert_open))
             .child(sep())
             .child(self.tool("tb-replicate", "replicate", "Replicate (seed instance + its mate onto matching geometry)", cx, |this, w, cx| this.open_pattern(PatternDialogKind::Replicate, w, cx)))
             .child(h_flex().child(self.tool("tb-linpat", "linear-pattern", "Linear pattern", cx, |this, w, cx| this.open_pattern(PatternDialogKind::Linear, w, cx))).child(patterns))
@@ -2219,7 +2364,7 @@ impl AssemblyView {
             .child(self.tool("tb-mirror", "mirror", "Mirror", cx, |this, w, cx| this.open_pattern(PatternDialogKind::Mirror, w, cx)))
             .child(sep())
             .child(self.tool("tb-mc", "mate-connector-assembly", "Mate connector", cx, |this, w, cx| this.open_mc(None, w, cx)).selected(self.mc.is_some()))
-            .child(self.tool("tb-snap", "link", "Snap mode (Shift+S)", cx, |this, w, cx| this.toggle_snap(w, cx)).selected(self.snap.is_some()))
+            .child(self.tool("tb-snap", "snap-mode", "Snap mode (Shift+S)", cx, |this, w, cx| this.toggle_snap(w, cx)).selected(self.snap.is_some()))
             .child(h_flex().child(self.tool("tb-fastened", "fastened", "Fastened mate (M)", cx, |this, w, cx| this.start_mate(MateType::Fastened, w, cx))).child(mate_more))
             .child(self.tool("tb-revolute", "revolute", "Revolute mate", cx, |this, w, cx| this.start_mate(MateType::Revolute, w, cx)))
             .child(self.tool("tb-slider", "slider", "Slider mate", cx, |this, w, cx| this.start_mate(MateType::Slider, w, cx)))
@@ -2234,13 +2379,16 @@ impl AssemblyView {
             .child(self.tool("tb-group", "group", "Group (select 2+ instances)", cx, |this, _, cx| this.create_group(cx)))
             .child(relations)
             .child(self.tool("tb-fix", "fix-instance", "Fix / unfix selected", cx, |this, _, cx| this.toggle_fix_selected(cx)))
+            .child(self.tool("tb-replace", "replace-part", "Replace instance", cx, |this, _, cx| this.replace_selected(cx)).selected(self.replace_panel.is_some()))
+            .child(self.tool("tb-display-states", "display-states", "Display states", cx, |this, w, cx| this.toggle_display_states(w, cx)).selected(self.ui.display_states))
+            .child(self.tool("tb-show-mates", "show-mates", "Show mates (H)", cx, |this, _, cx| this.toggle_show_mates_mode(cx)).selected(self.show_mates_mode))
             .child(sep())
             .child(self.tool("tb-explode", "explode", "Exploded views", cx, |this, _, cx| this.toggle_explode_panel(cx)).selected(exploded || self.panel == Some(SidePanel::Explode)))
             .child(self.tool("tb-named", "named-position", "Named positions", cx, |this, _, cx| {
                 this.panel = if this.panel == Some(SidePanel::Positions) { None } else { Some(SidePanel::Positions) };
                 cx.notify();
             }).selected(self.panel == Some(SidePanel::Positions)))
-            .child(self.tool("tb-animate", "animate", "Animate mate", cx, |this, _, cx| this.start_animation(cx)).selected(self.anim.is_some()))
+            .child(self.tool("tb-animate", "animate", "Animate mate", cx, |this, w, cx| this.start_animation(w, cx)).selected(self.anim.is_some()))
             .child(sep())
             .child(self.tool("tb-interference", "interference", "Interference detection", cx, |this, _, cx| {
                 if this.panel == Some(SidePanel::Interference) {
@@ -2276,6 +2424,8 @@ impl AssemblyView {
         let hidden = inst.map(|i| i.hidden).unwrap_or_else(|| node.is_some_and(|n| n.hidden));
         let suppressed = inst.map(|i| i.suppressed).unwrap_or_else(|| node.is_some_and(|n| n.suppressed));
         let error = node.and_then(|n| n.error.clone());
+        // Onshape warns when more than one part is fixed.
+        let fixed_tip: SharedString = if is_top && fixed && self.assembly(cx).is_some_and(|a| a.fixed_instances().len() > 1) { format!("{name} has warning: More than one part is fixed").into() } else { "Part is fixed".into() };
         let ext_key = inst.and_then(|i| i.source.external_key().map(|k| k.to_string()));
         let update = ext_key.as_ref().and_then(|k| self.ext_updates.get(k).cloned().flatten()).zip(ext_key.clone());
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
@@ -2285,7 +2435,7 @@ impl AssemblyView {
         let icon = match kind {
             NodeKind::Part => "part",
             NodeKind::PartStudio => "part-studio",
-            NodeKind::Assembly => "assembly",
+            NodeKind::Assembly => "sub-assembly",
         };
         let color = if suppressed || hidden {
             pal.text_faint
@@ -2298,21 +2448,21 @@ impl AssemblyView {
         let p3 = path.clone();
         let row = h_flex()
             .id(SharedString::from(format!("inst-{}", path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
-            .h(px(24.))
-            .pl(px(6. + depth as f32 * 14.))
-            .pr_1()
-            .gap_1p5()
-            .rounded_sm()
-            .text_sm()
+            .group(SharedString::from(format!("inst-row-{}", top.0)))
+            .h(px(crate::ui::ROW_H))
+            .pl(px(5. + depth as f32 * 22.))
+            .pr(px(3.))
+            .gap(px(3.))
+            .text_size(px(crate::ui::ROW_TEXT))
             .text_color(color)
             .when(selected, |d| d.bg(pal.accent_soft))
-            .hover(|d| d.bg(pal.panel_hover))
+            .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(
                 div()
                     .id(SharedString::from(format!("exp-{}", path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
                     .w(px(12.))
                     .when(has_children, |d| {
-                        d.child(svg().path(icon_path(if expanded { "chevron-down" } else { "chevron-right" })).size_3().text_color(pal.text_faint)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.expanded.remove(&p2) {
                                 this.expanded.insert(p2.clone());
                             }
@@ -2321,11 +2471,32 @@ impl AssemblyView {
                         }))
                     }),
             )
-            .child(svg().path(icon_path(icon)).size_3p5().text_color(if suppressed { pal.text_faint } else { pal.text_muted }))
-            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(name.clone()))
-            .when(fixed, |d| d.child(svg().path(icon_path("fix")).size_3().text_color(pal.text_muted)))
+            .child(crate::ui::tree_icon(icon, suppressed || hidden, cx))
+            .child(match self.rename_field(behaviors::RenameRow::Instance(top)).filter(|_| is_top) {
+                Some(field) => field,
+                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(name.clone()).into_any_element(),
+            })
+            .when(fixed, |d| d.child(div().id(SharedString::from(format!("fixed-{}", top.0))).child(crate::assets::icon(&icon_path("fix"), 12., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(fixed_tip.clone()).build(w, cx))))
+            .when_some(inst.map(|i| i.lock.clone()).filter(|l| is_top && !l.is_flexible()), |d, lock| {
+                // Lock icon of a locked subassembly (click to unlock).
+                let tip = match &lock {
+                    SubassemblyLock::Named(n) => format!("Locked at named position {n}"),
+                    _ => "Locked at current position".to_string(),
+                };
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("lock-{}", top.0)))
+                        .cursor_pointer()
+                        .child(svg().path(icon_path("lock")).size_3().text_color(pal.text_muted))
+                        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            this.set_sub_lock(top, SubassemblyLock::Flexible, cx);
+                        })),
+                )
+            })
             .when_some(dof.filter(|d| *d > 0 && !fixed), |d, n| {
-                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).text_xs().text_color(pal.info).child(format!("{n}")).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has {n} degrees of freedom")).build(w, cx)))
+                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).text_xs().text_color(pal.info).child(format!("{n}")).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has degrees of freedom ({n})")).build(w, cx)))
             })
             .when_some(error.clone(), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .when_some(update.clone(), |d, (v, key)| {
@@ -2347,16 +2518,34 @@ impl AssemblyView {
                 )
             })
             .when(is_top, |d| {
+                // Eye icon on hover (kept visible on hidden instances).
                 d.child(
-                    Button::new(SharedString::from(format!("eye-{}", top.0)))
-                        .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
-                        .ghost()
-                        .xsmall()
-                        .tooltip(if hidden { "Show" } else { "Hide" })
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_hidden(vec![top], !hidden, cx))),
+                    div().when(!hidden, |d| d.invisible().group_hover(SharedString::from(format!("inst-row-{}", top.0)), |d| d.visible())).child(
+                        Button::new(SharedString::from(format!("eye-{}", top.0)))
+                            .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
+                            .ghost()
+                            .xsmall()
+                            .tooltip(if hidden { "Show" } else { "Hide" })
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                cx.stop_propagation();
+                                this.set_hidden(vec![top], !hidden, cx)
+                            })),
+                    ),
                 )
             })
+            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                // Hovering a row highlights the instance in the graphics area.
+                let new = if *h { Some(top) } else { None };
+                if this.ui.list_hover != new && (*h || this.ui.list_hover == Some(top)) {
+                    this.ui.list_hover = new;
+                    this.refresh_scene(false, cx);
+                }
+            }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+                if this.ui.group.is_some() {
+                    this.toggle_group_member(p3[0], cx);
+                    return;
+                }
                 this.selected_mate = None;
                 let top = p3[0];
                 if ev.modifiers().shift || ev.modifiers().secondary() {
@@ -2374,60 +2563,37 @@ impl AssemblyView {
         if !is_top {
             return row.into_any_element();
         }
-        let view = cx.entity();
-        row.context_menu(move |menu, _, _| {
-            let (v1, v2, v3, v4, v5) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
-            let menu = menu.item(PopupMenuItem::new(if fixed { "Unfix" } else { "Fix" }).on_click(move |_, _, cx| v1.update(cx, |t, cx| {
-                let ids = t.targets(Some(top));
-                t.set_fixed(ids, !fixed, cx)
-            })))
-            .item(PopupMenuItem::new(if hidden { "Show" } else { "Hide" }).on_click(move |_, _, cx| v2.update(cx, |t, cx| {
-                let ids = t.targets(Some(top));
-                t.set_hidden(ids, !hidden, cx)
-            })))
-            .item(PopupMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| v3.update(cx, |t, cx| {
-                let ids = t.targets(Some(top));
-                t.set_suppressed(ids, !suppressed, cx)
-            })))
-            .item(PopupMenuItem::new("Isolate").on_click(move |_, _, cx| v4.update(cx, |t, cx| {
-                let ids = t.targets(Some(top));
-                t.isolate(ids, cx)
-            })))
-            .separator()
-            .item({
-                let v = view.clone();
-                PopupMenuItem::new("Change configuration…").on_click(move |_, window, cx| v.update(cx, |t, cx| t.open_config(top, window, cx)))
-            })
-            .item({
-                let v = view.clone();
-                PopupMenuItem::new("Replace instance…").on_click(move |_, _, cx| v.update(cx, |t, cx| t.open_replace(top, cx)))
-            })
-
-            .item({
-                let v = view.clone();
-                PopupMenuItem::new("Add mate connector at instance origin").on_click(move |_, window, cx| v.update(cx, |t, cx| t.mc_at_instance_origin(top, window, cx)))
-            })
-            .item({
-                let v = view.clone();
-                PopupMenuItem::new("Show mates").on_click(move |_, _, cx| v.update(cx, |t, cx| {
-                    t.show_mates_mode = true;
-                    t.mates_pinned = Some(top);
-                    t.refresh_scene(false, cx);
-                    cx.notify();
-                }))
-            })
-            .separator()
-            .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v5.update(cx, |t, cx| {
-                let ids = t.targets(Some(top));
-                t.delete_instances(ids, cx)
-            })));
-            match update.clone() {
-                Some((ver, key)) => {
-                    let v = view.clone();
-                    menu.separator().item(PopupMenuItem::new(format!("Update to {}", ver.label)).on_click(move |_, _, cx| v.update(cx, |t, cx| t.update_external(&key, &ver, cx))))
+        // Drag and drop: reorder (drives BOM order), joining the target's folder.
+        let accent = pal.accent;
+        let row = row
+            .on_drag(behaviors::InstanceDrag { id: top, label: name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
+            .drag_over::<behaviors::InstanceDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
+            .on_drop(cx.listener(move |this, d: &behaviors::InstanceDrag, _, cx| {
+                if d.id == top {
+                    return;
                 }
-                None => menu,
+                let id = d.id;
+                // Dropped onto a subassembly: into it (Onshape); else reorder.
+                if this.assembly(cx).and_then(|a| a.instance(top)).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { .. })) {
+                    let ids = if this.selected.contains(&id) { this.selected.clone() } else { vec![id] };
+                    this.move_into_subassembly(ids, top, cx);
+                } else {
+                    this.edit("Reorder instances", cx, |a| a.move_instance(id, Some(top)));
+                }
+            }));
+        let view = cx.entity();
+        row.context_menu(move |menu, window, cx| {
+            let mut entries = view.read(cx).instance_menu(top, false, cx);
+            if let Some((ver, key)) = update.clone() {
+                entries.push(MenuEntry::Sep);
+                entries.push(MenuEntry::Item {
+                    label: format!("Update to {}", ver.label),
+                    icon: None,
+                    disabled: false,
+                    act: std::rc::Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.update_external(&key, &ver, cx)),
+                });
             }
+            fill_menu(menu, entries, view.clone(), window, cx)
         })
         .into_any_element()
     }
@@ -2442,9 +2608,9 @@ impl AssemblyView {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn feature_row(&self, id: MateId, icon: SharedString, name: String, ok: bool, inactive: bool, message: Option<String>, cx: &mut Context<Self>) -> AnyElement {
+    fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
         let selected = self.selected_mate == Some(id);
         let color = if inactive {
             pal.text_faint
@@ -2453,23 +2619,59 @@ impl AssemblyView {
         } else {
             pal.text
         };
+        let expanded = self.ui.expanded_mates.contains(&id);
+        let can_expand = !implicit.is_empty();
+        let tip = match (&message, tooltip) {
+            (Some(m), Some(t)) => Some(format!("{name} has error: {m}\n{t}")),
+            (Some(m), None) => Some(format!("{name} has error: {m}")),
+            (None, t) => t,
+        };
         let row = h_flex()
             .id(SharedString::from(format!("mate-{}", id.0)))
-            .h(px(24.))
-            .px_2()
-            .gap_2()
-            .rounded_sm()
-            .text_sm()
+            .group(SharedString::from(format!("mate-row-{}", id.0)))
+            .h(px(crate::ui::ROW_H))
+            .pl(px(5.))
+            .pr(px(3.))
+            .gap(px(3.))
+            .text_size(px(crate::ui::ROW_TEXT))
             .text_color(color)
             .when(selected, |d| d.bg(pal.accent_soft))
-            .hover(|d| d.bg(pal.panel_hover))
-            .child(svg().path(icon).size_3p5().text_color(if ok { pal.text_muted } else { pal.error }))
-            .child(div().flex_1().truncate().when(inactive, |d| d.line_through()).child(name))
+            .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
+            .child(div().id(SharedString::from(format!("mexp-{}", id.0))).w(px(12.)).when(can_expand, |d| {
+                d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if !this.ui.expanded_mates.remove(&id) {
+                        this.ui.expanded_mates.insert(id);
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+            }))
+            .child(crate::assets::icon(&icon, 14., cx))
+            .child(match self.rename_field(behaviors::RenameRow::Feature(id)) {
+                Some(field) => field,
+                None => div().flex_1().truncate().when(inactive, |d| d.line_through()).child(name.clone()).into_any_element(),
+            })
+            .when(has_limits, |d| {
+                let n = name.clone();
+                d.child(div().id(SharedString::from(format!("mlim-{}", id.0))).child(crate::assets::icon(&icon_path("mate-limits"), 12., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("{n} has limits")).build(w, cx)))
+            })
             .when(!ok && !inactive, |d| d.child(div().size(px(6.)).rounded_full().bg(pal.error)))
-            .when_some(message, |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
+            .when_some(hidden, |d, hidden| {
+                // Eye icon (shown on hover, or always while hidden) toggles the mate indicator.
+                d.child(
+                    div()
+                        .invisible()
+                        .group_hover(SharedString::from(format!("mate-row-{}", id.0)), |d| d.visible())
+                        .child(Button::new(SharedString::from(format!("meye-{}", id.0))).icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" }))).ghost().xsmall().tooltip(if hidden { "Show" } else { "Hide" }).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            this.set_mates_hidden(vec![id], !hidden, cx);
+                        }))),
+                )
+            })
+            .when_some(tip, |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
-                if this.list_hover_mate != new {
+                if this.list_hover_mate != new && (*h || this.list_hover_mate == Some(id)) {
                     this.list_hover_mate = new;
                     this.refresh_scene(false, cx);
                 }
@@ -2479,48 +2681,191 @@ impl AssemblyView {
                     this.edit_mate(id, window, cx);
                     return;
                 }
+                if this.pick_mode(cx).is_some() {
+                    return;
+                }
+                if this.relation.is_some() {
+                    // Relation dialog: clicking a mate fills the next mate field.
+                    this.pick_relation_mate(id, cx);
+                    return;
+                }
                 this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
                 this.selected.clear();
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));
         let view = cx.entity();
-        row.context_menu(move |menu, _, _| {
-            let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
-            menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.edit_mate(id, window, cx))))
-                .item(PopupMenuItem::new("Animate…").on_click(move |_, _, cx| v2.update(cx, |t, cx| {
-                    t.selected_mate = Some(id);
-                    t.start_animation(cx)
-                })))
-                .item(PopupMenuItem::new(if inactive { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| v3.update(cx, |t, cx| t.toggle_mate_suppressed(id, cx))))
-                .separator()
-                .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.delete_mate(id, cx))))
-        })
-        .into_any_element()
+        let main = row
+            .context_menu(move |menu, window, cx| {
+                let entries = view.read(cx).mate_menu(id, cx);
+                fill_menu(menu, entries, view.clone(), window, cx)
+            })
+            .into_any_element();
+        if !(expanded && can_expand) {
+            return main;
+        }
+        // Implicit mate connectors are listed under the mate that uses them.
+        let mut col = v_flex().gap_px().child(main);
+        for (k, (label, _)) in implicit.into_iter().enumerate() {
+            col = col.child(
+                h_flex()
+                    .id(SharedString::from(format!("mimp-{}-{k}", id.0)))
+                    .h(px(22.))
+                    .pl(px(32.))
+                    .gap_1p5()
+                    .rounded_sm()
+                    .text_xs()
+                    .text_color(pal.text_muted)
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(crate::assets::icon(&icon_path("mate-connector"), 12., cx))
+                    .child(div().flex_1().truncate().child(label))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        let new = if *h { Some(id) } else { None };
+                        if this.list_hover_mate != new {
+                            this.list_hover_mate = new;
+                            this.refresh_scene(false, cx);
+                        }
+                    })),
+            );
+        }
+        col.into_any_element()
+    }
+
+    /// Top-level assembly row (click selects every instance; its menu has Unfix all, Expand all...).
+    fn assembly_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let all_selected = self.assembly(cx).is_some_and(|a| !a.instances.is_empty() && a.instances.iter().all(|i| self.selected.contains(&i.id)));
+        let view = cx.entity();
+        h_flex()
+            .id("asm-top-row")
+            .h(px(crate::ui::ROW_H))
+            .pl(px(5.))
+            .pr_1()
+            .gap_1p5()
+            .rounded_sm()
+            .text_sm()
+            .text_color(pal.text)
+            .when(all_selected, |d| d.bg(pal.accent_soft))
+            .hover(|d| d.bg(pal.panel_hover))
+            .child(div().w(px(12.)))
+            .child(crate::assets::icon(&icon_path("assembly"), 14., cx))
+            .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN)) {
+                Some(field) => field,
+                None => div().flex_1().truncate().child(name).into_any_element(),
+            })
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.selected = this.assembly(cx).map(|a| a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).map(|i| i.id).collect()).unwrap_or_default();
+                this.selected_mate = None;
+                this.refresh_scene(false, cx);
+                cx.notify();
+            }))
+            .context_menu(move |menu, window, cx| {
+                let entries = view.read(cx).assembly_menu(cx);
+                fill_menu(menu, entries, view.clone(), window, cx)
+            })
+            .into_any_element()
+    }
+
+    /// Read-only description of a mate's offsets and limits (row tooltip).
+    fn mate_tooltip(&self, m: &Mate) -> String {
+        let mut lines = vec![format!("{} mate", m.mate_type.name())];
+        let mut offs: Vec<String> = Vec::new();
+        for (label, e) in [("X", &m.offset_x), ("Y", &m.offset_y), ("Z", &m.offset_z)] {
+            if let Some(e) = e.as_ref().filter(|e| !e.text.trim().is_empty()) {
+                offs.push(format!("{label} {}", e.text));
+            }
+        }
+        if let Some(e) = m.rotation.as_ref().filter(|e| !e.text.trim().is_empty()) {
+            offs.push(format!("rotation {} about {}", e.text, ["X", "Y", "Z"][(m.rotation_axis as usize).min(2)]));
+        }
+        lines.push(if offs.is_empty() { "Offset: off".into() } else { format!("Offset: {}", offs.join(", ")) });
+        if !m.limits.is_empty() {
+            let mut ls = Vec::new();
+            for (k, l) in &m.limits {
+                let label = match k.as_str() {
+                    "rz" => "Z angle",
+                    "x" => "X",
+                    "y" => "Y",
+                    "cone" => "Cone angle",
+                    _ => "Z",
+                };
+                let t = |e: &Option<ExprValue>| e.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "–".into());
+                ls.push(format!("{label} {} to {}", t(&l.min), t(&l.max)));
+            }
+            lines.push(format!("Limits: {}", ls.join(", ")));
+        }
+        lines.join("\n")
     }
 
     fn render_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(asm) = self.assembly(cx).cloned() else { return div().into_any_element() };
         let result = self.result.clone();
+        let filtering = !self.ui.filter.is_empty();
         let mut rows: Vec<AnyElement> = Vec::new();
-        rows.push(self.origin_row(cx));
+        let mut selected_row: Option<usize> = None;
+        if !filtering {
+            rows.push(self.assembly_row(cx));
+            rows.push(self.origin_row(cx));
+        }
+        let mut shown_folders: HashSet<MateId> = HashSet::new();
         for inst in &asm.instances {
             if asm.generated_by(inst.id).is_some() {
                 continue;
             }
+            // Folders show at the place of their first member (not while filtering).
+            if !filtering && let Some(folder) = asm.folder_of_instance(inst.id) {
+                if shown_folders.insert(folder.id) {
+                    rows.push(self.folder_row(folder, cx));
+                    if self.expanded.contains(&vec![InstanceId(folder.id.0)]) {
+                        for m in &folder.instances {
+                            let Some(mi) = asm.instance(*m) else { continue };
+                            let node = result.node(&[mi.id]);
+                            if selected_row.is_none() && self.selected.first() == Some(&mi.id) {
+                                selected_row = Some(rows.len());
+                            }
+                            rows.push(self.instance_row(node, Some(mi), vec![mi.id], 1, cx));
+                            if let Some(n) = node {
+                                self.push_children(n, 2, &mut rows, cx);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
             let node = result.node(&[inst.id]);
+            if !self.instance_passes(inst, node) {
+                continue;
+            }
+            if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
+                selected_row = Some(rows.len());
+            }
             rows.push(self.instance_row(node, Some(inst), vec![inst.id], 0, cx));
-            if let Some(n) = node {
+            if let Some(n) = node
+                && !filtering
+            {
                 self.push_children(n, 1, &mut rows, cx);
             }
         }
+        if !filtering {
+            // Empty instance folders.
+            for folder in asm.folders.iter().filter(|f| f.instances.is_empty() && f.features.is_empty()) {
+                rows.push(self.folder_row(folder, cx));
+            }
+        }
         for p in &asm.patterns {
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Pattern, &p.name, false, p.suppressed, false, false) {
+                continue;
+            }
             let err = result.pattern_errors.iter().find(|(id, _)| *id == p.id).map(|(_, m)| m.clone());
             rows.push(self.pattern_row(p, err, cx));
             if self.expanded.contains(&vec![InstanceId(p.id.0)]) {
                 for g in &p.generated {
                     if let Some(inst) = asm.instance(g.instance) {
+                        if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
+                            selected_row = Some(rows.len());
+                        }
                         rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], 1, cx));
                     }
                 }
@@ -2529,31 +2874,62 @@ impl AssemblyView {
         if asm.instances.is_empty() {
             rows.push(div().px_3().py_2().text_xs().text_color(pal.text_faint).child("Insert parts and assemblies (I) to start.").into_any_element());
         }
+        // Selecting in the graphics area scrolls the list to the row.
+        if std::mem::take(&mut self.ui.scroll_to_selection)
+            && let Some(ix) = selected_row
+        {
+            self.ui.list_scroll.scroll_to_item(ix);
+        }
+        let labeler = self.labeler(cx);
         let mut mate_rows: Vec<AnyElement> = Vec::new();
+        let mut mate_ids: Vec<MateId> = Vec::new();
         for c in &asm.connectors {
             let st = result.connectors.iter().find(|s| s.id == c.id);
             let msg = st.and_then(|s| s.message.clone());
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Connector, &c.name, msg.is_some(), c.suppressed, c.hidden, false) {
+                continue;
+            }
             mate_rows.push(self.connector_row(c, msg, cx));
+            mate_ids.push(c.id);
         }
         for m in &asm.mates {
             let st = result.mates.iter().find(|s| s.id == m.id);
             let ok = st.is_none_or(|s| s.ok);
             let inactive = m.suppressed || st.is_some_and(|s| s.inactive);
-            mate_rows.push(self.feature_row(m.id, mate_icon(m.mate_type), m.name.clone(), ok, inactive, st.and_then(|s| s.message.clone()), cx));
+            let hidden = m.hidden || !self.show_mates;
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Mate, &m.name, !ok, inactive, hidden, !m.limits.is_empty()) {
+                continue;
+            }
+            let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| (labeler(c), c.clone())).collect();
+            mate_rows.push(self.feature_row(
+                FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), implicit },
+                cx,
+            ));
+            mate_ids.push(m.id);
         }
         for r in &asm.relations {
             let st = result.relations.iter().find(|s| s.id == r.id);
+            let ok = st.is_none_or(|s| s.ok);
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Relation, &r.name, !ok, r.suppressed, false, false) {
+                continue;
+            }
             let icon = icon_path(match r.relation_type {
                 RelationType::Gear => "gear-relation",
                 RelationType::RackAndPinion => "rack-pinion",
                 RelationType::Screw => "screw-relation",
                 RelationType::Linear => "linear-relation",
             });
-            mate_rows.push(self.feature_row(r.id, icon, r.name.clone(), st.is_none_or(|s| s.ok), r.suppressed, st.and_then(|s| s.message.clone()), cx));
+            mate_rows.push(self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive: r.suppressed, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
+            mate_ids.push(r.id);
         }
         for g in &asm.groups {
-            mate_rows.push(self.feature_row(g.id, icon_path("group"), g.name.clone(), true, g.suppressed, None, cx));
+            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
+                continue;
+            }
+            mate_rows.push(self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: true, inactive: g.suppressed, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
+            mate_ids.push(g.id);
         }
+        let mate_rows = if filtering { mate_rows } else { self.fold_mate_rows(&asm, mate_ids, mate_rows, cx) };
         let dof = result.solved.dof;
         v_flex()
             .size_full()
@@ -2562,22 +2938,32 @@ impl AssemblyView {
             .border_color(pal.border)
             .child(
                 h_flex()
-                    .h(px(32.))
-                    .px_3()
+                    .h(px(30.))
+                    .flex_none()
+                    .px(px(6.))
                     .justify_between()
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(format!("INSTANCES ({})", asm.instances.len())))
-                    .child(div().text_xs().text_color(pal.text_faint).child(if dof > 0 { format!("{dof} DOF") } else { String::new() })),
+                    .child(crate::ui::panel_title(format!("Instances ({})", asm.instances.len())))
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .child(div().text_xs().text_color(pal.text_faint).child(if dof > 0 { format!("{dof} DOF") } else { String::new() }))
+                            // New folder (around the selection, or empty).
+                            .child(Button::new("asm-new-folder").icon(Icon::empty().path(icon_path("folder"))).ghost().xsmall().tooltip("New folder").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                let ids = this.selected.clone();
+                                this.folder_from_instances(ids, window, cx);
+                            }))),
+                    ),
             )
-            .child(v_flex().id("instance-list").flex_1().min_h_0().p_1().gap_px().overflow_y_scroll().children(rows))
+            .child(self.render_list_filter(cx))
+            .child(v_flex().id("instance-list").flex_1().min_h_0().pt(px(2.)).overflow_y_scroll().track_scroll(&self.ui.list_scroll).children(rows))
             .child(
                 v_flex()
                     .max_h(px(280.))
                     .border_t_1()
                     .border_color(pal.border)
-                    .child(h_flex().h(px(28.)).px_3().child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(format!("MATE FEATURES ({})", asm.mates.len() + asm.relations.len() + asm.groups.len() + asm.connectors.len()))))
-                    .child(v_flex().id("mate-list").p_1().gap_px().overflow_y_scroll().children(mate_rows)),
+                    .pt(px(4.))
+                    .child(crate::ui::tree_row("mates-folder", false).child(crate::ui::caret(true)).child(format!("Mates ({})", asm.mates.len() + asm.relations.len() + asm.groups.len() + asm.connectors.len())))
+                    .child(v_flex().id("mate-list").pl(px(17.)).overflow_y_scroll().children(mate_rows)),
             )
             .into_any_element()
     }
@@ -2586,127 +2972,160 @@ impl AssemblyView {
 
     fn panel_frame(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str) -> Div {
         let pal = p();
+        // Onshape dialog frame: white at 95%, no border or radius, 28 px header (§3.9).
         v_flex()
-            .w(px(300.))
+            .w(px(280.))
             .max_h(px(560.))
-            .rounded_lg()
-            .border_1()
-            .border_color(pal.border_strong)
-            .bg(pal.panel_raised)
-            .shadow_lg()
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .child(
                 h_flex()
-                    .px_3()
-                    .py_2()
-                    .gap_2()
+                    .h(px(28.))
+                    .flex_none()
+                    .pl(px(6.))
+                    .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
-                    .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(title.to_string()))
-                    .child(Button::new(id).icon(IconName::Close).ghost().xsmall().on_click(close)),
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string()))
+                    .child(Button::new(id).ghost().child(crate::ui::glyph("close", 14., pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)),
             )
             .child(body)
     }
 
     fn render_insert_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let mut body = v_flex().id("insert-body").p_2().gap_1().overflow_y_scroll().max_h(px(480.));
-        body = body.child(Checkbox::new("insert-rigid").label("Insert entire Part Studio as rigid").checked(self.insert_rigid).on_click(cx.listener(|this, v: &bool, _, cx| {
-            this.insert_rigid = *v;
-            cx.notify();
-        })));
-        body = body.child(div().pt_1().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("PART STUDIOS"));
-        for s in self.catalog.studios.clone() {
-            let s2 = s.clone();
-            body = body.child(
-                h_flex()
-                    .id(SharedString::from(format!("ins-ps-{}", s.tab)))
-                    .h(px(26.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
-                    .cursor_pointer()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path("part-studio")).size_4().text_color(pal.accent))
-                    .child(div().flex_1().text_sm().truncate().child(s.name.clone()))
-                    .child(div().text_xs().text_color(pal.text_faint).child(if self.insert_rigid { "rigid".to_string() } else { format!("{} parts", s.parts.len()) }))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))),
-            );
-            if !self.insert_rigid {
-                for part in &s.parts {
-                    let part2 = part.clone();
-                    let tab = s.tab;
-                    body = body.child(
-                        h_flex()
-                            .id(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)))
-                            .h(px(24.))
-                            .pl(px(26.))
-                            .pr_2()
-                            .gap_2()
-                            .rounded_sm()
-                            .cursor_pointer()
-                            .text_sm()
-                            .hover(|d| d.bg(pal.panel_hover))
-                            .child(svg().path(icon_path("part")).size_3p5().text_color(pal.text_muted))
-                            .child(div().flex_1().truncate().child(part.1.clone()))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
-                    );
-                }
+        let query = self.ui.insert_search.as_ref().map(|s| s.read(cx).value().trim().to_lowercase()).unwrap_or_default();
+        let hit = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
+        let (source, tab) = (self.ui.insert_source, self.ui.insert_tab);
+        let seg = |id: &'static str, label: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut AsmUi)| {
+            Button::new(id).label(label).ghost().xsmall().selected(on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                f(&mut this.ui);
+                cx.notify();
+            }))
+        };
+        // Source tabs (Onshape: Current document | Other documents), element
+        // tabs (Part Studios | Assemblies) and the search box.
+        let mut head = v_flex().px_2().pt_2().gap_1().child(
+            h_flex()
+                .gap_1()
+                .child(seg("ins-src-cur", "Current document", source == 0, cx, |u| u.insert_source = 0))
+                .child(seg("ins-src-other", "Other documents", source == 1, cx, |u| u.insert_source = 1)),
+        );
+        if source == 0 {
+            head = head.child(h_flex().gap_1().child(seg("ins-tab-ps", "Part Studios", tab == 0, cx, |u| u.insert_tab = 0)).child(seg("ins-tab-asm", "Assemblies", tab == 1, cx, |u| u.insert_tab = 1)));
+            if let Some(st) = &self.ui.insert_search {
+                head = head.child(Input::new(st).xsmall().cleanable(true));
             }
         }
-        body = body.child(div().pt_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("ASSEMBLIES"));
-        if self.catalog.assemblies.is_empty() {
-            body = body.child(div().px_2().text_xs().text_color(pal.text_faint).child("No other assemblies can be inserted."));
-        }
-        for (tab, name) in self.catalog.assemblies.clone() {
-            let n2 = name.clone();
+        let mut body = v_flex().id("insert-body").p_2().gap_1().overflow_y_scroll().max_h(px(440.));
+        if source == 1 {
             body = body.child(
                 h_flex()
-                    .id(SharedString::from(format!("ins-asm-{tab}")))
+                    .id("ins-other-doc")
                     .h(px(26.))
                     .px_2()
                     .gap_2()
                     .rounded_sm()
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path("assembly")).size_4().text_color(pal.accent))
-                    .child(div().flex_1().text_sm().truncate().child(name))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))),
-            );
-        }
-        body = body.child(div().pt_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("OTHER DOCUMENTS"));
-        body = body.child(
-            h_flex()
-                .id("ins-other-doc")
-                .h(px(26.))
-                .px_2()
-                .gap_2()
-                .rounded_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(svg().path(icon_path("document")).size_4().text_color(pal.accent))
-                .child(div().flex_1().text_sm().child("Other document…"))
-                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                    let v = cx.entity();
-                    crate::files::request_open_path("Insert from document", "noshape documents", &["noshape"], window, cx, move |path, cx| {
-                        v.update(cx, |this, cx| {
-                            match crate::derived::external_doc_info(&path) {
-                                Ok(info) => this.ext_pick = Some((info, 0)),
-                                Err(e) => this.message = Some((true, format!("Could not open {}: {e:#}", path.display()))),
-                            }
-                            cx.notify();
+                    .child(crate::assets::icon(&icon_path("document"), 16., cx))
+                    .child(div().flex_1().text_sm().child("Choose a document…"))
+                    .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                        let v = cx.entity();
+                        crate::files::request_open_path("Insert from document", "noshape documents", &["noshape"], window, cx, move |path, cx| {
+                            v.update(cx, |this, cx| {
+                                match crate::derived::external_doc_info(&path) {
+                                    Ok(info) => this.ext_pick = Some((info, 0)),
+                                    Err(e) => this.message = Some((true, format!("Could not open {}: {e:#}", path.display()))),
+                                }
+                                cx.notify();
+                            });
                         });
-                    });
-                })),
-        );
-        if let Some(ch) = self.render_ext_insert_chooser(cx) {
-            body = body.child(ch);
+                    })),
+            );
+            if let Some(ch) = self.render_ext_insert_chooser(cx) {
+                body = body.child(ch);
+            }
+        } else if tab == 0 {
+            body = body.child(Checkbox::new("insert-rigid").label("Insert entire Part Studio as rigid").checked(self.insert_rigid).on_click(cx.listener(|this, v: &bool, _, cx| {
+                this.insert_rigid = *v;
+                cx.notify();
+            })));
+            let mut any = false;
+            for s in self.catalog.studios.clone() {
+                let studio_hit = hit(&s.name);
+                let parts: Vec<CatalogPart> = s.parts.iter().filter(|p| studio_hit || hit(&p.1)).cloned().collect();
+                if !studio_hit && parts.is_empty() {
+                    continue;
+                }
+                any = true;
+                let s2 = s.clone();
+                body = body.child(
+                    h_flex()
+                        .id(SharedString::from(format!("ins-ps-{}", s.tab)))
+                        .h(px(26.))
+                        .px_2()
+                        .gap_2()
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .child(crate::assets::icon(&icon_path("part-studio"), 16., cx))
+                        .child(div().flex_1().text_sm().truncate().child(s.name.clone()))
+                        .child(div().text_xs().text_color(pal.text_faint).child(if self.insert_rigid { "rigid".to_string() } else { format!("{} parts", s.parts.len()) }))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))),
+                );
+                if let Some(el) = self.render_insert_config(s.tab, cx) {
+                    body = body.child(el);
+                }
+                if !self.insert_rigid {
+                    for part in parts {
+                        let part2 = part.clone();
+                        let tab = s.tab;
+                        body = body.child(
+                            h_flex()
+                                .id(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)))
+                                .h(px(24.))
+                                .pl(px(26.))
+                                .pr_2()
+                                .gap_2()
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .text_sm()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .child(crate::assets::icon(&icon_path("part"), 14., cx))
+                                .child(div().flex_1().truncate().child(part.1.clone()))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
+                        );
+                    }
+                }
+            }
+            if !any {
+                body = body.child(div().px_2().text_xs().text_color(pal.text_faint).child(if query.is_empty() { "No Part Studios with parts." } else { "No results." }));
+            }
+        } else {
+            let list: Vec<(TabId, String)> = self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect();
+            if list.is_empty() {
+                body = body.child(div().px_2().text_xs().text_color(pal.text_faint).child(if self.catalog.assemblies.is_empty() { "No other assemblies can be inserted." } else { "No results." }));
+            }
+            for (tab, name) in list {
+                let n2 = name.clone();
+                body = body.child(
+                    h_flex()
+                        .id(SharedString::from(format!("ins-asm-{tab}")))
+                        .h(px(26.))
+                        .px_2()
+                        .gap_2()
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .child(crate::assets::icon(&icon_path("assembly"), 16., cx))
+                        .child(div().flex_1().text_sm().truncate().child(name))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))),
+                );
+            }
         }
-        Self::panel_frame("Insert parts and assemblies", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.insert_open = false;
-            cx.notify();
-        }), "insert-close")
-        .into_any_element()
+        Self::panel_frame("Insert parts and assemblies", v_flex().child(head).child(body), cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)), "insert-close").into_any_element()
     }
 
     fn render_relation_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -2778,49 +3197,6 @@ impl AssemblyView {
         .into_any_element()
     }
 
-    fn render_anim_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let Some(a) = &self.anim else { return div().into_any_element() };
-        let name = self.assembly(cx).and_then(|x| x.mate(a.mate).map(|m| m.name.clone())).unwrap_or_default();
-        let units = self.units(cx);
-        let fmt = |v: f64| {
-            let q = if a.angular { noshape_units::Quantity::radians(v) } else { noshape_units::Quantity::meters(v) };
-            noshape_units::format_quantity(q, &units)
-        };
-        let cur = a.start + (a.end - a.start) * a.t;
-        let playing = a.playing;
-        let pb = a.playback;
-        let body = v_flex()
-            .p_3()
-            .gap_2()
-            .child(div().text_xs().text_color(pal.text_muted).child(format!("From {} to {}", fmt(a.start), fmt(a.end))))
-            .child(div().text_sm().child(format!("Current: {}", fmt(cur))))
-            .child(
-                h_flex()
-                    .gap_1()
-                    .child(Button::new("anim-play").icon(if playing { IconName::Pause } else { IconName::Play }).small().ghost().label(if playing { "Stop" } else { "Play" }).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if playing {
-                            this.stop_animation(window, cx);
-                        } else {
-                            this.play_animation(cx);
-                        }
-                    })))
-                    .child(Button::new("anim-loop").label("Loop").xsmall().ghost().selected(pb == Playback::Loop).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(a) = &mut this.anim {
-                            a.playback = Playback::Loop;
-                        }
-                        cx.notify();
-                    })))
-                    .child(Button::new("anim-recip").label("Reciprocate").xsmall().ghost().selected(pb == Playback::Reciprocate).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(a) = &mut this.anim {
-                            a.playback = Playback::Reciprocate;
-                        }
-                        cx.notify();
-                    }))),
-            );
-        Self::panel_frame(&format!("Animate {name}"), body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close").into_any_element()
-    }
-
     fn render_side_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
@@ -2837,6 +3213,14 @@ impl AssemblyView {
             Some(SidePanel::Bom) => {
                 let rows = analysis::bom(&self.result);
                 let studio_name = |t: TabId| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default();
+                // Configured parts: name the non-default configuration, so rows
+                // of the same part in different configurations can be told apart.
+                let config_text = |r: &analysis::BomRow| -> String {
+                    match self.doc.read(cx).session.doc.tab(r.studio).map(|t| &t.content) {
+                        Some(noshape_model::TabContent::PartStudio(ps)) => ps.configuration.describe(&r.config),
+                        _ => String::new(),
+                    }
+                };
                 let mut body = v_flex().id("bom-body").p_2().gap_px().overflow_y_scroll().max_h(px(460.));
                 body = body.child(
                     h_flex()
@@ -2858,7 +3242,10 @@ impl AssemblyView {
                             .rounded_sm()
                             .hover(|d| d.bg(pal.panel_hover))
                             .child(div().w(px(28.)).text_color(pal.text_faint).child(format!("{}", r.item)))
-                            .child(div().flex_1().truncate().child(r.name.clone()))
+                            .child(div().flex_1().truncate().child(match config_text(r) {
+                                c if c.is_empty() => r.name.clone(),
+                                c => format!("{} ({c})", r.name),
+                            }))
                             .child(div().w(px(90.)).truncate().text_xs().text_color(pal.text_muted).child(match r.external.as_deref().and_then(crate::derived::ExternalRef::parse) {
                                 Some(e) => e.path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Other document".into()),
                                 None => studio_name(r.studio),
@@ -2885,7 +3272,6 @@ impl AssemblyView {
                         body = body.child(div().p_2().text_sm().text_color(pal.success).child("No interference found."));
                     }
                     for (i, it) in list.iter().enumerate() {
-                        let vol = it.volume.cbrt();
                         let (a, b) = (it.a[0], it.b[0]);
                         body = body.child(
                             v_flex()
@@ -2896,7 +3282,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .child(div().text_sm().text_color(pal.error).child(format!("{}  ×  {}", path_name(&it.a), path_name(&it.b))))
-                                .child(div().text_xs().text_color(pal.text_muted).child(format!("Volume ≈ ({})³", noshape_units::format_quantity(noshape_units::Quantity::meters(vol), &units))))
+                                .child(div().text_xs().text_color(pal.text_muted).child(format!("Volume ≈ {}", noshape_units::format_quantity(noshape_units::Quantity::new(it.volume, noshape_units::Dim::VOLUME), &units))))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     this.selected = vec![a, b];
                                     this.refresh_scene(false, cx);
@@ -2918,76 +3304,11 @@ impl AssemblyView {
         }
     }
 
-    fn render_context_menu(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
-        let (pos, top) = self.context_menu?;
-        let inst = self.assembly(cx)?.instance(top)?.clone();
-        let item = |id: &'static str, label: String, cx: &mut Context<Self>, f: MenuAction| {
-            h_flex()
-                .id(id)
-                .h(px(26.))
-                .px_3()
-                .rounded_sm()
-                .text_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(label)
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                    this.context_menu = None;
-                    f(this, window, cx);
-                    cx.notify();
-                }))
-        };
-        let (fixed, hidden, suppressed) = (inst.fixed, inst.hidden, inst.suppressed);
-        let menu = v_flex()
-            .id("asm-ctx")
-            .w(px(180.))
-            .p_1()
-            .rounded_md()
-            .border_1()
-            .border_color(pal.border_strong)
-            .bg(pal.panel_raised)
-            .shadow_lg()
-            .text_color(pal.text)
-            .child(div().px_3().py_1().text_xs().text_color(pal.text_faint).child(inst.name.clone()))
-            .child(item("ctx-fix", (if fixed { "Unfix" } else { "Fix" }).into(), cx, Box::new(move |t, _w, cx| {
-                let ids = t.targets(Some(top));
-                t.set_fixed(ids, !fixed, cx)
-            })))
-            .child(item("ctx-hide", (if hidden { "Show" } else { "Hide" }).into(), cx, Box::new(move |t, _w, cx| {
-                let ids = t.targets(Some(top));
-                t.set_hidden(ids, !hidden, cx)
-            })))
-            .child(item("ctx-supp", (if suppressed { "Unsuppress" } else { "Suppress" }).into(), cx, Box::new(move |t, _w, cx| {
-                let ids = t.targets(Some(top));
-                t.set_suppressed(ids, !suppressed, cx)
-            })))
-            .child(item("ctx-iso", (if self.isolate.is_some() { "Exit isolate" } else { "Isolate" }).into(), cx, Box::new(move |t, _w, cx| {
-                let ids = t.targets(Some(top));
-                t.isolate(ids, cx)
-            })))
-            .child(div().h(px(1.)).my_1().bg(pal.border))
-            .child(item("ctx-config", "Change configuration…".into(), cx, Box::new(move |t, w, cx| t.open_config(top, w, cx))))
-            .child(item("ctx-replace", "Replace instance…".into(), cx, Box::new(move |t, _w, cx| t.open_replace(top, cx))))
-            .child(item("ctx-mc", "Add mate connector at origin".into(), cx, Box::new(move |t, w, cx| t.mc_at_instance_origin(top, w, cx))))
-            .child(item("ctx-showmates", "Show mates".into(), cx, Box::new(move |t, _w, cx| {
-                t.show_mates_mode = true;
-                t.mates_pinned = Some(top);
-                t.refresh_scene(false, cx);
-            })))
-            .child(div().h(px(1.)).my_1().bg(pal.border))
-            .child(item("ctx-del", "Delete".into(), cx, Box::new(move |t, _w, cx| {
-                let ids = t.targets(Some(top));
-                t.delete_instances(ids, cx)
-            })));
-        Some(deferred(anchored().position(pos).snap_to_window().child(menu)).with_priority(3).into_any_element())
-    }
-
     fn render_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
         // Left column: insert panel / mate dialog / relation dialog / animation.
-        let mut left = v_flex().absolute().top_3().left_3().gap_2();
+        let mut left = v_flex().id("asm-left-dialogs").occlude().absolute().top_3().left_3().gap_2();
         let mut any_left = false;
         if self.insert_open {
             left = left.child(self.render_insert_panel(cx));
@@ -2996,12 +3317,29 @@ impl AssemblyView {
         if let Some(s) = &self.mate {
             left = left.child(s.dialog.clone());
             any_left = true;
+            if let Some(at) = s.hud.filter(|_| !s.dialog.read(cx).awaiting_pick()) {
+                out.push(
+                    div()
+                        .absolute()
+                        .left(px(at.x as f32 + 14.))
+                        .top(px(at.y as f32 + 14.))
+                        .child(
+                            Button::new("mate-hud-ok")
+                                .icon(Icon::empty().path(icon_path("check")))
+                                .primary()
+                                .xsmall()
+                                .tooltip("Commit current mate and start a new mate")
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mate_and_new(window, cx))),
+                        )
+                        .into_any_element(),
+                );
+            }
         }
         if self.relation.is_some() {
             left = left.child(self.render_relation_panel(cx));
             any_left = true;
         }
-        if self.anim.is_some() {
+        if self.anim.as_ref().is_some_and(|a| !a.preview) {
             left = left.child(self.render_anim_panel(cx));
             any_left = true;
         }
@@ -3023,6 +3361,18 @@ impl AssemblyView {
         }
         if self.step_edit.is_some() {
             left = left.child(self.render_step_edit(cx));
+            any_left = true;
+        }
+        if self.ui.display_states {
+            left = left.child(self.render_display_states(cx));
+            any_left = true;
+        }
+        if self.ui.group.is_some() {
+            left = left.child(self.render_group_dialog(cx));
+            any_left = true;
+        }
+        if let Some(el) = self.render_section(cx) {
+            left = left.child(el);
             any_left = true;
         }
         if any_left {
@@ -3066,7 +3416,23 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        if let Some(m) = self.render_context_menu(cx) {
+        if let Some(el) = self.render_isolate_panel(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_mini_toolbar(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_shortcuts(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_select_other(cx) {
+            out.push(el);
+        }
+        out.extend(self.render_mate_values(cx));
+        if let Some(el) = self.render_measure(cx) {
+            out.push(el);
+        }
+        if let Some(m) = self.render_graphics_menu() {
             out.push(m);
         }
         if let Some(m) = self.render_triad_menu(cx) {
@@ -3076,28 +3442,40 @@ impl AssemblyView {
     }
 
     fn render_view_controls(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // Onshape-style rail of white 32 px buttons at the viewport's top-right.
         let pal = p();
-        let btn = |id: &'static str, icon: &'static str, tip: &'static str, v: StandardView, cx: &mut Context<Self>| {
-            Button::new(id).icon(Icon::empty().path(icon_path(icon))).ghost().xsmall().tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.view(v, cx)))
+        let cell = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(32.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .border_t_1()
+                .border_color(pal.border)
+                .bg(if on { pal.row_hover } else { pal.panel })
+                .hover(|d| d.bg(pal.panel_hover))
+                .cursor_pointer()
+                .child(crate::assets::icon(icon, 20., cx))
+                .tooltip(crate::ui::tooltip(tip))
         };
+        let view = |id: &'static str, icon: &'static str, tip: &'static str, v: StandardView, cx: &mut Context<Self>| cell(id, icon, tip, false, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.view(v, cx)));
         v_flex()
             .absolute()
-            .top_3()
-            .right_3()
-            .gap_0p5()
-            .p_1()
-            .rounded_md()
-            .bg(with_alpha(pal.panel_raised, 0.85))
-            .border_1()
+            .top(px(15.))
+            .right(px(15.))
+            .border_l_1()
+            .border_r_1()
+            .border_b_1()
             .border_color(pal.border)
-            .child(btn("av-iso", "iso-view", "Isometric (Shift+7)", StandardView::Isometric, cx))
-            .child(btn("av-front", "front-view", "Front (Shift+1)", StandardView::Front, cx))
-            .child(btn("av-top", "top-view", "Top (Shift+5)", StandardView::Top, cx))
-            .child(btn("av-right", "right-view", "Right (Shift+4)", StandardView::Right, cx))
-            .child(Button::new("av-fit").icon(Icon::empty().path(icon_path("zoom-fit"))).ghost().xsmall().tooltip("Zoom to fit (F)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(view("av-iso", "iso-view", "Isometric (Shift+7)", StandardView::Isometric, cx))
+            .child(view("av-front", "front-view", "Front (Shift+1)", StandardView::Front, cx))
+            .child(view("av-top", "top-view", "Top (Shift+5)", StandardView::Top, cx))
+            .child(view("av-right", "right-view", "Right (Shift+4)", StandardView::Right, cx))
+            .child(cell("av-fit", "zoom-fit", "Zoom to fit (F)", false, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
             })))
-            .child(Button::new("av-mates").icon(Icon::empty().path(icon_path("fastened"))).ghost().xsmall().selected(self.show_mates).tooltip("Show mates (J)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(cell("av-mates", "show-mates", "Show mates (J)", self.show_mates, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.show_mates = !this.show_mates;
                 this.refresh_scene(false, cx);
                 cx.notify();
@@ -3107,8 +3485,9 @@ impl AssemblyView {
 }
 
 impl Render for AssemblyView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        self.ensure_filter_input(window, cx);
         let toolbar = self.render_toolbar(cx);
         let list = self.render_list(cx);
         let overlay = self.render_overlay(cx);
@@ -3123,23 +3502,14 @@ impl Render for AssemblyView {
                     window.focus(&this.focus, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &InsertInstance, _, cx| {
-                this.insert_open = !this.insert_open;
-                cx.notify();
-            }))
+            .on_action(cx.listener(|this, _: &InsertInstance, window, cx| this.toggle_insert(window, cx)))
             .on_action(cx.listener(|this, _: &FastenMate, window, cx| this.start_mate(MateType::Fastened, window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMates, _, cx| {
                 this.show_mates = !this.show_mates;
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
-            .on_action(cx.listener(|this, _: &ToggleShowMatesMode, _, cx| {
-                this.show_mates_mode = !this.show_mates_mode;
-                this.mates_pinned = None;
-                this.update_capture(cx);
-                this.refresh_scene(false, cx);
-                cx.notify();
-            }))
+            .on_action(cx.listener(|this, _: &ToggleShowMatesMode, _, cx| this.toggle_show_mates_mode(cx)))
             .on_action(cx.listener(|this, _: &ToggleSnapMode, window, cx| this.toggle_snap(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMateConnectors, _, cx| {
                 this.show_connectors = !this.show_connectors;
@@ -3154,20 +3524,31 @@ impl Render for AssemblyView {
                     this.delete_instances(ids, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &HideSelected, _, cx| {
-                let ids = this.selected.clone();
-                this.set_hidden(ids, true, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ShowAll, _, cx| {
-                let ids: Vec<InstanceId> = this.assembly(cx).map(|a| a.instances.iter().filter(|i| i.hidden).map(|i| i.id).collect()).unwrap_or_default();
-                if !ids.is_empty() {
-                    this.set_hidden(ids, false, cx);
-                }
-            }))
+            .on_action(cx.listener(|this, _: &HideSelected, _, cx| this.hide_hovered_or_selected(cx)))
+            .on_action(cx.listener(|this, _: &ShowAll, _, cx| this.show_hidden(cx)))
             .on_action(cx.listener(|this, _: &IsolateSelected, _, cx| {
-                let ids = this.selected.clone();
-                this.isolate(ids, cx);
+                let ids = this.hovered_or_selected();
+                this.isolate_cmd(false, ids, cx);
             }))
+            .on_action(cx.listener(|this, _: &TransparentSelected, _, cx| {
+                let ids = this.hovered_or_selected();
+                this.isolate_cmd(true, ids, cx);
+            }))
+            .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_selection(cx)))
+            .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_instances(cx)))
+            .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
+            .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_mini_toolbar(cx)))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, _, cx| {
+                this.ui.show_shortcuts = !this.ui.show_shortcuts;
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.open_mc(None, window, cx)))
+            .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
+            .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
+            .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
+            .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
+            .on_action(cx.listener(|this, _: &FlipPrimaryAxis, window, cx| this.flip_or_reorient(true, window, cx)))
+            .on_action(cx.listener(|this, _: &ReorientSecondaryAxis, window, cx| this.flip_or_reorient(false, window, cx)))
             .on_action(cx.listener(|this, _: &ClearSelection, _, cx| {
                 this.selected.clear();
                 this.selected_mate = None;
@@ -3181,6 +3562,13 @@ impl Render for AssemblyView {
                     this.cycle_snap_source(cx);
                 }
                 this.ctrl_down = ctrl;
+                // Shift (hold) locks mate inference to the hovered entity.
+                if ev.modifiers.shift != this.infer_locked {
+                    this.infer_locked = ev.modifiers.shift;
+                    if this.update_inference(cx) || this.pick_mode(cx).is_some() {
+                        this.refresh_scene(false, cx);
+                    }
+                }
             }))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
                 if this.triad_menu.is_some() {
@@ -3189,8 +3577,9 @@ impl Render for AssemblyView {
                 } else if this.step_edit.is_some() {
                     this.step_edit = None;
                     cx.notify();
-                } else if this.placing.is_some() {
-                    this.finish_placing(true, window, cx);
+                } else if this.placing.is_some() || this.insert_open {
+                    // Esc ends the insertion: placed instances stay (Undo removes them).
+                    this.close_insert(window, cx);
                 } else if this.mate.is_some() {
                     this.close_mate(window, cx);
                 } else if this.snap.is_some() {
@@ -3199,6 +3588,10 @@ impl Render for AssemblyView {
                     this.close_mc(window, cx);
                 } else if this.pattern.is_some() {
                     this.pattern = None;
+                    cx.notify();
+                } else if this.ui.group.is_some() {
+                    this.ui.group = None;
+                    this.update_capture(cx);
                     cx.notify();
                 } else if this.show_mates_mode {
                     this.show_mates_mode = false;
@@ -3209,9 +3602,17 @@ impl Render for AssemblyView {
                 } else if this.explode_edit {
                     this.explode_edit = false;
                     cx.notify();
-                } else if this.context_menu.is_some() {
-                    this.context_menu = None;
+                } else if this.ui.ctx_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.show_shortcuts || this.ui.select_other.is_some() {
+                    this.ui.select_other = None;
+                    this.ui.ctx_menu = None;
+                    this.ui.mini_toolbar = None;
+                    this.ui.show_shortcuts = false;
                     cx.notify();
+                } else if this.ui.measure.is_some() {
+                    this.toggle_measure(cx);
+                } else if this.ui.section.is_some() {
+                    this.toggle_section(window, cx);
+                } else if this.exit_isolate(cx) {
                 } else {
                     this.insert_open = false;
                     this.relation = None;

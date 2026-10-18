@@ -85,11 +85,11 @@ fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64) -> Camera {
     camera
 }
 
-/// Thumbnail look: a soft background matching the start window's cards.
+/// Thumbnail look: Onshape's white document thumbnails.
 fn thumbnail_style() -> Style {
     Style {
-        background_top: crate::theme::lin(0x2a2f3a),
-        background_bottom: crate::theme::lin(0x181b22),
+        background_top: crate::theme::lin(0xffffff),
+        background_bottom: crate::theme::lin(0xffffff),
         show_edges: true,
         msaa: 4,
         ..Style::default()
@@ -111,7 +111,7 @@ impl Thumbnailer {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, cx: &mut Context<Self>) -> Self {
         let sub = cx.subscribe(&doc, |this: &mut Self, _, ev: &DocEvent, cx| match ev {
             DocEvent::TabChanged(_) | DocEvent::TabsChanged | DocEvent::Reloaded => this.schedule(cx),
-            DocEvent::HistoryChanged | DocEvent::Error(_) => {}
+            DocEvent::HistoryChanged | DocEvent::Error(_) | DocEvent::Info(_) => {}
         });
         // Finish a pending thumbnail when the window goes away.
         cx.on_release(|this: &mut Self, cx: &mut App| {
@@ -177,7 +177,7 @@ impl Thumbnailer {
         Some(Job {
             config: studio.configuration.defaults(),
             studio,
-            units: doc.settings.units.clone(),
+            units: doc.settings.units,
             doc_vars: noshape_model::variables::document_variables(doc),
             engine: self.engine.clone(),
             gpu: self.gpu.clone(),

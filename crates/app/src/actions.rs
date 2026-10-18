@@ -27,6 +27,7 @@ actions!(
         ToggleMateConnectors,
         FlipPrimaryAxis,
         SelectOther,
+        SelectOtherPrevious,
         NewDocument,
         OpenDocument,
         SaveCopyAs,
@@ -40,6 +41,9 @@ actions!(
         Revolve,
         Fillet,
         ToggleSketches,
+        CurvatureAnalysis,
+        DraftAnalysis,
+        ViewHighQuality,
         RollbackUp,
         RollbackDown,
         // 3D view
@@ -115,6 +119,7 @@ actions!(
         ToggleMates,
         ToggleShowMatesMode,
         ToggleSnapMode,
+        ReorientSecondaryAxis,
         // Drawing
         DrawingUpdate,
     ]
@@ -143,6 +148,8 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("enter", Accept, dlg),
         KeyBinding::new("shift-enter", AcceptAndRepeat, dlg),
         KeyBinding::new("escape", Cancel, dlg),
+        // Esc while typing in a dialog field still cancels the dialog (Onshape).
+        KeyBinding::new("escape", Cancel, Some("FeatureDialog > Input")),
         KeyBinding::new("shift-n", RenameSelected, doc),
         KeyBinding::new("alt-c", SearchTools, doc_mod),
         KeyBinding::new("s", ShortcutToolbar, doc),
@@ -155,6 +162,8 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("k", ToggleMateConnectors, doc),
         KeyBinding::new("a", FlipPrimaryAxis, dlg),
         KeyBinding::new("`", SelectOther, doc),
+        KeyBinding::new("shift-`", SelectOtherPrevious, doc),
+        KeyBinding::new("~", SelectOtherPrevious, doc),
         KeyBinding::new("secondary-n", NewDocument, None),
         KeyBinding::new("secondary-o", OpenDocument, None),
         KeyBinding::new("secondary-shift-s", SaveCopyAs, doc_mod),
@@ -164,10 +173,17 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("secondary-alt-v", CreateVersion, doc_mod),
         // Part Studio
         KeyBinding::new("shift-s", NewSketch, ps),
+        // Enter edits the selected feature (or picks the Select other entry).
+        KeyBinding::new("enter", Accept, ps),
+        KeyBinding::new("shift-enter", AcceptAndRepeat, ps),
         KeyBinding::new("shift-e", Extrude, ps),
         KeyBinding::new("shift-w", Revolve, ps),
         KeyBinding::new("shift-f", Fillet, ps),
         KeyBinding::new("shift-h", ToggleSketches, ps),
+        // Analysis tools and view in high quality.
+        KeyBinding::new("shift-c", CurvatureAnalysis, ps),
+        KeyBinding::new("shift-d", DraftAnalysis, ps),
+        KeyBinding::new("shift-r", ViewHighQuality, ps),
         KeyBinding::new("up", RollbackUp, Some("FeatureList && !Input")),
         KeyBinding::new("down", RollbackDown, Some("FeatureList && !Input")),
         // 3D view
@@ -251,6 +267,9 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("j", ToggleMates, asm),
         KeyBinding::new("h", ToggleShowMatesMode, asm),
         KeyBinding::new("shift-s", ToggleSnapMode, asm),
+        // Snap drag: a flips the dragged connector's primary axis, q reorients its secondary axis.
+        KeyBinding::new("a", FlipPrimaryAxis, asm),
+        KeyBinding::new("q", ReorientSecondaryAxis, asm),
         // Drawing
         KeyBinding::new("ctrl-q", DrawingUpdate, Some("Drawing")),
     ]);

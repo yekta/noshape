@@ -42,7 +42,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | K23 | `s` opens the shortcut toolbar at the cursor | E§2, B `OPEN_MINI_TOOLBAR` | ✅ | assembly tool set, kept inside the graphics area |
 | K24 | `Shift+/` keyboard shortcut list | H:shortcuts | ✅ | assembly list overlay |
 | K25 | `Alt+C` search tools | E§2 | 🔧 | workspace search; assembly commands not listed |
-| K26 | `[` Measure, `Shift+X` section view | E§3 | ❌ | not in assemblies |
+| K26 | `[` Measure, `Shift+X` section view | E§3 | ✅ | Measure: click faces/edges/vertices of any instances (length, area, radius, position, distance ΔXYZ, angle; model test `measure_between_instances`); Section view through the hovered planar face, the selected mate connector or Front, offset and flip |
 | K27 | `` ` `` select other | E§3 | ✅ | cycles the instances under the cursor (Shift+` backwards), list at the cursor |
 | K28 | `Alt+click` select through transparent | H:shortcuts | 🔧 | transparent instances are never pickable |
 | K29 | View keys (`f`, `Shift+1..7`, `z`, arrows) | H:shortcuts | ✅ | shared viewport bindings |
@@ -82,7 +82,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | I11 | Other documents at a version, newer-version notice | E§4.1 | ✅ | pre-existing |
 | I12 | Filters (sketches, surfaces, parts, composite) | E§4.1 | ❌ | |
 | I13 | Configuration inputs before inserting | E§4.1 | 🔧 | list and checkbox inputs under the Part Studio, Reset to default; variable inputs show their default; no Generate (part list uses the default configuration) |
-| I14 | Snap-insert with explicit MCs (Fastened) | E§4.3 | ❌ | |
+| I14 | Snap-insert with explicit MCs (Fastened) | E§4.3 | ⏳ | snap mode on: the inserted instance's Part Studio mate connector lands on the connector under the cursor, Ctrl cycles it, the click adds a Fastened mate |
 | I15 | Standard content tab | E§4.7 | ❌ | |
 | I16 | Inserted count, thumbnails | E§4.1 | ❌ | |
 
@@ -109,11 +109,11 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | L17 | Folder menu: Rename, Hide/Show, Hide other, Hide all, Isolate, Make transparent, Suppress, Add selection to folder, Expand, Collapse, Delete (with contents), Unpack folder | E§5.6, UI:concepts__featurelist-contextmenu | ✅ | Unpack / Delete model-tested |
 | L18 | Folder eye hides / shows all members | E§5.6 | ⏳ | |
 | L19 | New folder icon in the header | E§5.6 | ✅ | header folder button (around the selection) |
-| L20 | Drag and drop to reorder / into folders / into subassemblies | E§5.5 | 🔧 | reorder and drop onto folders work; dropping into subassemblies does not |
+| L20 | Drag and drop to reorder / into folders / into subassemblies | E§5.5 | ✅ | dropping onto a subassembly row moves the dragged (or selected) instances into it at the same place; model test `drop_instances_into_a_subassembly` |
 | L21 | Instance list properties columns | E§5.1 | ❌ | |
 | L22 | Items list (non-geometric BOM items) | E§5.1 | ❌ | |
 | L23 | Dynamic suppression | E§5.7 | ❌ | |
-| L24 | Rigid / lock icons on subassemblies | E§5.3 | ❌ | |
+| L24 | Rigid / lock icons on subassemblies | E§5.3 | 🔧 | lock icon done; no rigid icon |
 | L25 | Warnings (more than one part fixed …) | E§5.3, B | ❌ | |
 
 ### 4.1 Instance context menu (part / subassembly), Onshape order
@@ -209,11 +209,11 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | D10 | Offset checkbox; offset axes per type (Fastened XYZ, Slider XY, Revolute/Planar/Pin slot Z) | E§6.2, E§7 | ✅ | |
 | D11 | Rotation offset with axis selector (Rotate about X / Y / Z) | H:mates | ✅ | model test `mate_rotation_offset_about_any_axis` |
 | D12 | Limits checkbox; per-DOF min / max fields (blank = unbounded) | E§6.2 | ✅ | |
-| D13 | Ball mate cone angle limit | E§7.8 | ❌ | |
+| D13 | Ball mate cone angle limit | E§7.8 | ✅ | model test `ball_mate_cone_limit`; dialog shows one Maximum cone angle field |
 | D14 | Solve button (solve all mates incl. this one) | H:mates | ✅ | |
 | D15 | Heads-up checkmark at the cursor after both picks: "Commit current mate and start a new mate" | H:mates, B | ✅ | |
 | D16 | Animate (preview) button in the dialog | H:mates | 🔧 | Animate button previews the first DOF back and forth; other mates stay enforced |
-| D17 | Edit implicit / assembly MCs from the dialog (MC icon) | H:mates | ❌ | |
+| D17 | Edit implicit / assembly MCs from the dialog (MC icon) | H:mates | 🔧 | opens the Mate connector dialog with the mate dialog kept; an implicit connector becomes an assembly mate connector (Onshape keeps it implicit) |
 | D18 | Only the current mate's instances move until Solve | H:mates | 🔧 | the stationary instance is held; other mates are enforced |
 | D19 | Tangent mate: entities, Tangent propagation, flip | E§7.10 | ✅ | pre-existing |
 | D20 | Width mate: tab and width connector fields | E§7.11 | ✅ | pre-existing |
@@ -261,7 +261,7 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | R8 | Right-click axis arrow: Align with Z, Anti-align with Z | H:triad | ✅ | |
 | R9 | Right-click arc: Rotate 90 degrees, Rotate 180 degrees | H:triad | ✅ | |
 | R10 | Box selection selects instances (Shift/Ctrl adds) | — | ✅ | |
-| R11 | Live mate values while dragging; double-click a value to type one | H:mates | ❌ | |
+| R11 | Live mate values while dragging (and on the selected mate); double-click a value to type one | H:mates | ✅ | labels Rz/X/Y/Z at the mate; typed value moves the parts with the other mates enforced |
 | R12 | Mates solved simultaneously; red when unsolvable | E§24.2 | ✅ | |
 | R13 | Rigid detection icon (0 DOF + fixed) | E§24.2 | ❌ | |
 
@@ -303,9 +303,9 @@ visibility, rename, filter, folders, subassemblies, display states, animate, sho
 | G9 | Display states: add, select to apply, update, rename, remove; new items keep defaults | E§15, B | ✅ | model test `folders_and_display_states` |
 | G10 | Replace instance (matches geometry) | E§14 | ✅ | pre-existing |
 | G11 | Subassemblies: Move to new, Dissolve, Create empty | E§5.5 | ✅ | |
-| G12 | Lock / follow position of subassemblies | E§5.5 | ❌ | |
+| G12 | Flexible subassemblies (default): their mates solve with the parent, their parts drag on their own; Lock/follow position to ▸ Lock current position / named position / Unlock; lock icon (click unlocks) | E§5.5, E§24.2 | ✅ | model test `flexible_subassembly_moves_in_parent_and_locks`; subassemblies with patterns, relations, tangent mates or nested flexible subassemblies stay rigid |
 | G13 | Modeling in context, Create Part Studio in context | E§18 | ❌ | |
 | G14 | Standard content | E§4.7 | ❌ | |
 | G15 | Show mates mode: hover shows an instance's mates, click pins | E§21 | ✅ | |
-| G16 | Isolate / Make transparent panel with Exit isolate | E§24.6 | 🔧 | no transparency slider or expand by distance / connectivity |
+| G16 | Isolate / Make transparent panel with Exit isolate and transparency steps | E§24.6 | 🔧 | transparency −/+ steps; no expand by distance / connectivity |
 | G17 | Assembly configurations and variable table | E§22 | ❌ | |

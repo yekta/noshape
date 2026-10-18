@@ -1,12 +1,18 @@
 //! Part Studio tab: toolbar, feature list (with rollback bar), parts list,
 //! 3D viewport with selection, and feature dialogs with live preview.
 
+mod analysis;
+mod appearance;
+mod behaviors;
 mod config_panel;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
+mod section;
 mod sketch;
+mod toolbar_prefs;
+mod view_cube;
 mod view_tools;
 
 use crate::actions::*;
@@ -16,20 +22,19 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::feature_dialog::{DialogEvent, FeatureDialog, RefLabeler};
 use crate::gpu::Gpu;
 use crate::scene_builder::{self, BuiltScene, GpuCache, PickKind, SceneOptions};
-use crate::theme::{p, with_alpha};
+use crate::theme::p;
 use crate::viewport::{Viewport, ViewportEvent};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use glam::DVec3;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
 use noshape_model::document::TabId;
 use noshape_model::features::{self, FeatureType};
 use noshape_model::params::{ParamKind, QueryFilter};
 use noshape_model::partstudio::{Feature, PartStudio};
-use noshape_model::reference::{DatumPlane, FeatureId, Reference, TopoName};
+use noshape_model::reference::{BodyId, DatumPlane, FeatureId, Reference, TopoName};
 use noshape_model::regen::{RegenOptions, Regenerator};
 use noshape_render::StandardView;
 use parking_lot::Mutex;
@@ -63,7 +68,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
     let name = match type_id {
         "cPlane" => "plane",
         "cPoint" => "point",
-        "assignVariable" | "queryVariable" => "variable",
+        "assignVariable" => "variable",
+        "queryVariable" => "query-variable",
         "booleanBodies" => "boolean",
         "splitPart" => "split",
         "deleteBodies" => "delete-part",
@@ -80,7 +86,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
         "sheetMetalCorner" => "corner-relief",
         "sheetMetalUnfold" => "unfold",
         "sheetMetalRefold" => "refold",
-        "sheetMetalJoint" | "sheetMetalMakeJoint" => "joint",
+        "sheetMetalJoint" => "joint",
+        "sheetMetalMakeJoint" => "sheet-metal-make-joint",
         "sheetMetalJog" => "jog",
         "sheetMetalFormed" => "form",
         "endcap" => "end-cap",
@@ -105,13 +112,69 @@ pub fn feature_icon(type_id: &str) -> SharedString {
     icon_path(name)
 }
 
+/// A menu entry's action on the Part Studio view.
+type ViewAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
+
 struct EditSession {
     dialog: Entity<FeatureDialog>,
     /// Index the feature occupies (new features are inserted at the rollback bar).
     index: usize,
     is_new: bool,
     _sub: Subscription,
+    /// Dialog-local undo (Onshape: Ctrl+Z inside an open dialog or sketch
+    /// undoes the last change to the draft, not the document's last edit).
+    history: DraftHistory,
 }
+
+/// Snapshots of the draft feature while its dialog is open.
+pub(crate) struct DraftHistory {
+    undo: Vec<Feature>,
+    redo: Vec<Feature>,
+    /// The draft as of the last checkpoint.
+    last: Feature,
+    /// A viewport gesture is in progress: its steps become one undo entry.
+    dragging: bool,
+}
+
+impl DraftHistory {
+    const LIMIT: usize = 200;
+
+    pub(crate) fn new(f: &Feature) -> Self {
+        Self { undo: Vec::new(), redo: Vec::new(), last: f.clone(), dragging: false }
+    }
+
+    /// Record `current` if it differs from the last checkpoint.
+    pub(crate) fn checkpoint(&mut self, current: &Feature) -> bool {
+        if *current == self.last {
+            return false;
+        }
+        let prev = std::mem::replace(&mut self.last, current.clone());
+        self.undo.push(prev);
+        if self.undo.len() > Self::LIMIT {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+        true
+    }
+
+    /// The draft to restore for Undo (`current` is the live draft).
+    pub(crate) fn undo(&mut self, current: &Feature) -> Option<Feature> {
+        // Unrecorded changes (e.g. mid-drag) are undone first.
+        self.checkpoint(current);
+        let prev = self.undo.pop()?;
+        self.redo.push(std::mem::replace(&mut self.last, prev.clone()));
+        Some(prev)
+    }
+
+    pub(crate) fn redo(&mut self) -> Option<Feature> {
+        let next = self.redo.pop()?;
+        self.undo.push(std::mem::replace(&mut self.last, next.clone()));
+        Some(next)
+    }
+}
+
+/// Measurements of the current selection: (selection, labelled results).
+type MeasureCache = (Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>);
 
 pub struct PartStudioView {
     pub tab: TabId,
@@ -136,17 +199,21 @@ pub struct PartStudioView {
     sketch: Option<SketchEditor>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<gpui_kit::component::menu::PopupMenu>, Subscription)>,
-    measure_cache: Option<(Vec<Reference>, Vec<(String, noshape_model::regen::measure::Measurement)>)>,
+    measure_cache: Option<MeasureCache>,
     show_mass: bool,
     right_panel: Option<config_panel::RightPanel>,
     panel_inputs: std::collections::HashMap<String, (Entity<gpui_kit::component::input::InputState>, String)>,
     panel_subs: Vec<Subscription>,
+    /// Panel cell that had the keyboard focus at the last render, and the
+    /// commit actions of all cells: a cell is committed when the focus
+    /// leaves it (GPUI does not deliver blur events for these inputs).
+    panel_focused: Option<String>,
+    panel_commits: std::collections::HashMap<String, config_panel::CellCommit>,
     config_values: noshape_model::configuration::ConfigValues,
     needs_regen: bool,
     palette: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     palette_query: String,
     show_shortcuts: bool,
-    section_input: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     renaming: Option<(FeatureId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     dim_input: Option<(noshape_sketch::ConstraintId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     manip_drag: Option<manipulators::ManipDrag>,
@@ -154,6 +221,8 @@ pub struct PartStudioView {
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
+    /// Onshape interaction state (hide/isolate, select other, S toolbar...).
+    ui: behaviors::UiState,
     _subs: Vec<Subscription>,
 }
 
@@ -195,6 +264,10 @@ impl PartStudioView {
                 this.message = Some((FeatureStatus::Error, msg.clone()));
                 cx.notify();
             }
+            DocEvent::Info(msg) => {
+                this.message = Some((FeatureStatus::Info, msg.clone()));
+                cx.notify();
+            }
             _ => {}
         }));
         let mut this = Self {
@@ -225,12 +298,13 @@ impl PartStudioView {
             right_panel: None,
             panel_inputs: Default::default(),
             panel_subs: Vec::new(),
+            panel_focused: None,
+            panel_commits: Default::default(),
             config_values: Default::default(),
             needs_regen: false,
             palette: None,
             palette_query: String::new(),
             show_shortcuts: false,
-            section_input: None,
             renaming: None,
             dim_input: None,
             manip_drag: None,
@@ -238,6 +312,7 @@ impl PartStudioView {
             named_views: None,
             flat_cache: None,
             flat_task: None,
+            ui: behaviors::UiState::new(cx),
             _subs: subs,
         };
         this.schedule_regen(window, cx);
@@ -273,8 +348,13 @@ impl PartStudioView {
     }
 
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Paused regeneration (Onshape): edits wait until "Regenerate".
+        if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
+            cx.notify();
+            return;
+        }
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
@@ -287,12 +367,14 @@ impl PartStudioView {
         let seq = self.regen_seq;
         self.regenerating = true;
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        // View in high quality (Shift+R): a 4x finer chord tolerance.
+        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality { 0.25 } else { 1.0 };
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Coalesce bursts of edits (typing in a field).
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
@@ -305,6 +387,7 @@ impl PartStudioView {
                 }
                 this.regenerating = false;
                 this.context = Some(result.context.clone());
+                scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
                 this.apply_display(Arc::new(result.display), window, cx);
             });
             // Progressive meshing: refine preview meshes in the background.
@@ -312,15 +395,18 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, derived: Some(derived2), custom_features: Some(custom2), ..Default::default() };
-                        regen2.lock().regenerate(&studio, &config, &units, &opts)
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), ..Default::default() };
+                        let r = regen2.lock().regenerate(&studio, &config, &units, &opts);
+                        (r, studio)
                     })
                     .await;
+                let (fine, studio) = fine;
                 let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                     if seq != this.regen_seq {
                         return;
                     }
                     this.context = Some(fine.context.clone());
+                    scene_builder::log_regen_perf("refine", &fine.display, &studio);
                     this.apply_display(Arc::new(fine.display), window, cx);
                 });
             }
@@ -340,11 +426,27 @@ impl PartStudioView {
     }
 
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
+        let _t = noshape_render::perf::scope("ps.apply_display");
         self.display = display;
-        let built = scene_builder::build(&self.display, &self.opts, &mut self.cache, self.gpu.uploader());
+        // Before building: the scene draws the edited sketch in its editing
+        // colors only once `opts.editing_sketch` is set (otherwise an
+        // existing sketch opened for editing showed gray until the next edit).
+        self.sync_sketch_editor(cx);
+        self.ui.measure_lines = None;
+        self.opts.vertex_colors = self.vertex_colors(cx);
+        let shown = self.display_for_scene();
+        let built = scene_builder::build(&shown, &self.opts, &mut self.cache, self.gpu.uploader());
         let prio = built.picks.priority_fn();
         self.built = Some(built);
-        self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
+        // Right-drag rotates about the geometry under the cursor.
+        let disp = self.display.clone();
+        let pivot: Arc<dyn Fn(glam::DVec3, glam::DVec3) -> Option<glam::DVec3> + Send + Sync> = Arc::new(move |o, d| {
+            noshape_model::interaction::entities_along_ray(&disp, o, d, 0.0, &|_| false, 1).first().map(|h| o + d.normalize() * h.depth)
+        });
+        self.viewport.update(cx, |vp, _| {
+            vp.pick_priority = prio;
+            vp.orbit_pivot_fn = Some(pivot);
+        });
         // Update dialog status from the edited feature's state.
         if let Some(e) = &self.edit {
             let id = e.dialog.read(cx).feature.id;
@@ -354,7 +456,7 @@ impl PartStudioView {
             });
             e.dialog.update(cx, |d, cx| d.set_status(st, cx));
         }
-        self.sync_sketch_editor(cx);
+        self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
         if !self.fitted_once {
             self.fitted_once = true;
@@ -376,6 +478,7 @@ impl PartStudioView {
 
     /// Rebuild highlight state and push the scene to the viewport.
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
+        let _t = noshape_render::perf::scope("ps.refresh_scene");
         if self.built.is_none() {
             return;
         }
@@ -384,14 +487,28 @@ impl PartStudioView {
                 let d = e.dialog.read(cx);
                 (d.active_refs(), d.selected_refs())
             }
-            None => (self.selection.clone(), Vec::new()),
+            None => (self.highlighted_selection(), Vec::new()),
         };
+        // Hovering a feature or part in the list lights up all of its
+        // geometry; a single hovered entity uses the hover highlight.
+        let hovered = self.highlighted_hover(cx);
+        let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() { hovered.first().cloned() } else { None };
+        if single_hover.is_none() {
+            accent.extend(hovered);
+        }
+        accent.extend(self.ui.appearance_hover.iter().cloned());
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
         extra.extend(self.manipulator_overlay(cx));
+        extra.extend(self.measure_overlay());
+        extra.extend(self.midpoint_overlay());
         self.sync_manipulator(cx);
         let built = self.built.as_ref().expect("built");
-        let scene = scene_builder::with_highlights(built, &self.display, &selection, self.hover.as_ref(), &accent, extra, self.gpu.uploader());
-        self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
+        let scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, self.gpu.uploader());
+        let (fit_bounds, fit_inset) = (self.fit_bounds(), self.fit_inset_left());
+        self.viewport.update(cx, |vp, cx| {
+            (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
+            vp.set_scene(Arc::new(scene), geometry_changed, cx)
+        });
     }
 
     // ------------------------------------------------------------ labels
@@ -399,6 +516,7 @@ impl PartStudioView {
     fn labeler(&self, cx: &App) -> RefLabeler {
         let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, f.name.clone())).collect()).unwrap_or_default();
         let bodies: Vec<(noshape_model::BodyId, String)> = self.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect();
+        let entity_kinds = sketch_entity_kinds(self.studio(cx), &self.display);
         Arc::new(move |r: &Reference| {
             let fname = |id: FeatureId| names.iter().find(|(i, _)| *i == id).map(|(_, n)| n.clone()).unwrap_or_else(|| "deleted feature".into());
             match r {
@@ -410,12 +528,13 @@ impl PartStudioView {
                 Reference::Edge(n) => format!("Edge of {}", edge_creator(n).map(fname).unwrap_or_else(|| "part".into())),
                 Reference::Vertex(_) => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
-                Reference::SketchEntity { sketch, .. } => format!("{} entity", fname(*sketch)),
+                Reference::SketchEntity { sketch, entity } => format!("{} {}", fname(*sketch), entity_kinds.get(&(*sketch, *entity)).copied().unwrap_or("entity")),
                 Reference::SketchRegion { sketch, .. } => format!("{} region", fname(*sketch)),
                 Reference::Sketch(s) => fname(*s),
                 Reference::FeaturePlane(f) => fname(*f),
                 Reference::MateConnector { feature, .. } => fname(*feature),
                 Reference::Feature(f) => fname(*f),
+                Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint } if matches!(**on, Reference::Edge(_)) => "Midpoint of edge".into(),
                 Reference::Implicit { .. } => "Mate connector".into(),
                 Reference::QueryVariable(name) => format!("#{name}"),
             }
@@ -425,6 +544,147 @@ impl PartStudioView {
     // ------------------------------------------------------------ viewport events
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
+        // Clicking the graphics area takes the keyboard focus from a panel
+        // field (which then commits), so shortcuts like F don't type into it.
+        if self.panel_focused.is_some() && matches!(ev, ViewportEvent::Click { .. } | ViewportEvent::ContextMenu { .. } | ViewportEvent::ToolDown { .. } | ViewportEvent::BoxSelect { .. }) {
+            window.focus(&self.focus, cx);
+            cx.notify();
+        }
+        // A press-drag-release gesture (a sketch click that adds a line,
+        // a drag, a manipulator drag) is one dialog-undo step.
+        if matches!(ev, ViewportEvent::ToolDown { .. }) {
+            self.draft_checkpoint(cx);
+        }
+        if let (ViewportEvent::ToolDown { .. } | ViewportEvent::ToolDrag { .. }, Some(e)) = (ev, &mut self.edit) {
+            e.history.dragging = true;
+        }
+        self.dispatch_viewport_event(vp, ev, window, cx);
+        if matches!(ev, ViewportEvent::ToolUp { .. }) {
+            if let Some(e) = &mut self.edit {
+                e.history.dragging = false;
+            }
+            self.draft_checkpoint(cx);
+        }
+    }
+
+    /// Onshape: with a feature dialog open, clicking a feature in the list
+    /// feeds the active selection field: feature fields (feature pattern)
+    /// take the feature, region fields take every region of a sketch, so a
+    /// sketch drawn on a part face can be extruded without picking regions
+    /// in the viewport. Returns false when the click is a plain selection.
+    fn pick_feature_into_dialog(&mut self, id: FeatureId, cx: &mut Context<Self>) -> bool {
+        let Some(e) = &self.edit else { return false };
+        let dialog = e.dialog.clone();
+        let Some((_, filter, _)) = dialog.read(cx).active_filter() else { return false };
+        if dialog.read(cx).feature.id == id {
+            return false;
+        }
+        let sketch = self.display.sketches.iter().find(|s| s.feature == id);
+        let refs: Vec<Reference> = if filter.intersects(QueryFilter::FEATURE) {
+            vec![Reference::Feature(id)]
+        } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_REGION)) {
+            sk.regions.iter().map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
+        } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH) {
+            vec![Reference::Sketch(id)]
+        } else {
+            Vec::new()
+        };
+        if refs.is_empty() {
+            return false;
+        }
+        // Add the missing ones; if all are already picked, toggle them off.
+        let current = dialog.read(cx).selected_refs();
+        let missing: Vec<Reference> = refs.iter().filter(|r| !current.contains(r)).cloned().collect();
+        let toggle = if missing.is_empty() { refs } else { missing };
+        dialog.update(cx, |d, cx| {
+            for r in toggle {
+                d.add_pick(r, cx);
+            }
+        });
+        self.refresh_scene(false, cx);
+        true
+    }
+
+    /// Show a transient info bubble that fades after a few seconds (errors
+    /// and warnings stay until dismissed).
+    pub(super) fn flash_info(&mut self, text: String, cx: &mut Context<Self>) {
+        let shown = (FeatureStatus::Info, text);
+        self.message = Some(shown.clone());
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_secs(4)).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.message.as_ref() == Some(&shown) {
+                    this.message = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Record the open dialog's draft for dialog-local undo.
+    fn draft_checkpoint(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = &mut self.edit else { return };
+        if e.history.dragging {
+            return;
+        }
+        let dialog = e.dialog.clone();
+        e.history.checkpoint(&dialog.read(cx).feature);
+    }
+
+    /// Ctrl+Z / Ctrl+Y while a feature dialog (or sketch) is open.
+    fn draft_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = &mut self.edit else { return };
+        e.history.dragging = false;
+        let dialog = e.dialog.clone();
+        let restored = if redo { e.history.redo() } else { e.history.undo(&dialog.read(cx).feature) };
+        let Some(f) = restored else { return };
+        dialog.update(cx, |d, cx| d.restore_draft(f, cx));
+        if let Some(ed) = &mut self.sketch {
+            use crate::sketch_mode::Tool;
+            // Drop in-progress clicks and picks that may name removed entities.
+            let tool = ed.tool;
+            ed.set_tool(Tool::Select);
+            if tool != Tool::Select {
+                ed.set_tool(tool);
+            }
+            ed.selection.clear();
+            ed.selected_constraints.clear();
+            ed.dim_edit = None;
+            ed.hover = None;
+            ed.hover_constraint = None;
+            self.dim_input = None;
+            self.regen_sync(window, cx);
+        }
+        cx.notify();
+    }
+
+    fn dispatch_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match ev {
+            ViewportEvent::PointerMove { position, .. } => {
+                self.ui.pointer = Some(*position);
+                // The selection-count badge follows the cursor; re-render at
+                // most ~30 times a second and only while something is selected.
+                if !self.selection.is_empty() || !self.selected_features.is_empty() {
+                    let now = std::time::Instant::now();
+                    let due = self.ui.badge_at.is_none_or(|(t, p)| now.duration_since(t).as_millis() >= 33 && p.distance(*position) >= 3.0);
+                    if due {
+                        self.ui.badge_at = Some((now, *position));
+                        cx.notify();
+                    }
+                }
+            }
+            ViewportEvent::Hover(None) if self.ui.badge_at.is_some() => cx.notify(),
+            ViewportEvent::Click { position, .. } | ViewportEvent::ToolDown { position, .. } => {
+                self.ui.pointer = Some(*position);
+                // A click elsewhere closes the S toolbar and Select other.
+                if self.ui.mini_toolbar.take().is_some() || self.ui.select_other.take().is_some() {
+                    cx.notify();
+                }
+            }
+            _ => {}
+        }
         if self.sketch.is_some() && self.sketch_viewport_event(vp, ev, window, cx) {
             return;
         }
@@ -439,48 +699,41 @@ impl PartStudioView {
                     self.refresh_scene(false, cx);
                 }
             }
-            ViewportEvent::Click { pick, .. } => {
+            ViewportEvent::Click { pick, position, modifiers } => {
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                if let Some(e) = &self.edit {
-                    if let Some(t) = target {
-                        let accepted = e.dialog.update(cx, |d, cx| {
-                            let Some((_, filter, _)) = d.active_filter() else { return false };
-                            if !kind_matches(t.kind, &t.reference, filter) {
-                                return false;
-                            }
-                            d.add_pick(t.reference.clone(), cx)
-                        });
-                        if !accepted {
-                            self.message = Some((FeatureStatus::Info, "That entity can't be used in the active field.".into()));
+                // Alt+click (or isolate without "Select transparent
+                // geometry") picks through transparent parts.
+                let target = match target {
+                    Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.pick_through_transparent(t, *position, modifiers.alt, cx),
+                    other => other,
+                };
+                // Clicking near a hovered edge's midpoint picks the midpoint.
+                let target = match target {
+                    Some(t) if t.kind == PickKind::Edge => Some(self.midpoint_pick(t, *position, cx)),
+                    other => other,
+                };
+                match target {
+                    // Double-clicking a sketch in the graphics area edits it.
+                    Some(t) if self.edit.is_none() && self.is_double_click(&t.reference) && matches!(t.kind, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion) => {
+                        if let Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } = t.reference {
+                            self.selection.clear();
+                            self.edit_feature(sketch, window, cx);
                         }
                     }
-                } else {
-                    match target {
-                        Some(t) => {
-                            if let Some(pos) = self.selection.iter().position(|r| *r == t.reference) {
-                                self.selection.remove(pos);
-                            } else {
-                                self.selection.push(t.reference);
-                            }
-                        }
-                        None => self.selection.clear(),
+                    Some(t) => self.pick(t, cx),
+                    // Clicking empty space clears the selection (not dialog fields).
+                    None if self.edit.is_none() => {
+                        self.selection.clear();
+                        self.selected_features.clear();
+                        self.refresh_scene(false, cx);
                     }
+                    None => {}
                 }
-                self.refresh_scene(false, cx);
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, .. } => {
-                if let Some(built) = &self.built {
-                    for id in ids {
-                        if let Some(t) = built.picks.get(*id)
-                            && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::SketchCurve | PickKind::SketchPoint)
-                            && !self.selection.contains(&t.reference)
-                        {
-                            self.selection.push(t.reference.clone());
-                        }
-                    }
-                }
-                self.refresh_scene(false, cx);
+            ViewportEvent::BoxSelect { ids, modifiers } => {
+                // Ctrl+drag deselects (Onshape).
+                self.box_select(ids, modifiers.control || modifiers.platform, cx);
             }
             ViewportEvent::ContextMenu { pick, position } => {
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
@@ -502,17 +755,34 @@ impl PartStudioView {
         } else if self.edit.is_some() {
             self.cancel_edit(window, cx);
         }
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let Some(studio) = self.studio(cx) else { return };
         let Some(mut feature) = studio.new_feature(type_id, &units) else { return };
+        if let Some(t) = features::get(type_id) {
+            self.ui.recent_tools.retain(|x| *x != t.id);
+            self.ui.recent_tools.insert(0, t.id);
+            self.ui.recent_tools.truncate(8);
+        }
         let index = studio.rollback_index();
+        self.apply_remembered(&mut feature);
         // Preselection fills the first compatible selection field (Onshape behavior).
-        if let Some(ty) = features::get(type_id)
-            && !self.selection.is_empty()
-        {
-            preselect(ty, &mut feature, &self.selection, self.built.as_ref());
+        if let Some(ty) = features::get(type_id) {
+            // Features selected in the list preselect too (a selected
+            // sketch fills Extrude's regions field, Onshape behavior).
+            let filters: Vec<QueryFilter> = ty.params.iter().filter_map(|p| match p.kind {
+                ParamKind::Query { filter, .. } => Some(filter),
+                _ => None,
+            }).collect();
+            let mut sel = self.selection.clone();
+            sel.extend(self.feature_preselection(&filters));
+            if !sel.is_empty() {
+                preselect(ty, &mut feature, &sel, self.built.as_ref());
+            }
         }
         self.selection.clear();
+        self.selected_features.clear();
+        self.ui.select_other = None;
+        self.ui.mini_toolbar = None;
         self.open_dialog(feature, index, true, window, cx);
     }
 
@@ -532,10 +802,10 @@ impl PartStudioView {
     }
 
     fn open_dialog(&mut self, feature: Feature, index: usize, is_new: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let labeler = self.labeler(cx);
         let is_derived = feature.type_id == "importDerived";
-        let dialog = cx.new(|cx| FeatureDialog::new(feature, is_new, units, labeler, cx));
+        let dialog = cx.new(|cx| FeatureDialog::new(feature, units, labeler, cx));
         if is_derived {
             let provider = self.doc.read(cx).derived_provider();
             let doc = self.doc.read(cx).session.doc.clone();
@@ -553,27 +823,83 @@ impl PartStudioView {
         }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
             DialogEvent::Changed => {
+                this.draft_checkpoint(cx);
+                this.auto_operation(cx);
                 this.schedule_regen(window, cx);
                 this.refresh_scene(false, cx);
             }
             DialogEvent::Accept { repeat } => this.accept_edit(*repeat, window, cx),
             DialogEvent::Cancel => this.cancel_edit(window, cx),
-            DialogEvent::QueryFocused { .. } => this.refresh_scene(false, cx),
+            DialogEvent::QueryFocused => this.refresh_scene(false, cx),
+            DialogEvent::PreviewOpacity(v) => {
+                this.ui.preview_opacity = *v;
+                this.schedule_preview_before(window, cx);
+                let d = this.display.clone();
+                this.apply_display(d, window, cx);
+            }
+            DialogEvent::HoverRef(r) => {
+                if this.hover != *r {
+                    this.hover = r.clone();
+                    this.refresh_scene(false, cx);
+                }
+            }
         });
-        dialog.update(cx, |d, cx| window.focus(&d.focus_handle(cx), cx));
-        self.edit = Some(EditSession { dialog, index, is_new, _sub: sub });
+        // Variables for evaluated-value hints; "Final" only when later
+        // features exist (Onshape).
+        let mut vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+        vars.extend(self.display.variables.iter().map(|(k, v)| (k.clone(), *v)));
+        // Only variables that exist where this feature evaluates (Onshape).
+        if let Some(s) = self.studio(cx) {
+            for name in noshape_model::variables::variables_defined_later(s, index) {
+                vars.remove(&name);
+            }
+        }
+        let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
+        // Missing references: their creating feature is gone or suppressed.
+        let live: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect()).unwrap_or_default();
+        let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = Arc::new(move |r: &Reference| match r {
+            Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f)),
+            r => r.depends_on().is_some_and(|f| !live.contains(&f)),
+        });
+        dialog.update(cx, |d, cx| {
+            d.missing = missing;
+            d.variables = vars;
+            d.final_available = later;
+            window.focus(&d.focus_handle(cx), cx)
+        });
+        let history = DraftHistory::new(&dialog.read(cx).feature);
+        self.ui.orient_pending = self.ui.orient_on_edit && dialog.read(cx).feature.type_id == "sketch";
+        self.ui.preview_opacity = 1.0;
+        self.ui.preview_before = None;
+        self.ui.before_context = None;
+        self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
+        self.auto_operation(cx);
         self.schedule_regen(window, cx);
+        self.schedule_preview_before(window, cx);
         cx.notify();
     }
 
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // Onshape: a feature whose dialog shows an error (red title) can't be
+        // committed. Sketches can always be closed.
+        if let Some(e) = &self.edit
+            && self.sketch.is_none()
+            && !self.regenerating
+            && let Some((FeatureStatus::Error, msg)) = e.dialog.read(cx).status.clone()
+        {
+            self.message = Some((FeatureStatus::Error, format!("Fix the feature before accepting it: {msg}")));
+            cx.notify();
+            return;
+        }
         self.leave_sketch(cx);
+        self.restore_after_sketch(cx);
         let Some(e) = self.edit.take() else { return };
         self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
         let type_id = feature.type_id.clone();
         let name = feature.name.clone();
         let (index, is_new) = (e.index, e.is_new);
+        self.remember_values(&feature);
         self.doc.update(cx, |doc, cx| {
             let desc = if is_new { format!("Insert feature : {name}") } else { format!("Edit : {name}") };
             doc.edit_studio(self.tab, &desc, cx, |ps| {
@@ -597,6 +923,7 @@ impl PartStudioView {
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.leave_sketch(cx);
+        self.restore_after_sketch(cx);
         if self.edit.take().is_some() {
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
@@ -641,17 +968,10 @@ impl PartStudioView {
         });
     }
 
-    fn move_feature(&mut self, id: FeatureId, to: usize, cx: &mut Context<Self>) {
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Reorder features", cx, |ps| {
-                ps.reorder(id, to);
-            });
-        });
-    }
-
     // ------------------------------------------------------------ actions
 
     fn view(&mut self, v: StandardView, cx: &mut Context<Self>) {
+        self.push_camera_history(cx);
         self.viewport.update(cx, |vp, cx| vp.animate_to_view(v, cx));
     }
 
@@ -660,11 +980,25 @@ impl PartStudioView {
             self.sketch_delete(window, cx);
             return;
         }
+        if self.edit.is_some() {
+            return;
+        }
         let ids = std::mem::take(&mut self.selected_features);
+        if ids.is_empty() {
+            // Selected parts are deleted with a Delete part feature.
+            self.delete_selected_parts(window, cx);
+            return;
+        }
         self.delete_features(ids, cx);
     }
 
     fn on_clear_selection(&mut self, _: &ClearSelection, _: &mut Window, cx: &mut Context<Self>) {
+        // With a dialog open, Space belongs to the focused control (it
+        // toggles a checkbox, Onshape); the selection lives in the fields.
+        if self.edit.is_some() && self.sketch.is_none() {
+            cx.propagate();
+            return;
+        }
         self.selection.clear();
         self.selected_features.clear();
         self.refresh_scene(false, cx);
@@ -672,15 +1006,32 @@ impl PartStudioView {
     }
 
     fn view_normal(&mut self, cx: &mut Context<Self>) {
-        // Normal to the hovered or first selected planar face / plane / sketch.
-        let r = self.hover.clone().or_else(|| self.selection.first().cloned());
-        let Some(r) = r else { return };
-        let frame = match &r {
-            Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| p.reference == r).map(|p| p.frame),
-            Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } => self.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
-            _ => None,
+        // Onshape: normal to the first selected planar face / plane / sketch
+        // entity; in a sketch with nothing usable selected, normal to the
+        // sketch plane. Only outside a sketch does the hovered entity count
+        // (otherwise N in a Top sketch could turn to whatever plane happened
+        // to be under the cursor, leaving the sketch plane edge-on).
+        let frame_of = |this: &Self, r: &Reference| -> Option<noshape_model::display::PlaneFrame> {
+            match r {
+                Reference::Plane(_) | Reference::FeaturePlane(_) => this.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
+                Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } => this.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
+                Reference::Face(n) => this.context.as_ref()?.bodies.iter().find_map(|b| {
+                    let fi = *b.find_faces(n).first()?;
+                    let pl = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()??;
+                    let (normal, x) = (pl.unit_normal(), pl.unit_x());
+                    Some(noshape_model::display::PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
+                }),
+                _ => None,
+            }
         };
+        let frame = self
+            .selection
+            .iter()
+            .find_map(|r| frame_of(self, r))
+            .or_else(|| self.sketch.as_ref().map(|s| s.frame))
+            .or_else(|| self.hover.as_ref().and_then(|r| frame_of(self, r)));
         if let Some(f) = frame {
+            self.push_camera_history(cx);
             let cur = self.viewport.read(cx).camera.forward();
             let fwd = if cur.dot(-f.normal) > 0.999 { f.normal } else { -f.normal };
             self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, f.y, cx));
@@ -690,59 +1041,182 @@ impl PartStudioView {
     // ------------------------------------------------------------ render pieces
 
     fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let mut bar = h_flex().h(px(40.)).px_2().gap_1().bg(pal.panel).border_b_1().border_color(pal.border).overflow_hidden();
-        for (gi, group) in TOOLBAR.iter().enumerate() {
-            if gi > 0 {
-                bar = bar.child(div().w(px(1.)).h(px(22.)).mx_1().bg(pal.border));
+        // Onshape toolbar (§3.2): undo/redo first, 2 px group separators,
+        // "Search tools…" at the right end.
+        let mut bar = h_flex().flex_1().min_w_0().overflow_hidden().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)).child(crate::ui::tool_separator());
+        let customizing = self.ui.customizing_toolbar;
+        let removed = self.ui.toolbar.removed.clone();
+        for (pos, gi) in self.ui.toolbar.ordered_groups(TOOLBAR.len()).into_iter().enumerate() {
+            let group = TOOLBAR[gi];
+            if pos > 0 {
+                bar = bar.child(crate::ui::tool_separator());
+            }
+            if customizing {
+                // Customize toolbar: move tool sets left/right.
+                bar = bar.child(self.group_mover(gi, -1, cx));
             }
             for items in group.iter() {
-                let Some(primary) = items.iter().find_map(|id| features::get(id)) else { continue };
-                bar = bar.child(self.tool_button(primary, &items[1..], cx));
+                if items.iter().all(|id| removed.iter().any(|r| r == id)) {
+                    continue;
+                }
+                let Some(primary) = items.iter().find(|id| !removed.iter().any(|r| r == *id)).and_then(|id| features::get(id)) else { continue };
+                // Onshape: the tool last picked from a dropdown becomes the
+                // group's face for the rest of the session.
+                let key = items[0];
+                let face = self.ui.toolbar_faces.get(key).and_then(|id| features::get(id)).unwrap_or(primary);
+                bar = bar.child(self.tool_button(face, items, key, cx));
+                if customizing {
+                    // Remove the tool (its whole dropdown) from the toolbar.
+                    let ids: Vec<String> = items.iter().map(|s| s.to_string()).collect();
+                    bar = bar.child(
+                        div()
+                            .id(SharedString::from(format!("tb-rm-{key}")))
+                            .text_xs()
+                            .text_color(p().error)
+                            .cursor_pointer()
+                            .child("×")
+                            .tooltip(crate::ui::tooltip("Remove from toolbar"))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.ui.toolbar.removed.extend(ids.iter().cloned());
+                                this.ui.toolbar.save();
+                                cx.notify();
+                            })),
+                    );
+                }
             }
+            if customizing {
+                bar = bar.child(self.group_mover(gi, 1, cx));
+            }
+        }
+        if customizing {
+            // Removed tools: click to put them back.
+            let view = cx.entity();
+            let removed_ids = removed.clone();
+            bar = bar
+                .child(crate::ui::tool_separator())
+                .child(
+                    Button::new("tb-removed")
+                        .label(format!("Removed ({})", removed.len()))
+                        .ghost()
+                        .xsmall()
+                        .dropdown_caret(true)
+                        .dropdown_menu(move |mut m, _, _| {
+                            for id in &removed_ids {
+                                let Some(t) = features::get(id) else { continue };
+                                let (v, id) = (view.clone(), id.clone());
+                                m = m.item(PopupMenuItem::new(t.name).icon(Icon::empty().path(feature_icon(t.id))).on_click(move |_, _, cx| {
+                                    v.update(cx, |this, cx| {
+                                        this.ui.toolbar.removed.retain(|r| *r != id);
+                                        this.ui.toolbar.save();
+                                        cx.notify();
+                                    })
+                                }));
+                            }
+                            m
+                        }),
+                )
+                .child(Button::new("tb-reset").label("Reset to default").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.ui.toolbar.removed.clear();
+                    this.ui.toolbar.group_order.clear();
+                    this.ui.toolbar.save();
+                    cx.notify();
+                })))
+                .child(Button::new("tb-done").label("Done").primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.ui.customizing_toolbar = false;
+                    cx.notify();
+                })));
         }
         // Custom features of the document's Feature Studios.
         let custom = self.doc.read(cx).custom_features().feature_types();
         if !custom.is_empty() {
-            bar = bar.child(div().w(px(1.)).h(px(22.)).mx_1().bg(pal.border));
+            bar = bar.child(crate::ui::tool_separator());
             bar = bar.child(self.custom_tools(custom, cx));
         }
-        bar
-        .into_any_element()
+        let view = cx.entity();
+        crate::ui::toolbar()
+            .id("part-studio-toolbar")
+            // Right-click the toolbar: Customize toolbar… (Onshape).
+            .context_menu(move |m, _, _| {
+                let (v1, v2) = (view.clone(), view.clone());
+                m.item(PopupMenuItem::new("Customize toolbar…").on_click(move |_, _, cx| {
+                    v1.update(cx, |this, cx| {
+                        this.ui.customizing_toolbar = true;
+                        cx.notify();
+                    })
+                }))
+                .item(PopupMenuItem::new("Reset toolbar to default").on_click(move |_, _, cx| {
+                    v2.update(cx, |this, cx| {
+                        this.ui.toolbar.removed.clear();
+                        this.ui.toolbar.group_order.clear();
+                        this.ui.toolbar.save();
+                        cx.notify();
+                    })
+                }))
+            })
+            .child(bar)
+            .child(crate::ui::search_tools_box("tb-search").ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_palette(window, cx))))
+            .into_any_element()
     }
 
-    fn tool_button(&mut self, ty: &'static FeatureType, extra: &'static [&'static str], cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
+    /// Customize toolbar: arrow moving a tool set left (-1) or right (+1).
+    fn group_mover(&self, group: usize, delta: isize, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id(SharedString::from(format!("tb-mv-{group}-{delta}")))
+            .text_xs()
+            .text_color(p().accent)
+            .cursor_pointer()
+            .child(if delta < 0 { "◂" } else { "▸" })
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.ui.toolbar.move_group(TOOLBAR.len(), group, delta);
+                this.ui.toolbar.save();
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    fn tool_button(&mut self, ty: &'static FeatureType, group: &'static [&'static str], key: &'static str, cx: &mut Context<Self>) -> AnyElement {
         let tooltip: SharedString = match ty.shortcut {
             Some(s) => format!("{}  ({})", ty.name, s.replace("shift-", "Shift+").to_uppercase()).into(),
             None => ty.name.into(),
         };
         let id = ty.id;
-        let main = Button::new(SharedString::from(format!("tb-{id}")))
-            .icon(Icon::empty().path(feature_icon(id)).text_color(pal.text).with_size(px(18.)))
-            .ghost()
-            .with_size(px(30.))
-            .tooltip(tooltip)
-            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
-        if extra.is_empty() {
-            return main.into_any_element();
+        // Onshape: a tool whose dialog is open shows the "running" fill.
+        let active = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == id);
+        let icon_name = feature_icon(id);
+        let main = if id == "sketch" {
+            crate::ui::text_tool_button(SharedString::from(format!("tb-{id}")), &icon_name, "Sketch", active, cx)
+        } else {
+            crate::ui::tool_button(SharedString::from(format!("tb-{id}")), &icon_name, active, cx)
+        };
+        let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                // Clicking the active tool again closes it (Onshape).
+                let active_new = this.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == id);
+                if active_new && this.sketch.is_none() {
+                    this.cancel_edit(window, cx);
+                } else {
+                    this.start_feature(id, window, cx);
+                }
+            }));
+        let main = crate::ui::with_tooltip(SharedString::from(format!("tt-{id}")), tooltip, main);
+        if group.len() <= 1 {
+            return main;
         }
         let view = cx.entity();
         h_flex()
+            .flex_none()
             .child(main)
             .child(
-                Button::new(SharedString::from(format!("tbm-{id}")))
-                    .icon(Icon::new(IconName::ChevronDown).xsmall())
-                    .ghost()
-                    .xsmall()
-                    .w(px(14.))
+                crate::ui::tool_caret(SharedString::from(format!("tbm-{id}")), cx)
                     .dropdown_menu(move |mut menu, _, _| {
-                        for other in extra.iter().chain(std::iter::once(&id)) {
+                        for other in group.iter().filter(|o| **o != id) {
                             let Some(t) = features::get(other) else { continue };
                             let v = view.clone();
                             let oid: &'static str = t.id;
                             menu = menu.item(PopupMenuItem::new(t.name).icon(Icon::empty().path(feature_icon(oid))).on_click(move |_, window, cx| {
-                                v.update(cx, |this, cx| this.start_feature(oid, window, cx));
+                                v.update(cx, |this, cx| {
+                                    this.ui.toolbar_faces.insert(key, oid);
+                                    this.start_feature(oid, window, cx)
+                                });
                             }));
                         }
                         menu
@@ -754,20 +1228,17 @@ impl PartStudioView {
     /// Toolbar group of custom features: the first few as buttons, all of
     /// them in a "Custom features" dropdown.
     fn custom_tools(&mut self, custom: Vec<&'static FeatureType>, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let mut group = h_flex();
+        let mut group = h_flex().flex_none();
         for ty in custom.iter().take(4) {
-            group = group.child(self.tool_button(ty, &[], cx));
+            group = group.child(self.tool_button(ty, &[], ty.id, cx));
         }
         let view = cx.entity();
         group
             .child(
-                Button::new("tb-custom-features")
-                    .icon(Icon::empty().path(icon_path("custom-feature")).text_color(pal.text).with_size(px(18.)))
-                    .ghost()
-                    .with_size(px(30.))
+                crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
+                    .w(px(crate::ui::TOOL_CELL + 15.))
+                    .child(crate::ui::glyph("ui-chevron-down", 9., p().text))
                     .tooltip("Custom features (Feature Studios)")
-                    .dropdown_caret(true)
                     .dropdown_menu(move |mut menu, _, _| {
                         menu = menu.label("Custom features");
                         for t in &custom {
@@ -787,7 +1258,9 @@ impl PartStudioView {
         let pal = p();
         let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
         let rollback = studio.rollback_index();
+        let filtered = noshape_model::interaction::filter_features(&studio, &self.display, &self.ui.filter_query);
         let mut rows: Vec<AnyElement> = Vec::new();
+        let mut dg_rows: Vec<AnyElement> = Vec::new();
         // Default geometry.
         for (label, r) in [
             ("Origin", Reference::Origin),
@@ -795,23 +1268,23 @@ impl PartStudioView {
             ("Front", Reference::Plane(DatumPlane::Front)),
             ("Right", Reference::Plane(DatumPlane::Right)),
         ] {
+            if filtered.is_some() {
+                break;
+            }
             let selected = self.selection.contains(&r);
+            let hidden = studio.hidden_defaults.contains(&r);
             let r2 = r.clone();
             let r3 = r.clone();
-            let icon = if label == "Origin" { "point" } else { "plane" };
-            rows.push(
-                h_flex()
-                    .id(SharedString::from(format!("dg-{label}")))
-                    .h(px(24.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
-                    .text_sm()
-                    .text_color(pal.text_muted)
-                    .when(selected, |d| d.bg(pal.accent_soft).text_color(pal.text))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_faint))
-                    .child(label)
+            let icon = if label == "Origin" { "origin" } else { "plane" };
+            let view = cx.entity();
+            dg_rows.push(
+                crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected)
+                    .group("dg-row")
+                    // Onshape: hidden default geometry is listed in gray.
+                    .when(hidden, |d| d.text_color(pal.text_faint))
+                    .child(crate::ui::tree_icon(icon, hidden, cx))
+                    .child(div().flex_1().truncate().child(label))
+                    .child(div().invisible().group_hover("dg-row", |d| d.visible()).child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = if *h { Some(r2.clone()) } else { None };
                         if this.hover != new {
@@ -820,91 +1293,137 @@ impl PartStudioView {
                         }
                     }))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(e) = &this.edit {
-                            e.dialog.update(cx, |d, cx| {
-                                d.add_pick(r3.clone(), cx);
-                            });
-                        } else if let Some(pos) = this.selection.iter().position(|x| *x == r3) {
-                            this.selection.remove(pos);
-                        } else {
-                            this.selection.push(r3.clone());
+                        let t = this.list_target(&r3);
+                        this.pick(t, cx);
+                    }))
+                    .context_menu(move |menu, _, _| {
+                        let r = r.clone();
+                        let is_plane = matches!(r, Reference::Plane(_));
+                        let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                        let (r1, r2, r3, r4) = (r.clone(), r.clone(), r.clone(), r.clone());
+                        let mut m = menu;
+                        if is_plane {
+                            m = m
+                                .item(PopupMenuItem::new("New sketch").icon(Icon::empty().path(icon_path("sketch"))).on_click(move |_, w, cx| {
+                                    v1.update(cx, |this, cx| {
+                                        this.selection = vec![r1.clone()];
+                                        this.start_feature("sketch", w, cx);
+                                    })
+                                }))
+                                .item(PopupMenuItem::new("Offset plane").icon(Icon::empty().path(icon_path("plane"))).on_click(move |_, w, cx| {
+                                    v4.update(cx, |this, cx| {
+                                        this.selection = vec![r4.clone()];
+                                        this.start_feature("cPlane", w, cx);
+                                    })
+                                }))
+                                .separator();
                         }
-                        this.refresh_scene(false, cx);
+                        m = m.item(PopupMenuItem::new(if hidden { "Show" } else { "Hide" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r2), !hidden, cx))));
+                        if is_plane {
+                            let (vp, rp) = (view.clone(), r.clone());
+                            m = m.item(PopupMenuItem::new("Paste sketch").on_click(move |_, _, cx| vp.update(cx, |this, cx| this.paste_sketch_onto(rp.clone(), cx))));
+                        }
+                        if is_plane {
+                            m = m.item(PopupMenuItem::new("View normal to").on_click(move |_, _, cx| {
+                                v3.update(cx, |this, cx| {
+                                    this.selection = vec![r3.clone()];
+                                    this.view_normal(cx);
+                                })
+                            }));
+                        }
+                        m
+                    })
+                    .into_any_element(),
+            );
+        }
+        if !dg_rows.is_empty() {
+            // Onshape: a collapsible "Default geometry" folder; children are
+            // indented 22 px under a 1 px guide line.
+            let open = !self.ui.default_geometry_collapsed;
+            rows.push(
+                crate::ui::tree_row("dg-folder", false)
+                    .child(crate::ui::caret(open))
+                    .child("Default geometry")
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.ui.default_geometry_collapsed = !this.ui.default_geometry_collapsed;
                         cx.notify();
                     }))
                     .into_any_element(),
             );
+            if open {
+                rows.push(
+                    v_flex()
+                        .relative()
+                        .pl(px(17.))
+                        .child(div().absolute().left(px(12.)).top_0().bottom_0().w(px(1.)).bg(pal.border))
+                        .children(dg_rows)
+                        .into_any_element(),
+                );
+            }
         }
-        rows.push(div().h(px(6.)).into_any_element());
 
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
-        let mut open_folder: Option<u32> = None;
+        let related = self.related_features(cx);
+        let mut open_folder: Vec<u32> = Vec::new();
         for (i, f) in studio.features.iter().enumerate() {
             if editing_new_at == Some(i) {
                 rows.push(self.render_editing_placeholder(cx));
             }
-            if i == rollback {
+            if i == rollback && filtered.is_none() {
                 rows.push(self.render_rollback_bar(i, cx));
             }
-            let folder = f.folder.and_then(|id| studio.folder(id));
-            if f.folder != open_folder {
-                open_folder = f.folder;
-                if let Some(fd) = folder {
-                    rows.push(self.render_folder_row(fd, cx));
-                }
-            }
-            if folder.is_some_and(|fd| fd.collapsed) && editing_id != Some(f.id) {
+            if filtered.as_ref().is_some_and(|set| !set.contains(&f.id)) {
                 continue;
             }
-            let row = self.render_feature_row(i, f, i >= rollback, editing_id == Some(f.id), cx);
-            rows.push(if folder.is_some() { div().pl_3().child(row).into_any_element() } else { row });
+            // Nested folders: emit headers for folders newly entered, indent
+            // by depth, and hide rows under a collapsed ancestor.
+            let chain = studio.folder_chain(f.folder);
+            let common = open_folder.iter().zip(&chain).take_while(|(a, b)| a == b).count();
+            for (depth, fid) in chain.iter().enumerate().skip(common) {
+                let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !fd.collapsed));
+                if let (Some(fd), true) = (studio.folder(*fid), ancestors_open || filtered.is_some()) {
+                    let row = self.render_folder_row(fd, cx);
+                    rows.push(div().pl(px(12.0 * depth as f32)).child(row).into_any_element());
+                }
+            }
+            open_folder = chain.clone();
+            let collapsed = chain.iter().any(|c| studio.folder(*c).is_some_and(|fd| fd.collapsed));
+            if collapsed && editing_id != Some(f.id) && filtered.is_none() {
+                continue;
+            }
+            let row = self.render_feature_row(i, f, i >= rollback, editing_id == Some(f.id), related.contains(&f.id), cx);
+            rows.push(if chain.is_empty() { row } else { div().pl(px(12.0 * chain.len() as f32)).child(row).into_any_element() });
         }
         if editing_new_at.is_some_and(|i| i >= studio.features.len()) {
             rows.push(self.render_editing_placeholder(cx));
         }
-        if rollback >= studio.features.len() {
+        if rollback >= studio.features.len() && filtered.is_none() {
             rows.push(self.render_rollback_bar(studio.features.len(), cx));
+        }
+        if filtered.as_ref().is_some_and(|s| s.is_empty()) {
+            rows.push(div().px_2().py_1().text_xs().text_color(pal.text_faint).child("No matching features").into_any_element());
         }
 
         // Parts list.
-        let parts: Vec<AnyElement> = self
-            .display
-            .bodies
-            .iter()
-            .map(|b| {
-                let r = Reference::Body(b.id.clone());
-                let selected = self.selection.contains(&r);
-                let c = b.color;
-                let swatch = gpui_kit::Rgba { r: c[0].powf(1.0 / 2.2), g: c[1].powf(1.0 / 2.2), b: c[2].powf(1.0 / 2.2), a: 1.0 };
-                let r2 = r.clone();
-                h_flex()
-                    .id(SharedString::from(format!("part-{}", b.id)))
-                    .h(px(24.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
-                    .text_sm()
-                    .when(selected, |d| d.bg(pal.accent_soft))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().size(px(10.)).rounded_sm().bg(swatch))
-                    .child(div().flex_1().truncate().child(b.name.clone()))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(e) = &this.edit {
-                            e.dialog.update(cx, |d, cx| {
-                                d.add_pick(r2.clone(), cx);
-                            });
-                        } else if let Some(pos) = this.selection.iter().position(|x| *x == r2) {
-                            this.selection.remove(pos);
-                        } else {
-                            this.selection.push(r2.clone());
-                        }
-                        this.refresh_scene(false, cx);
-                        cx.notify();
-                    }))
-                    .into_any_element()
+        // Parts list sections by body kind (Onshape: Parts, Surfaces, Curves).
+        use noshape_model::display::BodyKind;
+        let sections: Vec<(&'static str, &'static str, Vec<AnyElement>, Vec<BodyId>)> = [("Parts", "parts"), ("Surfaces", "surfaces"), ("Curves", "curves")]
+            .into_iter()
+            .map(|(title, key)| {
+                let of_kind = |k: BodyKind| match key {
+                    "parts" => k == BodyKind::Solid,
+                    "surfaces" => k == BodyKind::Surface,
+                    _ => matches!(k, BodyKind::Wire | BodyKind::Point),
+                };
+                let bodies: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| of_kind(b.kind)).collect();
+                let rows: Vec<AnyElement> = bodies.iter().map(|b| self.render_part_row(b, cx)).collect();
+                (title, key, rows, bodies.iter().map(|b| b.id.clone()).collect())
             })
+            .filter(|(key, _, rows, _)| *key == "Parts" || !rows.is_empty())
             .collect();
+        let errors = studio.features.iter().filter(|f| self.display.feature_state(f.id).is_some_and(|s| s.status == FeatureStatus::Error)).count();
+        let filter_input = self.ui.filter.as_ref().map(|(st, _)| st.clone());
 
         v_flex()
             .size_full()
@@ -913,23 +1432,285 @@ impl PartStudioView {
             .border_color(pal.border)
             .child(
                 h_flex()
-                    .h(px(32.))
-                    .px_3()
-                    .justify_between()
-                    .border_b_1()
-                    .border_color(pal.border)
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(format!("FEATURES ({})", studio.features.len())))
-                    .when(self.regenerating, |d| d.child(div().text_xs().text_color(pal.text_faint).child("regenerating…"))),
+                    .h(px(30.))
+                    .flex_none()
+                    .pl(px(6.))
+                    .pr(px(6.))
+                    .gap_2()
+                    .child(
+                        div()
+                            .id("list-collapse")
+                            .text_xs()
+                            .text_color(pal.text_faint)
+                            .cursor_pointer()
+                            .child("‹")
+                            .tooltip(crate::ui::tooltip("Collapse the Features and parts list"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.list_collapsed = true;
+                                cx.notify();
+                            })),
+                    )
+                    .child(crate::ui::panel_title(format!("Features ({})", studio.features.len())))
+                    .child(
+                        div()
+                            .id("regen-times-btn")
+                            .px_1()
+                            .text_xs()
+                            .text_color(if self.ui.show_regen_times { pal.accent } else { pal.text_faint })
+                            .cursor_pointer()
+                            .child("⏱")
+                            .tooltip(crate::ui::tooltip("Show regeneration times"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.show_regen_times = !this.ui.show_regen_times;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        div()
+                            .id("pause-regen-btn")
+                            .px_1()
+                            .text_xs()
+                            .text_color(if self.ui.regen_paused.is_some() { pal.accent } else { pal.text_faint })
+                            .cursor_pointer()
+                            .child("⏸")
+                            .tooltip(crate::ui::tooltip("Pause regeneration"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_pause_regen(w, cx))),
+                    )
+                    .child(div().flex_1())
+                    .when(self.regenerating, |d| d.child(div().text_xs().text_color(pal.text_faint).child("regenerating…")))
+                    .when(errors > 0, |d| {
+                        // Onshape: the error icon shows the count; clicking it filters to errors.
+                        d.child(
+                            div()
+                                .id("feature-errors")
+                                .px_1p5()
+                                .rounded_sm()
+                                .text_xs()
+                                .text_color(pal.error)
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .child(format!("⚠ {errors}"))
+                                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" })).build(window, cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                    let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors" };
+                                    this.set_filter(next, window, cx);
+                                })),
+                        )
+                    }),
             )
-            .child(v_flex().id("feature-list").key_context("FeatureList").flex_1().p_1().gap_px().overflow_y_scroll().children(rows))
+            // Onshape filter row: funnel icon, then a 28 px "Filter by name or type" box.
+            .children(filter_input.map(|st| {
+                h_flex()
+                    .h(px(34.))
+                    .flex_none()
+                    .pl(px(4.))
+                    .pr(px(5.))
+                    .gap(px(4.))
+                    .child(crate::assets::icon("filter", 20., cx))
+                    .child(div().flex_1().child(gpui_kit::component::input::Input::new(&st).small().h(px(28.)).rounded(px(2.))))
+            }))
             .child(
-                v_flex()
-                    .max_h(px(220.))
+                v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).flex_1().pt(px(2.)).overflow_y_scroll().children(rows).child(
+                    // Space below the last feature: dropping the rollback bar
+                    // here rolls it to the end (otherwise it could only be
+                    // dragged up, and back down to above the last feature).
+                    div()
+                        .id("feature-list-end")
+                        .flex_1()
+                        .min_h(px(32.))
+                        .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent_soft))
+                        .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(None, cx)))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            // Clicking empty list space clears the feature selection.
+                            if !this.selected_features.is_empty() {
+                                this.selected_features.clear();
+                                this.refresh_scene(false, cx);
+                                cx.notify();
+                            }
+                        })),
+                ),
+            )
+            // Drag the separator to share space between features and parts.
+            .child(
+                div()
+                    .id("parts-separator")
+                    .h(px(5.))
+                    .flex_none()
+                    .cursor(CursorStyle::ResizeUpDown)
                     .border_t_1()
                     .border_color(pal.border)
-                    .child(h_flex().h(px(28.)).px_3().child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(format!("PARTS ({})", self.display.bodies.len()))))
-                    .child(v_flex().id("parts-list").p_1().overflow_y_scroll().children(parts)),
+                    .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
             )
+            .child({
+                let mut col = v_flex().h(px(self.ui.parts_height)).flex_none().id("parts-area").overflow_y_scroll();
+                let show_props = self.ui.show_part_props;
+                for (title, key, rows, ids) in sections {
+                    let collapsed = self.ui.collapsed_sections.contains(key);
+                    let n = rows.len();
+                    let all_hidden = !ids.is_empty() && ids.iter().all(|b| self.display.body(b).is_some_and(|d| d.hidden));
+                    let view = cx.entity();
+                    let ids2 = ids.clone();
+                    col = col
+                        .child(
+                            crate::ui::tree_row(SharedString::from(format!("{key}-folder")), false)
+                                .group("section-head")
+                                .child(crate::ui::caret(!collapsed))
+                                .child(div().flex_1().child(format!("{title} ({n})")))
+                                // Eye on hover: hide or show every item of the section.
+                                .child(
+                                    div()
+                                        .id(SharedString::from(format!("{key}-eye")))
+                                        .invisible()
+                                        .group_hover("section-head", |d| d.visible())
+                                        .cursor_pointer()
+                                        .child(svg().path(icon_path(if all_hidden { "eye-off" } else { "eye" })).size_3p5().text_color(pal.text_faint))
+                                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            cx.stop_propagation();
+                                            let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
+                                            this.set_visibility(&t, !all_hidden, cx);
+                                        })),
+                                )
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    if !this.ui.collapsed_sections.remove(key) {
+                                        this.ui.collapsed_sections.insert(key);
+                                    }
+                                    cx.notify();
+                                }))
+                                .context_menu(move |m, _, _| {
+                                    let (v1, v2) = (view.clone(), view.clone());
+                                    let ids = ids2.clone();
+                                    m.item(PopupMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
+                                        v1.update(cx, |this, cx| {
+                                            this.ui.show_part_props = !this.ui.show_part_props;
+                                            cx.notify();
+                                        })
+                                    }))
+                                    .item(PopupMenuItem::new(format!("Hide all {}", title.to_lowercase())).on_click(move |_, _, cx| {
+                                        let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
+                                        v2.update(cx, |this, cx| this.set_visibility(&t, true, cx))
+                                    }))
+                                }),
+                        )
+                        .when(!collapsed, |d| d.child(v_flex().pl(px(17.)).pb(px(4.)).children(rows)));
+                }
+                col
+            })
+            .into_any_element()
+    }
+
+    /// A row of the parts list: click selects (or feeds a dialog's part
+    /// field), hover highlights the part, the eye hides or shows it, and the
+    /// context menu has Onshape's part commands.
+    fn render_part_row(&self, b: &noshape_model::display::BodyDisplay, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let r = Reference::Body(b.id.clone());
+        let selected = self.selection.contains(&r);
+        let hidden = b.hidden;
+        let (id1, id2, id3) = (b.id.clone(), b.id.clone(), b.id.clone());
+        let r_hover = r.clone();
+        let view = cx.entity();
+        let sheet_metal = self.context.as_ref().is_some_and(|ctx| ctx.sheet_metal.contains_key(&b.id));
+        let part_icon = match b.kind {
+            noshape_model::display::BodyKind::Surface => "surface-body",
+            noshape_model::display::BodyKind::Wire => "wire-body",
+            _ => "part",
+        };
+        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected)
+            .group("part-row")
+            .when(hidden, |d| d.text_color(pal.text_faint))
+            .child(crate::ui::tree_icon(part_icon, hidden, cx))
+            .child(div().flex_1().truncate().child(b.name.clone()))
+            // Parts list properties (part number, revision).
+            .when_some(self.ui.show_part_props.then(|| self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| [p.part_number.clone().unwrap_or_default(), p.revision.clone().unwrap_or_default()].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(" · "))).flatten().filter(|t| !t.is_empty()), |d, t| d.child(div().text_xs().text_color(pal.text_faint).child(t)))
+            .child(
+                div()
+                    .id(SharedString::from(format!("part-eye-{}", b.id)))
+                    .when(!hidden, |d| d.invisible().group_hover("part-row", |d| d.visible()))
+                    .cursor_pointer()
+                    .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.set_part_hidden(&id3, !hidden, cx);
+                    })),
+            )
+            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                let new = if *h { Some(r_hover.clone()) } else { None };
+                if this.hover != new {
+                    this.hover = new;
+                    this.refresh_scene(false, cx);
+                }
+            }))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_body(id1.clone(), cx)))
+            .context_menu(move |menu, _, _| {
+                let b = id2.clone();
+                let item = |label: &str, f: ViewAction| {
+                    let v = view.clone();
+                    PopupMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                };
+                // Commands apply to every selected part when the row is selected.
+                let targets = move |this: &PartStudioView, b: &BodyId| -> Vec<BodyId> {
+                    let sel: Vec<BodyId> = this.selection.iter().filter_map(|r| match r {
+                        Reference::Body(x) => Some(x.clone()),
+                        _ => None,
+                    }).collect();
+                    if sel.contains(b) { sel } else { vec![b.clone()] }
+                };
+                let (b1, b2, b3, b4, b5, b6, b7, b8, b9) = (b.clone(), b.clone(), b.clone(), b.clone(), b.clone(), b.clone(), b.clone(), b.clone(), b.clone());
+                let mut m = menu
+                    .item(item("Rename…", Box::new(move |this, w, cx| this.open_part_properties(b1.clone(), w, cx))))
+                    .item(item("Properties…", Box::new(move |this, w, cx| this.open_part_properties(b2.clone(), w, cx))))
+                    .item(item("Assign material…", Box::new(move |this, w, cx| this.open_part_properties(b3.clone(), w, cx))))
+                    .item(item("Edit appearance…", Box::new(move |this, w, cx| {
+                        let t = targets(this, &b4);
+                        this.edit_appearance(appearance::EditTarget::Parts(t), w, cx);
+                    })))
+                    .separator()
+                    .item(item(if hidden { "Show" } else { "Hide" }, Box::new(move |this, _, cx| {
+                        let t: Vec<Reference> = targets(this, &b5).into_iter().map(Reference::Body).collect();
+                        this.set_visibility(&t, !hidden, cx);
+                    })))
+                    .item(item("Hide other parts", Box::new(move |this, _, cx| {
+                        let keep = targets(this, &b6);
+                        this.hide_other_parts(&keep, cx);
+                    })))
+                    .item(item("Hide all parts", Box::new(|this, _, cx| this.hide_all_parts(cx))))
+                    .item(item("Isolate", Box::new(move |this, w, cx| {
+                        this.selection = targets(this, &b7).into_iter().map(Reference::Body).collect();
+                        this.hover = None;
+                        this.isolate(behaviors::IsolateMode::Isolate, w, cx);
+                    })))
+                    .item(item("Make transparent", Box::new(move |this, w, cx| {
+                        this.selection = targets(this, &b8).into_iter().map(Reference::Body).collect();
+                        this.hover = None;
+                        this.isolate(behaviors::IsolateMode::Transparent, w, cx);
+                    })))
+                    .item(item("Zoom to selection", Box::new(move |this, _, cx| {
+                        let t = targets(this, &b9);
+                        this.selection = t.into_iter().map(Reference::Body).collect();
+                        this.zoom_to_selection(cx);
+                    })));
+                let (b10, b11, b12) = (b.clone(), b.clone(), b.clone());
+                m = m.item(item("Section view", Box::new(move |this, w, cx| {
+                    // Section through the part's center, normal to the view.
+                    let center = this.display.body(&b12).and_then(|b| b.bounds).map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or_default();
+                    let n = -this.viewport.read(cx).camera.forward();
+                    this.ui.section.clear();
+                    this.restore_section(&[[n.x, n.y, n.z, n.dot(center)]], w, cx);
+                })));
+                m = m.item(item("Mass properties", Box::new(move |this, _, cx| {
+                    this.selection = vec![Reference::Body(b10.clone())];
+                    this.show_mass = true;
+                    cx.notify();
+                })));
+                if sheet_metal {
+                    let b12 = b.clone();
+                    m = m.item(item("Export flat pattern (DXF)…", Box::new(move |this, w, cx| this.export_flat(b12.clone(), "dxf", w, cx))));
+                }
+                m.separator().item(item("Delete", Box::new(move |this, w, cx| {
+                    this.selection = targets(this, &b11).into_iter().map(Reference::Body).collect();
+                    this.delete_selected_parts(w, cx);
+                })))
+            })
             .into_any_element()
     }
 
@@ -937,17 +1718,10 @@ impl PartStudioView {
         let pal = p();
         let id = fd.id;
         let collapsed = fd.collapsed;
-        let row = h_flex()
-            .id(SharedString::from(format!("folder-{id}")))
-            .h(px(26.))
-            .px_2()
-            .gap_2()
-            .rounded_sm()
-            .text_sm()
-            .text_color(pal.text_muted)
-            .hover(|d| d.bg(pal.panel_hover))
-            .child(Icon::new(if collapsed { IconName::ChevronRight } else { IconName::ChevronDown }).size_3().text_color(pal.text_faint))
-            .child(svg().path(icon_path("folder")).size_4().text_color(pal.text_faint))
+        let _ = pal;
+        let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), false)
+            .child(crate::ui::caret(!collapsed))
+            .child(crate::ui::tree_icon("folder", false, cx))
             .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
                 None => div().flex_1().truncate().child(fd.name.clone()).into_any_element(),
@@ -964,10 +1738,23 @@ impl PartStudioView {
             let v = view.clone();
             let v2 = view.clone();
             let v3 = view.clone();
+            let v4 = view.clone();
+            let v5 = view.clone();
+            let v6 = view.clone();
             menu.item(PopupMenuItem::new(if collapsed { "Expand" } else { "Collapse" }).on_click(move |_, _, cx| v.update(cx, |this, cx| this.toggle_folder(id, cx))))
-                .item(PopupMenuItem::new("Rename folder").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_folder_rename(id, window, cx))))
+                .item(PopupMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_folder_rename(id, window, cx))))
                 .separator()
-                .item(PopupMenuItem::new("Remove folder").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.dissolve_folder(id, cx))))
+                // Onshape: suppressing a folder suppresses everything in it.
+                .item(PopupMenuItem::new("Suppress").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.suppress_folder(id, true, cx))))
+                .item(PopupMenuItem::new("Unsuppress").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.suppress_folder(id, false, cx))))
+                .separator()
+                .item(PopupMenuItem::new("Expand all").on_click({
+                    let v = v6.clone();
+                    move |_, _, cx| v.update(cx, |this, cx| this.set_all_folders_collapsed(false, cx))
+                }))
+                .item(PopupMenuItem::new("Collapse all").on_click(move |_, _, cx| v6.update(cx, |this, cx| this.set_all_folders_collapsed(true, cx))))
+                .separator()
+                .item(PopupMenuItem::new("Unpack folder").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.dissolve_folder(id, cx))))
         })
         .into_any_element()
     }
@@ -975,127 +1762,243 @@ impl PartStudioView {
     fn render_editing_placeholder(&self, cx: &App) -> AnyElement {
         let pal = p();
         let name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_default();
-        h_flex()
-            .h(px(26.))
-            .px_2()
-            .gap_2()
-            .rounded_sm()
+        let icon = self.edit.as_ref().map(|e| feature_icon(&e.dialog.read(cx).feature.type_id)).unwrap_or_else(|| icon_path("part"));
+        crate::ui::tree_row("editing-placeholder", true)
             .bg(pal.accent_soft)
-            .border_1()
-            .border_color(pal.accent)
-            .text_sm()
-            .child(div().size(px(6.)).rounded_full().bg(pal.accent))
-            .child(name)
+            .font_weight(FontWeight::SEMIBOLD)
+            .child(crate::ui::tree_icon(&icon, false, cx))
+            .child(div().flex_1().truncate().child(name))
             .into_any_element()
     }
 
     fn render_rollback_bar(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let view = cx.entity();
         div()
             .id(SharedString::from(format!("rollback-{index}")))
-            .h(px(8.))
-            .mx_1()
+            .h(px(14.))
+            .px(px(5.))
             .flex()
+            .flex_none()
             .items_center()
             .cursor(CursorStyle::ResizeUpDown)
-            .child(div().w_full().h(px(3.)).rounded_full().bg(pal.accent))
+            .group("rollback")
+            .child(div().w_full().h(px(7.)).bg(pal.rollback).group_hover("rollback", |d| d.bg(pal.row_hover)))
             .on_drag(RollbackDrag, |_, _, _, cx| cx.new(|_| RollbackDrag))
-            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                window.focus(&cx.focus_handle(), cx);
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                // Selecting the bar lets ↑/↓ step it (Onshape).
+                window.focus(&this.ui.list_focus, cx);
+                cx.notify();
             }))
+            .context_menu(move |menu, _, _| {
+                let v = view.clone();
+                menu.item(PopupMenuItem::new("Roll to end").on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_rollback(None, cx))))
+            })
             .into_any_element()
     }
 
-    fn render_feature_row(&self, i: usize, f: &Feature, rolled_back: bool, editing: bool, cx: &mut Context<Self>) -> AnyElement {
+    fn render_feature_row(&self, i: usize, f: &Feature, rolled_back: bool, editing: bool, related: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let state = self.display.feature_state(f.id);
         let status = state.map(|s| s.status).unwrap_or(FeatureStatus::Ok);
         let selected = self.selected_features.contains(&f.id);
-        let color = if f.suppressed || rolled_back {
+        // Onshape (§3.4): rolled back = italic #ccc, suppressed = #999 struck
+        // through, error = #aa252d; everything else (sketches included) #333.
+        // Suppressed directly, or by a configuration / expression (the
+        // regenerated state says so).
+        let suppressed = f.suppressed || (!rolled_back && status == FeatureStatus::Suppressed);
+        let color = if rolled_back {
+            pal.text_rolled_back
+        } else if suppressed {
             pal.text_faint
         } else {
             match status {
-                FeatureStatus::Error => pal.error,
-                FeatureStatus::Warning => pal.warning,
-                _ if state.is_some_and(|s| s.underdefined) => pal.info,
+                FeatureStatus::Error => pal.text_invalid,
                 _ => pal.text,
             }
         };
+        let underdefined = !rolled_back && state.is_some_and(|s| s.underdefined);
         let id = f.id;
         let msg = state.and_then(|s| s.message.clone());
-        let suppressed = f.suppressed;
-        let row = h_flex()
-            .id(SharedString::from(format!("feat-{}", f.id)))
-            .h(px(26.))
-            .px_2()
-            .gap_2()
-            .rounded_sm()
-            .text_sm()
+        let manually_suppressed = f.suppressed;
+        let hidden = f.hidden;
+        // Sketches, planes and mate connectors can be hidden from the list.
+        let hideable = matches!(f.type_id.as_str(), "sketch" | "cPlane" | "mateConnector") || self.display.sketches.iter().any(|s| s.feature == id);
+        let first_config_input = self.studio(cx).and_then(|s| s.configuration.inputs.first().map(|i| i.id.clone()));
+        let dyn_expr = f.suppression_expr.clone();
+        let makes_faces = self.display.bodies.iter().any(|b| b.face_refs.iter().any(|r| r.depends_on() == Some(id)));
+        let has_appearance = self.studio(cx).is_some_and(|s| s.appearances.iter().any(|a| a.target == noshape_model::partstudio::AppearanceTarget::Feature(id)));
+        let is_sketch = self.display.sketches.iter().any(|s| s.feature == id);
+        let has_plane = is_sketch || self.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(id));
+        let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
+            .group("feature-row")
             .text_color(color)
-            .when(selected, |d| d.bg(pal.accent_soft))
-            .when(editing, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent))
-            .hover(|d| d.bg(pal.panel_hover))
-            .child(svg().path(feature_icon(&f.type_id)).size_4().text_color(if rolled_back || suppressed { pal.text_faint } else { pal.text_muted }))
+            .when(rolled_back, |d| d.italic())
+            .when(related && !selected && !editing, |d| d.bg(gpui_kit::rgb(0xecf0f4)))
+            .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
+            .child(
+                crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx)
+                    .relative()
+                    // Onshape list badges: error (red) and under-defined sketch (blue), 12 px at the icon's bottom-right.
+                    .when(status == FeatureStatus::Error && !rolled_back, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).size(px(8.)).rounded_full().bg(pal.error).border_1().border_color(pal.panel)))
+                    // Missing selections / warnings: Onshape's yellow triangle.
+                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
+                    .when(underdefined, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).w(px(8.)).h(px(4.)).bg(pal.accent))),
+            )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
                 None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(f.name.clone()).into_any_element(),
             })
-            .when(status == FeatureStatus::Error && !rolled_back, |d| d.child(div().size(px(6.)).rounded_full().bg(pal.error)))
+            // Onshape's expression icon on dynamically suppressed features.
+            .when_some(dyn_expr.clone(), |d, e| {
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("feat-dyn-{id}")))
+                        .text_xs()
+                        .italic()
+                        .text_color(pal.accent)
+                        .cursor_pointer()
+                        .child("ƒx")
+                        .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Suppressed with expression: {e}")).build(window, cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
+                            cx.stop_propagation();
+                            this.edit_dynamic_suppression(id, w, cx);
+                        })),
+                )
+            })
+            .when(hideable, |d| {
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("feat-eye-{}", f.id)))
+                        .when(!hidden, |d| d.invisible().group_hover("feature-row", |d| d.visible()))
+                        .cursor_pointer()
+                        .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            this.set_visibility(&[Reference::Feature(id)], !hidden, cx);
+                        })),
+                )
+            })
             .when_some(msg, |d, m| d.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(window, cx)))
+            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                // Hovering a feature highlights its geometry (Onshape).
+                let new = if *h { Some(id) } else { None };
+                if this.ui.list_hover != new && (*h || this.ui.list_hover == Some(id)) {
+                    this.ui.list_hover = new;
+                    this.refresh_scene(false, cx);
+                }
+            }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 if ev.click_count() >= 2 {
                     this.edit_feature(id, window, cx);
                     return;
                 }
-                if ev.modifiers().shift || ev.modifiers().secondary() {
-                    if let Some(pos) = this.selected_features.iter().position(|x| *x == id) {
-                        this.selected_features.remove(pos);
-                    } else {
-                        this.selected_features.push(id);
-                    }
-                } else {
-                    this.selected_features = vec![id];
+                if this.pick_feature_into_dialog(id, cx) {
+                    return;
                 }
+                this.click_feature(id, ev.modifiers().shift, cx);
                 window.focus(&this.focus, cx);
-                cx.notify();
             }))
-            .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(rgb(0x8b7cff)))
+            .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent_soft))
             .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| this.set_rollback(Some(i), cx)))
             .on_drag(FeatureDrag { id, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
-            .drag_over::<FeatureDrag>(|s, _, _, _| s.border_t_2().border_color(rgb(0x5aa9ff)))
-            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.move_feature(d.id, i, cx)));
+            .drag_over::<FeatureDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
+            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
         let view = cx.entity();
         row.context_menu(move |menu, _, _| {
-            let v = view.clone();
-            let v2 = view.clone();
-            let v3 = view.clone();
-            let v4 = view.clone();
-            let v5 = view.clone();
-            let v6 = view.clone();
-            let v7 = view.clone();
-            let v8 = view.clone();
-            menu.item(PopupMenuItem::new("Edit…").on_click(move |_, window, cx| v.update(cx, |this, cx| this.edit_feature(id, window, cx))))
-                .item(PopupMenuItem::new("Rename").on_click(move |_, window, cx| v5.update(cx, |this, cx| this.start_rename(id, window, cx))))
-                .item(PopupMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_suppressed(vec![id], !suppressed, cx))))
-                .item(PopupMenuItem::new("Roll to here").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.set_rollback(Some(i + 1), cx))))
+            // Onshape's feature context menu; commands act on every selected
+            // feature when the clicked one is part of the selection.
+            let item = |label: &str, f: ViewAction| {
+                let v = view.clone();
+                PopupMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+            };
+            let targets = move |this: &PartStudioView| if this.selected_features.contains(&id) { this.selected_features.clone() } else { vec![id] };
+            let mut m = menu
+                .item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))))
+                .item(item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx))))
+                .item(item("Roll to here", Box::new(move |this, _, cx| this.set_rollback(Some(i + 1), cx))))
                 .separator()
-                .item(PopupMenuItem::new("Copy").on_click(move |_, _, cx| {
-                    v6.update(cx, |this, cx| {
-                        if !this.selected_features.contains(&id) {
-                            this.selected_features = vec![id];
-                        }
-                        this.copy_selected_features(cx);
-                    })
-                }))
-                .item(PopupMenuItem::new("Paste").on_click(move |_, _, cx| v7.update(cx, |this, cx| this.paste_features(cx))))
-                .item(PopupMenuItem::new("Add to new folder").on_click(move |_, _, cx| {
-                    v8.update(cx, |this, cx| {
-                        let ids = if this.selected_features.contains(&id) { this.selected_features.clone() } else { vec![id] };
-                        this.add_to_new_folder(ids, cx);
-                    })
-                }))
+                .item(item(if manually_suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| {
+                    let t = targets(this);
+                    this.set_suppressed(t, !manually_suppressed, cx);
+                })));
+            if hideable {
+                m = m.item(item(if hidden { "Show" } else { "Hide" }, Box::new(move |this, _, cx| {
+                    let t: Vec<Reference> = targets(this).into_iter().map(Reference::Feature).collect();
+                    this.set_visibility(&t, !hidden, cx);
+                })));
+            }
+            if let Some(input) = first_config_input.clone() {
+                // Onshape: Configure suppression adds the feature to the
+                // configuration table.
+                m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {
+                    this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
+                    this.right_panel = Some(config_panel::RightPanel::Configurations);
+                    cx.notify();
+                })));
+            }
+            // Dynamic suppression: suppress while an expression is true.
+            let has_expr = dyn_expr.is_some();
+            m = m.item(item(if has_expr { "Edit dynamic suppression…" } else { "Dynamic suppression…" }, Box::new(move |this, w, cx| this.edit_dynamic_suppression(id, w, cx))));
+            if has_expr {
+                m = m.item(item("Remove dynamic suppression", Box::new(move |this, _, cx| this.set_suppression_expr(id, None, cx))));
+            }
+            // Appearances: sketches color their curves, features their faces.
+            if is_sketch {
+                m = m.item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(id, None), w, cx))));
+                m = m.item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))));
+                m = m.item(item("Export as DXF…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
+                m = m.item(item("Export as SVG…", Box::new(move |this, w, cx| this.export_sketch(id, "svg", w, cx))));
+            } else if makes_faces {
+                m = m.item(item(if has_appearance { "Edit feature appearance…" } else { "Add appearance to feature…" }, Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(id, None), w, cx))));
+            }
+            m = m.item(item("Show dependencies…", Box::new(move |this, _, cx| {
+                this.ui.dependencies = Some(id);
+                cx.notify();
+            })));
+            m = m
                 .separator()
-                .item(PopupMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |this, cx| this.delete_features(vec![id], cx))))
+                .item(item("Copy", Box::new(move |this, _, cx| {
+                    if !this.selected_features.contains(&id) {
+                        this.selected_features = vec![id];
+                    }
+                    this.copy_selected_features(cx);
+                })))
+                .item(item("Paste", Box::new(|this, _, cx| this.paste_features(cx))))
+                .item(item("Add selection to folder", Box::new(move |this, _, cx| {
+                    let t = targets(this);
+                    this.add_to_new_folder(t, cx);
+                })))
+                .separator()
+                .item(item("Zoom to selection", Box::new(move |this, _, cx| {
+                    if !this.selected_features.contains(&id) {
+                        this.selected_features = vec![id];
+                    }
+                    this.zoom_to_selection(cx);
+                })));
+            if has_plane {
+                m = m.item(item("View normal to", Box::new(move |this, _, cx| {
+                    let r = if is_sketch {
+                        this.display.sketches.iter().find(|s| s.feature == id).and_then(|s| s.curves.first().map(|c| Reference::SketchEntity { sketch: id, entity: c.entity })).unwrap_or(Reference::FeaturePlane(id))
+                    } else {
+                        Reference::FeaturePlane(id)
+                    };
+                    let prev = std::mem::replace(&mut this.selection, vec![r]);
+                    this.view_normal(cx);
+                    this.selection = prev;
+                })));
+            }
+            m.item(item("Clear selection", Box::new(|this, _, cx| {
+                this.selection.clear();
+                this.selected_features.clear();
+                this.refresh_scene(false, cx);
+                cx.notify();
+            })))
+            .separator()
+            .item(item("Delete", Box::new(move |this, _, cx| {
+                let t = targets(this);
+                this.delete_features(t, cx);
+            })))
         })
         .into_any_element()
     }
@@ -1112,10 +2015,11 @@ impl PartStudioView {
                     out.push(
                         div()
                             .absolute()
-                            .left(px(s.x as f32 + 4.0))
-                            .top(px(s.y as f32 + 2.0))
-                            .text_xs()
-                            .text_color(with_alpha(pal.accent_hover, 0.9))
+                            // Onshape: plane names in #1651b0 at the plane's top-left corner, inside.
+                            .left(px(s.x as f32 + 5.0))
+                            .top(px(s.y as f32 + 3.0))
+                            .text_size(px(16.))
+                            .text_color(pal.accent)
                             .child(pl.name.clone())
                             .into_any_element(),
                     );
@@ -1124,7 +2028,13 @@ impl PartStudioView {
         }
         // Feature dialog.
         if let Some(e) = &self.edit {
-            out.push(div().absolute().top_3().left_3().child(e.dialog.clone()).into_any_element());
+            // Moved dialogs keep their place (Onshape lets you drag them).
+            let d = div().absolute().child(e.dialog.clone());
+            let d = match self.ui.dialog_pos {
+                Some(p) => d.left(p.x).top(p.y),
+                None => d.top_3().left_3(),
+            };
+            out.push(d.into_any_element());
         }
         // View cube / quick views.
         out.push(self.render_view_controls(cx));
@@ -1133,31 +2043,36 @@ impl PartStudioView {
         }
         // Message toast.
         if let Some((st, msg)) = self.message.clone() {
-            let c = match st {
-                FeatureStatus::Error => pal.error,
-                FeatureStatus::Warning => pal.warning,
-                _ => pal.info,
+            // Onshape alert: top-center of the viewport, info/warn/error colors (§4.9).
+            let kind = match st {
+                FeatureStatus::Error => crate::ui::AlertKind::Error,
+                FeatureStatus::Warning => crate::ui::AlertKind::Warning,
+                _ => crate::ui::AlertKind::Info,
             };
             out.push(
-                h_flex()
+                div()
                     .id("toast")
                     .absolute()
-                    .bottom_3()
-                    .left_3()
-                    .gap_2()
-                    .px_3()
-                    .py_2()
-                    .rounded_md()
-                    .bg(pal.panel_raised)
-                    .border_1()
-                    .border_color(with_alpha(c, 0.5))
-                    .text_xs()
-                    .text_color(c)
-                    .child(msg)
-                    .child(Button::new("toast-x").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.message = None;
-                        cx.notify();
-                    })))
+                    .top(px(8.))
+                    .left_0()
+                    .right_0()
+                    .flex()
+                    .justify_center()
+                    .child(
+                        crate::ui::alert(kind)
+                            .max_w(px(560.))
+                            .child(msg)
+                            .child(
+                                div()
+                                    .id("toast-x")
+                                    .cursor_pointer()
+                                    .child(crate::ui::glyph("close", 12., crate::ui::alert_colors(kind).2))
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.message = None;
+                                        cx.notify();
+                                    })),
+                            ),
+                    )
                     .into_any_element(),
             );
         }
@@ -1165,39 +2080,20 @@ impl PartStudioView {
     }
 
     fn render_view_controls(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let btn = |id: &'static str, icon: &'static str, tip: &'static str, v: StandardView, cx: &mut Context<Self>| {
-            Button::new(id).icon(Icon::empty().path(icon_path(icon))).ghost().xsmall().tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.view(v, cx)))
-        };
-        v_flex()
-            .absolute()
-            .top_3()
-            .right_3()
-            .gap_0p5()
-            .p_1()
-            .rounded_md()
-            .bg(with_alpha(pal.panel_raised, 0.85))
-            .border_1()
-            .border_color(pal.border)
-            .child(self.render_display_menu(cx))
-            .child(btn("v-iso", "iso-view", "Isometric (Shift+7)", StandardView::Isometric, cx))
-            .child(btn("v-front", "front-view", "Front (Shift+1)", StandardView::Front, cx))
-            .child(btn("v-top", "top-view", "Top (Shift+5)", StandardView::Top, cx))
-            .child(btn("v-right", "right-view", "Right (Shift+4)", StandardView::Right, cx))
-            .child(Button::new("v-named").icon(Icon::empty().path(icon_path("camera"))).ghost().xsmall().tooltip("Named views (Shift+V)").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_named_views(window, cx))))
-            .child(
-                Button::new("v-fit").icon(Icon::empty().path(icon_path("zoom-fit"))).ghost().xsmall().tooltip("Zoom to fit (F)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
-                })),
-            )
-            .child(
-                Button::new("v-planes").icon(Icon::empty().path(icon_path("plane"))).ghost().xsmall().tooltip("Show/hide planes (P)").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    this.opts.show_planes = !this.opts.show_planes;
-                    let d = this.display.clone();
-                    this.apply_display(d, window, cx);
-                })),
-            )
-        .into_any_element()
+        // Onshape: the view cube sits 15 px from the viewport's top-right
+        // corner; view and render options live in its dropdown menu (§3.7).
+        let cube = self.render_view_cube(cx);
+        v_flex().absolute().top(px(8.)).right(px(15.)).items_end().child(cube).into_any_element()
+    }
+}
+
+/// The separator between the feature and parts lists being dragged.
+#[derive(Clone)]
+struct SeparatorDrag;
+
+impl Render for SeparatorDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
     }
 }
 
@@ -1206,7 +2102,7 @@ struct RollbackDrag;
 
 impl Render for RollbackDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(200.)).h(px(3.)).rounded_full().bg(rgb(0x8b7cff))
+        div().w(px(200.)).h(px(7.)).bg(p().accent_soft)
     }
 }
 
@@ -1263,7 +2159,15 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
                     let kind = built.and_then(|b| b.picks.ids_for(r).first().and_then(|id| b.picks.get(*id)).map(|t| t.kind));
                     match kind {
                         Some(k) => kind_matches(k, r, filter),
-                        None => matches!(r, Reference::Body(_)) && filter.intersects(QueryFilter::BODY),
+                        None => match r {
+                            Reference::Body(_) => filter.intersects(QueryFilter::BODY),
+                            Reference::Sketch(_) => filter.intersects(QueryFilter::SKETCH),
+                            Reference::Feature(_) => filter.intersects(QueryFilter::FEATURE),
+                            Reference::SketchRegion { .. } => filter.intersects(QueryFilter::SKETCH_REGION),
+                            Reference::SketchEntity { .. } => filter.intersects(QueryFilter::SKETCH_EDGE),
+                            Reference::Plane(_) | Reference::FeaturePlane(_) => filter.intersects(QueryFilter::PLANE),
+                            _ => false,
+                        },
                     }
                 })
                 .cloned()
@@ -1277,14 +2181,11 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
     }
 }
 
-#[allow(dead_code)]
-fn world(p: [f32; 3]) -> DVec3 {
-    DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)
-}
 
 impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        self.ensure_filter_input(window, cx);
         let toolbar = if self.sketch.is_some() { self.render_sketch_toolbar(cx) } else { self.render_toolbar(cx) };
         let list = self.render_feature_list(cx);
         if self.needs_regen {
@@ -1293,13 +2194,26 @@ impl Render for PartStudioView {
         }
         let right = self.render_right_panel(window, cx);
         let mut overlay = self.render_viewport_overlay(cx);
-        overlay.push(div().absolute().top_3().right(px(52.)).child(self.render_panel_toggles(cx)).into_any_element());
+        overlay.push(div().absolute().top_0().bottom_0().right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
         overlay.extend(self.render_sketch_labels(window, cx));
         overlay.extend(self.render_measure_panel(cx));
+        if self.edit.is_none() {
+            overlay.push(self.render_evaluation_tools(cx));
+        }
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx));
         overlay.extend(self.render_palette(cx));
         overlay.extend(self.render_shortcut_sheet(cx));
+        overlay.extend(self.render_isolate_panel(cx));
+        overlay.extend(self.render_appearance_editor(cx));
+        overlay.extend(self.render_create_selection(cx));
+        overlay.extend(self.render_dynamic_suppression(cx));
+        overlay.extend(self.render_regen_panels(cx));
+        overlay.extend(self.render_analysis_panel(cx));
+        overlay.extend(self.render_dependencies(cx));
+        overlay.extend(self.render_select_other(cx));
+        overlay.extend(self.render_mini_toolbar(cx));
+        overlay.extend(self.render_selection_badge(cx));
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()
@@ -1328,24 +2242,106 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(Self::on_clear_selection))
+            .on_action(cx.listener(|this, _: &Undo, window, cx| {
+                if this.edit.is_some() {
+                    this.draft_undo(false, window, cx);
+                } else {
+                    cx.propagate();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &Redo, window, cx| {
+                if this.edit.is_some() {
+                    this.draft_undo(true, window, cx);
+                } else {
+                    cx.propagate();
+                }
+            }))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
+                // Esc closes transient UI first (S toolbar, Select other,
+                // zoom to window, dependencies), then the tool or dialog,
+                // then isolate / make transparent, then the selection.
+                if this.show_shortcuts {
+                    this.toggle_shortcut_sheet(window, cx);
+                    return;
+                }
+                if this.ui.mini_toolbar.take().is_some() || this.ui.select_other.take().is_some() || this.ui.dependencies.take().is_some() {
+                    this.hover = None;
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                    return;
+                }
+                if this.viewport.read(cx).zoom_window {
+                    this.viewport.update(cx, |vp, cx| {
+                        vp.zoom_window = false;
+                        cx.notify();
+                    });
+                    return;
+                }
                 if this.sketch.is_some() {
                     this.sketch_cancel(cx);
                     return;
                 }
                 if this.edit.is_some() {
                     this.cancel_edit(window, cx);
-                } else {
+                } else if !this.exit_isolate(window, cx) {
                     this.selection.clear();
+                    this.selected_features.clear();
                     this.refresh_scene(false, cx);
+                    cx.notify();
                 }
             }))
-            .on_action(cx.listener(|this, _: &NewSketch, window, cx| this.start_feature("sketch", window, cx)))
-            .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_palette(window, cx)))
-            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, _, cx| {
-                this.show_shortcuts = !this.show_shortcuts;
+            .on_action(cx.listener(|this, _: &Accept, window, cx| {
+                if this.ui.select_other.is_some() {
+                    this.choose_select_other(None, cx);
+                } else if this.sketch.is_some() {
+                    cx.propagate();
+                } else if this.edit.is_some() {
+                    this.accept_edit(false, window, cx);
+                } else if let Some(id) = this.selected_features.first().copied() {
+                    // Enter on a selected feature opens it for editing.
+                    this.edit_feature(id, window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &AcceptAndRepeat, window, cx| {
+                if this.edit.is_some() && this.sketch.is_none() {
+                    this.accept_edit(true, window, cx);
+                } else {
+                    cx.propagate();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &HideSelected, _, cx| this.hide_hovered_or_selected(cx)))
+            .on_action(cx.listener(|this, _: &ShowAll, _, cx| this.show_hidden(cx)))
+            .on_action(cx.listener(|this, _: &IsolateSelected, window, cx| this.isolate(behaviors::IsolateMode::Isolate, window, cx)))
+            .on_action(cx.listener(|this, _: &TransparentSelected, window, cx| this.isolate(behaviors::IsolateMode::Transparent, window, cx)))
+            .on_action(cx.listener(|this, _: &HideConstruction, window, cx| this.hide_construction(window, cx)))
+            .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.toggle_zoom_window(cx)))
+            .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| {
+                if this.edit.is_none() || this.sketch.is_some() {
+                    this.toggle_mini_toolbar(cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
+            .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
+            .on_action(cx.listener(|this, _: &MeasureTool, _, cx| {
+                this.ui.measure_pinned = !this.ui.measure_pinned;
+                this.show_mass = false;
                 cx.notify();
             }))
+            .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.start_feature("mateConnector", window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleMateConnectors, _, cx| this.toggle_mate_connectors(cx)))
+            .on_action(cx.listener(|this, _: &CurvatureAnalysis, window, cx| this.toggle_analysis(analysis::Analysis::Curvature, window, cx)))
+            .on_action(cx.listener(|this, _: &DraftAnalysis, window, cx| {
+                let a = this.draft_analysis();
+                this.toggle_analysis(a, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ViewHighQuality, window, cx| this.toggle_high_quality(window, cx)))
+            .on_action(cx.listener(|this, _: &PanLeft, _, cx| this.pan_by(-150.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &PanRight, _, cx| this.pan_by(150.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &PanUp, _, cx| this.pan_by(0.0, -150.0, cx)))
+            .on_action(cx.listener(|this, _: &PanDown, _, cx| this.pan_by(0.0, 150.0, cx)))
+            .on_action(cx.listener(|this, _: &NewSketch, window, cx| this.start_feature("sketch", window, cx)))
+            .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_palette(window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
             .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
@@ -1364,7 +2360,7 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &ViewBottom, _, cx| this.view(StandardView::Bottom, cx)))
             .on_action(cx.listener(|this, _: &ViewIsometric, _, cx| this.view(StandardView::Isometric, cx)))
             .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.view_normal(cx)))
-            .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))))
+            .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_fit(cx)))
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {
                 this.viewport.update(cx, |vp, cx| {
                     let s = vp.size();
@@ -1427,8 +2423,64 @@ impl Render for PartStudioView {
                 h_flex()
                     .flex_1()
                     .min_h_0()
-                    .child(div().w(px(250.)).h_full().flex_none().child(list))
-                    .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay))
+                    .child(if self.ui.list_collapsed {
+                        // Collapsed Features and parts list: a strip that reopens it.
+                        div()
+                            .id("list-expand")
+                            .w(px(16.))
+                            .h_full()
+                            .flex_none()
+                            .flex()
+                            .justify_center()
+                            .pt_2()
+                            .cursor_pointer()
+                            .text_xs()
+                            .text_color(pal.text_faint)
+                            .border_r_1()
+                            .border_color(pal.border)
+                            .child("›")
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.list_collapsed = false;
+                                cx.notify();
+                            }))
+                            .into_any_element()
+                    } else {
+                        div()
+                            .id("list-panel")
+                            .w(px(crate::ui::LEFT_PANEL_W))
+                            .h_full()
+                            .flex_none()
+                            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<SeparatorDrag>, _, cx| {
+                                let h = f32::from(e.bounds.bottom() - e.event.position.y).clamp(60.0, f32::from(e.bounds.size.height) - 120.0);
+                                if (h - this.ui.parts_height).abs() > 0.5 {
+                                    this.ui.parts_height = h;
+                                    cx.notify();
+                                }
+                            }))
+                            .child(list)
+                            .into_any_element()
+                    })
+                    .child(
+                        div()
+                            .id("viewport-area")
+                            .flex_1()
+                            .h_full()
+                            .relative()
+                            .overflow_hidden()
+                            .border_t_1()
+                            .border_color(pal.border)
+                            .bg(pal.app_bg)
+                            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogMove>, _, cx| {
+                                let grab = *e.drag(cx).0.lock();
+                                let p = e.event.position - e.bounds.origin - grab;
+                                let max_x = (e.bounds.size.width - px(80.)).max(px(0.));
+                                let max_y = (e.bounds.size.height - px(40.)).max(px(0.));
+                                this.ui.dialog_pos = Some(point(p.x.clamp(px(0.), max_x), p.y.clamp(px(0.), max_y)));
+                                cx.notify();
+                            }))
+                            .child(self.viewport.clone())
+                            .children(overlay),
+                    )
                     .children(right),
             );
         self.with_sketch_actions(root, cx)
@@ -1527,4 +2579,32 @@ impl PartStudioView {
             vp.animate_to(to, cx);
         });
     }
+}
+
+/// What a sketch entity is, for selection labels ("Sketch 1 point"): from the
+/// sketch definitions, falling back to the displayed sketches.
+fn sketch_entity_kinds(studio: Option<&PartStudio>, display: &StudioDisplay) -> std::collections::HashMap<(FeatureId, u32), &'static str> {
+    use noshape_sketch::EntityKind;
+    let mut kinds = std::collections::HashMap::new();
+    for sk in &display.sketches {
+        kinds.extend(sk.points.iter().map(|p| ((sk.feature, p.entity), "point")));
+        kinds.extend(sk.curves.iter().map(|c| ((sk.feature, c.entity), "curve")));
+    }
+    for f in studio.map(|s| s.features.as_slice()).unwrap_or_default() {
+        let Some(noshape_model::ParamValue::Sketch(data)) = f.params.get("sketch") else { continue };
+        for e in data.sketch.entities() {
+            let kind = match e.kind() {
+                EntityKind::Point => "point",
+                EntityKind::Line => "line",
+                EntityKind::Circle => "circle",
+                EntityKind::Arc => "arc",
+                EntityKind::Ellipse => "ellipse",
+                EntityKind::EllipticalArc => "elliptical arc",
+                EntityKind::BSpline | EntityKind::FitSpline => "spline",
+                EntityKind::Conic => "conic",
+            };
+            kinds.insert((f.id, e.id.0), kind);
+        }
+    }
+    kinds
 }

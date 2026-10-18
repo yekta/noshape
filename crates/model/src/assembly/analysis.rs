@@ -571,3 +571,80 @@ pub fn remap_replaced(asm: &mut Assembly, ids: &[InstanceId], old: &AssemblyResu
     }
     count
 }
+
+/// Measure tool in an assembly: entities picked on occurrences (instance
+/// path, face / edge / vertex), measured at their solved world positions —
+/// one entity: length, area, radius / diameter or position; two: minimum
+/// distance (with ΔX/ΔY/ΔZ) and angle; several edges or faces: totals.
+pub fn measure_entities(result: &AssemblyResult, picks: &[(InstancePath, Reference)]) -> Vec<(String, crate::regen::measure::Measurement)> {
+    use crate::regen::measure::{Measurement, resolve_shapes};
+    let shapes: Vec<Vec<k::Shape>> = picks
+        .iter()
+        .map(|(path, r)| {
+            let Some(o) = result.occurrences.iter().find(|o| &o.path == path && o.context.body(&o.body).is_some_and(|b| entity_on_body(b, r))) else { return vec![] };
+            let mut ctx = (*o.context).clone();
+            ctx.bodies.retain(|b| b.id == o.body);
+            resolve_shapes(&ctx, r).into_iter().filter_map(|s| s.transformed(&k::Transform::Matrix(o.transform)).ok()).collect()
+        })
+        .collect();
+    let mut out = Vec::new();
+    if picks.len() == 1 {
+        for s in &shapes[0] {
+            match s.shape_type() {
+                k::ShapeType::Edge => {
+                    if let Ok(l) = s.length() {
+                        out.push(("Length".into(), Measurement::Length(l)));
+                    }
+                    if let Ok(k::Curve::Circle { radius, .. }) = s.edge_curve() {
+                        out.push(("Radius".into(), Measurement::Radius(radius)));
+                        out.push(("Diameter".into(), Measurement::Diameter(radius * 2.0)));
+                    }
+                }
+                k::ShapeType::Face => {
+                    if let Ok(a) = s.area() {
+                        out.push(("Area".into(), Measurement::Area(a)));
+                    }
+                    if let Ok(k::Surface::Cylinder { radius, .. }) = s.face_surface() {
+                        out.push(("Radius".into(), Measurement::Radius(radius)));
+                        out.push(("Diameter".into(), Measurement::Diameter(radius * 2.0)));
+                    }
+                }
+                k::ShapeType::Vertex => {
+                    if let Ok(p) = s.vertex_point() {
+                        out.push(("Point".into(), Measurement::Point(p)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        return out;
+    }
+    let flat: Vec<&k::Shape> = shapes.iter().flatten().collect();
+    if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == k::ShapeType::Edge) {
+        out.push(("Total length".into(), Measurement::Length(flat.iter().filter_map(|s| s.length().ok()).sum())));
+    }
+    if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == k::ShapeType::Face) {
+        out.push(("Total area".into(), Measurement::Area(flat.iter().filter_map(|s| s.area().ok()).sum())));
+    }
+    if picks.len() == 2
+        && let (Some(a), Some(b)) = (shapes[0].first(), shapes[1].first())
+    {
+        if let Ok(d) = k::distance(a, b) {
+            let v = d.point_b - d.point_a;
+            out.push(("Distance".into(), Measurement::Distance { distance: d.distance, a: d.point_a, b: d.point_b, dx: v.x.abs(), dy: v.y.abs(), dz: v.z.abs() }));
+        }
+        if let Ok(ang) = k::angle_between(a, b) {
+            out.push(("Angle".into(), Measurement::Angle(ang)));
+        }
+    }
+    out
+}
+
+fn entity_on_body(b: &crate::regen::context::Body, r: &Reference) -> bool {
+    match r {
+        Reference::Face(n) => !b.find_faces(n).is_empty(),
+        Reference::Edge(n) => !b.find_edges(n).is_empty(),
+        Reference::Vertex(n) => !b.find_vertices(n).is_empty(),
+        _ => true,
+    }
+}

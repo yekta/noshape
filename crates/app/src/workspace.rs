@@ -11,7 +11,7 @@ use crate::variable_studio::VariableStudioView;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Disableable as _, Icon, IconName, Sizable as _, TitleBar, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::Assembly;
@@ -27,7 +27,6 @@ enum TabView {
     Drawing(Entity<crate::drawing_view::DrawingEditor>),
     Assembly(Entity<AssemblyView>),
     FeatureStudio(Entity<crate::feature_studio::FeatureStudioView>),
-    Placeholder(&'static str),
 }
 
 pub struct Workspace {
@@ -37,6 +36,10 @@ pub struct Workspace {
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
     history: Option<Entity<HistoryPanel>>,
+    /// Previously active tabs, most recent first (Ctrl+Space).
+    recent: Vec<TabId>,
+    /// Tab manager (Alt+T): search box and its query.
+    tab_manager: Option<(Entity<gpui_kit::component::input::InputState>, Subscription, String)>,
     _thumbnailer: Entity<crate::start_thumbnail::Thumbnailer>,
     _subs: Vec<Subscription>,
 }
@@ -61,7 +64,7 @@ impl Workspace {
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, _thumbnailer: thumbnailer, _subs: subs };
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, _thumbnailer: thumbnailer, _subs: subs };
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -96,7 +99,12 @@ impl Workspace {
             Some("assembly") => {
                 let doc = self.doc.clone();
                 let gpu = self.gpu.clone();
-                TabView::Assembly(cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx)))
+                let v = cx.new(|cx| AssemblyView::new(doc, tab, gpu, window, cx));
+                // "Switch to Part Studio / Assembly" from the instance context menu.
+                self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::assembly_view::AssemblyViewEvent, window, cx| match ev {
+                    crate::assembly_view::AssemblyViewEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                }));
+                TabView::Assembly(v)
             }
             Some("drawing") => {
                 let (doc, gpu) = (self.doc.clone(), self.gpu.clone());
@@ -116,6 +124,11 @@ impl Workspace {
     }
 
     fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(prev) = self.active.filter(|p| *p != tab) {
+            self.recent.retain(|t| *t != prev && *t != tab);
+            self.recent.insert(0, prev);
+            self.recent.truncate(16);
+        }
         self.active = Some(tab);
         self.ensure_view(tab, window, cx);
         if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
@@ -178,70 +191,69 @@ impl Workspace {
         });
     }
 
+    /// Onshape's document top bar (§3.1): 40 px `#eaeaea`, ☰ document menu,
+    /// document name 22 px / 600 and the workspace name in gray.
     fn render_title_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let doc = self.doc.read(cx);
         let name = doc.name();
-        let can_undo = doc.session.can_undo();
-        let can_redo = doc.session.can_redo();
-        let undo_tip: SharedString = doc.session.undo_description().map(|d| format!("Undo {d}")).unwrap_or_else(|| "Undo".into()).into();
-        let redo_tip: SharedString = doc.session.redo_description().map(|d| format!("Redo {d}")).unwrap_or_else(|| "Redo".into()).into();
         let read_only = doc.session.read_only();
-        TitleBar::new().child(
-            h_flex()
-                .w_full()
-                .pr_2()
-                .gap_2()
-                .child(self.render_doc_menu(cx))
-                .child(div().w(px(1.)).h(px(16.)).bg(pal.border))
-                .child(div().text_sm().text_color(pal.text_muted).child(name))
-                .when(read_only, |d| d.child(div().px_2().rounded_sm().bg(pal.warning).text_xs().text_color(rgb(0x000000)).child("VIEWING HISTORY")))
-                .child(div().flex_1())
-                .child(
-                    Button::new("undo")
-                        .icon(IconName::Undo)
-                        .ghost()
-                        .small()
-                        .disabled(!can_undo)
-                        .tooltip(undo_tip)
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.doc.update(cx, |d, cx| d.undo(cx)))),
-                )
-                .child(
-                    Button::new("redo")
-                        .icon(IconName::Redo)
-                        .ghost()
-                        .small()
-                        .disabled(!can_redo)
-                        .tooltip(redo_tip)
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.doc.update(cx, |d, cx| d.redo(cx)))),
-                )
-                .child(
-                    Button::new("history")
-                        .icon(Icon::empty().path(icon_path("version-graph")))
-                        .ghost()
-                        .small()
-                        .tooltip("Versions and history (Alt+H)")
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
-                ),
-        )
-        .into_any_element()
+        // The current branch (Onshape shows the workspace name, e.g. "Main").
+        let branch_name = doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
+        TitleBar::new()
+            .h(px(crate::ui::NAVBAR_H))
+            .bg(pal.panel_inactive)
+            .border_b_0()
+            .child(
+                h_flex()
+                    .w_full()
+                    .h_full()
+                    .pr_2()
+                    .gap(px(4.))
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .pl(px(4.))
+                            .pr(px(5.))
+                            .gap(px(5.))
+                            .child(crate::assets::icon("noshape-logo", 22., cx))
+                            .child(div().text_size(px(19.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")),
+                    )
+                    .child(self.render_doc_menu(cx))
+                    .child(div().flex_none().px(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).truncate().child(name))
+                    .child(div().flex_none().ml(px(4.)).text_size(px(16.)).text_color(pal.text_faint).child(if read_only { "History".to_string() } else { branch_name }))
+                    .when(read_only, |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
+                    .child(div().flex_1())
+                    .child(self.render_help_menu(cx)),
+            )
+            .into_any_element()
+    }
+
+    /// Help ▾ at the right of the navbar (Onshape's `?▾`).
+    fn render_help_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        Button::new("help-menu")
+            .custom(navbar_variant(cx))
+            .child(h_flex().gap(px(3.)).child(Icon::new(IconName::Info).with_size(px(18.)).text_color(pal.text)).child(crate::ui::glyph("ui-chevron-down", 9., pal.text)))
+            .h(px(crate::ui::NAVBAR_H))
+            .px(px(6.))
+            .rounded(px(0.))
+            .dropdown_menu(|menu, _, _| menu.menu("Keyboard shortcuts", Box::new(ToggleShortcutHelp)).separator().item(PopupMenuItem::new("About noshape").disabled(true)))
+            .into_any_element()
     }
 
     fn render_doc_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let ws = cx.entity();
         let recent = crate::files::recent();
         let units = self.doc.read(cx).session.doc.settings.units.length;
         Button::new("doc-menu")
-            .child(
-                h_flex()
-                    .gap_1p5()
-                    .child(div().size(px(14.)).rounded_sm().bg(pal.accent))
-                    .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(pal.text).child("noshape")),
-            )
-            .ghost()
-            .small()
-            .dropdown_caret(true)
+            .custom(navbar_variant(cx))
+            .child(crate::assets::icon("menu", 20., cx))
+            .tooltip("Document menu")
+            .w(px(32.))
+            .h(px(crate::ui::NAVBAR_H))
+            .p_0()
+            .rounded(px(0.))
             .dropdown_menu(move |menu, window, cx| {
                 let w = ws.clone();
                 let mut menu = menu
@@ -374,7 +386,7 @@ impl Workspace {
             ws.update(cx, |this, cx| match result {
                 Ok(brep) => {
                     let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-                    let units = this.doc.read(cx).session.doc.settings.units.clone();
+                    let units = this.doc.read(cx).session.doc.settings.units;
                     this.doc.update(cx, |doc, cx| {
                         doc.edit_studio(tab, &format!("Import {file}"), cx, |ps| {
                             if let Some(mut f) = ps.new_feature("importForeign", &units) {
@@ -410,11 +422,30 @@ impl Workspace {
         cx.notify();
     }
 
+    /// Onshape's bottom tab bar (§3.5): 30 px `#d7d7d7`; tab-list cell under
+    /// the rail, a + cell, then tabs hanging from the top edge with rounded
+    /// bottom corners; the active tab is white with a 2 px blue underline.
     fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let tabs: Vec<(TabId, String, &'static str)> = self.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| (t.id, t.name.clone(), kind_of(&t.content))).collect();
         let view = cx.entity();
-        let add = Button::new("add-tab").icon(IconName::Plus).ghost().small().tooltip("Insert new tab").dropdown_menu(move |menu, _, _| {
+        let cell = |id: &'static str, cx: &App| {
+            Button::new(id)
+                .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).hover(gpui_kit::rgb(0xbababa).into()).active(gpui_kit::rgb(0xbababa).into()).shadow(false))
+                .h(px(crate::ui::TAB_BAR_H))
+                .p_0()
+                .rounded(px(0.))
+        };
+        let list_tabs = tabs.clone();
+        let list_view = view.clone();
+        let tab_list = cell("tab-list", cx).w(px(crate::ui::RAIL_W)).child(Icon::new(IconName::Search).with_size(px(18.)).text_color(gpui_kit::rgb(0x555555))).tooltip("Tabs").dropdown_menu(move |mut menu, _, _| {
+            for (id, name, kind) in &list_tabs {
+                let (id, v) = (*id, list_view.clone());
+                menu = menu.item(PopupMenuItem::new(name.clone()).icon(Icon::empty().path(icon_path(tab_icon(kind)))).on_click(move |_, w, cx| v.update(cx, |t, cx| t.activate(id, w, cx))));
+            }
+            menu
+        });
+        let add = cell("add-tab", cx).w(px(34.)).child(Icon::new(IconName::Plus).with_size(px(18.)).text_color(gpui_kit::rgb(0x555555))).tooltip("Insert new tab").dropdown_menu(move |menu, _, _| {
             let v1 = view.clone();
             let v2 = view.clone();
             let v3 = view.clone();
@@ -426,30 +457,30 @@ impl Workspace {
                 .item(PopupMenuItem::new("Variable Studio").icon(Icon::empty().path(icon_path("variable-studio"))).on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
                 .item(PopupMenuItem::new("Feature Studio").icon(Icon::empty().path(icon_path("feature-studio"))).on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
         });
-        let mut bar = h_flex().h(px(32.)).px_1().gap_0p5().bg(pal.panel).border_t_1().border_color(pal.border).child(add);
+        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().gap(px(2.)).overflow_x_scroll();
         for (id, name, kind) in tabs {
             let active = self.active == Some(id);
-            let icon = match kind {
-                "partstudio" => "part-studio",
-                "assembly" => "assembly",
-                "drawing" => "drawing",
-                "featurestudio" => "feature-studio",
-                _ => "variable-studio",
-            };
             let view = cx.entity();
-            bar = bar.child(
+            strip = strip.child(
                 h_flex()
                     .id(SharedString::from(format!("tab-{id}")))
-                    .h(px(26.))
-                    .px_3()
-                    .gap_1p5()
-                    .rounded_md()
-                    .text_sm()
+                    .relative()
+                    .flex_none()
+                    .min_w(px(60.))
+                    .max_w(px(200.))
+                    .h(px(if active { 28. } else { 27. }))
+                    .pl(px(10.))
+                    .pr(px(10.))
+                    .gap(px(3.))
+                    .rounded_b(px(5.))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.12), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
+                    .text_size(px(14.))
                     .cursor_pointer()
-                    .when(active, |d| d.bg(pal.panel_active).text_color(pal.text))
-                    .when(!active, |d| d.text_color(pal.text_muted).hover(|d| d.bg(pal.panel_hover)))
-                    .child(svg().path(icon_path(icon)).size_3p5().text_color(if active { pal.accent } else { pal.text_faint }))
-                    .child(name)
+                    .bg(if active { pal.panel } else { pal.tab_inactive })
+                    .text_color(if active { pal.text } else { pal.text_muted })
+                    .child(crate::assets::icon(tab_icon(kind), 20., cx))
+                    .child(div().truncate().child(name))
+                    .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(id, window, cx)))
                     .context_menu(move |menu, _, _| {
                         let v1 = view.clone();
@@ -460,9 +491,55 @@ impl Workspace {
                     }),
             );
         }
-        bar
-        .into_any_element()
+        h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(tab_list).child(add).child(strip).into_any_element()
     }
+
+    /// Onshape's left document-panel rail (§3.3): 40 px `#fafafa`.
+    fn render_rail(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let history_open = self.history.is_some();
+        v_flex()
+            .w(px(crate::ui::RAIL_W))
+            .h_full()
+            .flex_none()
+            .pt(px(4.))
+            .gap(px(4.))
+            .bg(pal.rail)
+            .border_r_1()
+            .border_t_1()
+            .border_color(pal.border)
+            .child(
+                crate::ui::rail_button("rail-history", "history", history_open, true, cx)
+                    .tooltip(crate::ui::tooltip("Versions and history (Alt+H)"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
+            )
+            .child(
+                crate::ui::rail_button("rail-version", "version", false, true, cx)
+                    .tooltip(crate::ui::tooltip("Create version"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        if this.history.is_none() {
+                            this.toggle_history(window, cx);
+                        }
+                    })),
+            )
+            .into_any_element()
+    }
+}
+
+fn tab_icon(kind: &str) -> &'static str {
+    match kind {
+        "partstudio" => "part-studio",
+        "assembly" => "assembly",
+        "drawing" => "drawing",
+        "featurestudio" => "feature-studio",
+        _ => "variable-studio",
+    }
+}
+
+/// Navbar buttons: transparent, `#d7d7d7` hover over the full bar height.
+fn navbar_variant(cx: &App) -> gpui_kit::component::button::ButtonCustomVariant {
+    let pal = p();
+    gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.border.into()).active(pal.border.into()).shadow(false)
 }
 
 fn kind_of(c: &TabContent) -> &'static str {
@@ -478,7 +555,9 @@ fn kind_of(c: &TabContent) -> &'static str {
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        crate::assets::set_scale_factor(_window.scale_factor());
         let title = self.render_title_bar(cx);
+        let rail = self.render_rail(cx);
         let tabs = self.render_tab_bar(cx);
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
@@ -486,14 +565,6 @@ impl Render for Workspace {
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
             Some(TabView::Assembly(v)) => v.clone().into_any_element(),
             Some(TabView::FeatureStudio(v)) => v.clone().into_any_element(),
-            Some(TabView::Placeholder(kind)) => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_color(pal.text_faint)
-                .child(format!("{kind} tab"))
-                .into_any_element(),
             None => div().into_any_element(),
         };
         v_flex()
@@ -512,14 +583,121 @@ impl Render for Workspace {
                     s.update(cx, |s, cx| s.open_palette(window, cx));
                 }
             }))
+            // Ctrl+Space: back to the previously active tab (Onshape).
+            .on_action(cx.listener(|this, _: &SwitchRecentTab, window, cx| {
+                let tabs: Vec<TabId> = this.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| t.id).collect();
+                if let Some(t) = this.recent.iter().copied().find(|t| tabs.contains(t)) {
+                    this.activate(t, window, cx);
+                    cx.notify();
+                }
+            }))
+            // Alt+T: Tab manager (search and open tabs).
+            .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))
             .child(title)
+            .children(self.render_tab_manager(cx))
             .child(
                 h_flex()
                     .flex_1()
                     .min_h_0()
-                    .child(div().flex_1().h_full().min_w_0().child(content))
-                    .children(self.history.clone().map(|h| div().w(px(300.)).h_full().flex_none().child(h))),
+                    .child(rail)
+                    .children(self.history.clone().map(|h| div().w(px(300.)).h_full().flex_none().border_r_1().border_color(pal.border).child(h)))
+                    .child(div().flex_1().h_full().min_w_0().child(content)),
             )
             .child(tabs)
     }
 }
+
+impl Workspace {
+    fn toggle_tab_manager(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tab_manager.take().is_some() {
+            if let Some(a) = self.active {
+                self.activate(a, window, cx);
+            }
+        } else {
+            let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("Search tabs"));
+            let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &gpui_kit::component::input::InputEvent, window, cx| match ev {
+                gpui_kit::component::input::InputEvent::Change => {
+                    if let Some(tm) = &mut this.tab_manager {
+                        tm.2 = st.read(cx).value().to_string();
+                    }
+                    cx.notify();
+                }
+                gpui_kit::component::input::InputEvent::PressEnter { .. } => {
+                    if let Some(t) = this.tab_manager_matches(cx).first().map(|t| t.0) {
+                        this.tab_manager = None;
+                        this.activate(t, window, cx);
+                    }
+                    cx.notify();
+                }
+                _ => {}
+            });
+            st.update(cx, |s, cx| s.focus(window, cx));
+            self.tab_manager = Some((st, sub, String::new()));
+        }
+        cx.notify();
+    }
+
+    fn tab_manager_matches(&self, cx: &App) -> Vec<(TabId, String, &'static str)> {
+        let q = self.tab_manager.as_ref().map(|t| t.2.to_lowercase()).unwrap_or_default();
+        self.doc.read(cx).session.doc.ordered_tabs().iter().filter(|t| q.is_empty() || t.name.to_lowercase().contains(&q)).map(|t| (t.id, t.name.clone(), kind_of(&t.content))).collect()
+    }
+
+    fn render_tab_manager(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (st, _, _) = self.tab_manager.as_ref()?;
+        let st = st.clone();
+        let pal = p();
+        let active = self.active;
+        let rows: Vec<AnyElement> = self
+            .tab_manager_matches(cx)
+            .into_iter()
+            .map(|(id, name, kind)| {
+                div()
+                    .id(SharedString::from(format!("tm-{id}")))
+                    .flex()
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .rounded_sm()
+                    .cursor_pointer()
+                    .when(active == Some(id), |d| d.bg(pal.accent_soft))
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(div().flex_1().text_sm().text_color(pal.text).child(name))
+                    .child(div().text_xs().text_color(pal.text_faint).child(kind))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.tab_manager = None;
+                        this.activate(id, window, cx);
+                        cx.notify();
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            deferred(
+                anchored().position(point(px(60.), px(80.))).child(
+                    v_flex()
+                        .id("tab-manager")
+                        .occlude()
+                        .w(px(320.))
+                        .p_2()
+                        .gap_1()
+                        .rounded_md()
+                        .bg(pal.panel_raised)
+                        .border_1()
+                        .border_color(pal.border_strong)
+                        .shadow_lg()
+                        .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                            if ev.keystroke.key == "escape" {
+                                this.toggle_tab_manager(window, cx);
+                            }
+                        }))
+                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Tab manager"))
+                        .child(gpui_kit::component::input::Input::new(&st))
+                        .children(rows),
+                ),
+            )
+            .with_priority(3)
+            .into_any_element(),
+        )
+    }
+}
+

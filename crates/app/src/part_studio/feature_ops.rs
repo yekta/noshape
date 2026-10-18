@@ -21,8 +21,7 @@ impl PartStudioView {
         let n = features.len();
         if let Ok(text) = serde_json::to_string(&serde_json::json!({ CLIP_KEY: features })) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
-            self.message = Some((noshape_model::display::FeatureStatus::Info, format!("Copied {n} feature{}", if n == 1 { "" } else { "s" })));
-            cx.notify();
+            self.flash_info(format!("Copied {n} feature{}", if n == 1 { "" } else { "s" }), cx);
         }
     }
 
@@ -61,6 +60,23 @@ impl PartStudioView {
     pub(super) fn dissolve_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Remove folder", cx, |ps| ps.dissolve_folder(folder));
+        });
+    }
+
+    /// Suppress or unsuppress every feature of a folder.
+    pub(super) fn suppress_folder(&mut self, folder: u32, suppressed: bool, cx: &mut Context<Self>) {
+        let ids: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| f.folder == Some(folder)).map(|f| f.id).collect()).unwrap_or_default();
+        self.set_suppressed(ids, suppressed, cx);
+    }
+
+    /// Folder menu "Expand all" / "Collapse all".
+    pub(super) fn set_all_folders_collapsed(&mut self, collapsed: bool, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, if collapsed { "Collapse all folders" } else { "Expand all folders" }, cx, |ps| {
+                for f in &mut ps.folders {
+                    f.collapsed = collapsed;
+                }
+            });
         });
     }
 

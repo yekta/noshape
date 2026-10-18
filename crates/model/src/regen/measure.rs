@@ -84,6 +84,17 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
                 }
             }
         }
+        // Edge midpoints (Onshape lets you pick them to measure from).
+        Reference::Implicit { on, inference: crate::reference::Inference::Midpoint } => {
+            for e in resolve_shapes(ctx, on) {
+                if let Ok(info) = e.edge_info()
+                    && let Ok(p) = e.point_at((info.first_param + info.last_param) * 0.5)
+                    && let Ok(v) = k::make_vertex(p)
+                {
+                    out.push(v);
+                }
+            }
+        }
         _ => {}
     }
     out.retain(|s| !s.is_null());

@@ -16,7 +16,7 @@ as the B-rep kernel.
 | `noshape-kernel` | crates/kernel | (C++ OCCT) | Safe Rust wrapper over a `cxx` bridge to OCCT: shapes, topology exploration, primitive/feature operations, booleans, fillets, offsets, sweeps, lofts, tessellation, HLR projection, STEP/IGES/BREP I/O plus STL/OBJ mesh import and export, mass properties, measurement. Knows nothing about features. |
 | `noshape-model` | crates/model | units, sketch, kernel | The CAD document model: Part Studio feature list & regeneration engine, persistent topological naming, feature definitions (extrude, revolve, ...), variables, configurations, assemblies & mate solver, drawings model. Deterministic, headless, fully testable. |
 | `noshape-store` | crates/store | – | Local persistence: single-file document (`.noshape`, SQLite) with content-addressed snapshots, microversion history (undo/redo across sessions), named versions, branches, merges. Generic over opaque blobs. |
-| `noshape-render` | crates/render | – | wgpu renderer: GPU meshes for faces/edges/vertices, sketch overlay, grid, triad, picking via an ID buffer, highlight/selection states, section planes, offscreen rendering with BGRA readback for GPUI. Its own scene types; no OCCT. |
+| `noshape-render` | crates/render | – | wgpu renderer: GPU meshes for faces/edges/vertices, sketch overlay, grid, triad, picking via an ID buffer, highlight/selection states, section planes, offscreen rendering with pipelined BGRA readback for GPUI, frame-time instrumentation (`perf`). Its own scene types; no OCCT. |
 | `noshape` | crates/app | all | GPUI application: start window (document library), document windows with tabs, feature list, toolbars, feature dialogs, sketch tools, selection, mouse/keyboard interaction, viewport element. |
 
 Dependency direction is strictly downward. `model` never depends on GPUI or wgpu.
@@ -63,11 +63,65 @@ over-constrained/conflicting constraints (red). Dragging adds weak
 "stay near cursor" terms so the rest of the sketch moves minimally.
 
 ### Viewport
-GPUI does not expose custom GPU passes on all platforms, so `noshape-render`
-owns its own wgpu device and renders offscreen into a BGRA8 texture which is
-read back and displayed as a GPUI `RenderImage` element (zero-copy surfaces
-can be added later on macOS). Rendering happens only when the scene, camera or
-hover state changes. Picking uses an R32Uint ID buffer read back at the cursor.
+GPUI does not let applications draw into its own GPU passes, so
+`noshape-render` owns a wgpu device and renders offscreen. One render thread
+(`render/src/worker.rs`) serves every viewport ("target"):
+
+* **Frames.** The viewport submits a `RenderJob` when its scene, camera or
+  size changes (`Viewport::request_frame`: submitted at the end of the current
+  update, coalescing several changes, and only while the viewport is on
+  screen). Waiting jobs are coalesced per target. Each target owns its render
+  textures and up to two readback buffers: on real GPUs two frames may be in
+  flight, so frame N+1 renders while frame N is mapped and copied out; on CPU
+  rasterizers (llvmpipe, WARP) one, because a second frame only competes with
+  the UI thread for the same cores (`NOSHAPE_FRAMES_IN_FLIGHT` overrides).
+  The viewport keeps the same number of frames in flight and submits the
+  next one when a frame is presented. Camera moves and scene changes do not
+  invalidate the GPUI window (nothing visible changes until the frame
+  arrives), so during navigation GPUI re-renders the UI once per presented
+  frame instead of on every mouse event. `Scene::same_as` drops refreshes that
+  would render an identical image (same buffers, instances and states).
+* **Presentation.** The resolved `Bgra8UnormSrgb` frame is copied out of the
+  mapped buffer once (row padding removed) and wrapped in a GPUI
+  `RenderImage` without any channel swizzle (GPUI's atlas is BGRA). GPUI then
+  uploads it into its sprite atlas (one more CPU copy and a texture upload
+  inside GPUI; the old image is dropped from the atlas when the next arrives).
+* **Picking.** The R32Uint pick-id buffer is rendered lazily: a frame only
+  marks it stale (geometry, camera or size changed) and the pick pass runs
+  when a pick query arrives, for the scene and camera of the newest frame.
+  Queries read back small rectangles (`PickRect`): the hover query reads 81x81
+  device pixels around the cursor and is cached, so small moves, clicks and
+  context menus are answered on the UI thread without a GPU round trip; box
+  selection reads the box (crossing) or the whole frame (window). After the
+  camera settles (60 ms without changes) the hover is refreshed with one
+  query; nothing pick-related is rendered or read back during orbit, pan,
+  zoom or camera animations.
+* **Culling and batching.** Instances whose bounds are outside the view
+  frustum are skipped (conservative clip-space test; margins for wide lines
+  and points). Geometry is uploaded once per `Arc<MeshBuffers>` (`GpuCache`)
+  and interleaved straight into mapped buffers; all regions of a sketch share
+  one pick mesh (one draw call instead of one per region). Draw calls scale
+  with bodies (3 per body), not with features or faces.
+
+**Zero-copy presentation (investigated, not implemented).** GPUI (gpui-pre
+0.3.9, used by gpui-kit 0.7.3) can show a platform surface only on macOS:
+`surface()` / `Window::paint_surface` take a `CVPixelBuffer`. The Metal
+renderer (`gpui-pre-apple/src/metal_renderer.rs`, `draw_surfaces`) asserts that
+the buffer is `kCVPixelFormatType_420YpCbCr8BiPlanarFullRange`, i.e. video
+YCbCr with chroma at half resolution, and converts it to RGB in its shader.
+Rendering wgpu frames into an IOSurface-backed CVPixelBuffer is possible
+(`wgpu::hal::metal::Device::texture_from_raw` on an `MTLTexture` made with
+`newTextureWithDescriptor:iosurface:plane:`, plus a conversion pass writing
+the Y and CbCr planes), but 4:2:0 chroma subsampling and the 8-bit YCbCr
+round trip visibly smear thin colored edges and highlights, so the image
+would not match the readback path. The Linux (wgpu) and Windows (DirectX 11)
+GPUI renderers ignore `PaintSurface` entirely, and GPUI does not expose its
+wgpu device or atlas textures (on Linux it is the same wgpu 29, so a GPU copy
+into the atlas would otherwise be possible). A real zero-copy path needs a GPUI
+change: a BGRA branch in the macOS `draw_surfaces` (single plane, `BGRA8Unorm`
+texture from the CoreVideo texture cache, pass-through fragment shader), or a
+public way to register an external `wgpu::Texture` for an element on
+Linux/Windows. Until then the readback path is used on every platform.
 
 ### Units and expressions
 Every numeric field accepts an expression (`25 mm`, `#width / 2`,
@@ -76,10 +130,37 @@ string plus its evaluated SI value; the document has default units.
 
 ### Performance rules
 * Release builds use thin LTO; dev profile optimizes dependencies.
-* Tessellation runs in parallel (rayon / OCCT parallel meshing) and is cached
-  per shape; meshes are uploaded once and reused.
-* No allocation per frame in the render loop; scene diffs only.
-* The UI thread never blocks on the kernel.
+* Tessellation uses OCCT's parallel BRepMesh and is cached per shape hash
+  across regenerations; meshes are uploaded once and reused. BRepMesh skips
+  faces whose stored triangulation is already fine enough (faces an operation
+  carried over unchanged from its input).
+* No allocation per frame in the render loop (draw lists, instance and state
+  uploads reuse buffers and skip unchanged data); scene diffs only.
+* The UI thread never blocks on the kernel or the GPU: device creation and
+  pipeline compilation run on background threads at startup.
+
+### Measuring (`NOSHAPE_PERF=1`)
+`noshape_render::perf` collects stage timings and logs mean/p50/p95/max every
+120 samples with log target `perf`:
+
+| stage | meaning |
+|---|---|
+| `r.prep`, `r.encode_submit` | render thread: uploads, draw lists, encoding |
+| `w.gpu_wait` | render thread blocked on the GPU (rendering + transfer) |
+| `r.readback_copy`, `r.pick_submit` | copy-out of a frame; lazy pick pass + region copy |
+| `g.submit_to_frame` | UI submit until the frame is read back |
+| `v.frame_to_present`, `v.present_to_paint` | until the UI thread takes the frame; until GPUI lays it out |
+| `v.submit_to_present`, `v.pick_latency` | end-to-end frame and pick-query latency |
+| `s.build`, `s.with_highlights`, `ps.apply_display`, `ps.refresh_scene` | scene building on the UI thread |
+
+Regenerations log per-feature times and triangle counts (`regen[...]`), meshing
+logs `tessellate ...` per body, and startup milestones are logged ("GPU
+initialized", "first viewport frame presented"). `NOSHAPE_PERF_PERIOD=<s>`
+flushes all stages periodically. Benchmarks: `NOSHAPE_PERF_ORBIT=<frames>`
+(with `NOSHAPE_PERF_ORBIT_DELAY=<s>`, default 10) rotates the camera every 8 ms
+like a 125 Hz mouse drag and logs the presented fps; with
+`NOSHAPE_PERF_BENCH=zoom` it scroll-zooms instead. GPU cost analysis:
+`NOSHAPE_PERF_MSAA=<n>` and `NOSHAPE_PERF_SKIP=lines,meshes`.
 
 ## Application structure (crates/app)
 

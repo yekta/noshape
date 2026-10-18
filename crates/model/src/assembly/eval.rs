@@ -89,6 +89,10 @@ pub struct PartOccurrence {
     pub mirrored: bool,
     /// External reference key for parts inserted from another document.
     pub external: Option<String>,
+    /// Part of a flexible subassembly: (child instance of the subassembly,
+    /// body coordinates -> child coordinates). Its transform follows the
+    /// child's solved placement inside the subassembly.
+    pub flex: Option<(InstanceId, DMat4)>,
 }
 
 impl PartOccurrence {
@@ -152,6 +156,8 @@ pub struct MateStatus {
 pub struct ConnectorStatus {
     pub id: MateId,
     pub owner: InstanceId,
+    /// Owner child inside a flexible subassembly (`local` is then relative to it).
+    pub child: Option<InstanceId>,
     /// Frame in the owner's instance coordinates.
     pub local: Option<Frame>,
     /// World frame after solving.
@@ -185,6 +191,16 @@ pub struct SolveOptions {
     /// Mates held at given free values (rotation about Z, translations
     /// X/Y/Z), e.g. when restoring a named position.
     pub locks: Vec<(MateId, [f64; 4])>,
+    /// One free value of a mate held at a target (mate, value index 0 = Rz,
+    /// 1..3 = Tx/Ty/Tz, target); the mate's other degrees of freedom stay
+    /// free (Animate, Apply limit position). The mate's limits are ignored.
+    pub hold_values: Vec<(MateId, usize, f64)>,
+    /// Starting placements of flexible subassembly children (relative to
+    /// their subassembly instance), overriding the stored ones.
+    pub nested_start: Option<HashMap<(InstanceId, InstanceId), Placement>>,
+    /// Drags of flexible subassembly children: ((subassembly, child), point in
+    /// child coordinates, world target).
+    pub nested_drags: Vec<((InstanceId, InstanceId), DVec3, DVec3)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -197,11 +213,18 @@ pub struct Solved {
     pub mate_frames: HashMap<MateId, (Frame, Frame)>,
     pub mate_values: HashMap<MateId, [f64; 4]>,
     pub relation_ok: HashMap<MateId, bool>,
+    /// Flexible subassembly children: (subassembly, child) -> placement in the subassembly.
+    pub nested: HashMap<(InstanceId, InstanceId), Placement>,
 }
 
 impl Solved {
     pub fn placement(&self, id: InstanceId) -> Option<Placement> {
         self.placements.iter().find(|(i, _)| *i == id).map(|(_, p)| *p)
+    }
+    /// World frame of a flexible subassembly child (None for other instances).
+    pub fn nested_world(&self, sub: InstanceId, child: InstanceId) -> Option<Frame> {
+        let q = self.nested.get(&(sub, child))?;
+        Some(placement_to_frame(&self.placement(sub)?).mul(&placement_to_frame(q)))
     }
 }
 
@@ -216,6 +239,16 @@ struct LeafInstance {
     hidden: bool,
     mirrored: bool,
     external: Option<String>,
+    /// Flexible subassembly part: (child of the subassembly, leaf -> child coordinates).
+    flex: Option<(InstanceId, DMat4)>,
+}
+
+/// Where a connector lives: a top-level instance or a child of a flexible
+/// subassembly (top-level subassembly instance, child).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Owner {
+    Top(InstanceId),
+    Nested(InstanceId, InstanceId),
 }
 
 /// Prepared solver problem (instance graph + resolved connector frames).
@@ -240,6 +273,17 @@ pub struct Prepared {
     pub failed_connectors: Vec<(MateId, String)>,
     /// Pattern followers (pattern id, failure message).
     pub failed_patterns: Vec<(MateId, String)>,
+    /// Flexible subassemblies: (subassembly instance, child) -> (solver body,
+    /// child frame in body coordinates). Children fixed in the subassembly
+    /// ride on the subassembly instance's body.
+    nested_body_of: HashMap<(InstanceId, InstanceId), (usize, Frame)>,
+    /// Children with their own solver body: (body, subassembly instance,
+    /// child, stored placement of the child in the subassembly).
+    nested_bodies: Vec<(usize, InstanceId, InstanceId, Frame)>,
+    /// Assembly mate connectors owned by a flexible subassembly child.
+    connector_child: HashMap<MateId, InstanceId>,
+    /// Top-level instances that are flexible subassemblies.
+    pub flexible: HashSet<InstanceId>,
 }
 
 #[derive(Clone, Debug)]
@@ -344,6 +388,13 @@ impl Prepared {
         self.body_of.contains_key(&id)
     }
 
+    /// Does this child of a flexible subassembly move on its own (not fixed
+    /// in the subassembly)?
+    pub fn is_flexible_child(&self, sub: InstanceId, child: InstanceId) -> bool {
+        self.nested_bodies.iter().any(|(_, s, c, _)| *s == sub && *c == child)
+            || self.nested_body_of.get(&(sub, child)).is_some_and(|(b, _)| self.body_of.get(&sub).is_none_or(|(sb, _)| sb != b))
+    }
+
     /// Solve for a named position: its placements as the start, its stored
     /// driving mate values imposed.
     pub fn solve_named_position(&self, np: &NamedPosition) -> Solved {
@@ -370,6 +421,29 @@ impl Prepared {
             .enumerate()
             .map(|(i, id)| SolverBody { pose: if *id == InstanceId::ORIGIN { Frame::default() } else { pose_of(*id, &stored[id]) }, fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
             .collect();
+        // Flexible subassembly children: world pose = subassembly pose * child placement.
+        for (b, sid, child, q0) in &self.nested_bodies {
+            let ps = stored.get(sid).map(|p| pose_of(*sid, p)).unwrap_or_default();
+            let q = opts.nested_start.as_ref().and_then(|n| n.get(&(*sid, *child))).map(placement_to_frame).unwrap_or(*q0);
+            bodies[*b].pose = ps.mul(&q);
+            // Holding the subassembly holds its parts.
+            if opts.hold.contains(sid) {
+                bodies[*b].fixed = true;
+            }
+        }
+        // A target placement of a flexible subassembly carries its parts along.
+        for (id, p) in &opts.targets {
+            if !self.flexible.contains(id) {
+                continue;
+            }
+            let cur = stored.get(id).map(|s| pose_of(*id, s)).unwrap_or_default();
+            let delta = placement_to_frame(p).mul(&cur.inverse());
+            for (b, sid, _, _) in &self.nested_bodies {
+                if sid == id && !bodies[*b].fixed {
+                    bodies[*b].pose = delta.mul(&bodies[*b].pose);
+                }
+            }
+        }
         let mut mates: Vec<SolverMate> = self.mates.iter().map(|(_, _, m)| m.clone()).collect();
         if let Some((mid, value)) = opts.drive
             && let Some(i) = self.mates.iter().position(|(id, _, _)| *id == mid)
@@ -405,6 +479,11 @@ impl Prepared {
             m.offset = DVec3::new(v[1], v[2], v[3]);
             m.limits.clear();
         }
+        for (mid, ix, v) in &opts.hold_values {
+            let Some(i) = self.mates.iter().position(|(id, _, _)| id == mid) else { continue };
+            mates[i].hold.push((*ix, *v));
+            mates[i].limits.clear();
+        }
         let mate_index: HashMap<MateId, usize> = self.mates.iter().enumerate().map(|(i, (id, _, _))| (*id, i)).collect();
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();
@@ -423,6 +502,18 @@ impl Prepared {
         let mut drags: Vec<DragTarget> = Vec::new();
         for (id, local, target) in &opts.drags {
             let Some((b, off)) = self.body_of.get(id) else { continue };
+            let lp = off.transform_point(*local);
+            if !constrained(*b) {
+                if !bodies[*b].fixed {
+                    let cur = bodies[*b].pose.transform_point(lp);
+                    bodies[*b].pose.origin += *target - cur;
+                }
+                continue;
+            }
+            drags.push(DragTarget { body: *b, local_point: lp, target: *target });
+        }
+        for (key, local, target) in &opts.nested_drags {
+            let Some((b, off)) = self.nested_body_of.get(key) else { continue };
             let lp = off.transform_point(*local);
             if !constrained(*b) {
                 if !bodies[*b].fixed {
@@ -457,6 +548,16 @@ impl Prepared {
             let f = poses[b].mul(&off);
             out.placements.push((*id, frame_to_placement(&f)));
             out.instance_dof.insert(*id, if self.fixed[b] { 0 } else { r.body_dof.get(b).copied().unwrap_or(6) });
+        }
+        for ((sid, child), (b, off)) in &self.nested_body_of {
+            let Some(&(sb, soff)) = self.body_of.get(sid) else { continue };
+            let ps = poses[sb].mul(&soff);
+            out.nested.insert((*sid, *child), frame_to_placement(&ps.inverse().mul(&poses[*b].mul(off))));
+        }
+        for (b, sid, _, _) in &self.nested_bodies {
+            if let Some(d) = out.instance_dof.get_mut(sid) {
+                *d += r.body_dof.get(*b).copied().unwrap_or(0);
+            }
         }
         for (i, (id, _, m)) in self.mates.iter().enumerate() {
             out.mate_ok.insert(*id, r.mate_ok.get(i).copied().unwrap_or(false));
@@ -507,7 +608,10 @@ impl AssemblyResult {
         let place: HashMap<InstanceId, DMat4> = self.solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         for o in &mut self.occurrences {
             let top = place.get(&o.top()).copied().unwrap_or(DMat4::IDENTITY);
-            o.transform = top * o.inner;
+            o.transform = match o.flex.and_then(|(c, rest)| self.solved.nested.get(&(o.path[0], c)).map(|q| (q.to_dmat4(), rest))) {
+                Some((q, rest)) => top * q * rest,
+                None => top * o.inner,
+            };
         }
         self.explode_trails.clear();
         if let Some((ev, progress)) = explode {
@@ -521,7 +625,12 @@ impl AssemblyResult {
         }
         let inst: HashMap<InstanceId, Frame> = self.solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect();
         for c in &mut self.connectors {
-            c.frame = c.local.map(|l| if c.owner == InstanceId::ORIGIN { l } else { inst.get(&c.owner).copied().unwrap_or_default().mul(&l) });
+            let owner = match c.child.and_then(|ch| self.solved.nested_world(c.owner, ch)) {
+                Some(f) => f,
+                None if c.owner == InstanceId::ORIGIN => Frame::default(),
+                None => inst.get(&c.owner).copied().unwrap_or_default(),
+            };
+            c.frame = c.local.map(|l| owner.mul(&l));
         }
         for m in &mut self.mates {
             if let Some((a, b)) = self.solved.mate_frames.get(&m.id) {
@@ -590,7 +699,7 @@ impl AssemblyResult {
             let mut path = vec![c.instance];
             path.extend(c.path.iter().copied());
             let o = self.occurrences.iter().find(|o| o.path == path)?;
-            let local = resolve_connector_in(&o.context, Some(&o.body), &c.reference, units)?;
+            let local = resolve_connector_aligned(&o.context, Some(&o.body), &c.reference, c.align.as_deref(), units)?;
             matrix_frame(&o.transform).mul(&local)
         };
         if c.flip {
@@ -810,6 +919,8 @@ pub fn limit_index(key: &str) -> Option<usize> {
         "x" => Some(1),
         "y" => Some(2),
         "z" => Some(3),
+        // Ball mate: maximum cone angle between the Z axes.
+        "cone" => Some(4),
         _ => None,
     }
 }
@@ -823,6 +934,21 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
         MateType::PinSlot => &["x", "rz"],
         MateType::Planar => &["x", "y", "rz"],
         MateType::Parallel => &["z"],
+        MateType::Ball => &["cone"],
+        _ => &[],
+    }
+}
+
+/// Degrees of freedom of a mate type that can be driven (Animate, named
+/// positions): (free value index, Onshape `MateDOFType` label).
+pub fn mate_dofs(t: MateType) -> &'static [(usize, &'static str)] {
+    match t {
+        MateType::Revolute => &[(0, "Rotational Z")],
+        MateType::Slider => &[(3, "Translational Z")],
+        MateType::Cylindrical => &[(3, "Translational Z"), (0, "Rotational Z")],
+        MateType::PinSlot => &[(1, "Translational X"), (0, "Rotational Z")],
+        MateType::Planar => &[(1, "Translational X"), (2, "Translational Y"), (0, "Rotational Z")],
+        MateType::Parallel => &[(1, "Translational X"), (2, "Translational Y"), (3, "Translational Z"), (0, "Rotational Z")],
         _ => &[],
     }
 }
@@ -836,6 +962,44 @@ pub fn offset_axes(t: MateType) -> (bool, bool, bool, bool) {
         MateType::PinSlot | MateType::Planar => (false, false, true, true),
         _ => (false, false, false, false),
     }
+}
+
+/// Limits, offsets, rotation offset and alignment of a mate on its solver mate.
+fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
+    let mut limits = Vec::new();
+    for (key, l) in &m.limits {
+        let Some(ix) = limit_index(key) else { continue };
+        if !limit_keys(m.mate_type).contains(&key.as_str()) {
+            continue;
+        }
+        let dim = if ix == 0 || ix == 4 { Dim::ANGLE } else { Dim::LENGTH };
+        let lo = eval_opt(&l.min, dim, units);
+        let hi = eval_opt(&l.max, dim, units);
+        if lo.is_some() || hi.is_some() {
+            limits.push((ix, lo, hi));
+        }
+    }
+    let (ox, oy, oz, orot) = offset_axes(m.mate_type);
+    sm.offset = DVec3::new(
+        if ox { eval_len(&m.offset_x, units) } else { 0.0 },
+        if oy { eval_len(&m.offset_y, units) } else { 0.0 },
+        if oz { eval_len(&m.offset_z, units) } else { 0.0 },
+    );
+    let rot = if orot { eval_angle(&m.rotation, units) } else { 0.0 };
+    if m.rotation_axis < 2 && rot != 0.0 {
+        // Rotation about the first connector's X or Y axis: the offset
+        // moves its whole coordinate system (translation, then rotation).
+        let axis = if m.rotation_axis == 0 { DVec3::X } else { DVec3::Y };
+        sm.a_local = sm.a_local.mul(&Frame::new(sm.offset, DQuat::from_axis_angle(axis, rot)));
+        sm.offset = DVec3::ZERO;
+        sm.rotation = 0.0;
+    } else {
+        sm.rotation = rot;
+    }
+    sm.kind = m.mate_type;
+    sm.flip_primary = m.flip_primary;
+    sm.reorient = m.reorient_secondary;
+    sm.limits = limits;
 }
 
 /// Merge instance configuration over the studio defaults.
@@ -853,6 +1017,24 @@ fn effective_config(doc: &Document, studio: TabId, cfg: &ConfigValues) -> Config
 /// Resolve a mate connector reference in a regenerated studio, restricted to
 /// one body when given. Returns the frame in studio coordinates.
 pub fn resolve_connector_in(ctx: &Arc<Context>, body: Option<&BodyId>, reference: &Reference, units: &UnitPrefs) -> Option<Frame> {
+    resolve_connector_aligned(ctx, body, reference, None, units)
+}
+
+fn connector_frame(origin: DVec3, z: DVec3) -> Frame {
+    let z = z.normalize();
+    let mut x = DVec3::X - z * z.x;
+    if x.length_squared() < 1e-12 {
+        x = DVec3::Y - z * z.y;
+    }
+    Frame::from_axes(origin, z, x.normalize())
+}
+
+/// Like [`resolve_connector_in`], with the primary axis taken from `align`
+/// (a face: its normal at the connector origin; an edge: its tangent there).
+/// Also resolves the inference points the regenerator does not know:
+/// a cone's virtual sharp (`Center` on a conical face) and the center of a
+/// face loop (`Centroid` on an edge, aligned to the face).
+pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, reference: &Reference, align: Option<&Reference>, units: &UnitPrefs) -> Option<Frame> {
     let mut c: Context = (**ctx).clone();
     if let Some(b) = body {
         c.bodies.retain(|x| &x.id == b);
@@ -860,12 +1042,70 @@ pub fn resolve_connector_in(ctx: &Arc<Context>, body: Option<&BodyId>, reference
     let params = ParamValues::default();
     let vars = BTreeMap::new();
     let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
-    let conn = match reference {
-        Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.resolve_connector(reference)?,
-        // A bare entity: infer its default connector.
-        other => crate::regen::implicit::implicit_connector(&ev, other, default_inference(other))?,
+    let special = match reference {
+        Reference::Implicit { on, inference: Inference::Center } if matches!(**on, Reference::Face(_)) => {
+            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(&**on)).first()?;
+            match ev.face_shape(bi, fi).ok()?.face_surface().ok()? {
+                noshape_kernel::Surface::Cone { axis, apex, .. } => Some(connector_frame(apex, axis)),
+                noshape_kernel::Surface::Sphere { center, axis, .. } => Some(connector_frame(center, axis)),
+                _ => None,
+            }
+        }
+        Reference::Implicit { on, inference: Inference::Centroid } if matches!(**on, Reference::Edge(_)) => {
+            let face_ref = align.filter(|a| matches!(a, Reference::Face(_)))?;
+            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(face_ref)).first()?;
+            let (be, ei) = *ev.resolve_edges(std::slice::from_ref(&**on)).first()?;
+            let face = ev.face_shape(bi, fi).ok()?;
+            let edge = ev.edge_shape(be, ei).ok()?;
+            let wire = face.wires().into_iter().find(|w| w.edges().iter().any(|e| e.is_same(&edge)))?;
+            let p = noshape_kernel::make_face_from_wire(&wire, true).ok().and_then(|f| f.centroid().ok()).or_else(|| {
+                // Not a planar loop: length-weighted edge midpoints.
+                let (mut sum, mut len) = (DVec3::ZERO, 0.0);
+                for e in wire.edges() {
+                    let i = e.edge_info().ok()?;
+                    let m = e.point_at((i.first_param + i.last_param) * 0.5).ok()?;
+                    sum += m * i.length;
+                    len += i.length;
+                }
+                (len > 0.0).then(|| sum / len)
+            })?;
+            Some(connector_frame(p, face.normal_at_point(p).ok()?))
+        }
+        _ => None,
     };
-    Some(Frame::from_axes(conn.origin, conn.z, conn.x))
+    let frame = match special {
+        Some(f) => f,
+        None => {
+            let conn = match reference {
+                Reference::MateConnector { .. } | Reference::Implicit { .. } => ev.resolve_connector(reference)?,
+                // A bare entity: infer its default connector.
+                other => crate::regen::implicit::implicit_connector(&ev, other, default_inference(other))?,
+            };
+            Frame::from_axes(conn.origin, conn.z, conn.x)
+        }
+    };
+    let Some(align) = align else { return Some(frame) };
+    let z = match align {
+        Reference::Face(_) => {
+            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(align)).first()?;
+            ev.face_shape(bi, fi).ok()?.normal_at_point(frame.origin).ok()?
+        }
+        Reference::Edge(_) => {
+            let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(align)).first()?;
+            let e = ev.edge_shape(bi, ei).ok()?;
+            let i = e.edge_info().ok()?;
+            // Tangent at the edge parameter nearest to the connector origin.
+            let ts = [i.first_param, (i.first_param + i.last_param) * 0.5, i.last_param];
+            let t = ts.iter().copied().min_by(|a, b| {
+                let da = e.point_at(*a).map(|p| p.distance(frame.origin)).unwrap_or(f64::MAX);
+                let db = e.point_at(*b).map(|p| p.distance(frame.origin)).unwrap_or(f64::MAX);
+                da.total_cmp(&db)
+            })?;
+            e.tangent_at(t).ok()?
+        }
+        _ => return Some(frame),
+    };
+    Some(connector_frame(frame.origin, z))
 }
 
 fn default_inference(r: &Reference) -> Inference {
@@ -877,47 +1117,166 @@ fn default_inference(r: &Reference) -> Inference {
     }
 }
 
-/// Implicit mate connector candidates on an entity (studio coordinates):
-/// (implicit reference, frame). Used for hover inference.
-pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Reference, units: &UnitPrefs) -> Vec<(Reference, Frame)> {
-    let infs: &[Inference] = match on {
-        Reference::Face(_) => &[Inference::Centroid, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis],
-        Reference::Edge(_) => &[Inference::Center, Inference::Midpoint, Inference::Vertex],
-        Reference::Vertex(_) => &[Inference::Vertex],
-        Reference::Origin => &[Inference::Origin],
-        Reference::MateConnector { .. } => {
-            return resolve_connector_in(ctx, body, on, units).map(|f| vec![(on.clone(), f)]).unwrap_or_default();
-        }
-        _ => return Vec::new(),
-    };
-    let mut out: Vec<(Reference, Frame)> = Vec::new();
-    let mut refs: Vec<Reference> = infs.iter().map(|inf| Reference::Implicit { on: Box::new(on.clone()), inference: *inf }).collect();
-    // Planar faces also offer the centers of their circular edges (holes, bosses).
-    if let Reference::Face(n) = on {
-        for b in ctx.bodies.iter().filter(|b| body.is_none_or(|id| &b.id == id)) {
-            if b.find_faces(n).is_empty() {
-                continue;
-            }
-            for (ei, e) in b.edges.iter().enumerate() {
-                let crate::reference::TopoName::Edge { faces, .. } = &**e else { continue };
-                if !faces.iter().any(|f| f.descends_from(n)) {
-                    continue;
-                }
-                let is_circle = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok().and_then(|s| s.edge_info().ok()).is_some_and(|i| matches!(i.curve, noshape_kernel::Curve::Circle { .. }));
-                if is_circle {
-                    refs.push(Reference::Implicit { on: Box::new(Reference::Edge((**e).clone())), inference: Inference::Center });
-                }
-            }
-        }
+/// One implicit mate connector candidate on a hovered entity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InferencePoint {
+    pub reference: Reference,
+    /// Primary axis entity (see [`MateConnectorRef::align`]).
+    pub align: Option<Reference>,
+    /// Frame in studio coordinates.
+    pub frame: Frame,
+}
+
+impl InferencePoint {
+    /// The mate connector this point stands for on an occurrence.
+    pub fn connector(&self, path: &[InstanceId]) -> MateConnectorRef {
+        let mut c = MateConnectorRef::on(path[0], path[1..].to_vec(), self.reference.clone());
+        c.align = self.align.clone().map(Box::new);
+        c
     }
-    for r in refs {
-        if let Some(f) = resolve_connector_in(ctx, body, &r, units)
-            && !out.iter().any(|(_, g)| g.origin.distance(f.origin) < 1e-9 && g.z().dot(f.z()) > 0.9999)
+}
+
+/// Implicit mate connector candidates on an entity (studio coordinates),
+/// the points Onshape shows while hovering it:
+/// * planar face: centroid, every vertex, edge midpoints, arc and circle
+///   centers and the centers of inner loops (slots, cut outs), all with the
+///   primary axis normal to the face;
+/// * cylindrical face: axis points at both ends and the middle;
+/// * conical face: the same plus the virtual sharp (apex);
+/// * spherical face: the center; other faces: the centroid;
+/// * circular edge: its center only; arc: center, midpoint and ends;
+///   other edges: midpoint and ends (primary axis along the edge);
+/// * vertex: the point.
+pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Reference, units: &UnitPrefs) -> Vec<InferencePoint> {
+    let implicit = |on: &Reference, inference: Inference| Reference::Implicit { on: Box::new(on.clone()), inference };
+    let mut refs: Vec<(Reference, Option<Reference>)> = Vec::new();
+    let bodies = || ctx.bodies.iter().filter(move |b| body.is_none_or(|id| &b.id == id));
+    match on {
+        Reference::Face(n) => {
+            let mut kind = None;
+            for b in bodies() {
+                let Some(&fi) = b.find_faces(n).first() else { continue };
+                let Ok(face) = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi) else { continue };
+                kind = face.face_surface().ok();
+                if !matches!(kind, Some(noshape_kernel::Surface::Plane(_))) {
+                    break;
+                }
+                refs.push((implicit(on, Inference::Centroid), None));
+                // Edges and vertices of the face.
+                let Ok(edge_faces) = b.shape.edge_faces() else { break };
+                // Outer loop: the wire with the largest extent (it encloses the others).
+                let outer = face.wires().into_iter().max_by(|a, b| {
+                    let d = |w: &noshape_kernel::Shape| w.bounding_box(false).map(|bb| bb.diagonal()).unwrap_or(0.0);
+                    d(a).total_cmp(&d(b))
+                });
+                // Edges bounding the face that have two distinct ends (vertices
+                // only on closed edges, like a circle's seam, are not offered).
+                let mut open_edges: HashSet<u32> = HashSet::new();
+                for (ei, faces) in edge_faces.iter().enumerate() {
+                    if !faces.contains(&(fi as u32)) {
+                        continue;
+                    }
+                    let (Some(en), Ok(e)) = (b.edges.get(ei), b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei)) else { continue };
+                    let Ok(info) = e.edge_info() else { continue };
+                    if !info.closed {
+                        open_edges.insert(ei as u32);
+                    }
+                    let edge_ref = Reference::Edge((**en).clone());
+                    if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
+                        refs.push((implicit(&edge_ref, Inference::Center), Some(on.clone())));
+                    }
+                    if !info.closed {
+                        refs.push((implicit(&edge_ref, Inference::Midpoint), Some(on.clone())));
+                    }
+                    // Inner loops (holes, slots): their center.
+                    let inner = outer.as_ref().is_some_and(|w| !w.edges().iter().any(|x| x.is_same(&e)));
+                    if inner && !info.closed {
+                        refs.push((implicit(&edge_ref, Inference::Centroid), Some(on.clone())));
+                    }
+                }
+                if let Ok(ve) = b.shape.vertex_edges() {
+                    for (vi, edges) in ve.iter().enumerate() {
+                        if edges.iter().any(|e| open_edges.contains(e))
+                            && let Some(vn) = b.vertices.get(vi)
+                        {
+                            refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(on.clone())));
+                        }
+                    }
+                }
+                break;
+            }
+            match kind {
+                Some(noshape_kernel::Surface::Plane(_)) => {}
+                Some(noshape_kernel::Surface::Cylinder { .. }) => {
+                    for inf in [Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis] {
+                        refs.push((implicit(on, inf), None));
+                    }
+                }
+                Some(noshape_kernel::Surface::Cone { .. }) => {
+                    for inf in [Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis, Inference::Center] {
+                        refs.push((implicit(on, inf), None));
+                    }
+                }
+                Some(noshape_kernel::Surface::Sphere { .. }) => refs.push((implicit(on, Inference::Center), None)),
+                _ => refs.push((implicit(on, Inference::Centroid), None)),
+            }
+        }
+        Reference::Edge(n) => {
+            let mut done = false;
+            for b in bodies() {
+                let Some(&ei) = b.find_edges(n).first() else { continue };
+                let Ok(e) = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei) else { continue };
+                let Ok(info) = e.edge_info() else { continue };
+                let circle = matches!(info.curve, noshape_kernel::Curve::Circle { .. });
+                if circle {
+                    refs.push((implicit(on, Inference::Center), None));
+                }
+                if info.closed && !circle {
+                    refs.push((implicit(on, Inference::Midpoint), None));
+                }
+                if !info.closed {
+                    refs.push((implicit(on, Inference::Midpoint), None));
+                    // Both ends, primary axis along the edge.
+                    if let Ok(ve) = b.shape.vertex_edges() {
+                        for (vi, edges) in ve.iter().enumerate() {
+                            if edges.contains(&(ei as u32))
+                                && let Some(vn) = b.vertices.get(vi)
+                            {
+                                refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(on.clone())));
+                            }
+                        }
+                    }
+                }
+                done = true;
+                break;
+            }
+            if !done {
+                // Sketch curves and edges outside the restricted body.
+                refs.push((implicit(on, Inference::Center), None));
+                refs.push((implicit(on, Inference::Midpoint), None));
+            }
+        }
+        Reference::Vertex(_) => refs.push((implicit(on, Inference::Vertex), None)),
+        Reference::Origin => refs.push((implicit(on, Inference::Origin), None)),
+        Reference::MateConnector { .. } => refs.push((on.clone(), None)),
+        _ => {}
+    }
+    let mut out: Vec<InferencePoint> = Vec::new();
+    for (r, align) in refs {
+        if let Some(f) = resolve_connector_aligned(ctx, body, &r, align.as_ref(), units)
+            && !out.iter().any(|p| p.frame.origin.distance(f.origin) < 1e-9 && p.frame.z().dot(f.z()) > 0.9999)
         {
-            out.push((r, f));
+            out.push(InferencePoint { reference: r, align, frame: f });
         }
     }
     out
+}
+
+/// Nearest inference point to a point (body coordinates), used for Shift
+/// (lock mate inference): the connector snaps to the closest point of the
+/// locked entity.
+pub fn nearest_inference(points: &[InferencePoint], p: DVec3) -> Option<usize> {
+    points.iter().enumerate().min_by(|(_, a), (_, b)| a.frame.origin.distance(p).total_cmp(&b.frame.origin.distance(p))).map(|(i, _)| i)
 }
 
 impl AssemblyEvaluator {
@@ -1022,6 +1381,7 @@ impl AssemblyEvaluator {
                     context: leaf.regen.context.clone(),
                     mirrored: leaf.mirrored,
                     external: leaf.external.clone(),
+                    flex: leaf.flex,
                 });
             }
         }
@@ -1058,7 +1418,7 @@ impl AssemblyEvaluator {
             .map(|c| {
                 let resolved = prepared.connectors.iter().find(|(id, _, _)| *id == c.id);
                 let message = prepared.failed_connectors.iter().find(|(id, _)| *id == c.id).map(|(_, m)| m.clone());
-                ConnectorStatus { id: c.id, owner: resolved.map(|r| r.1).unwrap_or(c.on.instance), local: resolved.map(|r| r.2), frame: None, message }
+                ConnectorStatus { id: c.id, owner: resolved.map(|r| r.1).unwrap_or(c.on.instance), child: prepared.connector_child.get(&c.id).copied(), local: resolved.map(|r| r.2), frame: None, message }
             })
             .collect();
         let mut nodes = nodes;
@@ -1088,6 +1448,8 @@ impl AssemblyEvaluator {
         let mut leaves: Vec<LeafInstance> = Vec::new();
         let mut nodes = Vec::new();
         let mut prepared = Prepared::default();
+        // Flexible subassemblies: (instance, content, stored child placements in the subassembly).
+        let mut flex_subs: Vec<(InstanceId, Assembly, HashMap<InstanceId, Frame>)> = Vec::new();
         // Copies of a suppressed pattern (or of a suppressed seed) are inactive.
         let mut inactive: HashSet<InstanceId> = asm.instances.iter().filter(|i| i.suppressed).map(|i| i.id).collect();
         for p in &asm.patterns {
@@ -1129,6 +1491,7 @@ impl AssemblyEvaluator {
                                     hidden: inst.hidden,
                                     mirrored: false,
                                     external: None,
+                                    flex: None,
                                 });
                             }
                         }
@@ -1154,6 +1517,7 @@ impl AssemblyEvaluator {
                                         hidden: inst.hidden,
                                         mirrored: true,
                                         external: None,
+                                        flex: None,
                                     }),
                                     None => node.error = Some("The mirrored part could not be created".into()),
                                 }
@@ -1180,6 +1544,7 @@ impl AssemblyEvaluator {
                                     hidden: inst.hidden,
                                     mirrored: false,
                                     external: Some(key.clone()),
+                                    flex: None,
                                 });
                             }
                         }
@@ -1202,6 +1567,7 @@ impl AssemblyEvaluator {
                                     hidden: inst.hidden,
                                     mirrored: false,
                                     external: None,
+                                    flex: None,
                                 });
                             }
                         }
@@ -1221,10 +1587,36 @@ impl AssemblyEvaluator {
                             visited.push(assembly.0);
                             let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
                             visited.pop();
-                            let solved = sub_prep.solve(&SolveOptions::default());
+                            // Positions of the subassembly's instances: its named position
+                            // (Lock/follow position to), else solved from the positions
+                            // stored in this assembly for them.
+                            let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
+                            let solved = match &inst.lock {
+                                super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
+                                    Some(np) => sub_prep.solve_named_position(np),
+                                    None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                                },
+                                _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                            };
+                            // Flexible (Onshape's default): its mates join this assembly's
+                            // solve. Subassemblies with patterns, relations, tangent mates or
+                            // nested flexible subassemblies stay rigid.
+                            let flexible = inst.lock.is_flexible()
+                                && !suppressed
+                                && sub.patterns.is_empty()
+                                && sub.relations.iter().all(|r| r.suppressed)
+                                && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
+                                && sub_prep.flexible.is_empty();
                             let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
+                            if flexible {
+                                prepared.flexible.insert(inst.id);
+                                flex_subs.push((inst.id, sub.clone(), solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect()));
+                            }
                             for mut l in sub_leaves {
                                 let top = place.get(&l.path[0]).copied().unwrap_or(DMat4::IDENTITY);
+                                if flexible {
+                                    l.flex = Some((l.path[0], l.inner));
+                                }
                                 l.inner = top * l.inner;
                                 let mut path = vec![inst.id];
                                 path.extend(l.path.iter().copied());
@@ -1276,6 +1668,56 @@ impl AssemblyEvaluator {
             prepared.fixed.push(i.fixed);
             assigned.insert(i.id, (bi, Frame::default()));
         }
+        // Flexible subassembly children: own bodies, except those fixed in the
+        // subassembly (and their groups), which ride on the subassembly's body.
+        for (sid, sub, q) in &flex_subs {
+            let Some(&(sbody, _)) = assigned.get(sid) else { continue };
+            let sub_active: Vec<&super::Instance> = sub.instances.iter().filter(|i| !i.suppressed && q.contains_key(&i.id)).collect();
+            let mut done: HashSet<InstanceId> = HashSet::new();
+            for g in sub.groups.iter().filter(|g| !g.suppressed) {
+                let members: Vec<&&super::Instance> = g.instances.iter().filter_map(|id| sub_active.iter().find(|i| i.id == *id)).filter(|i| !done.contains(&i.id)).collect();
+                let Some(rep) = members.first() else { continue };
+                let on_sub = members.iter().any(|m| m.fixed);
+                let rep_q = q[&rep.id];
+                let body = if on_sub {
+                    sbody
+                } else {
+                    let b = prepared.reps.len();
+                    prepared.reps.push(*sid);
+                    prepared.fixed.push(false);
+                    prepared.nested_bodies.push((b, *sid, rep.id, rep_q));
+                    b
+                };
+                for m in &members {
+                    let off = if on_sub { q[&m.id] } else { rep_q.inverse().mul(&q[&m.id]) };
+                    prepared.nested_body_of.insert((*sid, m.id), (body, off));
+                    done.insert(m.id);
+                }
+            }
+            for i in &sub_active {
+                if done.contains(&i.id) {
+                    continue;
+                }
+                if i.fixed {
+                    prepared.nested_body_of.insert((*sid, i.id), (sbody, q[&i.id]));
+                } else {
+                    let b = prepared.reps.len();
+                    prepared.reps.push(*sid);
+                    prepared.fixed.push(false);
+                    prepared.nested_bodies.push((b, *sid, i.id, q[&i.id]));
+                    prepared.nested_body_of.insert((*sid, i.id), (b, Frame::default()));
+                }
+            }
+            // Nothing rides on the subassembly's own frame (no part fixed in it,
+            // nothing mated to its origin): the frame is bookkeeping only and
+            // adds no degrees of freedom.
+            let on_frame = prepared.nested_body_of.iter().any(|((s2, _), (b, _))| s2 == sid && *b == sbody);
+            let origin_used = sub.mates.iter().any(|m| !m.suppressed && m.connectors().any(|c| c.is_origin())) || sub.connectors.iter().any(|c| c.on.is_origin());
+            let shared = assigned.iter().filter(|(_, (b, _))| *b == sbody).count() > 1;
+            if !on_frame && !origin_used && !shared {
+                prepared.fixed[sbody] = true;
+            }
+        }
         // The assembly origin: a fixed body at the world frame.
         let ground = prepared.reps.len();
         prepared.reps.push(InstanceId::ORIGIN);
@@ -1285,14 +1727,11 @@ impl AssemblyEvaluator {
         let stored: HashMap<InstanceId, Frame> = active.iter().map(|i| (i.id, placement_to_frame(&i.placement))).collect();
 
         // ---------------------------------------------------- assembly mate connectors
-        let resolve_entity = |c: &MateConnectorRef| -> Result<(InstanceId, Frame), String> {
+        // Frame of a connector relative to its owner (a flexible subassembly
+        // child owns the connectors on its parts).
+        let resolve_entity = |c: &MateConnectorRef| -> Result<(Owner, Frame), String> {
             if c.instance == InstanceId::ORIGIN {
-                // The origin (or a plane / implicit connector on it).
-                let f = match &c.reference {
-                    Reference::Implicit { on, .. } if matches!(**on, Reference::Origin) => Frame::default(),
-                    _ => Frame::default(),
-                };
-                return Ok((InstanceId::ORIGIN, f));
+                return Ok((Owner::Top(InstanceId::ORIGIN), Frame::default()));
             }
             if inactive.contains(&c.instance) {
                 return Err("Instance is suppressed".into());
@@ -1300,8 +1739,17 @@ impl AssemblyEvaluator {
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
             let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
-            let f = resolve_connector_in(&leaf.regen.context, leaf.body.as_ref(), &c.reference, &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
-            Ok((c.instance, matrix_frame(&leaf.inner).mul(&f)))
+            let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
+            Ok(match leaf.flex {
+                Some((child, rest)) => (Owner::Nested(c.instance, child), matrix_frame(&rest).mul(&f)),
+                None => (Owner::Top(c.instance), matrix_frame(&leaf.inner).mul(&f)),
+            })
+        };
+        let owner_body = |o: Owner, body_of: &HashMap<InstanceId, (usize, Frame)>, nested: &HashMap<(InstanceId, InstanceId), (usize, Frame)>| -> Option<(usize, Frame)> {
+            match o {
+                Owner::Top(id) => body_of.get(&id).copied(),
+                Owner::Nested(s, c) => nested.get(&(s, c)).copied(),
+            }
         };
         for mc in &asm.connectors {
             if mc.suppressed {
@@ -1313,7 +1761,14 @@ impl AssemblyEvaluator {
                     if mc.on.flip {
                         f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
                     }
-                    prepared.connectors.push((mc.id, owner, f.mul(&asm_connector_offset(mc, &units))));
+                    let top = match owner {
+                        Owner::Top(id) => id,
+                        Owner::Nested(sid, child) => {
+                            prepared.connector_child.insert(mc.id, child);
+                            sid
+                        }
+                    };
+                    prepared.connectors.push((mc.id, top, f.mul(&asm_connector_offset(mc, &units))));
                 }
                 Err(e) => prepared.failed_connectors.push((mc.id, e)),
             }
@@ -1326,7 +1781,10 @@ impl AssemblyEvaluator {
                         return Err(msg.clone());
                     }
                     let (_, owner, f) = prepared.connectors.iter().find(|(x, _, _)| *x == id).ok_or("Mate connector was deleted or is suppressed")?;
-                    (*owner, *f)
+                    match prepared.connector_child.get(&id) {
+                        Some(child) => (Owner::Nested(*owner, *child), *f),
+                        None => (Owner::Top(*owner), *f),
+                    }
                 }
                 None => resolve_entity(c)?,
             };
@@ -1336,7 +1794,7 @@ impl AssemblyEvaluator {
             if !c.rotate_quarters.is_multiple_of(4) {
                 f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
             }
-            let (bi, off) = *prepared.body_of.get(&owner).ok_or("Instance no longer exists")?;
+            let (bi, off) = owner_body(owner, &prepared.body_of, &prepared.nested_body_of).ok_or("Instance no longer exists")?;
             Ok((bi, off.mul(&f)))
         };
 
@@ -1397,31 +1855,68 @@ impl AssemblyEvaluator {
                 prepared.failed_mates.push((m.id, "Both mate connectors are on the same rigid set".into()));
                 continue;
             }
-            let mut limits = Vec::new();
-            for (key, l) in &m.limits {
-                let Some(ix) = limit_index(key) else { continue };
-                if !limit_keys(m.mate_type).contains(&key.as_str()) {
+            fill_solver_mate(m, &mut sm, &units);
+            prepared.mates.push((m.id, m.mate_type, sm));
+        }
+
+        // ---------------------------------------------------- flexible subassembly mates
+        // Solved together with this assembly's (ids outside the assembly's range).
+        let mut synth = 1u64 << 62;
+        for (sid, sub, _) in &flex_subs {
+            let sbody = prepared.body_of.get(sid).copied();
+            let entity = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
+                if c.instance == InstanceId::ORIGIN {
+                    // The subassembly's origin is its instance frame.
+                    return sbody.ok_or_else(|| "Subassembly is suppressed".to_string());
+                }
+                let mut full = vec![*sid, c.instance];
+                full.extend(c.path.iter().copied());
+                let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+                let rest = leaf.flex.map(|f| f.1).unwrap_or(DMat4::IDENTITY);
+                let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
+                let (b, off) = *prepared.nested_body_of.get(&(*sid, c.instance)).ok_or("Instance no longer exists")?;
+                Ok((b, off.mul(&matrix_frame(&rest)).mul(&f)))
+            };
+            let sub_resolve = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
+                let (b, mut f) = match c.connector {
+                    Some(id) => {
+                        let mc = sub.connectors.iter().find(|x| x.id == id && !x.suppressed).ok_or("Mate connector was deleted or is suppressed")?;
+                        let (b, mut f) = entity(&mc.on)?;
+                        if mc.on.flip {
+                            f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+                        }
+                        (b, f.mul(&asm_connector_offset(mc, &units)))
+                    }
+                    None => entity(c)?,
+                };
+                if c.flip {
+                    f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));
+                }
+                if !c.rotate_quarters.is_multiple_of(4) {
+                    f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
+                }
+                Ok((b, f))
+            };
+            for m in sub.mates.iter().filter(|m| !m.suppressed && m.mate_type != MateType::Tangent) {
+                if m.connectors().any(|c| c.instance != InstanceId::ORIGIN && sub.instance(c.instance).is_none_or(|i| i.suppressed)) {
                     continue;
                 }
-                let dim = if ix == 0 { Dim::ANGLE } else { Dim::LENGTH };
-                let lo = eval_opt(&l.min, dim, &units);
-                let hi = eval_opt(&l.max, dim, &units);
-                if lo.is_some() || hi.is_some() {
-                    limits.push((ix, lo, hi));
+                let (Ok(a), Ok(b)) = (sub_resolve(&m.a), sub_resolve(&m.b)) else { continue };
+                let mut sm = SolverMate { a: a.0, a_local: a.1, b: b.0, b_local: b.1, ..Default::default() };
+                if m.mate_type == MateType::Width {
+                    let extra: Result<Vec<_>, _> = m.extra.iter().map(sub_resolve).collect();
+                    match extra {
+                        Ok(e) if !e.is_empty() => sm.extra = e,
+                        _ => continue,
+                    }
                 }
+                if sm.a == sm.b && m.mate_type != MateType::Width {
+                    continue;
+                }
+                fill_solver_mate(m, &mut sm, &units);
+                prepared.mates.push((MateId(synth), m.mate_type, sm));
+                synth += 1;
             }
-            let (ox, oy, oz, orot) = offset_axes(m.mate_type);
-            sm.offset = DVec3::new(
-                if ox { eval_len(&m.offset_x, &units) } else { 0.0 },
-                if oy { eval_len(&m.offset_y, &units) } else { 0.0 },
-                if oz { eval_len(&m.offset_z, &units) } else { 0.0 },
-            );
-            sm.rotation = if orot { eval_angle(&m.rotation, &units) } else { 0.0 };
-            sm.kind = m.mate_type;
-            sm.flip_primary = m.flip_primary;
-            sm.reorient = m.reorient_secondary;
-            sm.limits = limits;
-            prepared.mates.push((m.id, m.mate_type, sm));
         }
 
         // ---------------------------------------------------- patterns (followers)
@@ -1602,8 +2097,16 @@ impl AssemblyEvaluator {
                 r => r.clone(),
             };
             let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, cones, spheres, tori, straight or circular edges, or vertices)")?;
-            let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
-            let to_body = off.mul(&matrix_frame(&leaf.inner));
+            let (bi, to_body) = match leaf.flex {
+                Some((child, rest)) => {
+                    let (bi, off) = *prepared.nested_body_of.get(&(c.instance, child)).ok_or("Instance no longer exists")?;
+                    (bi, off.mul(&matrix_frame(&rest)))
+                }
+                None => {
+                    let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
+                    (bi, off.mul(&matrix_frame(&leaf.inner)))
+                }
+            };
             let chain = if m.tangent_propagation { tangent_chain(&leaf.regen.context, leaf.body.as_ref(), &entity, units) } else { Vec::new() };
             // A single face needs no propagation.
             let chain: Vec<TangentFace> = if chain.len() > 1 { chain.iter().map(|f| face_transformed(f, &to_body)).collect() } else { Vec::new() };
@@ -1638,7 +2141,11 @@ impl AssemblyEvaluator {
 type FollowMaker<'a> = dyn Fn(u32, InstanceId, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
 
 fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
-    stored.get(&prepared.reps[body]).copied().unwrap_or_default()
+    let rep = stored.get(&prepared.reps[body]).copied().unwrap_or_default();
+    match prepared.nested_bodies.iter().find(|(b, ..)| *b == body) {
+        Some((_, _, _, q)) => rep.mul(q),
+        None => rep,
+    }
 }
 
 fn studio_eval_ctx<'a>(ctx: &Arc<Context>, body: Option<&BodyId>, units: &'a UnitPrefs, params: &'a ParamValues, vars: &'a BTreeMap<String, noshape_units::Quantity>) -> EvalCtx<'a> {

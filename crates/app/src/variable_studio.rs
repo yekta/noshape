@@ -76,7 +76,7 @@ impl Render for VariableStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let studio = self.studio(cx).cloned().unwrap_or_default();
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let eval = studio.evaluate(&units);
         let mut rows: Vec<AnyElement> = Vec::new();
         for (i, v) in studio.variables.iter().enumerate() {

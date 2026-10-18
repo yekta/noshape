@@ -52,17 +52,27 @@ Checklist (kept current): `docs/parity/assembly.md` — one line per Onshape beh
 - `workspace.rs`: subscribes to `AssemblyViewEvent::ActivateTab` (5 lines).
 - New icon `crates/app/assets/icons/mate-limits.svg`.
 
+## Milestones since the first handoff
+- Flexible subassemblies + Lock/follow position (done, tested): `Instance.lock: SubassemblyLock`
+  (Flexible default / Current / Named) and `Instance.nested` (children positions stored in the
+  parent). eval: `flex_subs`, `Prepared.nested_body_of / nested_bodies / flexible / connector_child`,
+  `Owner` enum in connector resolution, sub mates added with synthetic ids (`1<<62`+),
+  `Solved.nested`, `SolveOptions.nested_start / nested_drags`, `PartOccurrence.flex`.
+  App: `edit()` folds `solved.nested` into `Instance.nested`; free drag of a part of a flexible
+  subassembly uses `nested_drags`; menu "Lock/follow position to"; lock icon.
+
+- Live mate values (done): `render_mate_values` / `apply_mate_value` in assembly_behaviors.rs.
+- Ball cone limit (done): limit key "cone" = value index 4 in the solver limits (angle of Z axes).
+
 ## Remaining (priority order, with notes)
-1. Flexible subassemblies (Onshape default) + Lock/follow position: eval currently solves a
-   subassembly internally and makes it rigid in the parent (`prepare_inner`, InstanceSource::Assembly).
-   Needs flattening sub bodies/mates into the parent problem; then `Instance.locked` restores rigid.
-2. Live mate values while dragging / selected mate value graphics with double-click edit (R11).
-3. Ball mate cone-angle limit (D13): solver inequality on angle between Z axes.
-4. Edit an implicit/assembly MC from the mate dialog (D17): open the MC dialog on the field's MC icon.
-5. Drop instances into a subassembly (L20 rest): like `move_to_new_subassembly` but into an existing
-   tab with id remapping and placement relative to the sub instance.
-6. Snap-insert with explicit MCs from the Insert dialog (I14); Insert filters (I12); Generate for configs.
-7. Measure / section view in assemblies (K26), transparency slider + expand by distance/connectivity (G16).
+- Done: edit MC from mate dialog (`edit_dialog_connector`, `McSession.for_mate`), drop into
+  subassembly (`Assembly::move_into_subassembly`, `move_into_subassembly` in behaviors),
+  snap-insert (`update_insert_snap`, `ui.place_snap`; untested in the app: the demo has no
+  Part Studio mate connectors), left dialog column now `.occlude()`s (clicks used to leak to the viewport).
+6. Insert filters (I12); Generate for configs.
+- Done: measure (`analysis::measure_entities`, `ui.measure`) and section view (`ui.section`,
+  `AsmSceneOptions.section`), transparency steps (`ui.transparency`, `AsmSceneOptions.dim_alpha`).
+7. Expand isolate by distance / connectivity (G16).
 8. Vertex inference Z normal to a face (N9); MC Between entities / Realign (X4).
 9. Rigid-assembly icon and warnings beyond "More than one part is fixed" (L24/L25, R13).
 

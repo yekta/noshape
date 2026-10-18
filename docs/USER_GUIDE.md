@@ -68,10 +68,24 @@ including the keyboard shortcuts. This page covers what is specific to a local a
 | Shift+V | Named views |
 | Shift+H | Show/hide sketches |
 | Shift+N | Rename the selected feature |
-| Space / Delete | Clear selection / delete selection |
+| Space / Delete | Clear selection / delete selection (selected parts get a Delete part feature) |
+| S | Shortcut toolbar at the cursor |
+| ` / Shift+` | Select other: faces and edges under the cursor, nearest first |
+| W | Zoom to window (drag a box) |
+| [ | Measure |
+| Ctrl+M / K | Mate connector / show-hide mate connectors |
+| Enter | Accept the dialog, or edit the selected feature |
 
-**Mouse:** right-drag rotates, middle-drag or Ctrl+right-drag pans, and the wheel
-zooms at the cursor.
+**Mouse:** right-drag rotates, middle-drag or Ctrl+right-drag pans, the wheel
+zooms at the cursor, and a double middle-click zooms to fit. Click the view cube's
+faces, edges or corners for those views; its arrows rotate 15° (Shift 90°, Ctrl 5°)
+and the menu under it has the camera and render options. In a dialog, the wheel
+over a focused number field steps it by 0.1 (Ctrl 0.01, Shift 1).
+
+**Feature list:** clicks add to the selection, Shift+click selects a range, and
+dragging moves every selected feature (not above what it depends on). Type in the
+filter box to search by name or type, or use `:errors`, `:suppressed`, `:type …`,
+`:variable …`. Click the rollback bar, then use ↑/↓.
 
 **In a sketch:**
 

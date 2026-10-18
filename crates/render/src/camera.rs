@@ -182,6 +182,29 @@ impl Camera {
         self.distance = needed_half_height / half;
     }
 
+    /// Fit an axis-aligned box as seen from the current orientation: its
+    /// projected extent fills the view (with a small margin), which frames
+    /// parts much tighter than [`Self::fit_sphere`]. In perspective the eye
+    /// backs off by the box's depth so its near side fits too.
+    pub fn fit_box(&mut self, lo: DVec3, hi: DVec3, aspect: f64) {
+        let (r, u, f) = (self.right(), self.up(), self.forward());
+        let (mut x0, mut x1, mut y0, mut y1, mut z0, mut z1) = (f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
+        for i in 0..8 {
+            let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+            let (x, y, z) = (c.dot(r), c.dot(u), c.dot(f));
+            (x0, x1, y0, y1, z0, z1) = (x0.min(x), x1.max(x), y0.min(y), y1.max(y), z0.min(z), z1.max(z));
+        }
+        if !(x0 <= x1 && y0 <= y1) {
+            return;
+        }
+        self.target = r * ((x0 + x1) * 0.5) + u * ((y0 + y1) * 0.5) + f * ((z0 + z1) * 0.5);
+        let half = ((y1 - y0) * 0.5).max((x1 - x0) * 0.5 / aspect.max(1e-6)).max(1e-6) * 1.12;
+        self.distance = half / (self.fov_y * 0.5).tan();
+        if self.projection == Projection::Perspective {
+            self.distance += (z1 - z0) * 0.5;
+        }
+    }
+
     pub fn view_matrix(&self) -> DMat4 {
         look_at_rh(self.eye(), self.target, self.up())
     }
@@ -278,6 +301,35 @@ pub fn orthographic_rh(left: f64, right: f64, bottom: f64, top: f64, near: f64, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fit_box_frames_the_projected_extent() {
+        let mut c = Camera::default();
+        c.set_view(StandardView::Front);
+        // A wide, flat box: 100 x 10 x 20 mm, seen from the front (X right, Z up).
+        let (lo, hi) = (DVec3::new(0.0, 0.0, 0.0), DVec3::new(0.1, 0.01, 0.02));
+        c.fit_box(lo, hi, 2.0);
+        let vp = DVec2::new(800.0, 400.0);
+        // Centered and filling the width with a margin.
+        let a = c.project(DVec3::new(0.0, 0.0, 0.01), vp, 1.0).unwrap();
+        let b = c.project(DVec3::new(0.1, 0.0, 0.01), vp, 1.0).unwrap();
+        assert!((a.x + b.x - 800.0).abs() < 1e-6 && (a.y - 200.0).abs() < 1e-6, "{a} {b}");
+        let fill = (b.x - a.x) / 800.0;
+        assert!(fill > 0.85 && fill < 0.95, "fill {fill}");
+        // Much tighter than the bounding sphere.
+        let mut s = c;
+        s.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.5, 2.0);
+        assert!(c.distance < s.distance * 0.6);
+        // Perspective: the near side still fits.
+        c.projection = Projection::Perspective;
+        c.set_view(StandardView::Isometric);
+        c.fit_box(lo, hi, 2.0);
+        for i in 0..8 {
+            let p = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+            let q = c.project(p, vp, 1.0).unwrap();
+            assert!(q.x >= 0.0 && q.x <= 800.0 && q.y >= 0.0 && q.y <= 400.0, "corner {i} at {q}");
+        }
+    }
 
     #[test]
     fn standard_views_look_along_expected_axes() {

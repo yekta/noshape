@@ -58,7 +58,7 @@ impl PartStudioView {
     pub(super) fn render_sheet_metal_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         self.ensure_flats(cx);
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
         let Some(cache) = self.flat_cache.as_ref().filter(|c| self.context.as_ref().is_some_and(|x| context_key(x) == c.context)) else {
             return div().text_xs().text_color(pal.text_faint).child(if self.has_sheet_metal() { "Unfolding…" } else { "No sheet metal parts." }).into_any_element();
@@ -122,7 +122,7 @@ impl PartStudioView {
         if rows.is_empty() {
             return div().text_xs().text_color(pal.text_faint).child("No frame members. Create a Frame feature to get a cut list.").into_any_element();
         }
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
         let ang = |a: Option<f64>| a.map(|a| format!("{:.1}°", a.to_degrees())).unwrap_or_else(|| "—".into());
         let header = h_flex()

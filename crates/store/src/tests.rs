@@ -934,3 +934,44 @@ fn commit_one_megabyte_is_fast() {
     eprintln!("1 MB read: {:?}", t.elapsed());
     assert_eq!(back, payload);
 }
+
+/// QA: after reopening a document, Ctrl+Z did nothing although the user
+/// guide promises undo across sessions. The stack is rebuilt from history.
+#[test]
+fn undo_stack_rebuilt_from_history() {
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let mut undo = UndoStack::new(main);
+    let s1 = undo
+        .commit(&mut doc, &[set("tab/a", b"1")], "Edit 1")
+        .unwrap();
+    let s2 = undo
+        .commit(&mut doc, &[set("tab/a", b"2")], "Edit 2")
+        .unwrap();
+    undo.commit(&mut doc, &[set("tab/a", b"3")], "Edit 3")
+        .unwrap();
+    undo.undo(&mut doc).unwrap();
+    undo.undo(&mut doc).unwrap();
+    undo.redo(&mut doc).unwrap();
+    // Live stack: undo [Edit 1, Edit 2], redo [Edit 3].
+
+    let mut re = UndoStack::from_history(&doc, main, 100).unwrap();
+    assert_eq!(re.undo_len(), undo.undo_len());
+    assert_eq!(re.redo_len(), undo.redo_len());
+    assert_eq!(re.undo_description(), Some("Edit 2"));
+    assert_eq!(re.redo_description(), Some("Edit 3"));
+    let u = re.undo(&mut doc).unwrap().unwrap();
+    assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap());
+    let r = re.redo(&mut doc).unwrap().unwrap();
+    assert_eq!(*doc.manifest(r).unwrap(), *doc.manifest(s2).unwrap());
+
+    // A new edit after undos clears redo, as in a live session.
+    re.undo(&mut doc).unwrap();
+    re.commit(&mut doc, &[set("tab/b", b"x")], "Edit 4").unwrap();
+    let re2 = UndoStack::from_history(&doc, main, 100).unwrap();
+    assert_eq!(re2.undo_description(), Some("Edit 4"));
+    assert!(!re2.can_redo());
+    assert_eq!(re2.undo_len(), 2);
+    // The limit caps the number of steps.
+    assert_eq!(UndoStack::from_history(&doc, main, 1).unwrap().undo_len(), 1);
+}

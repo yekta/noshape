@@ -339,7 +339,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [0.038, 0.018], horizontal: true }, [148.0, 260.0]);
     add(sheet, AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.002, 0.002], d: [0.01, 0.002] }, [150.0, 180.0]);
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
-    add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()] }, [40.0, 40.0]);
+    add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![] }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into() }, [60.0, 112.0]);
     add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -449,4 +449,448 @@ fn assembly_views_and_exploded_views() {
     let src = &sources[&SourceKey::studio(asm)];
     let (p, _) = views::resolve_point(&src.context, g1.frame.as_ref().unwrap(), snap.point.as_ref().unwrap()).unwrap();
     assert!((p[0] - snap.p[0]).abs() < 1e-12 && (p[1] - snap.p[1]).abs() < 1e-12);
+}
+
+// ------------------------------------------------------------ sections, crops, dimensions, tables, templates
+
+fn pick_of(b: &build::BuiltSheet, t: PickTarget) -> u32 {
+    b.picks.iter().position(|p| *p == t).unwrap_or(0) as u32
+}
+
+fn seg_range(segs: &[[[f64; 2]; 2]], axis: usize) -> f64 {
+    let (lo, hi) = segs.iter().flatten().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), p| (lo.min(p[axis]), hi.max(p[axis])));
+    hi - lo
+}
+
+#[test]
+fn broken_out_section_exposes_interior() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let before = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    assert!(before.section_segments.is_empty());
+    // Front view (x right, z up): open the plate down to its middle (y = 0)
+    // around the center hole.
+    let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile: profile.clone(), spline: true, depth: 0.03, depth_ref: None });
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, true);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    assert!(!g.section_segments.is_empty(), "pocket floor is hatched");
+    // The cut halves the center hole: its walls at x = +-12 mm now show as
+    // visible lines inside the broken-out region.
+    for x in [-0.012, 0.012] {
+        assert!(
+            g.edges.iter().any(|e| e.visible && e.points.iter().all(|p| (p[0] - x).abs() < 2e-4) && e.points.len() >= 2),
+            "hole wall at x = {x} visible"
+        );
+    }
+    // Snap points removed with the material are gone; edges keep their names.
+    assert!(g.snaps.len() <= before.snaps.len());
+    assert!(g.edges.iter().any(|e| e.model.is_some()));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let vp = pick_of(&built, PickTarget::View(ViewId(1)));
+    assert!(built.geometry.lines.iter().filter(|l| l.pick == vp && l.style == sheet::LineStyle::Thin).count() > 3, "hatch lines");
+    // Up to entity: the depth follows a model vertex (the plate's back face).
+    let studio = studio_tab(&doc);
+    let ctx = sources[&SourceKey::studio(studio)].context.clone();
+    let back = views::vertex_ref_near(&ctx, glam::DVec3::new(-0.05, 0.03, 0.0), 1e-6).expect("back vertex");
+    let frame = g.frame.unwrap();
+    let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back) };
+    assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
+}
+
+#[test]
+fn partial_and_angular_sections() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // A full section of the top view along x = -25 mm (clear of the holes).
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.04], [-0.025, 0.04]]);
+    let full = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    // (The section view shows the model's y axis upward.)
+    assert!((seg_range(&full.section_segments, 1) - 0.06).abs() < 1e-3, "{}", seg_range(&full.section_segments, 1));
+    // Partial: a short cutting line inside the part cuts only 20 mm.
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.01], [-0.025, 0.01]]);
+    drawing.sheets[0].view_mut(ViewId(5)).unwrap().partial = true;
+    let part = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    assert!(part.error.is_none(), "{:?}", part.error);
+    assert!((seg_range(&part.section_segments, 1) - 0.02).abs() < 1e-3, "{}", seg_range(&part.section_segments, 1));
+    // ...and the rest of the part is still shown.
+    assert!((part.max[1] - part.min[1] - 0.06).abs() < 1e-3);
+    // Angular: a cutting line at atan(0.75) through the center.
+    drawing.sheets[0].view_mut(ViewId(5)).unwrap().partial = false;
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.04, -0.03], [0.04, 0.03]]);
+    let ang = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    assert!(ang.error.is_none(), "{:?}", ang.error);
+    // The cut face spans the plate's 100 mm diagonal (by 12 mm thickness).
+    let pts: Vec<[f64; 2]> = ang.section_segments.iter().flatten().copied().collect();
+    let span = pts.iter().flat_map(|p| pts.iter().map(move |q| ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt())).fold(0.0, f64::max);
+    assert!(span > 0.098 && span < 0.1008, "{span}");
+}
+
+#[test]
+fn editing_cutting_line_points() {
+    // Jogged lines keep their horizontal/vertical legs.
+    let line = vec![[0.0, -0.04], [0.0, 0.01], [0.038, 0.01], [0.038, 0.04]];
+    let moved = views::move_cut_point(&line, 1, [0.005, 0.02], true);
+    assert_eq!(moved[1], [0.005, 0.02]);
+    assert_eq!(moved[0], [0.005, -0.04], "first leg stays vertical");
+    assert_eq!(moved[2], [0.038, 0.02], "jog stays horizontal");
+    assert_eq!(moved[3], line[3]);
+    // A straight line's end moves freely (an angular section).
+    let tilted = views::move_cut_point(&[[0.0, -0.04], [0.0, 0.04]], 1, [0.02, 0.04], true);
+    assert_eq!(tilted, vec![[0.0, -0.04], [0.02, 0.04]]);
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let pts = drawing.sheets[0].section_points(ViewId(5)).unwrap();
+    assert!(drawing.sheets[0].set_section_points(ViewId(5), views::move_cut_point(&pts, 1, [0.01, 0.04], true)));
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    assert!(g.error.is_none() && !g.section_segments.is_empty(), "{:?}", g.error);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let sp = pick_of(&built, PickTarget::SectionLine(ViewId(5)));
+    let l = built.geometry.lines.iter().find(|l| l.pick == sp && l.style == sheet::LineStyle::Section).unwrap();
+    assert!((l.points[1][0] - l.points[0][0]).abs() > 1.0, "cutting line is tilted on the sheet");
+}
+
+#[test]
+fn spline_and_polygon_crops() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let pts = vec![[-0.03, -0.02], [0.0, -0.028], [0.03, -0.02], [0.03, 0.02], [-0.03, 0.02]];
+    drawing.sheets[0].view_mut(ViewId(2)).unwrap().crop = Some(Crop::Spline(pts.clone()));
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
+    let outline = views::closed_spline(&pts, 16);
+    assert!(!g.edges.is_empty());
+    for e in &g.edges {
+        for p in &e.points {
+            let inside = views::point_in_polygon(*p, &outline) || outline.windows(2).any(|w| views::dist_to_segment(*p, w[0], w[1]) < 1e-7) || views::dist_to_segment(*p, outline[outline.len() - 1], outline[0]) < 1e-7;
+            assert!(inside, "{p:?} outside the spline crop");
+        }
+    }
+    // The spline passes through its points.
+    for p in &pts {
+        assert!(outline.iter().any(|q| (q[0] - p[0]).abs() < 1e-12 && (q[1] - p[1]).abs() < 1e-12));
+    }
+    assert!(g.snaps.iter().all(|s| views::point_in_polygon(s.p, &outline)));
+    // A free polygon (triangle) crop.
+    let tri = vec![[-0.05, -0.03], [0.05, -0.03], [0.0, 0.03]];
+    drawing.sheets[0].view_mut(ViewId(2)).unwrap().crop = Some(Crop::Polygon(tri.clone()));
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
+    assert!(g.edges.iter().flat_map(|e| e.points.iter()).all(|p| p[1] <= 0.03 - (p[0].abs() / 0.05) * 0.06 + 1e-7));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.placement(ViewId(2)).is_some());
+}
+
+#[test]
+fn grouped_ordinate_dimensions() {
+    assert_eq!(sheet::ordinate_text_positions(&[0.0, 1.0, 2.0, 30.0], 5.0), vec![-4.0, 1.0, 6.0, 30.0]);
+    assert_eq!(sheet::ordinate_text_positions(&[10.0, 0.0], 5.0), vec![10.0, 0.0]);
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
+    let snap = |p: [f64; 2]| g.snaps.iter().find(|s| (s.p[0] - p[0]).abs() < 1e-6 && (s.p[1] - p[1]).abs() < 1e-6).and_then(|s| s.point.clone());
+    let origin = [-0.05, -0.03];
+    let pts = vec![origin, [-0.038, -0.018], [-0.036, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]];
+    let mut refs = vec![AnnotationRef { slot: 0, point: snap(origin).expect("corner snap") }];
+    for (i, p) in pts.iter().enumerate() {
+        if let Some(r) = snap(*p) {
+            refs.push(AnnotationRef { slot: i as u8 + 1, point: r });
+        }
+    }
+    let id = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: ViewId(2), origin, points: pts.clone(), horizontal: true }, position: [100.0, 262.0], refs, ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.dangling.is_empty(), "{:?}", built.dangling);
+    let pick = pick_of(&built, PickTarget::Annotation(id));
+    let ts: Vec<&sheet::Text2> = built.geometry.texts.iter().filter(|t| t.pick == pick).collect();
+    let vals: Vec<&str> = ts.iter().map(|t| t.text.as_str()).collect();
+    for want in ["0", "12", "14", "50", "88", "100"] {
+        assert!(vals.contains(&want), "missing {want}: {vals:?}");
+    }
+    // Every value on one line; the close values 12 and 14 are jogged apart.
+    let xs: Vec<f64> = ts.iter().map(|t| t.pos[0]).collect();
+    let mut sorted = xs.clone();
+    sorted.sort_by(f64::total_cmp);
+    assert!(sorted.windows(2).all(|w| w[1] - w[0] >= 5.0 - 1e-6), "{sorted:?}");
+    assert!(ts.iter().all(|t| (t.pos[1] - ts[0].pos[1]).abs() < 1e-6 || t.angle.abs() > 1.0));
+}
+
+#[test]
+fn max_min_dimensions() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let first = drawing.sheets[0].next_annotation_id();
+    let mut ids = Vec::new();
+    // Center hole (R12) to the plate corner, horizontally: 50 to the center.
+    let cases = [(ArcCondition::Min, ArcCondition::Center, 0.0), (ArcCondition::Max, ArcCondition::Center, 0.0), (ArcCondition::Min, ArcCondition::Min, 0.0048), (ArcCondition::Max, ArcCondition::Max, 0.0048)];
+    for (id, (ca, cb, rb)) in (first..).zip(cases) {
+        let b = if rb > 0.0 { [0.038, 0.018] } else { [-0.05, -0.03] };
+        drawing.sheets[0].annotations.push(Annotation {
+            id,
+            kind: AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca, b, rb, cb, offset: 8.0, orientation: DimOrientation::Horizontal },
+            position: [0.0; 2],
+            ..Default::default()
+        });
+        ids.push(id);
+    }
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let text = |id: u64| {
+        let p = pick_of(&built, PickTarget::Annotation(id));
+        built.geometry.texts.iter().find(|t| t.pick == p).map(|t| t.text.clone()).unwrap()
+    };
+    assert_eq!(text(ids[0]), "38");
+    assert_eq!(text(ids[1]), "62");
+    assert_eq!(text(ids[2]), "21.2");
+    assert_eq!(text(ids[3]), "54.8");
+    // The min dimension's extension line starts on the circle (12 mm right of center).
+    let pl = built.placement(ViewId(2)).unwrap();
+    let c = pl.to_sheet([0.0, 0.0]);
+    let p0 = pick_of(&built, PickTarget::Annotation(ids[0]));
+    assert!(built.geometry.lines.iter().filter(|l| l.pick == p0).any(|l| (l.points[0][0] - (c[0] - 12.0)).abs() < 1e-6));
+}
+
+#[test]
+fn foreshortened_dimensions() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let s = &mut drawing.sheets[0];
+    let id = s.next_annotation_id();
+    s.annotations.push(Annotation { id, kind: AnnotationKind::ForeshortenedRadial { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, angle: 0.6, jog: [0.03, 0.035] }, position: [0.0; 2], ..Default::default() });
+    // Front view: half diameter of the center hole about its axis (x = 0).
+    s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::ForeshortenedDiameter { view: ViewId(1), axis: [[0.0, 0.0], [0.0, 0.012]], edge: [0.012, 0.006], direct: false }, position: [110.0, 140.0], ..Default::default() });
+    s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::ForeshortenedDiameter { view: ViewId(1), axis: [[0.0, 0.0], [0.0, 0.012]], edge: [0.012, 0.006], direct: true }, position: [110.0, 145.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let texts_of = |id: u64| {
+        let p = pick_of(&built, PickTarget::Annotation(id));
+        built.geometry.texts.iter().filter(|t| t.pick == p).map(|t| t.text.clone()).collect::<Vec<_>>()
+    };
+    assert_eq!(texts_of(id), vec!["R12".to_string()]);
+    assert_eq!(texts_of(id + 1), vec!["Ø24".to_string()]);
+    assert_eq!(texts_of(id + 2), vec!["Ø24".to_string()]);
+    // The foreshortened radius leader is a jogged polyline from the false center.
+    let p = pick_of(&built, PickTarget::Annotation(id));
+    let pl = built.placement(ViewId(2)).unwrap();
+    let f = pl.to_sheet([0.03, 0.035]);
+    let leader = built.geometry.lines.iter().find(|l| l.pick == p && l.points.len() == 4).expect("jogged leader");
+    assert!((leader.points[0][0] - f[0]).abs() < 1e-9 && (leader.points[0][1] - f[1]).abs() < 1e-9);
+    // Half diameter: one dimension line crossing the axis; direct: both ends on the cylinder.
+    let fp = pl.to_sheet([0.0, 0.0]);
+    let _ = fp;
+    let p1 = pick_of(&built, PickTarget::Annotation(id + 1));
+    let p2 = pick_of(&built, PickTarget::Annotation(id + 2));
+    let fpl = built.placement(ViewId(1)).unwrap();
+    let axis_x = fpl.to_sheet([0.0, 0.0])[0];
+    let half = built.geometry.lines.iter().filter(|l| l.pick == p1 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
+    assert!((half - (axis_x - 6.0)).abs() < 1e-6, "overshoots the axis by 6 mm: {half} vs {axis_x}");
+    let full = built.geometry.lines.iter().filter(|l| l.pick == p2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9).map(|l| l.points[1][0]).next().unwrap();
+    assert!((full - (axis_x - 12.0)).abs() < 1e-6);
+}
+
+#[test]
+fn aligned_section_dimensions_are_associative() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let id = drawing.sheets[0].next_view_id();
+    drawing.sheets[0].views.push(DrawingView { id, kind: ViewKind::AlignedSection { parent: ViewId(2), center: [0.0, 0.0], a: [0.0, -0.045], b: [0.0475, 0.0225], label: "C".into() }, position: [330.0, 215.0], ..Default::default() });
+    let g = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, false);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    assert!(g.aligned.is_some());
+    assert!(!g.model_edges.is_empty(), "edges keep their model names");
+    assert!(g.snaps.len() >= 4, "{}", g.snaps.len());
+    let studio = studio_tab(&doc);
+    let ctx = sources[&SourceKey::studio(studio)].context.clone();
+    // Every snap resolves back to where it is drawn, including the
+    // revolved leg's vertices.
+    let mut revolved = 0;
+    for s in &g.snaps {
+        let r = s.point.as_ref().unwrap();
+        let (p, _) = views::resolve_in_view(&ctx, &g, r).expect("resolves");
+        assert!((p[0] - s.p[0]).abs() < 1e-9 && (p[1] - s.p[1]).abs() < 1e-9, "{p:?} vs {:?}", s.p);
+        let (p3, _) = views::resolve_point3(&ctx, r).unwrap();
+        if g.aligned.unwrap().revolved(p3) {
+            revolved += 1;
+        }
+    }
+    assert!(revolved > 0, "the revolved leg has snap points");
+    // A dimension between two snaps survives a rebuild.
+    let (sa, sb) = (g.snaps[0].clone(), g.snaps.iter().rev().find(|s| (s.p[0] - g.snaps[0].p[0]).abs() > 1e-4).unwrap().clone());
+    let aid = drawing.sheets[0].next_annotation_id();
+    drawing.sheets[0].annotations.push(Annotation {
+        id: aid,
+        kind: AnnotationKind::LinearDimension { view: id, a: [0.0; 2], b: [0.0; 2], offset: 10.0, orientation: DimOrientation::Horizontal, override_text: None },
+        position: [0.0; 2],
+        refs: vec![AnnotationRef { slot: 0, point: sa.point.clone().unwrap() }, AnnotationRef { slot: 1, point: sb.point.clone().unwrap() }],
+        ..Default::default()
+    });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!built.dangling.contains(&aid), "{:?}", built.dangling);
+    let want = format::format_len(&drawing, &DimFormat::default(), (sb.p[0] - sa.p[0]).abs());
+    let p = pick_of(&built, PickTarget::Annotation(aid));
+    assert_eq!(built.geometry.texts.iter().find(|t| t.pick == p).unwrap().text, want);
+}
+
+#[test]
+fn table_cell_formats_and_merged_cells() {
+    let cells = vec![vec!["PART".into(), "".into(), "QTY".into()], vec!["Bracket".into(), "B-1".into(), "2".into()], vec!["Pin".into(), "P-7".into(), "4".into()]];
+    let mut t = Table::new(1, TableKind::General { cells, title: Some("PARTS".into()), header: true }, [300.0, 200.0]);
+    assert!(t.merge_cells((0, 0), (0, 1)));
+    assert!(!t.merge_cells((0, 1), (1, 1)), "partial overlap rejected");
+    assert_eq!(t.anchor_cell(0, 1), (0, 0));
+    t.set_cell_format(1, 0, CellFormat { align: CellAlign::Left, height: Some(4.0), bold: true });
+    t.set_cell_format(2, 2, CellFormat { align: CellAlign::Right, ..Default::default() });
+    assert_eq!(t.cell_format(1, 0).height, Some(4.0));
+    t.set_cell_format(2, 1, CellFormat::default());
+    assert_eq!(t.cell_formats.len(), 2, "default formats are not stored");
+    let d = tables::table_data(&Drawing::default(), &t, None, None, None, &|s| s.to_string());
+    let l = tables::layout(&t, &d);
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    tables::render(&mut g, &t, &d, &l, 1);
+    // The merged header shows once, centered over both columns.
+    let part = g.texts.iter().find(|x| x.text == "PART").unwrap();
+    assert!((part.pos[0] - (l.xs[0] + l.xs[2]) / 2.0).abs() < 1e-9);
+    // No divider crosses the merged cell.
+    let y_hdr = (l.ys[1] + l.ys[2]) / 2.0;
+    assert!(!g.lines.iter().any(|ln| ln.points.len() == 2 && (ln.points[0][0] - l.xs[1]).abs() < 1e-9 && (ln.points[1][0] - l.xs[1]).abs() < 1e-9 && ln.points[0][1].min(ln.points[1][1]) < y_hdr && ln.points[0][1].max(ln.points[1][1]) > y_hdr));
+    // Bold: drawn three times; left aligned; bigger text makes the row taller.
+    let br: Vec<&sheet::Text2> = g.texts.iter().filter(|x| x.text == "Bracket").collect();
+    assert_eq!(br.len(), 3);
+    assert!(br[0].height == 4.0 && br[0].pos[0] < l.xs[0] + 3.0);
+    assert!(l.ys[2] - l.ys[3] > l.ys[3] - l.ys[4]);
+    let four = g.texts.iter().find(|x| x.text == "4").unwrap();
+    assert!(four.pos[0] > (l.xs[2] + l.xs[3]) / 2.0, "right aligned");
+    // Inserting a row above shifts formats and merges; deleting restores.
+    t.insert_row(0);
+    assert_eq!((t.merges[0].row, t.cell_format(2, 0).bold), (1, true));
+    assert!(t.delete_row(0));
+    assert_eq!((t.merges[0].row, t.cell_format(1, 0).bold), (0, true));
+    // Inserting a column inside a merge widens it.
+    t.insert_col(1);
+    assert_eq!(t.merges[0].cols, 3);
+    assert!(t.unmerge(0, 2) && t.merges.is_empty());
+}
+
+#[test]
+fn gdt_leaders_and_datum_targets() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let s = &mut drawing.sheets[0];
+    let id = s.next_annotation_id();
+    let target = [0.05, 0.0];
+    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target }] }, position: [200.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [60.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A2".into(), area: DatumTargetArea::Point }, position: [50.0, 262.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pl = *built.placement(ViewId(2)).unwrap();
+    let tip = pl.to_sheet(target);
+    assert!(built.geometry.fills.iter().any(|f| (f.points[0][0] - tip[0]).abs() < 1e-9 && (f.points[0][1] - tip[1]).abs() < 1e-9), "leader arrow at the edge");
+    let t = texts(&built);
+    for want in ["A1", "Ø10", "A2"] {
+        assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
+    }
+    // The leader follows its view.
+    drawing.sheets[0].view_mut(ViewId(2)).unwrap().position[0] += 10.0;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(built.geometry.fills.iter().any(|f| (f.points[0][0] - tip[0] - 10.0).abs() < 1e-9));
+    // Deleting the view drops the leader, not the frame.
+    drawing.sheets[0].remove_view(ViewId(2));
+    let gdt = drawing.sheets[0].annotations.iter().find(|a| a.id == id).unwrap();
+    assert!(matches!(&gdt.kind, AnnotationKind::Gdt { leaders, .. } if leaders.is_empty()));
+    assert!(!drawing.sheets[0].annotations.iter().any(|a| a.id == id + 1));
+}
+
+#[test]
+fn move_views_between_sheets() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let top_frame = views::view_frame(&drawing, &drawing.sheets[0], ViewId(2)).unwrap();
+    let to = drawing.add_sheet(0);
+    // A section view cannot leave its parent behind.
+    assert!(drawing.move_views_to_sheet(0, &[ViewId(5)], to, Some(&sources)).is_err());
+    let n_ann = drawing.sheets[0].annotations.len();
+    let on_top = drawing.sheets[0].annotations.iter().filter(|a| a.kind.view().is_some_and(|v| [2, 5, 6].contains(&v.0))).count();
+    // The top view moves with its section and detail views.
+    let map = drawing.move_views_to_sheet(0, &[ViewId(2)], to, Some(&sources)).unwrap();
+    assert_eq!(map.len(), 3);
+    assert_eq!(drawing.sheets[0].views.len(), 3);
+    assert_eq!(drawing.sheets[0].annotations.len(), n_ann - on_top);
+    let dst = &drawing.sheets[to];
+    assert_eq!(dst.views.len(), 3);
+    assert_eq!(dst.annotations.len(), on_top);
+    let new_top = map[0].1;
+    let v = dst.view(new_top).unwrap();
+    assert!(matches!(v.kind, ViewKind::Base { .. }) && v.custom_frame.is_some());
+    let f = views::view_frame(&drawing, dst, new_top).unwrap();
+    assert!((f.dir - top_frame.dir).length() < 1e-12 && (f.up - top_frame.up).length() < 1e-12);
+    // The section and detail views follow their (renumbered) parent.
+    assert!(dst.views.iter().filter(|v| v.id != new_top).all(|v| dst.parent_of(v.id) == Some(new_top)));
+    let built = render_sheet(&drawing, to, &sources, &cache, false).unwrap();
+    assert!(built.dangling.is_empty(), "{:?}", built.dangling);
+    assert!(texts(&built).iter().any(|t| t == "SECTION A-A"));
+    for v in &drawing.sheets[to].views {
+        let g = compute_view(&drawing, &drawing.sheets[to], v.id, &sources, &cache, false);
+        assert!(g.error.is_none(), "{:?}", g.error);
+    }
+    // A detail view alone becomes a cropped view at the same place.
+    let (doc2, mut d2) = demo();
+    let src2 = regenerate_sources(&doc2, &d2);
+    let before = render_sheet(&d2, 0, &src2, &cache, false).unwrap();
+    let pl = *before.placement(ViewId(6)).unwrap();
+    let to2 = d2.add_sheet(0);
+    let map = d2.move_views_to_sheet(0, &[ViewId(6)], to2, Some(&src2)).unwrap();
+    let after = render_sheet(&d2, to2, &src2, &cache, false).unwrap();
+    let pl2 = *after.placement(map[0].1).unwrap();
+    assert!(matches!(d2.sheets[to2].views[0].crop, Some(Crop::Circle { .. })));
+    let c = [0.038, 0.018];
+    let (a, b) = (pl.to_sheet(c), pl2.to_sheet(c));
+    assert!((a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6, "{a:?} vs {b:?}");
+}
+
+#[test]
+fn templates_and_title_blocks() {
+    let names: Vec<&str> = templates::standard_templates().iter().map(|t| t.name).collect();
+    for n in ["ISO A4", "ISO A3", "ISO A2", "ISO A1", "ISO A0", "ANSI A", "ANSI B", "ANSI C", "ANSI D", "ANSI E"] {
+        assert!(names.contains(&n), "{n}");
+    }
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // Keep the demo's values when switching layouts.
+    templates::apply_template(&mut drawing, 0, &templates::template_by_name("ISO A3").unwrap());
+    assert_eq!(drawing.projection, Projection::FirstAngle);
+    let s = &drawing.sheets[0];
+    assert_eq!((s.size, s.title_style), (SheetSize::A3, TitleBlockStyle::Iso));
+    assert_eq!(s.title_field("Part number"), Some("P-001"));
+    assert_eq!(s.title_field("Title"), Some("Plate"));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let t = texts(&built);
+    for want in ["LEGAL OWNER", "DOCUMENT TYPE", "P-001", "Plate", "1:1", "Part drawing"] {
+        assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
+    }
+    let rect = sheet::title_block_rect(&drawing.sheets[0]).unwrap();
+    let tb = pick_of(&built, PickTarget::TitleBlock);
+    assert_eq!(built.hit([rect[0] + 70.0, rect[1] + 4.0], 1.0), Some(tb));
+    // Imperial: ANSI B with a tolerance block in inches.
+    templates::apply_template(&mut drawing, 0, &templates::template_by_name("ANSI B").unwrap());
+    assert!(!drawing.units_mm && drawing.projection == Projection::ThirdAngle);
+    assert_eq!(drawing.sheets[0].size, SheetSize::AnsiB);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let t = texts(&built);
+    for want in ["TOLERANCES", "DIMENSIONS ARE IN INCHES", "B", "DRAWN BY", "P-001", "3.937"] {
+        assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
+    }
+    assert_eq!(built.geometry.width, SheetSize::AnsiB.size_mm().0);
+    // Per sheet: another sheet keeps its own layout.
+    let i = drawing.add_sheet(0);
+    templates::set_title_style(&mut drawing, i, TitleBlockStyle::None);
+    let built = render_sheet(&drawing, i, &sources, &cache, false).unwrap();
+    assert!(!texts(&built).iter().any(|x| x == "TOLERANCES"));
+    assert_eq!(drawing.sheets[0].title_style, TitleBlockStyle::Ansi);
 }

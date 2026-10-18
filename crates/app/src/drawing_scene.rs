@@ -63,7 +63,7 @@ pub fn dash(points: &[[f64; 2]], closed: bool, pattern: &[f64]) -> Vec<Vec<[f64;
                 cur.clear();
                 k = (k + 1) % pattern.len();
                 left = pattern[k];
-                on = k % 2 == 0;
+                on = k.is_multiple_of(2);
             }
         }
     }
@@ -174,7 +174,6 @@ impl Overlay {
         });
         self.lines.push((pts.collect(), dashed));
     }
-    #[allow(dead_code)]
     pub fn rect(&mut self, a: [f64; 2], b: [f64; 2], dashed: bool) {
         self.lines.push((vec![a, [b[0], a[1]], b, [a[0], b[1]], a], dashed));
     }

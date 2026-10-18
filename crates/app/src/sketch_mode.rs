@@ -39,22 +39,6 @@ pub enum ConstraintTool {
 }
 
 impl ConstraintTool {
-    pub const ALL: [ConstraintTool; 14] = [
-        ConstraintTool::Coincident,
-        ConstraintTool::Concentric,
-        ConstraintTool::Parallel,
-        ConstraintTool::Tangent,
-        ConstraintTool::Horizontal,
-        ConstraintTool::Vertical,
-        ConstraintTool::Midpoint,
-        ConstraintTool::Normal,
-        ConstraintTool::Pierce,
-        ConstraintTool::Perpendicular,
-        ConstraintTool::Equal,
-        ConstraintTool::Symmetric,
-        ConstraintTool::Fix,
-        ConstraintTool::Curvature,
-    ];
     pub fn label(self) -> &'static str {
         match self {
             ConstraintTool::Coincident => "Coincident (I)",
@@ -105,6 +89,7 @@ impl ConstraintTool {
 pub enum Tool {
     Select,
     Line,
+    MidpointLine,
     CornerRect,
     CenterRect,
     AlignedRect,
@@ -113,9 +98,11 @@ pub enum Tool {
     Arc3,
     TangentArc,
     CenterArc,
+    EllipticalArc,
     Point,
     Spline,
     Bezier,
+    SplinePoint,
     Conic,
     Slot,
     Polygon,
@@ -123,6 +110,7 @@ pub enum Tool {
     Ellipse,
     Text,
     Fillet,
+    Chamfer,
     Trim,
     Extend,
     Split,
@@ -133,6 +121,8 @@ pub enum Tool {
     Transform,
     Use,
     Intersection,
+    InsertDxf,
+    InsertImage,
     Dimension,
     Constraint(ConstraintTool),
 }
@@ -142,6 +132,7 @@ impl Tool {
         match self {
             Tool::Select => "Select",
             Tool::Line => "Line (L)",
+            Tool::MidpointLine => "Midpoint line",
             Tool::CornerRect => "Corner rectangle (G)",
             Tool::CenterRect => "Center rectangle (R)",
             Tool::AlignedRect => "Aligned rectangle",
@@ -150,9 +141,11 @@ impl Tool {
             Tool::Arc3 => "3 point arc (A)",
             Tool::TangentArc => "Tangent arc",
             Tool::CenterArc => "Center point arc",
+            Tool::EllipticalArc => "Elliptical arc",
             Tool::Point => "Point (Shift+S)",
             Tool::Spline => "Spline",
             Tool::Bezier => "Bezier",
+            Tool::SplinePoint => "Spline control point",
             Tool::Conic => "Conic",
             Tool::Slot => "Slot",
             Tool::Polygon => "Inscribed polygon",
@@ -160,6 +153,7 @@ impl Tool {
             Tool::Ellipse => "Ellipse",
             Tool::Text => "Text",
             Tool::Fillet => "Sketch fillet (Shift+F)",
+            Tool::Chamfer => "Sketch chamfer",
             Tool::Trim => "Trim (M)",
             Tool::Extend => "Extend (X)",
             Tool::Split => "Split",
@@ -170,6 +164,8 @@ impl Tool {
             Tool::Transform => "Transform",
             Tool::Use => "Use / project edges (U)",
             Tool::Intersection => "Intersection",
+            Tool::InsertDxf => "Insert DXF or DWG",
+            Tool::InsertImage => "Insert image",
             Tool::Dimension => "Dimension (D)",
             Tool::Constraint(c) => c.label(),
         }
@@ -178,6 +174,7 @@ impl Tool {
         match self {
             Tool::Select => "select-box",
             Tool::Line => "line",
+            Tool::MidpointLine => "midpoint-line",
             Tool::CornerRect => "corner-rectangle",
             Tool::CenterRect => "center-rectangle",
             Tool::AlignedRect => "aligned-rectangle",
@@ -186,9 +183,11 @@ impl Tool {
             Tool::Arc3 => "three-point-arc",
             Tool::TangentArc => "tangent-arc",
             Tool::CenterArc => "center-point-arc",
+            Tool::EllipticalArc => "elliptical-arc",
             Tool::Point => "point-sketch",
             Tool::Spline => "spline",
             Tool::Bezier => "bezier",
+            Tool::SplinePoint => "fit-spline",
             Tool::Conic => "conic",
             Tool::Slot => "slot",
             Tool::Polygon => "polygon-inscribed",
@@ -196,6 +195,7 @@ impl Tool {
             Tool::Ellipse => "ellipse",
             Tool::Text => "text",
             Tool::Fillet => "sketch-fillet",
+            Tool::Chamfer => "sketch-chamfer",
             Tool::Trim => "trim",
             Tool::Extend => "extend",
             Tool::Split => "split-sketch",
@@ -206,6 +206,8 @@ impl Tool {
             Tool::Transform => "transform-sketch",
             Tool::Use => "use",
             Tool::Intersection => "intersection-curve",
+            Tool::InsertDxf => "import",
+            Tool::InsertImage => "image",
             Tool::Dimension => "dimension",
             Tool::Constraint(c) => c.icon(),
         }
@@ -214,10 +216,10 @@ impl Tool {
         match self {
             Tool::Select => SketchTool::Select,
             Tool::Point | Tool::Text => SketchTool::Point,
-            Tool::Line => SketchTool::Line,
+            Tool::Line | Tool::MidpointLine => SketchTool::Line,
             Tool::CornerRect | Tool::CenterRect | Tool::AlignedRect => SketchTool::Rectangle,
             Tool::Circle | Tool::ThreePointCircle | Tool::Polygon | Tool::CircumPolygon => SketchTool::Circle,
-            Tool::Arc3 | Tool::CenterArc => SketchTool::Arc,
+            Tool::Arc3 | Tool::CenterArc | Tool::EllipticalArc => SketchTool::Arc,
             Tool::TangentArc => SketchTool::TangentArc,
             Tool::Spline | Tool::Bezier | Tool::Conic => SketchTool::Spline,
             _ => SketchTool::Other,
@@ -228,6 +230,7 @@ impl Tool {
         matches!(
             self,
             Tool::Line
+                | Tool::MidpointLine
                 | Tool::CornerRect
                 | Tool::CenterRect
                 | Tool::AlignedRect
@@ -236,6 +239,7 @@ impl Tool {
                 | Tool::Arc3
                 | Tool::TangentArc
                 | Tool::CenterArc
+                | Tool::EllipticalArc
                 | Tool::Point
                 | Tool::Spline
                 | Tool::Bezier
@@ -245,6 +249,7 @@ impl Tool {
                 | Tool::CircumPolygon
                 | Tool::Ellipse
                 | Tool::Text
+                | Tool::InsertImage
         )
     }
     /// Tools working on a selection with parameters and an explicit Apply.
@@ -262,7 +267,7 @@ struct Click {
 #[derive(Clone, Debug)]
 enum DragState {
     /// Pressed on an entity; becomes a geometry drag when moved.
-    Pending { entity: EntityId, start: DVec2, additive: bool },
+    Pending { entity: EntityId, start: DVec2 },
     Geometry { handle: DragHandle },
     /// Pressed on a dimension label: moves it when dragged, selects it on release.
     Label { constraint: ConstraintId, start: DVec2, moved: bool, additive: bool },
@@ -273,6 +278,12 @@ enum DragState {
     /// Pressed on a text (glyph or box line): moves the whole box when dragged.
     Text { entity: EntityId, start: DVec2, points: Vec<(EntityId, DVec2)>, moved: bool },
     Box { start: DVec2 },
+    /// Dragging (or clicking) the offset direction arrow.
+    OffsetArrow { start: DVec2, moved: bool },
+    /// Dragging the fillet radius manipulator (the session's first fillet).
+    FilletRadius { arc: EntityId },
+    /// Trim tool drag: every curve the path crosses is trimmed.
+    TrimPath { points: Vec<DVec2> },
 }
 
 /// On-canvas manipulators of the pattern and transform tools.
@@ -303,12 +314,30 @@ pub struct DimEdit {
     pub text: String,
 }
 
+/// One value box of an on-the-fly dimension (shown right after an entity
+/// is created; typing a value and pressing Enter adds a driving dimension).
+#[derive(Clone, Debug)]
+pub struct OtfField {
+    /// Dimension to add (its value is replaced by the typed one).
+    pub kind: ConstraintKind,
+    /// The box shows `value * scale` (ellipse axes are entered as diameters).
+    pub scale: f64,
+    /// Label position of the resulting dimension (sketch coordinates).
+    pub label: DVec2,
+}
+
+/// On-the-fly dimension boxes of the last created geometry (Onshape:
+/// "the suggested dimension value appears in a box"; Alt+arrows switch).
+#[derive(Clone, Debug)]
+pub struct OnTheFly {
+    pub fields: Vec<OtfField>,
+    pub active: usize,
+}
+
 /// Dimension graphics in sketch-plane coordinates.
 #[derive(Clone, Debug)]
 pub struct DimGraphic {
     pub constraint: ConstraintId,
-    pub label: DVec2,
-    pub text: String,
     pub driving: bool,
     pub segments: Vec<[DVec2; 2]>,
 }
@@ -325,6 +354,8 @@ pub struct GlyphInfo {
     pub on_point: bool,
     /// User placement offset (sketch-plane units) when the glyph was dragged.
     pub offset: Option<DVec2>,
+    /// The constraint refers to external (used / projected) geometry.
+    pub external: bool,
 }
 
 /// Key of a moved constraint glyph in [`SketchData::glyph_offsets`].
@@ -338,7 +369,7 @@ pub enum ExternalSnap {
     /// A model vertex projected onto the sketch plane.
     Vertex { position: DVec2, reference: noshape_model::reference::Reference },
     /// A point on a model edge projected onto the sketch plane.
-    Edge { position: DVec2 },
+    Edge { position: DVec2, reference: noshape_model::reference::Reference },
 }
 
 pub struct SketchEditor {
@@ -355,6 +386,12 @@ pub struct SketchEditor {
     pub selected_constraints: Vec<ConstraintId>,
     /// Hovered sketch entity (from the viewport pick).
     pub hover: Option<EntityId>,
+    /// Use tool: projection preview of the hovered model edges.
+    pub use_preview: Vec<Vec<DVec2>>,
+    /// Hovered sketch region (key) when no entity is under the cursor.
+    pub hover_region: Option<Vec<u32>>,
+    /// Selected sketch regions (clicking inside a closed profile).
+    pub selected_regions: Vec<Vec<u32>>,
     /// Hovered dimension label or constraint glyph.
     pub hover_constraint: Option<ConstraintId>,
     /// Entity whose glyphs stay visible briefly after hover ends.
@@ -365,16 +402,26 @@ pub struct SketchEditor {
     drag_snap: Option<(EntityId, DVec2, bool)>,
     /// Entities picked so far for a constraint/dimension tool.
     picks: Vec<(EntityId, DVec2)>,
+    /// Picks of the dimension being placed (click positions decide min/max).
+    picks_placed: Vec<(EntityId, DVec2)>,
     pub dim_edit: Option<DimEdit>,
     pub construction: bool,
     /// Show every constraint glyph (toolbar toggle).
     pub show_constraints: bool,
+    /// Show dimension expressions (not remembered between sessions).
+    pub show_expressions: bool,
+    /// Show errors (over-defined constraints in red; on by default).
+    pub show_errors: bool,
     /// Shift held while moving: show all glyphs temporarily (Onshape).
     pub shift_held: bool,
     pub polygon_sides: usize,
     pub fillet_radius: f64,
     pub offset_distance: f64,
     pub offset_flip: bool,
+    /// Curves of the offset being set up (preview, arrow and distance box).
+    pub offset_pending: Option<Vec<EntityId>>,
+    /// An offset was made: later curve clicks repeat it with the same distance.
+    offset_repeat: bool,
     pub conic_rho: f64,
     pub text_string: String,
     pub text_height: f64,
@@ -391,17 +438,44 @@ pub struct SketchEditor {
     pub xf_angle: f64,
     pub xf_scale: f64,
     /// First fillet arc of the current fillet session (later fillets are equal to it).
-    fillet_session: Option<(EntityId, f64)>,
+    fillet_session: Option<EntityId>,
+    pub chamfer_distance: f64,
+    pub slot_width: f64,
+    /// End cap of the first slot of the session (later slots are equal to it).
+    slot_session: Option<EntityId>,
+    /// Pattern being edited (Edit pattern): replaced on commit.
+    pub editing_pattern: Option<u32>,
+    /// Insert image: the chosen file (name, bytes, width / height) waiting for its rectangle.
+    pub pending_image: Option<(String, Vec<u8>, f64)>,
+    /// Insert DXF: meters per drawing unit (`None`: the file's units, else millimeters).
+    pub dxf_unit_scale: Option<f64>,
+    /// Insert DXF: keep the file origin at the sketch origin (else center the drawing).
+    pub dxf_use_origin: bool,
     /// Mirror line chosen in tool-first mode.
     mirror_axis: Option<EntityId>,
-    /// Inline value entry while drawing (typed values, SI).
-    pub entry_active: bool,
-    pub entry_values: Vec<Option<f64>>,
-    /// Entities created by the last tool action.
-    last_created: Vec<EntityId>,
-    /// Previous line of the current line chain (typed angles are relative to it)
-    /// and the unit vector from the chain end back along it.
-    last_line: Option<(EntityId, DVec2)>,
+    /// On-the-fly dimension boxes of the geometry created last.
+    pub otf: Option<OnTheFly>,
+    /// The user started typing into the active on-the-fly box.
+    pub otf_typing: bool,
+    /// Curves the cursor passed over while drawing (wake-up inferences).
+    pub woken: Vec<EntityId>,
+    /// Press position of a drawing tool (press-drag-release placement).
+    press: Option<DVec2>,
+    /// Line tool temporarily drawing a tangent arc (Shift+A or hovering
+    /// back over the chain end); reverts to lines after one arc.
+    pub tangent_mode: bool,
+    /// The cursor left the chain end since the last segment (re-entering
+    /// it toggles the tangent arc mode).
+    left_chain_end: bool,
+    /// Alt held while drawing a rectangle: square.
+    pub alt_held: bool,
+    /// Polygon side count typed while placing the circumference.
+    pub polygon_typed: String,
+    /// Side count when the polygon's circumference was locked (drag adjusts from it).
+    polygon_base_sides: usize,
+    /// Signed angle the cursor swept around a center point arc's center
+    /// (the arc follows the cursor's direction).
+    center_arc_sweep: f64,
     /// Label/glyph pressed in the GPUI overlay (consumed by the next tool_down).
     pub pressed_label: Option<(ConstraintId, bool, bool)>,
     pub pressed_glyph: Option<(ConstraintId, EntityId, bool)>,
@@ -410,6 +484,10 @@ pub struct SketchEditor {
     /// World units per pixel at the sketch (for snap radii).
     pub world_per_px: f64,
     pub message: Option<String>,
+    /// Profile inspector: the focused issue (position and curves), drawn red.
+    pub issue_highlight: Option<(DVec2, Vec<EntityId>)>,
+    /// Profile inspector: positions of all open issues.
+    pub issue_markers: Vec<DVec2>,
     /// View-side UI state (input entities), owned by the Part Studio view.
     pub ui: Option<Box<dyn std::any::Any>>,
 }
@@ -441,6 +519,97 @@ fn is_angle_kind(k: &ConstraintKind) -> bool {
     matches!(k, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. })
 }
 
+/// Last Show constraints setting (the Sketch dialog remembers its options).
+static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Inference guide lines and snap markers (`INFERENCE_SNAP_LINE_COLOR`).
+const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
+/// Geometry being drawn (`SKETCH_PREVIEW_COLOR`).
+const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
+
+/// Unit kind of a dimension's value.
+pub fn dim_unit(k: &ConstraintKind) -> Dim {
+    match k {
+        ConstraintKind::Rho { .. } => Dim::UNITLESS,
+        _ if is_angle_kind(k) => Dim::ANGLE,
+        _ => Dim::LENGTH,
+    }
+}
+
+/// Displayed text of a dimension value (Ø for diameters, R for radii).
+pub fn dim_value_text(k: &ConstraintKind, v: f64, units: &UnitPrefs) -> String {
+    dim_value_text_tol(k, v, units, None)
+}
+
+/// A number in display units with a fixed number of decimals (no unit).
+fn fixed_number(v: f64, dim: Dim, units: &UnitPrefs, decimals: u8) -> String {
+    // Value in display units: format with many decimals and parse the number back.
+    let exact = noshape_units::format_quantity_with(Quantity::new(v, dim), units, 12);
+    let num: String = exact.chars().take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-').collect();
+    let x: f64 = num.parse().unwrap_or(0.0);
+    format!("{x:.prec$}", prec = decimals as usize)
+}
+
+/// Unit suffix of a dimension kind as formatted (e.g. " mm", "°").
+fn unit_suffix_of(dim: Dim, units: &UnitPrefs) -> String {
+    let t = noshape_units::format_quantity_with(Quantity::new(0.0, dim), units, 0);
+    t.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == '-').to_string()
+}
+
+/// Displayed text of a dimension with its tolerance and precision.
+pub fn dim_value_text_tol(k: &ConstraintKind, v: f64, units: &UnitPrefs, tol: Option<&noshape_model::sketch_feature::DimTolerance>) -> String {
+    use noshape_model::sketch_feature::ToleranceKind as T;
+    let dim = dim_unit(k);
+    let scale = dim_display_scale(k);
+    let prefix = match k {
+        ConstraintKind::Diameter { .. } | ConstraintKind::EllipseRadius { .. } | ConstraintKind::Distance { mode: DistanceMode::Centerline, .. } => "Ø",
+        ConstraintKind::Radius { .. } => "R",
+        ConstraintKind::Rho { .. } => "ρ ",
+        _ => "",
+    };
+    let suffix = unit_suffix_of(dim, units);
+    let prec = tol.and_then(|t| t.precision);
+    let fmt = |x: f64| match prec {
+        Some(n) => format!("{}{suffix}", fixed_number(x, dim, units, n)),
+        None => noshape_units::format_quantity(Quantity::new(x, dim), units),
+    };
+    let dev = |x: f64| fixed_number(x, dim, units, prec.unwrap_or(if dim == Dim::ANGLE { units.angle_precision } else { units.length_precision }));
+    let base = format!("{prefix}{}", fmt(v * scale));
+    let Some(t) = tol else { return base };
+    match t.kind {
+        T::None => base,
+        T::Symmetrical => format!("{base} ±{}", dev(t.upper)),
+        T::Deviation => format!("{base} +{}/-{}", dev(t.upper), dev(t.lower)),
+        T::Limits => format!("{prefix}{} / {}", fmt(v * scale + t.upper), fmt(v * scale - t.lower)),
+        T::Min => format!("{base} MIN"),
+        T::Max => format!("{base} MAX"),
+        T::Basic => format!("[{base}]"),
+    }
+}
+
+/// Tolerances are not allowed on single line lengths and arc lengths (Onshape).
+pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
+    !matches!(k, ConstraintKind::Length { .. })
+}
+
+/// A dimension text that is more than a plain number with an optional unit.
+fn is_expression(t: &str) -> bool {
+    let t = t.trim();
+    let num_end = t.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+')).unwrap_or(t.len());
+    let rest = t[num_end..].trim();
+    num_end == 0 || !(rest.is_empty() || rest.chars().all(|c| c.is_ascii_alphabetic()))
+}
+
+fn truncate_chars(t: &str, n: usize) -> String {
+    if t.chars().count() <= n { t.to_string() } else { format!("{}…", t.chars().take(n).collect::<String>()) }
+}
+
+/// Factor between a dimension's stored value and the value shown / typed:
+/// ellipse axes are shown as diameters (Onshape's major / minor diameter).
+pub fn dim_display_scale(k: &ConstraintKind) -> f64 {
+    if matches!(k, ConstraintKind::EllipseRadius { .. }) { 2.0 } else { 1.0 }
+}
+
 /// Glyph icon for a geometric constraint (None for dimensions).
 pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
     use ConstraintKind::*;
@@ -460,6 +629,7 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Collinear { .. } => "collinear",
         Curvature { .. } => "curvature",
         Pierce { .. } => "pierce",
+        Quadrant { .. } => "coincident",
         _ => return None,
     })
 }
@@ -492,20 +662,28 @@ impl SketchEditor {
             selection: Vec::new(),
             selected_constraints: Vec::new(),
             hover: None,
+            use_preview: Vec::new(),
+            hover_region: None,
+            selected_regions: Vec::new(),
             hover_constraint: None,
             glyph_entity: None,
             drag: None,
             box_end: None,
             drag_snap: None,
             picks: Vec::new(),
+            picks_placed: Vec::new(),
             dim_edit: None,
             construction: false,
-            show_constraints: false,
+            show_constraints: SHOW_CONSTRAINTS.load(std::sync::atomic::Ordering::Relaxed),
+            show_expressions: false,
+            show_errors: true,
             shift_held: false,
             polygon_sides: 6,
             fillet_radius: 0.005,
             offset_distance: 0.005,
             offset_flip: false,
+            offset_pending: None,
+            offset_repeat: false,
             conic_rho: 0.5,
             text_string: "Text".into(),
             text_height: 0.01,
@@ -522,16 +700,31 @@ impl SketchEditor {
             xf_angle: 0.0,
             xf_scale: 1.0,
             fillet_session: None,
+            chamfer_distance: 0.005,
+            slot_width: 0.005,
+            slot_session: None,
             mirror_axis: None,
-            entry_active: false,
-            entry_values: Vec::new(),
-            last_created: Vec::new(),
-            last_line: None,
+            pending_image: None,
+            dxf_unit_scale: None,
+            dxf_use_origin: false,
+            editing_pattern: None,
+            otf: None,
+            otf_typing: false,
+            woken: Vec::new(),
+            press: None,
+            tangent_mode: false,
+            left_chain_end: false,
+            alt_held: false,
+            polygon_typed: String::new(),
+            polygon_base_sides: 6,
+            center_arc_sweep: 0.0,
             pressed_label: None,
             pressed_glyph: None,
             conflicting: Vec::new(),
             world_per_px: 1e-4,
             message: None,
+            issue_highlight: None,
+            issue_markers: Vec::new(),
             ui: None,
         }
     }
@@ -541,27 +734,40 @@ impl SketchEditor {
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
         self.clicks.clear();
         self.chain_end = None;
-        self.last_line = None;
         self.picks.clear();
         self.inference = None;
         self.external_snap = None;
         self.fillet_session = None;
+        self.slot_session = None;
+        self.offset_pending = None;
+        self.offset_repeat = false;
         self.mirror_axis = None;
-        self.entry_active = false;
-        self.entry_values.clear();
+        self.otf = None;
+        self.otf_typing = false;
+        self.woken.clear();
+        self.press = None;
+        self.tangent_mode = false;
         self.message = match self.tool {
-            Tool::Fillet => Some("Click corners to fillet; each fillet is equal to the first".into()),
-            Tool::Trim => Some("Click the part of a curve to remove".into()),
-            Tool::Extend => Some("Click near the end of a curve to extend it".into()),
-            Tool::Split => Some("Click a curve where it should be split".into()),
-            Tool::Offset => Some("Click curves to offset them (selected curves are offset first)".into()),
-            Tool::Mirror => Some(if self.selection.is_empty() { "Click a mirror line, then click entities to mirror" } else { "Click a mirror line" }.into()),
-            Tool::Dimension => Some("Select one or two entities, then click to place the dimension".into()),
-            Tool::Use => Some("Click model edges or faces to project them into the sketch".into()),
-            Tool::Intersection => Some("Click a model face crossing the sketch plane".into()),
-            Tool::Text => Some("Drag (or click two corners) to place the text box; its height sets the text size".into()),
-            Tool::Conic => Some("Click start, end, then the control point".into()),
-            Tool::Bezier => Some("Click control points; double-click to finish".into()),
+            Tool::Fillet => Some("Select a point or two sketch curves to fillet".into()),
+            Tool::Chamfer => Some("Select a vertex or two edges to chamfer".into()),
+            Tool::Trim => Some("Click entities to trim away, or drag across them".into()),
+            Tool::Extend => Some("Click the line or arc to extend".into()),
+            Tool::Split => Some("Click the sketch curve to split".into()),
+            Tool::SplinePoint => Some("Click a spline or bezier control polygon to add a control point".into()),
+            Tool::Offset => Some("Select one or more curves to offset".into()),
+            Tool::Mirror => Some("Select a mirror line.".into()),
+            Tool::Dimension => Some("Select the entities to dimension, then click to place the dimension".into()),
+            Tool::Use => Some("Click edges, faces or sketch entities to use (project) them".into()),
+            Tool::Intersection => Some("Select a surface or face crossing the sketch plane".into()),
+            Tool::InsertDxf => Some("Choose the units, then a DXF file".into()),
+            Tool::InsertImage => Some("Choose an image file, then draw the image rectangle".into()),
+            Tool::Text => Some("Drag a box: its lower-left corner and height set the first line of text".into()),
+            Tool::Conic => Some("Click the start point, the end point, then the control point".into()),
+            Tool::Spline => Some("Click to add points; double-click to end".into()),
+            Tool::Bezier => Some("Click to add control points; double-click to end".into()),
+            Tool::MidpointLine => Some("Click the midpoint, then an end point".into()),
+            Tool::EllipticalArc => Some("Click the center, the primary axis, the start point, then the end point".into()),
+            Tool::Polygon | Tool::CircumPolygon => Some("Click the center, then the circumference (type a number first to set the sides)".into()),
             Tool::LinearPattern => Some("Select entities, set the pattern, click empty space to aim, then Apply".into()),
             Tool::CircularPattern => Some("Select entities, click empty space to set the center, then Apply".into()),
             Tool::Transform => Some("Select entities, set the transform (click empty space for the center), then Apply".into()),
@@ -570,34 +776,76 @@ impl SketchEditor {
         };
     }
 
+    /// Tools that act on a preselection as soon as they are chosen (Slot,
+    /// Offset; Onshape "select curves, then click the tool").
+    pub fn apply_preselection(&mut self, data: &mut SketchData) -> EditOutcome {
+        if self.selection.is_empty() {
+            return EditOutcome::none();
+        }
+        match self.tool {
+            Tool::Slot => {
+                let ids = std::mem::take(&mut self.selection);
+                self.make_slots(data, &ids)
+            }
+            Tool::Offset => {
+                let ids: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| !is_point(&data.sketch, *e)).collect();
+                if !ids.is_empty() {
+                    self.offset_pending = Some(ids);
+                    self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
+                }
+                EditOutcome::redraw()
+            }
+            _ => EditOutcome::none(),
+        }
+    }
+
     /// Cancel the in-progress operation (Esc). Returns true if something was cancelled.
     pub fn cancel(&mut self) -> bool {
         if self.dim_edit.take().is_some() {
             return true;
         }
-        if self.entry_active {
-            self.entry_active = false;
-            self.entry_values.clear();
+        // A box being typed into closes first; an idle box goes away with
+        // the chain / tool.
+        if self.otf_typing && self.otf.take().is_some() {
+            self.otf_typing = false;
             return true;
         }
-        if !self.clicks.is_empty() || !self.picks.is_empty() || self.chain_end.is_some() || self.mirror_axis.is_some() {
+        let had_box = self.otf.take().is_some();
+        if self.offset_pending.take().is_some() {
+            return true;
+        }
+        // Esc cancels a pattern / transform being set up.
+        if self.tool.is_pattern() && (!self.selection.is_empty() || self.editing_pattern.is_some()) {
+            self.selection.clear();
+            self.editing_pattern = None;
+            self.xf_offset = DVec2::ZERO;
+            self.xf_angle = 0.0;
+            self.xf_scale = 1.0;
+            return true;
+        }
+        if !self.clicks.is_empty() || !self.picks.is_empty() || self.chain_end.is_some() || self.mirror_axis.is_some() || self.tangent_mode {
             self.clicks.clear();
             self.picks.clear();
             self.chain_end = None;
-            self.last_line = None;
-            self.mirror_axis = None;
+                self.mirror_axis = None;
+            self.tangent_mode = false;
+            self.press = None;
+            if self.tool == Tool::Mirror {
+                self.message = Some("Select a mirror line.".into());
+            }
             return true;
         }
         if self.tool != Tool::Select {
             self.set_tool(Tool::Select);
             return true;
         }
-        if !self.selection.is_empty() || !self.selected_constraints.is_empty() {
+        if !self.selection.is_empty() || !self.selected_constraints.is_empty() || !self.selected_regions.is_empty() {
             self.selection.clear();
             self.selected_constraints.clear();
+            self.selected_regions.clear();
             return true;
         }
-        false
+        had_box
     }
 
     /// Cursor position on the sketch plane from a world ray.
@@ -609,22 +857,99 @@ impl SketchEditor {
         if suppress {
             return None;
         }
+        // While a line chain is drawing a tangent arc there is no anchor
+        // direction to infer from (the arc is tangent by construction).
+        let anchor = if self.tangent_mode { None } else { self.anchor_pos(sk) };
         let ctx = InferenceContext {
-            tool: self.tool.inference_tool(),
-            anchor: self.clicks.last().map(|c| c.pos),
+            tool: if self.tangent_mode { SketchTool::TangentArc } else { self.tool.inference_tool() },
+            anchor,
             anchor_point: self.chain_end,
             snap_radius: self.world_per_px * 9.0,
             angle_tolerance: 3f64.to_radians(),
             exclude: Vec::new(),
+            origin: true,
+            woken: self.woken.clone(),
         };
-        noshape_sketch::infer(sk, p, &ctx).into_iter().next()
+        let mut best = noshape_sketch::infer(sk, p, &ctx).into_iter().next();
+        // Elliptical arc: the end snaps to the construction ellipse's axis points.
+        if self.tool == Tool::EllipticalArc
+            && self.clicks.len() == 3
+            && best.as_ref().is_none_or(|i| i.priority > 1)
+            && let Some((c, major, minor)) = construction_ellipse(self.clicks[0].pos, self.clicks[1].pos, self.clicks[2].pos)
+        {
+            let n = major.normalize().perp() * minor;
+            let r = self.world_per_px * 9.0;
+            if let Some(q) = [c + major, c - major, c + n, c - n].into_iter().filter(|q| (*q - p).length() <= r).min_by(|a, b| (*a - p).length().total_cmp(&(*b - p).length())) {
+                best = Some(Inference { kind: InferenceKind::Quadrant, position: q, entity: None, reference: Some(c), constraints: Vec::new(), distance: (q - p).length(), priority: 1 });
+            }
+        }
+        // 3 point arc: snap to an exact semicircle when the center reaches the chord.
+        if self.tool == Tool::Arc3
+            && self.clicks.len() == 2
+            && best.as_ref().is_none_or(|i| i.priority > 1)
+            && let Some(s) = semicircle_snap(self.clicks[0].pos, self.clicks[1].pos, p, self.world_per_px * 9.0)
+        {
+            best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
+        }
+        best
     }
 
-    pub fn pointer_move(&mut self, data: &mut SketchData, p: DVec2, shift: bool) -> EditOutcome {
+    /// Current anchor of the tool (last click; a chained line starts at the
+    /// solved position of the chain end, which a typed dimension may move).
+    fn anchor_pos(&self, sk: &Sketch) -> Option<DVec2> {
+        if let Some(e) = self.chain_end
+            && let Some(p) = sk.point(e)
+        {
+            return Some(p);
+        }
+        self.clicks.last().map(|c| c.pos)
+    }
+
+    pub fn pointer_move(&mut self, data: &mut SketchData, p: DVec2, shift: bool, alt: bool) -> EditOutcome {
+        // Polygon side count: distance from the locked circumference, one side per 15 px.
+        if matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2 && self.polygon_typed.is_empty() {
+            let (ctr, rim) = (self.clicks[0].pos, self.clicks[1].pos);
+            let delta = ((p - ctr).length() - (rim - ctr).length()) / (self.world_per_px * 15.0);
+            let n = (self.polygon_base_sides as f64 + delta.round()).clamp(3.0, 50.0) as usize;
+            if n != self.polygon_sides {
+                self.polygon_sides = n;
+                self.message = Some(format!("Sides: {n}"));
+            }
+        }
+        if self.tool == Tool::CenterArc && self.clicks.len() == 2 {
+            let c = self.clicks[0].pos;
+            let prev = self.cursor.unwrap_or(self.clicks[1].pos);
+            let delta = ((p - c).to_angle() - (prev - c).to_angle() + PI).rem_euclid(TAU) - PI;
+            self.center_arc_sweep += delta;
+        } else {
+            self.center_arc_sweep = 0.0;
+        }
         self.cursor = Some(p);
         self.shift_held = shift;
+        self.alt_held = alt;
         self.external_snap = None;
         if self.tool.draws() {
+            // Curves the cursor passes over wake up their inferences.
+            if let Some(h) = self.hover
+                && !is_point(&data.sketch, h)
+            {
+                self.woken.retain(|e| *e != h);
+                self.woken.insert(0, h);
+                self.woken.truncate(10);
+            }
+            // Line chain: moving back onto the chain end switches to a tangent arc.
+            if self.tool == Tool::Line
+                && let Some(end) = self.chain_end.and_then(|e| data.sketch.point(e))
+            {
+                let d = (p - end).length();
+                let r = self.world_per_px * 9.0;
+                if d > r * 2.5 {
+                    self.left_chain_end = true;
+                } else if d < r && self.left_chain_end {
+                    self.left_chain_end = false;
+                    self.tangent_mode = !self.tangent_mode;
+                }
+            }
             self.inference = self.infer(&data.sketch, p, shift);
             return EditOutcome::redraw();
         }
@@ -632,9 +957,51 @@ impl SketchEditor {
         EditOutcome::redraw()
     }
 
+    /// Show constraints toggle (remembered for the next sketch, Onshape).
+    pub fn set_show_constraints(&mut self, on: bool) {
+        self.show_constraints = on;
+        SHOW_CONSTRAINTS.store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Polygon waiting for its side count (circumference locked).
+    pub fn polygon_sides_pending(&self) -> bool {
+        matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
+    }
+
+    /// Set the pending polygon's side count (Enter / click).
+    pub fn finish_polygon(&mut self, data: &mut SketchData) -> EditOutcome {
+        if !self.polygon_sides_pending() {
+            return EditOutcome::none();
+        }
+        let pos = self.clicks[1].pos;
+        self.place(data, Click { pos, inference: None }, false)
+    }
+
+    /// Mirror tool: the mirror line is chosen.
+    pub fn has_mirror_axis(&self) -> bool {
+        self.mirror_axis.is_some()
+    }
+
+    /// No click of the current tool placed yet.
+    pub fn clicks_empty(&self) -> bool {
+        self.clicks.is_empty()
+    }
+
+    /// Toggle between Line and Tangent arc while chaining (Shift+A).
+    pub fn toggle_tangent_arc(&mut self) {
+        match self.tool {
+            Tool::Line if self.chain_end.is_some() => {
+                self.tangent_mode = !self.tangent_mode;
+                self.left_chain_end = false;
+            }
+            Tool::TangentArc => self.set_tool(Tool::Line),
+            _ => self.set_tool(Tool::TangentArc),
+        }
+    }
+
     /// Apply a snap to model geometry when it beats the sketch inference.
     pub fn apply_external_snap(&mut self, snap: ExternalSnap) {
-        if !self.tool.draws() || self.entry_active {
+        if !self.tool.draws() {
             return;
         }
         let strong = self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center));
@@ -643,7 +1010,7 @@ impl SketchEditor {
         }
         let (position, kind) = match &snap {
             ExternalSnap::Vertex { position, .. } => (*position, InferenceKind::Endpoint),
-            ExternalSnap::Edge { position } => (*position, InferenceKind::OnCurve),
+            ExternalSnap::Edge { position, .. } => (*position, InferenceKind::OnCurve),
         };
         if self.inference.as_ref().is_some_and(|i| kind == InferenceKind::OnCurve && i.kind != InferenceKind::OnCurve) {
             return;
@@ -654,14 +1021,19 @@ impl SketchEditor {
     }
 
     fn snapped(&self) -> Option<(DVec2, Option<Inference>)> {
-        if let Some(p) = self.entry_cursor() {
-            return Some((p, None));
-        }
         let c = self.cursor?;
-        Some(match &self.inference {
+        let (mut pos, inf) = match &self.inference {
             Some(i) => (i.position, Some(i.clone())),
             None => (c, None),
-        })
+        };
+        // Alt while drawing a rectangle: square.
+        if self.alt_held
+            && matches!(self.tool, Tool::CornerRect | Tool::CenterRect)
+            && let Some(a) = self.clicks.first()
+        {
+            pos = square_corner(a.pos, pos);
+        }
+        Some((pos, inf))
     }
 
     /// Create (or reuse) a point entity for a placed click and return it plus
@@ -692,14 +1064,35 @@ impl SketchEditor {
                 let _ = data.sketch.set_construction(*id, true);
             }
         }
-        self.last_created = created.to_vec();
         data.sketch.solve();
+    }
+
+    /// Constrain the next click onto an external entity (a snapped model edge).
+    pub fn link_edge_snap(&mut self, id: EntityId) {
+        if let Some(inf) = &mut self.inference {
+            inf.kind = InferenceKind::OnCurve;
+            inf.constraints = vec![AutoConstraint::OnCurve(id)];
+        }
+        self.external_snap = None;
     }
 
     /// Link an external snap (model vertex) to a fixed sketch point before a
     /// click is placed, so the new geometry becomes coincident with it.
     pub fn take_vertex_snap(&mut self, data: &mut SketchData) {
+        // The sketch origin becomes a fixed point the new geometry is constrained to.
+        if let Some(inf) = &mut self.inference
+            && inf.constraints.iter().any(|c| auto_target(c) == Some(noshape_sketch::ORIGIN))
+        {
+            let o = origin_point(&mut data.sketch);
+            for c in &mut inf.constraints {
+                *c = retarget_auto(*c, noshape_sketch::ORIGIN, o);
+            }
+            if inf.entity == Some(noshape_sketch::ORIGIN) {
+                inf.entity = Some(o);
+            }
+        }
         let Some(ExternalSnap::Vertex { position, reference }) = self.external_snap.clone() else { return };
+        // (Edge snaps are linked by the view, which can project the edge.)
         let id = data.sketch.use_external_point(position);
         data.external_refs.insert(id.0, reference);
         if let Some(inf) = &mut self.inference {
@@ -728,26 +1121,20 @@ impl SketchEditor {
             self.drag = Some(DragState::Handle(h));
             return EditOutcome::redraw();
         }
-        if self.entry_active && self.tool.draws() {
-            // Clicking while typing a value commits the typed value.
-            return self.commit_entry_values(data, &[]);
-        }
         match self.tool {
             Tool::Select => {
                 match hovered {
                     // Text: glyphs and box lines move the whole box (corners resize it).
-                    Some(e) if !is_point(&data.sketch, e) && data.text_of_entity(e).is_some() => {
-                        let tid = data.text_of_entity(e).unwrap_or_default();
-                        let points: Vec<(EntityId, DVec2)> = data
-                            .texts
-                            .iter()
-                            .find(|t| t.id == tid)
-                            .map(|t| t.box_points.iter().filter_map(|q| data.sketch.point(EntityId(*q)).map(|pos| (EntityId(*q), pos))).collect())
-                            .unwrap_or_default();
+                    Some(e) if !is_point(&data.sketch, e) && (data.text_of_entity(e).is_some() || data.image_of_entity(e).is_some()) => {
+                        let box_points: Vec<u32> = match data.text_of_entity(e) {
+                            Some(tid) => data.texts.iter().find(|t| t.id == tid).map(|t| t.box_points.clone()).unwrap_or_default(),
+                            None => data.image_of_entity(e).and_then(|i| data.images.iter().find(|x| x.id == i)).map(|x| x.box_points.clone()).unwrap_or_default(),
+                        };
+                        let points: Vec<(EntityId, DVec2)> = box_points.iter().filter_map(|q| data.sketch.point(EntityId(*q)).map(|pos| (EntityId(*q), pos))).collect();
                         self.drag = Some(DragState::Text { entity: e, start: p, points, moved: false });
                     }
                     Some(e) => {
-                        self.drag = Some(DragState::Pending { entity: e, start: p, additive: shift });
+                        self.drag = Some(DragState::Pending { entity: e, start: p });
                     }
                     None => {
                         self.drag = Some(DragState::Box { start: p });
@@ -757,63 +1144,37 @@ impl SketchEditor {
                 EditOutcome::none()
             }
             t if t.draws() => {
+                // Continuing to sketch leaves the last geometry undimensioned.
+                self.otf = None;
+                self.otf_typing = false;
                 if self.inference.is_none() {
-                    self.inference = self.infer(&data.sketch, p, shift);
+                    self.inference = self.infer(&data.sketch, p, self.shift_held || shift);
                 }
                 self.take_vertex_snap(data);
                 let (pos, inference) = self.snapped().unwrap_or((p, None));
-                let click = Click { pos, inference };
-                self.place(data, click, double_click)
+                let out = self.place(data, Click { pos, inference }, double_click);
+                // Press-drag-release: the release places the next click.
+                let pending = !self.clicks.is_empty() || (self.tool == Tool::Line && self.chain_end.is_some());
+                self.press = (pending && !matches!(self.tool, Tool::Spline | Tool::Bezier | Tool::Point)).then_some(p);
+                out
             }
-            Tool::Fillet => {
-                let Some(pid) = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| nearest_point(&data.sketch, p, self.world_per_px * 10.0)) else {
-                    self.message = Some("Click a corner point".into());
-                    return EditOutcome::none();
-                };
-                match data.sketch.fillet_corner(pid, self.fillet_radius) {
-                    Ok(r) => {
-                        let arc = r.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc));
-                        // The fillet comes with its own radius dimension.
-                        let rad_dim = r.constraints_added.iter().copied().find(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Radius { .. })));
-                        self.finish_create(data, &r.created);
-                        if let Some(arc) = arc {
-                            match self.fillet_session {
-                                // Later fillets of the session are equal to the first one,
-                                // so editing the first dimension changes them all (Onshape).
-                                Some((first, rad)) if (rad - self.fillet_radius).abs() < 1e-12 && data.sketch.entity(first).is_some() => {
-                                    if let Some(d) = rad_dim {
-                                        let _ = data.sketch.remove_constraint(d);
-                                    }
-                                    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: first, b: arc });
-                                }
-                                _ => {
-                                    if let (Some(d), Some(m)) = (rad_dim, curve_mid(&data.sketch, arc)) {
-                                        let c = match data.sketch.curve(arc) {
-                                            Some(Curve2::Arc { center, .. }) => center,
-                                            _ => m,
-                                        };
-                                        let l = m + (m - c).try_normalize().unwrap_or(DVec2::X) * self.world_per_px * 30.0;
-                                        data.dimension_labels.insert(d.0, [l.x, l.y]);
-                                    }
-                                    self.fillet_session = Some((arc, self.fillet_radius));
-                                }
-                            }
-                            data.sketch.solve();
-                        }
-                        EditOutcome::changed()
-                    }
-                    Err(e) => {
-                        self.message = Some(format!("Fillet failed: {e}"));
-                        EditOutcome::redraw()
-                    }
+            Tool::Fillet if self.fillet_handle(&data.sketch).is_some_and(|(_, m)| (m - p).length() <= self.world_per_px * 8.0) => {
+                if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
+                    self.drag = Some(DragState::FilletRadius { arc });
                 }
+                EditOutcome::redraw()
             }
-            Tool::Trim | Tool::Extend | Tool::Split => {
+            Tool::Fillet | Tool::Chamfer => self.corner_click(data, p, hovered),
+            Tool::Trim => {
+                self.drag = Some(DragState::TrimPath { points: vec![p] });
+                self.trim_at(data, p, hovered)
+            }
+            Tool::Extend | Tool::Split => {
                 let Some(id) = hovered.filter(|e| !is_point(&data.sketch, *e)).or_else(|| data.sketch.pick(p, self.world_per_px * 8.0).filter(|e| !is_point(&data.sketch, *e))) else {
                     return EditOutcome::none();
                 };
                 let r = match self.tool {
-                    Tool::Trim => data.sketch.trim(id, p),
+                    Tool::Extend if double_click => data.sketch.extend(id, p),
                     Tool::Extend => data.sketch.extend(id, p),
                     _ => {
                         let at = data.sketch.curve(id).map(|c| c.closest(p).1).unwrap_or(p);
@@ -827,47 +1188,86 @@ impl SketchEditor {
                         self.selection.retain(|e| data.sketch.entity(*e).is_some());
                         EditOutcome::changed()
                     }
+                    Err(_) if self.tool == Tool::Extend => {
+                        self.message = Some("Unable to extend the selected geometry.".into());
+                        EditOutcome::redraw()
+                    }
                     Err(e) => {
                         self.message = Some(format!("{e}"));
                         EditOutcome::redraw()
                     }
                 }
             }
-            Tool::Offset => {
-                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { self.selection.clone() };
-                if ids.is_empty() {
+            Tool::SplinePoint => {
+                let Some(id) = hovered.filter(|e| matches!(data.sketch.kind(*e), Some(EntityKind::FitSpline | EntityKind::BSpline))) else {
                     return EditOutcome::none();
-                }
-                let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
-                match data.sketch.offset(&ids, d) {
-                    Ok(r) => {
-                        // Repeat mode: later clicks offset single curves by the same distance.
-                        self.selection.clear();
-                        self.finish_create(data, &r.created);
+                };
+                match data.sketch.insert_spline_point(id, p) {
+                    Ok(_) => {
+                        data.sketch.solve();
                         EditOutcome::changed()
                     }
                     Err(e) => {
-                        self.message = Some(format!("Offset failed: {e}"));
+                        self.message = Some(format!("{e}"));
                         EditOutcome::redraw()
                     }
                 }
+            }
+            Tool::Slot => {
+                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().collect() } else { std::mem::take(&mut self.selection) };
+                self.make_slots(data, &ids)
+            }
+            Tool::Offset => {
+                // The direction arrow: drag to set the distance, click to flip.
+                if let Some((base, tip)) = self.offset_arrow(&data.sketch)
+                    && (p - tip).length().min((p - (base + tip) * 0.5).length()) <= self.world_per_px * 9.0
+                {
+                    self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
+                    return EditOutcome::redraw();
+                }
+                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
+                if ids.is_empty() {
+                    // Clicking empty space accepts a pending offset.
+                    return if self.offset_pending.is_some() { self.commit_offset(data) } else { EditOutcome::none() };
+                }
+                if self.offset_repeat && self.offset_pending.is_none() {
+                    // Later clicks offset by the same distance right away.
+                    self.offset_pending = Some(ids);
+                    return self.commit_offset(data);
+                }
+                match &mut self.offset_pending {
+                    // Add curves to the pending offset (chain selection).
+                    Some(p) => {
+                        for e in ids {
+                            if !p.contains(&e) {
+                                p.push(e);
+                            }
+                        }
+                    }
+                    None => self.offset_pending = Some(ids),
+                }
+                self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
+                EditOutcome::redraw()
             }
             Tool::Mirror => {
                 let is_line = |e: &EntityId| data.sketch.kind(*e) == Some(EntityKind::Line);
                 match self.mirror_axis.filter(|a| data.sketch.entity(*a).is_some()) {
                     None => {
                         let Some(axis) = hovered.filter(is_line) else {
-                            self.message = Some("Click a line to mirror about".into());
+                            self.message = Some("Select a mirror line.".into());
                             return EditOutcome::none();
                         };
                         self.mirror_axis = Some(axis);
                         let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| *e != axis).collect();
                         if ids.is_empty() {
-                            self.message = Some("Click entities to mirror (Esc to finish)".into());
+                            self.message = Some("Select entities to be mirrored.".into());
                             return EditOutcome::redraw();
                         }
                         self.selection.clear();
-                        self.mirror_entities(data, &ids)
+                        let out = self.mirror_entities(data, &ids);
+                        // Pre-selection: the mirror resolves at once and the tool ends.
+                        self.set_tool(Tool::Select);
+                        out
                     }
                     Some(axis) => {
                         let Some(e) = hovered.filter(|e| *e != axis) else { return EditOutcome::none() };
@@ -885,18 +1285,9 @@ impl SketchEditor {
                             self.selection.push(e);
                         }
                     }
-                    None => match self.tool {
-                        Tool::LinearPattern => {
-                            if let Some(c) = self.selection_center(&data.sketch) {
-                                let d = p - c;
-                                if d.length() > 1e-9 {
-                                    self.pattern_angle = d.to_angle();
-                                    self.pattern_distance = d.length();
-                                }
-                            }
-                        }
-                        _ => self.pattern_center = self.inference_free_snap(&data.sketch, p),
-                    },
+                    // Clicking white space accepts the pattern / transform (Onshape).
+                    None if !self.selection.is_empty() => return self.apply_pattern(data),
+                    None => {}
                 }
                 EditOutcome::redraw()
             }
@@ -906,7 +1297,10 @@ impl SketchEditor {
                 if !self.picks.iter().any(|(x, _)| *x == e) {
                     self.picks.push((e, p));
                 }
-                if self.picks.len() >= c.arity() {
+                // One-entity constraints (horizontal, vertical, fix) apply to each
+                // pick; two points make a horizontal/vertical pair.
+                let need = if matches!(c, ConstraintTool::Horizontal | ConstraintTool::Vertical) && self.picks.len() == 1 && is_point(&data.sketch, e) { 2 } else { c.arity() };
+                if self.picks.len() >= need {
                     let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
                     self.picks.clear();
                     match make_constraint(&data.sketch, c, &ids) {
@@ -924,6 +1318,260 @@ impl SketchEditor {
             }
             _ => EditOutcome::none(),
         }
+    }
+
+    /// Fillet / chamfer tool click: a corner point, or the first / second curve.
+    fn corner_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
+        let chamfer = self.tool == Tool::Chamfer;
+        let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
+        let r = if let Some(pid) = corner {
+            self.picks.clear();
+            if chamfer { data.sketch.chamfer_corner(pid, self.chamfer_distance, self.chamfer_distance) } else { data.sketch.fillet_corner(pid, self.fillet_radius) }
+        } else if let Some(c) = hovered {
+            // Two curves: the first click only picks.
+            if let Some(&(first, _)) = self.picks.first().filter(|(f, _)| *f != c) {
+                self.picks.clear();
+                if chamfer { data.sketch.chamfer(first, c, self.chamfer_distance, self.chamfer_distance) } else { data.sketch.fillet(first, c, self.fillet_radius) }
+            } else {
+                self.picks = vec![(c, p)];
+                return EditOutcome::redraw();
+            }
+        } else {
+            return EditOutcome::none();
+        };
+        match r {
+            Ok(r) => {
+                self.finish_create(data, &r.created);
+                if chamfer {
+                    self.after_chamfer(data, &r);
+                } else {
+                    self.after_fillet(data, &r);
+                }
+                data.sketch.solve();
+                EditOutcome::changed()
+            }
+            Err(e) => {
+                self.message = Some(if chamfer { format!("Cannot chamfer selected point. {e}") } else { format!("Cannot fillet selected point. {e}") });
+                EditOutcome::redraw()
+            }
+        }
+    }
+
+    /// First fillet of a session gets a radius value box; later ones are equal
+    /// to it, so editing the first dimension changes them all (Onshape).
+    fn after_fillet(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
+        let Some(arc) = r.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc)) else { return };
+        let rad_dim = r.constraints_added.iter().copied().find(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Radius { .. })));
+        match self.fillet_session {
+            Some(first) if data.sketch.entity(first).is_some() => {
+                if let Some(d) = rad_dim {
+                    let _ = data.sketch.remove_constraint(d);
+                }
+                let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: first, b: arc });
+            }
+            _ => {
+                if let (Some(d), Some(m)) = (rad_dim, curve_mid(&data.sketch, arc)) {
+                    let c = match data.sketch.curve(arc) {
+                        Some(Curve2::Arc { center, .. }) => center,
+                        _ => m,
+                    };
+                    let l = m + (m - c).try_normalize().unwrap_or(DVec2::X) * self.world_per_px * 30.0;
+                    data.dimension_labels.insert(d.0, [l.x, l.y]);
+                    self.open_value_box(data, d);
+                }
+                self.fillet_session = Some(arc);
+            }
+        }
+    }
+
+    fn after_chamfer(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
+        let dims: Vec<ConstraintId> = r.constraints_added.iter().copied().filter(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Distance { .. }))).collect();
+        for (k, d) in dims.iter().enumerate() {
+            if let Some(ConstraintKind::Distance { a, b, .. }) = data.sketch.constraint(*d).map(|c| c.kind.clone())
+                && let (Some(pa), Some(pb)) = (data.sketch.point(a), data.sketch.point(b))
+            {
+                let n = (pb - pa).try_normalize().unwrap_or(DVec2::X).perp();
+                let l = (pa + pb) * 0.5 + n * self.world_per_px * if k == 0 { 24.0 } else { -24.0 };
+                data.dimension_labels.insert(d.0, [l.x, l.y]);
+            }
+        }
+        if let Some(d) = dims.first() {
+            self.open_value_box(data, *d);
+        }
+    }
+
+    /// Offset curves of the pending offset with the current distance (preview / commit).
+    fn offset_result(&self, sk: &Sketch) -> Option<(Sketch, Vec<EntityId>)> {
+        let ids = self.offset_pending.as_ref()?;
+        let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
+        let mut tmp = sk.clone();
+        let r = tmp.offset(ids, d).ok()?;
+        let created = r.created.into_iter().filter(|e| tmp.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
+        Some((tmp, created))
+    }
+
+    /// Midpoint of the first pending curve and its left normal.
+    fn offset_frame(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        let first = *self.offset_pending.as_ref()?.first()?;
+        let c = sk.curve(first)?;
+        let (a, b) = c.domain();
+        let t = (a + b) * 0.5;
+        Some((c.point(t), c.tangent(t).try_normalize()?.perp()))
+    }
+
+    /// Whether a positive offset of the first pending curve goes against its
+    /// left normal (closed curves offset inward).
+    fn offset_flip_base(&self, sk: &Sketch) -> bool {
+        let Some(first) = self.offset_pending.as_ref().and_then(|p| p.first().copied()) else { return false };
+        let Some((mid, n)) = self.offset_frame(sk) else { return false };
+        let mut tmp = sk.clone();
+        let Ok(r) = tmp.offset(&[first], self.world_per_px.max(1e-9)) else { return false };
+        let probe = r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(mid).1).min_by(|x, y| (*x - mid).length().total_cmp(&(*y - mid).length()));
+        probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
+    }
+
+    /// The offset direction arrow (base on the curve, tip in the offset direction).
+    pub fn offset_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        let (mid, n) = self.offset_frame(sk)?;
+        let sign = if self.offset_flip != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
+        let len = (self.offset_distance).max(self.world_per_px * 30.0);
+        Some((mid, mid + n * sign * len))
+    }
+
+    /// Create the pending offset (Enter / click in space); later clicks repeat it.
+    pub fn commit_offset(&mut self, data: &mut SketchData) -> EditOutcome {
+        let Some(ids) = self.offset_pending.take() else { return EditOutcome::none() };
+        let d = if self.offset_flip { -self.offset_distance } else { self.offset_distance };
+        match data.sketch.offset(&ids, d) {
+            Ok(r) => {
+                self.offset_repeat = true;
+                self.finish_create(data, &r.created);
+                self.message = Some("Click more curves to offset them by the same distance".into());
+                EditOutcome::changed()
+            }
+            Err(e) => {
+                self.message = Some(format!("Offset failed: {e}"));
+                EditOutcome::redraw()
+            }
+        }
+    }
+
+    /// The fillet radius manipulator: the session's first fillet arc and its midpoint.
+    fn fillet_handle(&self, sk: &Sketch) -> Option<(EntityId, DVec2)> {
+        let arc = self.fillet_session.filter(|a| sk.entity(*a).is_some())?;
+        Some((arc, curve_mid(sk, arc)?))
+    }
+
+    /// Preview of a fillet at the hovered corner: the arc, and whether it fits.
+    fn fillet_preview(&self, sk: &Sketch) -> Option<(Vec<DVec2>, bool)> {
+        let pid = self.hover.filter(|e| is_point(sk, *e))?;
+        let users: Vec<EntityId> = sk.entities().filter(|e| e.endpoints().is_some_and(|(s, en)| s == pid || en == pid)).map(|e| e.id).collect();
+        if users.len() != 2 {
+            return None;
+        }
+        let v = sk.point(pid)?;
+        let far = |l: EntityId| -> Option<DVec2> {
+            let (s, e) = sk.endpoints(l)?;
+            sk.point(if s == pid { e } else { s })
+        };
+        let (Some(a), Some(b)) = (far(users[0]), far(users[1])) else { return None };
+        let (Some(_), Some(_)) = (line_of(sk, users[0]), line_of(sk, users[1])) else { return None };
+        let (ua, ub) = ((a - v).try_normalize()?, (b - v).try_normalize()?);
+        let theta = ua.angle_to(ub).abs();
+        if theta < 1e-6 || (PI - theta).abs() < 1e-6 {
+            return None;
+        }
+        let r = self.fillet_radius;
+        let t = r / (theta * 0.5).tan();
+        let c = v + (ua + ub).normalize() * (r / (theta * 0.5).sin());
+        let (pa, pb) = (v + ua * t, v + ub * t);
+        let fits = t <= (a - v).length() && t <= (b - v).length();
+        let a0 = (pa - c).to_angle();
+        let sweep = noshape_sketch::geom::ccw_sweep(a0, (pb - c).to_angle());
+        let sweep = if sweep > PI { sweep - TAU } else { sweep };
+        Some((arc_points(c, r, a0, sweep), fits))
+    }
+
+    /// Open the value box of a dimension (the Onshape dimension context dialog).
+    fn open_value_box(&mut self, data: &SketchData, cid: ConstraintId) {
+        let Some(c) = data.sketch.constraint(cid) else { return };
+        let value = c.kind.value().unwrap_or(0.0) * dim_display_scale(&c.kind);
+        let q = Quantity::new(value, dim_unit(&c.kind));
+        self.dim_edit = Some(DimEdit { constraint: cid, text: noshape_units::format_quantity(q, &UnitPrefs::default()) });
+    }
+
+    /// Trim tool: trim the curve under `p` (click, or each curve a drag crosses).
+    fn trim_at(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
+        let r = self.world_per_px * 6.0;
+        let id = hovered.or_else(|| data.sketch.pick(p, r));
+        let Some(id) = id else { return EditOutcome::none() };
+        let res = if is_point(&data.sketch, id) {
+            // Standalone points are deleted.
+            if data.sketch.users_of_point(id).is_empty() {
+                data.sketch.remove_entities(&[id]);
+                Ok(())
+            } else {
+                return EditOutcome::none();
+            }
+        } else {
+            data.sketch.trim(id, p).map(|_| ())
+        };
+        match res {
+            Ok(()) => {
+                data.sketch.solve();
+                prune_exprs(data);
+                self.selection.retain(|e| data.sketch.entity(*e).is_some());
+                if self.hover.is_some_and(|h| data.sketch.entity(h).is_none()) {
+                    self.hover = None;
+                }
+                EditOutcome::changed()
+            }
+            Err(e) => {
+                self.message = Some(format!("{e}"));
+                EditOutcome::redraw()
+            }
+        }
+    }
+
+    /// Slot tool: slots of one shared width around the given centerlines
+    /// (connected curves give one slot following the chain).
+    fn make_slots(&mut self, data: &mut SketchData, ids: &[EntityId]) -> EditOutcome {
+        let curves: Vec<EntityId> = ids.iter().copied().filter(|e| data.sketch.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
+        if curves.is_empty() {
+            return EditOutcome::redraw();
+        }
+        let (created, caps) = match data.sketch.slot_chains(&curves, self.slot_width) {
+            Ok(r) => r,
+            Err(e) => {
+                self.message = Some(format!("{e}"));
+                return EditOutcome::redraw();
+            }
+        };
+        if created.is_empty() {
+            return EditOutcome::redraw();
+        }
+        // One width for every slot of the session: the first cap carries the
+        // diameter dimension, the others are equal to it.
+        let first = self.slot_session.filter(|f| data.sketch.entity(*f).is_some());
+        for (k, cap) in caps.iter().enumerate() {
+            match first {
+                Some(f) => {
+                    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: f, b: *cap });
+                }
+                None if k == 0 => {
+                    let label = curve_mid(&data.sketch, *cap).map(|m| m + DVec2::new(1.0, 1.0).normalize() * self.world_per_px * 28.0);
+                    if let Some(d) = add_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label, None) {
+                        self.open_value_box(data, d);
+                    }
+                    self.slot_session = Some(*cap);
+                }
+                None => {
+                    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: caps[0], b: *cap });
+                }
+            }
+        }
+        self.finish_create(data, &created);
+        EditOutcome::changed()
     }
 
     fn mirror_entities(&mut self, data: &mut SketchData, ids: &[EntityId]) -> EditOutcome {
@@ -967,18 +1615,43 @@ impl SketchEditor {
                 self.finish_create(data, &[pid]);
                 EditOutcome::changed()
             }
+            Tool::Line if self.tangent_mode => {
+                let Some(from) = self.chain_end else {
+                    self.tangent_mode = false;
+                    return EditOutcome::redraw();
+                };
+                match sk.tangent_arc(from, click.pos) {
+                    Ok(ids) => {
+                        let end = ids.points.last().copied();
+                        let arc = ids.curves[0];
+                        let end = end.map(|e| attach(sk, e, Some(arc), &click)).unwrap_or(from);
+                        // Back to lines, continuing from the arc end (Onshape).
+                        self.tangent_mode = false;
+                        self.left_chain_end = false;
+                        self.chain_end = Some(end);
+                        self.clicks = vec![Click { pos: sk.point(end).unwrap_or(click.pos), inference: None }];
+                        self.finish_create(data, &ids.curves);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
+                        EditOutcome::changed()
+                    }
+                    Err(e) => {
+                        self.message = Some(format!("{e}"));
+                        EditOutcome::redraw()
+                    }
+                }
+            }
             Tool::Line => {
                 if double_click {
                     self.clicks.clear();
                     self.chain_end = None;
-                    self.last_line = None;
                     return EditOutcome::redraw();
                 }
                 let Some(prev) = self.clicks.last().cloned() else {
                     self.clicks.push(click);
                     return EditOutcome::redraw();
                 };
-                if (prev.pos - click.pos).length() < 1e-9 {
+                let start_pos = self.chain_end.and_then(|e| sk.point(e)).unwrap_or(prev.pos);
+                if (start_pos - click.pos).length() < 1e-9 {
                     return EditOutcome::none();
                 }
                 let (a, autos_a) = match self.chain_end {
@@ -995,16 +1668,32 @@ impl SketchEditor {
                 if closed {
                     self.clicks.clear();
                     self.chain_end = None;
-                    self.last_line = None;
                 } else {
-                    let back = match (data.sketch.point(a), data.sketch.point(b)) {
-                        (Some(pa), Some(pb)) => (pa - pb).try_normalize().unwrap_or(-DVec2::X),
-                        _ => -DVec2::X,
-                    };
                     self.clicks = vec![click];
                     self.chain_end = Some(b);
-                    self.last_line = Some((line, back));
+                    self.left_chain_end = false;
                 }
+                self.set_otf(data, vec![length_field(&data.sketch, line, self.world_per_px)]);
+                EditOutcome::changed()
+            }
+            Tool::MidpointLine => {
+                if self.clicks.is_empty() {
+                    self.clicks.push(click);
+                    return EditOutcome::redraw();
+                }
+                let m = self.clicks.remove(0);
+                if (m.pos - click.pos).length() < 1e-9 {
+                    return EditOutcome::none();
+                }
+                let pa = sk.add_point(m.pos * 2.0 - click.pos);
+                let pb = sk.add_point(click.pos);
+                let Ok(line) = sk.add_line_between(pa, pb) else { return EditOutcome::none() };
+                let mid = sk.add_point(m.pos);
+                let _ = sk.add_constraint(ConstraintKind::Midpoint { point: mid, curve: line });
+                attach(sk, mid, None, &m);
+                attach(sk, pb, Some(line), &click);
+                self.finish_create(data, &[line]);
+                self.set_otf(data, vec![length_field(&data.sketch, line, self.world_per_px)]);
                 EditOutcome::changed()
             }
             Tool::CornerRect | Tool::CenterRect => {
@@ -1017,15 +1706,27 @@ impl SketchEditor {
                     return EditOutcome::none();
                 }
                 let ids = if self.tool == Tool::CornerRect { sk.corner_rectangle(first.pos, click.pos) } else { sk.center_rectangle(first.pos, click.pos) };
-                if self.tool == Tool::CornerRect {
-                    if let (Some(&p0), Some(inf)) = (ids.points.first(), &first.inference) {
-                        Self::apply_auto(sk, p0, None, &inf.constraints);
-                    }
-                    if let (Some(&p2), Some(inf)) = (ids.points.get(2), &click.inference) {
-                        Self::apply_auto(sk, p2, None, &inf.constraints);
-                    }
+                let corners = &ids.points[..4];
+                let nearest = |q: DVec2, sk: &Sketch| corners.iter().copied().min_by(|x, y| (sk.point(*x).unwrap_or_default() - q).length().total_cmp(&(sk.point(*y).unwrap_or_default() - q).length()));
+                let first_pt = if self.tool == Tool::CornerRect { nearest(first.pos, sk) } else { ids.points.last().copied() };
+                let second_pt = nearest(click.pos, sk);
+                if let Some(p0) = first_pt {
+                    attach(sk, p0, None, &first);
+                }
+                if let Some(p2) = second_pt {
+                    attach(sk, p2, None, &click);
+                }
+                // Alt: square.
+                if self.alt_held {
+                    let _ = sk.add_constraint(ConstraintKind::Equal { a: ids.curves[0], b: ids.curves[1] });
                 }
                 self.finish_create(data, &ids.curves);
+                let w = self.world_per_px;
+                let mut fields = vec![length_field(&data.sketch, ids.curves[0], w)];
+                if !self.alt_held {
+                    fields.push(length_field(&data.sketch, ids.curves[1], w));
+                }
+                self.set_otf(data, fields);
                 EditOutcome::changed()
             }
             Tool::AlignedRect => {
@@ -1033,10 +1734,27 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
-                match sk.three_point_rectangle(c[0].pos, c[1].pos, c[2].pos) {
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
+                let c2 = if self.alt_held { aligned_square(c[0].pos, c[1].pos, c[2].pos) } else { c[2].pos };
+                match sk.three_point_rectangle(c[0].pos, c[1].pos, c2) {
                     Ok(ids) => {
+                        for (k, cl) in c.iter().take(2).enumerate() {
+                            let near = ids.points.iter().copied().min_by(|x, y| (sk.point(*x).unwrap_or_default() - cl.pos).length().total_cmp(&(sk.point(*y).unwrap_or_default() - cl.pos).length()));
+                            if let Some(pt) = near {
+                                attach(sk, pt, None, cl);
+                            }
+                            let _ = k;
+                        }
+                        if self.alt_held {
+                            let _ = sk.add_constraint(ConstraintKind::Equal { a: ids.curves[0], b: ids.curves[1] });
+                        }
                         self.finish_create(data, &ids.curves);
+                        let w = self.world_per_px;
+                        let mut fields = vec![length_field(&data.sketch, ids.curves[0], w)];
+                        if !self.alt_held {
+                            fields.push(length_field(&data.sketch, ids.curves[1], w));
+                        }
+                        self.set_otf(data, fields);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -1058,13 +1776,9 @@ impl SketchEditor {
                 let (center, autos) = Self::point_for(sk, &c);
                 let Ok(circle) = sk.add_circle_at(center, r) else { return EditOutcome::none() };
                 Self::apply_auto(sk, center, None, &autos);
-                // A point snapped on the rim makes the circle pass through it.
-                if let Some(inf) = &click.inference
-                    && let Some(AutoConstraint::CoincidentPoint(pt)) = inf.constraints.first()
-                {
-                    let _ = sk.add_constraint(ConstraintKind::Coincident { a: *pt, b: circle });
-                }
+                rim_autos(sk, circle, &click);
                 self.finish_create(data, &[circle]);
+                self.set_otf(data, vec![diameter_field(&data.sketch, circle, self.world_per_px)]);
                 EditOutcome::changed()
             }
             Tool::ThreePointCircle => {
@@ -1072,10 +1786,14 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let pts: Vec<DVec2> = self.clicks.drain(..).map(|c| c.pos).collect();
-                match sk.three_point_circle(pts[0], pts[1], pts[2]) {
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
+                match sk.three_point_circle(c[0].pos, c[1].pos, c[2].pos) {
                     Ok(id) => {
+                        for cl in &c {
+                            rim_autos(sk, id, cl);
+                        }
                         self.finish_create(data, &[id]);
+                        self.set_otf(data, vec![diameter_field(&data.sketch, id, self.world_per_px)]);
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -1087,20 +1805,19 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
                 match sk.three_point_arc(c[0].pos, c[2].pos, c[1].pos) {
                     Ok(arc) => {
                         if let Some((s, e)) = sk.endpoints(arc) {
-                            for pt in [s, e] {
-                                let p = sk.point(pt).unwrap_or_default();
-                                let near = |q: DVec2| (q - p).length();
-                                let cl = if near(c[0].pos) < near(c[1].pos) { &c[0] } else { &c[1] };
-                                if let Some(inf) = &cl.inference {
-                                    Self::apply_auto(sk, pt, Some(arc), &inf.constraints);
-                                }
-                            }
+                            let near = |q: DVec2, p: DVec2| (q - p).length();
+                            let ps = sk.point(s).unwrap_or_default();
+                            let (cs, ce) = if near(c[0].pos, ps) < near(c[1].pos, ps) { (&c[0], &c[1]) } else { (&c[1], &c[0]) };
+                            attach(sk, s, Some(arc), cs);
+                            attach(sk, e, Some(arc), ce);
                         }
+                        rim_autos(sk, arc, &c[2]);
                         self.finish_create(data, &[arc]);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -1111,9 +1828,18 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
-                let id = sk.center_point_arc(c[0].pos, c[1].pos, c[2].pos, true);
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
+                // The sweep follows the cursor: counter-clockwise unless the cursor went the other way.
+                let ccw = self.center_arc_sweep >= 0.0;
+                let id = sk.center_point_arc(c[0].pos, c[1].pos, c[2].pos, ccw);
+                if let Some(noshape_sketch::Geometry::Arc { center, start, end }) = sk.entity(id).map(|e| e.geometry.clone()) {
+                    attach(sk, center, None, &c[0]);
+                    let (s_click, e_click) = if ccw { (&c[1], &c[2]) } else { (&c[2], &c[1]) };
+                    attach(sk, start, Some(id), s_click);
+                    attach(sk, end, Some(id), e_click);
+                }
                 self.finish_create(data, &[id]);
+                self.set_otf(data, vec![radius_field(&data.sketch, id, self.world_per_px)]);
                 EditOutcome::changed()
             }
             Tool::TangentArc => {
@@ -1133,12 +1859,17 @@ impl SketchEditor {
                 };
                 if self.chain_end.is_none() {
                     self.chain_end = Some(from);
+                    self.clicks = vec![click];
                     return EditOutcome::redraw();
                 }
                 match sk.tangent_arc(from, click.pos) {
                     Ok(ids) => {
-                        self.chain_end = ids.points.last().copied();
+                        let arc = ids.curves[0];
+                        let end = ids.points.last().map(|e| attach(sk, *e, Some(arc), &click));
+                        self.chain_end = end;
+                        self.clicks = vec![click];
                         self.finish_create(data, &ids.curves);
+                        self.set_otf(data, vec![radius_field(&data.sketch, arc, self.world_per_px)]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -1149,25 +1880,17 @@ impl SketchEditor {
             }
             Tool::Spline | Tool::Bezier => {
                 if double_click && self.clicks.len() >= 2 {
-                    let pts: Vec<DVec2> = self.clicks.drain(..).map(|c| c.pos).collect();
-                    let r = if self.tool == Tool::Spline {
-                        sk.add_fit_spline(&pts)
-                    } else if pts.len() == 2 {
-                        Ok(sk.add_line(pts[0], pts[1]))
-                    } else {
-                        let deg = (pts.len() - 1).min(15);
-                        sk.add_bspline(&pts, deg)
-                    };
-                    if let Ok(id) = r {
-                        self.finish_create(data, &[id]);
-                        return EditOutcome::changed();
-                    }
-                    return EditOutcome::redraw();
+                    return self.finish_spline(data, false);
                 }
                 if self.clicks.last().is_some_and(|c| (c.pos - click.pos).length() < 1e-9) {
                     return EditOutcome::none();
                 }
+                // A spline closes when its last point lands on its first.
+                let closes = self.tool == Tool::Spline && self.clicks.len() >= 3 && self.clicks.first().is_some_and(|f| (f.pos - click.pos).length() <= self.world_per_px * 9.0);
                 self.clicks.push(click);
+                if closes {
+                    return self.finish_spline(data, true);
+                }
                 EditOutcome::redraw()
             }
             Tool::Conic => {
@@ -1175,10 +1898,17 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
                 match sk.add_conic(c[0].pos, c[2].pos, c[1].pos, self.conic_rho.clamp(0.01, 0.99)) {
                     Ok(id) => {
+                        if let Some((s, e)) = sk.endpoints(id) {
+                            attach(sk, s, Some(id), &c[0]);
+                            attach(sk, e, Some(id), &c[1]);
+                        }
                         self.finish_create(data, &[id]);
+                        // The rho box opens right away (Onshape).
+                        let label = curve_mid(&data.sketch, id).unwrap_or_default() + DVec2::new(0.0, self.world_per_px * 26.0);
+                        self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label }]);
                         EditOutcome::changed()
                     }
                     Err(e) => {
@@ -1187,36 +1917,43 @@ impl SketchEditor {
                     }
                 }
             }
-            Tool::Slot => {
-                self.clicks.push(click);
-                if self.clicks.len() < 3 {
-                    return EditOutcome::redraw();
-                }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
-                let width = 2.0 * dist_point_line(c[2].pos, c[0].pos, c[1].pos);
-                match sk.straight_slot(c[0].pos, c[1].pos, width.max(1e-6)) {
-                    Ok(ids) => {
-                        let mut all = ids.curves.clone();
-                        all.extend(ids.construction.iter().copied());
-                        self.finish_create(data, &ids.curves);
-                        self.last_created = all;
-                        EditOutcome::changed()
-                    }
-                    Err(_) => EditOutcome::redraw(),
-                }
-            }
             Tool::Polygon | Tool::CircumPolygon => {
                 if self.clicks.is_empty() {
                     self.clicks.push(click);
                     return EditOutcome::redraw();
                 }
+                // The second click locks the circumference; then moving toward /
+                // away from the polygon sets the side count; click (or Enter) sets it.
+                if self.clicks.len() == 1 {
+                    if (click.pos - self.clicks[0].pos).length() < 1e-9 {
+                        return EditOutcome::none();
+                    }
+                    self.polygon_base_sides = self.polygon_sides.clamp(3, 50);
+                    self.clicks.push(click);
+                    self.message = Some(format!("Sides: {} (drag toward / away from the polygon, type a number, click or press Enter to set)", self.polygon_sides));
+                    return EditOutcome::redraw();
+                }
                 let c = self.clicks.remove(0);
-                match sk.polygon(c.pos, click.pos, self.polygon_sides.clamp(3, 50), self.tool == Tool::Polygon) {
+                let rim = self.clicks.remove(0);
+                let sides = self.polygon_sides.clamp(3, 50);
+                self.polygon_typed.clear();
+                match sk.polygon(c.pos, rim.pos, sides, self.tool == Tool::Polygon) {
                     Ok(ids) => {
-                        let mut all = ids.curves.clone();
-                        all.extend(ids.construction.iter().copied());
+                        if let Some(&cp) = ids.points.last() {
+                            attach(sk, cp, None, &c);
+                        }
+                        let drawn = (rim.pos - c.pos).length();
+                        let circle = ids.construction.iter().copied().min_by(|x, y| {
+                            let r = |e: EntityId| match sk.curve(e) {
+                                Some(Curve2::Circle { radius, .. }) => (radius - drawn).abs(),
+                                _ => f64::INFINITY,
+                            };
+                            r(*x).total_cmp(&r(*y))
+                        });
                         self.finish_create(data, &ids.curves);
-                        self.last_created = all;
+                        if let Some(circle) = circle {
+                            self.set_otf(data, vec![diameter_field(&data.sketch, circle, self.world_per_px)]);
+                        }
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
@@ -1227,13 +1964,72 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = self.clicks.drain(..).collect();
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
                 match sk.ellipse_3pt(c[0].pos, c[1].pos, c[2].pos) {
                     Ok(id) => {
+                        if let Some(ctr) = sk.entity(id).and_then(|e| e.center()) {
+                            attach(sk, ctr, None, &c[0]);
+                        }
                         self.finish_create(data, &[id]);
+                        let w = self.world_per_px;
+                        self.set_otf(data, ellipse_fields(&data.sketch, id, w));
                         EditOutcome::changed()
                     }
                     Err(_) => EditOutcome::redraw(),
+                }
+            }
+            Tool::EllipticalArc => {
+                self.clicks.push(click);
+                if self.clicks.len() < 4 {
+                    return EditOutcome::redraw();
+                }
+                let c: Vec<Click> = std::mem::take(&mut self.clicks);
+                let Some((center, major, minor)) = construction_ellipse(c[0].pos, c[1].pos, c[2].pos) else { return EditOutcome::redraw() };
+                let t0 = noshape_sketch::sketch::ellipse_param(center, major, minor, c[2].pos);
+                let mut t1 = noshape_sketch::sketch::ellipse_param(center, major, minor, c[3].pos);
+                while t1 <= t0 {
+                    t1 += TAU;
+                }
+                let id = sk.add_elliptical_arc(center, major, minor, t0, t1);
+                if let Some(e) = sk.entity(id).cloned() {
+                    if let Some(ctr) = e.center() {
+                        attach(sk, ctr, None, &c[0]);
+                    }
+                    if let Some((s, en)) = e.endpoints() {
+                        attach(sk, s, Some(id), &c[2]);
+                        attach(sk, en, Some(id), &c[3]);
+                    }
+                }
+                self.finish_create(data, &[id]);
+                let w = self.world_per_px;
+                self.set_otf(data, ellipse_fields(&data.sketch, id, w));
+                EditOutcome::changed()
+            }
+            Tool::InsertImage => {
+                let Some((name, bytes, aspect)) = self.pending_image.clone() else {
+                    self.message = Some("Choose an image file first".into());
+                    return EditOutcome::redraw();
+                };
+                if self.clicks.is_empty() {
+                    self.clicks.push(click);
+                    return EditOutcome::redraw();
+                }
+                let first = self.clicks.remove(0);
+                let (origin, height) = image_box(first.pos, click.pos, aspect);
+                if height < self.world_per_px * 2.0 {
+                    return EditOutcome::redraw();
+                }
+                match data.add_image(&name, &bytes, origin, height, aspect) {
+                    Ok(_) => {
+                        data.sketch.solve();
+                        self.pending_image = None;
+                        self.set_tool(Tool::Select);
+                        EditOutcome::changed()
+                    }
+                    Err(e) => {
+                        self.message = Some(e);
+                        EditOutcome::redraw()
+                    }
                 }
             }
             Tool::Text => {
@@ -1263,6 +2059,117 @@ impl SketchEditor {
         }
     }
 
+    /// Create the spline / bezier from the clicked points.
+    fn finish_spline(&mut self, data: &mut SketchData, closed: bool) -> EditOutcome {
+        let clicks: Vec<Click> = std::mem::take(&mut self.clicks);
+        let mut pts: Vec<DVec2> = clicks.iter().map(|c| c.pos).collect();
+        if closed
+            && let Some(f) = pts.first().copied()
+            && let Some(l) = pts.last_mut()
+        {
+            *l = f;
+        }
+        if pts.len() < 2 {
+            return EditOutcome::redraw();
+        }
+        let sk = &mut data.sketch;
+        let r = if self.tool == Tool::Spline {
+            // Open splines get tangent handles at their ends (Onshape).
+            if closed { sk.add_fit_spline(&pts) } else { sk.add_fit_spline_with_handles(&pts) }
+        } else if pts.len() == 2 {
+            Ok(sk.add_line(pts[0], pts[1]))
+        } else {
+            let deg = (pts.len() - 1).min(15);
+            sk.add_bspline(&pts, deg)
+        };
+        let Ok(id) = r else { return EditOutcome::redraw() };
+        // Snapped first / last points carry their inferred constraints.
+        if let Some((first, last)) = sk.entity(id).and_then(|e| e.endpoints()) {
+            if closed && first != last {
+                let _ = sk.merge_points(last, first);
+            } else {
+                attach(sk, last, Some(id), clicks.last().expect("clicks"));
+            }
+            attach(sk, first, Some(id), clicks.first().expect("clicks"));
+        }
+        self.finish_create(data, &[id]);
+        EditOutcome::changed()
+    }
+
+    /// Confirm spline (context menu): finish at the point before the cursor.
+    pub fn confirm_spline(&mut self, data: &mut SketchData) -> EditOutcome {
+        if self.tool == Tool::Spline && self.clicks.len() >= 2 {
+            return self.finish_spline(data, false);
+        }
+        EditOutcome::none()
+    }
+
+    // ------------------------------------------------------------ on-the-fly dimensions
+
+    fn set_otf(&mut self, data: &SketchData, fields: Vec<OtfField>) {
+        let fields: Vec<OtfField> = fields.into_iter().filter(|f| data.sketch.measure_new(&f.kind).is_some()).collect();
+        self.otf = (!fields.is_empty()).then_some(OnTheFly { fields, active: 0 });
+        self.otf_typing = false;
+    }
+
+    /// Boxes to show: label position, suggested value text and whether the box is active.
+    pub fn otf_boxes(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(DVec2, String, bool)> {
+        let Some(o) = &self.otf else { return Vec::new() };
+        o.fields
+            .iter()
+            .enumerate()
+            .filter_map(|(i, f)| {
+                let v = data.sketch.measure_new(&f.kind)? * f.scale;
+                let dim = dim_unit(&f.kind);
+                Some((f.label, noshape_units::format_quantity(Quantity::new(v, dim), units), i == o.active))
+            })
+            .collect()
+    }
+
+    /// Switch the active on-the-fly box (Alt+arrows / Tab).
+    pub fn otf_step(&mut self, delta: isize) {
+        if let Some(o) = &mut self.otf {
+            let n = o.fields.len() as isize;
+            o.active = (o.active as isize + delta).rem_euclid(n.max(1)) as usize;
+        }
+    }
+
+    /// Commit the active on-the-fly box: add a driving dimension with the
+    /// typed value. Returns an error message for invalid input.
+    pub fn commit_otf(&mut self, data: &mut SketchData, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
+        let Some(o) = self.otf.clone() else { return Ok(()) };
+        let Some(f) = o.fields.get(o.active).cloned() else { return Ok(()) };
+        let text = text.trim().trim_start_matches('=').trim();
+        let dim = dim_unit(&f.kind);
+        let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
+        if !(q.value.is_finite() && q.value > 0.0) {
+            return Err("Value must be positive".into());
+        }
+        let mut kind = f.kind.clone();
+        kind.set_value(q.value / f.scale);
+        let expr = (is_expression(text) && f.scale == 1.0).then_some(text);
+        let Some(cid) = add_dimension(data, kind, Some(f.label), expr) else { return Err("Could not create the dimension.".into()) };
+        if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
+            let _ = data.sketch.set_dimension_value(cid, q.value / f.scale);
+            data.sketch.solve();
+        } else {
+            self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
+        }
+        // Next box (rectangle width after length, ellipse minor after major).
+        let mut o = o;
+        o.fields.remove(o.active);
+        o.active = o.active.min(o.fields.len().saturating_sub(1));
+        self.otf = (!o.fields.is_empty()).then_some(o);
+        self.otf_typing = false;
+        // The geometry moved: refresh the snap of the tool in progress.
+        if let Some(c) = self.cursor
+            && self.tool.draws()
+        {
+            self.inference = self.infer(&data.sketch, c, self.shift_held);
+        }
+        Ok(())
+    }
+
     pub fn tool_drag(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
         self.cursor = Some(p);
         match self.drag.clone() {
@@ -1278,7 +2185,8 @@ impl SketchEditor {
                 let _report = data.sketch.drag(&[(handle, p)]);
                 match handle {
                     DragHandle::Entity { id, .. } => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p } }),
-                    DragHandle::Point(id) => self.drag_snap = self.point_drop_target(&data.sketch, id),
+                    // Shift suppresses snapping onto other geometry.
+                    DragHandle::Point(id) => self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) },
                     #[allow(unreachable_patterns)]
                     _ => {}
                 }
@@ -1295,6 +2203,55 @@ impl SketchEditor {
             Some(DragState::Box { .. }) => {
                 self.box_end = Some(p);
                 EditOutcome::redraw()
+            }
+            Some(DragState::OffsetArrow { start, moved }) => {
+                if !moved && (p - start).length() < self.world_per_px * 3.0 {
+                    return EditOutcome::none();
+                }
+                self.drag = Some(DragState::OffsetArrow { start, moved: true });
+                // Signed distance of the cursor from the curve along the arrow's normal.
+                if let Some((mid, n)) = self.offset_frame(&data.sketch) {
+                    let d = (p - mid).dot(n);
+                    if d.abs() > self.world_per_px {
+                        self.offset_distance = d.abs();
+                        self.offset_flip = (d < 0.0) != self.offset_flip_base(&data.sketch);
+                    }
+                }
+                EditOutcome::redraw()
+            }
+            Some(DragState::FilletRadius { arc }) => {
+                // The arc midpoint follows the cursor along the corner bisector.
+                let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = data.sketch.curve(arc) else { return EditOutcome::none() };
+                let half = (end_angle - start_angle) * 0.5;
+                let u = DVec2::from_angle(start_angle + half);
+                let k = 1.0 / half.cos().max(1e-6) - 1.0;
+                let sharp = center + u * radius / half.cos().max(1e-6);
+                let d = (sharp - p).dot(u);
+                let r = (d / k.max(1e-9)).max(self.world_per_px);
+                let dim = data.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).map(|c| c.id);
+                if let Some(dim) = dim {
+                    let _ = data.sketch.set_dimension_value(dim, r);
+                    data.dimension_exprs.remove(&dim.0);
+                    data.sketch.solve();
+                    self.fillet_radius = r;
+                }
+                EditOutcome::changed()
+            }
+            Some(DragState::TrimPath { mut points }) => {
+                let last = points.last().copied().unwrap_or(p);
+                // Sample the path so fast drags don't skip thin curves.
+                let n = ((p - last).length() / (self.world_per_px * 4.0)).ceil().clamp(1.0, 64.0) as usize;
+                let mut out = EditOutcome::redraw();
+                for k in 1..=n {
+                    let q = last.lerp(p, k as f64 / n as f64);
+                    let o = self.trim_at(data, q, None);
+                    if o.changed {
+                        out = o;
+                    }
+                }
+                points.push(p);
+                self.drag = Some(DragState::TrimPath { points });
+                out
             }
             Some(DragState::Glyph { constraint, entity, start, orig, moved, additive }) => {
                 if !moved && (p - start).length() < self.world_per_px * 3.0 {
@@ -1320,11 +2277,8 @@ impl SketchEditor {
                 EditOutcome::changed()
             }
             // Drawing tools: keep the preview following the pointer while a
-            // button is held (text box / click-drag placement).
-            None if self.tool.draws() => {
-                self.inference = self.infer(&data.sketch, p, false);
-                EditOutcome::redraw()
-            }
+            // button is held (click-drag placement).
+            None if self.tool.draws() => self.pointer_move(data, p, self.shift_held, self.alt_held),
             None => EditOutcome::none(),
         }
     }
@@ -1345,6 +2299,10 @@ impl SketchEditor {
         if let Some((e, q, _)) = best_pt {
             return Some((e, q, true));
         }
+        // The sketch origin (a fixed point is created on drop).
+        if pos.length() <= r && !sk.entity(id).is_some_and(|e| e.external) {
+            return Some((noshape_sketch::ORIGIN, DVec2::ZERO, true));
+        }
         sk.entities()
             .filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id))
             .filter_map(|e| {
@@ -1357,10 +2315,27 @@ impl SketchEditor {
     }
 
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
-        // Text box by click-drag: the release is the second corner.
-        if self.tool == Tool::Text && self.drag.is_none() && self.clicks.len() == 1 && (p - self.clicks[0].pos).length() > self.world_per_px * 6.0 {
-            return self.place(data, Click { pos: p, inference: None }, false);
+        // Press-drag-release with a drawing tool: the release is the next click.
+        if self.tool.draws()
+            && self.drag.is_none()
+            && let Some(start) = self.press.take()
+            && (p - start).length() > self.world_per_px * 4.0
+        {
+            let tool = self.tool;
+            let tangent = self.tangent_mode;
+            self.cursor = Some(p);
+            self.inference = self.infer(&data.sketch, p, self.shift_held);
+            self.take_vertex_snap(data);
+            let (pos, inference) = self.snapped().unwrap_or((p, None));
+            let out = self.place(data, Click { pos, inference }, false);
+            // A dragged line is a single segment (no chaining).
+            if tool == Tool::Line && !tangent {
+                self.clicks.clear();
+                self.chain_end = None;
+            }
+            return out;
         }
+        self.press = None;
         let out = match self.drag.take() {
             Some(DragState::Pending { entity, .. }) => {
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
@@ -1372,6 +2347,7 @@ impl SketchEditor {
             }
             Some(DragState::Geometry { handle }) => {
                 if let (DragHandle::Point(id), Some((target, _, is_pt))) = (handle, self.drag_snap.take()) {
+                    let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
                     let ok = if is_pt {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
@@ -1391,18 +2367,28 @@ impl SketchEditor {
             Some(DragState::Box { start }) => {
                 let (lo, hi) = (start.min(p), start.max(p));
                 if (hi - lo).length() > self.world_per_px * 3.0 {
+                    // Left to right: window (entirely inside); right to left: crossing.
                     let crossing = p.x < start.x;
+                    let tol = self.world_per_px;
                     for e in data.sketch.entities() {
                         let Some(bb) = data.sketch.entity_bbox(e.id) else { continue };
                         let inside = bb.min.x >= lo.x && bb.min.y >= lo.y && bb.max.x <= hi.x && bb.max.y <= hi.y;
-                        let touches = bb.max.x >= lo.x && bb.min.x <= hi.x && bb.max.y >= lo.y && bb.min.y <= hi.y;
-                        if (inside || (crossing && touches)) && !self.selection.contains(&e.id) {
+                        let hit = inside || (crossing && crosses_box(&data.sketch, e.id, lo, hi, tol));
+                        if hit && !self.selection.contains(&e.id) {
                             self.selection.push(e.id);
                         }
+                    }
+                } else if let Some(r) = self.hover_region.clone() {
+                    // A click inside a closed profile selects the region.
+                    if let Some(i) = self.selected_regions.iter().position(|x| *x == r) {
+                        self.selected_regions.remove(i);
+                    } else {
+                        self.selected_regions.push(r);
                     }
                 } else {
                     self.selection.clear();
                     self.selected_constraints.clear();
+                    self.selected_regions.clear();
                 }
                 self.box_end = None;
                 EditOutcome::redraw()
@@ -1423,7 +2409,14 @@ impl SketchEditor {
                     EditOutcome::redraw()
                 }
             }
-            Some(DragState::Handle(_)) => EditOutcome::redraw(),
+            Some(DragState::Handle(_)) | Some(DragState::TrimPath { .. }) => EditOutcome::redraw(),
+            Some(DragState::FilletRadius { .. }) => EditOutcome::changed(),
+            Some(DragState::OffsetArrow { moved, .. }) => {
+                if !moved {
+                    self.offset_flip = !self.offset_flip;
+                }
+                EditOutcome::redraw()
+            }
             Some(DragState::Text { entity, moved, .. }) => {
                 if moved {
                     data.sketch.solve();
@@ -1446,166 +2439,6 @@ impl SketchEditor {
         } else {
             self.selected_constraints.push(cid);
         }
-    }
-
-    // ------------------------------------------------------------ inline value entry
-
-    /// Value fields offered while drawing with the current tool state.
-    pub fn entry_fields(&self) -> &'static [&'static str] {
-        match (self.tool, self.clicks.len()) {
-            (Tool::Line, n) if n >= 1 => &["Length", "Angle"],
-            (Tool::Circle, 1) => &["Diameter"],
-            (Tool::CornerRect | Tool::CenterRect, 1) => &["Width", "Height"],
-            (Tool::Polygon | Tool::CircumPolygon, 1) => &["Diameter"],
-            (Tool::Slot, 2) => &["Width"],
-            _ => &[],
-        }
-    }
-
-    pub fn entry_dims(&self) -> Vec<Dim> {
-        self.entry_fields().iter().map(|f| if *f == "Angle" { Dim::ANGLE } else { Dim::LENGTH }).collect()
-    }
-
-    /// Cursor implied by the typed values (preview and commit position).
-    fn entry_cursor(&self) -> Option<DVec2> {
-        if !self.entry_active {
-            return None;
-        }
-        let c = self.cursor?;
-        let v = |i: usize| self.entry_values.get(i).copied().flatten();
-        let last = self.clicks.last()?.pos;
-        let first = self.clicks.first()?.pos;
-        let dir_of = |a: DVec2| (c - a).try_normalize().unwrap_or(DVec2::X);
-        Some(match self.tool {
-            Tool::Line => {
-                let len = v(0).unwrap_or((c - last).length());
-                let dir = match (v(1), self.chained_back()) {
-                    (None, _) => dir_of(last),
-                    // Chained: the typed angle is measured from the previous
-                    // line at the joint, on the cursor's side.
-                    (Some(ang), Some(u)) => {
-                        let (d1, d2) = (DVec2::from_angle(ang).rotate(u), DVec2::from_angle(-ang).rotate(u));
-                        if d1.dot(dir_of(last)) >= d2.dot(dir_of(last)) { d1 } else { d2 }
-                    }
-                    (Some(ang), None) => DVec2::from_angle(ang),
-                };
-                last + dir * len
-            }
-            Tool::Circle | Tool::Polygon | Tool::CircumPolygon => {
-                let r = v(0).map(|d| d * 0.5).unwrap_or((c - first).length());
-                first + dir_of(first) * r
-            }
-            Tool::CornerRect | Tool::CenterRect => {
-                let d = c - first;
-                let sx = if d.x < 0.0 { -1.0 } else { 1.0 };
-                let sy = if d.y < 0.0 { -1.0 } else { 1.0 };
-                let k = if self.tool == Tool::CenterRect { 0.5 } else { 1.0 };
-                let w = v(0).map(|w| w * k).unwrap_or(d.x.abs());
-                let h = v(1).map(|h| h * k).unwrap_or(d.y.abs());
-                first + DVec2::new(sx * w, sy * h)
-            }
-            Tool::Slot => {
-                let (a, b) = (self.clicks[0].pos, self.clicks[1].pos);
-                let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
-                let side = if (c - a).dot(n) < 0.0 { -1.0 } else { 1.0 };
-                let w = v(0).unwrap_or(2.0 * (c - a).dot(n).abs());
-                (a + b) * 0.5 + n * side * w * 0.5
-            }
-            _ => return None,
-        })
-    }
-
-    /// Unit vector from the chain end back along the previous line, while chaining.
-    fn chained_back(&self) -> Option<DVec2> {
-        self.chain_end.and(self.last_line).map(|(_, u)| u)
-    }
-
-    /// Start typing values (first key press while drawing).
-    pub fn begin_entry(&mut self) -> bool {
-        if self.entry_fields().is_empty() {
-            return false;
-        }
-        self.entry_active = true;
-        self.entry_values = vec![None; self.entry_fields().len()];
-        true
-    }
-
-    /// Commit the typed values: place the click and add driving dimensions.
-    /// `texts` are the raw field texts (kept as expressions when they use variables).
-    pub fn commit_entry_values(&mut self, data: &mut SketchData, texts: &[String]) -> EditOutcome {
-        let Some(pos) = self.entry_cursor() else {
-            self.entry_active = false;
-            return EditOutcome::redraw();
-        };
-        let tool = self.tool;
-        let values = std::mem::take(&mut self.entry_values);
-        let anchor = self.clicks.first().map(|c| c.pos);
-        let prev_line = self.chain_end.and(self.last_line).map(|(l, _)| l);
-        self.entry_active = false;
-        self.last_created.clear();
-        let out = self.place(data, Click { pos, inference: None }, false);
-        if self.last_created.is_empty() {
-            return out;
-        }
-        let expr = |i: usize| texts.get(i).filter(|t| t.contains('#')).map(|t| t.trim().trim_start_matches('=').to_string());
-        let v = |i: usize| values.get(i).copied().flatten();
-        let off = self.world_per_px * 28.0;
-        let created = self.last_created.clone();
-        let sk = &data.sketch;
-        let lines: Vec<(EntityId, DVec2, DVec2)> = created
-            .iter()
-            .filter(|e| sk.kind(**e) == Some(EntityKind::Line))
-            .filter_map(|e| {
-                let (a, b) = sk.endpoints(*e)?;
-                Some((*e, sk.point(a)?, sk.point(b)?))
-            })
-            .collect();
-        let mut dims: Vec<(ConstraintKind, Option<DVec2>, Option<String>)> = Vec::new();
-        match tool {
-            Tool::Line => {
-                if let Some(&(l, a, b)) = lines.first() {
-                    if let Some(len) = v(0) {
-                        let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
-                        dims.push((ConstraintKind::Length { curve: l, value: len }, Some((a + b) * 0.5 + n * off), expr(0)));
-                    }
-                    if let Some(ang) = v(1) {
-                        dims.extend(line_angle_dimension(data, l, prev_line, ang, off, expr(1)));
-                    }
-                }
-            }
-            Tool::Circle | Tool::Polygon | Tool::CircumPolygon => {
-                if let Some(d) = v(0)
-                    && let Some(c) = created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Circle))
-                {
-                    let label = anchor.map(|a| a + DVec2::new(1.0, 1.0).normalize() * (d * 0.5 + off));
-                    dims.push((ConstraintKind::Diameter { curve: c, value: d }, label, expr(0)));
-                }
-            }
-            Tool::CornerRect | Tool::CenterRect => {
-                let horiz = lines.iter().filter(|(_, a, b)| (b.y - a.y).abs() < 1e-9).max_by(|x, y| x.1.y.min(x.2.y).total_cmp(&y.1.y.min(y.2.y)));
-                let vert = lines.iter().filter(|(_, a, b)| (b.x - a.x).abs() < 1e-9).min_by(|x, y| x.1.x.total_cmp(&y.1.x));
-                if let (Some(w), Some(&(l, a, b))) = (v(0), horiz) {
-                    dims.push((ConstraintKind::Length { curve: l, value: w }, Some((a + b) * 0.5 + DVec2::Y * off), expr(0)));
-                }
-                if let (Some(h), Some(&(l, a, b))) = (v(1), vert) {
-                    dims.push((ConstraintKind::Length { curve: l, value: h }, Some((a + b) * 0.5 - DVec2::X * off), expr(1)));
-                }
-            }
-            Tool::Slot => {
-                if let Some(w) = v(0)
-                    && let Some(arc) = created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))
-                {
-                    let label = curve_mid(&data.sketch, arc).map(|m| m + DVec2::new(1.0, 1.0).normalize() * off);
-                    dims.push((ConstraintKind::Radius { curve: arc, value: w * 0.5 }, label, None));
-                }
-            }
-            _ => {}
-        }
-        for (kind, label, ex) in dims {
-            add_dimension(data, kind, label, ex.as_deref());
-        }
-        data.sketch.solve();
-        EditOutcome::changed()
     }
 
     // ------------------------------------------------------------ patterns / transform
@@ -1658,10 +2491,50 @@ impl SketchEditor {
             self.message = Some("Select entities first".into());
             return EditOutcome::redraw();
         }
+        // Editing a pattern: its old instances are replaced.
+        if let Some(pid) = self.editing_pattern.take()
+            && let Some(i) = data.patterns.iter().position(|p| p.id == pid)
+        {
+            let old = data.patterns.remove(i);
+            let gone: Vec<EntityId> = old.instances.iter().flatten().map(|e| EntityId(*e)).filter(|e| data.sketch.entity(*e).is_some()).collect();
+            data.sketch.remove_entities(&gone);
+        }
         let sk = &mut data.sketch;
+        let groups = match self.tool {
+            Tool::LinearPattern => Some(sk.linear_pattern_groups(&ids, DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.pattern_count.max(1))),
+            Tool::CircularPattern => Some(sk.circular_pattern_groups(&ids, self.pattern_center, self.circular_count.max(1), self.circular_angle)),
+            _ => None,
+        };
+        if let Some(groups) = groups {
+            return match groups {
+                Ok(groups) => {
+                    if self.tool == Tool::LinearPattern {
+                        link_linear_pattern(data, &ids, &groups, DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.world_per_px);
+                    }
+                    let created: Vec<EntityId> = groups.iter().flatten().copied().collect();
+                    let id = data.patterns.iter().map(|p| p.id + 1).max().unwrap_or(1);
+                    let circular = self.tool == Tool::CircularPattern;
+                    data.patterns.push(noshape_model::sketch_feature::SketchPattern {
+                        id,
+                        circular,
+                        seeds: ids.iter().map(|e| e.0).collect(),
+                        instances: groups.iter().map(|g| g.iter().map(|e| e.0).collect()).collect(),
+                        count: if circular { self.circular_count } else { self.pattern_count },
+                        distance: self.pattern_distance,
+                        angle: if circular { self.circular_angle } else { self.pattern_angle },
+                        center: [self.pattern_center.x, self.pattern_center.y],
+                    });
+                    self.finish_create(data, &created);
+                    self.selection.clear();
+                    EditOutcome::changed()
+                }
+                Err(e) => {
+                    self.message = Some(format!("{e}"));
+                    EditOutcome::redraw()
+                }
+            };
+        }
         let r = match self.tool {
-            Tool::LinearPattern => sk.linear_pattern(&ids, DVec2::from_angle(self.pattern_angle) * self.pattern_distance, self.pattern_count.max(1)),
-            Tool::CircularPattern => sk.circular_pattern(&ids, self.pattern_center, self.circular_count.max(1), self.circular_angle),
             Tool::Transform => {
                 let c = self.pattern_center;
                 let mut r = Ok(Default::default());
@@ -1695,6 +2568,33 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
         }
+    }
+
+    /// Edit pattern: the pattern tool with the pattern's seeds and values.
+    pub fn edit_pattern(&mut self, data: &SketchData, id: u32) -> bool {
+        let Some(p) = data.patterns.iter().find(|p| p.id == id).cloned() else { return false };
+        let seeds: Vec<EntityId> = p.seeds.iter().map(|e| EntityId(*e)).filter(|e| data.sketch.entity(*e).is_some()).collect();
+        if seeds.is_empty() {
+            self.message = Some("The pattern's seed entities no longer exist".into());
+            return false;
+        }
+        let tool = if p.circular { Tool::CircularPattern } else { Tool::LinearPattern };
+        if self.tool != tool {
+            self.set_tool(tool);
+        }
+        self.selection = seeds;
+        self.editing_pattern = Some(id);
+        if p.circular {
+            self.circular_count = p.count;
+            self.circular_angle = p.angle;
+            self.pattern_center = DVec2::new(p.center[0], p.center[1]);
+        } else {
+            self.pattern_count = p.count;
+            self.pattern_distance = p.distance;
+            self.pattern_angle = p.angle;
+        }
+        self.message = Some("Adjust the pattern, then click in empty space or press Enter".into());
+        true
     }
 
     /// On-canvas manipulators of the active pattern / transform tool.
@@ -1823,8 +2723,14 @@ impl SketchEditor {
     }
 
     fn toggle_text_selection(&mut self, data: &SketchData, e: EntityId) {
-        let Some(t) = data.text_of_entity(e).and_then(|id| data.texts.iter().find(|t| t.id == id)) else { return };
-        let lines: Vec<EntityId> = t.box_lines.iter().map(|l| EntityId(*l)).collect();
+        let box_lines = match data.text_of_entity(e).and_then(|id| data.texts.iter().find(|t| t.id == id)) {
+            Some(t) => t.box_lines.clone(),
+            None => match data.image_of_entity(e).and_then(|id| data.images.iter().find(|i| i.id == id)) {
+                Some(i) => i.box_lines.clone(),
+                None => return,
+            },
+        };
+        let lines: Vec<EntityId> = box_lines.iter().map(|l| EntityId(*l)).collect();
         if lines.iter().any(|l| self.selection.contains(l)) {
             self.selection.retain(|x| !lines.contains(x));
         } else {
@@ -1835,51 +2741,108 @@ impl SketchEditor {
     // ------------------------------------------------------------ dimensions
 
     fn dimension_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
+        // The sketch origin can be dimensioned to (a fixed point is created).
+        let hovered = hovered.or_else(|| (p.length() <= self.world_per_px * 9.0).then(|| origin_point(&mut data.sketch)));
         if let Some(e) = hovered
             && !self.picks.iter().any(|(x, _)| *x == e)
-            && self.picks.len() < 2
         {
-            self.picks.push((e, p));
-            return EditOutcome::redraw();
+            let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+            // Arc length: both end points, then the arc.
+            let arc_length = ids.len() == 2 && data.sketch.endpoints(e).is_some_and(|(s, en)| data.sketch.kind(e) == Some(EntityKind::Arc) && ids.contains(&s) && ids.contains(&en));
+            if self.picks.len() < 2 || arc_length {
+                self.picks.push((e, p));
+                return EditOutcome::redraw();
+            }
         }
         if self.picks.is_empty() {
             return EditOutcome::none();
         }
-        // Click in empty space places the dimension.
+        // This click places the dimension and opens its value box.
         let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
-        self.picks.clear();
-        let Some(kind) = smart_dimension(&data.sketch, &ids, p) else {
-            self.message = Some("A dimension cannot be created between these items".into());
+        self.picks_placed = std::mem::take(&mut self.picks);
+        let picks = std::mem::take(&mut self.picks_placed);
+        let Some(kind) = smart_dimension(&data.sketch, &ids, p).map(|k| circle_mode(&data.sketch, k, &picks, self.world_per_px)) else {
+            self.message = Some("A dimension cannot be created between these items.".into());
             return EditOutcome::redraw();
         };
         let Some(cid) = add_dimension(data, kind, Some(p), None) else {
-            self.message = Some("Could not create the dimension".into());
+            self.message = Some("Could not create the dimension.".into());
             return EditOutcome::redraw();
         };
-        let c = data.sketch.constraint(cid);
-        let value = c.and_then(|c| c.kind.value()).unwrap_or(0.0);
-        let is_angle = c.is_some_and(|c| is_angle_kind(&c.kind));
-        let driving = c.is_some_and(|c| c.driving);
-        if driving {
-            let q = Quantity::new(value, if is_angle { Dim::ANGLE } else { Dim::LENGTH });
-            self.dim_edit = Some(DimEdit { constraint: cid, text: noshape_units::format_quantity(q, &UnitPrefs::default()) });
+        if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
+            self.open_value_box(data, cid);
         } else {
-            self.message = Some("Dimension would over-constrain the sketch; added as driven".into());
+            self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
         }
         EditOutcome::changed()
     }
 
+    /// Live preview of the dimension being placed: kind, label position and
+    /// displayed value.
+    pub fn dimension_preview(&self, data: &SketchData) -> Option<(ConstraintKind, DVec2, f64)> {
+        if self.tool != Tool::Dimension || self.picks.is_empty() {
+            return None;
+        }
+        let c = self.cursor?;
+        let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+        let kind = circle_mode(&data.sketch, smart_dimension(&data.sketch, &ids, c)?, &self.picks, self.world_per_px);
+        let v = data.sketch.measure_new(&kind)? * dim_display_scale(&kind);
+        Some((kind, c, v))
+    }
+
     /// Apply a typed dimension value (expression). Returns an error message.
+    /// Negative values flip the geometry where Onshape allows it (distances,
+    /// angles, line lengths); radii, diameters and arc lengths must be positive.
     pub fn apply_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
-        let Some(c) = data.sketch.constraint(cid) else { return Err("Dimension no longer exists".into()) };
-        let dim = if is_angle_kind(&c.kind) { Dim::ANGLE } else { Dim::LENGTH };
+        let Some(c) = data.sketch.constraint(cid).cloned() else { return Err("Dimension no longer exists".into()) };
+        let dim = dim_unit(&c.kind);
+        let text = text.trim().trim_start_matches('=').trim();
         let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
-        if dim == Dim::LENGTH && q.value <= 0.0 && matches!(c.kind, ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. } | ConstraintKind::Length { .. }) {
+        let value = q.value / dim_display_scale(&c.kind);
+        if !value.is_finite() {
+            return Err("Invalid value".into());
+        }
+        let positive_only = match &c.kind {
+            ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. } | ConstraintKind::EllipseRadius { .. } | ConstraintKind::ArcAngle { .. } | ConstraintKind::Rho { .. } => true,
+            ConstraintKind::Length { curve, .. } => data.sketch.kind(*curve) != Some(EntityKind::Line),
+            _ => false,
+        };
+        if value == 0.0 && dim != Dim::ANGLE && !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) {
             return Err("Value must be positive".into());
         }
-        data.sketch.set_dimension_value(cid, q.value).map_err(|e| e.to_string())?;
-        // Plain numbers are stored as literals; expressions keep their text.
-        data.dimension_exprs.insert(cid.0, ExprValue::new(text.trim()));
+        if value < 0.0 {
+            if positive_only {
+                return Err("This dimension can't be negative".into());
+            }
+            match &c.kind {
+                // A negative line length flips the line about its start point.
+                ConstraintKind::Length { curve, .. } => {
+                    if let Some((s, e)) = data.sketch.endpoints(*curve)
+                        && let (Some(ps), Some(pe)) = (data.sketch.point(s), data.sketch.point(e))
+                    {
+                        let _ = data.sketch.set_point(e, ps * 2.0 - pe);
+                    }
+                }
+                // Distances and angles: solve to the mirrored side, then keep it.
+                _ => {
+                    data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
+                    data.sketch.solve();
+                    let _ = data.sketch.recompute_hints(cid);
+                }
+            }
+            data.sketch.set_dimension_value(cid, value.abs()).map_err(|e| e.to_string())?;
+            let _ = data.sketch.recompute_hints(cid);
+            data.dimension_exprs.remove(&cid.0);
+        } else {
+            data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
+            // Plain numbers are stored as literals; expressions keep their text
+            // (the regeneration re-evaluates them, so only unscaled values).
+            if dim_display_scale(&c.kind) == 1.0 {
+                data.dimension_exprs.insert(cid.0, ExprValue::new(text));
+            } else {
+                data.dimension_exprs.remove(&cid.0);
+            }
+        }
         let report = data.sketch.solve();
         if !report.is_solved() {
             return Err("The sketch could not be solved with that value".into());
@@ -1897,16 +2860,13 @@ impl SketchEditor {
         for c in data.sketch.constraints() {
             let Some(v) = c.kind.value() else { continue };
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
-            let q = Quantity::new(v, if is_angle_kind(&c.kind) { Dim::ANGLE } else { Dim::LENGTH });
+            let value = dim_value_text_tol(&c.kind, v, units, data.dimension_tolerances.get(&c.id.0));
+            // Expressions: an indicator, or the expression itself with Show expressions.
             let mut text = match data.dimension_exprs.get(&c.id.0) {
-                Some(e) if e.text.contains('#') => format!("{} = {}", e.text, noshape_units::format_quantity(q, units)),
-                _ => noshape_units::format_quantity(q, units),
+                Some(e) if is_expression(&e.text) && self.show_expressions => format!("{} = {value}", truncate_chars(&e.text, 70)),
+                Some(e) if is_expression(&e.text) => format!("ƒ {value}"),
+                _ => value,
             };
-            match c.kind {
-                ConstraintKind::Diameter { .. } => text = format!("Ø{text}"),
-                ConstraintKind::Radius { .. } => text = format!("R{text}"),
-                _ => {}
-            }
             if !c.driving {
                 text = format!("({text})");
             }
@@ -1927,7 +2887,7 @@ impl SketchEditor {
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let mut segs = Vec::new();
             dim_segments(sk, &c.kind, pos, s, &mut segs);
-            out.push(DimGraphic { constraint: c.id, label: pos, text: String::new(), driving: c.driving, segments: segs });
+            out.push(DimGraphic { constraint: c.id, driving: c.driving, segments: segs });
         }
         out
     }
@@ -1947,13 +2907,40 @@ impl SketchEditor {
             for e in glyph_entities(sk, &c.kind) {
                 let Some(anchor) = glyph_anchor(sk, e) else { continue };
                 let offset = data.glyph_offsets.get(&glyph_key(c.id, e)).map(|o| DVec2::new(o[0], o[1]));
-                out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e), offset });
+                let external = c.kind.entities().iter().any(|x| sk.entity(*x).is_some_and(|x| x.external));
+                out.push(GlyphInfo { constraint: c.id, icon, entity: e, anchor, on_point: is_point(sk, e), offset, external });
             }
         }
         out
     }
 
     // ------------------------------------------------------------ editing commands
+
+    /// Copy sketch entities: the selection (with internal constraints) as
+    /// clipboard JSON.
+    pub fn copy_selection(&self, data: &SketchData) -> Option<String> {
+        let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| data.text_of_entity(*e).is_none() && noshape_sketch::text::glyph_text_id(*e).is_none()).collect();
+        if ids.is_empty() {
+            return None;
+        }
+        let clip = data.sketch.extract(&ids);
+        serde_json::to_string(&serde_json::json!({ "noshape_sketch_entities": clip })).ok()
+    }
+
+    /// Paste sketch entities from clipboard JSON; the pasted entities are
+    /// selected so they can be dragged or transformed into place.
+    pub fn paste_clipboard(&mut self, data: &mut SketchData, text: &str) -> bool {
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else { return false };
+        let Some(clip) = v.get("noshape_sketch_entities").and_then(|c| serde_json::from_value::<Sketch>(c.clone()).ok()) else { return false };
+        let created = data.sketch.paste(&clip, DVec2::ZERO);
+        if created.is_empty() {
+            return false;
+        }
+        data.sketch.solve();
+        self.selection = created;
+        self.message = Some("Pasted; drag or transform the selection into place".into());
+        true
+    }
 
     pub fn delete_selection(&mut self, data: &mut SketchData) -> bool {
         let mut changed = false;
@@ -1966,9 +2953,18 @@ impl SketchEditor {
         }
         self.hover_constraint = None;
         if !self.selection.is_empty() {
-            let ids = std::mem::take(&mut self.selection);
-            data.sketch.remove_entities(&ids);
-            changed = true;
+            let mut ids = std::mem::take(&mut self.selection);
+            // Spline tangent handles can't be deleted (Onshape).
+            let handles: Vec<EntityId> = data.sketch.entities().filter_map(|e| e.spline_handles()).flat_map(|(a, b)| [a, b]).collect();
+            let n = ids.len();
+            ids.retain(|e| !handles.contains(e));
+            if ids.len() != n {
+                self.message = Some("Spline handles cannot be deleted".into());
+            }
+            if !ids.is_empty() {
+                data.sketch.remove_entities(&ids);
+                changed = true;
+            }
         }
         if changed {
             data.external_refs.retain(|k, _| data.sketch.entity(EntityId(*k)).is_some());
@@ -2030,14 +3026,22 @@ impl SketchEditor {
     /// Apply a constraint tool to the current selection if it fits; else
     /// switch to the constraint tool.
     pub fn constraint_command(&mut self, data: &mut SketchData, c: ConstraintTool) -> bool {
-        if self.selection.len() >= c.arity()
-            && let Some(kind) = make_constraint(&data.sketch, c, &self.selection)
-            && data.sketch.add_constraint(kind).is_ok()
-        {
-            data.sketch.solve();
-            self.selection.clear();
-            return true;
+        // Select-first: the constraint applies to the whole selection at once.
+        if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
+            match apply_constraint(&mut data.sketch, c, &self.selection) {
+                Ok(n) if n > 0 => {
+                    data.sketch.solve();
+                    self.selection.clear();
+                    return true;
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    self.message = Some(format!("Can't add constraint: {e}"));
+                    return false;
+                }
+            }
         }
+        // Tool-first: each pair of entities picked is constrained.
         self.set_tool(Tool::Constraint(c));
         false
     }
@@ -2054,8 +3058,8 @@ impl SketchEditor {
             let v = frame.to_world(p) + frame.normal * 1e-6;
             [v.x as f32, v.y as f32, v.z as f32]
         };
-        let preview_color = [0x44, 0x9c, 0xcd, 255];
-        let guide_color = [0xff, 0xc2, 0x0e, 255];
+        let preview_color = PREVIEW_COLOR;
+        let guide_color = INFERENCE_COLOR;
         let on_top = LineSegment::ON_TOP;
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
@@ -2066,11 +3070,55 @@ impl SketchEditor {
         if let Some(c) = cursor {
             let anchors: Vec<DVec2> = self.clicks.iter().map(|k| k.pos).collect();
             match self.tool {
-                Tool::Line => {
-                    if let Some(a) = anchors.last() {
-                        poly(&[*a, c], preview_color, false);
+                Tool::Line if self.tangent_mode => {
+                    if let Some(from) = self.chain_end
+                        && let Some(a) = data.sketch.point(from)
+                    {
+                        let mut tmp = data.sketch.clone();
+                        match tmp.tangent_arc(from, c) {
+                            Ok(ids) => poly(&tmp.tessellate(ids.curves[0], self.world_per_px), preview_color, false),
+                            Err(_) => poly(&[a, c], preview_color, true),
+                        }
                     }
                 }
+                Tool::Line => {
+                    if let Some(a) = self.anchor_pos(&data.sketch) {
+                        // A line inferred parallel to another is drawn dotted.
+                        let parallel = self.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::Parallel);
+                        poly(&[a, c], preview_color, parallel);
+                    }
+                }
+                Tool::MidpointLine => {
+                    if let Some(m) = anchors.first() {
+                        poly(&[*m * 2.0 - c, c], preview_color, false);
+                        points.points.push(PointSprite { position: w(*m), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                    }
+                }
+                Tool::EllipticalArc => match anchors.len() {
+                    1 => {
+                        poly(&[anchors[0], c], preview_color, true);
+                        poly(&circle_pts(anchors[0], (c - anchors[0]).length(), 72), preview_color, true);
+                    }
+                    2 | 3 => {
+                        let minor_pt = if anchors.len() == 2 { c } else { anchors[2] };
+                        if let Some((ctr, major, minor)) = construction_ellipse(anchors[0], anchors[1], minor_pt) {
+                            let u = major.normalize();
+                            let at = |t: f64| ctr + major * t.cos() + u.perp() * minor * t.sin();
+                            let pts: Vec<DVec2> = (0..=72).map(|i| at(i as f64 / 72.0 * TAU)).collect();
+                            poly(&pts, preview_color, true);
+                            if anchors.len() == 3 {
+                                let t0 = noshape_sketch::sketch::ellipse_param(ctr, major, minor, anchors[2]);
+                                let mut t1 = noshape_sketch::sketch::ellipse_param(ctr, major, minor, c);
+                                while t1 <= t0 {
+                                    t1 += TAU;
+                                }
+                                let arc: Vec<DVec2> = (0..=64).map(|i| at(t0 + (t1 - t0) * i as f64 / 64.0)).collect();
+                                poly(&arc, preview_color, false);
+                            }
+                        }
+                    }
+                    _ => {}
+                },
                 Tool::CornerRect => {
                     if let Some(a) = anchors.first() {
                         poly(&[*a, DVec2::new(c.x, a.y), c, DVec2::new(a.x, c.y), *a], preview_color, false);
@@ -2103,6 +3151,8 @@ impl SketchEditor {
                 }
                 Tool::Polygon | Tool::CircumPolygon => {
                     if let Some(a) = anchors.first() {
+                        // After the circumference is locked the cursor sets the side count.
+                        let c = anchors.get(1).copied().unwrap_or(c);
                         let r = (c - *a).length();
                         let n = self.polygon_sides.clamp(3, 50);
                         let start = (c - *a).to_angle();
@@ -2145,7 +3195,9 @@ impl SketchEditor {
                         let ctr = anchors[0];
                         let r = (anchors[1] - ctr).length();
                         let a0 = (anchors[1] - ctr).to_angle();
-                        let sweep = noshape_sketch::geom::ccw_sweep(a0, (c - ctr).to_angle());
+                        // The sweep follows the direction the cursor moved around the center.
+                        let ccw = noshape_sketch::geom::ccw_sweep(a0, (c - ctr).to_angle());
+                        let sweep = if self.center_arc_sweep >= 0.0 { ccw } else { ccw - TAU };
                         let pts: Vec<DVec2> = (0..=48).map(|i| ctr + DVec2::from_angle(a0 + sweep * i as f64 / 48.0) * r).collect();
                         poly(&pts, preview_color, false);
                         poly(&[ctr, anchors[1]], preview_color, true);
@@ -2240,6 +3292,13 @@ impl SketchEditor {
                     }
                     _ => {}
                 },
+                Tool::InsertImage => {
+                    if let (Some(a), Some((_, _, aspect))) = (anchors.first(), &self.pending_image) {
+                        let (o, h) = image_box(*a, c, *aspect);
+                        let wdt = h * aspect;
+                        poly(&[o, o + DVec2::X * wdt, o + DVec2::new(wdt, h), o + DVec2::Y * h, o], preview_color, true);
+                    }
+                }
                 Tool::Text => {
                     let (origin, h) = match anchors.first() {
                         Some(a) => self.text_box_from(*a, c),
@@ -2258,6 +3317,51 @@ impl SketchEditor {
             }
             if self.tool.draws() {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+            }
+        }
+        // Use: preview of the projection of the hovered edges.
+        if self.tool == Tool::Use {
+            for pl in &self.use_preview {
+                poly(pl, preview_color, false);
+            }
+        }
+        // Offset: preview of the pending offset and its direction arrow.
+        if self.tool == Tool::Offset {
+            if let Some((tmp, created)) = self.offset_result(&data.sketch) {
+                for e in created {
+                    poly(&tmp.tessellate(e, self.world_per_px), preview_color, false);
+                }
+            }
+            if let Some((base, tip)) = self.offset_arrow(&data.sketch) {
+                let d = (tip - base).try_normalize().unwrap_or(DVec2::X);
+                let (h, s) = (self.world_per_px * 10.0, self.world_per_px * 5.0);
+                poly(&[base, tip], guide_color, false);
+                poly(&[tip - d * h + d.perp() * s, tip, tip - d * h - d.perp() * s], guide_color, false);
+            }
+        }
+        // Fillet: preview at the hovered corner (red when it doesn't fit) and the
+        // radius manipulator of the session's first fillet.
+        if self.tool == Tool::Fillet {
+            if let Some((arc, ok)) = self.fillet_preview(&data.sketch) {
+                poly(&arc, if ok { preview_color } else { crate::theme::rgb8(crate::theme::viewport::SKETCH_OVER) }, false);
+            }
+            if let Some((_, m)) = self.fillet_handle(&data.sketch) {
+                let s = self.world_per_px * 5.0;
+                poly(&[m + DVec2::new(-s, -s), m + DVec2::new(s, -s), m + DVec2::new(s, s), m + DVec2::new(-s, s), m + DVec2::new(-s, -s)], [0x4c, 0xc9, 0xf0, 255], false);
+            }
+        }
+        // Trim drag path.
+        if let Some(DragState::TrimPath { points: path }) = &self.drag
+            && path.len() > 1
+        {
+            poly(path, crate::theme::rgb8(0x555555), false);
+        }
+        // Dimension being placed.
+        if let Some((kind, pos, _)) = self.dimension_preview(data) {
+            let mut segs = Vec::new();
+            dim_segments(&data.sketch, &kind, pos, self.world_per_px, &mut segs);
+            for sg in segs {
+                poly(&sg, preview_color, false);
             }
         }
         // Split marker on the hovered curve.
@@ -2282,7 +3386,8 @@ impl SketchEditor {
         // Pattern / transform manipulators.
         if self.tool.is_pattern() {
             let px = self.world_per_px;
-            let handle_color = [0x4c, 0xc9, 0xf0, 255];
+            // Onshape SPLINE_HANDLE_COLOR.
+            let handle_color = [0x80, 0x80, 0x80, 255];
             let active = match &self.drag {
                 Some(DragState::Handle(h)) => Some(*h),
                 _ => None,
@@ -2351,6 +3456,18 @@ impl SketchEditor {
                 lines.push_polyline(&pts3, [0xf2, 0xff, 0x80, 150], 0, 5.0, on_top);
             }
         }
+        // Spline tangent handles: white points joined to the spline ends.
+        for e in data.sketch.entities() {
+            let Some((h0, h1)) = e.spline_handles() else { continue };
+            let Some((s, en)) = e.endpoints() else { continue };
+            for (end, h) in [(s, h0), (en, h1)] {
+                if let (Some(a), Some(b)) = (data.sketch.point(end), data.sketch.point(h)) {
+                    lines.push_polyline(&[w(a), w(b)], [0x80, 0x80, 0x80, 255], 0, 1.0, on_top);
+                    points.points.push(PointSprite { position: w(b), color: [0x60, 0x60, 0x60, 255], pick_id: 0, size: 10.0, style: on_top, _pad: 0 });
+                    points.points.push(PointSprite { position: w(b), color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: 7.0, style: on_top, _pad: 0 });
+                }
+            }
+        }
         // Control polygons of selected/hovered B-splines (Bezier editing).
         for e in self.selection.iter().chain(self.hover.iter()) {
             if let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::BSpline { control, .. }, .. }) = data.sketch.entity(*e) {
@@ -2358,24 +3475,43 @@ impl SketchEditor {
                 lines.push_polyline(&pts3, [0x90, 0x90, 0x90, 255], 0, 1.0, on_top | LineSegment::DASHED);
             }
         }
+        // The entity a parallel / perpendicular / tangent inference relates to
+        // is highlighted orange (Onshape).
         if let Some(inf) = &self.inference
-            && !self.entry_active
+            && matches!(inf.kind, InferenceKind::Parallel | InferenceKind::Perpendicular | InferenceKind::Tangent)
+            && let Some(e) = inf.entity.filter(|e| data.sketch.entity(*e).is_some())
+        {
+            let pts3: Vec<[f32; 3]> = data.sketch.tessellate(e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+            lines.push_polyline(&pts3, crate::theme::rgb8(crate::theme::viewport::PREHIGHLIGHT), 0, 4.0, on_top);
+        }
+        if let Some(inf) = &self.inference
             && let Some(r) = inf.reference
         {
             let pts3 = [w(r), w(inf.position)];
             lines.push_polyline(&pts3, guide_color, 0, 1.0, on_top | LineSegment::DASHED);
         }
-        if let Some(inf) = &self.inference
-            && !self.entry_active
-        {
+        if let Some(inf) = &self.inference {
             points.points.push(PointSprite { position: w(inf.position), color: guide_color, pick_id: 0, size: 8.0, style: on_top, _pad: 0 });
         }
         if let Some((_, q, _)) = self.drag_snap {
             points.points.push(PointSprite { position: w(q), color: guide_color, pick_id: 0, size: 10.0, style: on_top, _pad: 0 });
         }
+        // Profile inspector issues: red markers, the focused one larger with its curves.
+        let issue_red = [0xbd, 0x30, 0x39, 255];
+        for q in &self.issue_markers {
+            points.points.push(PointSprite { position: w(*q), color: issue_red, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+        }
+        if let Some((q, ents)) = &self.issue_highlight {
+            for e in ents {
+                let pts3: Vec<[f32; 3]> = data.sketch.tessellate(*e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+                lines.push_polyline(&pts3, [0xf2, 0xff, 0x80, 200], 0, 5.0, on_top);
+            }
+            points.points.push(PointSprite { position: w(*q), color: [0xf2, 0xe0, 0x30, 255], pick_id: 0, size: 14.0, style: on_top, _pad: 0 });
+        }
         // Box selection rectangle.
         if let (Some(DragState::Box { start }), Some(end)) = (&self.drag, self.box_end) {
-            let color = if end.x < start.x { [0x4a, 0xde, 0x80, 255] } else { [0x4c, 0xc9, 0xf0, 255] };
+            // Onshape box select: crossing #ffdc74 (right to left), window #789ad1.
+            let color = if end.x < start.x { [0xff, 0xdc, 0x74, 255] } else { [0x78, 0x9a, 0xd1, 255] };
             let a = *start;
             let b = end;
             let pts3: Vec<[f32; 3]> = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y), a].iter().map(|p| w(*p)).collect();
@@ -2385,16 +3521,18 @@ impl SketchEditor {
         for g in self.dimension_graphics(data) {
             let selected = self.selected_constraints.contains(&g.constraint);
             let hovered = self.hover_constraint == Some(g.constraint);
+            // Onshape dimension colors: black driving, gray driven, gold hover/selection.
+            use crate::theme::{rgb8, viewport as vc};
             let color = if selected {
-                [0xff, 0xb0, 0x20, 255]
+                rgb8(0x6a4f06)
             } else if hovered {
-                [0xfc, 0xda, 0x7f, 255]
+                rgb8(0x987107)
             } else if self.conflicting.contains(&g.constraint) {
-                [0xff, 0x6b, 0x6b, 255]
+                rgb8(vc::SKETCH_OVER)
             } else if g.driving {
-                [0xd6, 0xda, 0xe2, 255]
+                rgb8(vc::SKETCH_FULL)
             } else {
-                [0x80, 0x88, 0x96, 255]
+                rgb8(vc::DIM_DRIVEN)
             };
             let width = if selected { 1.8 } else { 1.0 };
             for s in &g.segments {
@@ -2418,57 +3556,6 @@ impl SketchEditor {
         }
         v
     }
-}
-
-/// Constraint or angle dimension for a typed line angle. The first line of a
-/// chain is measured from horizontal (a construction reference line equal to
-/// the line is added at its start); later lines are measured from the
-/// previous line at the joint. Right and straight angles become
-/// horizontal/vertical or perpendicular/parallel constraints instead.
-fn line_angle_dimension(data: &mut SketchData, line: EntityId, prev: Option<EntityId>, ang: f64, off: f64, expr: Option<String>) -> Option<(ConstraintKind, Option<DVec2>, Option<String>)> {
-    let (s, e) = data.sketch.endpoints(line)?;
-    let (ps, pe) = (data.sketch.point(s)?, data.sketch.point(e)?);
-    let dir = (pe - ps).try_normalize()?;
-    let near = |a: f64, b: f64| (a - b).abs() < 1e-6;
-    if let Some(prev) = prev.filter(|p| data.sketch.entity(*p).is_some()) {
-        let deg = ang.to_degrees().rem_euclid(360.0);
-        let deg = if deg > 180.0 { 360.0 - deg } else { deg };
-        if near(deg, 90.0) {
-            let _ = data.sketch.add_constraint(ConstraintKind::Perpendicular { a: prev, b: line });
-            return None;
-        }
-        if near(deg, 0.0) || near(deg, 180.0) {
-            let _ = data.sketch.add_constraint(ConstraintKind::Parallel { a: prev, b: line });
-            return None;
-        }
-        let (a0, a1) = data.sketch.endpoints(prev)?;
-        let far = if a1 == s { a0 } else { a1 };
-        let back = (data.sketch.point(far)? - ps).try_normalize()?;
-        let bis = (back + dir).try_normalize().unwrap_or(dir.perp());
-        return Some((ConstraintKind::Angle { a: prev, b: line, value: deg.to_radians() }, Some(ps + bis * off * 1.6), expr));
-    }
-    let deg = ang.to_degrees().rem_euclid(180.0);
-    if near(deg, 0.0) || near(deg, 180.0) {
-        let _ = data.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None });
-        return None;
-    }
-    if near(deg, 90.0) {
-        let _ = data.sketch.add_constraint(ConstraintKind::Vertical { a: line, b: None });
-        return None;
-    }
-    // Horizontal construction reference on the side the line leans to.
-    let ref_dir = if dir.x >= 0.0 { DVec2::X } else { -DVec2::X };
-    let len = (pe - ps).length();
-    let q = data.sketch.add_point(ps + ref_dir * len);
-    let r = data.sketch.add_line_between(s, q).ok()?;
-    let _ = data.sketch.set_construction(r, true);
-    let _ = data.sketch.add_constraint(ConstraintKind::Horizontal { a: r, b: None });
-    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: r, b: line });
-    let theta = ref_dir.dot(dir).clamp(-1.0, 1.0).acos();
-    let bis = (ref_dir + dir).try_normalize().unwrap_or(dir.perp());
-    // The typed text only matches the dimension when it is the acute angle itself.
-    let expr = expr.filter(|_| (theta - ang).abs() < 1e-9);
-    Some((ConstraintKind::Angle { a: r, b: line, value: theta }, Some(ps + bis * off * 1.6), expr))
 }
 
 /// Add a dimension: driving if possible, driven when it would over-constrain.
@@ -2511,6 +3598,254 @@ fn arc_span(a0: f64, a1: f64, am: f64) -> (f64, f64) {
     (s, e)
 }
 
+/// Apply a click's inferred constraints to a new point `pt` of `curve`.
+/// A snapped existing point is merged with it. Returns the surviving point.
+fn attach(sk: &mut Sketch, pt: EntityId, curve: Option<EntityId>, click: &Click) -> EntityId {
+    let Some(inf) = &click.inference else { return pt };
+    let mut out = pt;
+    for a in &inf.constraints {
+        match *a {
+            AutoConstraint::CoincidentPoint(q) if q != pt => {
+                // Don't collapse the new curve onto itself.
+                let own = curve.and_then(|c| sk.entity(c)).is_some_and(|e| e.point_refs().contains(&q));
+                if own {
+                    continue;
+                }
+                if sk.merge_points(pt, q).is_ok() {
+                    out = q;
+                }
+            }
+            AutoConstraint::CoincidentPoint(_) => {}
+            other => {
+                if let Some(kind) = other.to_constraint(out, curve) {
+                    let _ = sk.add_constraint(kind);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// A click on a circle's rim that snapped to a point or curve: coincident / tangent.
+fn rim_autos(sk: &mut Sketch, circle: EntityId, click: &Click) {
+    let Some(inf) = &click.inference else { return };
+    match inf.constraints.first() {
+        Some(AutoConstraint::CoincidentPoint(pt)) => {
+            let _ = sk.add_constraint(ConstraintKind::Coincident { a: *pt, b: circle });
+        }
+        Some(AutoConstraint::MidpointOf(c)) => {
+            // Rim through a line's midpoint: a point at the midpoint on the circle.
+            if let Some(m) = curve_mid(sk, *c) {
+                let q = sk.add_point(m);
+                let _ = sk.add_constraint(ConstraintKind::Midpoint { point: q, curve: *c });
+                let _ = sk.add_constraint(ConstraintKind::Coincident { a: q, b: circle });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
+    let label = match sk.curve(line) {
+        // Closed shapes run counter-clockwise: the label goes outside (right of the edge).
+        Some(Curve2::Line { a, b }) => (a + b) * 0.5 - (b - a).try_normalize().unwrap_or(DVec2::X).perp() * wpp * 26.0,
+        _ => DVec2::ZERO,
+    };
+    OtfField { kind: ConstraintKind::Length { curve: line, value: 0.0 }, scale: 1.0, label }
+}
+
+fn radius_field(sk: &Sketch, arc: EntityId, wpp: f64) -> OtfField {
+    let label = default_label_pos(sk, &ConstraintKind::Radius { curve: arc, value: 0.0 }, wpp).unwrap_or_default();
+    OtfField { kind: ConstraintKind::Radius { curve: arc, value: 0.0 }, scale: 1.0, label }
+}
+
+fn diameter_field(sk: &Sketch, circle: EntityId, wpp: f64) -> OtfField {
+    let label = default_label_pos(sk, &ConstraintKind::Diameter { curve: circle, value: 0.0 }, wpp).unwrap_or_default();
+    OtfField { kind: ConstraintKind::Diameter { curve: circle, value: 0.0 }, scale: 1.0, label }
+}
+
+/// Primary then secondary axis diameter boxes of an ellipse / elliptical arc.
+fn ellipse_fields(sk: &Sketch, id: EntityId, wpp: f64) -> Vec<OtfField> {
+    let Some(Curve2::Ellipse { center, major, minor } | Curve2::EllipticalArc { center, major, minor, .. }) = sk.curve(id) else { return Vec::new() };
+    let u = major.try_normalize().unwrap_or(DVec2::X);
+    let off = wpp * 26.0;
+    vec![
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off) },
+    ]
+}
+
+/// Construction ellipse of the elliptical arc tool: center, primary axis end
+/// and a point fixing the secondary radius.
+fn construction_ellipse(c: DVec2, major_end: DVec2, minor_pt: DVec2) -> Option<(DVec2, DVec2, f64)> {
+    let major = major_end - c;
+    let u = major.try_normalize()?;
+    let minor = u.perp().dot(minor_pt - c).abs();
+    // A point on the ellipse through `minor_pt` would need both axes; the
+    // click's distance across the axis sets the secondary radius.
+    (minor > 1e-12).then_some((c, major, minor))
+}
+
+/// Third point of an aligned square on the cursor's side of the first edge.
+fn aligned_square(a: DVec2, b: DVec2, c: DVec2) -> DVec2 {
+    let d = b - a;
+    let n = d.perp();
+    let side = if (c - a).dot(n) < 0.0 { -1.0 } else { 1.0 };
+    b + n * side
+}
+
+/// Does entity `id` cross (or lie in) the box `lo`-`hi`?
+fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> bool {
+    let inside = |p: DVec2| p.x >= lo.x && p.y >= lo.y && p.x <= hi.x && p.y <= hi.y;
+    if let Some(p) = sk.point(id) {
+        return inside(p);
+    }
+    let pts = sk.tessellate(id, tol);
+    let corners = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)];
+    let seg_x = |p: DVec2, q: DVec2, a: DVec2, b: DVec2| {
+        let (d1, d2) = (q - p, b - a);
+        let den = d1.perp_dot(d2);
+        if den.abs() < 1e-300 {
+            return false;
+        }
+        let t = (a - p).perp_dot(d2) / den;
+        let u = (a - p).perp_dot(d1) / den;
+        (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u)
+    };
+    pts.iter().any(|p| inside(*p)) || pts.windows(2).any(|w| (0..4).any(|k| seg_x(w[0], w[1], corners[k], corners[(k + 1) % 4])))
+}
+
+/// The fixed point on the sketch origin (created on first use).
+pub fn origin_point(sk: &mut Sketch) -> EntityId {
+    let existing = sk.entities().find(|e| e.external && matches!(e.geometry, noshape_sketch::Geometry::Point { pos } if pos.length() < 1e-12)).map(|e| e.id);
+    existing.unwrap_or_else(|| sk.use_external_point(DVec2::ZERO))
+}
+
+/// Entity an automatic constraint refers to.
+fn auto_target(c: &AutoConstraint) -> Option<EntityId> {
+    use AutoConstraint::*;
+    match *c {
+        CoincidentPoint(e) | OnCurve(e) | MidpointOf(e) | HorizontalWith(e) | VerticalWith(e) | PerpendicularTo(e) | ParallelTo(e) | TangentTo(e) | QuadrantOf(e, _) => Some(e),
+        HorizontalLine | VerticalLine => None,
+    }
+}
+
+fn retarget_auto(c: AutoConstraint, from: EntityId, to: EntityId) -> AutoConstraint {
+    use AutoConstraint::*;
+    let m = |e: EntityId| if e == from { to } else { e };
+    match c {
+        CoincidentPoint(e) => CoincidentPoint(m(e)),
+        OnCurve(e) => OnCurve(m(e)),
+        MidpointOf(e) => MidpointOf(m(e)),
+        HorizontalWith(e) => HorizontalWith(m(e)),
+        VerticalWith(e) => VerticalWith(m(e)),
+        PerpendicularTo(e) => PerpendicularTo(m(e)),
+        ParallelTo(e) => ParallelTo(m(e)),
+        TangentTo(e) => TangentTo(m(e)),
+        QuadrantOf(e, major) => QuadrantOf(m(e), major),
+        other => other,
+    }
+}
+
+/// Constrain a linear pattern's instances to their seeds (Onshape's linear
+/// pattern constraint): every instance point = seed point + k * step, the
+/// step's length is a spacing dimension and an axis-aligned step keeps its
+/// direction. Instance points are found by position (seed + k * step).
+fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<EntityId>], step: DVec2, wpp: f64) {
+    let sk = &mut data.sketch;
+    let seed_points: Vec<EntityId> = seeds
+        .iter()
+        .flat_map(|e| if is_point(sk, *e) { vec![*e] } else { sk.entity(*e).map(|x| x.point_refs().to_vec()).unwrap_or_default() })
+        .fold(Vec::new(), |mut acc, p| {
+            if !acc.contains(&p) && sk.entity(p).is_some_and(|x| !x.external) {
+                acc.push(p);
+            }
+            acc
+        });
+    let tol = step.length().max(1e-9) * 1e-7;
+    let find = |sk: &Sketch, g: &[EntityId], at: DVec2| g.iter().copied().find(|e| is_point(sk, *e) && sk.point(*e).is_some_and(|q| (q - at).length() <= tol));
+    let Some(&s0) = seed_points.first() else { return };
+    let Some(p0) = sk.point(s0) else { return };
+    let Some(first0) = groups.first().and_then(|g| find(sk, g, p0 + step)) else { return };
+    for (k, g) in groups.iter().enumerate() {
+        let kk = (k + 1) as f64;
+        for (j, seed) in seed_points.iter().enumerate() {
+            if k == 0 && j == 0 {
+                continue;
+            }
+            let Some(ps) = sk.point(*seed) else { continue };
+            if let Some(inst) = find(sk, g, ps + step * kk) {
+                let _ = sk.add_constraint(ConstraintKind::PatternLink { seed: *seed, inst, ref_seed: s0, ref_inst: first0, k: kk });
+            }
+        }
+        // Circles keep the seed's radius.
+        let circles: Vec<EntityId> = seeds.iter().copied().filter(|e| matches!(sk.kind(*e), Some(EntityKind::Circle))).collect();
+        for seed in &circles {
+            let Some(Curve2::Circle { center, .. }) = sk.curve(*seed) else { continue };
+            let target = center + step * kk;
+            let inst = g.iter().copied().find(|e| matches!(sk.curve(*e), Some(Curve2::Circle { center: c, .. }) if (c - target).length() <= tol));
+            if let Some(inst) = inst {
+                let _ = sk.add_constraint(ConstraintKind::Equal { a: *seed, b: inst });
+            }
+        }
+    }
+    // Spacing dimension and direction.
+    if step.y.abs() < 1e-12 {
+        let _ = sk.add_constraint(ConstraintKind::Horizontal { a: s0, b: Some(first0) });
+    } else if step.x.abs() < 1e-12 {
+        let _ = sk.add_constraint(ConstraintKind::Vertical { a: s0, b: Some(first0) });
+    }
+    let label = p0 + step * 0.5 + step.try_normalize().unwrap_or(DVec2::X).perp() * wpp * 24.0;
+    add_dimension(data, ConstraintKind::Distance { a: s0, b: first0, value: step.length(), mode: DistanceMode::Center }, Some(label), None);
+}
+
+/// Lower-left corner and height of an image rectangle dragged from `a` to
+/// `b` with its aspect ratio (width / height) locked.
+fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
+    let d = b - a;
+    let h = d.y.abs().max(d.x.abs() / aspect.max(1e-9));
+    let w = h * aspect;
+    let x = if d.x < 0.0 { a.x - w } else { a.x };
+    let y = if d.y < 0.0 { a.y - h } else { a.y };
+    (DVec2::new(x, y), h)
+}
+
+/// Insert DXF: add a drawing's geometry (`scale` meters per drawing unit),
+/// centered on the sketch origin unless `use_origin`.
+pub fn insert_dxf(data: &mut SketchData, drawing: &noshape_sketch::dxf::DxfDrawing, scale: f64, use_origin: bool) -> Vec<EntityId> {
+    let offset = if use_origin {
+        DVec2::ZERO
+    } else {
+        let mut tmp = Sketch::new();
+        tmp.insert_drawing(drawing, scale, DVec2::ZERO);
+        let bb = tmp.bbox();
+        if bb.is_empty() { DVec2::ZERO } else { -bb.center() }
+    };
+    let ids = data.sketch.insert_drawing(drawing, scale, offset);
+    data.sketch.solve();
+    ids
+}
+
+/// Corner of a square with the given first corner/center, on the cursor's side.
+fn square_corner(a: DVec2, c: DVec2) -> DVec2 {
+    let d = c - a;
+    let s = d.x.abs().max(d.y.abs());
+    a + DVec2::new(if d.x < 0.0 { -s } else { s }, if d.y < 0.0 { -s } else { s })
+}
+
+/// Third point of an exact semicircle over the chord `a`-`b` when the
+/// cursor's 3-point circle has its center within `tol` of the chord midpoint.
+fn semicircle_snap(a: DVec2, b: DVec2, p: DVec2, tol: f64) -> Option<DVec2> {
+    let m = (a + b) * 0.5;
+    let (ctr, _) = noshape_sketch::shapes::circle_through(a, p, b)?;
+    if (ctr - m).length() > tol {
+        return None;
+    }
+    let n = (b - a).perp().try_normalize()?;
+    let side = if (p - m).dot(n) < 0.0 { -1.0 } else { 1.0 };
+    Some(m + n * side * (b - a).length() * 0.5)
+}
+
 fn nearest_point(sk: &Sketch, p: DVec2, radius: f64) -> Option<EntityId> {
     sk.entities()
         .filter(|e| e.kind() == EntityKind::Point)
@@ -2533,6 +3868,7 @@ fn dist_point_line(p: DVec2, a: DVec2, b: DVec2) -> f64 {
 /// and glyph offsets whose constraints are gone.
 fn prune_exprs(data: &mut SketchData) {
     data.prune_texts();
+    data.prune_images();
     let live: std::collections::HashSet<u32> = data.sketch.constraints().map(|c| c.id.0).collect();
     data.dimension_exprs.retain(|k, _| live.contains(k));
     data.dimension_labels.retain(|k, _| live.contains(k));
@@ -2541,6 +3877,10 @@ fn prune_exprs(data: &mut SketchData) {
         l.entities.retain(|e| data.sketch.entity(EntityId(*e)).is_some());
         !l.entities.is_empty()
     });
+    data.dimension_tolerances.retain(|k, _| live.contains(k));
+    // A pattern lives while a seed does (deleted instances leave a gap).
+    let sk = &data.sketch;
+    data.patterns.retain(|p| p.seeds.iter().any(|e| sk.entity(EntityId(*e)).is_some()));
 }
 
 fn curve_mid(sk: &Sketch, id: EntityId) -> Option<DVec2> {
@@ -2612,6 +3952,7 @@ fn dimension_anchor(sk: &Sketch, k: &ConstraintKind) -> Option<DVec2> {
         ConstraintKind::Length { curve, .. } | ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. } => curve_mid(sk, *curve),
         ConstraintKind::ArcAngle { arc, .. } => curve_mid(sk, *arc),
         ConstraintKind::EllipseRadius { ellipse, .. } => curve_mid(sk, *ellipse),
+        ConstraintKind::Rho { conic, .. } => curve_mid(sk, *conic),
         _ => None,
     }
 }
@@ -2757,8 +4098,31 @@ fn angle_arc(out: &mut Vec<[DVec2; 2]>, c: DVec2, s1: DVec2, s2: DVec2, r: f64, 
 
 fn dim_segments(sk: &Sketch, k: &ConstraintKind, pos: DVec2, s: f64, out: &mut Vec<[DVec2; 2]>) {
     match k {
-        ConstraintKind::Distance { a, b, .. } => {
-            if let Some((p, q)) = linear_pair(sk, *a, *b) {
+        // Centerline: from the entity to its mirror image across the axis.
+        ConstraintKind::Distance { a, b, mode: DistanceMode::Centerline, .. } => {
+            let (other, axis) = if sk.kind(*b) == Some(EntityKind::Line) && sk.entity(*b).is_some_and(|e| e.construction) { (*a, *b) } else { (*b, *a) };
+            if let (Some(q), Some((l0, l1))) = (rep_point(sk, other), line_of(sk, axis)) {
+                let m = noshape_sketch::reflect(q, l0, l1);
+                linear_dim(out, q, m, None, pos, s);
+            }
+        }
+        ConstraintKind::Distance { a, b, mode, .. } => {
+            if let Some((mut p, mut q)) = linear_pair(sk, *a, *b) {
+                // Minimum / maximum: measured to the circles' rims.
+                if matches!(mode, DistanceMode::Minimum | DistanceMode::Maximum) {
+                    let sign = if *mode == DistanceMode::Minimum { 1.0 } else { -1.0 };
+                    let radius = |e: EntityId| match sk.curve(e) {
+                        Some(Curve2::Circle { radius, .. } | Curve2::Arc { radius, .. }) => Some(radius),
+                        _ => None,
+                    };
+                    let u = (q - p).try_normalize().unwrap_or(DVec2::X);
+                    if let Some(r) = radius(*a) {
+                        p += u * r * sign;
+                    }
+                    if let Some(r) = radius(*b) {
+                        q -= u * r * sign;
+                    }
+                }
                 // Parallel lines: measure perpendicular to them.
                 let u = match (line_of(sk, *a), line_of(sk, *b)) {
                     (Some(l), _) | (_, Some(l)) => Some((l.1 - l.0).try_normalize().unwrap_or(DVec2::X).perp()),
@@ -2834,6 +4198,11 @@ fn dim_segments(sk: &Sketch, k: &ConstraintKind, pos: DVec2, s: f64, out: &mut V
                 }
             }
         }
+        ConstraintKind::Rho { conic, .. } => {
+            if let Some(m) = curve_mid(sk, *conic) {
+                out.push([m, pos]);
+            }
+        }
         ConstraintKind::EllipseRadius { ellipse, major, .. } => {
             let (center, major_v, minor) = match sk.curve(*ellipse) {
                 Some(Curve2::Ellipse { center, major, minor }) | Some(Curve2::EllipticalArc { center, major, minor, .. }) => (center, major, minor),
@@ -2882,6 +4251,7 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         },
         Midpoint { point, .. } => vec![point],
         Pierce { point, .. } => vec![point],
+        Quadrant { point, .. } => vec![point],
         Symmetric { a, b, .. } => vec![a, b],
         Fix { entity } => vec![entity],
         Normal { line, curve } => vec![line, curve],
@@ -2903,17 +4273,25 @@ fn glyph_anchor(sk: &Sketch, id: EntityId) -> Option<DVec2> {
 /// Onshape-style smart dimension from picked entities and cursor position.
 fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<ConstraintKind> {
     let kind = |id: EntityId| sk.kind(id);
+    let dist = |a: EntityId, b: EntityId| ConstraintKind::Distance { a, b, value: 0.0, mode: DistanceMode::Center };
     match ids {
         [a] => match kind(*a)? {
             EntityKind::Line => {
                 let (pa, pb) = sk.endpoints(*a)?;
                 let (qa, qb) = (sk.point(pa)?, sk.point(pb)?);
-                Some(directed(pa, pb, qa, qb, cursor).unwrap_or(ConstraintKind::Length { curve: *a, value: (qb - qa).length() }))
+                let len = ConstraintKind::Length { curve: *a, value: (qb - qa).length() };
+                // Axis-aligned lines always get their length.
+                let d = qb - qa;
+                if d.x.abs() < 1e-9 * d.length().max(1e-300) || d.y.abs() < 1e-9 * d.length().max(1e-300) {
+                    return Some(len);
+                }
+                Some(directed(pa, pb, qa, qb, cursor).unwrap_or(len))
             }
             EntityKind::Circle => Some(ConstraintKind::Diameter { curve: *a, value: 0.0 }),
             EntityKind::Arc => Some(ConstraintKind::Radius { curve: *a, value: 0.0 }),
+            EntityKind::Conic => Some(ConstraintKind::Rho { conic: *a, value: 0.0 }),
             EntityKind::Ellipse | EntityKind::EllipticalArc => {
-                // Major or minor radius depending on which axis the cursor is nearer.
+                // Major or minor diameter depending on which axis the cursor is nearer.
                 let major = match sk.curve(*a) {
                     Some(Curve2::Ellipse { center, major, .. }) | Some(Curve2::EllipticalArc { center, major, .. }) => {
                         let d = cursor - center;
@@ -2925,30 +4303,91 @@ fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<Const
             }
             _ => None,
         },
+        [p1, p2, arc] if kind(*arc) == Some(EntityKind::Arc) && kind(*p1) == Some(EntityKind::Point) && kind(*p2) == Some(EntityKind::Point) => Some(ConstraintKind::Length { curve: *arc, value: 0.0 }),
         [a, b] => {
             let (ka, kb) = (kind(*a)?, kind(*b)?);
             match (ka, kb) {
                 (EntityKind::Point, EntityKind::Point) => {
                     let (qa, qb) = (sk.point(*a)?, sk.point(*b)?);
-                    Some(directed(*a, *b, qa, qb, cursor).unwrap_or(ConstraintKind::Distance { a: *a, b: *b, value: 0.0, mode: DistanceMode::Center }))
+                    Some(directed(*a, *b, qa, qb, cursor).unwrap_or(dist(*a, *b)))
                 }
                 (EntityKind::Line, EntityKind::Line) => {
-                    let dir = |l: EntityId| -> Option<DVec2> {
-                        let (pa, pb) = sk.endpoints(l)?;
-                        Some((sk.point(pb)? - sk.point(pa)?).normalize())
-                    };
-                    let (da, db) = (dir(*a)?, dir(*b)?);
+                    let (la, lb) = (line_of(sk, *a)?, line_of(sk, *b)?);
+                    let (da, db) = ((la.1 - la.0).normalize(), (lb.1 - lb.0).normalize());
                     if da.perp_dot(db).abs() < 1e-6 {
-                        Some(ConstraintKind::Distance { a: *a, b: *b, value: 0.0, mode: DistanceMode::Center })
+                        Some(centerline_or(sk, *a, *b, cursor).unwrap_or(dist(*a, *b)))
                     } else {
-                        Some(ConstraintKind::Angle { a: *a, b: *b, value: 0.0 })
+                        // The angle of the quadrant the cursor is in.
+                        Some(ConstraintKind::Angle { a: *a, b: *b, value: sector_angle(la, lb, cursor) })
                     }
                 }
-                _ => Some(ConstraintKind::Distance { a: *a, b: *b, value: 0.0, mode: DistanceMode::Center }),
+                _ => Some(centerline_or(sk, *a, *b, cursor).unwrap_or(dist(*a, *b))),
             }
         }
         _ => None,
     }
+}
+
+/// Distances to circles / arcs picked on their rim measure to the nearest
+/// (minimum) or farthest (maximum) point instead of the center.
+fn circle_mode(sk: &Sketch, k: ConstraintKind, picks: &[(EntityId, DVec2)], wpp: f64) -> ConstraintKind {
+    let ConstraintKind::Distance { a, b, value, mode: DistanceMode::Center } = k else { return k };
+    let circ = |e: EntityId| sk.kind(e).is_some_and(|k| k.is_circular());
+    let on_rim = |e: EntityId| {
+        let q = picks.iter().find(|p| p.0 == e)?.1;
+        let (ctr, r) = match sk.curve(e)? {
+            Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. } => (center, radius),
+            _ => return None,
+        };
+        ((q - ctr).length() - r).abs().le(&(wpp * 8.0)).then_some((q, ctr))
+    };
+    let (c, other) = if circ(b) { (b, a) } else if circ(a) { (a, b) } else { return k };
+    let Some((q, ctr)) = on_rim(c) else { return k };
+    let o = match sk.curve(other) {
+        Some(Curve2::Line { a: l0, b: l1 }) => foot(ctr, l0, l1),
+        _ => rep_point(sk, other).unwrap_or(ctr),
+    };
+    let mode = if (q - o).length() < (ctr - o).length() { DistanceMode::Minimum } else { DistanceMode::Maximum };
+    ConstraintKind::Distance { a, b, value, mode }
+}
+
+/// Centerline dimension when one entity is a construction line and the
+/// cursor is on the other side of it than the other entity (Onshape toggles
+/// between distance and centerline dimensions as the cursor crosses).
+fn centerline_or(sk: &Sketch, a: EntityId, b: EntityId, cursor: DVec2) -> Option<ConstraintKind> {
+    let is_cl = |e: EntityId| sk.entity(e).is_some_and(|x| x.construction && x.kind() == EntityKind::Line);
+    let (other, axis) = if is_cl(b) { (a, b) } else if is_cl(a) { (b, a) } else { return None };
+    if is_cl(other) {
+        return None;
+    }
+    let (l0, l1) = line_of(sk, axis)?;
+    let q = rep_point(sk, other)?;
+    let side = |p: DVec2| (l1 - l0).perp_dot(p - l0);
+    (side(q) * side(cursor) < 0.0).then_some(ConstraintKind::Distance { a: other, b: axis, value: 0.0, mode: DistanceMode::Centerline })
+}
+
+/// Angle (0..180 degrees) of the sector between two lines that contains `cursor`.
+fn sector_angle(la: (DVec2, DVec2), lb: (DVec2, DVec2), cursor: DVec2) -> f64 {
+    let da = (la.1 - la.0).try_normalize().unwrap_or(DVec2::X);
+    let db = (lb.1 - lb.0).try_normalize().unwrap_or(DVec2::Y);
+    let den = da.perp_dot(db);
+    if den.abs() < 1e-12 {
+        return 0.0;
+    }
+    let t = (lb.0 - la.0).perp_dot(db) / den;
+    let c = la.0 + da * t;
+    let th = (cursor - c).to_angle();
+    let mut rays = [da, db, -da, -db];
+    rays.sort_by(|x, y| x.to_angle().rem_euclid(TAU).total_cmp(&y.to_angle().rem_euclid(TAU)));
+    for i in 0..4 {
+        let (s1, s2) = (rays[i], rays[(i + 1) % 4]);
+        let a0 = s1.to_angle();
+        let sweep = noshape_sketch::geom::ccw_sweep(a0, s2.to_angle());
+        if noshape_sketch::geom::angle_in_range(th, a0, sweep, 1e-12).is_some() {
+            return sweep;
+        }
+    }
+    da.angle_to(db).abs()
 }
 
 /// Horizontal/vertical distance when the cursor is outside the band between two points.
@@ -2985,7 +4424,11 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
             if is_point(sk, a) { ConstraintKind::Midpoint { point: a, curve: b } } else { ConstraintKind::Midpoint { point: b, curve: a } }
         }
         ConstraintTool::Normal => ConstraintKind::Normal { line: a, curve: b? },
-        ConstraintTool::Pierce => ConstraintKind::Pierce { point: a, target: b? },
+        ConstraintTool::Pierce => {
+            let b = b?;
+            let ext = |e: EntityId| sk.entity(e).is_some_and(|x| x.external);
+            if ext(a) && !ext(b) { ConstraintKind::Pierce { point: b, target: a } } else { ConstraintKind::Pierce { point: a, target: b } }
+        }
         // Onshape order: the axis is picked first.
         ConstraintTool::Symmetric => {
             let (x, y, z) = (a, b?, pt(2)?);
@@ -2996,6 +4439,90 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
             }
         }
     })
+}
+
+/// Can constraint `c` be applied to the selected entities? (Onshape enables
+/// only the applicable constraint buttons for a selection.)
+pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> bool {
+    let kinds: Vec<EntityKind> = ids.iter().filter_map(|e| sk.kind(*e)).collect();
+    if kinds.len() != ids.len() || kinds.is_empty() {
+        return false;
+    }
+    let n = kinds.len();
+    let all = |f: &dyn Fn(EntityKind) -> bool| kinds.iter().all(|k| f(*k));
+    let count = |f: &dyn Fn(EntityKind) -> bool| kinds.iter().filter(|k| f(**k)).count();
+    let point = |k: EntityKind| k == EntityKind::Point;
+    let line = |k: EntityKind| k == EntityKind::Line;
+    let round = |k: EntityKind| k.is_circular() || k.is_elliptical();
+    let curve = |k: EntityKind| k != EntityKind::Point;
+    match c {
+        ConstraintTool::Coincident => n >= 2 && (count(&point) >= 1 && (count(&point) == n || count(&point) == 1 || n == 2) || all(&line) || all(&|k| k.is_circular())),
+        ConstraintTool::Concentric => n >= 2 && all(&|k| round(k) || point(k)) && count(&round) >= 1,
+        ConstraintTool::Parallel => n >= 2 && all(&line),
+        ConstraintTool::Tangent => n >= 2 && all(&curve) && !all(&line),
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => all(&|k| line(k) || k == EntityKind::Ellipse) || (n >= 2 && all(&point)),
+        ConstraintTool::Perpendicular => n == 2 && all(&line),
+        ConstraintTool::Equal => n >= 2 && (all(&line) || all(&|k| k.is_circular())),
+        ConstraintTool::Midpoint => (n == 2 && count(&point) == 1 && kinds.iter().any(|k| matches!(k, EntityKind::Line | EntityKind::Arc))) || (n == 3 && all(&point)),
+        ConstraintTool::Normal => n == 2 && count(&line) >= 1 && all(&curve),
+        ConstraintTool::Pierce => n == 2 && ids.iter().filter(|e| sk.entity(**e).is_some_and(|x| x.external)).count() == 1 && ids.iter().any(|e| is_point(sk, *e) && !sk.entity(*e).is_some_and(|x| x.external)),
+        ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
+        ConstraintTool::Fix => true,
+        ConstraintTool::Curvature => n == 2 && all(&curve) && kinds.iter().any(|k| k.is_spline()),
+    }
+}
+
+/// Apply constraint `c` to a selection: n-ary constraints chain the first
+/// entity with each other one, one-entity constraints apply to each entity.
+/// Returns the number of constraints added.
+pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) -> Result<usize, String> {
+    let mut kinds: Vec<ConstraintKind> = Vec::new();
+    let pts = ids.iter().all(|e| is_point(sk, *e));
+    match c {
+        ConstraintTool::Horizontal | ConstraintTool::Vertical if pts => {
+            for e in &ids[1..] {
+                kinds.extend(make_constraint(sk, c, &[ids[0], *e]));
+            }
+        }
+        ConstraintTool::Horizontal | ConstraintTool::Vertical | ConstraintTool::Fix => {
+            for e in ids {
+                kinds.extend(make_constraint(sk, c, &[*e]));
+            }
+        }
+        ConstraintTool::Symmetric | ConstraintTool::Perpendicular | ConstraintTool::Normal | ConstraintTool::Pierce | ConstraintTool::Curvature => {
+            kinds.extend(make_constraint(sk, c, ids));
+        }
+        ConstraintTool::Midpoint if ids.len() == 3 => {
+            // Third point midway between the first two: a construction line carries it.
+            let l = sk.add_line_between(ids[0], ids[1]).map_err(|e| e.to_string())?;
+            let _ = sk.set_construction(l, true);
+            kinds.push(ConstraintKind::Midpoint { point: ids[2], curve: l });
+        }
+        ConstraintTool::Coincident if ids.iter().filter(|e| is_point(sk, **e)).count() == 1 && ids.len() > 2 => {
+            // One point on several curves.
+            let p = *ids.iter().find(|e| is_point(sk, **e)).expect("point");
+            for e in ids.iter().filter(|e| **e != p) {
+                kinds.push(ConstraintKind::Coincident { a: p, b: *e });
+            }
+        }
+        _ => {
+            for e in &ids[1..] {
+                kinds.extend(make_constraint(sk, c, &[ids[0], *e]));
+            }
+        }
+    }
+    let mut n = 0;
+    let mut last_err = None;
+    for k in kinds {
+        match sk.add_constraint(k) {
+            Ok(_) => n += 1,
+            Err(e) => last_err = Some(e.to_string()),
+        }
+    }
+    match (n, last_err) {
+        (0, Some(e)) => Err(e),
+        (n, _) => Ok(n),
+    }
 }
 
 impl SketchEditor {
@@ -3026,21 +4553,561 @@ impl SketchEditor {
             }
         }
     }
+}
 
-    /// Add a projected (used) curve linked to a 3D reference.
-    pub fn add_used(&mut self, data: &mut SketchData, curve: &Curve2, reference: Option<noshape_model::reference::Reference>) -> bool {
-        match data.sketch.use_external(curve) {
-            Ok(r) => {
-                if let (Some(&id), Some(reference)) = (r.created.last(), reference) {
-                    data.external_refs.insert(id.0, reference);
-                }
-                data.sketch.solve();
-                true
-            }
-            Err(e) => {
-                self.message = Some(format!("{e}"));
-                false
-            }
+#[cfg(test)]
+mod tests {
+    //! Headless tests of the sketch editor's Onshape interaction rules:
+    //! click sequences, drags, inference, on-the-fly dimensions, the
+    //! dimension tool and constraint application.
+    use super::*;
+
+    const PX: f64 = 1e-4; // world units per pixel in these tests
+
+    fn editor(tool: Tool) -> (SketchEditor, SketchData) {
+        let mut ed = SketchEditor::new(FeatureId(1), PlaneFrame::TOP);
+        ed.world_per_px = PX;
+        ed.set_tool(tool);
+        (ed, SketchData::default())
+    }
+
+    fn v(x: f64, y: f64) -> DVec2 {
+        DVec2::new(x, y)
+    }
+
+    /// Move to `p` and click (press + release in place).
+    fn click(ed: &mut SketchEditor, data: &mut SketchData, p: DVec2) {
+        ed.pointer_move(data, p, false, false);
+        let h = data.sketch.pick(p, PX * 4.0);
+        ed.hover = h;
+        ed.tool_down(data, p, h, false, false);
+        ed.tool_up(data, p);
+    }
+
+    fn drag(ed: &mut SketchEditor, data: &mut SketchData, a: DVec2, b: DVec2) {
+        ed.pointer_move(data, a, false, false);
+        let h = data.sketch.pick(a, PX * 4.0);
+        ed.hover = h;
+        ed.tool_down(data, a, h, false, false);
+        for k in 1..=4 {
+            ed.tool_drag(data, a.lerp(b, k as f64 / 4.0));
         }
+        ed.tool_up(data, b);
+    }
+
+    fn count(data: &SketchData, k: EntityKind) -> usize {
+        data.sketch.entities().filter(|e| e.kind() == k).count()
+    }
+
+    #[test]
+    fn line_clicks_chain_and_esc_ends_the_chain() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.013));
+        click(&mut ed, &mut d, v(0.03, 0.017));
+        click(&mut ed, &mut d, v(0.035, 0.04));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+        // the two segments share their joint
+        let pts = count(&d, EntityKind::Point);
+        assert_eq!(pts, 3);
+        assert!(ed.cancel(), "Esc ends the chain");
+        assert_eq!(ed.tool, Tool::Line, "first Esc keeps the tool");
+        assert!(ed.cancel());
+        assert_eq!(ed.tool, Tool::Select, "second Esc exits the tool");
+    }
+
+    #[test]
+    fn line_drag_makes_one_segment() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        drag(&mut ed, &mut d, v(0.01, 0.013), v(0.03, 0.027));
+        assert_eq!(count(&d, EntityKind::Line), 1);
+        // the next click starts a new line instead of chaining
+        click(&mut ed, &mut d, v(0.05, 0.05));
+        assert_eq!(count(&d, EntityKind::Line), 1);
+    }
+
+    #[test]
+    fn line_snaps_to_origin_and_infers_horizontal() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(PX * 2.0, -PX * 3.0));
+        click(&mut ed, &mut d, v(0.03, PX * 2.0));
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+        let (s, _) = d.sketch.endpoints(line).unwrap();
+        assert!(d.sketch.entity(s).unwrap().external, "start point is the fixed origin point");
+        assert_eq!(d.sketch.point(s).unwrap(), DVec2::ZERO);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
+    }
+
+    #[test]
+    fn on_the_fly_length_box() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.013));
+        click(&mut ed, &mut d, v(0.03, 0.021));
+        let boxes = ed.otf_boxes(&d, &UnitPrefs::default());
+        assert_eq!(boxes.len(), 1);
+        ed.commit_otf(&mut d, "25", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        assert!(ed.otf.is_none());
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+        assert!((d.sketch.curve(line).unwrap().length() - 0.025).abs() < 1e-9);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Length { .. }) && c.driving));
+    }
+
+    #[test]
+    fn rectangle_boxes_then_square_with_alt() {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, v(0.011, 0.013));
+        click(&mut ed, &mut d, v(0.031, 0.027));
+        assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
+        let u = UnitPrefs::default();
+        ed.commit_otf(&mut d, "30", &u, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(1), "width box follows");
+        ed.commit_otf(&mut d, "10", &u, &noshape_units::EmptyScope).unwrap();
+        let bb = d.sketch.bbox();
+        assert!((bb.size().x - 0.03).abs() < 1e-9 && (bb.size().y - 0.01).abs() < 1e-9, "{:?}", bb.size());
+        // Alt: square
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        ed.pointer_move(&mut d, v(0.011, 0.013), false, true);
+        click_alt(&mut ed, &mut d, v(0.011, 0.013));
+        click_alt(&mut ed, &mut d, v(0.031, 0.020));
+        d.sketch.solve();
+        let bb = d.sketch.bbox();
+        assert!((bb.size().x - bb.size().y).abs() < 1e-9);
+    }
+
+    fn click_alt(ed: &mut SketchEditor, data: &mut SketchData, p: DVec2) {
+        ed.pointer_move(data, p, false, true);
+        ed.tool_down(data, p, None, false, false);
+        ed.tool_up(data, p);
+    }
+
+    #[test]
+    fn shift_a_draws_one_tangent_arc_then_lines() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.011, 0.013));
+        click(&mut ed, &mut d, v(0.031, 0.013));
+        ed.toggle_tangent_arc();
+        assert!(ed.tangent_mode);
+        click(&mut ed, &mut d, v(0.041, 0.023));
+        assert_eq!(count(&d, EntityKind::Arc), 1);
+        assert!(!ed.tangent_mode, "back to lines after one arc");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { .. })));
+        click(&mut ed, &mut d, v(0.041, 0.043));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+    }
+
+    #[test]
+    fn hovering_back_over_the_chain_end_switches_to_a_tangent_arc() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.011, 0.013));
+        click(&mut ed, &mut d, v(0.031, 0.013));
+        assert!(!ed.tangent_mode, "the cursor starts on the chain end");
+        ed.pointer_move(&mut d, v(0.036, 0.02), false, false);
+        ed.pointer_move(&mut d, v(0.031 + PX, 0.013), false, false);
+        assert!(ed.tangent_mode, "moving back onto the end switches to the tangent arc");
+        click(&mut ed, &mut d, v(0.041, 0.023));
+        assert_eq!(count(&d, EntityKind::Arc), 1);
+        assert!(!ed.tangent_mode);
+    }
+
+    #[test]
+    fn spline_closes_on_its_first_point_and_confirm_spline() {
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [v(0.01, 0.01), v(0.03, 0.01), v(0.03, 0.03), v(0.01 + PX, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::FitSpline), 1);
+        let s = d.sketch.entities().find(|e| e.kind() == EntityKind::FitSpline).unwrap();
+        let refs = s.point_refs();
+        assert_eq!(refs.first(), refs.last(), "closed spline");
+        for p in [v(0.05, 0.01), v(0.06, 0.02), v(0.07, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert!(ed.confirm_spline(&mut d).changed);
+        assert_eq!(count(&d, EntityKind::FitSpline), 2);
+    }
+
+    #[test]
+    fn mirror_tool_first_mirrors_each_click_until_esc() {
+        let (mut ed, mut d) = editor(Tool::Mirror);
+        d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        d.sketch.add_circle(v(0.01, 0.01), 0.003);
+        d.sketch.add_circle(v(0.01, 0.03), 0.003);
+        click(&mut ed, &mut d, v(0.0, 0.02));
+        assert_eq!(ed.message.as_deref(), Some("Select entities to be mirrored."));
+        click(&mut ed, &mut d, v(0.013, 0.01));
+        click(&mut ed, &mut d, v(0.013, 0.03));
+        assert_eq!(count(&d, EntityKind::Circle), 4);
+        assert_eq!(ed.tool, Tool::Mirror);
+        ed.cancel();
+        assert_eq!(ed.message.as_deref(), Some("Select a mirror line."));
+    }
+
+    #[test]
+    fn remaining_geometry_tools_click_sequences() {
+        // aligned rectangle: two clicks for the side, one for the width
+        let (mut ed, mut d) = editor(Tool::AlignedRect);
+        for p in [v(0.01, 0.01), v(0.03, 0.02), v(0.025, 0.03)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Line), 4);
+        assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
+        // 3 point circle: drag 1 -> 2, then click 3
+        let (mut ed, mut d) = editor(Tool::ThreePointCircle);
+        drag(&mut ed, &mut d, v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.025));
+        assert_eq!(count(&d, EntityKind::Circle), 1);
+        // tangent arc tool from a line end
+        let (mut ed, mut d) = editor(Tool::TangentArc);
+        d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.04, 0.02));
+        assert_eq!(count(&d, EntityKind::Arc), 1);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { .. })));
+        // center point arc: the sweep follows the cursor (clockwise here)
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        click(&mut ed, &mut d, v(0.02, 0.02));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        for a in [-0.3f64, -0.8, -1.2] {
+            ed.pointer_move(&mut d, v(0.02, 0.02) + DVec2::from_angle(a) * 0.01, false, false);
+        }
+        click(&mut ed, &mut d, v(0.02, 0.02) + DVec2::from_angle(-1.2) * 0.01);
+        let Some(Curve2::Arc { start_angle, end_angle, .. }) = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).and_then(|e| d.sketch.curve(e.id)) else { panic!() };
+        assert!((end_angle - start_angle - 1.2).abs() < 1e-6, "short clockwise arc, {start_angle} {end_angle}");
+        // ellipse
+        let (mut ed, mut d) = editor(Tool::Ellipse);
+        for p in [v(0.02, 0.02), v(0.04, 0.02), v(0.02, 0.03)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Ellipse), 1);
+        // bezier: Esc removes the curve in progress
+        let (mut ed, mut d) = editor(Tool::Bezier);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.03));
+        assert!(ed.cancel());
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        assert!(ed.clicks.len() == 1 && count(&d, EntityKind::BSpline) == 0);
+    }
+
+    #[test]
+    fn more_dimension_kinds() {
+        let mut sk = Sketch::new();
+        let l1 = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
+        let l2 = sk.add_line(v(0.0, 3.0), v(10.0, 3.0));
+        assert!(matches!(smart_dimension(&sk, &[l1, l2], v(5.0, 1.0)), Some(ConstraintKind::Distance { mode: DistanceMode::Center, .. })));
+        let arc = sk.add_arc(v(20.0, 0.0), v(25.0, 0.0), v(20.0, 5.0));
+        let (s, e) = sk.endpoints(arc).unwrap();
+        assert!(matches!(smart_dimension(&sk, &[s, e, arc], v(26.0, 6.0)), Some(ConstraintKind::Length { curve, .. }) if curve == arc));
+        let el = sk.add_ellipse(v(40.0, 0.0), v(4.0, 0.0), 2.0);
+        assert!(matches!(smart_dimension(&sk, &[el], v(46.0, 0.0)), Some(ConstraintKind::EllipseRadius { major: true, .. })));
+        assert!(matches!(smart_dimension(&sk, &[el], v(40.0, 4.0)), Some(ConstraintKind::EllipseRadius { major: false, .. })));
+        // dimension to the origin
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        d.sketch.add_point(v(0.02, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        click(&mut ed, &mut d, v(PX, PX));
+        assert_eq!(ed.picks.len(), 2, "the origin is pickable");
+        click(&mut ed, &mut d, v(0.01, 0.03));
+        assert!(d.sketch.constraints().any(|c| c.kind.is_dimension()));
+    }
+
+    #[test]
+    fn crossing_box_and_drag_to_origin() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.01, 0.01), v(0.05, 0.01));
+        // right to left box that only touches the middle of the line
+        drag(&mut ed, &mut d, v(0.035, 0.02), v(0.025, 0.0));
+        assert!(ed.selection.contains(&l), "crossing selects what the box touches");
+        ed.selection.clear();
+        drag(&mut ed, &mut d, v(0.025, 0.0), v(0.035, 0.02));
+        assert!(!ed.selection.contains(&l), "window needs the whole entity inside");
+        // drag a free point onto the origin
+        let (mut ed, mut d) = editor(Tool::Select);
+        let p = d.sketch.add_point(v(0.01, 0.01));
+        drag(&mut ed, &mut d, v(0.01, 0.01), v(PX, -PX));
+        let survivor = if d.sketch.entity(p).is_some() { p } else { d.sketch.entities().next().unwrap().id };
+        assert_eq!(d.sketch.point(survivor), Some(DVec2::ZERO));
+        assert!(d.sketch.entity(survivor).unwrap().external);
+        // Shift suppresses the snap
+        let (mut ed, mut d) = editor(Tool::Select);
+        d.sketch.add_point(v(0.01, 0.01));
+        ed.shift_held = true;
+        ed.tool_down(&mut d, v(0.01, 0.01), Some(EntityId(0)), false, false);
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, v(0.01, 0.01).lerp(v(PX, -PX), k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, v(PX, -PX));
+        assert_eq!(d.sketch.entity_count(), 1, "no merge with Shift held");
+    }
+
+    #[test]
+    fn expression_detection_and_value_text() {
+        for t in ["10*3", "#d", "#w / 2", "sin(30 deg) * 10", "(3)"] {
+            assert!(is_expression(t), "{t}");
+        }
+        for t in ["25", "25 mm", "-3.5in", "0.5"] {
+            assert!(!is_expression(t), "{t}");
+        }
+        let u = UnitPrefs::default();
+        let k = ConstraintKind::EllipseRadius { ellipse: EntityId(0), major: true, value: 0.0 };
+        assert!(dim_value_text(&k, 0.01, &u).starts_with('Ø'));
+        assert!(dim_value_text(&k, 0.01, &u).contains("20"), "ellipse axes show diameters");
+    }
+
+    #[test]
+    fn fillet_two_curves() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let a = d.sketch.add_point(v(0.0, 0.0));
+        let b = d.sketch.add_point(v(0.04, 0.0));
+        let c = d.sketch.add_point(v(0.04, 0.04));
+        d.sketch.add_line_between(a, b).unwrap();
+        d.sketch.add_line_between(b, c).unwrap();
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        assert_eq!(count(&d, EntityKind::Arc), 0, "the first curve only picks");
+        click(&mut ed, &mut d, v(0.04, 0.02));
+        assert_eq!(count(&d, EntityKind::Arc), 1);
+    }
+
+    #[test]
+    fn offset_preview_arrow_and_repeat() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        let l1 = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        d.sketch.add_line(v(0.01, 0.03), v(0.03, 0.03));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert!(ed.offset_pending.is_some(), "picking a curve previews the offset");
+        assert_eq!(count(&d, EntityKind::Line), 2, "nothing is created yet");
+        let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
+        // drag the arrow to the other side: 4 mm below the line
+        ed.pointer_move(&mut d, tip, false, false);
+        ed.tool_down(&mut d, tip, None, false, false);
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, tip.lerp(v(0.02, 0.006), k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, v(0.02, 0.006));
+        assert!((ed.offset_distance - 0.004).abs() < 1e-9);
+        let _ = base;
+        assert!(ed.commit_offset(&mut d).changed);
+        let below = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y - 0.006).abs() < 1e-9);
+        assert!(below, "offset toward the dragged side");
+        // later clicks repeat the offset right away
+        click(&mut ed, &mut d, v(0.02, 0.03));
+        assert_eq!(count(&d, EntityKind::Line), 4);
+        let _ = l1;
+    }
+
+    #[test]
+    fn pattern_accepts_on_click_in_space_and_edit_pattern() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let c = d.sketch.add_circle(v(0.01, 0.01), 0.002);
+        ed.selection = vec![c];
+        ed.set_tool(Tool::LinearPattern);
+        ed.pattern_count = 3;
+        ed.pattern_distance = 0.01;
+        ed.pattern_angle = 0.0;
+        click(&mut ed, &mut d, v(0.04, 0.04));
+        assert_eq!(count(&d, EntityKind::Circle), 3, "click in empty space accepts");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::PatternLink { .. })), "instances are linked to the seed");
+        assert!(d.sketch.solve().is_solved());
+        assert_eq!(d.patterns.len(), 1);
+        let pid = d.patterns[0].id;
+        assert!(ed.edit_pattern(&d, pid));
+        ed.pattern_count = 5;
+        assert!(ed.apply_pattern(&mut d).changed);
+        assert_eq!(count(&d, EntityKind::Circle), 5, "edit replaces the old instances");
+        assert_eq!(d.patterns.len(), 1);
+        // Esc cancels a pattern being set up
+        ed.selection = vec![c];
+        assert!(ed.cancel());
+        assert!(ed.selection.is_empty());
+    }
+
+    #[test]
+    fn fillet_radius_manipulator_and_conic_rho_box() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+        let p0 = d.sketch.point(r.points[0]).unwrap();
+        click(&mut ed, &mut d, p0);
+        let (arc, m) = ed.fillet_handle(&d.sketch).expect("manipulator");
+        ed.dim_edit = None;
+        ed.tool_down(&mut d, m, None, false, false);
+        let target = m + (m - p0).normalize() * -0.0005;
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, m.lerp(target, k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, target);
+        let Some(Curve2::Arc { radius, .. }) = d.sketch.curve(arc) else { panic!() };
+        assert!((radius - 0.005).abs() > 1e-6, "dragging changed the radius");
+        let (mut ed, mut d) = editor(Tool::Conic);
+        for p in [v(0.01, 0.01), v(0.03, 0.01), v(0.02, 0.02)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert!(matches!(ed.otf.as_ref().and_then(|o| o.fields.first()).map(|f| &f.kind), Some(ConstraintKind::Rho { .. })));
+        ed.commit_otf(&mut d, "0.3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let conic = d.sketch.entities().find(|e| e.kind() == EntityKind::Conic).unwrap();
+        assert!(matches!(conic.geometry, noshape_sketch::Geometry::Conic { rho, .. } if (rho - 0.3).abs() < 1e-12));
+    }
+
+    #[test]
+    fn rim_picks_measure_min_and_max() {
+        let mut sk = Sketch::new();
+        let p = sk.add_point(v(0.0, 0.0));
+        let c = sk.add_circle(v(10.0, 0.0), 2.0);
+        let k = ConstraintKind::Distance { a: p, b: c, value: 0.0, mode: DistanceMode::Center };
+        assert!(matches!(circle_mode(&sk, k.clone(), &[(c, v(8.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Minimum, .. }));
+        assert!(matches!(circle_mode(&sk, k.clone(), &[(c, v(12.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Maximum, .. }));
+        assert!(matches!(circle_mode(&sk, k, &[(c, v(10.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Center, .. }));
+    }
+
+    #[test]
+    fn select_first_constraints_apply_to_the_whole_selection() {
+        let mut sk = Sketch::new();
+        let l1 = sk.add_line(v(0.0, 0.0), v(1.0, 0.1));
+        let l2 = sk.add_line(v(0.0, 1.0), v(1.0, 1.3));
+        let l3 = sk.add_line(v(0.0, 2.0), v(1.0, 2.2));
+        let c = sk.add_circle(v(5.0, 0.0), 1.0);
+        assert!(constraint_applicable(&sk, ConstraintTool::Parallel, &[l1, l2, l3]));
+        assert!(!constraint_applicable(&sk, ConstraintTool::Parallel, &[l1, c]));
+        assert!(!constraint_applicable(&sk, ConstraintTool::Perpendicular, &[l1, l2, l3]));
+        assert!(constraint_applicable(&sk, ConstraintTool::Tangent, &[l1, c]));
+        assert!(constraint_applicable(&sk, ConstraintTool::Horizontal, &[l1, l2]));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Parallel, &[l1, l2, l3]), Ok(2));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Horizontal, &[l1]), Ok(1));
+        assert!(sk.solve().is_solved());
+        for l in [l1, l2, l3] {
+            let (a, b) = line_of(&sk, l).unwrap();
+            assert!((a.y - b.y).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn dimension_tool_infers_type_from_picks_and_cursor() {
+        let mut sk = Sketch::new();
+        let axis = sk.add_line(v(0.0, -1.0), v(0.0, 1.0));
+        sk.set_construction(axis, true).unwrap();
+        let p = sk.add_point(v(2.0, 0.5));
+        assert!(matches!(smart_dimension(&sk, &[p, axis], v(3.0, 0.0)), Some(ConstraintKind::Distance { mode: DistanceMode::Center, .. })));
+        assert!(matches!(smart_dimension(&sk, &[p, axis], v(-1.0, 0.0)), Some(ConstraintKind::Distance { mode: DistanceMode::Centerline, .. })));
+        let a = sk.add_point(v(0.0, 0.0));
+        let b = sk.add_point(v(4.0, 3.0));
+        assert!(matches!(smart_dimension(&sk, &[a, b], v(2.0, 5.0)), Some(ConstraintKind::HorizontalDistance { .. })));
+        assert!(matches!(smart_dimension(&sk, &[a, b], v(6.0, 1.0)), Some(ConstraintKind::VerticalDistance { .. })));
+        assert!(matches!(smart_dimension(&sk, &[a, b], v(1.0, 2.5)), Some(ConstraintKind::Distance { .. })));
+        let l1 = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
+        let l2 = sk.add_line(v(0.0, 0.0), v(10.0, 10.0));
+        let Some(ConstraintKind::Angle { value, .. }) = smart_dimension(&sk, &[l1, l2], v(5.0, 1.0)) else { panic!() };
+        assert!((value - PI / 4.0).abs() < 1e-9);
+        let Some(ConstraintKind::Angle { value, .. }) = smart_dimension(&sk, &[l1, l2], v(-5.0, 1.0)) else { panic!() };
+        assert!((value - 3.0 * PI / 4.0).abs() < 1e-9, "obtuse quadrant");
+    }
+
+    #[test]
+    fn dimension_click_sequence_opens_the_value_box() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let l = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert!(ed.dimension_preview(&d).is_none() || ed.picked(None) == vec![l]);
+        ed.pointer_move(&mut d, v(0.02, 0.015), false, false);
+        let (k, _, val) = ed.dimension_preview(&d).expect("preview follows the cursor");
+        assert!(matches!(k, ConstraintKind::Length { .. }));
+        assert!((val - 0.02).abs() < 1e-12);
+        click(&mut ed, &mut d, v(0.02, 0.015));
+        assert!(ed.dim_edit.is_some(), "placement opens the value box");
+        assert_eq!(ed.tool, Tool::Dimension, "tool stays active");
+        let cid = ed.dim_edit.as_ref().unwrap().constraint;
+        ed.apply_dimension(&mut d, cid, "-30", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let c = d.sketch.curve(l).unwrap();
+        assert!((c.length() - 0.03).abs() < 1e-9);
+        assert!(c.end_point().x < c.start_point().x, "negative length flips the line");
+    }
+
+    #[test]
+    fn trim_drag_and_point_delete() {
+        let (mut ed, mut d) = editor(Tool::Trim);
+        d.sketch.add_line(v(0.0, 0.01), v(0.04, 0.01));
+        d.sketch.add_line(v(0.0, 0.02), v(0.04, 0.02));
+        let pt = d.sketch.add_point(v(0.05, 0.05));
+        drag(&mut ed, &mut d, v(0.02, 0.0), v(0.02, 0.03));
+        assert_eq!(count(&d, EntityKind::Line), 0, "both lines crossed by the path are trimmed away");
+        click(&mut ed, &mut d, v(0.05, 0.05));
+        assert!(d.sketch.entity(pt).is_none());
+    }
+
+    #[test]
+    fn trim_drag_across_a_rectangle_removes_only_crossed_sides() {
+        let (mut ed, mut d) = editor(Tool::Trim);
+        let r = d.sketch.corner_rectangle(v(0.01, 0.01), v(0.03, 0.025));
+        drag(&mut ed, &mut d, v(0.015, 0.005), v(0.015, 0.03));
+        let alive: Vec<bool> = r.curves.iter().map(|c| d.sketch.entity(*c).is_some()).collect();
+        assert_eq!(alive, vec![false, true, false, true]);
+    }
+
+    #[test]
+    fn polygon_sides_typed_and_midpoint_line() {
+        let (mut ed, mut d) = editor(Tool::Polygon);
+        click(&mut ed, &mut d, v(0.011, 0.013));
+        ed.polygon_sides = 5;
+        click(&mut ed, &mut d, v(0.031, 0.013));
+        assert!(ed.polygon_sides_pending(), "the circumference is locked first");
+        // moving away from the polygon adds sides, back restores them
+        ed.pointer_move(&mut d, v(0.031 + PX * 31.0, 0.013), false, false);
+        assert_eq!(ed.polygon_sides, 7);
+        ed.pointer_move(&mut d, v(0.031, 0.013), false, false);
+        assert_eq!(ed.polygon_sides, 5);
+        click(&mut ed, &mut d, v(0.031, 0.013));
+        assert_eq!(count(&d, EntityKind::Line), 5);
+        assert!(ed.otf.is_some(), "diameter box");
+        let (mut ed, mut d) = editor(Tool::MidpointLine);
+        click(&mut ed, &mut d, v(0.021, 0.023));
+        click(&mut ed, &mut d, v(0.031, 0.027));
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+        let c = d.sketch.curve(line).unwrap();
+        assert!(((c.start_point() + c.end_point()) * 0.5 - v(0.021, 0.023)).length() < 1e-9);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Midpoint { .. })));
+    }
+
+    #[test]
+    fn elliptical_arc_four_clicks() {
+        let (mut ed, mut d) = editor(Tool::EllipticalArc);
+        for p in [v(0.011, 0.013), v(0.031, 0.013), v(0.011, 0.023), v(0.031, 0.0131)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::EllipticalArc), 1);
+        assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
+    }
+
+    #[test]
+    fn fillet_vertex_then_equal_fillets() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
+        let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
+        click(&mut ed, &mut d, p0);
+        assert!(ed.dim_edit.is_some(), "radius box after the first fillet");
+        click(&mut ed, &mut d, p1);
+        assert_eq!(count(&d, EntityKind::Arc), 2);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
+    }
+
+    #[test]
+    fn mirror_with_preselection_resolves_and_ends() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let axis = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        let c = d.sketch.add_circle(v(0.01, 0.02), 0.003);
+        ed.selection = vec![c];
+        ed.set_tool(Tool::Mirror);
+        click(&mut ed, &mut d, v(0.0, 0.03));
+        let _ = axis;
+        assert_eq!(count(&d, EntityKind::Circle), 2);
+        assert_eq!(ed.tool, Tool::Select);
+    }
+
+    #[test]
+    fn copy_paste_selection() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.0));
+        ed.selection = vec![l];
+        let clip = ed.copy_selection(&d).unwrap();
+        assert!(ed.paste_clipboard(&mut d, &clip));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+        assert_eq!(ed.selection.len(), 1);
+        assert_ne!(ed.selection[0], l);
+        assert!(!ed.paste_clipboard(&mut d, "hello"));
     }
 }

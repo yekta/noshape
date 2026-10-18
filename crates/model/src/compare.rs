@@ -161,7 +161,10 @@ fn compare_studios(a: &PartStudio, b: &PartStudio) -> Vec<Change> {
     if common_a != common_b {
         out.push(change(ChangeKind::Modified, "Features reordered"));
     }
-    if a.rollback_index() != b.rollback_index() || (a.rollback.is_some() != b.rollback.is_some()) {
+    // A bar at the end of the list counts as "no rollback" (adding a
+    // feature changes the end index without moving the bar).
+    let bar = |s: &crate::partstudio::PartStudio| Some(s.rollback_index()).filter(|&i| i < s.features.len());
+    if bar(a) != bar(b) {
         out.push(change(ChangeKind::Modified, "Rollback bar moved"));
     }
     if a.configuration != b.configuration {
@@ -230,5 +233,21 @@ mod tests {
         assert!(texts.iter().any(|t| t.contains("→ 30 mm") && t.contains("suppressed")), "{texts:?}");
         assert!(texts.iter().any(|t| t.starts_with("Added feature \"Chamfer")), "{texts:?}");
         assert!(compare_documents(&new, &new).is_empty());
+        assert!(!texts.iter().any(|t| t.contains("Rollback")), "bar at the end did not move: {texts:?}");
+    }
+
+    #[test]
+    fn rollback_moves_are_reported() {
+        let old = crate::demo::demo_document();
+        let mut new = old.clone();
+        let tab = new.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
+        let TabContent::PartStudio(ps) = &mut new.tabs[tab].content else { unreachable!() };
+        ps.rollback = Some(1);
+        let diff = compare_documents(&old, &new);
+        assert!(diff.iter().flat_map(|d| &d.changes).any(|c| c.text == "Rollback bar moved"), "{diff:?}");
+        // Explicitly at the end is the same as no rollback.
+        let TabContent::PartStudio(ps) = &mut new.tabs[tab].content else { unreachable!() };
+        ps.rollback = Some(ps.features.len());
+        assert!(compare_documents(&old, &new).is_empty());
     }
 }

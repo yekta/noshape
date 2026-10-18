@@ -17,6 +17,11 @@ pub(super) struct Arrow {
     pub base: DVec3,
     pub dir: DVec3,
     pub length: f64,
+    /// Length parameter the arrow drives.
+    pub param: &'static str,
+    /// Boolean flipped when the arrow is dragged past zero (None: the
+    /// value stays positive).
+    pub flip: Option<&'static str>,
 }
 
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
@@ -53,6 +58,7 @@ impl PartStudioView {
     pub(super) fn current_manip(&self, cx: &App) -> Option<Manip> {
         match self.edit.as_ref()?.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
+            "cPlane" | "shell" | "fillet" | "chamfer" => self.param_arrow(cx).map(Manip::Arrow),
             "revolve" => self.current_arc(cx).map(Manip::Arc),
             _ => None,
         }
@@ -64,7 +70,7 @@ impl PartStudioView {
         if p.bool("fullRevolve") || !p.is("endBound", "BLIND") {
             return None;
         }
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
         let anchor = p.query("entities").iter().find_map(|r| match r {
             Reference::SketchRegion { sketch, key } => {
@@ -117,7 +123,7 @@ impl PartStudioView {
             return None;
         }
         let depth = d.feature.params.expr("depth").and_then(|x| x.cached.map(|q| q.value)).or_else(|| {
-            let units = self.doc.read(cx).session.doc.settings.units.clone();
+            let units = self.doc.read(cx).session.doc.settings.units;
             d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok()).map(|q| q.value)
         })?;
         // Profile center and normal from the first selected region.
@@ -134,7 +140,36 @@ impl PartStudioView {
             dir = -dir;
         }
         let symmetric = d.feature.params.bool("symmetric");
-        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth } })
+        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: "depth", flip: Some("oppositeDirection") })
+    }
+
+    /// Drag handles of other features (Onshape): plane offset, shell
+    /// thickness, fillet radius, chamfer distance.
+    fn param_arrow(&self, cx: &App) -> Option<Arrow> {
+        let d = self.edit.as_ref()?.dialog.read(cx);
+        let p = &d.feature.params;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)));
+        // Edges/faces the feature consumes only exist before it.
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+        match d.feature.type_id.as_str() {
+            "cPlane" if p.is("cplaneType", "OFFSET") => {
+                let f = p.query("entities").iter().find_map(|r| self.frame_of_ref(r))?;
+                let dir = if p.bool("oppositeDirection") { -f.normal } else { f.normal };
+                Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection") })
+            }
+            "shell" if !p.bool("isHollow") => {
+                let (base, n) = p.query("entities").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
+                let dir = if p.bool("oppositeDirection") { n } else { -n };
+                Some(Arrow { base, dir, length: value("thickness")?, param: "thickness", flip: Some("oppositeDirection") })
+            }
+            "fillet" | "chamfer" => {
+                let param = if d.feature.type_id == "fillet" { "radius" } else { "width" };
+                let (base, dir) = p.query("entities").iter().find_map(|r| noshape_model::select::edge_inward(ctx, r))?;
+                Some(Arrow { base, dir, length: value(param)?, param, flip: None })
+            }
+            _ => None,
+        }
     }
 
     /// Publish the current arrow's handle to the viewport hit test.
@@ -152,7 +187,8 @@ impl PartStudioView {
     pub(super) fn manipulator_overlay(&self, cx: &App) -> Vec<Instance> {
         let up = self.gpu.uploader();
         let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
-        let color = [0x8b, 0x7c, 0xff, 255];
+        // Onshape manipulators: dark blue (`--os-color-charles-600`).
+        let color = crate::theme::rgb8(0x134e96);
         let a = match self.current_manip(cx) {
             Some(Manip::Arrow(a)) => a,
             Some(Manip::Arc(h)) => {
@@ -228,20 +264,20 @@ impl PartStudioView {
                 if symmetric {
                     len *= 2.0;
                 }
-                let flip = len < 0.0;
+                let flip = len < 0.0 && a.flip.is_some();
                 // Snap to a round step one decade below the value (Onshape-like).
                 let len = len.abs().max(1e-6);
                 let step = 10f64.powf((len * 1e3).log10().floor() - 1.0).max(0.01) * 1e-3;
                 let len = ((len / step).round() * step).max(step);
-                let units = self.doc.read(cx).session.doc.settings.units.clone();
+                let units = self.doc.read(cx).session.doc.settings.units;
                 let text = noshape_units::format_quantity(Quantity::new(len, Dim::LENGTH), &units);
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| {
-                        if flip {
-                            let cur = dlg.feature.params.bool("oppositeDirection");
-                            dlg.feature.params.set("oppositeDirection", ParamValue::Bool(!cur));
+                        if flip && let Some(f) = a.flip {
+                            let cur = dlg.feature.params.bool(f);
+                            dlg.feature.params.set(f, ParamValue::Bool(!cur));
                         }
-                        dlg.set_expr_text("depth", &text, window, cx);
+                        dlg.set_expr_text(a.param, &text, window, cx);
                     });
                 }
                 if flip {
@@ -288,7 +324,7 @@ impl PartStudioView {
                 }
                 // Whole degrees, never zero.
                 let deg = a.to_degrees().round().clamp(1.0, 360.0);
-                let units = self.doc.read(cx).session.doc.settings.units.clone();
+                let units = self.doc.read(cx).session.doc.settings.units;
                 let text = noshape_units::format_quantity(Quantity::new(deg.to_radians(), Dim::ANGLE), &units);
                 if let Some(e) = &self.edit {
                     e.dialog.update(cx, |dlg, cx| dlg.set_expr_text("angle", &text, window, cx));
@@ -306,7 +342,7 @@ impl PartStudioView {
 fn region_anchor(positions: &[[f32; 3]], indices: &[u32]) -> Option<DVec3> {
     let v = |i: u32| positions.get(i as usize).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
     let tris: Vec<(DVec3, f64)> = indices
-        .chunks_exact(3)
+        .as_chunks::<3>().0.iter()
         .filter_map(|t| {
             let (a, b, c) = (v(t[0])?, v(t[1])?, v(t[2])?);
             Some(((a + b + c) / 3.0, (b - a).cross(c - a).length() * 0.5))

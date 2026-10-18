@@ -27,7 +27,14 @@ pub enum Geometry {
     /// Control-point B-spline (optionally rational).
     BSpline { control: Vec<EntityId>, degree: usize, knots: Vec<f64>, weights: Option<Vec<f64>> },
     /// Interpolating spline through the given points (cubic, chord-length).
-    FitSpline { points: Vec<EntityId> },
+    /// `handles`: tangent handle points at the start / end (Onshape's white
+    /// handles, see [`crate::nurbs::Nurbs::interpolate_with_handles`]).
+    /// Without handles the ends are natural.
+    FitSpline {
+        points: Vec<EntityId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        handles: Option<(EntityId, EntityId)>,
+    },
     /// Conic as a rational quadratic Bézier (Onshape rho value).
     Conic { start: EntityId, control: EntityId, end: EntityId, rho: f64 },
 }
@@ -104,8 +111,16 @@ impl Entity {
                 SmallVec::from_slice(&[*center, *start, *end])
             }
             Geometry::BSpline { control, .. } => control.iter().copied().collect(),
-            Geometry::FitSpline { points } => points.iter().copied().collect(),
+            Geometry::FitSpline { points, handles } => points.iter().copied().chain(handles.iter().flat_map(|h| [h.0, h.1])).collect(),
             Geometry::Conic { start, control, end, .. } => SmallVec::from_slice(&[*start, *control, *end]),
+        }
+    }
+
+    /// Tangent handle points of a fit spline.
+    pub fn spline_handles(&self) -> Option<(EntityId, EntityId)> {
+        match &self.geometry {
+            Geometry::FitSpline { handles, .. } => *handles,
+            _ => None,
         }
     }
 
@@ -153,7 +168,7 @@ impl Entity {
             | Geometry::EllipticalArc { start, end, .. }
             | Geometry::Conic { start, end, .. } => Some((*start, *end)),
             Geometry::BSpline { control, .. } => Some((*control.first()?, *control.last()?)),
-            Geometry::FitSpline { points } => Some((*points.first()?, *points.last()?)),
+            Geometry::FitSpline { points, .. } => Some((*points.first()?, *points.last()?)),
             _ => None,
         }
     }
@@ -189,7 +204,13 @@ impl Entity {
                 r(end)
             }
             Geometry::BSpline { control, .. } => control.iter_mut().for_each(r),
-            Geometry::FitSpline { points } => points.iter_mut().for_each(r),
+            Geometry::FitSpline { points, handles } => {
+                points.iter_mut().for_each(r);
+                if let Some((h0, h1)) = handles {
+                    r(h0);
+                    r(h1);
+                }
+            }
             Geometry::Conic { start, control, end, .. } => {
                 r(start);
                 r(control);

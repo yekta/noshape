@@ -7,7 +7,7 @@ use super::font;
 use super::format::{default_digits, format_number, length_units};
 use super::sheet::{Anchor, LineStyle, Polyline2, SheetGeometry, Text2};
 use super::views::{SourceModel, ViewGeometry};
-use super::{DimFormat, Drawing, Table, TableCorner, TableKind};
+use super::{CellAlign, DimFormat, Drawing, Table, TableCorner, TableKind};
 
 /// Resolved table content.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -165,14 +165,24 @@ impl TableLayout {
     }
 }
 
-/// Natural column widths (mm) for content.
+/// Text height of a cell.
+fn cell_height(table: &Table, r: usize, c: usize) -> f64 {
+    table.cell_format(r, c).height.filter(|h| *h > 0.0).unwrap_or(table.text_height)
+}
+
+/// Natural column widths (mm) for content. Cells merged across columns do
+/// not widen single columns.
 pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     let n = data.columns();
     let pad = table.text_height * 2.2;
     let mut w = vec![table.text_height * 3.0; n];
-    for row in data.all_rows() {
+    for (ri, row) in data.all_rows().iter().enumerate() {
         for (i, c) in row.iter().enumerate() {
-            let tw = c.lines().map(|l| font::text_width(l, table.text_height)).fold(0.0, f64::max);
+            if table.merge_at(ri, i).is_some_and(|m| m.cols > 1 || (m.row, m.col) != (ri, i)) {
+                continue;
+            }
+            let h = cell_height(table, ri, i);
+            let tw = c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.cell_format(ri, i).bold { 1.05 } else { 1.0 };
             w[i] = w[i].max(tw + pad);
         }
     }
@@ -187,20 +197,28 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     w
 }
 
-/// Cell lines in a row (for multi-line cells).
-fn row_lines(row: &[String]) -> usize {
-    row.iter().map(|c| c.lines().count().max(1)).max().unwrap_or(1)
+/// Height (mm) a row's content needs.
+fn row_need(table: &Table, ri: usize, row: &[String]) -> f64 {
+    let mut need = table.row_height;
+    for (ci, c) in row.iter().enumerate() {
+        if table.merge_at(ri, ci).is_some_and(|m| m.rows > 1 || (m.row, m.col) != (ri, ci)) {
+            continue;
+        }
+        let h = cell_height(table, ri, ci);
+        let lines = c.lines().count().max(1) as f64;
+        need = need.max(table.row_height - table.text_height + h + (lines - 1.0) * h * 1.5).max(h * 2.0);
+    }
+    need
 }
 
 pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     let widths = if table.col_widths.len() == data.columns() { table.col_widths.clone() } else { auto_widths(table, data) };
-    let line_h = table.text_height * 1.5;
     let mut heights: Vec<f64> = Vec::new();
     if data.title.is_some() {
         heights.push(table.row_height.max(table.text_height * 2.0));
     }
-    for r in data.all_rows() {
-        heights.push(table.row_height.max(table.row_height + (row_lines(r) as f64 - 1.0) * line_h));
+    for (ri, r) in data.all_rows().iter().enumerate() {
+        heights.push(row_need(table, ri, r));
     }
     if heights.is_empty() {
         heights.push(table.row_height);
@@ -224,44 +242,89 @@ pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     TableLayout { xs, ys, title: data.title.is_some() }
 }
 
-/// Draw a table (grid and cell texts) with pick id `pick`.
+/// Push runs of consecutive `keep` cells as polylines along a grid line.
+fn grid_runs(g: &mut SheetGeometry, n: usize, keep: impl Fn(usize) -> bool, seg: impl Fn(usize) -> ([f64; 2], [f64; 2]), style: LineStyle, pick: u32) {
+    let mut i = 0;
+    while i < n {
+        if !keep(i) {
+            i += 1;
+            continue;
+        }
+        let start = seg(i).0;
+        let mut j = i;
+        while j + 1 < n && keep(j + 1) {
+            j += 1;
+        }
+        g.lines.push(Polyline2 { points: vec![start, seg(j).1], style, closed: false, pick });
+        i = j + 1;
+    }
+}
+
+/// Draw a table (grid and cell texts) with pick id `pick`. Merged ranges
+/// show one cell; cell formats set alignment, text height and weight.
 pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableLayout, pick: u32) {
     let (lo, hi) = (l.min(), l.max());
     g.lines.push(Polyline2 { points: vec![[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]], style: LineStyle::Visible, closed: true, pick });
     let th = table.text_height;
-    let mut row = 0usize;
+    let mut row0 = 0usize;
     if let Some(t) = &data.title {
         let (ya, yb) = (l.ys[0], l.ys[1]);
         g.lines.push(Polyline2 { points: vec![[lo[0], yb], [hi[0], yb]], style: LineStyle::Thin, closed: false, pick });
         g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0, (ya + yb) / 2.0], height: th * 1.2, text: t.clone(), angle: 0.0, anchor: Anchor::Center, pick });
-        row = 1;
+        row0 = 1;
     }
     let rows = data.all_rows();
+    let nrows = rows.len();
+    let ncols = l.xs.len().saturating_sub(1);
     let header_rows = data.header.is_some() as usize;
-    for (ri, r) in rows.iter().enumerate() {
-        let (ya, yb) = (l.ys[row + ri], l.ys[row + ri + 1]);
+    let merged_across = |r0: usize, c0: usize, r1: usize, c1: usize| table.merges.iter().any(|m| m.contains(r0, c0) && m.contains(r1, c1));
+    // Row dividers (interrupted by merged ranges).
+    for ri in 0..nrows.saturating_sub(1) {
+        let y = l.ys[row0 + ri + 1];
         let style = if ri + 1 == header_rows { LineStyle::Visible } else { LineStyle::Thin };
-        if ri + 1 < rows.len() {
-            g.lines.push(Polyline2 { points: vec![[lo[0], yb], [hi[0], yb]], style, closed: false, pick });
-        }
-        for (ci, c) in r.iter().enumerate() {
-            if ci + 1 >= l.xs.len() {
-                break;
-            }
-            let (xa, xb) = (l.xs[ci], l.xs[ci + 1]);
-            let lines: Vec<&str> = c.lines().collect();
-            let n = lines.len().max(1) as f64;
-            let line_h = th * 1.5;
-            for (k, text) in lines.iter().enumerate() {
-                let y = (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0 - k as f64 * line_h;
-                g.texts.push(Text2 { pos: [(xa + xb) / 2.0, y], height: th, text: text.to_string(), angle: 0.0, anchor: Anchor::Center, pick });
-            }
-        }
+        grid_runs(g, ncols, |c| !merged_across(ri, c, ri + 1, c), |c| ([l.xs[c], y], [l.xs[c + 1], y]), style, pick);
     }
     // Column dividers below the title.
-    let top = if data.title.is_some() { l.ys[1] } else { l.ys[0] };
-    for x in &l.xs[1..l.xs.len() - 1] {
-        g.lines.push(Polyline2 { points: vec![[*x, top], [*x, lo[1]]], style: LineStyle::Thin, closed: false, pick });
+    for c in 1..ncols {
+        let x = l.xs[c];
+        let n = nrows.max(1);
+        grid_runs(g, n, |r| !merged_across(r, c - 1, r, c), |r| ([x, l.ys[row0 + r]], [x, l.ys[(row0 + r + 1).min(l.ys.len() - 1)]]), LineStyle::Thin, pick);
+    }
+    for (ri, r) in rows.iter().enumerate() {
+        for (ci, c) in r.iter().enumerate() {
+            if ci >= ncols {
+                break;
+            }
+            let (rows_n, cols_n) = match table.merge_at(ri, ci) {
+                Some(m) if (m.row, m.col) == (ri, ci) => (m.rows, m.cols),
+                Some(_) => continue,
+                None => (1, 1),
+            };
+            let (xa, xb) = (l.xs[ci], l.xs[(ci + cols_n).min(ncols)]);
+            let (ya, yb) = (l.ys[row0 + ri], l.ys[(row0 + ri + rows_n).min(l.ys.len() - 1)]);
+            let fmt = table.cell_format(ri, ci);
+            let h = cell_height(table, ri, ci);
+            let lines: Vec<&str> = c.lines().collect();
+            let n = lines.len().max(1) as f64;
+            let line_h = h * 1.5;
+            let pad = th * 0.8;
+            for (k, text) in lines.iter().enumerate() {
+                let y = (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0 - k as f64 * line_h;
+                let tw = font::text_width(text, h);
+                let (pos, anchor) = match fmt.align {
+                    CellAlign::Center => ([(xa + xb) / 2.0, y], Anchor::Center),
+                    CellAlign::Left => ([xa + pad, y - h / 2.0], Anchor::BottomLeft),
+                    CellAlign::Right => ([xb - pad - tw, y - h / 2.0], Anchor::BottomLeft),
+                };
+                g.texts.push(Text2 { pos, height: h, text: text.to_string(), angle: 0.0, anchor, pick });
+                if fmt.bold {
+                    // Bold: the stroke text drawn again, slightly offset.
+                    for dx in [0.045, 0.09] {
+                        g.texts.push(Text2 { pos: [pos[0] + h * dx, pos[1]], height: h, text: text.to_string(), angle: 0.0, anchor, pick });
+                    }
+                }
+            }
+        }
     }
 }
 

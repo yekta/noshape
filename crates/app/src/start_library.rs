@@ -119,7 +119,7 @@ fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
     let img = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
     let mut rgba = img.to_rgba8();
     // GPUI render images are BGRA.
-    for px in rgba.chunks_exact_mut(4) {
+    for px in rgba.as_chunks_mut::<4>().0 {
         px.swap(0, 2);
     }
     Some(Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
@@ -174,11 +174,10 @@ impl Library {
         }
         // Files that disappeared.
         for (p, c) in &old {
-            if !fresh.contains_key(p) {
-                if let Some(img) = &c.thumbnail {
+            if !fresh.contains_key(p)
+                && let Some(img) = &c.thumbnail {
                     dropped.push(img.clone());
                 }
-            }
         }
         *self.cache.lock() = fresh;
         ScanResult { docs, dropped }

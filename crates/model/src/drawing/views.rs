@@ -7,7 +7,7 @@
 //! placement maps view coordinates to sheet millimeters (see
 //! [`super::build::ViewPlacement`]); annotations store view coordinates.
 
-use super::{Crop, Drawing, PointRef, Projection, Sheet, ViewId, ViewKind, ViewOrientation};
+use super::{BrokenOut, Crop, Drawing, PointRef, Projection, Sheet, ViewId, ViewKind, ViewOrientation};
 use crate::assembly::eval::{AssemblyEvaluator, AssemblyResult, SolveOptions};
 use crate::configuration::ConfigValues;
 use crate::display::BodyKind;
@@ -17,7 +17,7 @@ use crate::partstudio::PartStudio;
 use crate::reference::BodyId;
 use crate::regen::context::{Body, Context};
 use crate::regen::{RegenOptions, Regenerator};
-use glam::{DVec2, DVec3};
+use glam::{DQuat, DVec2, DVec3};
 use noshape_kernel::{Curve, EdgeClass, Plane, Segment2d, Shape, ShapeType, Surface, Visibility};
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -435,6 +435,8 @@ pub struct SectionCut {
     /// toward the section view (the removed side); the line of sight is the
     /// opposite direction.
     pub toward_view: [f64; 2],
+    /// Partial section (see [`super::DrawingView::partial`]).
+    pub partial: bool,
 }
 
 pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
@@ -455,7 +457,7 @@ pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
     }
     let n = [-e[1] / l, e[0] / l];
     let s = side_of(sheet, id, parent, n);
-    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s] })
+    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && matches!(v.kind, ViewKind::Section { .. }) })
 }
 
 /// The frame of any view on a sheet (follows the parent chain).
@@ -469,7 +471,10 @@ fn view_frame_depth(drawing: &Drawing, sheet: &Sheet, id: ViewId, depth: usize) 
     }
     let v = sheet.view(id)?;
     match &v.kind {
-        ViewKind::Base { orientation, .. } => Some(orientation_frame(*orientation)),
+        ViewKind::Base { orientation, .. } => Some(match v.custom_frame {
+            Some([d, u]) => ViewFrame::new(DVec3::from_array(d), DVec3::from_array(u)),
+            None => orientation_frame(*orientation),
+        }),
         ViewKind::Projected { parent, .. } => {
             let pf = view_frame_depth(drawing, sheet, *parent, depth + 1)?;
             Some(fold(&pf, projected_direction(sheet, id)?, drawing.projection))
@@ -534,6 +539,76 @@ pub fn view_scale(sheet: &Sheet, id: ViewId) -> f64 {
 /// The solid bodies a view shows.
 pub fn view_bodies<'a>(ctx: &'a Context, part: Option<&BodyId>) -> Vec<&'a Arc<Body>> {
     ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid && part.is_none_or(|p| &b.id == p)).collect()
+}
+
+/// View coordinates of the center of a source's bodies (the point a base or
+/// projected view of it places at the view position).
+pub fn source_origin(sources: &Sources, key: &SourceKey, part: Option<&BodyId>, frame: &ViewFrame) -> Option<[f64; 2]> {
+    let src = sources.get(key)?;
+    let bodies = view_bodies(&src.context, part);
+    (!bodies.is_empty()).then(|| frame.project(bodies_center(&bodies)))
+}
+
+// ------------------------------------------------------------ cutting lines
+
+/// Move point `i` of a cutting line to `p`. With `keep_ortho` (jogged
+/// section lines made of horizontal and vertical legs) the neighbors follow
+/// so that every leg keeps its direction.
+pub fn move_cut_point(points: &[[f64; 2]], i: usize, p: [f64; 2], keep_ortho: bool) -> Vec<[f64; 2]> {
+    let mut out = points.to_vec();
+    if i >= out.len() {
+        return out;
+    }
+    let d = [p[0] - points[i][0], p[1] - points[i][1]];
+    let tol = 1e-12;
+    let ortho = keep_ortho && points.len() > 2 && points.windows(2).all(|w| (w[0][0] - w[1][0]).abs() < tol || (w[0][1] - w[1][1]).abs() < tol);
+    out[i] = p;
+    if ortho {
+        for j in [i.wrapping_sub(1), i + 1] {
+            let Some(q) = points.get(j) else { continue };
+            if (q[1] - points[i][1]).abs() < tol {
+                out[j][1] += d[1];
+            } else {
+                out[j][0] += d[0];
+            }
+        }
+    }
+    out
+}
+
+/// Closed uniform Catmull-Rom curve through `pts`, `per_segment` samples
+/// per span (fewer than 3 points are returned as they are).
+pub fn closed_spline(pts: &[[f64; 2]], per_segment: usize) -> Vec<[f64; 2]> {
+    let n = pts.len();
+    if n < 3 {
+        return pts.to_vec();
+    }
+    let k = per_segment.max(1);
+    let mut out = Vec::with_capacity(n * k);
+    for i in 0..n {
+        let (p0, p1, p2, p3) = (pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]);
+        for s in 0..k {
+            let t = s as f64 / k as f64;
+            let (t2, t3) = (t * t, t * t * t);
+            let f = |c: usize| 0.5 * (2.0 * p1[c] + (p2[c] - p0[c]) * t + (2.0 * p0[c] - 5.0 * p1[c] + 4.0 * p2[c] - p3[c]) * t2 + (3.0 * p1[c] - p0[c] - 3.0 * p2[c] + p3[c]) * t3);
+            out.push([f(0), f(1)]);
+        }
+    }
+    out
+}
+
+/// Outline polygon of a broken-out profile.
+pub fn broken_out_outline(b: &BrokenOut) -> Vec<[f64; 2]> {
+    if b.spline { closed_spline(&b.profile, 16) } else { b.profile.clone() }
+}
+
+/// Polygonal crop boundaries as a polygon (circles: None).
+pub fn crop_polygon(c: &Crop) -> Option<Vec<[f64; 2]>> {
+    match c {
+        Crop::Circle { .. } => None,
+        Crop::Polygon(p) => Some(p.clone()),
+        Crop::Spline(p) => Some(closed_spline(p, 16)),
+    }
 }
 
 // ------------------------------------------------------------ geometry
@@ -617,6 +692,40 @@ pub struct ViewGeometry {
     /// Exact HLR (false = fast polygonal preview).
     pub exact: bool,
     pub error: Option<String>,
+    /// Aligned sections: how model points map into the view (the revolved
+    /// leg), for associative annotations.
+    pub aligned: Option<AlignedMap>,
+}
+
+/// Point mapping of an aligned section view: model points on the revolved
+/// leg's side of the center are rotated into the viewing plane.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AlignedMap {
+    pub parent: ViewFrame,
+    /// Center and unit leg directions in the parent's view coordinates.
+    pub center: [f64; 2],
+    pub ua: [f64; 2],
+    pub ub: [f64; 2],
+    pub axis_origin: DVec3,
+    pub axis: DVec3,
+    pub angle: f64,
+}
+
+impl AlignedMap {
+    /// Whether a model point lies on the revolved (`b`) leg's side.
+    pub fn revolved(&self, p: DVec3) -> bool {
+        let q = self.parent.project(p);
+        let d = [q[0] - self.center[0], q[1] - self.center[1]];
+        let tol = 1e-9;
+        d[0] * self.ua[0] + d[1] * self.ua[1] < -tol && d[0] * self.ub[0] + d[1] * self.ub[1] >= -tol
+    }
+    pub fn rotate(&self, p: DVec3) -> DVec3 {
+        self.axis_origin + DQuat::from_axis_angle(self.axis, self.angle) * (p - self.axis_origin)
+    }
+    /// Where a model point appears in the section (3D, before projection).
+    pub fn map(&self, p: DVec3) -> DVec3 {
+        if self.revolved(p) { self.rotate(p) } else { p }
+    }
 }
 
 impl ViewGeometry {
@@ -729,10 +838,11 @@ impl ViewGeometry {
 pub fn crop_bounds(c: &Crop) -> ([f64; 2], [f64; 2]) {
     match c {
         Crop::Circle { center, radius } => ([center[0] - radius, center[1] - radius], [center[0] + radius, center[1] + radius]),
-        Crop::Polygon(p) => {
+        Crop::Polygon(_) | Crop::Spline(_) => {
+            let p = crop_polygon(c).unwrap_or_default();
             let mut lo = [f64::INFINITY; 2];
             let mut hi = [f64::NEG_INFINITY; 2];
-            for q in p {
+            for q in &p {
                 for k in 0..2 {
                     lo[k] = lo[k].min(q[k]);
                     hi[k] = hi[k].max(q[k]);
@@ -748,6 +858,7 @@ pub fn clip_to_crop(pts: &[[f64; 2]], crop: &Crop) -> Vec<Vec<[f64; 2]>> {
     match crop {
         Crop::Circle { center, radius } => clip_polyline_circle(pts, *center, *radius),
         Crop::Polygon(poly) => clip_polyline_polygon(pts, poly),
+        Crop::Spline(p) => clip_polyline_polygon(pts, &closed_spline(p, 16)),
     }
 }
 
@@ -941,6 +1052,37 @@ pub fn resolve_point(ctx: &Context, frame: &ViewFrame, r: &PointRef) -> Option<(
     }
 }
 
+/// Model position of a point reference (and, for circle centers, the radius).
+pub fn resolve_point3(ctx: &Context, r: &PointRef) -> Option<(DVec3, Option<f64>)> {
+    match r {
+        PointRef::Vertex { body, name } => {
+            let b = ctx.body(body)?;
+            let i = *b.find_vertices(name).first()?;
+            Some((b.shape.sub_shape(ShapeType::Vertex, i).ok()?.vertex_point().ok()?, None))
+        }
+        PointRef::Center { body, name } => {
+            let b = ctx.body(body)?;
+            let i = *b.find_edges(name).first()?;
+            match b.shape.sub_shape(ShapeType::Edge, i).ok()?.edge_curve().ok()? {
+                Curve::Circle { center, radius, .. } => Some((center, Some(radius))),
+                _ => None,
+            }
+        }
+    }
+}
+
+/// Resolve a point reference in a computed view: like [`resolve_point`],
+/// following the view's point mapping (aligned sections).
+pub fn resolve_in_view(ctx: &Context, g: &ViewGeometry, r: &PointRef) -> Option<([f64; 2], Option<f64>)> {
+    let frame = g.frame?;
+    let (p, radius) = resolve_point3(ctx, r)?;
+    let p = match &g.aligned {
+        Some(m) => m.map(p),
+        None => p,
+    };
+    Some((frame.project(p), radius))
+}
+
 /// Reference to the vertex nearest to a 3D point (within `tol`).
 pub fn vertex_ref_near(ctx: &Context, p: DVec3, tol: f64) -> Option<PointRef> {
     let mut best: Option<(f64, PointRef)> = None;
@@ -1044,6 +1186,16 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
         }
         _ => 0u8.hash(&mut h),
     }
+    v.partial.hash(&mut h);
+    for b in &v.broken_out {
+        b.spline.hash(&mut h);
+        fx(b.depth, &mut h);
+        format!("{:?}", b.depth_ref).hash(&mut h);
+        for p in &b.profile {
+            fx(p[0], &mut h);
+            fx(p[1], &mut h);
+        }
+    }
     match &v.crop {
         None => 0u8.hash(&mut h),
         Some(Crop::Circle { center, radius }) => {
@@ -1052,8 +1204,8 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
                 fx(x, &mut h);
             }
         }
-        Some(Crop::Polygon(pts)) => {
-            2u8.hash(&mut h);
+        Some(Crop::Polygon(pts)) | Some(Crop::Spline(pts)) => {
+            (if matches!(v.crop, Some(Crop::Spline(_))) { 3u8 } else { 2u8 }).hash(&mut h);
             for p in pts {
                 fx(p[0], &mut h);
                 fx(p[1], &mut h);
@@ -1091,10 +1243,16 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             let pf = view_frame(drawing, sheet, *parent).expect("parent frame");
             aligned_section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, exact)
         }
-        _ => projected_geometry(id, &ctx, part.as_ref(), &frame, exact, None),
+        _ if !v.broken_out.is_empty() => broken_out_geometry(id, &ctx, part.as_ref(), &frame, &v.broken_out, exact),
+        _ => projected_geometry(id, &ctx, part.as_ref(), &frame, exact),
     };
     if let Some(crop) = &v.crop {
-        apply_crop(&mut g, crop);
+        // Spline crops are clipped as their sampled outline.
+        let crop = match crop_polygon(crop) {
+            Some(p) if matches!(crop, Crop::Spline(_)) => Crop::Polygon(p),
+            _ => crop.clone(),
+        };
+        apply_crop(&mut g, &crop);
     }
     let g = Arc::new(g);
     cache.put(key, g.clone());
@@ -1109,9 +1267,11 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
             g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model });
         }
     }
-    let inside = |p: [f64; 2]| match crop {
-        Crop::Circle { center, radius } => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
-        Crop::Polygon(poly) => point_in_polygon(p, poly),
+    let poly = crop_polygon(crop);
+    let inside = |p: [f64; 2]| match (crop, &poly) {
+        (Crop::Circle { center, radius }, _) => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
+        (_, Some(poly)) => point_in_polygon(p, poly),
+        _ => true,
     };
     g.snaps.retain(|s| inside(s.p));
     // Section boundaries stay whole; hatch lines are cropped at build time.
@@ -1203,8 +1363,10 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
 /// Axes of (at least half) cylindrical faces perpendicular to the view
 /// direction, as projected segments covering the faces' extent.
 fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
-    // (origin, axis, angular span, tmin, tmax)
-    let mut groups: Vec<(DVec3, DVec3, f64, f64, f64)> = Vec::new();
+    // (origin, axis, angular intervals, tmin, tmax)
+    type Group = (DVec3, DVec3, Vec<(f64, f64)>, f64, f64);
+    let mut groups: Vec<Group> = Vec::new();
+    let tau = std::f64::consts::TAU;
     for shape in shapes {
         for f in shape.faces() {
             let Ok(Surface::Cylinder { origin, axis, radius, .. }) = f.face_surface() else { continue };
@@ -1213,7 +1375,7 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
                 continue;
             }
             let Ok(uv) = f.uv_bounds() else { continue };
-            let span = (uv[1] - uv[0]).abs();
+            let (u0, u1) = (uv[0].min(uv[1]), uv[0].max(uv[1]));
             let (mut t0, mut t1) = (f64::INFINITY, f64::NEG_INFINITY);
             for e in f.edges() {
                 for p in sample_edge(&e, 8) {
@@ -1233,23 +1395,68 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
                     let s = if g.1.dot(axis) < 0.0 { -1.0 } else { 1.0 };
                     let off = (origin - g.0).dot(g.1);
                     let (a, b) = (off + s * t0, off + s * t1);
-                    g.2 += span;
+                    // Angles are only comparable for equally oriented frames;
+                    // opposite axes count as a separate coverage estimate.
+                    if s > 0.0 {
+                        g.2.push((u0, u1));
+                    } else {
+                        g.2.push((tau - u1, tau - u0));
+                    }
                     g.3 = g.3.min(a.min(b));
                     g.4 = g.4.max(a.max(b));
                 }
-                None => groups.push((origin, axis, span, t0, t1)),
+                None => groups.push((origin, axis, vec![(u0, u1)], t0, t1)),
             }
         }
     }
     groups
         .into_iter()
-        .filter(|g| g.2 >= std::f64::consts::PI - 1e-6)
+        .filter(|g| angular_coverage(&g.2) >= std::f64::consts::PI - 1e-6)
         .map(|(o, a, _, t0, t1)| [frame.project(o + a * t0), frame.project(o + a * t1)])
         .collect()
 }
 
+/// Total angle covered by a set of angular intervals (radians, union,
+/// modulo a full turn). Pieces of one face split along the axis share their
+/// interval and count once.
+fn angular_coverage(iv: &[(f64, f64)]) -> f64 {
+    let tau = std::f64::consts::TAU;
+    let mut parts: Vec<(f64, f64)> = Vec::new();
+    for &(a, b) in iv {
+        let span = (b - a).min(tau);
+        if span >= tau - 1e-9 {
+            return tau;
+        }
+        let a = a.rem_euclid(tau);
+        if a + span <= tau {
+            parts.push((a, a + span));
+        } else {
+            parts.push((a, tau));
+            parts.push((0.0, a + span - tau));
+        }
+    }
+    parts.sort_by(|x, y| x.0.total_cmp(&y.0));
+    let mut total = 0.0;
+    let mut cur: Option<(f64, f64)> = None;
+    for (a, b) in parts {
+        match cur {
+            Some((ca, cb)) if a <= cb + 1e-9 => cur = Some((ca, cb.max(b))),
+            Some((ca, cb)) => {
+                total += cb - ca;
+                cur = Some((a, b));
+            }
+            None => cur = Some((a, b)),
+        }
+    }
+    if let Some((a, b)) = cur {
+        total += b - a;
+    }
+    total
+}
+
 /// HLR projection of bodies (optionally pre-cut) into a view.
-fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: bool, keep: Option<(&Plane, f64)>) -> ViewGeometry {
+/// `keep(body index, point)` filters the vertex snap points.
+fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: bool, keep: &dyn Fn(usize, DVec3) -> bool) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: Some(*frame), exact, ..Default::default() };
     if bodies.is_empty() {
         g.error = Some("No parts to show".into());
@@ -1311,13 +1518,11 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     }
     // Snap points: vertices (on the kept side of a section) and centers of
     // face-on circles.
-    for pb in bodies {
+    for (bi, pb) in bodies.iter().enumerate() {
         let b = pb.body;
         for (i, v) in b.shape.vertices().iter().enumerate() {
             let Ok(p) = v.vertex_point() else { continue };
-            if let Some((plane, tol)) = keep
-                && plane.signed_distance(p) < -tol
-            {
+            if !keep(bi, p) {
                 continue;
             }
             g.snaps.push(Snap { p: frame.project(p), kind: SnapKind::Vertex, point: Some(PointRef::Vertex { body: b.id.clone(), name: (*b.vertices[i]).clone() }) });
@@ -1336,10 +1541,10 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     g
 }
 
-fn projected_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, exact: bool, keep: Option<(&Plane, f64)>) -> ViewGeometry {
+fn projected_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, exact: bool) -> ViewGeometry {
     let bodies = view_bodies(ctx, part);
     let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
-    let mut g = project_bodies(id, &pbs, frame, exact, keep);
+    let mut g = project_bodies(id, &pbs, frame, exact, &|_, _| true);
     g.origin = frame.project(bodies_center(&bodies));
     g.update_bounds();
     g
@@ -1352,17 +1557,19 @@ fn view_plane(parent: &ViewFrame, depth: f64) -> Plane {
 }
 
 /// Solid covering the removed side of a (possibly jogged) cutting line:
-/// the polygon bounded by the line (extended past the model) and a far
-/// offset toward the viewer side, extruded through the model along the
-/// parent's view direction.
-fn removal_tool(parent: &ViewFrame, points: &[[f64; 2]], toward: [f64; 2], center: DVec3, big: f64) -> noshape_kernel::Result<Shape> {
+/// the polygon bounded by the line (extended past the model unless
+/// `partial`) and a far offset toward the viewer side, extruded through the
+/// model along the parent's view direction.
+fn removal_tool(parent: &ViewFrame, points: &[[f64; 2]], toward: [f64; 2], center: DVec3, big: f64, partial: bool) -> noshape_kernel::Result<Shape> {
     let v2 = |p: [f64; 2]| DVec2::new(p[0], p[1]);
     let mut pts: Vec<DVec2> = points.iter().map(|p| v2(*p)).collect();
     let n = pts.len();
-    let d0 = (pts[0] - pts[1]).normalize_or_zero();
-    let d1 = (pts[n - 1] - pts[n - 2]).normalize_or_zero();
-    pts[0] += d0 * big;
-    pts[n - 1] += d1 * big;
+    if !partial {
+        let d0 = (pts[0] - pts[1]).normalize_or_zero();
+        let d1 = (pts[n - 1] - pts[n - 2]).normalize_or_zero();
+        pts[0] += d0 * big;
+        pts[n - 1] += d1 * big;
+    }
     let t = v2(toward) * big * 2.0;
     let mut poly = pts.clone();
     poly.push(pts[n - 1] + t);
@@ -1376,15 +1583,28 @@ fn removal_tool(parent: &ViewFrame, points: &[[f64; 2]], toward: [f64; 2], cente
     Ok(noshape_kernel::extrude(&face, parent.dir * big * 2.0)?.shape)
 }
 
+/// A shape to cut: the body it shows (names, geometry for model edges), the
+/// shape itself and its edge -> body edge map (None = the body's own edges).
+struct CutPiece<'a> {
+    body: &'a Arc<Body>,
+    shape: Shape,
+    map: Option<HashMap<usize, usize>>,
+}
+
 /// Cut bodies with a removal tool; returns projected bodies (with edge
 /// maps) and the section faces (tool faces facing the viewer) as edges.
 fn cut_bodies<'a>(bodies: &[&'a Arc<Body>], tool: &noshape_kernel::Result<Shape>, sight: DVec3) -> (Vec<ProjBody<'a>>, Vec<Shape>, Option<String>) {
+    let pieces: Vec<CutPiece> = bodies.iter().map(|b| CutPiece { body: b, shape: b.shape.clone(), map: None }).collect();
+    cut_pieces(pieces, tool, sight)
+}
+
+fn cut_pieces<'a>(pieces: Vec<CutPiece<'a>>, tool: &noshape_kernel::Result<Shape>, sight: DVec3) -> (Vec<ProjBody<'a>>, Vec<Shape>, Option<String>) {
     let mut pbs: Vec<ProjBody> = Vec::new();
     let mut faces: Vec<Shape> = Vec::new();
     let mut error = None;
-    for b in bodies {
+    for pc in pieces {
         let r = match tool {
-            Ok(t) => noshape_kernel::cut(&b.shape, t),
+            Ok(t) => noshape_kernel::cut(&pc.shape, t),
             Err(e) => Err(e.clone()),
         };
         match r {
@@ -1393,9 +1613,16 @@ fn cut_bodies<'a>(bodies: &[&'a Arc<Body>], tool: &noshape_kernel::Result<Shape>
                     continue;
                 }
                 let mut map = HashMap::new();
-                for i in 0..b.shape.count(ShapeType::Edge) {
+                for i in 0..pc.shape.count(ShapeType::Edge) {
+                    let src = match &pc.map {
+                        Some(m) => match m.get(&i) {
+                            Some(s) => *s,
+                            None => continue,
+                        },
+                        None => i,
+                    };
                     for o in r.history.modified(0, ShapeType::Edge, i as u32) {
-                        map.entry(o as usize).or_insert(i);
+                        map.entry(o as usize).or_insert(src);
                     }
                 }
                 for (fi, f) in r.shape.faces().iter().enumerate() {
@@ -1404,7 +1631,7 @@ fn cut_bodies<'a>(bodies: &[&'a Arc<Body>], tool: &noshape_kernel::Result<Shape>
                         faces.push(f.clone());
                     }
                 }
-                pbs.push(ProjBody { body: b, shape: r.shape, edge_map: Some(map) });
+                pbs.push(ProjBody { body: pc.body, shape: r.shape, edge_map: Some(map) });
             }
             Err(e) => error = Some(format!("Section cut failed: {e}")),
         }
@@ -1426,26 +1653,26 @@ fn section_segments_of(faces: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]>
 }
 
 fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, exact: bool) -> ViewGeometry {
+    let partial = cut.partial;
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
     let center = bodies_center(&bodies);
     let sight = frame.dir;
     let big = diag * 4.0 + 1.0;
-    let tool = removal_tool(parent, &cut.points, cut.toward_view, center, big);
+    let tool = removal_tool(parent, &cut.points, cut.toward_view, center, big, partial);
     let (pbs, faces, error) = cut_bodies(&bodies, &tool, sight);
     // Plane of the first leg (keeps snaps on the remaining side).
     let along = parent.lift([cut.points[1][0] - cut.p0[0], cut.points[1][1] - cut.p0[1]]).normalize();
     let p0 = parent.lift(cut.p0) + parent.dir * center.dot(parent.dir);
     let plane = Plane::new(p0, sight, along);
-    let keep = (cut.points.len() == 2).then_some((&plane, diag * 1e-7));
-    let mut g = project_bodies(id, &pbs, frame, exact, keep);
+    let full = cut.points.len() == 2 && !partial;
+    let tol = diag * 1e-7;
+    let mut g = project_bodies(id, &pbs, frame, exact, &|_, p| !full || plane.signed_distance(p) >= -tol);
     if g.error.is_none() {
         g.error = error;
     }
     g.section_segments = section_segments_of(&faces, frame);
-    if g.section_segments.is_empty()
-        && cut.points.len() == 2
-    {
+    if g.section_segments.is_empty() && full {
         // Fallback: planar section of the original bodies.
         for b in &bodies {
             if let Ok(c) = noshape_kernel::section_caps(&b.shape, &plane) {
@@ -1460,7 +1687,9 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
 
 /// Aligned section: the part on the `b` leg's side of the center is
 /// revolved about the center axis into the plane of the `a` leg; both
-/// halves are then cut along the straight line through the center.
+/// halves are then cut along the straight line through the center. Edge
+/// names are carried through, so dimensions stay associative (see
+/// [`AlignedMap`]).
 fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, exact: bool) -> ViewGeometry {
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
@@ -1488,54 +1717,168 @@ fn aligned_section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, fr
     // Rotation is counter-clockwise in the parent view plane, i.e. about the
     // axis pointing toward the viewer.
     let rot = noshape_kernel::Transform::Rotate { origin: axis_origin, axis: -parent.dir, angle: ang };
-    let mut owned: Vec<Arc<Body>> = Vec::new();
-    let mut error = None;
-    for body in &bodies {
-        let (Ok(ha), Ok(hb)) = (half(ua), half(ub)) else {
-            error = Some("Aligned section failed".to_string());
-            continue;
-        };
-        if let Ok(r) = noshape_kernel::common(&body.shape, &ha)
-            && r.shape.count(ShapeType::Face) > 0
-        {
-            owned.push(Arc::new(Body::new(body.id.clone(), body.name.clone(), body.kind, r.shape, vec![], body.color, body.id.feature)));
+    let map = AlignedMap { parent: *parent, center: c, ua: [ua.x, ua.y], ub: [ub.x, ub.y], axis_origin, axis: -parent.dir, angle: ang };
+    // Rotated copies of the bodies keep the original names.
+    let rotated: Vec<Option<Arc<Body>>> = bodies
+        .iter()
+        .map(|body| {
+            let t = noshape_kernel::transform(&body.shape, &rot, false).ok()?;
+            let mut rb = Body::new(body.id.clone(), body.name.clone(), body.kind, t.shape, vec![], body.color, body.id.feature);
+            rb.faces = body.faces.clone();
+            rb.edges = body.edges.clone();
+            rb.vertices = body.vertices.clone();
+            Some(Arc::new(rb))
+        })
+        .collect();
+    let edge_map = |r: &noshape_kernel::OpResult, n: usize| -> HashMap<usize, usize> {
+        let mut m = HashMap::new();
+        for i in 0..n {
+            for o in r.history.modified(0, ShapeType::Edge, i as u32) {
+                m.entry(o as usize).or_insert(i);
+            }
         }
+        m
+    };
+    let (Ok(ha), Ok(hb)) = (half(ua), half(ub)) else {
+        let mut g = ViewGeometry { id, frame: Some(*frame), exact, error: Some("Aligned section failed".into()), ..Default::default() };
+        g.update_bounds();
+        return g;
+    };
+    let mut pieces: Vec<CutPiece> = Vec::new();
+    let mut error = None;
+    for (body, rb) in bodies.iter().zip(&rotated) {
+        let ne = body.shape.count(ShapeType::Edge);
+        match noshape_kernel::common(&body.shape, &ha) {
+            Ok(r) if r.shape.count(ShapeType::Face) > 0 => {
+                let m = edge_map(&r, ne);
+                pieces.push(CutPiece { body, shape: r.shape, map: Some(m) });
+            }
+            Ok(_) => {}
+            Err(e) => error = Some(format!("Aligned section failed: {e}")),
+        }
+        let Some(rb) = rb else { continue };
         if let Ok(r) = noshape_kernel::common(&body.shape, &hb)
             && r.shape.count(ShapeType::Face) > 0
             && let Ok(t) = noshape_kernel::transform(&r.shape, &rot, false)
         {
-            owned.push(Arc::new(Body::new(body.id.clone(), body.name.clone(), body.kind, t.shape, vec![], body.color, body.id.feature)));
+            // A located copy keeps the sub-shape order of `r`.
+            let m = edge_map(&r, ne);
+            pieces.push(CutPiece { body: rb, shape: t.shape, map: Some(m) });
         }
     }
-    let refs: Vec<&Arc<Body>> = owned.iter().collect();
     // Straight cut through the center along the a leg.
     let line = [[c[0] + ua.x * big, c[1] + ua.y * big], [c[0] - ua.x * big, c[1] - ua.y * big]];
     let n = DVec2::new(-ua.y, ua.x);
     let s = if n.dot(v2(cut.toward_view)) < 0.0 { -1.0 } else { 1.0 };
-    let tool = removal_tool(parent, &line, [n.x * s, n.y * s], center3, big);
-    let (mut pbs, faces, err2) = cut_bodies(&refs, &tool, frame.dir);
-    // Names of the split bodies are not the model's: no associativity.
-    for pb in &mut pbs {
-        pb.edge_map = Some(HashMap::new());
-    }
-    let mut g = project_bodies(id, &pbs, frame, exact, None);
-    g.snaps.clear();
-    g.model_edges.clear();
-    for e in &mut g.edges {
-        e.model = None;
-    }
+    let tool = removal_tool(parent, &line, [n.x * s, n.y * s], center3, big, false);
+    let (pbs, faces, err2) = cut_pieces(pieces, &tool, frame.dir);
+    // Which projected bodies show the revolved leg.
+    let revolved: Vec<bool> = pbs.iter().map(|pb| rotated.iter().flatten().any(|r| Arc::ptr_eq(r, pb.body))).collect();
+    let tol = diag * 1e-7;
+    let keep = |bi: usize, p: DVec3| {
+        let q = parent.project(p);
+        let d = DVec2::new(q[0] - c[0], q[1] - c[1]);
+        let leg = if revolved.get(bi).copied().unwrap_or(false) { -ua } else { ua };
+        d.dot(leg) >= -tol && d.dot(n * s) <= tol
+    };
+    let mut g = project_bodies(id, &pbs, frame, exact, &keep);
     if g.error.is_none() {
         g.error = error.or(err2);
     }
     g.section_segments = section_segments_of(&faces, frame);
     g.origin = frame.project(center3);
+    g.aligned = Some(map);
+    g.update_bounds();
+    g
+}
+
+/// Nearest and farthest depth (along `dir`) of a set of bodies' bounding boxes.
+fn depth_range(bodies: &[&Arc<Body>], dir: DVec3) -> (f64, f64) {
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for b in bodies {
+        if let Ok(bb) = b.shape.bounding_box(true) {
+            for k in 0..8 {
+                let p = DVec3::new(if k & 1 == 0 { bb.min.x } else { bb.max.x }, if k & 2 == 0 { bb.min.y } else { bb.max.y }, if k & 4 == 0 { bb.min.z } else { bb.max.z });
+                lo = lo.min(p.dot(dir));
+                hi = hi.max(p.dot(dir));
+            }
+        }
+    }
+    if lo.is_finite() { (lo, hi) } else { (0.0, 0.0) }
+}
+
+/// Extent of the model along a view's line of sight (meters).
+pub fn model_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame) -> f64 {
+    let (lo, hi) = depth_range(&view_bodies(ctx, part), frame.dir);
+    hi - lo
+}
+
+/// Depth of a broken-out section below the model's nearest point.
+pub fn broken_out_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, b: &BrokenOut) -> f64 {
+    match &b.depth_ref {
+        Some(r) => match resolve_point3(ctx, r) {
+            Some((p, _)) => p.dot(frame.dir) - depth_range(&view_bodies(ctx, part), frame.dir).0,
+            None => b.depth,
+        },
+        None => b.depth,
+    }
+}
+
+/// A view with broken-out sections: each profile, extruded from in front of
+/// the model down to its depth, is cut away; the pocket floors are hatched.
+fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, cuts: &[BrokenOut], exact: bool) -> ViewGeometry {
+    let bodies = view_bodies(ctx, part);
+    let diag = bodies_diagonal(&bodies);
+    let center = bodies_center(&bodies);
+    let (front, _) = depth_range(&bodies, frame.dir);
+    let margin = diag * 0.05 + 1e-4;
+    let mut tools: Vec<Shape> = Vec::new();
+    let mut regions: Vec<(Vec<[f64; 2]>, f64)> = Vec::new();
+    let mut error = None;
+    for b in cuts {
+        let mut poly = broken_out_outline(b);
+        poly.dedup_by(|p, q| (p[0] - q[0]).abs() < 1e-12 && (p[1] - q[1]).abs() < 1e-12);
+        if poly.len() > 2 && poly.first() == poly.last() {
+            poly.pop();
+        }
+        let depth = broken_out_depth(ctx, part, frame, b);
+        if poly.len() < 3 || depth <= 0.0 {
+            continue;
+        }
+        let segs: Vec<Segment2d> = (0..poly.len()).map(|i| Segment2d::Line { a: DVec2::from_array(poly[i]), b: DVec2::from_array(poly[(i + 1) % poly.len()]) }).collect();
+        // Plane coordinates of `view_plane` are the view coordinates.
+        let plane = view_plane(frame, front - margin);
+        match noshape_kernel::make_face_2d(&plane, &segs, &[]).and_then(|f| noshape_kernel::extrude(&f, frame.dir * (depth + margin))) {
+            Ok(t) => tools.push(t.shape),
+            Err(e) => error = Some(format!("Broken-out section failed: {e}")),
+        }
+        regions.push((poly, front + depth));
+    }
+    if tools.is_empty() {
+        let mut g = projected_geometry(id, ctx, part, frame, exact);
+        if g.error.is_none() {
+            g.error = error;
+        }
+        return g;
+    }
+    let tool = Ok(if tools.len() == 1 { tools.remove(0) } else { Shape::compound(&tools) });
+    let (pbs, faces, err2) = cut_bodies(&bodies, &tool, frame.dir);
+    // Vertices removed by a pocket are no snap points.
+    let tol = diag * 1e-7;
+    let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor)| p.dot(frame.dir) < floor - tol && point_in_polygon(frame.project(p), poly));
+    let mut g = project_bodies(id, &pbs, frame, exact, &keep);
+    if g.error.is_none() {
+        g.error = error.or(err2);
+    }
+    g.section_segments = section_segments_of(&faces, frame);
+    g.origin = frame.project(center);
     g.update_bounds();
     g
 }
 
 /// Crop a parent view's geometry to a circle.
 fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: f64) -> ViewGeometry {
-    let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), ..Default::default() };
+    let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), aligned: parent.aligned, ..Default::default() };
     let mut used: HashMap<u32, u32> = HashMap::new();
     for e in &parent.edges {
         for piece in clip_polyline_circle(&e.points, center, radius) {

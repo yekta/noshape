@@ -5,11 +5,12 @@
 //! and optionally a [`PickBuffer`] of per-pixel pick ids.
 
 pub mod camera;
+pub mod perf;
 pub mod primitives;
 pub mod renderer;
 pub mod scene;
 pub mod worker;
 
 pub use camera::{Camera, Projection, StandardView};
-pub use renderer::{Frame, PickBuffer, RenderError, RenderParams, Renderer};
+pub use renderer::{Completed, Frame, FrameRequest, PickBuffer, PickRect, RenderError, RenderParams, Renderer};
 pub use scene::*;

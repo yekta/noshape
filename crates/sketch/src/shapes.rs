@@ -2,7 +2,6 @@
 //! arcs and circles, built from primitive entities plus constraints.
 
 use crate::constraints::ConstraintKind;
-use crate::entities::Geometry;
 use crate::ids::{ConstraintId, EntityId};
 use crate::sketch::{Result, Sketch, SketchError};
 use glam::DVec2;
@@ -257,6 +256,209 @@ impl Sketch {
         Ok(out)
     }
 
+    /// Slot of total `width` around a line or arc centerline (Onshape's Slot
+    /// tool): two side curves joined by semicircular end caps centered on
+    /// the centerline's end points. The centerline becomes construction
+    /// geometry; the end caps are equal so one dimension sets the width.
+    pub fn slot_around(&mut self, id: EntityId, width: f64) -> Result<ShapeIds> {
+        if width <= 0.0 {
+            return Err(SketchError::InvalidGeometry("slot width must be positive".into()));
+        }
+        let h = width * 0.5;
+        let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
+        let mut out = ShapeIds::default();
+        match e.geometry {
+            crate::entities::Geometry::Line { start, end } => {
+                let (p0, p1) = (self.point(start).unwrap(), self.point(end).unwrap());
+                let d = p1 - p0;
+                if d.length() < 1e-12 {
+                    return Err(SketchError::InvalidGeometry("degenerate slot centerline".into()));
+                }
+                let n = d.normalize().perp() * h;
+                let b0 = self.add_point(p0 - n);
+                let b1 = self.add_point(p1 - n);
+                let a1 = self.add_point(p1 + n);
+                let a0 = self.add_point(p0 + n);
+                let bottom = self.add_line_between(b0, b1)?;
+                let cap1 = self.add_arc_between(end, b1, a1)?;
+                let top = self.add_line_between(a1, a0)?;
+                let cap0 = self.add_arc_between(start, a0, b0)?;
+                out.points = vec![b0, b1, a1, a0];
+                out.curves = vec![bottom, cap1, top, cap0];
+                for (l, c) in [(bottom, cap1), (top, cap1), (top, cap0), (bottom, cap0)] {
+                    self.c(&mut out, ConstraintKind::Tangent { a: l, b: c });
+                }
+                self.c(&mut out, ConstraintKind::Equal { a: cap0, b: cap1 });
+            }
+            crate::entities::Geometry::Arc { center, start, end } => {
+                let (c, s, en) = (self.point(center).unwrap(), self.point(start).unwrap(), self.point(end).unwrap());
+                let r = (s - c).length();
+                if r - h <= 1e-12 {
+                    return Err(SketchError::InvalidGeometry("slot is wider than the arc".into()));
+                }
+                let us = (s - c).normalize();
+                let ue = (en - c).normalize();
+                let os = self.add_point(c + us * (r + h));
+                let is = self.add_point(c + us * (r - h));
+                let oe = self.add_point(c + ue * (r + h));
+                let ie = self.add_point(c + ue * (r - h));
+                let outer = self.add_arc_between(center, os, oe)?;
+                let inner = self.add_arc_between(center, is, ie)?;
+                // caps run CCW around their centers, bulging away from the arc
+                let cap_s = self.add_arc_between(start, is, os)?;
+                let cap_e = self.add_arc_between(end, oe, ie)?;
+                out.points = vec![os, is, oe, ie];
+                out.curves = vec![outer, cap_e, inner, cap_s];
+                for (a, b) in [(outer, cap_s), (inner, cap_s), (outer, cap_e), (inner, cap_e)] {
+                    self.c(&mut out, ConstraintKind::Tangent { a, b });
+                }
+                self.c(&mut out, ConstraintKind::Equal { a: cap_s, b: cap_e });
+            }
+            _ => return Err(SketchError::InvalidGeometry("slots follow lines and arcs".into())),
+        }
+        self.set_construction(id, true)?;
+        out.construction.push(id);
+        Ok(out)
+    }
+
+    /// Adds a defining point to a spline at `at` (Spline control point tool):
+    /// a fit point for fit splines, a control point on the control polygon
+    /// for Bezier curves (raising their degree, at most 15).
+    pub fn insert_spline_point(&mut self, id: EntityId, at: DVec2) -> Result<EntityId> {
+        let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
+        match e.geometry {
+            crate::entities::Geometry::FitSpline { mut points, handles } => {
+                let curve = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+                let (t, q, _) = curve.closest(at);
+                // fit points are interpolated in order: insert before the first one past t
+                let params: Vec<f64> = points.iter().map(|p| curve.closest(self.point(*p).unwrap()).0).collect();
+                let k = params.iter().position(|pt| *pt > t).unwrap_or(points.len() - 1).max(1);
+                let np = self.add_point(q);
+                points.insert(k, np);
+                self.replace_geometry(id, crate::entities::Geometry::FitSpline { points, handles });
+                Ok(np)
+            }
+            crate::entities::Geometry::BSpline { mut control, weights: None, .. } => {
+                if control.len() >= 16 {
+                    return Err(SketchError::InvalidGeometry("The maximum bezier degree (15) has been reached.".into()));
+                }
+                let pts: Vec<DVec2> = control.iter().map(|p| self.point(*p).unwrap()).collect();
+                let mut best = (f64::INFINITY, 1, at);
+                for k in 0..pts.len() - 1 {
+                    let (a, b) = (pts[k], pts[k + 1]);
+                    let d = b - a;
+                    let t = if d.length_squared() < 1e-30 { 0.0 } else { ((at - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) };
+                    let q = a + d * t;
+                    if (q - at).length() < best.0 {
+                        best = ((q - at).length(), k + 1, q);
+                    }
+                }
+                let np = self.add_point(best.2);
+                control.insert(best.1, np);
+                let degree = control.len() - 1;
+                let knots = crate::nurbs::clamped_uniform_knots(control.len(), degree);
+                self.replace_geometry(id, crate::entities::Geometry::BSpline { control, degree, knots, weights: None });
+                Ok(np)
+            }
+            _ => Err(SketchError::InvalidGeometry("click a spline or a bezier curve".into())),
+        }
+    }
+
+    /// Degree of a Bezier curve (a single-segment B-spline), if it is one.
+    pub fn bezier_degree(&self, id: EntityId) -> Option<usize> {
+        match &self.entity(id)?.geometry {
+            crate::entities::Geometry::BSpline { control, degree, weights: None, .. } if *degree + 1 == control.len() => Some(*degree),
+            _ => None,
+        }
+    }
+
+    /// Changes a Bezier curve's degree (1..=15). Raising the degree keeps
+    /// the shape exactly (degree elevation); lowering it approximates the
+    /// curve by least squares with the end points kept.
+    pub fn set_bezier_degree(&mut self, id: EntityId, degree: usize) -> Result<()> {
+        let Some(cur) = self.bezier_degree(id) else { return Err(SketchError::InvalidGeometry("not a bezier curve".into())) };
+        if !(1..=15).contains(&degree) {
+            return Err(SketchError::InvalidGeometry("The maximum bezier degree (15) has been reached.".into()));
+        }
+        if degree == cur {
+            return Ok(());
+        }
+        let crate::entities::Geometry::BSpline { control, .. } = self.entity(id).unwrap().geometry.clone() else { unreachable!() };
+        let pts: Vec<DVec2> = control.iter().map(|p| self.point(*p).unwrap()).collect();
+        let bez = |c: &[DVec2], t: f64| -> DVec2 {
+            let mut v = c.to_vec();
+            while v.len() > 1 {
+                for i in 0..v.len() - 1 {
+                    v[i] = v[i].lerp(v[i + 1], t);
+                }
+                v.pop();
+            }
+            v[0]
+        };
+        let new_pts: Vec<DVec2> = if degree > cur {
+            let mut c = pts.clone();
+            while c.len() < degree + 1 {
+                let n = c.len() - 1;
+                let mut e = Vec::with_capacity(c.len() + 1);
+                e.push(c[0]);
+                for i in 1..=n {
+                    let a = i as f64 / (n + 1) as f64;
+                    e.push(c[i - 1] * a + c[i] * (1.0 - a));
+                }
+                e.push(c[n]);
+                c = e;
+            }
+            c
+        } else {
+            // Least squares with fixed ends on Bernstein polynomials.
+            let m = 64;
+            let samples: Vec<(f64, DVec2)> = (0..=m).map(|k| {
+                let t = k as f64 / m as f64;
+                (t, bez(&pts, t))
+            }).collect();
+            let d = degree;
+            let binom = |n: usize, k: usize| -> f64 { (0..k).fold(1.0, |acc, i| acc * (n - i) as f64 / (i + 1) as f64) };
+            let b = |i: usize, t: f64| binom(d, i) * t.powi(i as i32) * (1.0 - t).powi((d - i) as i32);
+            let (p0, pn) = (pts[0], pts[pts.len() - 1]);
+            let inner = d.saturating_sub(1);
+            let mut c = vec![p0];
+            if inner > 0 {
+                let mut a = nalgebra::DMatrix::<f64>::zeros(samples.len(), inner);
+                let mut rx = nalgebra::DVector::<f64>::zeros(samples.len());
+                let mut ry = nalgebra::DVector::<f64>::zeros(samples.len());
+                for (r, (t, q)) in samples.iter().enumerate() {
+                    for j in 0..inner {
+                        a[(r, j)] = b(j + 1, *t);
+                    }
+                    let rest = *q - p0 * b(0, *t) - pn * b(d, *t);
+                    rx[r] = rest.x;
+                    ry[r] = rest.y;
+                }
+                let at = a.transpose();
+                let ata = &at * &a;
+                let lu = ata.lu();
+                let x = lu.solve(&(&at * rx)).ok_or_else(|| SketchError::OperationFailed("degree reduction failed".into()))?;
+                let y = lu.solve(&(&at * ry)).ok_or_else(|| SketchError::OperationFailed("degree reduction failed".into()))?;
+                c.extend((0..inner).map(|j| DVec2::new(x[j], y[j])));
+            }
+            c.push(pn);
+            c
+        };
+        // Keep the end points (and their constraints); rebuild the interior.
+        let (first, last) = (control[0], control[control.len() - 1]);
+        let mut ids = vec![first];
+        for p in &new_pts[1..new_pts.len() - 1] {
+            ids.push(self.add_point(*p));
+        }
+        ids.push(last);
+        let old_inner: Vec<EntityId> = control[1..control.len() - 1].to_vec();
+        let knots = crate::nurbs::clamped_uniform_knots(ids.len(), degree);
+        self.replace_geometry(id, crate::entities::Geometry::BSpline { control: ids, degree, knots, weights: None });
+        let orphans: Vec<EntityId> = old_inner.into_iter().filter(|p| self.users_of_point(*p).is_empty()).collect();
+        self.remove_entities(&orphans);
+        Ok(())
+    }
+
     /// Circle by center and radius (convenience alias used by the UI).
     pub fn center_circle(&mut self, center: DVec2, radius: f64) -> EntityId {
         self.add_circle(center, radius)
@@ -275,11 +477,4 @@ impl Sketch {
         Ok(self.add_ellipse(center, m, b))
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn arc_points(&self, id: EntityId) -> Option<(EntityId, EntityId, EntityId)> {
-        match self.entity(id)?.geometry {
-            Geometry::Arc { center, start, end } => Some((center, start, end)),
-            _ => None,
-        }
-    }
 }

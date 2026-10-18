@@ -37,6 +37,35 @@ pub fn err<T>(m: impl Into<String>) -> FResult<T> {
     Err(FeatureError::new(m))
 }
 
+/// Why `v` (SI) is outside the bounds of `spec`, in user units; `None` if inside.
+pub fn bounds_violation(v: f64, spec: &crate::params::NumSpec, units: &UnitPrefs) -> Option<String> {
+    use crate::params::NumKind;
+    let fmt = |x: f64| -> String {
+        match spec.kind {
+            NumKind::Length => noshape_units::format_quantity(Quantity::new(x, Dim::LENGTH), units),
+            NumKind::Angle => noshape_units::format_quantity(Quantity::new(x, Dim::ANGLE), units),
+            NumKind::Integer => format!("{}", x.round() as i64),
+            NumKind::Real => noshape_units::format_number(x, 6),
+        }
+    };
+    let tol = 1e-9 * spec.min.abs().max(spec.max.abs()).max(1e-9);
+    // Integers are rounded by the evaluators, so 0.6 for a min of 1 is fine.
+    let v = if spec.kind == NumKind::Integer { v.round() } else { v };
+    if v < spec.min - tol {
+        return Some(if spec.min > 0.0 && spec.min < 1e-4 && spec.kind != NumKind::Integer {
+            "must be greater than 0".into()
+        } else if spec.min == 0.0 {
+            "must not be negative".into()
+        } else {
+            format!("must be at least {}", fmt(spec.min))
+        });
+    }
+    if v > spec.max + tol {
+        return Some(format!("must be at most {}", fmt(spec.max)));
+    }
+    None
+}
+
 struct ContextScope<'a>(&'a BTreeMap<String, Quantity>);
 
 impl VariableScope for ContextScope<'_> {
@@ -235,6 +264,38 @@ impl<'a> EvalCtx<'a> {
     }
     pub fn integer(&self, id: &str) -> FResult<i64> {
         Ok(self.eval_num_in(self.params, id, NumKind::Integer)?.round() as i64)
+    }
+
+    /// Check every visible numeric parameter against its schema bounds
+    /// (Onshape rejects out-of-range values such as a pattern count of 0 or
+    /// 10⁶, or a zero fillet radius, before the feature runs). Values that
+    /// fail to evaluate are left to the evaluator's own error.
+    pub fn check_bounds(&self, specs: &[crate::params::ParamSpec]) -> FResult<()> {
+        self.check_bounds_in(specs, self.params)
+    }
+
+    fn check_bounds_in(&self, specs: &[crate::params::ParamSpec], vals: &ParamValues) -> FResult<()> {
+        use crate::params::ParamKind;
+        for s in specs {
+            if !s.is_visible(vals) {
+                continue;
+            }
+            match &s.kind {
+                ParamKind::Num(n) => {
+                    let Ok(v) = self.eval_num_in(vals, s.id, n.kind) else { continue };
+                    if let Some(msg) = bounds_violation(v, n, self.units) {
+                        return err(format!("{}: {msg}", s.label));
+                    }
+                }
+                ParamKind::Array { item, .. } => {
+                    for it in vals.array(s.id) {
+                        self.check_bounds_in(item, it)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     /// Evaluate an arbitrary expression text with a dimension.

@@ -7,7 +7,9 @@ struct Globals {
     camera_up: vec4<f32>,
     viewport: vec4<f32>,     // width px, height px, device pixel ratio, pick widening px
     clip: vec4<f32>,         // plane normal xyz, d
-    flags: vec4<u32>,        // x = clip enabled
+    flags: vec4<u32>,        // x = number of clip planes (0..3)
+    clip2: vec4<f32>,
+    clip3: vec4<f32>,
     bg_top: vec4<f32>,
     bg_bottom: vec4<f32>,
     hover: vec4<f32>,
@@ -54,7 +56,11 @@ fn state_of(id: u32) -> u32 {
 }
 
 fn clipped(world: vec3<f32>) -> bool {
-    return g.flags.x != 0u && inst.params.y == 0u && dot(world, g.clip.xyz) > g.clip.w;
+    if (g.flags.x == 0u || inst.params.y != 0u) { return false; }
+    var c = dot(world, g.clip.xyz) > g.clip.w;
+    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w; }
+    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w; }
+    return c;
 }
 
 fn highlight(base: vec3<f32>, st: u32) -> vec3<f32> {
@@ -94,6 +100,7 @@ struct MeshIn {
     @location(0) pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) pick: u32,
+    @location(3) color: vec4<f32>,
 };
 
 struct MeshOut {
@@ -101,6 +108,7 @@ struct MeshOut {
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) @interpolate(flat) pick: u32,
+    @location(3) color: vec4<f32>,
 };
 
 @vertex
@@ -111,6 +119,7 @@ fn vs_mesh(v: MeshIn) -> MeshOut {
     o.pos = g.view_proj * w;
     o.normal = (inst.normal_m * vec4(v.normal, 0.0)).xyz;
     o.pick = global_pick(v.pick);
+    o.color = v.color;
     return o;
 }
 
@@ -141,7 +150,11 @@ fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    var base = highlight(inst.color.rgb, st);
+    // Per-primitive instances color each vertex (analysis maps, face
+    // appearances); vertices with alpha 0 keep the instance color.
+    var own = inst.color.rgb;
+    if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
+    var base = highlight(own, st);
     var c = shade(i.world, i.normal, front, base);
     // Back faces revealed by a section cut are tinted so cut solids read well.
     if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }

@@ -8,6 +8,9 @@ use noshape_units::Dim;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+/// Parameter id prefix of a configured sketch dimension (`sketchDim:<constraint id>`).
+pub const CONFIGURED_DIMENSION_PREFIX: &str = "sketchDim:";
+
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(plane_ref) = ev.query("sketchPlane").first() else {
         return err("Select a sketch plane");
@@ -20,27 +23,86 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         _ => Box::default(),
     };
     let mut sk = data.sketch.clone();
-    // Re-project used ("Use") 3D edges so they follow upstream changes.
+    // Re-project used ("Use") 3D geometry so it follows upstream changes:
+    // vertices, edges (exact or sampled projections, pierce points), plane
+    // traces and silhouettes of curved faces.
     let mut missing = 0;
+    let mut silhouettes: BTreeMap<String, Vec<noshape_sketch::Curve2>> = BTreeMap::new();
     for (eid, r) in &data.external_refs {
+        let id = noshape_sketch::EntityId(*eid);
         // Projected model vertices (snapped to while sketching).
         if matches!(r, crate::reference::Reference::Vertex(_)) {
             match ev.resolve_vertex_point(r) {
                 Some(p) => {
-                    let _ = sk.set_point(noshape_sketch::EntityId(*eid), frame.to_local(p));
+                    let _ = sk.set_point(id, frame.to_local(p));
                 }
                 None => missing += 1,
             }
             continue;
         }
-        let edges = ev.resolve_edges(std::slice::from_ref(r));
-        let Some(&(bi, ei)) = edges.first() else {
-            missing += 1;
-            continue;
+        // Planes (and planar faces) appear as their trace line.
+        let curved_face = matches!(r, crate::reference::Reference::Face(_)) && {
+            let f = ev.resolve_faces(std::slice::from_ref(r));
+            f.first().and_then(|&(bi, fi)| ev.face_shape(bi, fi).ok()).is_some_and(|f| !f.is_planar())
         };
-        let Ok(edge) = ev.edge_shape(bi, ei) else { continue };
-        if let Some(c) = project_edge(&edge, &frame) {
-            update_external(&mut sk, noshape_sketch::EntityId(*eid), &c);
+        if !curved_face && let Some(pl) = (!matches!(r, crate::reference::Reference::Edge(_))).then(|| ev.resolve_plane(r)).flatten() {
+            match plane_trace(&pl, &frame) {
+                Some((p, d)) => update_trace(&mut sk, id, p, d),
+                None => missing += 1,
+            }
+            continue;
+        }
+        if curved_face {
+            let key = format!("{r:?}");
+            if !silhouettes.contains_key(&key) {
+                let f = ev.resolve_faces(std::slice::from_ref(r));
+                let sil = f.first().and_then(|&(bi, fi)| ev.face_shape(bi, fi).ok()).map(|f| face_silhouettes(&f, &frame)).unwrap_or_default();
+                silhouettes.insert(key.clone(), sil);
+            }
+            let cands: Vec<SectionCurve> = silhouettes[&key].iter().cloned().map(SectionCurve::Exact).collect();
+            if cands.is_empty() {
+                missing += 1;
+            } else {
+                missing += update_intersection(&mut sk, &[*eid], &cands);
+            }
+            continue;
+        }
+        // Entities of other sketches are used like model edges / vertices.
+        let edge = if let crate::reference::Reference::SketchEntity { .. } = r {
+            let Some(shape) = crate::regen::measure::resolve_shapes(&ev.ctx, r).into_iter().next() else {
+                missing += 1;
+                continue;
+            };
+            if let Ok(p) = shape.vertex_point() {
+                let _ = sk.set_point(id, frame.to_local(p));
+                continue;
+            }
+            shape
+        } else {
+            let edges = ev.resolve_edges(std::slice::from_ref(r));
+            let Some(&(bi, ei)) = edges.first() else {
+                missing += 1;
+                continue;
+            };
+            let Ok(edge) = ev.edge_shape(bi, ei) else { continue };
+            edge
+        };
+        if sk.kind(id) == Some(noshape_sketch::EntityKind::Point) {
+            // Pierce point: where the edge crosses the sketch plane.
+            match pierce_point(&edge, &frame) {
+                Some(p) => {
+                    let _ = sk.set_point(id, p);
+                }
+                None => missing += 1,
+            }
+            continue;
+        }
+        match project_edge_any(&edge, &frame) {
+            Some(SectionCurve::Exact(c)) => update_external(&mut sk, id, &c),
+            Some(sampled) => {
+                update_intersection(&mut sk, &[*eid], &[sampled]);
+            }
+            None => {}
         }
     }
     if missing > 0 {
@@ -69,6 +131,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         }
         let dim = match c.kind {
             ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. } => Dim::ANGLE,
+            ConstraintKind::Rho { .. } => Dim::UNITLESS,
             _ => Dim::LENGTH,
         };
         match ev.eval_text(&expr.text, dim) {
@@ -76,6 +139,42 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 let _ = sk.set_dimension_value(id, q.value);
             }
             Err(e) => problems.push(e.message),
+        }
+    }
+    // Configured dimensions ("Configure dimension"): the configuration's
+    // value for this dimension overrides its expression.
+    for (key, v) in ev.params.0.iter() {
+        let (Some(cid), crate::params::ParamValue::Expr(expr)) = (key.strip_prefix(CONFIGURED_DIMENSION_PREFIX).and_then(|c| c.parse::<u32>().ok()), v) else { continue };
+        let id = ConstraintId(cid);
+        let Some(c) = sk.constraint(id) else { continue };
+        let dim = match c.kind {
+            ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. } => Dim::ANGLE,
+            ConstraintKind::Rho { .. } => Dim::UNITLESS,
+            _ => Dim::LENGTH,
+        };
+        match ev.eval_text(&expr.text, dim) {
+            Ok(q) => {
+                let _ = sk.set_dimension_value(id, q.value);
+            }
+            Err(e) => problems.push(e.message),
+        }
+    }
+    // Text expressions (Convert to expression): evaluate, and size the box
+    // to the evaluated text before solving.
+    let mut data = data;
+    if data.texts.iter().any(|t| t.expression) {
+        for t in data.texts.iter_mut().filter(|t| t.expression) {
+            match eval_text_expression(ev, &t.text) {
+                Ok(v) if !v.trim().is_empty() => {
+                    t.text = v;
+                    let width = noshape_sketch::text::layout_text(&t.text, &t.font, t.bold, t.italic).width;
+                    if let Some(rc) = t.ratio_constraint {
+                        let _ = sk.set_length_ratio(ConstraintId(rc), width.max(1e-6));
+                    }
+                }
+                Ok(_) => problems.push("The text expression is empty".into()),
+                Err(e) => problems.push(e),
+            }
         }
     }
     let report = sk.solve();
@@ -88,6 +187,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         if let Some(v) = c.kind.value() {
             let q = match c.kind {
                 ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. } => noshape_units::Quantity::new(v, Dim::ANGLE),
+                ConstraintKind::Rho { .. } => noshape_units::Quantity::new(v, Dim::UNITLESS),
                 _ => noshape_units::Quantity::new(v, Dim::LENGTH),
             };
             let mut text = noshape_units::format_quantity(q, ev.units);
@@ -112,6 +212,67 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     ev.ctx.sketches.retain(|s| s.feature != ev.feature);
     ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, wires, dimension_text }));
     Ok(())
+}
+
+/// Splits `text` at top-level occurrences of `sep` (outside quotes and parentheses).
+fn split_top(text: &str, sep: char) -> Vec<String> {
+    let (mut out, mut cur, mut depth, mut quoted) = (Vec::new(), String::new(), 0i32, false);
+    for ch in text.chars() {
+        match ch {
+            '"' => quoted = !quoted,
+            '(' | '[' if !quoted => depth += 1,
+            ')' | ']' if !quoted => depth -= 1,
+            c if c == sep && !quoted && depth == 0 => {
+                out.push(std::mem::take(&mut cur));
+                continue;
+            }
+            _ => {}
+        }
+        cur.push(ch);
+    }
+    out.push(cur);
+    out
+}
+
+/// A number with up to `max` decimals, trailing zeros removed.
+fn trim_number(v: f64, max: usize) -> String {
+    let s = format!("{v:.max$}");
+    if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s }
+}
+
+/// Evaluates a sketch text expression: string literals ("..."), numeric
+/// expressions (variables, units, functions; unitless results print as
+/// numbers, lengths and angles with their unit), `roundToPrecision(x, n)`
+/// and `~` concatenation (Onshape's text expressions).
+pub fn eval_text_expression(ev: &EvalCtx, text: &str) -> Result<String, String> {
+    let mut out = String::new();
+    for piece in split_top(text, '~') {
+        let p = piece.trim();
+        if p.is_empty() {
+            continue;
+        }
+        if p.len() >= 2 && p.starts_with('"') && p.ends_with('"') {
+            out.push_str(&p[1..p.len() - 1].replace("\\\"", "\""));
+            continue;
+        }
+        if let Some(inner) = p.strip_prefix("roundToPrecision(").and_then(|r| r.strip_suffix(')')) {
+            let args = split_top(inner, ',');
+            if args.len() == 2 {
+                let x = ev.eval_text(args[0].trim(), Dim::UNITLESS).map_err(|e| e.message)?.value;
+                let n = ev.eval_text(args[1].trim(), Dim::UNITLESS).map_err(|e| e.message)?.value.round().clamp(0.0, 12.0) as usize;
+                out.push_str(&format!("{x:.n$}"));
+                continue;
+            }
+        }
+        let v = ev
+            .eval_text(p, Dim::UNITLESS)
+            .map(|q| trim_number(q.value, 6))
+            .or_else(|_| ev.eval_text(p, Dim::LENGTH).map(|q| noshape_units::format_quantity(q, ev.units)))
+            .or_else(|_| ev.eval_text(p, Dim::ANGLE).map(|q| noshape_units::format_quantity(q, ev.units)))
+            .map_err(|e| e.message)?;
+        out.push_str(&v);
+    }
+    Ok(out)
 }
 
 /// Project a 3D edge onto a sketch plane (orthogonal projection).
@@ -146,6 +307,172 @@ pub fn project_edge(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneF
     }
 }
 
+/// Projection of any edge onto the sketch plane: exact for lines, circles
+/// in planes parallel to the sketch and circles seen obliquely (ellipses),
+/// sampled (fit spline) otherwise.
+pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<SectionCurve> {
+    use glam::{DVec2, DVec3};
+    use noshape_kernel as k;
+    if let Some(c) = project_edge(edge, frame) {
+        return Some(SectionCurve::Exact(c));
+    }
+    let info = edge.edge_info().ok()?;
+    if let k::Curve::Circle { center, axis, x_dir, radius } = info.curve {
+        let a = axis.normalize();
+        let cos = a.dot(frame.normal).abs();
+        if cos > 1e-6 {
+            // A circle seen obliquely is an ellipse: the axis direction in
+            // the plane foreshortens by cos, the perpendicular stays.
+            let c2 = frame.to_local(center);
+            let in_plane = frame.normal.cross(a);
+            let major3 = if in_plane.length() < 1e-12 { x_dir.normalize() } else { in_plane.normalize() };
+            let m2 = frame.to_local(center + major3 * radius) - c2;
+            if info.closed {
+                return Some(SectionCurve::Exact(noshape_sketch::Curve2::Ellipse { center: c2, major: m2, minor: radius * cos }));
+            }
+        }
+    }
+    let t = k::tessellate(edge, 1e-5, 0.05, false).ok()?;
+    if t.edges.is_empty() {
+        return None;
+    }
+    let pl: Vec<DVec2> = t.edge_polyline(0).iter().map(|v| frame.to_local(DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64))).collect();
+    // An edge seen end-on (normal to the sketch) projects to a point.
+    let len: f64 = pl.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+    if len < 1e-9 {
+        return None;
+    }
+    resample(&pl, SECTION_SAMPLES).map(SectionCurve::Sampled)
+}
+
+/// Where an edge crosses the sketch plane (Pierce).
+pub fn pierce_point(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<glam::DVec2> {
+    use glam::DVec3;
+    let t = noshape_kernel::tessellate(edge, 1e-6, 0.02, false).ok()?;
+    if t.edges.is_empty() {
+        return None;
+    }
+    let pts: Vec<DVec3> = t.edge_polyline(0).iter().map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64)).collect();
+    let h = |p: DVec3| (p - frame.origin).dot(frame.normal);
+    let mut best: Option<(f64, DVec3)> = None;
+    for w in pts.windows(2) {
+        let (a, b) = (h(w[0]), h(w[1]));
+        if a * b <= 0.0 && (a - b).abs() > 1e-15 {
+            let p = w[0] + (w[1] - w[0]) * (a / (a - b));
+            return Some(frame.to_local(p));
+        }
+        let d = a.abs().min(b.abs());
+        if best.is_none_or(|bb| d < bb.0) {
+            best = Some((d, if a.abs() < b.abs() { w[0] } else { w[1] }));
+        }
+    }
+    // Lines (straight edges) extended to the plane.
+    if let Ok(info) = edge.edge_info()
+        && let noshape_kernel::Curve::Line { .. } = info.curve
+    {
+        let d = info.end - info.start;
+        let den = d.dot(frame.normal);
+        if den.abs() > 1e-12 {
+            let s = (frame.origin - info.start).dot(frame.normal) / den;
+            return Some(frame.to_local(info.start + d * s));
+        }
+    }
+    best.filter(|b| b.0 < 1e-7).map(|b| frame.to_local(b.1))
+}
+
+/// Trace of a plane in the sketch plane: a point on it and its direction
+/// (sketch coordinates). `None` when the planes are parallel.
+pub fn plane_trace(plane: &crate::display::PlaneFrame, frame: &crate::display::PlaneFrame) -> Option<(glam::DVec2, glam::DVec2)> {
+    let d3 = frame.normal.cross(plane.normal);
+    if d3.length() < 1e-9 {
+        return None;
+    }
+    let d3 = d3.normalize();
+    // In-plane direction perpendicular to the trace, towards the other plane.
+    let w = frame.normal.cross(d3);
+    let den = w.dot(plane.normal);
+    if den.abs() < 1e-15 {
+        return None;
+    }
+    let s = (plane.origin - frame.origin).dot(plane.normal) / den;
+    let p3 = frame.origin + w * s;
+    let p = frame.to_local(p3);
+    let d = frame.to_local(p3 + d3) - p;
+    Some((p, d.normalize()))
+}
+
+/// Move a trace line (external line entity) onto a new trace, keeping its
+/// length and centering it at the projection of its old midpoint.
+pub fn update_trace(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, p: glam::DVec2, d: glam::DVec2) {
+    let Some((s, e)) = sk.endpoints(id) else { return };
+    let (Some(a), Some(b)) = (sk.point(s), sk.point(e)) else { return };
+    let half = ((b - a).length() * 0.5).max(1e-6);
+    let m = (a + b) * 0.5;
+    let c = p + d * (m - p).dot(d);
+    let dir = if (b - a).dot(d) < 0.0 { -d } else { d };
+    let _ = sk.set_point(s, c - dir * half);
+    let _ = sk.set_point(e, c + dir * half);
+}
+
+/// Silhouette curves of a curved face seen normal to the sketch plane
+/// (Use silhouette edges): cylinders, cones, spheres and tori whose
+/// silhouettes are trackable analytic curves.
+pub fn face_silhouettes(face: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Vec<noshape_sketch::Curve2> {
+    use glam::DVec3;
+    use noshape_kernel::Surface;
+    use noshape_sketch::Curve2;
+    let Ok(surf) = face.face_surface() else { return Vec::new() };
+    let n = frame.normal;
+    // Extent of the face along a 3D direction (from its bounding box corners).
+    let extent = |o: DVec3, a: DVec3| -> Option<(f64, f64)> {
+        let bb = face.bounding_box(true).ok()?;
+        let (lo, hi) = (bb.min, bb.max);
+        let mut r = (f64::INFINITY, f64::NEG_INFINITY);
+        for i in 0..8 {
+            let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+            let t = (c - o).dot(a);
+            r = (r.0.min(t), r.1.max(t));
+        }
+        Some(r)
+    };
+    let line = |p: DVec3, q: DVec3| Curve2::Line { a: frame.to_local(p), b: frame.to_local(q) };
+    match surf {
+        Surface::Cylinder { origin, axis, radius, .. } => {
+            let a = axis.normalize();
+            let side = n.cross(a);
+            if side.length() < 1e-9 {
+                // Axis normal to the sketch: the silhouette is the circle.
+                return vec![Curve2::Circle { center: frame.to_local(origin), radius }];
+            }
+            let side = side.normalize() * radius;
+            let Some((t0, t1)) = extent(origin, a) else { return Vec::new() };
+            [side, -side].iter().map(|s| line(origin + *s + a * t0, origin + *s + a * t1)).collect()
+        }
+        Surface::Sphere { center, radius, .. } => vec![Curve2::Circle { center: frame.to_local(center), radius }],
+        Surface::Torus { center, axis, major_radius, minor_radius } if axis.normalize().dot(n).abs() > 1.0 - 1e-9 => {
+            let c = frame.to_local(center);
+            vec![Curve2::Circle { center: c, radius: major_radius + minor_radius }, Curve2::Circle { center: c, radius: (major_radius - minor_radius).abs() }]
+        }
+        Surface::Cone { axis, half_angle, apex, .. } if axis.normalize().dot(n).abs() < 1e-9 => {
+            // Axis in a plane parallel to the sketch: two generators from the apex.
+            let a = axis.normalize();
+            let side = n.cross(a).normalize();
+            let Some((t0, t1)) = extent(apex, a) else { return Vec::new() };
+            let (c, s) = (half_angle.cos(), half_angle.sin());
+            [1.0, -1.0]
+                .iter()
+                .map(|k| {
+                    let g = a * c + side * (s * *k);
+                    let (u0, u1) = (t0.max(0.0) / c, t1 / c);
+                    line(apex + g * u0, apex + g * u1)
+                })
+                .filter(|l| l.length() > 1e-9)
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// Update an external entity's geometry in place from a projected curve.
 pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, c: &noshape_sketch::Curve2) {
     use noshape_sketch::{Curve2, Geometry};
@@ -167,6 +494,15 @@ pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::Enti
             let _ = sk.set_point(*center, *c2);
             let _ = sk.set_point(*start, *c2 + glam::DVec2::from_angle(*start_angle) * *radius);
             let _ = sk.set_point(*end, *c2 + glam::DVec2::from_angle(*end_angle) * *radius);
+        }
+        (Geometry::Ellipse { center, .. }, Curve2::Ellipse { center: c2, major, minor }) => {
+            let _ = sk.set_point(*center, *c2);
+            if let Some(ent) = sk.entity_mut(id)
+                && let Geometry::Ellipse { major: m, minor: n, .. } = &mut ent.geometry
+            {
+                *m = *major;
+                *n = *minor;
+            }
         }
         (Geometry::BSpline { control: points, .. }, _) => {
             if let Curve2::Nurbs(n) = c
@@ -317,4 +653,31 @@ pub fn update_intersection(sk: &mut noshape_sketch::Sketch, entities: &[u32], cu
         }
     }
     lost
+}
+
+#[cfg(test)]
+mod text_expression_tests {
+    use super::*;
+
+    #[test]
+    fn splits_concatenations_outside_quotes_and_calls() {
+        assert_eq!(split_top(r#""a ~ b" ~ #x ~ f(1 ~ 2)"#, '~'), vec![r#""a ~ b" "#, " #x ", " f(1 ~ 2)"]);
+        assert_eq!(split_top("roundToPrecision(#l / in, 3)", ','), vec!["roundToPrecision(#l / in, 3)"]);
+        assert_eq!(trim_number(2.500, 6), "2.5");
+        assert_eq!(trim_number(3.0, 6), "3");
+    }
+
+    #[test]
+    fn plane_trace_of_perpendicular_planes() {
+        use crate::display::PlaneFrame;
+        // The Front plane seen from a Top sketch: the sketch x axis.
+        let (p, d) = plane_trace(&PlaneFrame::FRONT, &PlaneFrame::TOP).unwrap();
+        assert!(p.y.abs() < 1e-12 && d.y.abs() < 1e-12 && (d.x.abs() - 1.0).abs() < 1e-12);
+        assert!(plane_trace(&PlaneFrame::TOP, &PlaneFrame::TOP).is_none());
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(glam::DVec2::new(-1.0, 3.0), glam::DVec2::new(1.0, 3.0));
+        update_trace(&mut sk, l, p, d);
+        let c = sk.curve(l).unwrap();
+        assert!(c.start_point().y.abs() < 1e-12 && c.end_point().y.abs() < 1e-12 && (c.length() - 2.0).abs() < 1e-12);
+    }
 }

@@ -22,14 +22,14 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 1.7 | A new empty sketch starts with the Line tool | LE (Onshape default) | ✅ |
 | 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ |
 | 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | 🔧 cancel works, no Restore bubble (feature dialog, other agent) |
-| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ |
+| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) |
 | 1.11 | Extrude (Shift+E) / Revolve (Shift+W) from the sketch toolbar accept the sketch and preselect all regions | H:sketch_tools | ✅ |
 | 1.12 | Ctrl+Z / Ctrl+Y inside the sketch step through sketch edits | LE, B§8.2 | ✅ |
 | 1.13 | Sketch dialog options are remembered between sessions (except Show expressions) | H:sketch_basics | ✅ (Show constraints remembered; Show expressions resets) |
 | 1.14 | Disable imprinting checkbox when sketching on a part face | H:sketch_basics | ✅ (feature param) |
 | 1.15 | Feature list shows a blue indicator on a sketch that is not fully defined | PartStudio__features_and_parts_lists, LE | ✅ |
 | 1.16 | Shift+H hides / shows all sketches | H:sketch_basics | ✅ |
-| 1.17 | Shift+P hides construction geometry | B§1.7 | 🔧 binding exists (Part Studio) |
+| 1.17 | Shift+P hides construction geometry | B§1.7 | ✅ (Part Studio: hides planes and sketches construction) |
 
 ## 2. Toolbar
 
@@ -44,7 +44,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ |
 | 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) |
 | 2.9 | Tooltips name the tool and its shortcut | UI | ✅ |
-| 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | 🔧 Part Studio palette (feature tools) |
+| 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | ✅ (sketch tools listed first in a sketch) |
 | 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) |
 
 ## 3. Keyboard shortcuts (sketch scope)
@@ -63,7 +63,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ |
-| 3.13 | Shortcuts are user-customizable | B§2.1 | ❌ |
+| 3.13 | Shortcuts are user-customizable | B§2.1 | 🔧 user sketch shortcuts from `<config>/noshape/sketch-shortcuts.json` (`{"Slot": "shift-t"}`); no preferences page |
 
 ## 4. Geometry tools: clicks, drags and results
 
@@ -101,11 +101,11 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 4.30 | Point: click to place | H:point | ✅ |
 | 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ |
 | 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ |
-| 4.33 | Text: Convert to expression | H:text | ⏳ (model evaluation + toggle in the text options) |
+| 4.33 | Text: Convert to expression | H:text | ✅ (Convert to expression / to text; strings, variables, `~`, roundToPrecision) |
 | 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) |
 | 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux) |
 | 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ |
-| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | 🔧 rendering (scene builder) |
+| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) |
 | 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | 🔧 DXF (lines, arcs, circles, polylines, ellipses, splines, units, file origin) and images (drawn when the view is normal to the box); no DWG reader |
 | 4.39 | Preview geometry while placing is drawn in the sketch preview color | B§2.3 | ✅ |
 
@@ -161,7 +161,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) |
 | 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) |
 | 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) |
-| 7.13 | Dimension to planes / model edges | H:dimension | ⏳ (plane traces / projected edges as linked reference geometry) |
+| 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) |
 | 7.14 | Over-defining dimensions are made driven, shown in parentheses and gray | H:dimension | ✅ |
 | 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ |
@@ -172,8 +172,8 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 7.21 | Expression indicator next to values that use expressions; Show expressions shows them (≤70 chars) | H:sketch_basics | ✅ |
 | 7.22 | Errors: "A dimension cannot be created between these items." / "Could not create the dimension." | i18n | ✅ |
 | 7.23 | Driving dimensions black, driven gray, hover/selected gold, conflicting red | Home__colors, B§4.5 | ✅ |
-| 7.24 | Tolerances, precision, configure dimension | B§4.3 | ⏳ (tolerance types, deviations, precision; configure dimension) |
-| 7.25 | Min / max distance to circles | SK-D07 | ⏳ (rim picks measure min / max) |
+| 7.24 | Tolerances, precision, configure dimension | B§4.3 | ✅ (tolerance types, deviations, precision; configure dimension) |
+| 7.25 | Min / max distance to circles | SK-D07 | ✅ (T:sm; rim picks measure min / max) |
 
 ## 8. Constraints
 
@@ -189,14 +189,14 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.8 | Pierce: point + off-plane edge | H:pierce | ⏳ (pierce point of an off-plane edge) |
 | 8.9 | Symmetric: axis line first, then two entities | H:symmetric | ✅ |
 | 8.10 | Curvature: spline/conic + adjacent curve | H:curvature | ✅ |
-| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ⏳ (planes and model edges as linked reference geometry) |
+| 8.11 | Constraints to planes / model edges | H:working_with_constraints | ✅ (same reference mechanism as dimensions) |
 | 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ |
 | 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ |
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ |
 | 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ⏳ |
 | 8.17 | Equal: if one curve is dimensioned, its size wins | H:equal | ✅ (solver) |
-| 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (profile inspector verified in the app; constraint manager ⏳) |
+| 8.18 | Constraint manager / Profile inspector | H:working_with_constraints | ✅ (both panels from the Sketch diagnostics tools) |
 
 ## 9. Selection
 
@@ -220,7 +220,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 10.3 | Dropping a point on another point merges them; on a curve makes it coincident | B§7.1 | ✅ |
 | 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) |
 | 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) |
-| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | 🔧 colors come from the scene builder palette |
+| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) |
 | 10.7 | Text boxes drag as a whole | H:text | ✅ |
 
 ## 11. Edit tools
@@ -230,7 +230,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ |
-| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ⏳ (red preview, radius manipulator) |
+| 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (T:sm; red preview, radius manipulator) |
 | 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) |
 | 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ |
 | 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) |
@@ -238,16 +238,16 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ |
 | 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ⏳ |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ |
-| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves | H:offset | ⏳ (preview, arrow drag / click, distance box, Enter / click in space) |
+| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves | H:offset | ✅ (T:sm) |
 | 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) |
 | 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) |
-| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ⏳ (click in space / Enter accept, Esc cancel) |
+| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) |
 | 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ |
-| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ⏳ (pattern glyph → Edit pattern; instances not linked to the seed) |
-| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ⏳ (click in space / Enter commit, Esc cancel) |
-| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ⏳ (any edge: exact or sampled projection; other sketches; linked) |
+| 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; circular instances not linked to the seed) |
+| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) |
+| 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (any edge: exact or sampled projection; other sketches; linked) |
 | 11.20 | Use: hover preview of the projection | H:use | ⏳ |
-| 11.21 | Use silhouette edges | H:use | ⏳ (cylinders, cones, spheres, tori) |
+| 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ |
 | 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ |
 
@@ -263,13 +263,13 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) |
 | 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ |
-| 12.9 | Add comment, Configure dimension | H:dimension | 🔧 Configure dimension ⏳; Add comment: no comment system in noshape |
+| 12.9 | Add comment, Configure dimension | H:dimension | 🔧 Configure dimension ✅; Add comment: no comment system in noshape |
 
 ## 13. Messages and errors
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
 | 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ |
-| 13.2 | "Cannot fillet selected point." | i18n | ⏳ |
+| 13.2 | "Cannot fillet selected point." | i18n | ✅ |
 | 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ⏳ |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ |

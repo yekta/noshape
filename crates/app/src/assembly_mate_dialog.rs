@@ -20,6 +20,14 @@ use std::sync::Arc;
 pub enum MateDialogEvent {
     Changed,
     Accept,
+    /// Shift+Enter / the heads-up checkmark: commit and start a new mate.
+    AcceptAndNew,
+    /// Solve: solve all mates including this one.
+    Solve,
+    /// Animate: preview the motion of the mate's degrees of freedom.
+    Animate,
+    /// The mate connector icon of a field: edit that mate connector.
+    EditConnector(usize),
     Cancel,
 }
 
@@ -45,6 +53,7 @@ fn limit_label(key: &str) -> &'static str {
         "rz" => "Z angle",
         "x" => "X distance",
         "y" => "Y distance",
+        "cone" => "Maximum cone angle",
         _ => "Z distance",
     }
 }
@@ -52,8 +61,6 @@ fn limit_label(key: &str) -> &'static str {
 pub struct MateDialog {
     pub id: MateId,
     pub name: String,
-    #[allow(dead_code)]
-    pub is_new: bool,
     pub mate_type: MateType,
     pub a: Option<MateConnectorRef>,
     pub b: Option<MateConnectorRef>,
@@ -67,6 +74,14 @@ pub struct MateDialog {
     pub suppressed: bool,
     /// Tangent mates: contact may move onto tangent-connected faces.
     pub tangent_propagation: bool,
+    /// Axis of the rotation offset (0 = X, 1 = Y, 2 = Z).
+    pub rotation_axis: u8,
+    /// Mate indicator hidden (kept when editing).
+    hidden: bool,
+    /// "Reorder items" mode: handles to swap the two mate connectors.
+    reordering: bool,
+    /// Animate preview running.
+    pub animating: bool,
     use_offset: bool,
     use_limits: bool,
     offsets: [Entity<InputState>; 4],
@@ -102,9 +117,9 @@ impl MateDialog {
             mk(text_of(&mate.rotation), "0 deg", window, cx),
         ];
         let mut limits = HashMap::new();
-        for key in ["rz", "x", "y", "z"] {
+        for key in ["rz", "x", "y", "z", "cone"] {
             let l = mate.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone());
-            let unit = if key == "rz" { "deg" } else { "mm" };
+            let unit = if key == "rz" || key == "cone" { "deg" } else { "mm" };
             let lo = mk(l.as_ref().map(|l| text_of(&l.min)).unwrap_or_default(), &format!("Min ({unit})"), window, cx);
             let hi = mk(l.as_ref().map(|l| text_of(&l.max)).unwrap_or_default(), &format!("Max ({unit})"), window, cx);
             limits.insert(key, (lo, hi));
@@ -126,7 +141,6 @@ impl MateDialog {
         Self {
             id: mate.id,
             name: mate.name,
-            is_new,
             mate_type: mate.mate_type,
             a,
             b,
@@ -137,6 +151,10 @@ impl MateDialog {
             reorient: mate.reorient_secondary,
             suppressed: mate.suppressed,
             tangent_propagation: mate.tangent_propagation,
+            rotation_axis: mate.rotation_axis,
+            hidden: mate.hidden,
+            reordering: false,
+            animating: false,
             use_offset,
             use_limits,
             offsets,
@@ -182,6 +200,18 @@ impl MateDialog {
             2 => &mut self.c,
             _ => &mut self.d,
         }
+    }
+
+    /// The connector in a field.
+    pub fn field(&self, i: usize) -> Option<&MateConnectorRef> {
+        self.slot(i).as_ref()
+    }
+
+    /// Replace a filled field (after editing its mate connector).
+    pub fn replace_field(&mut self, i: usize, c: MateConnectorRef, cx: &mut Context<Self>) {
+        *self.slot_mut(i) = Some(c);
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
     }
 
     /// Filled connectors (for previews).
@@ -254,17 +284,26 @@ impl MateDialog {
             offset_y: off(1, oy),
             offset_z: off(2, oz),
             rotation: off(3, orot),
+            rotation_axis: self.rotation_axis,
             flip_primary: self.flip_primary,
             reorient_secondary: self.reorient,
             limits,
             suppressed: self.suppressed,
             extra,
             tangent_propagation: self.tangent_propagation,
+            hidden: self.hidden,
         })
     }
 
     pub fn flip(&mut self, cx: &mut Context<Self>) {
         self.flip_primary = !self.flip_primary;
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
+    }
+
+    /// Reorient the secondary axis by 90 degrees.
+    pub fn reorient(&mut self, cx: &mut Context<Self>) {
+        self.reorient = (self.reorient + 1) % 4;
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
     }
@@ -301,9 +340,27 @@ impl MateDialog {
             .border_color(if active { pal.accent } else { pal.border_strong })
             .bg(if active { with_alpha(pal.accent, 0.10) } else { pal.panel })
             .cursor_pointer()
-            .child(svg().path(icon_path("mate-connector")).size_3p5().text_color(if filled { pal.accent_hover } else { pal.text_faint }))
+            .child(
+                div()
+                    .id(SharedString::from(format!("mc-edit-{field}")))
+                    .when(filled && self.mate_type != MateType::Tangent, |d| {
+                        d.cursor_pointer().tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Edit mate connector").build(w, cx)).on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            cx.emit(MateDialogEvent::EditConnector(field));
+                        }))
+                    })
+                    .child(svg().path(icon_path("mate-connector")).size_3p5().text_color(if filled { pal.accent_hover } else { pal.text_faint })),
+            )
             .child(div().flex_1().truncate().text_sm().text_color(if filled { pal.text } else { pal.text_faint }).child(label))
-            .when(filled, |d| {
+            .when(self.reordering && field < 2, |d| {
+                d.child(Button::new(SharedString::from(format!("mc-handle-{field}"))).icon(if field == 0 { IconName::ArrowDown } else { IconName::ArrowUp }).ghost().xsmall().tooltip("Drag to reorder").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    std::mem::swap(&mut this.a, &mut this.b);
+                    this.active = this.next_active();
+                    cx.emit(MateDialogEvent::Changed);
+                    cx.notify();
+                })))
+            })
+            .when(filled && !self.reordering, |d| {
                 d.child(Button::new(SharedString::from(format!("mc-clear-{field}"))).icon(IconName::Close).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     *this.slot_mut(field) = None;
                     this.active = Some(field);
@@ -353,7 +410,17 @@ impl Render for MateDialog {
                 offset_rows = offset_rows.child(field("Z offset", &self.offsets[2]));
             }
             if orot {
-                offset_rows = offset_rows.child(field("Rotation (Z)", &self.offsets[3]));
+                let ax = self.rotation_axis;
+                let mut axes = h_flex().gap_0p5();
+                for (k, label) in ["X", "Y", "Z"].into_iter().enumerate() {
+                    let k = k as u8;
+                    axes = axes.child(Button::new(SharedString::from(format!("mate-rot-ax-{k}"))).label(label).ghost().xsmall().selected(ax == k).tooltip(format!("Rotate about {label}")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.rotation_axis = k;
+                        cx.emit(MateDialogEvent::Changed);
+                        cx.notify();
+                    })));
+                }
+                offset_rows = offset_rows.child(h_flex().gap_2().child(div().w(px(84.)).text_xs().text_color(pal.text_muted).child("Rotation axis")).child(axes)).child(field("Rotation", &self.offsets[3]));
             }
         }
         let mut limit_rows = v_flex().gap_1();
@@ -364,7 +431,12 @@ impl Render for MateDialog {
                     v_flex()
                         .gap_0p5()
                         .child(div().text_xs().text_color(pal.text_muted).child(limit_label(key)))
-                        .child(h_flex().gap_1().child(div().flex_1().child(Input::new(lo).xsmall())).child(div().flex_1().child(Input::new(hi).xsmall()))),
+                        .child(if *key == "cone" {
+                            // Ball: a single maximum angle from the Z axis.
+                            h_flex().child(div().flex_1().child(Input::new(hi).xsmall()))
+                        } else {
+                            h_flex().gap_1().child(div().flex_1().child(Input::new(lo).xsmall())).child(div().flex_1().child(Input::new(hi).xsmall()))
+                        }),
                 );
             }
         }
@@ -382,6 +454,7 @@ impl Render for MateDialog {
             .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(MateDialogEvent::Accept)))
             .on_action(cx.listener(|_, _: &crate::actions::Cancel, _, cx| cx.emit(MateDialogEvent::Cancel)))
             .on_action(cx.listener(|this, _: &crate::actions::FlipPrimaryAxis, _, cx| this.flip(cx)))
+            .on_action(cx.listener(|_, _: &crate::actions::AcceptAndRepeat, _, cx| cx.emit(MateDialogEvent::AcceptAndNew)))
             .child(
                 h_flex()
                     .px_3()
@@ -425,6 +498,24 @@ impl Render for MateDialog {
                             div().text_xs().text_color(pal.text_muted).child("Mate connectors").into_any_element(),
                             self.connector_row(0, "Select mate connector", cx),
                             self.connector_row(1, "Select mate connector", cx),
+                            // Reorder items: the order decides which connector flips /
+                            // reorients and which frame the offset is relative to.
+                            h_flex()
+                                .justify_end()
+                                .child(
+                                    div()
+                                        .id("mate-reorder")
+                                        .text_xs()
+                                        .text_color(pal.accent)
+                                        .cursor_pointer()
+                                        .hover(|d| d.underline())
+                                        .child(if self.reordering { "Done" } else { "Reorder items" })
+                                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            this.reordering = !this.reordering;
+                                            cx.notify();
+                                        })),
+                                )
+                                .into_any_element(),
                         ],
                     })
                     .child(
@@ -452,7 +543,15 @@ impl Render for MateDialog {
                                         cx.emit(MateDialogEvent::Changed);
                                         cx.notify();
                                     })),
-                            ),
+                            )
+                            // Animate: preview the mate's motion (mates with degrees of freedom).
+                            .when(!noshape_model::assembly::eval::mate_dofs(t).is_empty(), |d| {
+                                d.child(Button::new("mate-animate").icon(IconName::Play).ghost().small().selected(self.animating).tooltip("Animate mate degree of freedom").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.animating = !this.animating;
+                                    cx.emit(MateDialogEvent::Animate);
+                                    cx.notify();
+                                })))
+                            }),
                     )
                     .when(t == MateType::Tangent, |d| {
                         d.child(Checkbox::new("mate-tangent-prop").label("Tangent propagation").checked(self.tangent_propagation).on_click(cx.listener(|this, v: &bool, _, cx| {
@@ -477,6 +576,7 @@ impl Render for MateDialog {
                         })))
                         .child(limit_rows)
                     })
+                    .child(h_flex().justify_end().child(Button::new("mate-solve").label("Solve").small().outline().tooltip("Solve all mates including this one").on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve)))))
                     .when_some(self.status.clone(), |d, s| d.child(div().text_xs().text_color(pal.warning).child(s)))
                     .when(self.active.is_some(), |d| {
                         d.child(div().text_xs().text_color(pal.text_faint).child(if t == MateType::Tangent {

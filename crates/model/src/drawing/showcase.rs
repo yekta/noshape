@@ -2,7 +2,10 @@
 //! hole and BOM tables, linked callouts, ordinate/chamfer-style dimensions
 //! with tolerances, GD&T, datums, surface finish, jogged and aligned
 //! sections, broken, cropped and rotated views, an exploded assembly view,
-//! a general table and property fields.
+//! a general table and property fields; a fourth sheet with broken-out,
+//! partial and angular sections, a spline crop, max/min and foreshortened
+//! dimensions, datum targets, a formatted table with merged cells and an
+//! ISO 7200 title block (sheet 2 uses an ANSI title block).
 
 use super::views::{self, SourceKey, regenerate_sources};
 use super::*;
@@ -55,16 +58,14 @@ pub fn showcase_document() -> Document {
             s.annotations.push(Annotation { id, kind, position, ..Default::default() });
             id += 1;
         };
-        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()] }, [24.0, 262.0]);
-        add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()] }, [24.0, 112.0]);
+        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2] }] }, [24.0, 262.0]);
+        add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![] }, [24.0, 112.0]);
         add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into() }, [150.0, 126.0]);
         add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into() }, [175.0, 200.0]);
         add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into() }, [95.0, 156.2]);
-        // Ordinate dimensions along the bottom of the top view.
-        add(s, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [-0.05, -0.03], horizontal: true }, [60.0, 168.0]);
-        add(s, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [-0.038, -0.018], horizontal: true }, [72.0, 168.0]);
-        add(s, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [0.0, 0.0], horizontal: true }, [110.0, 168.0]);
-        add(s, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [0.038, 0.018], horizontal: true }, [148.0, 168.0]);
+        // A grouped ordinate dimension along the bottom of the top view.
+        let o = [-0.05, -0.03];
+        add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true }, [110.0, 168.0]);
         s.tables.push(Table { corner: TableCorner::BottomLeft, ..Table::new(1, TableKind::Hole { view: ViewId(2), origin: [-0.05, -0.03], origin_ref: None, precision: Some(1) }, [150.0, 46.0]) });
         // Ordinates now carry the bottom-left location: move the front view's notes down.
         if let Some(n) = s.annotations.iter_mut().find(|a| matches!(a.kind, AnnotationKind::Note { .. })) {
@@ -80,9 +81,10 @@ pub fn showcase_document() -> Document {
         s.views.push(DrawingView { id: ViewId(1), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [110.0, 190.0], label: Some("ASSEMBLED".into()), scale: Some(1.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(2), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [300.0, 150.0], label: Some("EXPLODED".into()), explode: Some(0), scale: Some(0.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Front, part: None }, position: [110.0, 80.0], style: RenderStyle::HiddenLinesVisible, ..Default::default() });
-        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1) }, [410.0, 287.0]));
+        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1) }, [421.8, 269.4]));
         s.annotations.push(Annotation { id: 1, kind: AnnotationKind::Note { text: "{model.name}: {part.name}\nSHEET {sheet.number} OF {sheet.count}".into(), height_mm: 3.5 }, position: [25.0, 40.0], ..Default::default() });
     }
+
 
     // ---- sheet 3: broken, cropped and rotated views, aligned section, general table.
     let s3 = drawing.add_sheet(s2);
@@ -114,6 +116,77 @@ pub fn showcase_document() -> Document {
         t.corner = TableCorner::TopRight;
         s.tables.push(t);
     }
+    // ---- sheet 4: broken-out, partial and angular sections, spline crop,
+    // max/min and foreshortened dimensions, datum targets, a formatted
+    // table, ISO 7200 title block.
+    let s4 = drawing.add_sheet(s3);
+    drawing.rename_sheet(s4, "Sections");
+    templates::set_title_style(&mut drawing, s4, TitleBlockStyle::Iso);
+    for (k, v) in [("Legal owner", "noshape"), ("Drawn by", "noshape"), ("Approved by", "QA")] {
+        if let Some(f) = drawing.sheets[s4].title_block.fields.iter_mut().find(|(key, _)| key == k) {
+            f.1 = v.to_string();
+        }
+    }
+    {
+        let s = &mut drawing.sheets[s4];
+        let base = |id: u64, orientation: ViewOrientation, position: [f64; 2]| DrawingView { id: ViewId(id), kind: ViewKind::Base { source: studio, config: Default::default(), orientation, part: None }, position, ..Default::default() };
+        let mut front = base(1, ViewOrientation::Front, [110.0, 245.0]);
+        front.scale = Some(1.5);
+        front.label = Some("BROKEN-OUT SECTION".into());
+        front.broken_out.push(BrokenOut { profile: vec![[-0.024, -0.003], [0.0, -0.006], [0.024, -0.003], [0.026, 0.016], [0.0, 0.019], [-0.026, 0.016]], spline: true, depth: 0.03, depth_ref: None });
+        s.views.push(front);
+        s.views.push(base(2, ViewOrientation::Top, [85.0, 150.0]));
+        s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.025, -0.012], [-0.025, 0.012]], label: "E".into() }, position: [175.0, 150.0], partial: true, label: Some("PARTIAL".into()), ..Default::default() });
+        s.views.push(DrawingView { id: ViewId(4), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.06, -0.045], [0.06, 0.045]], label: "F".into() }, position: [125.0, 62.0], ..Default::default() });
+        let mut cropped = base(5, ViewOrientation::Top, [262.0, 215.0]);
+        cropped.crop = Some(Crop::Spline(vec![[0.012, -0.03], [0.05, -0.022], [0.05, 0.03], [0.03, 0.03], [0.02, 0.005]]));
+        cropped.scale = Some(1.5);
+        cropped.label = Some("SPLINE CROP".into());
+        s.views.push(cropped);
+        let mut id = 1;
+        let mut add = |s: &mut Sheet, kind: AnnotationKind, position: [f64; 2]| {
+            s.annotations.push(Annotation { id, kind, position, ..Default::default() });
+            id += 1;
+        };
+        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Min, b: [-0.05, -0.03], rb: 0.0, cb: ArcCondition::Center, offset: -8.0, orientation: DimOrientation::Horizontal }, [0.0; 2]);
+        add(s, AnnotationKind::MaxMinDimension { view: ViewId(2), a: [0.0, 0.0], ra: 0.012, ca: ArcCondition::Max, b: [0.038, 0.018], rb: 0.0048, cb: ArcCondition::Max, offset: 6.0, orientation: DimOrientation::Horizontal }, [0.0; 2]);
+        add(s, AnnotationKind::ForeshortenedDiameter { view: ViewId(1), axis: [[0.0, 0.0], [0.0, 0.012]], edge: [0.012, 0.006], direct: false }, [150.0, 262.0]);
+        add(s, AnnotationKind::ForeshortenedRadial { view: ViewId(5), center: [0.038, 0.018], radius: 0.0048, angle: -0.8, jog: [0.028, -0.012] }, [0.0; 2]);
+        add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A1".into(), area: DatumTargetArea::Point }, [28.0, 190.0]);
+        add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [0.03, -0.02], label: "A2".into(), area: DatumTargetArea::Circle { diameter: 0.008 } }, [150.0, 100.0]);
+        add(s, AnnotationKind::Gdt { anchor: [30.0, 270.0], frame: vec!["⟂".into(), "0.02".into(), "A".into()], leaders: vec![Leader { view: Some(ViewId(1)), point: [-0.05, 0.006] }] }, [30.0, 270.0]);
+        let mut t = Table::new(1, TableKind::General {
+            cells: vec![
+                vec!["PROPERTY".into(), "".into(), "VALUE".into()],
+                vec!["Material".into(), "".into(), "{part.material}".into()],
+                vec!["Mass".into(), "".into(), "0.16 kg".into()],
+                vec!["Finish".into(), "Anodized".into(), "Ra 1.6".into()],
+            ],
+            title: Some("PART DATA".into()),
+            header: true,
+        }, [250.0, 140.0]);
+        t.corner = TableCorner::TopLeft;
+        t.merge_cells((0, 0), (0, 1));
+        t.merge_cells((1, 0), (1, 1));
+        t.merge_cells((2, 0), (2, 1));
+        for r in 1..4 {
+            t.set_cell_format(r, 0, CellFormat { align: CellAlign::Left, bold: true, ..Default::default() });
+            t.set_cell_format(r, 2, CellFormat { align: CellAlign::Right, ..Default::default() });
+        }
+        t.set_cell_format(0, 0, CellFormat { height: Some(3.5), bold: true, ..Default::default() });
+        t.set_cell_format(0, 2, CellFormat { height: Some(3.5), bold: true, ..Default::default() });
+        s.tables.push(t);
+    }
+
+    // ANSI B sheet with an ASME Y14.1 title block (the drawing stays metric).
+    drawing.sheets[s2].size = SheetSize::AnsiB;
+    templates::set_title_style(&mut drawing, s2, TitleBlockStyle::Ansi);
+    for (k, v) in [("Company", "noshape"), ("Drawn by", "noshape"), ("Weight", "0.21 kg")] {
+        if let Some(f) = drawing.sheets[s2].title_block.fields.iter_mut().find(|(key, _)| key == k) {
+            f.1 = v.to_string();
+        }
+    }
+
     // Callouts on the assembly view, linked to the BOM (empty text).
     let sources = regenerate_sources(&doc, &drawing);
     let cache = views::ViewCache::new();
@@ -134,7 +207,8 @@ pub fn showcase_document() -> Document {
             placed.push(item);
             let at = pl.map(|p| p.to_sheet(sn.p)).unwrap_or([100.0, 100.0]);
             let off = if item % 2 == 1 { [-30.0, 18.0] } else { [35.0, 28.0] };
-            let pos = [(at[0] + off[0]).clamp(25.0, 400.0), (at[1] + off[1]).clamp(25.0, 280.0)];
+            let top = drawing.sheets[s2].size.size_mm().1 - 20.0;
+            let pos = [(at[0] + off[0]).clamp(25.0, 400.0), (at[1] + off[1]).clamp(25.0, top)];
             drawing.sheets[s2].annotations.push(Annotation { id: next, kind: AnnotationKind::Balloon { view: ViewId(1), anchor: sn.p, text: String::new() }, position: pos, refs: vec![AnnotationRef { slot: 0, point: sn.point.clone().unwrap() }], ..Default::default() });
             next += 1;
         }
@@ -152,7 +226,7 @@ mod tests {
     fn showcase_builds_every_sheet() {
         let doc = showcase_document();
         let drawing = doc.tabs.iter().find_map(|t| if let TabContent::Drawing(d) = &t.content { Some(d.clone()) } else { None }).unwrap();
-        assert_eq!(drawing.sheets.len(), 3);
+        assert_eq!(drawing.sheets.len(), 4);
         let sources = regenerate_sources(&doc, &drawing);
         let cache = views::ViewCache::new();
         let info = SheetInfo { doc_name: "Showcase".into(), drawing_name: "Drawing 1".into() };
@@ -171,9 +245,9 @@ mod tests {
                 assert!(drawing.sheets[1].annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Balloon { .. })).count() == 2);
             }
         }
-        let pages: Vec<_> = (0..3).map(|si| render_sheet_with(&drawing, si, &sources, &cache, true, &info).unwrap().geometry).collect();
+        let pages: Vec<_> = (0..4).map(|si| render_sheet_with(&drawing, si, &sources, &cache, true, &info).unwrap().geometry).collect();
         let pdf = export::to_pdf_pages(&pages);
-        assert!(String::from_utf8_lossy(&pdf).contains("/Count 3"));
+        assert!(String::from_utf8_lossy(&pdf).contains("/Count 4"));
         std::fs::write("/tmp/drw/showcase.pdf", pdf).unwrap();
     }
 }

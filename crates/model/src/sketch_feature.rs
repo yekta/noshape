@@ -33,6 +33,74 @@ pub struct SketchData {
     /// coordinates, keyed by `"<constraint>:<entity>"`.
     #[serde(default)]
     pub glyph_offsets: BTreeMap<String, [f64; 2]>,
+    /// Tolerance and display precision of dimensions, by constraint id.
+    #[serde(default)]
+    pub dimension_tolerances: BTreeMap<u32, DimTolerance>,
+    /// Sketch patterns (linear / circular), editable from their glyph.
+    #[serde(default)]
+    pub patterns: Vec<SketchPattern>,
+    /// Inserted images (reference only: no geometry is created).
+    #[serde(default)]
+    pub images: Vec<SketchImage>,
+}
+
+/// Tolerance type of a dimension (Onshape dimension context dialog).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ToleranceKind {
+    #[default]
+    None,
+    Symmetrical,
+    Deviation,
+    Limits,
+    Min,
+    Max,
+    Basic,
+}
+
+/// Tolerance and precision of one dimension. `upper` / `lower` are SI
+/// deviations (both positive for Deviation: +upper / -lower).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct DimTolerance {
+    pub kind: ToleranceKind,
+    #[serde(default)]
+    pub upper: f64,
+    #[serde(default)]
+    pub lower: f64,
+    /// Decimal places (`None`: workspace precision).
+    #[serde(default)]
+    pub precision: Option<u8>,
+}
+
+/// A sketch pattern: the seed entities, the instance entities (per
+/// instance, in seed order; deleted instances simply vanish) and its
+/// parameters, so it can be edited later (Onshape "Edit pattern").
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SketchPattern {
+    pub id: u32,
+    /// `true`: circular (center, total angle), `false`: linear (direction, spacing).
+    pub circular: bool,
+    pub seeds: Vec<u32>,
+    pub instances: Vec<Vec<u32>>,
+    pub count: usize,
+    /// Linear: spacing and direction angle; circular: total angle.
+    pub distance: f64,
+    pub angle: f64,
+    pub center: [f64; 2],
+}
+
+/// An inserted image: an encoded image file drawn in a box whose corners
+/// are solver points (lower-left, lower-right, upper-right, upper-left).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SketchImage {
+    pub id: u32,
+    pub name: String,
+    /// PNG / JPEG / GIF / BMP bytes, base64 encoded.
+    pub data_base64: String,
+    pub box_points: Vec<u32>,
+    pub box_lines: Vec<u32>,
+    /// Aspect-ratio constraint keeping the image proportions.
+    #[serde(default)]
+    pub ratio_constraint: Option<u32>,
 }
 
 /// A sketch text box (Onshape `skText`).
@@ -62,6 +130,10 @@ pub struct SketchText {
     /// Flip about the box's vertical center.
     #[serde(default)]
     pub mirror_vertical: bool,
+    /// `text` is an expression (Convert to expression): string literals,
+    /// variables and `~` concatenation, evaluated on regeneration.
+    #[serde(default)]
+    pub expression: bool,
 }
 
 impl SketchText {
@@ -96,6 +168,9 @@ impl PartialEq for SketchData {
             && self.dimension_labels == other.dimension_labels
             && self.intersections == other.intersections
             && self.glyph_offsets == other.glyph_offsets
+            && self.dimension_tolerances == other.dimension_tolerances
+            && self.patterns == other.patterns
+            && self.images == other.images
             && serde_json::to_value(&self.sketch).ok() == serde_json::to_value(&other.sketch).ok()
     }
 }
@@ -124,6 +199,7 @@ impl SketchData {
             ratio_constraint: tb.ratio.map(|c| c.0),
             mirror_horizontal: false,
             mirror_vertical: false,
+            expression: false,
         });
         Ok(id)
     }
@@ -175,6 +251,42 @@ impl SketchData {
         }
     }
 
+    /// Inserts an image in a box with its lower-left corner at `origin`, the
+    /// given height and the image's aspect ratio (kept by a ratio
+    /// constraint; the bottom edge is horizontal). Returns the image id.
+    pub fn add_image(&mut self, name: &str, bytes: &[u8], origin: glam::DVec2, height: f64, aspect: f64) -> Result<u32, String> {
+        if bytes.is_empty() {
+            return Err("The image file is empty".into());
+        }
+        let tb = self.sketch.add_text_box(origin, height, aspect).map_err(|_| "The image rectangle could not be created with the selected points.".to_string())?;
+        let id = self.images.iter().map(|t| t.id + 1).max().unwrap_or(1);
+        self.images.push(SketchImage {
+            id,
+            name: name.to_string(),
+            data_base64: base64_encode(bytes),
+            box_points: tb.points.iter().map(|p| p.0).collect(),
+            box_lines: tb.lines.iter().map(|l| l.0).collect(),
+            ratio_constraint: tb.ratio.map(|c| c.0),
+        });
+        Ok(id)
+    }
+
+    /// The image whose box contains entity `e`.
+    pub fn image_of_entity(&self, e: EntityId) -> Option<u32> {
+        self.images.iter().find(|i| i.box_points.contains(&e.0) || i.box_lines.contains(&e.0)).map(|i| i.id)
+    }
+
+    /// Removes images whose box was (partly) deleted, with the rest of their box.
+    pub fn prune_images(&mut self) {
+        let sk = &self.sketch;
+        let (keep, gone): (Vec<SketchImage>, Vec<SketchImage>) = std::mem::take(&mut self.images).into_iter().partition(|i| i.box_points.iter().chain(&i.box_lines).all(|e| sk.entity(EntityId(*e)).is_some()));
+        self.images = keep;
+        for i in gone {
+            let ids: Vec<EntityId> = i.box_points.iter().chain(&i.box_lines).map(|e| EntityId(*e)).filter(|e| self.sketch.entity(*e).is_some()).collect();
+            self.sketch.remove_entities(&ids);
+        }
+    }
+
     /// Adds every text's glyph outlines to `sk` (a solved copy of the
     /// sketch) as fixed curves with stable ids.
     pub fn add_text_outlines(&self, sk: &mut Sketch) -> usize {
@@ -185,5 +297,80 @@ impl SketchData {
             n += sk.add_text_outlines(&layout, &place, Some(noshape_sketch::text::glyph_id_base(t.id))).len();
         }
         n
+    }
+}
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// Standard base64 (with padding) of `bytes`.
+pub fn base64_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for c in bytes.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for k in 0..4 {
+            if k <= c.len() {
+                out.push(B64[((n >> (18 - 6 * k)) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+/// Decodes standard base64 (padding optional, whitespace ignored).
+pub fn base64_decode(text: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(text.len() / 4 * 3);
+    let (mut acc, mut bits) = (0u32, 0u32);
+    for ch in text.bytes() {
+        let v = match ch {
+            b'A'..=b'Z' => ch - b'A',
+            b'a'..=b'z' => ch - b'a' + 26,
+            b'0'..=b'9' => ch - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => break,
+            b' ' | b'\n' | b'\r' | b'\t' => continue,
+            _ => return None,
+        } as u32;
+        acc = acc << 6 | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+mod image_tests {
+    use super::*;
+
+    #[test]
+    fn base64_round_trip() {
+        for data in [&b""[..], b"f", b"fo", b"foo", b"foob", b"fooba", b"foobar", &[0u8, 255, 128, 7]] {
+            let e = base64_encode(data);
+            assert_eq!(base64_decode(&e).unwrap(), data);
+        }
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+    }
+
+    #[test]
+    fn images_follow_their_box() {
+        let mut d = SketchData::default();
+        let id = d.add_image("a.png", &[1, 2, 3], glam::DVec2::ZERO, 0.02, 2.0).unwrap();
+        let img = d.images[0].clone();
+        assert_eq!(img.id, id);
+        assert_eq!(d.image_of_entity(EntityId(img.box_lines[0])), Some(id));
+        d.sketch.solve();
+        let bb = d.sketch.bbox();
+        assert!((bb.size().x - 0.04).abs() < 1e-9 && (bb.size().y - 0.02).abs() < 1e-9);
+        d.sketch.remove_entities(&[EntityId(img.box_lines[1])]);
+        d.prune_images();
+        assert!(d.images.is_empty());
+        assert_eq!(d.sketch.entity_count(), 0);
     }
 }

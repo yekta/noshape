@@ -419,17 +419,18 @@ fn tok_style(t: Tok) -> HighlightStyle {
     let mut s = HighlightStyle::default();
     match t {
         Tok::Comment => {
-            s.color = Some(color(0x6b7382));
+            // Light editor palette (Onshape's FeatureScript editor is light).
+            s.color = Some(color(0x6a737d));
             s.font_style = Some(FontStyle::Italic);
         }
-        Tok::String => s.color = Some(color(0x9ece6a)),
-        Tok::Number => s.color = Some(color(0xff9e64)),
+        Tok::String => s.color = Some(color(0xa31515)),
+        Tok::Number => s.color = Some(color(0x098658)),
         Tok::Keyword => {
-            s.color = Some(color(0xa498ff));
+            s.color = Some(color(0x0000c0));
             s.font_weight = Some(FontWeight::SEMIBOLD);
         }
-        Tok::Function => s.color = Some(color(0x5aa9ff)),
-        Tok::Constant => s.color = Some(color(0xf5b84b)),
+        Tok::Function => s.color = Some(color(0x795e26)),
+        Tok::Constant => s.color = Some(color(0x1651b0)),
         Tok::Plain => {}
     }
     s

@@ -376,6 +376,80 @@ impl Nurbs {
         Some(Nurbs { degree: p, knots, ctrl, weights: None })
     }
 
+    /// Interpolation through `pts` with tangent handles `h0` (start) and
+    /// `h1` (end): like Bezier control points, a handle at a third of the
+    /// first / last segment gives the natural-looking end tangent.
+    pub fn interpolate_with_handles(pts: &[DVec2], h0: DVec2, h1: DVec2) -> Option<Nurbs> {
+        let n = pts.len();
+        if n < 2 {
+            return None;
+        }
+        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
+        let first = (pts[1] - pts[0]).length().max(total * 1e-9);
+        let last = (pts[n - 1] - pts[n - 2]).length().max(total * 1e-9);
+        Self::interpolate_with_ends(pts, (h0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - h1) * (3.0 * total / last))
+    }
+
+    /// Handle positions giving the natural end tangents of [`Nurbs::interpolate`].
+    pub fn natural_handles(pts: &[DVec2]) -> Option<(DVec2, DVec2)> {
+        let n = pts.len();
+        let c = Nurbs::interpolate(pts)?;
+        let (a, b) = c.domain();
+        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
+        let first = (pts[1] - pts[0]).length();
+        let last = (pts[n - 1] - pts[n - 2]).length();
+        Some((pts[0] + c.eval_ders(a)[1] * (first / (3.0 * total)), pts[n - 1] - c.eval_ders(b)[1] * (last / (3.0 * total))))
+    }
+
+    /// Interpolation through `pts` with prescribed end derivatives `d0`,
+    /// `d1` (with respect to the chord-length parameter on [0, 1]); cubic
+    /// with `n + 2` control points (The NURBS Book, section 9.2.2).
+    pub fn interpolate_with_ends(pts: &[DVec2], d0: DVec2, d1: DVec2) -> Option<Nurbs> {
+        let n = pts.len();
+        if n < 2 {
+            return None;
+        }
+        let p = 3usize;
+        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+        let mut ub = vec![0.0; n];
+        for k in 1..n {
+            ub[k] = if total <= 1e-300 { k as f64 / (n - 1) as f64 } else { ub[k - 1] + (pts[k] - pts[k - 1]).length() / total };
+        }
+        ub[n - 1] = 1.0;
+        let nc = n + 2;
+        let mut knots = vec![0.0; nc + p + 1];
+        for k in knots.iter_mut().skip(nc) {
+            *k = 1.0;
+        }
+        // Internal knots: averages of the parameters (eq. 9.22).
+        for j in 0..nc.saturating_sub(p + 1) {
+            let s: f64 = (j..j + p).map(|i| ub[i.min(n - 1)]).sum();
+            knots[p + 1 + j] = s / p as f64;
+        }
+        let tmp = Nurbs { degree: p, knots: knots.clone(), ctrl: vec![DVec2::ZERO; nc], weights: None };
+        let mut a = nalgebra::DMatrix::<f64>::zeros(nc, nc);
+        let mut bx = nalgebra::DVector::<f64>::zeros(nc);
+        let mut by = nalgebra::DVector::<f64>::zeros(nc);
+        // Rows: position at 0, derivative at 0, interior positions, derivative at 1, position at 1.
+        let mut rows: Vec<(f64, usize, DVec2)> = vec![(0.0, 0, pts[0]), (0.0, 1, d0)];
+        rows.extend((1..n - 1).map(|k| (ub[k], 0, pts[k])));
+        rows.extend([(1.0, 1, d1), (1.0, 0, pts[n - 1])]);
+        for (row, (u, der, rhs)) in rows.into_iter().enumerate() {
+            let span = tmp.find_span(u);
+            let d = tmp.basis_ders(span, u, der);
+            for j in 0..=p {
+                a[(row, span - p + j)] = d[der][j];
+            }
+            bx[row] = rhs.x;
+            by[row] = rhs.y;
+        }
+        let lu = a.lu();
+        let x = lu.solve(&bx)?;
+        let y = lu.solve(&by)?;
+        let ctrl = (0..nc).map(|i| DVec2::new(x[i], y[i])).collect();
+        Some(Nurbs { degree: p, knots, ctrl, weights: None })
+    }
+
     /// Least-squares cubic B-spline with `n_ctrl` control points (clamped
     /// uniform knots) approximating `pts` (ordered samples), interpolating
     /// the first and last sample. Parameters start chord-length and are

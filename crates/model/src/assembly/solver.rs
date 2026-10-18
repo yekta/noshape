@@ -107,6 +107,9 @@ pub struct SolverMate {
     /// Pattern / mirror follower: `b` (instance frame `b_local`) is placed
     /// relative to `a` (instance frame `a_local`) by a transform about an axis frame.
     pub follow: Option<Follow>,
+    /// Free values held at targets (value index, target): animation drives
+    /// one degree of freedom, Apply limit position moves one to a limit.
+    pub hold: Vec<(usize, f64)>,
 }
 
 impl Default for SolverMate {
@@ -125,6 +128,7 @@ impl Default for SolverMate {
             extra: vec![],
             geom: None,
             follow: None,
+            hold: vec![],
         }
     }
 }
@@ -577,7 +581,8 @@ fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
     // Limits: penalize violation of free values.
     let vals = mate_values(bodies, m);
     for &(i, lo, hi) in &m.limits {
-        let v = vals[i.min(3)];
+        // Index 4: cone angle between the connectors' Z axes (Ball mate limit).
+        let v = if i == 4 { (relative(bodies, m).rotation * DVec3::Z).z.clamp(-1.0, 1.0).acos() } else { vals[i.min(3)] };
         let mut e = 0.0;
         if let Some(lo) = lo
             && v < lo
@@ -630,6 +635,12 @@ fn residuals(p: &Problem, poses: &[Frame], out: &mut Vec<f64>) {
     out.clear();
     for m in p.mates {
         mate_residuals(poses, m, out);
+        if !m.hold.is_empty() {
+            let v = mate_values(poses, m);
+            for (i, target) in &m.hold {
+                out.push(if *i == 0 { wrap_angle(v[0] - target) } else { v[(*i).min(3)] - target });
+            }
+        }
     }
     for r in p.relations {
         out.push(relation_residual(poses, p.mates, r));

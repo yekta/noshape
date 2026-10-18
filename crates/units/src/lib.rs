@@ -29,6 +29,7 @@
 //!
 //! Booleans are unitless 1/0; any non-zero value is true.
 
+pub mod complete;
 mod dim;
 mod error;
 mod expr;

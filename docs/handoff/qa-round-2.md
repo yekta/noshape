@@ -72,13 +72,43 @@ sketch_mode.rs collapsible `if`.
     - Fix (`part_studio/mod.rs::render_feature_row`): also treat a regenerated status of `Suppressed` as suppressed. The context menu still toggles the manual flag.
     - Verified.
 
+15. **BOM rows of the same part in different configurations looked identical** ("Part 1" twice).
+    - Fix: `Configuration::describe` (`crates/model/src/configuration.rs`, test `describe_tests`); the BOM panel (`assembly_view.rs`) shows e.g. "Part 1 (Large)".
+    - Verified.
+16. **Interference volumes were shown as "Volume ≈ (33.526 mm)³".**
+    - Fix: format as a volume, e.g. "Volume ≈ 37682.672 mm³" (`assembly_view.rs`).
+    - Verified.
+
+17. **"Compare with current" reported "Rollback bar moved"** after a feature was added, with the bar at the end in both states.
+    - Fix: `crates/model/src/compare.rs` treats a bar at the end as "no rollback". Tests: `studio_feature_diff` (extended) and `rollback_moves_are_reported`.
+18. **The merge result toast ("Merged 1 tab(s)") was styled as an error.**
+    - Fix: new `DocEvent::Info` (`doc_model.rs`), emitted by `history_panel.rs::merge` and handled as info in `part_studio/mod.rs`, `assembly_view.rs` and `start_thumbnail.rs`.
+19. **The header always said "Main"**, even on another branch.
+    - Fix (`workspace.rs`): shows the current branch name from `store.branch(session.branch)`.
+    - Verified.
+
 ## In progress / not yet tested (Part 2)
 
 - Configurations: DONE (`/tmp/qa2/docs/c1.noshape`).
   - Size list with Small/Large drives the depth.
   - Checkbox 2 drives Fillet 1 suppression.
   - Boolean configured values are typed as text ("true"/"false"), not shown as checkboxes; a gap, not fixed.
-- Not started: assembly (insert twice, fastened and revolute mates, drag, BOM, interference), drawing (views, dimensions, PDF), versions (version, branch, edit, merge, compare), STEP/STL export and re-import, robustness (delete a depended-on feature, close/reopen with undo, fast typing, Esc everywhere, tiny/huge window).
+- Assembly: DONE (c1, Assembly 1).
+  - Inserted the same part twice plus a Large-configuration instance.
+  - Fastened and revolute mates; dragging rotates about the revolute axis.
+  - BOM and interference checked (fixes 15, 16).
+- Drawing: DONE (c1, Drawing 1). Front base view, two projected views, Section A-A, linear dimensions.
+  PDF export checked with the Read tool (/tmp/qa2/out/drawing1.pdf): every element is present.
+  Minor: views stay highlighted orange after Esc; the title block isn't filled.
+- Versions: DONE.
+  - Created V1, branched to Branch 1, added Fillet 2 on the branch.
+  - Switched to Main and merged; Fillet 2 arrived on Main.
+  - Compare with current lists "Added feature Fillet 2".
+- Import/export: DONE.
+  - Document menu > Export active Part Studio: STEP (8 faces, PRODUCT 'Part 1') and STL (binary, 100 triangles).
+  - Both imported into the new Part Studio 2.
+  - Gap: the part context menu has no "Export…" (Onshape has one). STL meshes draw every facet edge on curved areas.
+- Not started: robustness (delete a depended-on feature, close/reopen with undo, fast typing, Esc everywhere, tiny/huge window).
 
 ## Known open bugs (not fixed; repro)
 

@@ -29,8 +29,9 @@ struct Entry {
 ///   (another window, a merge or restore that was not recorded), the next
 ///   undo/redo returns [`StoreError::UndoStale`] and clears the stack rather
 ///   than silently discarding that change.
-/// * The stack lives in memory only; after reopening a document, earlier
-///   states are reached through the history (restore), not undo.
+/// * Undo and redo are themselves microversions ("Undo …" / "Redo …"), so
+///   [`UndoStack::from_history`] rebuilds the stack of a reopened document
+///   by replaying the branch's history: undo works across sessions.
 #[derive(Clone, Debug)]
 pub struct UndoStack {
     branch: BranchId,
@@ -53,6 +54,46 @@ impl UndoStack {
             expected_head: None,
             limit: Self::DEFAULT_LIMIT,
         }
+    }
+
+    /// Rebuilds the stack a session would have after making the branch's
+    /// recent edits (at most `limit` undo steps), by replaying its
+    /// first-parent history: ordinary microversions are edits, "Undo X" and
+    /// "Redo X" move the matching entry between the lists. History made on
+    /// other branches (before this branch was created) is not replayed.
+    pub fn from_history(doc: &Document, branch: BranchId, limit: usize) -> Result<Self> {
+        let mut stack = UndoStack::new(branch).with_limit(limit);
+        // Undo/redo pairs can push and pop many times; look back further than `limit`.
+        let window = limit.saturating_mul(4).max(64);
+        let mut hist = doc.history_from(doc.head(branch)?, Some(window))?;
+        hist.reverse();
+        for m in &hist {
+            let Some(&parent) = m.parents.first() else { continue };
+            if m.branch != branch {
+                stack.clear();
+                continue;
+            }
+            let d = m.description.as_str();
+            if let Some(rest) = d.strip_prefix("Undo ")
+                && stack.undo.last().is_some_and(|e| e.description == rest)
+                && stack.expected_head == Some(parent)
+            {
+                let e = stack.undo.pop().expect("non-empty");
+                stack.redo.push(e);
+                stack.expected_head = Some(m.id);
+            } else if let Some(rest) = d.strip_prefix("Redo ")
+                && stack.redo.last().is_some_and(|e| e.description == rest)
+                && stack.expected_head == Some(parent)
+            {
+                let e = stack.redo.pop().expect("non-empty");
+                stack.undo.push(e);
+                stack.expected_head = Some(m.id);
+            } else {
+                stack.record(parent, m.id, d);
+            }
+        }
+        stack.expected_head = Some(doc.head(branch)?);
+        Ok(stack)
     }
 
     /// Sets the maximum number of undo steps (oldest are dropped).

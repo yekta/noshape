@@ -12,13 +12,13 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_store::{BranchId, MicroversionId, VersionGraph};
 
-/// Branch lane colors.
-const LANES: [u32; 6] = [0x8b7cff, 0x3ecf8e, 0xf5b84b, 0x5aa9ff, 0xff7aa8, 0x4cc9f0];
+/// Branch lane colors (Onshape `--os-version-graph-branch-0..5`).
+const LANES: [u32; 6] = [0x1651b0, 0xfab601, 0x3ad4a7, 0xb689be, 0x3e94ff, 0xb88a00];
 
 enum Prompt {
     None,
     CreateVersion(Entity<InputState>),
-    Branch(MicroversionId, Entity<InputState>),
+    Branch(Entity<InputState>),
 }
 
 pub struct HistoryPanel {
@@ -170,7 +170,7 @@ impl HistoryPanel {
                     format!("Merged; {} tab(s) changed on both branches were merged feature by feature", outcome.conflicts.len())
                 };
                 self.after_change(cx);
-                self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
+                self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(msg)));
             }
             Err(e) => self.error(e, cx),
         }
@@ -216,7 +216,7 @@ impl HistoryPanel {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
-        self.prompt = Prompt::Branch(from, st);
+        self.prompt = Prompt::Branch(st);
         cx.notify();
     }
 }
@@ -333,7 +333,7 @@ impl Render for HistoryPanel {
                     .child(Input::new(st).xsmall())
                     .into_any_element(),
             ),
-            Prompt::Branch(_, st) => Some(
+            Prompt::Branch(st) => Some(
                 v_flex()
                     .gap_1()
                     .p_2()

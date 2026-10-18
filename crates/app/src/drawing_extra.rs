@@ -8,7 +8,7 @@
 use crate::drawing_scene::Overlay;
 use crate::drawing_view::*;
 use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, Textarea};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenu};
@@ -175,22 +175,23 @@ impl DrawingEditor {
     }
 
     /// Sheet tabs below the canvas.
+    /// Onshape's Sheets panel (left of the drawing, §3.11): a `#fafafa` header
+    /// with a blue "Sheets (n)" title and an add button, then one row per
+    /// sheet (the active one light blue with a 3 px blue bar) and the views of
+    /// the active sheet.
     pub fn render_sheet_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let mut bar = h_flex().h(px(28.)).px_2().gap_1().bg(pal.panel).border_t_1().border_color(pal.border).items_center().text_xs();
+        let si = self.sheet;
+        let mut list = gpui_kit::component::v_flex().id("dr-sheets").flex_1().min_h_0().pt(px(2.)).overflow_y_scroll();
         for (i, s) in self.drawing.sheets.iter().enumerate() {
             let active = i == self.sheet;
-            let tab = div()
-                .id(("dr-sheet-tab", i))
-                .px_3()
-                .h(px(22.))
-                .flex()
-                .items_center()
-                .rounded_sm()
+            let row = crate::ui::tree_row(("dr-sheet-tab", i), active)
+                .relative()
                 .cursor_pointer()
-                .when(active, |d| d.bg(pal.panel_raised).text_color(pal.text).border_1().border_color(pal.accent))
-                .when(!active, |d| d.text_color(pal.text_muted).hover(|d| d.bg(pal.panel_raised)))
-                .child(s.name.clone())
+                .child(crate::ui::caret(active))
+                .child(crate::ui::tree_icon("sheet", false, cx))
+                .child(div().flex_1().truncate().child(format!("{} ({})", s.name, s.views.len())))
+                .when(active, |d| d.child(div().absolute().left_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
                 .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                     if e.click_count() >= 2 {
                         this.open_sheet_name_panel(i, window, cx);
@@ -205,17 +206,58 @@ impl DrawingEditor {
                         this.open_sheet_menu(i, e.position, window, cx);
                     }),
                 );
-            bar = bar.child(tab);
+            list = list.child(row);
+            if active {
+                for v in &s.views {
+                    let (label, icon) = match &v.kind {
+                        ViewKind::Base { orientation, .. } => (format!("{orientation:?}"), "base-view"),
+                        ViewKind::Projected { .. } => ("Projected view".to_string(), "projected-view"),
+                        ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), "auxiliary-view"),
+                        ViewKind::Section { label, .. } => (format!("Section {label}"), "section-view"),
+                        ViewKind::Detail { label, .. } => (format!("Detail {label}"), "detail-view"),
+                        _ => ("Section view".to_string(), "section-view"),
+                    };
+                    let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
+                    list = list.child(crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false).pl(px(38.)).child(crate::ui::tree_icon(icon, false, cx)).child(div().flex_1().truncate().child(label)));
+                }
+            }
         }
-        let si = self.sheet;
-        bar = bar.child(Button::new("dr-add-sheet").icon(gpui_kit::component::IconName::Plus).ghost().xsmall().tooltip("Add sheet").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.add_sheet_after(si, cx))));
-        bar.into_any_element()
+        gpui_kit::component::v_flex()
+            .w(px(crate::ui::LEFT_PANEL_W))
+            .h_full()
+            .flex_none()
+            .bg(pal.panel)
+            .border_r_1()
+            .border_t_1()
+            .border_color(pal.border)
+            .child(
+                h_flex()
+                    .relative()
+                    .h(px(36.))
+                    .flex_none()
+                    .justify_center()
+                    .bg(pal.rail)
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.accent).child(format!("Sheets ({})", self.drawing.sheets.len())))
+                    .child(
+                        div()
+                            .absolute()
+                            .right(px(6.))
+                            .child(crate::ui::tool_button("dr-add-sheet", "plus", false, cx).w(px(26.)).h(px(26.)).tooltip("Add sheet").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.add_sheet_after(si, cx)))),
+                    ),
+            )
+            .child(list)
+            .into_any_element()
     }
 
     // ------------------------------------------------------------ tools
 
     /// Enter / double-click: finish a jogged cutting line.
-    pub fn confirm(&mut self, cx: &mut Context<Self>) {
+    pub fn confirm(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.more_confirm(window, cx) {
+            return;
+        }
         if let Tool::JoggedSection { parent: Some(pid), points, done: false } = self.tool.clone()
             && points.len() >= 2
         {
@@ -248,7 +290,7 @@ impl DrawingEditor {
     }
 
     /// A point in a view: snap, else the cursor position in the view.
-    fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
+    pub(crate) fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
         let c = self.cursor;
         if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
             return Some(p);
@@ -276,6 +318,9 @@ impl DrawingEditor {
     }
 
     pub fn extra_pending_annotation(&self, id: u64) -> Option<Annotation> {
+        if let Some(a) = self.more_pending_annotation(id) {
+            return Some(a);
+        }
         let c = self.cursor;
         let refs = |v: Vec<(u8, Option<PointRef>)>| v.into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect::<Vec<_>>();
         match &self.tool {
@@ -314,14 +359,23 @@ impl DrawingEditor {
                 let horizontal = d[1].abs() >= d[0].abs();
                 let n = self.ordinate_normal(o.view, horizontal);
                 let pos = add(os, mul(n, dot(sub(c, os), n)));
-                Some(Annotation { id, kind: AnnotationKind::OrdinateDimension { view: o.view, origin: o.p, point: o.p, horizontal }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, o.r.clone())]), ..Default::default() })
+                // A new ordinate group holding the datum's own "0".
+                Some(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: o.view, origin: o.p, points: vec![o.p], horizontal }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, o.r.clone())]), ..Default::default() })
             }
-            Tool::Ordinate { origin: Some(o), horizontal: Some(h), level } => {
+            Tool::Ordinate { origin: Some(o), horizontal: Some(_), group: Some(gid), .. } => {
+                // The group with the point under the cursor added.
                 let p = self.snap_at(c).filter(|p| p.view == o.view)?;
-                let ps = self.pick_sheet(&p)?;
-                let n = self.ordinate_normal(o.view, *h);
-                let pos = add(ps, mul(n, dot(sub(*level, ps), n)));
-                Some(Annotation { id, kind: AnnotationKind::OrdinateDimension { view: o.view, origin: o.p, point: p.p, horizontal: *h }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, p.r.clone())]), ..Default::default() })
+                let mut a = self.current_sheet().annotations.iter().find(|a| a.id == *gid)?.clone();
+                let AnnotationKind::OrdinateGroup { points, .. } = &mut a.kind else { return None };
+                if points.iter().any(|q| len(sub(*q, p.p)) < 1e-9) {
+                    return None;
+                }
+                points.push(p.p);
+                let slot = points.len() as u8;
+                if let Some(r) = p.r.clone() {
+                    a.refs.push(AnnotationRef { slot, point: r });
+                }
+                Some(a)
             }
             Tool::Datum { anchor: Some(a) } => {
                 if len(sub(c, *a)) < 3.0 {
@@ -419,12 +473,15 @@ impl DrawingEditor {
                 overlay.rect([self.cursor[0] - w, self.cursor[1] - 20.0], self.cursor, true);
             }
             Tool::Datum { anchor: Some(a) } => overlay.lines.push((vec![*a, self.cursor], true)),
-            _ => {}
+            _ => self.more_overlay(overlay),
         }
     }
 
     /// Clicks of the tools defined here; false when the tool is not one of them.
     pub fn extra_tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.more_tool_click(window, cx) {
+            return true;
+        }
         let c = self.cursor;
         match self.tool.clone() {
             Tool::JoggedSection { parent, points, done: false } => {
@@ -508,17 +565,22 @@ impl DrawingEditor {
             }
             Tool::Ordinate { origin: None, .. } => {
                 if let Some(p) = self.any_point(c) {
-                    self.tool = Tool::Ordinate { origin: Some(p), horizontal: None, level: c };
+                    self.tool = Tool::Ordinate { origin: Some(p), horizontal: None, group: None };
                 }
             }
-            Tool::Ordinate { origin: Some(o), horizontal, .. } => {
+            Tool::Ordinate { origin: Some(o), group, .. } => {
                 if let Some(a) = self.pending_annotation() {
-                    let AnnotationKind::OrdinateDimension { horizontal: h, .. } = a.kind.clone() else { return true };
-                    let level = a.position;
-                    self.edit_sheet("Ordinate dimension", cx, |s| s.annotations.push(a));
-                    if horizontal.is_none() {
-                        self.tool = Tool::Ordinate { origin: Some(o), horizontal: Some(h), level };
+                    let AnnotationKind::OrdinateGroup { horizontal: h, .. } = a.kind.clone() else { return true };
+                    let gid = a.id;
+                    match group {
+                        None => self.edit_sheet("Ordinate dimension", cx, |s| s.annotations.push(a)),
+                        Some(_) => self.edit_sheet("Add to ordinate group", cx, |s| {
+                            if let Some(x) = s.annotations.iter_mut().find(|x| x.id == gid) {
+                                *x = a;
+                            }
+                        }),
                     }
+                    self.tool = Tool::Ordinate { origin: Some(o), horizontal: Some(h), group: Some(gid) };
                 }
             }
             Tool::Table { kind: TableTool::General, .. } => self.open_new_table_panel(c, window, cx),
@@ -586,6 +648,10 @@ impl DrawingEditor {
             }
             PickTarget::SectionLine(v) => {
                 self.selection = vec![Sel::View(v)];
+                // Near a point of the line: move that point only.
+                if let Some(index) = self.section_point_at(v, start) {
+                    return Some(Drag::MoveSectionPoint { view: v, index, orig: sheet.section_points(v)? });
+                }
                 Some(Drag::MoveSectionLine { view: v, start, orig: sheet.view(v)?.kind.clone() })
             }
             PickTarget::DetailCircle(v) => {
@@ -639,6 +705,13 @@ impl DrawingEditor {
                     v.kind = kind;
                 }
             }
+            Drag::MoveSectionPoint { view, index, orig } => {
+                let Some(parent) = sheet.parent_of(*view) else { return };
+                let Some(ppl) = self.placement(parent) else { return };
+                let p = self.snap_at(c).filter(|s| s.view == parent).map(|s| s.p).unwrap_or_else(|| ppl.to_view(c));
+                let ortho = matches!(sheet.view(*view).map(|v| &v.kind), Some(ViewKind::Section { .. }));
+                sheet.set_section_points(*view, views::move_cut_point(orig, *index, p, ortho));
+            }
             Drag::MoveDetailCircle { view, start, orig } => {
                 let Some(parent) = sheet.parent_of(*view) else { return };
                 let Some(ppl) = self.placement(parent) else { return };
@@ -673,6 +746,8 @@ impl DrawingEditor {
         let mut crop = vec![
             MenuEntry::item("Rectangle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: false }, cx)),
             MenuEntry::item("Circle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: true }, cx)),
+            MenuEntry::item("Polygon", move |t, _, cx| t.set_tool(Tool::CropPoly { parent: Some(id), points: vec![], spline: false }, cx)),
+            MenuEntry::item("Spline", move |t, _, cx| t.set_tool(Tool::CropPoly { parent: Some(id), points: vec![], spline: true }, cx)),
         ];
         if v.crop.is_some() {
             crop.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
@@ -691,6 +766,8 @@ impl DrawingEditor {
             vec![
                 MenuEntry::item("Jogged section view", move |t, _, cx| t.set_tool(Tool::JoggedSection { parent: Some(id), points: vec![], done: false }, cx)),
                 MenuEntry::item("Aligned section view", move |t, _, cx| t.set_tool(Tool::AlignedSection { parent: Some(id), center: None, a: None, b: None }, cx)),
+                MenuEntry::item("Partial section view", move |t, _, cx| t.set_tool(Tool::Section { parent: Some(id), p0: None, line: None, partial: true }, cx)),
+                MenuEntry::item("Broken-out section", move |t, _, cx| t.set_tool(Tool::BrokenOut { parent: Some(id), points: vec![], done: false }, cx)),
             ],
         ));
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
@@ -787,54 +864,20 @@ impl DrawingEditor {
         let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
         if let TableKind::General { .. } = t.kind {
             out.push(MenuEntry::item("Edit cell…", move |t, w, cx| t.open_cell_panel(id, w, cx)));
-            let (r, c) = cell.unwrap_or((0, 0));
-            let cells_edit = move |t: &mut DrawingEditor, name: &str, cx: &mut Context<DrawingEditor>, f: &dyn Fn(&mut Vec<Vec<String>>)| {
-                t.edit_sheet(name, cx, |s| {
-                    if let Some(TableKind::General { cells, .. }) = s.table_mut(id).map(|t| &mut t.kind) {
-                        f(cells);
-                        let n = cells.iter().map(|r| r.len()).max().unwrap_or(1);
-                        for row in cells.iter_mut() {
-                            row.resize(n, String::new());
-                        }
-                    }
-                    if let Some(t) = s.table_mut(id) {
-                        t.col_widths.clear();
-                    }
-                });
-            };
-            out.push(MenuEntry::item("Insert row below", move |t, _, cx| {
-                cells_edit(t, "Insert row", cx, &|cells| {
-                    let n = cells.first().map(|r| r.len()).unwrap_or(1);
-                    cells.insert((r + 1).min(cells.len()), vec![String::new(); n]);
-                })
-            }));
-            out.push(MenuEntry::item("Insert column right", move |t, _, cx| {
-                cells_edit(t, "Insert column", cx, &|cells| {
-                    for row in cells.iter_mut() {
-                        row.insert((c + 1).min(row.len()), String::new());
-                    }
-                })
-            }));
-            out.push(MenuEntry::item("Delete row", move |t, _, cx| {
-                cells_edit(t, "Delete row", cx, &|cells| {
-                    if cells.len() > 1 && r < cells.len() {
-                        cells.remove(r);
-                    }
-                })
-            }));
-            out.push(MenuEntry::item("Delete column", move |t, _, cx| {
-                cells_edit(t, "Delete column", cx, &|cells| {
-                    if cells.first().is_some_and(|x| x.len() > 1) {
-                        for row in cells.iter_mut() {
-                            if c < row.len() {
-                                row.remove(c);
-                            }
-                        }
-                    }
-                })
-            }));
+            let (r, c) = cell.map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
+            out.push(MenuEntry::item("Insert row above", move |t, _, cx| t.edit_table(id, "Insert row", cx, |t| t.insert_row(r))));
+            out.push(MenuEntry::item("Insert row below", move |t, _, cx| t.edit_table(id, "Insert row", cx, |t| t.insert_row(r + 1))));
+            out.push(MenuEntry::item("Insert column left", move |t, _, cx| t.edit_table(id, "Insert column", cx, |t| t.insert_col(c))));
+            out.push(MenuEntry::item("Insert column right", move |t, _, cx| t.edit_table(id, "Insert column", cx, |t| t.insert_col(c + 1))));
+            out.push(MenuEntry::item("Delete row", move |t, _, cx| t.edit_table(id, "Delete row", cx, |t| {
+                t.delete_row(r);
+            })));
+            out.push(MenuEntry::item("Delete column", move |t, _, cx| t.edit_table(id, "Delete column", cx, |t| {
+                t.delete_col(c);
+            })));
             out.push(MenuEntry::Separator);
         }
+        out.extend(self.table_more_entries(&t, cell));
         if let TableKind::Hole { precision, .. } = t.kind {
             let mut prec = vec![MenuEntry::check("Drawing default", precision.is_none(), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = None }))];
             for p in 0..=4u8 {
@@ -886,7 +929,7 @@ impl DrawingEditor {
         out
     }
 
-    fn edit_table(&mut self, id: u64, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Table)) {
+    pub(crate) fn edit_table(&mut self, id: u64, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Table)) {
         self.edit_sheet(name, cx, |s| {
             if let Some(t) = s.table_mut(id) {
                 f(t);
@@ -954,7 +997,7 @@ impl DrawingEditor {
             cx.notify();
             return;
         };
-        let (row, col) = self.built.as_ref().and_then(|b| b.table_layout(table)).and_then(|l| l.cell_at(self.cursor)).unwrap_or((0, 0));
+        let (row, col) = self.built.as_ref().and_then(|b| b.table_layout(table)).and_then(|l| l.cell_at(self.cursor)).map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
         let text = cells.get(row).and_then(|r| r.get(col)).cloned().unwrap_or_default();
         let input = self.textarea(&text, 3, window, cx);
         self.panel = Some(Panel::Cell { table, row, col, input });
@@ -990,7 +1033,7 @@ impl DrawingEditor {
     pub fn open_annotation_panel(&mut self, a: &Annotation, window: &mut Window, cx: &mut Context<Self>) {
         let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|x| x.id == a.id).cloned() else { return };
         match &a.kind {
-            AnnotationKind::Gdt { anchor, frame } => self.open_gdt_panel(Some(a.id), *anchor, frame, window, cx),
+            AnnotationKind::Gdt { anchor, frame, .. } => self.open_gdt_panel(Some(a.id), *anchor, frame, window, cx),
             AnnotationKind::SurfaceFinish { anchor, value } => self.open_surface_finish_panel(Some(a.id), *anchor, value, window, cx),
             AnnotationKind::Datum { anchor, label } => {
                 let input = self.input(label, window, cx);
@@ -1031,11 +1074,11 @@ impl DrawingEditor {
                 self.panel = Some(Panel::Dimension { id: a.id, angular, units: f.units, show_units: f.show_units, tol: tol_index(&f.tolerance), precision, upper, lower, hole, shaft, prefix, suffix, text });
                 cx.notify();
             }
-            _ => {}
+            _ => self.open_more_panel(&a, window, cx),
         }
     }
 
-    fn label_row(label: &str, el: AnyElement) -> AnyElement {
+    pub(crate) fn label_row(label: &str, el: AnyElement) -> AnyElement {
         let pal = p();
         h_flex().gap_2().items_center().child(div().w(px(84.)).text_xs().text_color(pal.text_muted).child(label.to_string())).child(el).into_any_element()
     }
@@ -1285,6 +1328,7 @@ impl DrawingEditor {
                 });
             }
             Panel::Datum { edit: None, .. } => {}
+            p @ (Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
             Panel::Gdt { edit, pos, symbol, diameter, modifier, tolerance, datums } => {
                 let tol = val(&tolerance, cx);
                 let mut frame = vec![GDT_SYMBOLS[symbol].0.to_string(), format!("{}{}{}", if diameter { "Ø" } else { "" }, tol.trim(), GDT_MODIFIERS[modifier].0)];
@@ -1302,7 +1346,7 @@ impl DrawingEditor {
                     }),
                     None => {
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: pos, frame }, position: pos, ..Default::default() }));
+                        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: pos, frame, leaders: vec![] }, position: pos, ..Default::default() }));
                         self.tool = Tool::Select;
                         self.selection = vec![Sel::Annotation(id)];
                     }

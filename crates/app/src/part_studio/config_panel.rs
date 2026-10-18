@@ -2,27 +2,56 @@
 //! (inputs, current configuration, configured feature parameters).
 
 use super::PartStudioView;
-use crate::theme::{p, with_alpha};
+use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption, VariableKind};
 use noshape_model::params::{ParamKind, ParamValue};
 use noshape_model::partstudio::PartStudio;
-use noshape_units::{Dim, ExprValue, Quantity};
+use noshape_units::{ExprValue, Quantity};
+
+/// A feature with its configurable parameters: (id, name, [(param id, label)]).
+type ConfigurableFeature = (noshape_model::FeatureId, String, Vec<(String, String)>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RightPanel {
+    Appearance,
     Variables,
     Configurations,
     SheetMetal,
     CutList,
 }
 
+/// Commit action of a panel text cell (gets the cell's text).
+pub(super) type CellCommit = std::rc::Rc<dyn Fn(&mut PartStudioView, String, &mut Context<PartStudioView>)>;
+
 impl PartStudioView {
+    /// Commit the cell that had the focus at the last render if the focus has
+    /// left it (clicking another cell or elsewhere), like Onshape's commit on
+    /// blur. Called at the start of every panel render.
+    fn commit_unfocused_cell(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(key) = self.panel_focused.clone() else { return };
+        let Some((st, last)) = self.panel_inputs.get(&key).cloned() else {
+            self.panel_focused = None;
+            return;
+        };
+        if st.read(cx).focus_handle(cx).is_focused(window) {
+            return;
+        }
+        self.panel_focused = None;
+        let text = st.read(cx).value().to_string();
+        if text != last
+            && let Some(commit) = self.panel_commits.get(&key).cloned()
+        {
+            commit(self, text, cx);
+        }
+    }
+
     pub(super) fn toggle_panel(&mut self, panel: RightPanel, window: &mut Window, cx: &mut Context<Self>) {
         self.right_panel = if self.right_panel == Some(panel) { None } else { Some(panel) };
         let _ = window;
@@ -37,22 +66,28 @@ impl PartStudioView {
 
     /// A text cell bound to a stable key; `commit` runs on Enter/blur.
     fn cell_input(&mut self, key: String, value: String, window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> Entity<InputState> {
-        if let Some((st, last)) = self.panel_inputs.get(&key)
-            && *last == value
-        {
-            return st.clone();
-        }
-        // (Re)create when the model value changed underneath (undo, other edits).
-        if let Some((st, _)) = self.panel_inputs.get(&key).cloned() {
-            st.update(cx, |s, cx| s.set_value(value.clone(), window, cx));
-            self.panel_inputs.insert(key.clone(), (st.clone(), value));
+        let commit: CellCommit = std::rc::Rc::new(commit);
+        // The newest closure (it captures the current ids).
+        self.panel_commits.insert(key.clone(), commit.clone());
+        if let Some((st, last)) = self.panel_inputs.get(&key).cloned() {
+            if st.read(cx).focus_handle(cx).is_focused(window) {
+                self.panel_focused = Some(key.clone());
+            } else if last != value {
+                // The model value changed underneath (undo, other edits).
+                st.update(cx, |s, cx| s.set_value(value.clone(), window, cx));
+                self.panel_inputs.insert(key.clone(), (st.clone(), value));
+            }
             return st;
         }
         let st = cx.new(|cx| InputState::new(window, cx).default_value(value.clone()));
-        let commit = std::rc::Rc::new(commit);
+        let k = key.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
+                // Committed: losing the focus later must not commit it again.
+                if let Some(e) = this.panel_inputs.get_mut(&k) {
+                    e.1 = v.clone();
+                }
                 commit(this, v, cx);
             }
         });
@@ -63,8 +98,10 @@ impl PartStudioView {
 
     pub(super) fn render_right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.right_panel?;
+        self.commit_unfocused_cell(window, cx);
         let pal = p();
         let body = match panel {
+            RightPanel::Appearance => self.render_appearance_panel(cx),
             RightPanel::Variables => self.render_variables(cx),
             RightPanel::Configurations => self.render_configurations(window, cx),
             RightPanel::SheetMetal => self.render_sheet_metal_panel(cx),
@@ -77,19 +114,21 @@ impl PartStudioView {
                 .flex_none()
                 .bg(pal.panel)
                 .border_l_1()
+                .border_t_1()
                 .border_color(pal.border)
                 .child(
                     h_flex()
-                        .h(px(32.))
+                        .h(px(30.))
                         .px_3()
                         .justify_between()
                         .border_b_1()
                         .border_color(pal.border)
-                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(match panel {
-                            RightPanel::Variables => "VARIABLES",
-                            RightPanel::Configurations => "CONFIGURATIONS",
-                            RightPanel::SheetMetal => "SHEET METAL",
-                            RightPanel::CutList => "CUT LIST",
+                        .child(div().text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match panel {
+                            RightPanel::Appearance => "Appearances",
+                            RightPanel::Variables => "Variable table",
+                            RightPanel::Configurations => "Configurations",
+                            RightPanel::SheetMetal => "Sheet metal",
+                            RightPanel::CutList => "Cut list",
                         }))
                         .child(Button::new("panel-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.right_panel = None;
@@ -103,7 +142,7 @@ impl PartStudioView {
 
     fn render_variables(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let units = self.doc.read(cx).session.doc.settings.units.clone();
+        let units = self.doc.read(cx).session.doc.settings.units;
         let vars: Vec<(String, Quantity)> = self.display.variables.iter().map(|(k, v)| (k.clone(), *v)).collect();
         if vars.is_empty() {
             return div()
@@ -115,7 +154,19 @@ impl PartStudioView {
         v_flex()
             .gap_px()
             .children(vars.into_iter().map(|(name, q)| {
+                let (n1, n2) = (name.clone(), name.clone());
+                let view = cx.entity();
                 h_flex()
+                    .id(SharedString::from(format!("var-row-{name}")))
+                    // Onshape: hovering a variable highlights the features that use it.
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        let new = h.then(|| n1.clone());
+                        if this.ui.var_hover != new {
+                            this.ui.var_hover = new;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        }
+                    }))
                     .justify_between()
                     .px_2()
                     .py_1()
@@ -123,6 +174,11 @@ impl PartStudioView {
                     .hover(|d| d.bg(pal.panel_hover))
                     .child(div().text_sm().text_color(pal.accent_hover).child(format!("#{name}")))
                     .child(div().text_sm().text_color(pal.text).child(noshape_units::format_quantity(q, &units)))
+                    .context_menu(move |menu, _, _| {
+                        let v = view.clone();
+                        let n = n2.clone();
+                        menu.item(PopupMenuItem::new("Filter feature list").on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_filter(&format!(":variable {n}"), w, cx))))
+                    })
             }))
             .into_any_element()
     }
@@ -334,7 +390,8 @@ impl PartStudioView {
                 let mut card = v_flex().gap_1().p_2().rounded_md().border_1().border_color(pal.border).child(
                     h_flex()
                         .justify_between()
-                        .child(div().text_xs().text_color(pal.text).child(format!("{fname} › {plabel}")))
+                        // Which input drives it, when there are several.
+                        .child(div().text_xs().text_color(pal.text).child(if list_inputs.len() > 1 { format!("{fname} › {plabel} ({})", input.name) } else { format!("{fname} › {plabel}") }))
                         .child(Button::new(SharedString::from(format!("cp-del-{ci}"))).icon(IconName::Delete).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.edit_config("Remove configured parameter", cx, |ps| {
                                 if ci < ps.configuration.configured.len() {
@@ -378,7 +435,7 @@ impl PartStudioView {
             }
             // Add a configured parameter: pick feature then parameter.
             let view = cx.entity();
-            let feats: Vec<(noshape_model::FeatureId, String, Vec<(String, String)>)> = studio
+            let feats: Vec<ConfigurableFeature> = studio
                 .features
                 .iter()
                 .filter_map(|f| {
@@ -389,23 +446,37 @@ impl PartStudioView {
                     Some((f.id, f.name.clone(), params))
                 })
                 .collect();
-            let first_input = list_inputs[0].id.clone();
+            // With several inputs, first choose the one that drives the
+            // parameter (Onshape configures a parameter per input).
+            let inputs: Vec<(String, String)> = list_inputs.iter().map(|i| (i.id.clone(), i.name.clone())).collect();
             col = col.child(
                 Button::new("add-configured").label("Configure a parameter").icon(IconName::Plus).outline().xsmall().dropdown_menu(move |mut m, window, cx| {
-                    for (fid, fname, params) in &feats {
-                        let v = view.clone();
-                        let params = params.clone();
-                        let fid = *fid;
-                        let input = first_input.clone();
-                        m = m.submenu(fname.clone(), window, cx, move |mut sm, _, _| {
-                            for (pid, plabel) in &params {
-                                let v = v.clone();
-                                let pid = pid.clone();
-                                let input = input.clone();
-                                sm = sm.item(PopupMenuItem::new(plabel.clone()).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_configured(fid, &pid, &input, cx))));
-                            }
-                            sm
-                        });
+                    let (feats, view) = (feats.clone(), view.clone());
+                    let feature_items = move |mut m: gpui_kit::component::menu::PopupMenu, input: String, window: &mut Window, cx: &mut Context<gpui_kit::component::menu::PopupMenu>| {
+                        for (fid, fname, params) in &feats {
+                            let v = view.clone();
+                            let params = params.clone();
+                            let fid = *fid;
+                            let input = input.clone();
+                            m = m.submenu(fname.clone(), window, cx, move |mut sm, _, _| {
+                                for (pid, plabel) in &params {
+                                    let v = v.clone();
+                                    let pid = pid.clone();
+                                    let input = input.clone();
+                                    sm = sm.item(PopupMenuItem::new(plabel.clone()).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_configured(fid, &pid, &input, cx))));
+                                }
+                                sm
+                            });
+                        }
+                        m
+                    };
+                    if let [(id, _)] = inputs.as_slice() {
+                        return feature_items(m, id.clone(), window, cx);
+                    }
+                    for (id, name) in &inputs {
+                        let id = id.clone();
+                        let feature_items = feature_items.clone();
+                        m = m.submenu(name.clone(), window, cx, move |sm, window, cx| feature_items(sm, id.clone(), window, cx));
                     }
                     m
                 }),
@@ -414,7 +485,7 @@ impl PartStudioView {
         col.into_any_element()
     }
 
-    fn add_configured(&mut self, feature: noshape_model::FeatureId, param: &str, input: &str, cx: &mut Context<Self>) {
+    pub(super) fn add_configured(&mut self, feature: noshape_model::FeatureId, param: &str, input: &str, cx: &mut Context<Self>) {
         let param = param.to_string();
         let input = input.to_string();
         self.edit_config("Configure parameter", cx, |ps| {
@@ -444,55 +515,40 @@ impl PartStudioView {
 
     /// Small toolbar of panel toggles shown above the view controls.
     pub(super) fn render_panel_toggles(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // Onshape's right panel rail (§3.6): a strip of 32 px white buttons
+        // flush with the right edge, vertically centered on the viewport.
         let pal = p();
         let active = self.right_panel;
-        h_flex()
-            .gap_0p5()
-            .p_1()
-            .rounded_md()
-            .bg(with_alpha(pal.panel_raised, 0.85))
-            .border_1()
+        let btn = |id: &'static str, icon: &'static str, tip: &'static str, panel: RightPanel, cx: &mut Context<Self>| {
+            let on = active == Some(panel);
+            div()
+                .id(id)
+                .relative()
+                .size(px(32.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(if on { pal.row_hover } else { pal.panel })
+                .hover(|d| d.bg(pal.panel_hover))
+                .cursor_pointer()
+                .border_t_1()
+                .border_color(pal.border)
+                .child(crate::assets::icon(icon, 20., cx))
+                .when(on, |d| d.child(div().absolute().right_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
+                .tooltip(crate::ui::tooltip(tip))
+                .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.toggle_panel(panel, w, cx)))
+        };
+        v_flex()
+            .border_l_1()
+            .border_b_1()
             .border_color(pal.border)
-            .child(
-                Button::new("panel-vars")
-                    .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("variable")))
-                    .ghost()
-                    .xsmall()
-                    .selected(active == Some(RightPanel::Variables))
-                    .tooltip("Variable table")
-                    .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::Variables, w, cx))),
-            )
-            .child(
-                Button::new("panel-config")
-                    .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("configuration")))
-                    .ghost()
-                    .xsmall()
-                    .selected(active == Some(RightPanel::Configurations))
-                    .tooltip("Configurations")
-                    .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::Configurations, w, cx))),
-            )
-            .when(self.has_sheet_metal(), |d| {
-                d.child(
-                    Button::new("panel-sm")
-                        .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("sheet-metal")))
-                        .ghost()
-                        .xsmall()
-                        .selected(active == Some(RightPanel::SheetMetal))
-                        .tooltip("Sheet metal: flat pattern and bend table")
-                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::SheetMetal, w, cx))),
-                )
-            })
-            .when(self.has_frames(), |d| {
-                d.child(
-                    Button::new("panel-cut")
-                        .icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("cut-list")))
-                        .ghost()
-                        .xsmall()
-                        .selected(active == Some(RightPanel::CutList))
-                        .tooltip("Cut list")
-                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_panel(RightPanel::CutList, w, cx))),
-                )
-            })
+            .bg(pal.panel)
+            // Onshape order: Appearance, Configurations, Variable table.
+            .child(btn("panel-appearance", "appearance", "Appearance panel", RightPanel::Appearance, cx))
+            .child(btn("panel-config", "configuration", "Configurations", RightPanel::Configurations, cx))
+            .child(btn("panel-vars", "variable-table", "Variable table", RightPanel::Variables, cx))
+            .when(self.has_sheet_metal(), |d| d.child(btn("panel-sm", "sheet-metal-table", "Sheet metal: flat pattern and bend table", RightPanel::SheetMetal, cx)))
+            .when(self.has_frames(), |d| d.child(btn("panel-cut", "cut-list", "Cut list", RightPanel::CutList, cx)))
             .into_any_element()
     }
 }
@@ -502,8 +558,3 @@ fn noshape_rand() -> String {
     format!("{:x}", (u as u64) ^ 0x9E37_79B9_7F4A_7C15)
 }
 
-#[allow(dead_code)]
-fn quantity_text(q: Quantity) -> String {
-    let _ = Dim::LENGTH;
-    format!("{}", q.value)
-}

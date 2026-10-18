@@ -17,6 +17,8 @@ pub enum DocEvent {
     /// Versions/branches changed.
     HistoryChanged,
     Error(String),
+    /// A user-facing notice (not an error), e.g. a merge result.
+    Info(String),
 }
 
 pub struct DocModel {

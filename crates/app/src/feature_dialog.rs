@@ -5,12 +5,11 @@
 //! the focused selection field receives viewport picks, Enter accepts,
 //! Shift+Enter accepts and repeats, Esc cancels.
 
-use crate::assets::icon_path;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::DropdownMenu as _;
-use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
+use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
@@ -29,7 +28,11 @@ pub enum DialogEvent {
     Accept { repeat: bool },
     Cancel,
     /// A selection field gained focus (viewport picks go there).
-    QueryFocused { path: String, filter: QueryFilter },
+    QueryFocused,
+    /// The pointer is over a selection chip (Onshape highlights the entity).
+    HoverRef(Option<Reference>),
+    /// Preview slider: 0 = the model before the feature, 1 = after.
+    PreviewOpacity(f32),
 }
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
@@ -45,7 +48,6 @@ pub struct DerivedSource {
 pub struct FeatureDialog {
     pub feature: Feature,
     pub ty: &'static FeatureType,
-    pub is_new: bool,
     units: UnitPrefs,
     inputs: HashMap<String, Entity<InputState>>,
     pub active_query: Option<String>,
@@ -65,6 +67,28 @@ pub struct FeatureDialog {
     /// Resolved external source: key, label, parts, newer version.
     ext_info: Option<ExtInfo>,
     ext_task: Option<Task<()>>,
+    /// Parameters the user changed in this session (automatic choices such
+    /// as Extrude's Add/Remove direction leave them alone).
+    pub user_set: std::collections::HashSet<String>,
+    /// Variables visible to the feature (evaluated value hints and wheel
+    /// nudging of expressions).
+    pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
+    /// "Final" is offered only when later features exist (Onshape hides it
+    /// for new features and for the last feature).
+    pub final_available: bool,
+    /// Selection field flashing after a rejected pick.
+    flash: Option<String>,
+    /// Help text shown under the title ("?").
+    show_help: bool,
+    /// Preview slider (before/after blend).
+    preview: Entity<gpui_kit::component::slider::SliderState>,
+    preview_value: f32,
+    /// Where the title was grabbed when dragging the dialog.
+    drag_grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
+    /// Whether a reference is missing (its feature was deleted/suppressed).
+    pub missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
+    /// Open `#` variable autofill list of a numeric field.
+    completion: Option<crate::var_complete::VarCompletion>,
 }
 
 #[derive(Clone)]
@@ -89,14 +113,20 @@ fn item_path(array: &str, i: usize, id: &str) -> String {
 }
 
 impl FeatureDialog {
-    pub fn new(feature: Feature, is_new: bool, units: UnitPrefs, labeler: RefLabeler, cx: &mut Context<Self>) -> Self {
+    pub fn new(feature: Feature, units: UnitPrefs, labeler: RefLabeler, cx: &mut Context<Self>) -> Self {
         let ty = feature.feature_type().expect("registered feature type");
         let mut feature = feature;
         fill_defaults(&ty.params, &mut feature.params, &units);
+        let preview = cx.new(|_| gpui_kit::component::slider::SliderState::new().min(0.0).max(1.0).step(0.01).default_value(1.0));
+        let preview_sub = cx.subscribe(&preview, |this: &mut Self, _, ev: &gpui_kit::component::slider::SliderEvent, cx| {
+            let (gpui_kit::component::slider::SliderEvent::Change(v) | gpui_kit::component::slider::SliderEvent::Release(v)) = ev;
+            this.preview_value = v.start();
+            cx.emit(DialogEvent::PreviewOpacity(v.start()));
+            cx.notify();
+        });
         let mut d = Self {
             feature,
             ty,
-            is_new,
             units,
             inputs: HashMap::new(),
             active_query: None,
@@ -112,8 +142,19 @@ impl FeatureDialog {
             ext_pick: None,
             ext_info: None,
             ext_task: None,
+            user_set: Default::default(),
+            variables: Default::default(),
+            final_available: true,
+            flash: None,
+            show_help: false,
+            preview,
+            preview_value: 1.0,
+            drag_grab: Default::default(),
+            missing: Arc::new(|_| false),
+            completion: None,
         };
         d.active_query = d.first_visible_query();
+        d.subs.push(preview_sub);
         d
     }
 
@@ -125,6 +166,19 @@ impl FeatureDialog {
             .filter(|s| s.is_visible(&self.feature.params))
             .find(|s| matches!(s.kind, ParamKind::Query { .. }))
             .map(|s| s.id.to_string())
+    }
+
+    /// Onshape: when an edit hides the active selection field (Part pattern
+    /// switched to Feature pattern, say), the first visible one becomes active
+    /// so picks keep going somewhere.
+    fn refocus_hidden_query(&mut self) {
+        let Some(path) = self.active_query.as_deref() else { return };
+        if path.contains('.') {
+            return;
+        }
+        if !self.ty.params.iter().any(|s| s.id == path && s.is_visible(&self.feature.params)) {
+            self.active_query = self.first_visible_query();
+        }
     }
 
     pub fn active_filter(&self) -> Option<(String, QueryFilter, Option<usize>)> {
@@ -182,8 +236,20 @@ impl FeatureDialog {
     }
 
     pub fn set_value(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
+        self.user_set.insert(path.to_string());
+        self.set_value_auto(path, v, cx);
+    }
+
+    /// Set a value on the user's behalf (automatic defaults): the field is
+    /// not marked as user-set.
+    pub fn set_value_auto(&mut self, path: &str, v: ParamValue, cx: &mut Context<Self>) {
         if let Some((vals, id)) = self.values_for_path_mut(path) {
             vals.set(&id, v);
+        }
+        self.refocus_hidden_query();
+        // Hole: switching units or style shows another Standard; copy its values.
+        if self.feature.type_id == "hole" && matches!(path, "unitsSystem" | "styleV2") && noshape_model::features::hole_tables::sync_hole_standard(&mut self.feature.params) {
+            self.inputs.clear();
         }
         cx.emit(DialogEvent::Changed);
         cx.notify();
@@ -203,6 +269,7 @@ impl FeatureDialog {
     /// no field is active.
     pub fn add_pick(&mut self, r: Reference, cx: &mut Context<Self>) -> bool {
         let Some((path, _filter, max)) = self.active_filter() else { return false };
+        self.user_set.insert(path.clone());
         let Some((vals, id)) = self.values_for_path_mut(&path) else { return false };
         let q = vals.query_mut(&id);
         if let Some(pos) = q.iter().position(|x| *x == r) {
@@ -222,6 +289,123 @@ impl FeatureDialog {
         cx.emit(DialogEvent::Changed);
         cx.notify();
         true
+    }
+
+    /// Remove the `k`-th pick of a selection field.
+    pub fn remove_pick(&mut self, path: &str, k: usize, cx: &mut Context<Self>) {
+        cx.emit(DialogEvent::HoverRef(None));
+        self.user_set.insert(path.to_string());
+        if let Some((vals, id)) = self.values_for_path_mut(path) {
+            let q = vals.query_mut(&id);
+            if k < q.len() {
+                q.remove(k);
+            }
+        }
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
+    }
+
+    /// Set or clear the tolerance of a top-level quantity (`key` =
+    /// `<param>__tolerance`).
+    fn set_tolerance(&mut self, key: &str, t: Option<Tolerance>, cx: &mut Context<Self>) {
+        match t {
+            Some(t) => self.feature.params.set(key, ParamValue::Text(t.encode())),
+            None => {
+                self.feature.params.0.shift_remove(key);
+            }
+        }
+        self.inputs.retain(|k, _| !k.starts_with(key));
+        self.user_set.insert(key.to_string());
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
+    }
+
+    /// Tolerance row: type, upper/lower values, precision.
+    fn render_tolerance(&mut self, key: &str, t: Tolerance, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let view = cx.entity();
+        let k1 = key.to_string();
+        let current = t.clone();
+        let type_menu = Button::new(SharedString::from(format!("toltype-{key}"))).label(t.kind.clone()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+            for kind in Tolerance::KINDS {
+                let (v, k, mut nt) = (view.clone(), k1.clone(), current.clone());
+                nt.kind = kind.to_string();
+                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(*kind).checked(current.kind == *kind).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_tolerance(&k, Some(nt.clone()), cx))));
+            }
+            m
+        });
+        let view = cx.entity();
+        let k2 = key.to_string();
+        let current = t.clone();
+        let prec_label = t.precision.map(|p| format!("{p} places")).unwrap_or_else(|| "Workspace precision".into());
+        let prec_menu = Button::new(SharedString::from(format!("tolprec-{key}"))).label(prec_label).ghost().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+            for p in std::iter::once(None).chain((0..=6u8).map(Some)) {
+                let (v, k, mut nt) = (view.clone(), k2.clone(), current.clone());
+                nt.precision = p;
+                let label = p.map(|p| format!("{p} places")).unwrap_or_else(|| "Workspace precision".into());
+                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(label).checked(current.precision == p).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_tolerance(&k, Some(nt.clone()), cx))));
+            }
+            m
+        });
+        let mut fields: Vec<AnyElement> = Vec::new();
+        for (slot, label) in t.value_labels() {
+            let text = if slot == 0 { t.upper.clone() } else { t.lower.clone() };
+            let ik = format!("{key}.{slot}");
+            let st = match self.inputs.get(&ik) {
+                Some(st) => st.clone(),
+                None => {
+                    let st = cx.new(|cx| InputState::new(window, cx).default_value(text));
+                    let (k, tt) = (key.to_string(), t.clone());
+                    let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+                        if matches!(ev, InputEvent::Change) {
+                            let mut nt = Tolerance::parse(this.get_value(&k)).unwrap_or_else(|| tt.clone());
+                            let v = st.read(cx).value().to_string();
+                            if slot == 0 {
+                                nt.upper = v;
+                            } else {
+                                nt.lower = v;
+                            }
+                            this.feature.params.set(&k, ParamValue::Text(nt.encode()));
+                            cx.emit(DialogEvent::Changed);
+                        }
+                    });
+                    self.subs.push(sub);
+                    self.inputs.insert(ik.clone(), st.clone());
+                    st
+                }
+            };
+            fields.push(h_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child(label)).child(div().w(px(70.)).child(Input::new(&st).xsmall())).into_any_element());
+        }
+        v_flex().pl(px(10.)).gap_1().child(h_flex().gap_1().child(type_menu).child(prec_menu)).children(fields).into_any_element()
+    }
+
+    /// Move pick `from` to position `to` within a selection field.
+    pub fn move_pick(&mut self, path: &str, from: usize, to: usize, cx: &mut Context<Self>) {
+        let Some((vals, id)) = self.values_for_path_mut(path) else { return };
+        let q = vals.query_mut(&id);
+        if from >= q.len() || to >= q.len() || from == to {
+            return;
+        }
+        let r = q.remove(from);
+        q.insert(to, r);
+        self.user_set.insert(path.to_string());
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
+    }
+
+    /// Flash the active selection field red (a rejected pick).
+    pub fn flash_active_field(&mut self, cx: &mut Context<Self>) {
+        let Some(path) = self.active_query.clone() else { return };
+        self.flash = Some(path);
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_millis(450)).await;
+            let _ = this.update(cx, |this, cx| {
+                this.flash = None;
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     fn advance_query_focus(&mut self, from: &str) {
@@ -283,8 +467,13 @@ impl FeatureDialog {
         }
     }
 
-    /// Notify listeners that the draft changed (e.g. after sketch edits).
-    pub fn mark_changed(&mut self, cx: &mut Context<Self>) {
+    /// Replace the whole draft (dialog-local undo/redo) and rebuild the
+    /// value fields from it.
+    pub fn restore_draft(&mut self, feature: Feature, cx: &mut Context<Self>) {
+        self.feature = feature;
+        self.inputs.clear();
+        self.parse_errors.clear();
+        self.refocus_hidden_query();
         cx.emit(DialogEvent::Changed);
         cx.notify();
     }
@@ -308,23 +497,82 @@ impl FeatureDialog {
             InputEvent::Change => {
                 let text = state.read(cx).value().to_string();
                 this.on_text_changed(&path_s, text, cx);
+                let numeric = this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_)));
+                this.completion = numeric.then(|| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables)).flatten();
             }
             InputEvent::PressEnter { shift, .. } => cx.emit(DialogEvent::Accept { repeat: *shift }),
-            InputEvent::Focus => {
-                this.active_query = None;
+            // Onshape keeps the selection field active while a number field
+            // has keyboard focus ("two fields are active"), so picks still
+            // go to it.
+            InputEvent::Focus => cx.notify(),
+            InputEvent::Blur => {
+                // Re-render: the field shows its converted value again.
+                this.completion = None;
                 cx.notify();
             }
-            InputEvent::Blur => {}
         });
         self.subs.push(sub);
         self.inputs.insert(path.to_string(), state.clone());
         state
     }
 
+    /// Insert autofill entry `index` (the selected one when `None`) into the
+    /// field and close the list.
+    fn accept_completion(&mut self, index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.completion.take() else { return };
+        let Some(state) = self.inputs.get(&c.key).cloned() else { return };
+        if let Some(text) = c.accept(index, &state, window, cx) {
+            self.on_text_changed(&c.key, text, cx);
+        }
+        cx.notify();
+    }
+
+    /// Key handling while a field's autofill list is open: ↑/↓ move, Enter
+    /// inserts, Esc closes. Capture listeners run before the input's own
+    /// handling and stop the key there; with no list open for this field
+    /// the key passes through untouched.
+    fn completion_keys(&self, el: Stateful<Div>, path: &str, cx: &mut Context<Self>) -> Stateful<Div> {
+        use gpui_kit::component::input::{Enter, Escape, MoveDown, MoveUp};
+        let open = |this: &Self, p: &str| this.completion.as_ref().is_some_and(|c| c.key == p);
+        let (p1, p2, p3, p4) = (path.to_string(), path.to_string(), path.to_string(), path.to_string());
+        el.capture_action(cx.listener(move |this, _: &MoveUp, _, cx| {
+            if open(this, &p1) {
+                cx.stop_propagation();
+                if let Some(c) = &mut this.completion {
+                    c.move_selection(-1);
+                }
+                cx.notify();
+            }
+        }))
+        .capture_action(cx.listener(move |this, _: &MoveDown, _, cx| {
+            if open(this, &p2) {
+                cx.stop_propagation();
+                if let Some(c) = &mut this.completion {
+                    c.move_selection(1);
+                }
+                cx.notify();
+            }
+        }))
+        .capture_action(cx.listener(move |this, _: &Enter, window, cx| {
+            if open(this, &p3) {
+                cx.stop_propagation();
+                this.accept_completion(None, window, cx);
+            }
+        }))
+        .capture_action(cx.listener(move |this, _: &Escape, _, cx| {
+            if open(this, &p4) {
+                cx.stop_propagation();
+                this.completion = None;
+                cx.notify();
+            }
+        }))
+    }
+
     fn on_text_changed(&mut self, path: &str, text: String, cx: &mut Context<Self>) {
         let Some(spec) = self.spec_for_path(path) else { return };
+        self.user_set.insert(path.to_string());
         let v = match spec.kind {
-            ParamKind::Num(_) => {
+            ParamKind::Num(_) | ParamKind::Bool { .. } => {
                 match noshape_units::parse(&text) {
                     Ok(_) => {
                         self.parse_errors.remove(path);
@@ -417,7 +665,8 @@ impl FeatureDialog {
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         let pal = p();
-        let label_el = |text: &'static str| div().text_xs().text_color(pal.text_muted).child(text);
+        // Onshape dialog field label: 13.33 px #666 (§3.9).
+        let label_el = |text: &'static str| div().text_size(px(13.33)).text_color(pal.text_muted).truncate().child(text);
         let flips: Vec<AnyElement> = trailing
             .iter()
             .map(|f| {
@@ -429,10 +678,14 @@ impl FeatureDialog {
                 let circular = f.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR);
                 let icon = if circular { "flip-circular" } else { "flip" };
                 Button::new(SharedString::from(format!("flip-{fpath}")))
-                    .icon(Icon::empty().path(icon_path(icon)))
-                    .ghost()
-                    .xsmall()
-                    .selected(on)
+                    .custom(dialog_icon_variant(cx, on))
+                    .child(crate::assets::icon(icon, 20., cx))
+                    .w(px(26.))
+                    .h(px(26.))
+                    .p_0()
+                    .rounded(px(0.))
+                    .flex_none()
+                    .when(on, |b| b.bg(pal.panel_active))
                     .tooltip(f.label)
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
@@ -444,20 +697,88 @@ impl FeatureDialog {
 
         let el: AnyElement = match &s.kind {
             ParamKind::Sketch => return None,
+            // A checkbox converted to an expression (Onshape "Convert to
+            // expression"): a text field; right-click > Convert to checkbox.
+            ParamKind::Bool { .. } if matches!(values.get(s.id), Some(ParamValue::Expr(_))) => {
+                let e = self.render_inline_value(s, path, values, window, cx)?;
+                let view = cx.entity();
+                let p2 = path.to_string();
+                h_flex()
+                    .id(SharedString::from(format!("bexpr-{path}")))
+                    .gap_2()
+                    .w_full()
+                    .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(s.label))
+                    .child(div().flex_1().child(e))
+                    .context_menu(move |m, _, _| {
+                        let v = view.clone();
+                        let p = p2.clone();
+                        m.item(gpui_kit::component::menu::PopupMenuItem::new("Convert to checkbox").on_click(move |_, _, cx| {
+                            v.update(cx, |this, cx| {
+                                this.inputs.remove(&p);
+                                this.parse_errors.remove(&p);
+                                this.set_value(&p, ParamValue::Bool(false), cx);
+                            })
+                        }))
+                    })
+                    .into_any_element()
+            }
             ParamKind::Bool { .. } => {
                 let on = values.bool(s.id);
                 let path_s = path.to_string();
                 let header = s.hints.has(Hints::GROUP_HEADER);
+                // Onshape: group headers are "› ☐ Direction" rows; the chevron
+                // folds the group's parameters (indented 20 px below).
+                let collapsed = self.collapsed_groups.contains(path);
+                let path_c = path.to_string();
+                let chevron = header.then(|| {
+                    div()
+                        .id(SharedString::from(format!("chev-{path}")))
+                        .w(px(16.))
+                        .flex_none()
+                        .flex()
+                        .justify_center()
+                        .cursor_pointer()
+                        .child(crate::ui::glyph(if on && !collapsed { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if on { pal.text_muted } else { pal.border }))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if !this.collapsed_groups.remove(&path_c) {
+                                this.collapsed_groups.insert(path_c.clone());
+                            }
+                            cx.notify();
+                        }))
+                });
                 let mut row = h_flex()
-                    .gap_2()
+                    .gap(px(4.))
                     .w_full()
-                    .child(
-                        gpui_kit::component::checkbox::Checkbox::new(SharedString::from(format!("cb-{path}")))
-                            .label(s.label)
-                            .checked(on)
-                            .small()
-                            .on_click(cx.listener(move |this, v: &bool, _, cx| this.set_value(&path_s, ParamValue::Bool(*v), cx))),
-                    );
+                    .min_h(px(26.))
+                    .pl(px(if header { 0. } else { 4. }))
+                    .children(chevron)
+                    .child({
+                        let view = cx.entity();
+                        let p2 = path.to_string();
+                        div()
+                            .id(SharedString::from(format!("cbw-{path}")))
+                            .child(
+                                gpui_kit::component::checkbox::Checkbox::new(SharedString::from(format!("cb-{path}")))
+                                    .label(s.label)
+                                    .checked(on)
+                                    .small()
+                                    .text_size(px(13.33))
+                                    .text_color(pal.text_muted)
+                                    .on_click(cx.listener(move |this, v: &bool, _, cx| this.set_value(&path_s, ParamValue::Bool(*v), cx))),
+                            )
+                            // Right-click > Convert to expression (e.g. `#Length > 3`).
+                            .context_menu(move |m, _, _| {
+                                let v = view.clone();
+                                let p = p2.clone();
+                                m.item(gpui_kit::component::menu::PopupMenuItem::new("Convert to expression").on_click(move |_, _, cx| {
+                                    v.update(cx, |this, cx| {
+                                        let cur = matches!(this.get_value(&p), Some(ParamValue::Bool(true)));
+                                        this.inputs.remove(&p);
+                                        this.set_value(&p, ParamValue::Expr(noshape_units::ExprValue::new(if cur { "1" } else { "0" })), cx);
+                                    })
+                                }))
+                            })
+                    });
                 if let Some(c) = companion {
                     let cpath = match prefix {
                         None => c.id.to_string(),
@@ -467,45 +788,47 @@ impl FeatureDialog {
                         row = row.child(div().flex_1().child(e));
                     }
                 }
-                let row = row.children(flips);
-                if header {
-                    div().pt_1().mt_1().border_t_1().border_color(pal.border).child(row).into_any_element()
-                } else {
-                    row.into_any_element()
-                }
+                row.children(flips).into_any_element()
             }
             ParamKind::Enum { options, .. } => {
                 let cur = values.enum_(s.id).to_string();
                 if s.hints.has(Hints::HORIZONTAL_ENUM) {
-                    let group = h_flex().gap_0p5().p_0p5().rounded_md().bg(pal.app_bg).w_full().children(options.iter().map(|(id, label)| {
+                    // Onshape underline tabs (Solid / Surface / Thin, New / Add / ...).
+                    let group = h_flex().w_full().h(px(26.)).children(options.iter().map(|(id, label)| {
                         let selected = cur == *id;
                         let path_s = path.to_string();
                         let id_s = id.to_string();
                         div()
                             .id(SharedString::from(format!("seg-{path}-{id}")))
                             .flex_1()
-                            .px_2()
-                            .py_1()
-                            .rounded_sm()
-                            .text_xs()
-                            .text_center()
+                            .h_full()
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(13.33))
                             .cursor_pointer()
-                            .when(selected, |d| d.bg(pal.accent).text_color(rgb(0xffffff)))
-                            .when(!selected, |d| d.text_color(pal.text_muted).hover(|d| d.bg(pal.panel_hover)))
+                            .when(selected, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
+                            .when(!selected, |d| d.text_color(pal.text_muted).hover(|d| d.text_color(pal.text)))
                             .child(*label)
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
                     }));
-                    h_flex().gap_1().w_full().child(group).children(flips).into_any_element()
+                    h_flex().w_full().border_b_1().border_color(gpui_kit::rgb(0xe8e8e8)).child(group).children(flips).into_any_element()
                 } else {
                     let label = options.iter().find(|(id, _)| *id == cur).map(|(_, l)| *l).unwrap_or("");
                     let path_s = path.to_string();
                     let opts = *options;
                     let view = cx.entity();
                     let dd = Button::new(SharedString::from(format!("dd-{path}")))
-                        .label(label)
-                        .outline()
-                        .small()
-                        .dropdown_caret(true)
+                        .custom(dialog_field_variant(cx))
+                        .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).text_color(pal.text).truncate().child(label)).child(crate::ui::glyph("ui-chevron-down", 9., gpui_kit::rgb(0x000000))))
+                        .w_full()
+                        .h(px(28.))
+                        .pl(px(6.))
+                        .pr(px(4.))
+                        .rounded(px(0.))
+                        .border_b_1()
+                        .border_color(pal.border)
                         .dropdown_menu(move |mut menu, _, _| {
                             for (id, l) in opts.iter() {
                                 let id_s = id.to_string();
@@ -517,49 +840,83 @@ impl FeatureDialog {
                             }
                             menu
                         });
-                    let mut row = h_flex().gap_2().w_full();
+                    let mut row = h_flex().gap(px(4.)).w_full().min_h(px(28.));
                     if s.hints.has(Hints::SHOW_LABEL) {
-                        row = row.child(div().w(px(96.)).child(label_el(s.label)));
+                        row = row.child(div().pl(px(5.)).max_w(px(90.)).flex_none().child(label_el(s.label)));
                     }
-                    row.child(div().flex_1().child(dd)).children(flips).into_any_element()
+                    row.child(div().flex_1().min_w_0().child(dd)).children(flips).into_any_element()
                 }
             }
             ParamKind::Text { .. } if s.id == "partStudio" && self.ty.id == "importDerived" => self.render_derived_picker(cx),
             ParamKind::Num(_) | ParamKind::Text { .. } => {
                 let e = self.render_inline_value(s, path, values, window, cx)?;
-                h_flex().gap_2().w_full().child(div().w(px(96.)).flex_none().child(label_el(s.label))).child(div().flex_1().child(e)).children(flips).into_any_element()
+                // Tolerance options on tolerant quantities (Onshape ± icon).
+                let tolerant = matches!(s.kind, ParamKind::Num(_)) && s.hints.has(Hints::CAN_BE_TOLERANT) && !path.contains('.');
+                let tol_key = format!("{path}__tolerance");
+                let tol = tolerant.then(|| Tolerance::parse(self.get_value(&tol_key))).flatten();
+                let tol_btn = tolerant.then(|| {
+                    let key = tol_key.clone();
+                    let on = tol.is_some();
+                    div()
+                        .id(SharedString::from(format!("tolbtn-{path}")))
+                        .pt(px(4.))
+                        .px_1()
+                        .text_xs()
+                        .cursor_pointer()
+                        .text_color(if on { pal.accent } else { pal.text_faint })
+                        .child("±")
+                        .tooltip(crate::ui::tooltip("Tolerance"))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            let next = if on { None } else { Some(Tolerance::default()) };
+                            this.set_tolerance(&key, next, cx);
+                        }))
+                });
+                let row = h_flex().gap(px(6.)).w_full().min_h(px(26.)).items_start().child(div().pl(px(5.)).pt(px(5.)).min_w(px(30.)).max_w(px(110.)).flex_none().child(label_el(s.label))).child(div().flex_1().min_w_0().child(e)).children(tol_btn).children(flips);
+                match tol {
+                    Some(t) => v_flex().w_full().child(row).child(self.render_tolerance(&tol_key, t, window, cx)).into_any_element(),
+                    None => row.into_any_element(),
+                }
             }
             ParamKind::Query { max_picks, .. } => {
                 let refs = values.query(s.id).to_vec();
                 let active = self.active_query.as_deref() == Some(path);
+                let flashing = self.flash.as_deref() == Some(path);
                 let path_s = path.to_string();
-                let filter = match s.kind {
-                    ParamKind::Query { filter, .. } => filter,
-                    _ => QueryFilter::default(),
-                };
                 let chips: Vec<AnyElement> = refs
                     .iter()
                     .enumerate()
                     .map(|(k, r)| {
                         let label = (self.labeler)(r);
+                        let label_for_drag = label.clone();
+                        // Missing references (deleted/suppressed creators) show red.
+                        let missing = (self.missing)(r);
                         let p2 = path_s.clone();
+                        let hover_ref = r.clone();
+                        // Onshape selection rows: 24 px plain text, × on hover, zebra tint.
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{k}")))
-                            .gap_1()
-                            .px_1p5()
-                            .py_0p5()
-                            .rounded_sm()
-                            .bg(pal.panel_hover)
-                            .text_xs()
-                            .child(div().text_color(pal.text).child(label))
+                            .group("qrow")
+                            .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
+                            .w_full()
+                            .h(px(24.))
+                            .pl(px(6.))
+                            .pr(px(4.))
+                            .when(k % 2 == 1, |d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
+                            .text_size(px(13.33))
+                            .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                            .child(div().flex_1().truncate().child(label))
                             .child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{k}")))
-                                    .text_color(pal.text_faint)
+                                    .invisible()
+                                    .group_hover("qrow", |d| d.visible())
+                                    .text_color(pal.text_muted)
                                     .hover(|d| d.text_color(pal.error))
                                     .cursor_pointer()
-                                    .child("×")
+                                    .child(Icon::new(IconName::Close).with_size(px(12.)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                        cx.emit(DialogEvent::HoverRef(None));
+                                        this.user_set.insert(p2.clone());
                                         if let Some((vals, id)) = this.values_for_path_mut(&p2) {
                                             let q = vals.query_mut(&id);
                                             if k < q.len() {
@@ -570,41 +927,101 @@ impl FeatureDialog {
                                         cx.notify();
                                     })),
                             )
+                            // Drag a pick onto another to reorder (Onshape ⇅).
+                            .on_drag(PickDrag { path: path_s.clone(), index: k, label: SharedString::from(label_for_drag.clone()) }, |d, _, _, cx| cx.new(|_| d.clone()))
+                            .drag_over::<PickDrag>(|st, _, _, _| st.border_t_2().border_color(p().accent))
+                            .on_drop(cx.listener({
+                                let pd = path_s.clone();
+                                move |this, d: &PickDrag, _, cx| {
+                                    if d.path == pd {
+                                        this.move_pick(&pd, d.index, k, cx);
+                                    }
+                                }
+                            }))
+                            .context_menu({
+                                // Right-click a pick: Remove it, or Clear all.
+                                let view = cx.entity();
+                                let p3 = path_s.clone();
+                                move |menu, _, _| {
+                                    let (v1, v2) = (view.clone(), view.clone());
+                                    let (pa, pb) = (p3.clone(), p3.clone());
+                                    let (vu, vd, pu, pd) = (view.clone(), view.clone(), p3.clone(), p3.clone());
+                                    menu.item(gpui_kit::component::menu::PopupMenuItem::new("Remove").on_click(move |_, _, cx| {
+                                        v1.update(cx, |this, cx| this.remove_pick(&pa, k, cx))
+                                    }))
+                                    // Order-sensitive fields (loft profiles…): reorder picks.
+                                    .item(gpui_kit::component::menu::PopupMenuItem::new("Move up").on_click(move |_, _, cx| vu.update(cx, |this, cx| this.move_pick(&pu, k, k.wrapping_sub(1), cx))))
+                                    .item(gpui_kit::component::menu::PopupMenuItem::new("Move down").on_click(move |_, _, cx| vd.update(cx, |this, cx| this.move_pick(&pd, k, k + 1, cx))))
+                                    .item(gpui_kit::component::menu::PopupMenuItem::new("Clear all").on_click(move |_, _, cx| {
+                                        v2.update(cx, |this, cx| {
+                                            this.set_value(&pb, ParamValue::Query(Vec::new()), cx);
+                                            cx.emit(DialogEvent::HoverRef(None));
+                                        })
+                                    }))
+                                    .item(gpui_kit::component::menu::PopupMenuItem::new("Clear missing references").on_click({
+                                        let v = view.clone();
+                                        let pc = p3.clone();
+                                        move |_, _, cx| {
+                                            v.update(cx, |this, cx| {
+                                                let missing = this.missing.clone();
+                                                if let Some((vals, id)) = this.values_for_path_mut(&pc) {
+                                                    vals.query_mut(&id).retain(|r| !missing(r));
+                                                }
+                                                this.user_set.insert(pc.clone());
+                                                cx.emit(DialogEvent::Changed);
+                                                cx.notify();
+                                            })
+                                        }
+                                    }))
+                                }
+                            })
                             .into_any_element()
                     })
                     .collect();
-                let placeholder = if refs.is_empty() {
-                    Some(div().text_xs().text_color(if active { pal.accent_hover } else { pal.text_faint }).child(if max_picks == &Some(1) { "Select an entity" } else { "Select entities" }))
-                } else {
-                    None
-                };
-                v_flex()
-                    .gap_1()
+                // Onshape: the field label is the placeholder inside the box; once
+                // entities are picked it shrinks to the top-left corner (§3.9).
+                let _ = max_picks;
+                let empty = refs.is_empty();
+                let caption = div()
+                    .px(px(6.))
+                    .when(empty, |d| d.py(px(5.)).text_size(px(12.)))
+                    .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
+                    .text_color(pal.text_muted)
+                    .truncate()
+                    .child(s.label);
+                h_flex()
                     .w_full()
-                    .child(h_flex().justify_between().child(label_el(s.label)).children(flips))
+                    .items_start()
+                    .gap(px(2.))
+                    .px(px(2.))
+                    .py(px(2.))
                     .child(
                         div()
                             .id(SharedString::from(format!("q-{path}")))
-                            .w_full()
-                            .min_h(px(30.))
-                            .p_1()
-                            .rounded_md()
+                            .flex_1()
+                            .min_w_0()
+                            .min_h(px(26.))
+                            .max_h(px(160.))
+                            .overflow_y_scroll()
+                            .rounded(px(2.))
                             .border_1()
-                            .border_color(if active { pal.accent } else { pal.border })
-                            .bg(if active { with_alpha(pal.accent, 0.08) } else { pal.app_bg })
+                            .border_color(if flashing { pal.error } else if active { pal.accent } else { pal.border })
+                            .bg(if active { pal.row_hover } else { pal.panel })
                             .cursor_pointer()
                             .flex()
-                            .flex_wrap()
-                            .gap_1()
+                            .flex_col()
+                            .child(caption)
                             .children(chips)
-                            .children(placeholder)
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 this.active_query = Some(path_s.clone());
                                 window.focus(&this.focus, cx);
-                                cx.emit(DialogEvent::QueryFocused { path: path_s.clone(), filter });
+                                cx.emit(DialogEvent::QueryFocused);
                                 cx.notify();
                             })),
+                        // Right-click > Clear all lives on the pick rows (a
+                        // field-level menu would open a second menu).
                     )
+                    .children(flips)
                     .into_any_element()
             }
             ParamKind::Array { item, item_label } => {
@@ -641,15 +1058,14 @@ impl FeatureDialog {
                     let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                     col = col.child(
                         v_flex()
-                            .gap_1()
-                            .p_1p5()
-                            .rounded_md()
-                            .border_1()
-                            .border_color(pal.border)
+                            .ml(px(4.))
+                            .pl(px(6.))
+                            .border_l_1()
+                            .border_color(gpui_kit::rgb(0xcccccc))
                             .child(
                                 h_flex()
                                     .justify_between()
-                                    .child(div().text_xs().text_color(pal.text_faint).child(format!("{item_label} {}", k + 1)))
+                                    .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(format!("{item_label} {}", k + 1)))
                                     .child(
                                         Button::new(SharedString::from(format!("rm-{path}-{k}")))
                                             .icon(IconName::Close)
@@ -693,7 +1109,7 @@ impl FeatureDialog {
                     let opts2: Vec<(String, String)> = opts.iter().map(|o| (o.0.to_string(), o.1.to_string())).collect();
                     let view = cx.entity();
                     row = row.child(
-                        h_flex().gap_2().child(div().w(px(96.)).text_xs().text_color(pal.text_faint).child(name)).child(
+                        h_flex().gap_2().min_h(px(26.)).child(div().pl(px(5.)).w(px(80.)).text_size(px(13.33)).text_color(pal.text_muted).truncate().child(name)).child(
                             Button::new(SharedString::from(format!("lk-{path}-{level}")))
                                 .label(label)
                                 .outline()
@@ -929,7 +1345,7 @@ impl FeatureDialog {
     /// Input element for a numeric or text value.
     fn render_inline_value(&mut self, s: &ParamSpec, path: &str, values: &ParamValues, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let text = match (&s.kind, values.get(s.id)) {
-            (ParamKind::Num(_), Some(ParamValue::Expr(e))) => e.text.clone(),
+            (ParamKind::Num(_) | ParamKind::Bool { .. }, Some(ParamValue::Expr(e))) => e.text.clone(),
             (ParamKind::Text { .. }, Some(ParamValue::Text(t))) => t.clone(),
             (ParamKind::Num(_), _) | (ParamKind::Text { .. }, _) => String::new(),
             _ => return None,
@@ -937,11 +1353,84 @@ impl FeatureDialog {
         let state = self.ensure_input(path, &text, window, cx);
         let err = self.parse_errors.get(path).cloned();
         let pal = p();
+        let num = match &s.kind {
+            ParamKind::Num(n) => Some(*n),
+            _ => None,
+        };
+        // Onshape shows what an expression evaluates to.
+        let hint = num.filter(|_| err.is_none()).and_then(|n| noshape_model::interaction::evaluated_hint(&text, n.kind.dim(), &self.units, &self.variables));
+        // Onshape: an accepted value displays converted to the document
+        // units (and an expression its result); focusing shows the text.
+        let focused = state.read(cx).focus_handle(cx).is_focused(window);
+        let converted = num
+            .filter(|_| !focused && err.is_none() && self.completion.is_none())
+            .and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).ok())
+            .map(|q| noshape_units::format_quantity(q, &self.units))
+            .filter(|c| c.replace(' ', "") != text.trim().replace(' ', ""));
+        let hint = hint.filter(|_| converted.is_none());
+        let path_s = path.to_string();
+        let st2 = state.clone();
+        let st3 = state.clone();
+        let field = v_flex().id(SharedString::from(format!("num-{path}")));
+        let field = self.completion_keys(field, path, cx);
         Some(
-            v_flex()
+            field
                 .gap_0p5()
-                .child(Input::new(&state).small().when(err.is_some(), |i| i.border_color(pal.error)))
-                .when_some(err, |d, e| d.child(div().text_xs().text_color(pal.error).child(e)))
+                // Onshape underline field: no box, 1 px #d7d7d7 underline (blue on hover/focus),
+                // invalid values get a pink fill and red underline (§3.9, §4.2).
+                .child(
+                    div()
+                        .border_b_1()
+                        .border_color(if err.is_some() { pal.error } else { pal.border })
+                        .when(err.is_some(), |d| d.bg(pal.error_fill))
+                        .hover(|d| d.border_color(pal.accent))
+                        .child(match converted {
+                            Some(c) => div()
+                                .id(SharedString::from(format!("numv-{path}")))
+                                .h(px(24.))
+                                .px_1()
+                                .flex()
+                                .items_center()
+                                .text_size(px(13.33))
+                                .text_color(pal.text)
+                                .cursor_text()
+                                .child(c)
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |_, _: &MouseDownEvent, window, cx| {
+                                    st3.update(cx, |s, cx| s.focus(window, cx));
+                                    cx.notify();
+                                }))
+                                .into_any_element(),
+                            None => Input::new(&state).small().appearance(false).text_size(px(13.33)).into_any_element(),
+                        }),
+                )
+                .when_some(self.completion.as_ref().filter(|c| c.key == path), |d, c| {
+                    let view = cx.entity();
+                    d.child(c.render(&self.variables, &self.units, move |i, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(i), window, cx))))
+                })
+                .when_some(err, |d, e| d.child(div().text_xs().text_color(pal.text_invalid).child(e)))
+                .when_some(hint, |d, h| d.child(div().text_xs().text_color(pal.text_faint).child(format!("= {h}"))))
+                .when_some(num, |d, n| {
+                    // Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1.
+                    d.on_scroll_wheel(cx.listener(move |this, e: &ScrollWheelEvent, window, cx| {
+                        if !st2.read(cx).focus_handle(cx).is_focused(window) {
+                            return;
+                        }
+                        let dy = match e.delta {
+                            ScrollDelta::Lines(l) => f64::from(l.y),
+                            ScrollDelta::Pixels(p) => f64::from(f32::from(p.y)),
+                        };
+                        if dy.abs() < 1e-6 {
+                            return;
+                        }
+                        cx.stop_propagation();
+                        let step = if n.kind == noshape_model::params::NumKind::Integer { 1.0 } else { noshape_model::interaction::wheel_step(e.modifiers.control || e.modifiers.platform, e.modifiers.shift) } * dy.signum();
+                        let text = st2.read(cx).value().to_string();
+                        if let Some(next) = noshape_model::interaction::nudge_value_text(&text, step, n.kind.dim(), &this.units, &this.variables, n.min, n.max) {
+                            st2.update(cx, |s, cx| s.set_value(next.clone(), window, cx));
+                            this.on_text_changed(&path_s, next, cx);
+                        }
+                    }))
+                })
                 .into_any_element(),
         )
     }
@@ -985,43 +1474,55 @@ impl Render for FeatureDialog {
         let params: &'static [ParamSpec] = self.ty.params.as_slice();
         let rows = self.render_params(params, None, window, cx);
         let status = self.status.clone();
-        let title_color = match status.as_ref().map(|s| s.0) {
-            Some(FeatureStatus::Error) => pal.error,
-            Some(FeatureStatus::Warning) => pal.warning,
-            _ => pal.text,
-        };
+        // Onshape: the title turns red while the feature is invalid.
+        let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
+        let title_color = if invalid { pal.text_invalid } else { pal.text };
         let name = self.feature.name.clone();
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
+            // Clicks on the dialog never reach the graphics area beneath.
+            .occlude()
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
-            .w(px(318.))
+            // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no
+            // border or radius, shadow 0 5px 10px rgba(0,0,0,.2).
+            .w(px(220.))
             .max_h(px(720.))
-            .rounded_lg()
-            .border_1()
-            .border_color(pal.border_strong)
-            .bg(pal.panel_raised)
-            .shadow_lg()
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(DialogEvent::Accept { repeat: false })))
             .on_action(cx.listener(|_, _: &crate::actions::AcceptAndRepeat, _, cx| cx.emit(DialogEvent::Accept { repeat: true })))
+            // A: flip the primary axis of a mate connector being edited.
+            .on_action(cx.listener(|this, _: &crate::actions::FlipPrimaryAxis, _, cx| {
+                if this.ty.params.iter().any(|p| p.id == "flipPrimary") {
+                    let cur = this.feature.params.bool("flipPrimary");
+                    this.set_value("flipPrimary", ParamValue::Bool(!cur), cx);
+                }
+            }))
             .on_action(cx.listener(|_, _: &crate::actions::Cancel, _, cx| cx.emit(DialogEvent::Cancel)))
             .child(
                 h_flex()
-                    .px_3()
-                    .py_2()
-                    .gap_2()
+                    .h(px(28.))
+                    .flex_none()
+                    .pl(px(6.))
+                    .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
-                    .child(svg().path(icon_path(self.ty.icon)).size_4().text_color(pal.accent))
                     .child(match renaming {
                         Some(state) => div().flex_1().child(Input::new(&state).xsmall()).into_any_element(),
                         None => div()
                             .id("dialog-title")
+                            // Drag the title to move the dialog (Onshape).
+                            .on_drag(DialogMove(self.drag_grab.clone()), |d, offset, _, cx| {
+                                *d.0.lock() = offset;
+                                cx.new(|_| DialogMoveGhost)
+                            })
                             .flex_1()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .min_w_0()
+                            .text_size(px(13.))
+                            .font_weight(FontWeight::MEDIUM)
                             .text_color(title_color)
                             .truncate()
                             .child(name)
@@ -1051,51 +1552,182 @@ impl Render for FeatureDialog {
                     })
                     .child(
                         Button::new("dlg-ok")
-                            .icon(Icon::empty().path(icon_path("check")))
-                            .ghost()
-                            .xsmall()
+                            .custom(
+                                gpui_kit::component::button::ButtonCustomVariant::new(cx)
+                                    .color(if invalid { gpui_kit::rgb(0xcce9cc).into() } else { pal.accept.into() })
+                                    .hover(gpui_kit::rgb(0x74ce3a).into())
+                                    .active(pal.accept.into())
+                                    .shadow(false),
+                            )
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .w(px(28.))
+                            .h(px(28.))
+                            .p_0()
+                            .rounded(px(0.))
+                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
                             .tooltip("Accept (Enter)")
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Accept { repeat: false }))),
                     )
                     .child(
                         Button::new("dlg-cancel")
-                            .icon(IconName::Close)
-                            .ghost()
-                            .xsmall()
+                            .custom(dialog_icon_variant(cx, false))
+                            .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                            .w(px(28.))
+                            .h(px(28.))
+                            .p_0()
+                            .rounded(px(0.))
                             .tooltip("Cancel (Esc)")
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Cancel))),
                     ),
             )
-            .child(v_flex().id("dialog-body").gap_2p5().p_3().overflow_y_scroll().children(rows))
+            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().children(rows))
             .child(
+                // Footer: Onshape's legacy "Final" footer (#eee, top border) with the ? help.
                 h_flex()
-                    .px_3()
-                    .py_1p5()
+                    .h(px(28.))
+                    .flex_none()
+                    .px(px(6.))
                     .gap_2()
+                    .bg(pal.dialog_footer)
                     .border_t_1()
                     .border_color(pal.border)
-                    .text_xs()
+                    .text_size(px(13.33))
                     .text_color(pal.text_muted)
-                    .child(
+                    .when(self.final_available, |d| d.child(
                         gpui_kit::component::checkbox::Checkbox::new("dlg-final")
                             .checked(self.show_final)
                             .label("Final")
-                            .xsmall()
+                            .small()
                             .tooltip("Preview the finished model instead of rolling back to this feature")
                             .on_click(cx.listener(|this, v: &bool, _, cx| {
                                 this.show_final = *v;
                                 cx.emit(DialogEvent::Changed);
                                 cx.notify();
                             })),
+                    ))
+                    // Preview slider: before (left) to after (right) the feature.
+                    .child(div().w(px(70.)).child(gpui_kit::component::slider::Slider::new(&self.preview)))
+                    .child(div().text_xs().text_color(pal.text_faint).child(format!("{:.0}%", self.preview_value * 100.0)))
+                    .child(div().flex_1())
+                    .child(
+                        div()
+                            .id("dlg-help")
+                            .size(px(16.))
+                            .rounded_full()
+                            .bg(gpui_kit::rgb(0x888888))
+                            .hover(|d| d.bg(pal.text_muted))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(11.))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(gpui_kit::rgb(0xffffff))
+                            .child("?")
+                            .cursor_pointer()
+                            .tooltip(crate::ui::tooltip(format!("{} help", self.ty.name)))
+                            // Help: the feature's description (offline help).
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.show_help = !this.show_help;
+                                cx.notify();
+                            })),
                     ),
             )
+            .when(self.show_help && !self.ty.description.is_empty(), |d| {
+                d.child(div().mx_3().mb_2().p_2().rounded_md().bg(pal.app_bg).text_xs().text_color(pal.text_muted).child(format!("{}: {}.", self.ty.name, self.ty.description)))
+            })
             .when_some(status.filter(|s| s.0 != FeatureStatus::Ok), |d, (st, msg)| {
-                let c = match st {
-                    FeatureStatus::Error => pal.error,
-                    FeatureStatus::Warning => pal.warning,
-                    _ => pal.info,
+                let kind = match st {
+                    FeatureStatus::Error => crate::ui::AlertKind::Error,
+                    FeatureStatus::Warning => crate::ui::AlertKind::Warning,
+                    _ => crate::ui::AlertKind::Info,
                 };
-                d.child(div().mx_3().mb_3().p_2().rounded_md().bg(with_alpha(c, 0.12)).border_1().border_color(with_alpha(c, 0.4)).text_xs().text_color(c).child(msg))
+                d.child(div().p(px(4.)).child(crate::ui::alert(kind).text_size(px(12.)).child(msg)))
             })
     }
 }
+
+/// Dialog side icon buttons (flip, cancel): transparent, `#eaeaea` hover (§4.1).
+fn dialog_icon_variant(cx: &App, on: bool) -> gpui_kit::component::button::ButtonCustomVariant {
+    let pal = p();
+    gpui_kit::component::button::ButtonCustomVariant::new(cx)
+        .color(if on { pal.panel_active.into() } else { gpui_kit::transparent_white() })
+        .foreground(pal.text.into())
+        .hover(pal.panel_hover.into())
+        .active(pal.panel_active.into())
+        .shadow(false)
+}
+
+/// Underline-style dialog dropdown field: `#def1fb` hover (§4.5).
+fn dialog_field_variant(cx: &App) -> gpui_kit::component::button::ButtonCustomVariant {
+    let pal = p();
+    gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false)
+}
+
+/// A selection row being dragged to a new position.
+#[derive(Clone)]
+struct PickDrag {
+    path: String,
+    index: usize,
+    label: SharedString,
+}
+
+impl Render for PickDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        div().px_2().py_0p5().rounded_sm().bg(pal.panel_raised).border_1().border_color(pal.accent).text_xs().text_color(pal.text).child(self.label.clone())
+    }
+}
+
+/// The dialog being moved by its title; holds the grab offset.
+#[derive(Clone)]
+pub struct DialogMove(pub Arc<parking_lot::Mutex<Point<Pixels>>>);
+
+struct DialogMoveGhost;
+
+impl Render for DialogMoveGhost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// Tolerance options of a tolerant quantity (Onshape: type, deviation or
+/// limit values, precision), stored as `<param>__tolerance` text.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Tolerance {
+    pub kind: String,
+    pub upper: String,
+    pub lower: String,
+    pub precision: Option<u8>,
+}
+
+impl Default for Tolerance {
+    fn default() -> Self {
+        Self { kind: "Symmetrical".into(), upper: "0.1".into(), lower: "0.1".into(), precision: None }
+    }
+}
+
+impl Tolerance {
+    pub const KINDS: &'static [&'static str] = &["Symmetrical", "Deviation", "Limits", "Min", "Max", "Basic"];
+
+    pub fn parse(v: Option<&ParamValue>) -> Option<Self> {
+        match v {
+            Some(ParamValue::Text(t)) => serde_json::from_str(t).ok(),
+            _ => None,
+        }
+    }
+
+    pub fn encode(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+
+    /// Value fields for the type: (slot, label).
+    pub fn value_labels(&self) -> Vec<(u8, &'static str)> {
+        match self.kind.as_str() {
+            "Symmetrical" => vec![(0, "Deviation")],
+            "Deviation" => vec![(0, "Upper"), (1, "Lower")],
+            "Limits" => vec![(0, "Upper"), (1, "Lower")],
+            _ => Vec::new(),
+        }
+    }
+}
+

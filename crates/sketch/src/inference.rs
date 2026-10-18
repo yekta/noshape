@@ -45,7 +45,21 @@ pub struct InferenceContext {
     pub angle_tolerance: f64,
     /// Entities to ignore (the geometry being created or dragged).
     pub exclude: Vec<EntityId>,
+    /// Offer the sketch origin as a snap point and for horizontal /
+    /// vertical alignment (Onshape's always-on origin inferences). Its
+    /// constraints reference [`ORIGIN`], which the caller replaces with a
+    /// real (fixed) point when the click is placed.
+    #[serde(default)]
+    pub origin: bool,
+    /// "Woken" entities: curves the cursor recently passed over. Lines give
+    /// parallel / perpendicular hints for the line being drawn even when
+    /// they don't touch it (Onshape's wake-up inferences).
+    #[serde(default)]
+    pub woken: Vec<EntityId>,
 }
+
+/// Placeholder id for the sketch origin in inference constraints.
+pub const ORIGIN: EntityId = EntityId(u32::MAX);
 
 impl Default for InferenceContext {
     fn default() -> Self {
@@ -56,6 +70,8 @@ impl Default for InferenceContext {
             snap_radius: 1e-3,
             angle_tolerance: 3f64.to_radians(),
             exclude: Vec::new(),
+            origin: false,
+            woken: Vec::new(),
         }
     }
 }
@@ -102,6 +118,8 @@ pub enum AutoConstraint {
     PerpendicularTo(EntityId),
     ParallelTo(EntityId),
     TangentTo(EntityId),
+    /// New point at an end of an ellipse's major (`true`) or minor axis.
+    QuadrantOf(EntityId, bool),
 }
 
 impl AutoConstraint {
@@ -119,6 +137,7 @@ impl AutoConstraint {
             PerpendicularTo(l) => ConstraintKind::Perpendicular { a: new_curve?, b: l },
             ParallelTo(l) => ConstraintKind::Parallel { a: new_curve?, b: l },
             TangentTo(c) => ConstraintKind::Tangent { a: new_curve?, b: c },
+            QuadrantOf(e, major) => ConstraintKind::Quadrant { point: new_point, ellipse: e, major },
         })
     }
 }
@@ -220,11 +239,34 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                         }
                     }
                 }
+                // ellipse quadrants (axis end points)
+                if let Curve2::Ellipse { center, major, minor } | Curve2::EllipticalArc { center, major, minor, .. } = &c {
+                    let n = major.normalize_or_zero().perp() * *minor;
+                    for (q, is_major) in [(*center + *major, true), (*center - *major, true), (*center + n, false), (*center - n, false)] {
+                        if (q - cursor).length() <= r && c.closest(q).2 < 1e-9 * (1.0 + major.length()) {
+                            push(&mut out, InferenceKind::Quadrant, q, Some(e.id), Some(*center), vec![AutoConstraint::QuadrantOf(e.id, is_major)], 1);
+                        }
+                    }
+                }
                 // on curve
                 let (_, q, d) = c.closest(cursor);
                 if d <= r {
                     push(&mut out, InferenceKind::OnCurve, q, Some(e.id), None, vec![AutoConstraint::OnCurve(e.id)], 3);
                 }
+            }
+        }
+    }
+    // the sketch origin (unless a point already sits on it)
+    if ctx.origin && !sk.entities().any(|e| matches!(e.geometry, Geometry::Point { pos } if pos.length() < 1e-12)) {
+        let d = cursor.length();
+        if d <= r {
+            push(&mut out, InferenceKind::Endpoint, DVec2::ZERO, Some(ORIGIN), None, vec![AutoConstraint::CoincidentPoint(ORIGIN)], 0);
+        } else {
+            if cursor.x.abs() <= r && best_v.is_none_or(|b| cursor.x.abs() < b.0) {
+                best_v = Some((cursor.x.abs(), ORIGIN, DVec2::ZERO));
+            }
+            if cursor.y.abs() <= r && best_h.is_none_or(|b| cursor.y.abs() < b.0) {
+                best_h = Some((cursor.y.abs(), ORIGIN, DVec2::ZERO));
             }
         }
     }
@@ -268,6 +310,33 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             }
             if near(ang, PI / 2.0) {
                 push(&mut out, InferenceKind::Vertical, DVec2::new(a.x, cursor.y), None, Some(a), vec![AutoConstraint::VerticalLine], 2);
+            }
+            // woken lines (not attached to the anchor): parallel / perpendicular
+            for &w in &ctx.woken {
+                if excluded(sk, ctx, w) || sk.kind(w) != Some(EntityKind::Line) {
+                    continue;
+                }
+                if ctx.anchor_point.is_some_and(|ap| sk.entity(w).and_then(|e| e.endpoints()).is_some_and(|(s, e)| s == ap || e == ap)) {
+                    continue;
+                }
+                let Some(Curve2::Line { a: la, b: lb }) = sk.curve(w) else { continue };
+                let dir = (lb - la).normalize_or_zero();
+                if dir == DVec2::ZERO {
+                    continue;
+                }
+                // horizontal / vertical woken lines add nothing over the H/V hints
+                if dir.x.abs() < 1e-9 || dir.y.abs() < 1e-9 {
+                    continue;
+                }
+                let proj_on = |u: DVec2| a + u * d.dot(u);
+                let perp = dir.perp();
+                if near(ang, dir.y.atan2(dir.x)) {
+                    let u = if d.dot(dir) < 0.0 { -dir } else { dir };
+                    push(&mut out, InferenceKind::Parallel, proj_on(u), Some(w), Some(a), vec![AutoConstraint::ParallelTo(w)], 2);
+                } else if near(ang, perp.y.atan2(perp.x)) {
+                    let u = if d.dot(perp) < 0.0 { -perp } else { perp };
+                    push(&mut out, InferenceKind::Perpendicular, proj_on(u), Some(w), Some(a), vec![AutoConstraint::PerpendicularTo(w)], 2);
+                }
             }
             if let Some(ap) = ctx.anchor_point {
                 for e in sk.entities() {
@@ -375,5 +444,47 @@ mod tests {
         let t = r.iter().find(|x| x.kind == InferenceKind::Tangent).expect("tangent hint");
         assert_eq!(t.constraints, vec![AutoConstraint::TangentTo(a)]);
         assert!((t.position - v(-2.0, 1.0)).length() < 1e-9);
+    }
+
+    #[test]
+    fn origin_snap_and_alignment() {
+        let sk = Sketch::new();
+        let ctx = InferenceContext { origin: true, snap_radius: 0.1, ..Default::default() };
+        let r = infer(&sk, v(0.03, -0.04), &ctx);
+        assert_eq!(r[0].kind, InferenceKind::Endpoint);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::CoincidentPoint(ORIGIN)]);
+        assert_eq!(r[0].position, DVec2::ZERO);
+        // directly above the origin: vertical alignment with it
+        let r = infer(&sk, v(0.05, 2.0), &ctx);
+        assert_eq!(r[0].kind, InferenceKind::AlignVertical);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::VerticalWith(ORIGIN)]);
+        assert!((r[0].position - v(0.0, 2.0)).length() < 1e-12);
+        // without the flag nothing is offered
+        assert!(infer(&sk, v(0.03, -0.04), &InferenceContext { snap_radius: 0.1, ..Default::default() }).is_empty());
+        // an existing point on the origin replaces the virtual one
+        let mut sk2 = Sketch::new();
+        let p = sk2.add_point(DVec2::ZERO);
+        let r = infer(&sk2, v(0.03, -0.04), &ctx);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::CoincidentPoint(p)]);
+        assert_eq!(r.iter().filter(|x| x.kind == InferenceKind::Endpoint).count(), 1);
+    }
+
+    #[test]
+    fn woken_line_gives_parallel_and_perpendicular() {
+        let mut sk = Sketch::new();
+        let l = sk.add_line(v(0.0, 0.0), v(1.0, 1.0));
+        let base = InferenceContext { tool: SketchTool::Line, anchor: Some(v(5.0, 0.0)), snap_radius: 0.05, ..Default::default() };
+        // not woken: no parallel hint
+        let r = infer(&sk, v(7.0, 2.01), &base);
+        assert!(!r.iter().any(|x| x.kind == InferenceKind::Parallel));
+        let ctx = InferenceContext { woken: vec![l], ..base };
+        let r = infer(&sk, v(7.0, 2.01), &ctx);
+        let par = r.iter().find(|x| x.kind == InferenceKind::Parallel).expect("parallel");
+        assert_eq!(par.constraints, vec![AutoConstraint::ParallelTo(l)]);
+        let q = par.position - v(5.0, 0.0);
+        assert!((q.x - q.y).abs() < 1e-9);
+        let r = infer(&sk, v(3.0, 2.02), &ctx);
+        let perp = r.iter().find(|x| x.kind == InferenceKind::Perpendicular).expect("perpendicular");
+        assert_eq!(perp.constraints, vec![AutoConstraint::PerpendicularTo(l)]);
     }
 }

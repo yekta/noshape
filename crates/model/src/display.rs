@@ -145,6 +145,8 @@ pub struct SketchDisplay {
     pub hidden: bool,
     /// Remaining degrees of freedom (0 = fully defined).
     pub dof: usize,
+    /// Custom sketch appearance (linear RGBA) when not being edited.
+    pub color: Option<[f32; 4]>,
 }
 
 #[derive(Clone, Debug)]

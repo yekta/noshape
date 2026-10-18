@@ -274,6 +274,34 @@ impl Shape { fn to_brep_bytes(&self) -> Result<Vec<u8>>; fn from_brep_bytes(&[u8
 ```rust
 pub enum Visibility { Visible, Hidden }   pub enum EdgeClass { Sharp, Smooth, Outline, Seam }
 pub struct ProjectedEdge { visibility, class, polyline: Vec<DVec2> /* x right, y up */, source_edge: Option<u32> }
-fn project_hlr(shape, view_dir, up, exact: bool) -> Result<Vec<ProjectedEdge>>;
+fn project_hlr(shape, view_dir, up, exact: bool) -> Result<Vec<ProjectedEdge>>;   // deflection = shape diagonal / 500
 fn project_hlr_with(shape, view_dir, up, exact, deflection) -> Result<Vec<ProjectedEdge>>;
+fn project_hlr_raw(shape, view_dir, up, exact, deflection) -> Result<Vec<ProjectedEdge>>;
 ```
+
+* `view_dir` points from the eye into the scene; output coordinates are x = right,
+  y = up in the view plane (right = up × (−view_dir)), in model units.
+  `exact = true` runs `HLRBRep_Algo` on the B-rep (exact curves, slower);
+  `false` runs `HLRBRep_PolyAlgo` on a triangulation (fast previews). Curves are
+  discretized with `deflection` (`<= 0` means 0.01).
+* `source_edge` is the index of the projected edge in the input shape's
+  `edges()` (MapShapes order); silhouettes of curved faces (`Outline`) have none,
+  except real edges lying on the silhouette (e.g. a cylinder seam seen from the
+  side), which are outlines that keep their source. `Seam` marks sewn/seam edges;
+  drawings normally skip them. Edges of a compound index the compound's edges, so
+  callers projecting several bodies map indices back with `Shape::index_of`.
+* `project_hlr_raw` returns the fragments as OCCT produces them: one polyline per
+  visible or hidden piece of each edge (the C++ side already chains consecutive
+  segments of the same edge, visibility and class).
+* `project_hlr_with` (and `project_hlr`) clean the raw result up in two steps:
+  1. **Drop covered hidden lines**: the parts of hidden polylines lying on a visible
+     sharp or outline line (within `max(deflection, diagonal * 1e-6)`) are removed,
+     so lines are drawn once, visible (e.g. the far edges of a plate seen face-on,
+     the bottom circle of a through hole). Uses a uniform segment grid.
+  2. **Merge fragments**: pieces with equal visibility, class and source whose ends
+     meet (within `diagonal * 1e-7`) are joined into one polyline and collinear
+     interior points are collapsed, so a straight edge is one segment and an edge
+     split by occlusion boundaries comes back as few polylines as possible.
+
+  Use the raw variant only when the per-fragment output itself matters (debugging,
+  tests of the cleanup).

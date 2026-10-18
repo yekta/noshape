@@ -80,6 +80,9 @@ pub(crate) enum EqKind {
     SymPerp,
     /// Inputs p, c, mx, my, minor.
     PointOnEllipse,
+    /// Inputs p, c, mx, my: p on the major axis line (or the minor axis
+    /// line with `minor`) of an ellipse centered at c with major vector m.
+    OnEllipseAxis { minor: bool },
     /// Inputs c, mx, my, minor, t, l0, l1: tangent at E(t) parallel to the line.
     EllipseTangent,
     /// Inputs c, mx, my, minor, t, l0, l1: E(t) on the line.
@@ -89,7 +92,7 @@ pub(crate) enum EqKind {
     /// Inputs p, t, control points: component of S(t) - p (analytic custom gradient).
     SplinePoint { comp: u8, curve: Arc<Nurbs> },
     /// Inputs p, t, fit points: component of S(t) - p (numeric gradient).
-    FitPoint { comp: u8 },
+    FitPoint { comp: u8, handles: bool },
     /// Inputs fit points (2n), o0, o1: cross (or dot if `perp`) of the fit
     /// spline's outgoing end tangent with (o1 - o0), normalized.
     FitEndDir { at_end: bool, perp: bool, n: usize },
@@ -187,6 +190,11 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let l = V2::at(x, 6).sub(V2::at(x, 4));
             d.dot(l) / l.norm()
         }
+        EqKind::OnEllipseAxis { minor } => {
+            let d = V2::at(x, 0).sub(V2::at(x, 2));
+            let m = V2::at(x, 4);
+            if *minor { d.dot(m) / m.norm() } else { m.cross(d) / m.norm() }
+        }
         EqKind::PointOnEllipse => {
             let p = V2::at(x, 0);
             let c = V2::at(x, 2);
@@ -254,6 +262,14 @@ fn spline_point_eval(curve: &Nurbs, comp: usize, x: &[f64], grad: Option<&mut [f
     s - p[comp]
 }
 
+/// Fit spline through `n` points followed by its two handle points.
+fn fit_curve_handles(x: &[f64], n: usize) -> Option<Nurbs> {
+    let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
+    let h0 = glam::DVec2::new(x[2 * n], x[2 * n + 1]);
+    let h1 = glam::DVec2::new(x[2 * n + 2], x[2 * n + 3]);
+    Nurbs::interpolate_with_handles(&pts, h0, h1)
+}
+
 fn fit_curve(x: &[f64], n: usize) -> Option<Nurbs> {
     let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
     Nurbs::interpolate(&pts)
@@ -264,9 +280,10 @@ impl Eq {
     pub fn eval(&self, x: &[f64]) -> f64 {
         match &self.kind {
             EqKind::SplinePoint { comp, curve } => spline_point_eval(curve, *comp as usize, x, None),
-            EqKind::FitPoint { comp } => {
-                let n = (x.len() - 3) / 2;
-                let Some(c) = fit_curve(&x[3..], n) else { return 0.0 };
+            EqKind::FitPoint { comp, handles } => {
+                let n = (x.len() - 3) / 2 - if *handles { 2 } else { 0 };
+                let c = if *handles { fit_curve_handles(&x[3..], n) } else { fit_curve(&x[3..], n) };
+                let Some(c) = c else { return 0.0 };
                 let (a, b) = c.domain();
                 let p = c.point(x[2].clamp(a, b));
                 if *comp == 0 { p.x - x[0] } else { p.y - x[1] }
@@ -488,7 +505,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
     fn spline_points(&self, id: EntityId) -> Result<Vec<EntityId>, String> {
         match self.geom(id)? {
             Geometry::BSpline { control, .. } => Ok(control.clone()),
-            Geometry::FitSpline { points } => Ok(points.clone()),
+            Geometry::FitSpline { points, .. } => Ok(points.clone()),
             Geometry::Conic { start, control, end, .. } => Ok(vec![*start, *control, *end]),
             _ => Err(format!("{id} is not a spline")),
         }
@@ -523,7 +540,12 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let p0 = if at_end { *end } else { *start };
                 Ok(Dir::Pts(l4(self.lk.point(p0), self.lk.point(*control))))
             }
-            Geometry::FitSpline { points } => {
+            // With tangent handles the end direction is the handle's.
+            Geometry::FitSpline { points, handles: Some((h0, h1)) } => {
+                let (p0, h) = if at_end { (points[points.len() - 1], *h1) } else { (points[0], *h0) };
+                Ok(Dir::Pts(l4(self.lk.point(p0), self.lk.point(h))))
+            }
+            Geometry::FitSpline { points, handles: None } => {
                 let mut pts = SmallVec::new();
                 for p in points {
                     pts.extend_from_slice(&self.lk.point(*p));
@@ -609,8 +631,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     for cp in self.spline_points(q)? {
                         inp.extend_from_slice(&self.lk.point(cp));
                     }
+                    let handles = self.sk.entity(q).and_then(|e| e.spline_handles());
+                    if let Some((h0, h1)) = handles {
+                        inp.extend_from_slice(&self.lk.point(h0));
+                        inp.extend_from_slice(&self.lk.point(h1));
+                    }
                     for comp in 0..2u8 {
-                        self.push(EqKind::FitPoint { comp }, inp.clone());
+                        self.push(EqKind::FitPoint { comp, handles: handles.is_some() }, inp.clone());
                     }
                 }
             }
@@ -763,19 +790,21 @@ impl<'a, L: Lookup> Builder<'a, L> {
             (0, 1) => {
                 let p = self.pt(a)?;
                 let l = self.line(b)?;
-                self.lin(Lin::new().pld(h.sign, p, l).cst(-v));
+                let k = crate::constraints::centerline_factor(mode);
+                self.lin(Lin::new().pld(h.sign * k, p, l).cst(-v));
             }
             (1, 1) => {
                 let la = self.line(a)?;
                 let lb = self.line(b)?;
-                self.lin(Lin::new().pldm(h.sign, [lb[0], lb[1]], [lb[2], lb[3]], la).cst(-v));
+                let k = crate::constraints::centerline_factor(mode);
+                self.lin(Lin::new().pldm(h.sign * k, [lb[0], lb[1]], [lb[2], lb[3]], la).cst(-v));
             }
             (0, 2) if circ_ok(kb) => {
                 let p = self.pt(a)?;
                 let cc = self.center(b)?;
                 let r = self.radius(b)?;
                 let l = match mode {
-                    DistanceMode::Center => Lin::new().dist(1.0, cc, p),
+                    DistanceMode::Center | DistanceMode::Centerline => Lin::new().dist(1.0, cc, p),
                     DistanceMode::Minimum => Lin::new().dist(h.sign, cc, p).rad(-h.sign, &r),
                     DistanceMode::Maximum => Lin::new().dist(1.0, cc, p).rad(1.0, &r),
                 };
@@ -787,6 +816,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let r = self.radius(b)?;
                 let e = match mode {
                     DistanceMode::Center => Lin::new().pld(h.sign, cc, l),
+                    DistanceMode::Centerline => Lin::new().pld(2.0 * h.sign, cc, l),
                     DistanceMode::Minimum => Lin::new().pld(h.sign, cc, l).rad(-1.0, &r),
                     DistanceMode::Maximum => Lin::new().pld(h.sign, cc, l).rad(1.0, &r),
                 };
@@ -796,7 +826,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let (c1, c2) = (self.center(a)?, self.center(b)?);
                 let (r1, r2) = (self.radius(a)?, self.radius(b)?);
                 let e = match mode {
-                    DistanceMode::Center => Lin::new().dist(1.0, c1, c2),
+                    DistanceMode::Center | DistanceMode::Centerline => Lin::new().dist(1.0, c1, c2),
                     DistanceMode::Minimum if h.internal => Lin::new().dist(-1.0, c1, c2).rad(h.sign2, &r1).rad(-h.sign2, &r2),
                     DistanceMode::Minimum => Lin::new().dist(1.0, c1, c2).rad(-1.0, &r1).rad(-1.0, &r2),
                     DistanceMode::Maximum => Lin::new().dist(1.0, c1, c2).rad(1.0, &r1).rad(1.0, &r2),
@@ -1064,6 +1094,37 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
                 _ => Err("arc angle needs an arc".into()),
             },
+            K::PatternLink { seed, inst, ref_seed, ref_inst, k } => {
+                let (s, i, rs, ri) = (self.pt(*seed)?, self.pt(*inst)?, self.pt(*ref_seed)?, self.pt(*ref_inst)?);
+                for comp in 0..2 {
+                    // inst - seed - k * ref_inst + k * ref_seed = 0, merging repeated unknowns.
+                    let mut terms: Vec<(u32, f64)> = Vec::new();
+                    for (var, coef) in [(i[comp], 1.0), (s[comp], -1.0), (ri[comp], -*k), (rs[comp], *k)] {
+                        match terms.iter_mut().find(|t| t.0 == var) {
+                            Some(t) => t.1 += coef,
+                            None => terms.push((var, coef)),
+                        }
+                    }
+                    let mut l = Lin::new();
+                    for (var, coef) in terms.into_iter().filter(|t| t.1.abs() > 1e-15) {
+                        l = l.p(coef, var);
+                    }
+                    self.lin(l);
+                }
+                Ok(())
+            }
+            K::Quadrant { point, ellipse, major } => {
+                let p = self.pt(*point)?;
+                let e = self.ell(*ellipse)?;
+                self.push(EqKind::PointOnEllipse, cat(&[&p, &e]));
+                self.push(EqKind::OnEllipseAxis { minor: !*major }, cat(&[&p, &e[..4]]));
+                Ok(())
+            }
+            // Applied to the conic directly (see `Sketch::set_dimension_value`).
+            K::Rho { conic, .. } => match self.geom(*conic)? {
+                Geometry::Conic { .. } => Ok(()),
+                _ => Err("rho needs a conic".into()),
+            },
             K::EllipseRadius { ellipse, major, value } => {
                 let e = self.ell(*ellipse)?;
                 if *major {
@@ -1138,10 +1199,6 @@ pub(crate) fn validate(sk: &Sketch, c: &Constraint) -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
-pub(crate) fn single(kind: EqKind, inputs: &[u32]) -> Eq {
-    Eq { kind, inputs: SmallVec::from_slice(inputs) }
-}
 
 #[cfg(test)]
 mod tests {
@@ -1175,6 +1232,8 @@ mod tests {
             (EqKind::SymPerp, 8),
             (EqKind::ArcLength { len: 1.0 }, 6),
             (EqKind::PointOnEllipse, 7),
+            (EqKind::OnEllipseAxis { minor: false }, 6),
+            (EqKind::OnEllipseAxis { minor: true }, 6),
             (EqKind::Linear { terms: smallvec![(1.0, Term::Dist), (-2.0, Term::Param)], c: 0.3 }, 5),
             (EqKind::Linear { terms: smallvec![(1.0, Term::PLDist), (1.0, Term::Param)], c: 0.0 }, 7),
             (EqKind::Linear { terms: smallvec![(1.0, Term::PLDistMid)], c: 0.0 }, 8),

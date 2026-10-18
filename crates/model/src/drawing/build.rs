@@ -7,7 +7,7 @@ use super::font;
 use super::format::{self, DimText};
 use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2, format_scale};
 use super::tables::{self, TableLayout};
-use super::views::{self, Sources, ViewCache, ViewGeometry, dist_to_segment, resolve_point, rotate2};
+use super::views::{self, Sources, ViewCache, ViewGeometry, dist_to_segment, resolve_in_view, rotate2};
 use super::{Annotation, AnnotationKind, BreakStyle, Drawing, RenderStyle, Sheet, TableKind, ViewId, ViewKind};
 use noshape_kernel::EdgeClass;
 use std::collections::HashMap;
@@ -172,6 +172,8 @@ pub struct BuiltSheet {
     pub dangling: Vec<u64>,
     /// Table grids (table id, layout).
     pub tables: Vec<(u64, TableLayout)>,
+    /// Title block rectangle [x0, y0, x1, y1] (mm).
+    pub title_rect: Option<[f64; 4]>,
 }
 
 impl BuiltSheet {
@@ -229,6 +231,17 @@ impl BuiltSheet {
                     return Some(i as u32);
                 }
             }
+        }
+        // Anywhere inside the title block selects it.
+        if best.is_none()
+            && let Some(r) = self.title_rect
+            && p[0] >= r[0]
+            && p[0] <= r[2]
+            && p[1] >= r[1]
+            && p[1] <= r[3]
+            && let Some(i) = self.picks.iter().position(|t| *t == PickTarget::TitleBlock)
+        {
+            return Some(i as u32);
         }
         best.map(|(k, _)| k)
     }
@@ -324,15 +337,15 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
             continue;
         }
         let Some(view) = a.kind.view() else { continue };
-        let frame = views.get(&view).and_then(|g| g.frame);
+        let geo = views.get(&view).filter(|g| g.frame.is_some());
         let ctx = views::view_source(sheet, view).and_then(|(key, _)| sources.get(&key)).map(|s| s.context.clone());
-        let (Some(frame), Some(ctx)) = (frame, ctx) else {
+        let (Some(geo), Some(ctx)) = (geo, ctx) else {
             dangling.push(a.id);
             continue;
         };
         let mut ok = true;
         for r in &a.refs {
-            let Some((p, radius)) = resolve_point(&ctx, &frame, &r.point) else {
+            let Some((p, radius)) = resolve_in_view(&ctx, geo, &r.point) else {
                 ok = false;
                 continue;
             };
@@ -371,6 +384,33 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                 }
                 (AnnotationKind::ArcLengthDimension { a: pa, .. }, 1) => *pa = p,
                 (AnnotationKind::ArcLengthDimension { b: pb, .. }, 2) => *pb = p,
+                (AnnotationKind::OrdinateGroup { origin, .. }, 0) => *origin = p,
+                (AnnotationKind::OrdinateGroup { points, .. }, k) => {
+                    if let Some(x) = points.get_mut(k as usize - 1) {
+                        *x = p;
+                    }
+                }
+                (AnnotationKind::MaxMinDimension { a: pa, ra, .. }, 0) => {
+                    *pa = p;
+                    if let (Some(r), true) = (radius, *ra > 0.0) {
+                        *ra = r;
+                    }
+                }
+                (AnnotationKind::MaxMinDimension { b: pb, rb, .. }, 1) => {
+                    *pb = p;
+                    if let (Some(r), true) = (radius, *rb > 0.0) {
+                        *rb = r;
+                    }
+                }
+                (AnnotationKind::ForeshortenedRadial { center, radius: rr, .. }, 0) => {
+                    *center = p;
+                    if let Some(r) = radius {
+                        *rr = r;
+                    }
+                }
+                (AnnotationKind::ForeshortenedDiameter { axis, .. }, k @ (0 | 1)) => axis[k as usize] = p,
+                (AnnotationKind::ForeshortenedDiameter { edge, .. }, 2) => *edge = p,
+                (AnnotationKind::DatumTarget { anchor, .. }, 0) => *anchor = p,
                 _ => {}
             }
         }
@@ -468,7 +508,7 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
         "sheet.number" => (si + 1).to_string(),
         "sheet.count" => drawing.sheets.len().to_string(),
         "sheet.scale" => format_scale(sheet.scale),
-        "sheet.size" => format!("{:?}", sheet.size),
+        "sheet.size" => sheet.size.label().to_string(),
         "date" => format::today(),
         "units" => if drawing.units_mm { "mm".into() } else { "in".into() },
         _ => return None,
@@ -534,10 +574,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // as the title block.
     let mark_l = g.lines.len();
     let mark_t = g.texts.len();
-    g.add_border_and_title_with(sheet, &expand);
-    let rows = sheet.title_block.fields.len().div_ceil(2) as f64;
-    let (tx0, ty1) = (w - 10.0 - 180.0, 10.0 + 8.0 * rows);
-    let in_tb = |p: &[f64; 2]| p[0] >= tx0 - 0.01 && p[1] <= ty1 + 0.01 && p[0] <= w - 9.99 && p[1] >= 9.99;
+    g.add_border_and_title_full(sheet, drawing.projection, &expand);
+    let title_rect = super::sheet::title_block_rect(sheet);
+    let tb_rect = title_rect.unwrap_or([0.0; 4]);
+    let in_tb = |p: &[f64; 2]| p[0] >= tb_rect[0] - 0.01 && p[1] <= tb_rect[3] + 0.01 && p[0] <= tb_rect[2] + 0.01 && p[1] >= tb_rect[1] - 0.01;
     let tb = picks.id(PickTarget::TitleBlock);
     for l in &mut g.lines[mark_l..] {
         if l.points.iter().all(in_tb) && l.style != LineStyle::Border {
@@ -777,9 +817,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let source = view.and_then(|v| views::view_source(sheet, v)).and_then(|(k, _)| sources.get(&k));
         let origin = match &t.kind {
             TableKind::Hole { origin, origin_ref, .. } => {
-                let frame = geo.and_then(|g| g.frame);
-                match (origin_ref, frame, source) {
-                    (Some(r), Some(f), Some(src)) => resolve_point(&src.context, &f, r).map(|(p, _)| p).or(Some(*origin)),
+                match (origin_ref, geo, source) {
+                    (Some(r), Some(g), Some(src)) => resolve_in_view(&src.context, g, r).map(|(p, _)| p).or(Some(*origin)),
                     _ => Some(*origin),
                 }
             }
@@ -802,7 +841,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         table_layouts.push((t.id, layout));
     }
 
-    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts }
+    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
 }
 
 #[cfg(test)]

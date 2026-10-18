@@ -149,9 +149,14 @@ impl Sketch {
                 let ctrl = control.iter().map(|q| p(*q)).collect::<Option<Vec<_>>>()?;
                 Curve2::Nurbs(Nurbs { degree: *degree, knots: knots.clone(), ctrl, weights: weights.clone() })
             }
-            Geometry::FitSpline { points } => {
+            Geometry::FitSpline { points, handles } => {
                 let pts = points.iter().map(|q| p(*q)).collect::<Option<Vec<_>>>()?;
-                Curve2::Nurbs(Nurbs::interpolate(&pts)?)
+                match handles {
+                    Some((h0, h1)) => {
+                        Curve2::Nurbs(Nurbs::interpolate_with_handles(&pts, p(*h0)?, p(*h1)?)?)
+                    }
+                    None => Curve2::Nurbs(Nurbs::interpolate(&pts)?),
+                }
             }
             Geometry::Conic { start, control, end, rho } => Curve2::Nurbs(Nurbs::conic(p(*start)?, p(*control)?, p(*end)?, *rho)),
         })
@@ -202,7 +207,7 @@ impl Sketch {
                     return Err(SketchError::InvalidGeometry("invalid B-spline definition".into()));
                 }
             }
-            Geometry::FitSpline { points } if points.len() < 2 => {
+            Geometry::FitSpline { points, .. } if points.len() < 2 => {
                 return Err(SketchError::InvalidGeometry("fit spline needs at least 2 points".into()));
             }
             Geometry::Conic { rho, .. } if !(*rho > 0.0 && *rho < 1.0) => {
@@ -233,6 +238,87 @@ impl Sketch {
         self.entities.insert(id, probe);
         self.touch();
         Ok(id)
+    }
+
+    /// A new sketch holding copies of `ids` (with their defining points) and
+    /// the constraints that only involve copied entities (Copy sketch
+    /// entities). External geometry is copied as regular geometry.
+    pub fn extract(&self, ids: &[EntityId]) -> Sketch {
+        let mut keep: Vec<EntityId> = Vec::new();
+        for id in ids {
+            let Some(e) = self.entity(*id) else { continue };
+            for p in e.point_refs() {
+                if !keep.contains(&p) {
+                    keep.push(p);
+                }
+            }
+            if !keep.contains(id) {
+                keep.push(*id);
+            }
+        }
+        let mut out = Sketch::new();
+        // Points first so curves can reference them; ids are preserved.
+        keep.sort_by_key(|e| (self.kind(*e) != Some(EntityKind::Point), e.0));
+        for id in &keep {
+            if let Some(e) = self.entity(*id) {
+                out.entities.insert(*id, Entity { external: false, ..e.clone() });
+            }
+        }
+        out.next_entity = keep.iter().map(|e| e.0 + 1).max().unwrap_or(0);
+        for c in self.constraints.values() {
+            if c.kind.entities().iter().all(|e| keep.contains(e)) {
+                out.constraints.insert(c.id, c.clone());
+            }
+        }
+        out.next_constraint = out.constraints.keys().map(|c| c.0 + 1).max().unwrap_or(0);
+        out
+    }
+
+    /// Adds every entity and constraint of `other` with fresh ids, offset by
+    /// `offset` (Paste sketch entities). Returns the new non-point entities
+    /// (or the points when only points were pasted).
+    pub fn paste(&mut self, other: &Sketch, offset: DVec2) -> Vec<EntityId> {
+        let mut map: std::collections::HashMap<EntityId, EntityId> = std::collections::HashMap::new();
+        let mut created = Vec::new();
+        let mut points = Vec::new();
+        for e in other.entities.values().filter(|e| e.kind() == EntityKind::Point) {
+            if let Geometry::Point { pos } = e.geometry {
+                let id = self.add_point(pos + offset);
+                let _ = self.set_construction(id, e.construction);
+                map.insert(e.id, id);
+                points.push(id);
+            }
+        }
+        for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point) {
+            let mut g = e.geometry.clone();
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false };
+            for p in e.point_refs() {
+                if let Some(n) = map.get(&p) {
+                    probe.replace_point(p, *n);
+                }
+            }
+            g = probe.geometry;
+            if let Ok(id) = self.add_entity(g, e.construction, false) {
+                map.insert(e.id, id);
+                created.push(id);
+            }
+        }
+        for c in other.constraints.values() {
+            let mut k = c.kind.clone();
+            if k.entities().iter().any(|e| !map.contains_key(e)) {
+                continue;
+            }
+            for (from, to) in &map {
+                k.replace_entity(*from, *to);
+            }
+            if let ConstraintKind::Fix { .. } = k {
+                // A fix re-anchors at the pasted position.
+                let _ = self.add_constraint(k);
+                continue;
+            }
+            let _ = self.add_constraint_ext(k, c.driving);
+        }
+        if created.is_empty() { points } else { created }
     }
 
     pub fn add_point(&mut self, p: DVec2) -> EntityId {
@@ -313,7 +399,20 @@ impl Sketch {
             return Err(SketchError::InvalidGeometry("fit spline needs at least 2 points".into()));
         }
         let ids: Vec<EntityId> = points.iter().map(|p| self.add_point(*p)).collect();
-        self.add_entity(Geometry::FitSpline { points: ids }, false, false)
+        self.add_entity(Geometry::FitSpline { points: ids, handles: None }, false, false)
+    }
+
+    /// Interpolating spline with tangent handles at both ends (the Spline
+    /// tool): the handles start at a third of the natural end derivatives.
+    pub fn add_fit_spline_with_handles(&mut self, points: &[DVec2]) -> Result<EntityId> {
+        if points.len() < 2 {
+            return Err(SketchError::InvalidGeometry("fit spline needs at least 2 points".into()));
+        }
+        let (hp0, hp1) = Nurbs::natural_handles(points).ok_or_else(|| SketchError::InvalidGeometry("could not interpolate the points".into()))?;
+        let ids: Vec<EntityId> = points.iter().map(|p| self.add_point(*p)).collect();
+        let h0 = self.add_point(hp0);
+        let h1 = self.add_point(hp1);
+        self.add_entity(Geometry::FitSpline { points: ids, handles: Some((h0, h1)) }, false, false)
     }
 
     pub fn add_conic(&mut self, start: DVec2, control: DVec2, end: DVec2, rho: f64) -> Result<EntityId> {
@@ -472,6 +571,9 @@ impl Sketch {
             && let Some(v) = self.measure_kind(&c.kind, &c.hints) {
                 c.kind.set_value(v);
             }
+        if c.driving {
+            self.apply_rho(&c.kind);
+        }
         self.constraints.insert(id, c);
         self.touch();
         Ok(id)
@@ -486,11 +588,30 @@ impl Sketch {
     /// Changes a dimension value (SI units). Call [`Sketch::solve`] afterwards.
     pub fn set_dimension_value(&mut self, id: ConstraintId, value: f64) -> Result<()> {
         let c = self.constraints.get_mut(&id).ok_or(SketchError::UnknownConstraint(id))?;
+        if let ConstraintKind::Rho { .. } = c.kind
+            && !(value > 0.0 && value < 1.0)
+        {
+            return Err(SketchError::InvalidConstraint("rho must be between 0 and 1".into()));
+        }
         if !c.kind.set_value(value) {
             return Err(SketchError::InvalidConstraint(format!("{id} is not a dimension")));
         }
+        let (kind, driving) = (c.kind.clone(), c.driving);
+        if driving {
+            self.apply_rho(&kind);
+        }
         self.touch();
         Ok(())
+    }
+
+    /// A driving rho dimension sets its conic's rho.
+    fn apply_rho(&mut self, kind: &ConstraintKind) {
+        if let ConstraintKind::Rho { conic, value } = kind
+            && let Some(e) = self.entities.get_mut(conic)
+            && let Geometry::Conic { rho, .. } = &mut e.geometry
+        {
+            *rho = value.clamp(1e-6, 1.0 - 1e-6);
+        }
     }
 
     /// Changes the ratio of a [`ConstraintKind::LengthRatio`] constraint.
@@ -532,6 +653,11 @@ impl Sketch {
             return Err(SketchError::InvalidConstraint("only dimensions can be driven".into()));
         }
         c.driving = driving;
+        if driving {
+            let k = c.kind.clone();
+            self.apply_rho(&k);
+        }
+        let c = self.constraints.get_mut(&id).ok_or(SketchError::UnknownConstraint(id))?;
         if !driving {
             let (k, h) = (c.kind.clone(), c.hints.clone());
             if let Some(v) = self.measure_kind(&k, &h) {

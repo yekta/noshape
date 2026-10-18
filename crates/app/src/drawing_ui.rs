@@ -1,13 +1,12 @@
 //! Drawing editor chrome: toolbar, status bar, inline property panels
 //! (note text, title block, scales, labels) and export (PDF/SVG/DXF).
 
-use crate::assets::icon_path;
 use crate::drawing_view::*;
-use crate::theme::p;
+use crate::theme::{p, with_alpha as theme_with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use gpui_kit::component::menu::DropdownMenu as _;
-use gpui_kit::component::{Disableable as _, Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
@@ -47,11 +46,8 @@ pub fn parse_scale(s: &str) -> Option<f64> {
 
 impl DrawingEditor {
     fn tool_btn(&self, id: &'static str, icon: &'static str, tip: &'static str, active: bool, tool: impl Fn() -> Tool + 'static, cx: &mut Context<Self>) -> AnyElement {
-        Button::new(id)
-            .icon(Icon::empty().path(icon_path(icon)))
-            .ghost()
-            .small()
-            .selected(active)
+        // Onshape toolbar button: 30 px cell, 20 px full-color icon (§3.2).
+        crate::ui::tool_button(id, icon, active, cx)
             .tooltip(tip)
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 window.focus(&this.focus, cx);
@@ -96,17 +92,13 @@ impl DrawingEditor {
     pub fn render_toolbar(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let ed = cx.entity();
-        let sep = || div().w(px(1.)).h(px(22.)).mx_1().bg(pal.border);
+        let sep = crate::ui::tool_separator;
         let t = self.tool.clone();
         let insert_entries = self.insert_view_entries(cx);
         let ed1 = ed.clone();
-        let insert = Button::new("dr-insert")
-            .icon(Icon::empty().path(icon_path("base-view")))
-            .label("Insert view")
-            .ghost()
-            .small()
-            .selected(matches!(t, Tool::InsertView { .. }))
-            .dropdown_caret(true)
+        let insert = crate::ui::tool_button("dr-insert", "base-view", matches!(t, Tool::InsertView { .. }), cx)
+            .w(px(crate::ui::TOOL_CELL + 12.))
+            .child(crate::ui::glyph("ui-chevron-down", 9., pal.text))
             .tooltip("Insert view of a Part Studio or Assembly")
             .dropdown_menu(move |m, w, cx| fill_menu(m, &insert_entries, &ed1, w, cx));
         let dim_kind = if let Tool::Dimension { kind, .. } = t { Some(kind) } else { None };
@@ -117,17 +109,23 @@ impl DrawingEditor {
             MenuEntry::item("Horizontal", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Horizontal, picks: vec![] }, cx)),
             MenuEntry::item("Vertical", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Vertical, picks: vec![] }, cx)),
             MenuEntry::Separator,
-            MenuEntry::item("Ordinate", |e, _, cx| e.set_tool(Tool::Ordinate { origin: None, horizontal: None, level: [0.0; 2] }, cx)),
+            MenuEntry::item("Ordinate", |e, _, cx| e.set_tool(Tool::Ordinate { origin: None, horizontal: None, group: None }, cx)),
             MenuEntry::item("Chamfer", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)),
             MenuEntry::item("Arc length", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
+            MenuEntry::item("Maximum / minimum (Ctrl+M)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)),
+            MenuEntry::item("Foreshortened diameter (Shift+H)", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)),
         ];
         let ed5 = ed.clone();
         let views_menu = vec![
             MenuEntry::item("Jogged section view", |e, _, cx| e.set_tool(Tool::JoggedSection { parent: None, points: vec![], done: false }, cx)),
             MenuEntry::item("Aligned section view", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
+            MenuEntry::item("Partial section view", |e, _, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: true }, cx)),
+            MenuEntry::item("Broken-out section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
             MenuEntry::Separator,
             MenuEntry::item("Crop view (rectangle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: false }, cx)),
             MenuEntry::item("Crop view (circle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: true }, cx)),
+            MenuEntry::item("Crop view (polygon)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: false }, cx)),
+            MenuEntry::item("Crop view (spline)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: true }, cx)),
             MenuEntry::item("Break view (vertical lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
             MenuEntry::item("Break view (horizontal lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: false }, cx)),
         ];
@@ -139,7 +137,11 @@ impl DrawingEditor {
         ];
         let ed3 = ed.clone();
         let sheet_menu = {
-            let mut v = vec![MenuEntry::Submenu("Sheet size".into(), self.sheet_size_entries())];
+            let mut v = vec![
+                MenuEntry::Submenu("Template".into(), self.template_entries()),
+                MenuEntry::Submenu("Sheet size".into(), self.sheet_size_entries()),
+                MenuEntry::Submenu("Title block".into(), self.title_style_entries()),
+            ];
             let cur = self.current_sheet().scale;
             let mut scales = Vec::new();
             for s in [0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0] {
@@ -163,92 +165,85 @@ impl DrawingEditor {
             MenuEntry::item("SVG…", |e, w, cx| e.export(ExportFormat::Svg, w, cx)),
             MenuEntry::item("DXF…", |e, w, cx| e.export(ExportFormat::Dxf, w, cx)),
         ];
-        h_flex()
-            .h(px(40.))
-            .px_2()
-            .gap_1()
-            .bg(pal.panel)
-            .border_b_1()
-            .border_color(pal.border)
-            .overflow_hidden()
+        let up_to_date = !self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
+        crate::ui::toolbar()
+            .child(crate::ui::undo_redo(&self.doc, cx))
+            .child(sep())
             .child(
-                Button::new("dr-update")
-                    .icon(IconName::RefreshCw)
-                    .ghost()
-                    .small()
-                    .when(self.out_of_date, |b| b.primary())
-                    .disabled(!self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len())
+                // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
+                crate::ui::tool_button("dr-update", "drawing-update", false, cx)
+                    .when(self.out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
+                    .opacity(if up_to_date { 0.4 } else { 1.0 })
                     .tooltip("Update drawing (Ctrl+Q)")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.update_drawing(cx))),
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if !up_to_date {
+                            this.update_drawing(cx)
+                        }
+                    })),
             )
             .child(sep())
             .child(insert)
             .child(self.tool_btn("dr-proj", "projected-view", "Projected view (P)", matches!(t, Tool::Projected { .. }), || Tool::Projected { parent: None }, cx))
             .child(self.tool_btn("dr-aux", "auxiliary-view", "Auxiliary view", matches!(t, Tool::Auxiliary { .. }), || Tool::Auxiliary { parent: None }, cx))
-            .child(self.tool_btn("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. }), || Tool::Section { parent: None, p0: None, line: None }, cx))
+            .child(self.tool_btn("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. }), || Tool::Section { parent: None, p0: None, line: None, partial: false }, cx))
             .child(self.tool_btn("dr-detail", "detail-view", "Detail view", matches!(t, Tool::Detail { .. }), || Tool::Detail { parent: None, center: None, radius: None }, cx))
             .child(self.tool_btn("dr-crop", "crop-view", "Crop view", matches!(t, Tool::Crop { .. }), || Tool::Crop { parent: None, first: None, circle: false }, cx))
             .child(self.tool_btn("dr-break", "broken-view", "Break view", matches!(t, Tool::Break { .. }), || Tool::Break { parent: None, first: None, vertical: true }, cx))
-            .child(Button::new("dr-views-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).tooltip("More views").dropdown_menu(move |m, w, cx| fill_menu(m, &views_menu, &ed5, w, cx)))
+            .child(self.tool_btn("dr-brokenout", "broken-out-section", "Broken-out section", matches!(t, Tool::BrokenOut { .. }), || Tool::BrokenOut { parent: None, points: vec![], done: false }, cx))
+            .child(crate::ui::tool_caret("dr-views-more", cx).tooltip("More views").dropdown_menu(move |m, w, cx| fill_menu(m, &views_menu, &ed5, w, cx)))
             .child(sep())
             .child(
                 h_flex()
                     .child(self.tool_btn("dr-dim", "linear-dim", "Dimension (D)", matches!(dim_kind, Some(DimTool::Linear | DimTool::Aligned | DimTool::Horizontal | DimTool::Vertical | DimTool::Chamfer | DimTool::ArcLength)), || Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx))
-                    .child(Button::new("dr-dim-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).dropdown_menu(move |m, w, cx| fill_menu(m, &dims_menu, &ed2, w, cx))),
+                    .child(crate::ui::tool_caret("dr-dim-more", cx).dropdown_menu(move |m, w, cx| fill_menu(m, &dims_menu, &ed2, w, cx))),
             )
             .child(self.tool_btn("dr-rad", "radial-dim", "Radial dimension (Shift+R)", dim_kind == Some(DimTool::Radius), || Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx))
             .child(self.tool_btn("dr-dia", "diameter-dim", "Diameter dimension (Shift+D)", dim_kind == Some(DimTool::Diameter), || Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx))
             .child(self.tool_btn("dr-ang", "angular-dim", "Angular dimension", dim_kind == Some(DimTool::Angle), || Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx))
-            .child(self.tool_btn("dr-ord", "ordinate-dim", "Ordinate dimension", matches!(t, Tool::Ordinate { .. }), || Tool::Ordinate { origin: None, horizontal: None, level: [0.0; 2] }, cx))
+            .child(self.tool_btn("dr-ord", "ordinate-dim", "Ordinate dimension", matches!(t, Tool::Ordinate { .. }), || Tool::Ordinate { origin: None, horizontal: None, group: None }, cx))
+            .child(self.tool_btn("dr-chamfer", "chamfer-dim", "Chamfer dimension", dim_kind == Some(DimTool::Chamfer), || Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx))
+            .child(self.tool_btn("dr-arclen", "arc-length-dim", "Arc length dimension", dim_kind == Some(DimTool::ArcLength), || Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx))
             .child(sep())
             .child(self.tool_btn("dr-note", "note", "Note (N)", matches!(t, Tool::Note), || Tool::Note, cx))
-            .child(self.tool_btn("dr-balloon", "balloon", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }, cx))
+            .child(self.tool_btn("dr-balloon", "callout", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }, cx))
             .child(self.tool_btn("dr-cmark", "centermark", "Centermark", matches!(t, Tool::Centermark), || Tool::Centermark, cx))
             .child(self.tool_btn("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }, cx))
             .child(self.tool_btn("dr-gdt", "gdt", "Geometric tolerance", matches!(t, Tool::Gdt), || Tool::Gdt, cx))
             .child(self.tool_btn("dr-datum", "datum", "Datum", matches!(t, Tool::Datum { .. }), || Tool::Datum { anchor: None }, cx))
+            .child(self.tool_btn("dr-dtarget", "datum", "Datum target", matches!(t, Tool::DatumTarget { .. }), || Tool::DatumTarget { anchor: None }, cx))
             .child(self.tool_btn("dr-sf", "surface-finish", "Surface finish", matches!(t, Tool::SurfaceFinish), || Tool::SurfaceFinish, cx))
             .child(sep())
             .child(
                 h_flex()
-                    .child(self.tool_btn("dr-table", "bom", "Table", matches!(t, Tool::Table { kind: TableTool::General, .. }), || Tool::Table { kind: TableTool::General, view: None, origin: None }, cx))
+                    .child(self.tool_btn("dr-table", "table", "Table", matches!(t, Tool::Table { kind: TableTool::General, .. }), || Tool::Table { kind: TableTool::General, view: None, origin: None }, cx))
+                    .child(self.tool_btn("dr-bomtable", "drawing-bom", "BOM table", matches!(t, Tool::Table { kind: TableTool::Bom, .. }), || Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx))
                     .child(self.tool_btn("dr-holetable", "hole-table", "Hole table", matches!(t, Tool::Table { kind: TableTool::Hole, .. }), || Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx))
-                    .child(Button::new("dr-table-more").icon(Icon::new(IconName::ChevronDown).xsmall()).ghost().xsmall().w(px(14.)).tooltip("Tables").dropdown_menu(move |m, w, cx| fill_menu(m, &table_menu, &ed6, w, cx))),
+                    .child(crate::ui::tool_caret("dr-table-more", cx).tooltip("Tables").dropdown_menu(move |m, w, cx| fill_menu(m, &table_menu, &ed6, w, cx))),
             )
             .child(sep())
             .child(
-                Button::new("dr-title")
-                    .icon(Icon::empty().path(icon_path("title-block")))
-                    .ghost()
-                    .small()
+                crate::ui::tool_button("dr-title", "title-block", false, cx)
                     .tooltip("Edit title block")
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_title_panel(window, cx))),
             )
             .child(
-                Button::new("dr-sheet")
-                    .icon(Icon::empty().path(icon_path("sheet")))
-                    .label("Sheet")
-                    .ghost()
-                    .small()
-                    .dropdown_caret(true)
+                crate::ui::tool_button("dr-sheet", "sheet", false, cx)
+                    .w(px(crate::ui::TOOL_CELL + 12.))
+                    .child(crate::ui::glyph("ui-chevron-down", 9., pal.text))
+                    .tooltip("Sheet setup")
                     .dropdown_menu(move |m, w, cx| fill_menu(m, &sheet_menu, &ed3, w, cx)),
             )
             .child(div().flex_1())
             .child(
-                Button::new("dr-fit")
-                    .icon(Icon::empty().path(icon_path("zoom-fit")))
-                    .ghost()
-                    .small()
+                crate::ui::tool_button("dr-fit", "zoom-fit", false, cx)
                     .tooltip("Zoom to fit (F)")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.zoom_to_fit(cx))),
             )
             .child(
-                Button::new("dr-export")
-                    .icon(Icon::empty().path(icon_path("export")))
-                    .label("Export")
-                    .ghost()
-                    .small()
-                    .dropdown_caret(true)
+                crate::ui::tool_button("dr-export", "export", false, cx)
+                    .w(px(crate::ui::TOOL_CELL + 12.))
+                    .child(crate::ui::glyph("ui-chevron-down", 9., pal.text))
+                    .tooltip("Export")
                     .dropdown_menu(move |m, w, cx| fill_menu(m, &export_menu, &ed4, w, cx)),
             )
             .into_any_element()
@@ -276,19 +271,17 @@ impl DrawingEditor {
             parts.push(format!("{} dangling annotation(s)", b.dangling.len()));
         }
         parts.push(format!("x {:.1}  y {:.1} mm", self.cursor[0], self.cursor[1]));
+        // Onshape has no status bar: the tool prompt and drawing state show as
+        // quiet text at the bottom-left of the drawing area.
         div()
             .absolute()
-            .bottom_0()
-            .left_0()
-            .right_0()
-            .h(px(24.))
-            .px_3()
-            .flex()
-            .items_center()
-            .bg(pal.panel)
-            .border_t_1()
-            .border_color(pal.border)
-            .text_xs()
+            .bottom(px(6.))
+            .left(px(10.))
+            .px(px(6.))
+            .py(px(2.))
+            .rounded(px(3.))
+            .bg(theme_with_alpha(pal.panel, 0.85))
+            .text_size(px(12.))
             .text_color(pal.text_muted)
             .child(parts.join("    "))
             .into_any_element()
@@ -308,6 +301,7 @@ impl DrawingEditor {
                 ],
             ),
             Panel::Dimension { .. } | Panel::Gdt { .. } | Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } | Panel::NewTable { .. } => self.extra_panel_rows(cx)?,
+            Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
             Panel::TitleBlock { inputs } => (
                 "Title block (fields like {part.name}, {sheet.scale} allowed)",
                 inputs

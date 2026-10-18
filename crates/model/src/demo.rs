@@ -235,7 +235,7 @@ pub fn add_demo_assembly(doc: &mut Document) {
         })
     };
     let (Some(top), Some(bottom), Some(hole), Some(pin_face)) = (face_named(pb, "CapEnd"), face_named(pb, "CapStart"), cylinder(pb, 0.012), cylinder(qb, 0.012)) else { return };
-    let mc = |instance: u64, on: Reference, inference: Inference| MateConnectorRef { instance: InstanceId(instance), path: vec![], reference: Reference::Implicit { on: Box::new(on), inference }, flip: false, rotate_quarters: 0, connector: None };
+    let mc = |instance: u64, on: Reference, inference: Inference| MateConnectorRef::on(InstanceId(instance), vec![], Reference::Implicit { on: Box::new(on), inference });
     let inst = |id: u64, name: &str, studio, body: crate::reference::BodyId, at: [f64; 3], fixed| Instance {
         id: InstanceId(id),
         name: name.into(),
@@ -244,24 +244,10 @@ pub fn add_demo_assembly(doc: &mut Document) {
         fixed,
         hidden: false,
         suppressed: false,
+        lock: SubassemblyLock::Flexible,
+        nested: Vec::new(),
     };
-    let mate = |id: u64, name: &str, t: MateType, a, b| Mate {
-        id: MateId(id),
-        name: name.into(),
-        mate_type: t,
-        a,
-        b,
-        offset_z: None,
-        offset_x: None,
-        offset_y: None,
-        rotation: None,
-        flip_primary: false,
-        reorient_secondary: 0,
-        limits: vec![],
-        suppressed: false,
-        extra: vec![],
-        tangent_propagation: true,
-    };
+    let mate = |id: u64, name: &str, t: MateType, a, b| Mate::new(MateId(id), name.into(), t, a, b);
     let mut fastened = mate(4, "Fastened 1", MateType::Fastened, mc(1, top, Inference::Centroid), mc(2, bottom, Inference::Centroid));
     fastened.reorient_secondary = 1;
     let asm = Assembly {

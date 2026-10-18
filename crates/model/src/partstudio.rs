@@ -4,7 +4,7 @@
 use crate::configuration::Configuration;
 use crate::features::{self, FeatureType};
 use crate::params::{ParamValues, fill_defaults};
-use crate::reference::{BodyId, FeatureId};
+use crate::reference::{BodyId, FeatureId, Reference};
 use noshape_units::UnitPrefs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -23,6 +23,15 @@ pub struct Feature {
     /// User has edited the name (otherwise it follows the default naming).
     #[serde(default)]
     pub custom_name: bool,
+    /// Hidden in the graphics area (sketches, planes, mate connectors;
+    /// Onshape's Hide/Show on a feature). Display only: not part of the
+    /// regeneration key.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
+    /// Dynamic suppression: the feature is suppressed while this boolean
+    /// expression (e.g. `#depth < 0.5 in`) is true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppression_expr: Option<String>,
 }
 
 impl Feature {
@@ -37,6 +46,9 @@ pub struct Folder {
     pub name: String,
     #[serde(default)]
     pub collapsed: bool,
+    /// Enclosing folder (folders nest).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<u32>,
 }
 
 /// Appearance of a part (linear RGBA).
@@ -56,6 +68,65 @@ pub struct PartProperties {
     pub hidden: bool,
     /// Density override, kg/m^3.
     pub density: Option<f64>,
+    /// Revision (parts list properties).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    /// Mass override, kg (Mass properties "Override").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mass_override: Option<f64>,
+    /// Tessellation quality (Appearance dialog).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tessellation: Option<TessQuality>,
+}
+
+/// Onshape's tessellation quality setting of a part.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TessQuality {
+    Auto,
+    Coarse,
+    Medium,
+    Fine,
+    VeryFine,
+}
+
+impl TessQuality {
+    pub const ALL: [TessQuality; 5] = [TessQuality::Auto, TessQuality::Coarse, TessQuality::Medium, TessQuality::Fine, TessQuality::VeryFine];
+    /// Multiplier of the chord tolerance (smaller = finer).
+    pub fn factor(self) -> f64 {
+        match self {
+            TessQuality::Auto => 1.0,
+            TessQuality::Coarse => 4.0,
+            TessQuality::Medium => 2.0,
+            TessQuality::Fine => 0.5,
+            TessQuality::VeryFine => 0.2,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            TessQuality::Auto => "Auto",
+            TessQuality::Coarse => "Coarse",
+            TessQuality::Medium => "Medium",
+            TessQuality::Fine => "Fine",
+            TessQuality::VeryFine => "Very fine",
+        }
+    }
+}
+
+/// What a face appearance colors.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum AppearanceTarget {
+    /// Selected faces.
+    Faces(Vec<Reference>),
+    /// The faces a feature created (or a sketch's curves).
+    Feature(FeatureId),
+}
+
+/// A face, feature or sketch appearance (Appearance panel).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FaceAppearance {
+    pub target: AppearanceTarget,
+    /// Linear RGBA.
+    pub color: [f32; 4],
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -76,6 +147,12 @@ pub struct PartStudio {
     /// Saved camera views (Shift+V).
     #[serde(default)]
     pub named_views: Vec<NamedView>,
+    /// Face, feature and sketch appearances.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub appearances: Vec<FaceAppearance>,
+    /// Hidden default geometry (Origin, Top, Front, Right planes).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_defaults: Vec<Reference>,
 }
 
 /// A saved camera (renderer-independent).
@@ -87,6 +164,9 @@ pub struct NamedView {
     pub rotation: [f64; 4],
     pub distance: f64,
     pub perspective: bool,
+    /// Section view planes (normal xyz, offset along it); empty = none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub section: Vec<[f64; 4]>,
 }
 
 impl PartStudio {
@@ -128,6 +208,9 @@ impl PartStudio {
         let ty = features::get(type_id)?;
         let mut params = ParamValues::default();
         fill_defaults(&ty.params, &mut params, units);
+        if type_id == "hole" {
+            features::hole_tables::init_new_hole(&mut params, units);
+        }
         Some(Feature {
             id: FeatureId::new_random(),
             type_id: type_id.to_string(),
@@ -136,6 +219,8 @@ impl PartStudio {
             params,
             folder: None,
             custom_name: false,
+            hidden: false,
+            suppression_expr: None,
         })
     }
 
@@ -223,7 +308,10 @@ impl PartStudio {
             }
             format!("Folder {n}")
         });
-        self.folders.push(Folder { id, name, collapsed: false });
+        // A folder made from features of one folder nests inside it.
+        let first_folder = ids.first().and_then(|i| self.feature(*i)).and_then(|f| f.folder);
+        let parent = first_folder.filter(|p| ids.iter().all(|i| self.feature(*i).is_some_and(|f| f.folder == Some(*p))));
+        self.folders.push(Folder { id, name, collapsed: false, parent });
         // Folders hold a contiguous run: gather members after the first one.
         let mut idx: Vec<usize> = ids.iter().filter_map(|i| self.index_of(*i)).collect();
         idx.sort_unstable();
@@ -239,12 +327,34 @@ impl PartStudio {
 
     /// Remove a folder (its features stay in place).
     pub fn dissolve_folder(&mut self, folder: u32) {
+        // Contents (features and sub-folders) move up to the parent folder.
+        let parent = self.folder(folder).and_then(|f| f.parent);
         self.folders.retain(|f| f.id != folder);
-        for f in &mut self.features {
-            if f.folder == Some(folder) {
-                f.folder = None;
+        for fd in &mut self.folders {
+            if fd.parent == Some(folder) {
+                fd.parent = parent;
             }
         }
+        for f in &mut self.features {
+            if f.folder == Some(folder) {
+                f.folder = parent;
+            }
+        }
+    }
+
+    /// Folder chain of a folder id, outermost first.
+    pub fn folder_chain(&self, id: Option<u32>) -> Vec<u32> {
+        let mut out = Vec::new();
+        let mut cur = id;
+        while let Some(c) = cur {
+            if out.contains(&c) {
+                break;
+            }
+            out.push(c);
+            cur = self.folder(c).and_then(|f| f.parent);
+        }
+        out.reverse();
+        out
     }
 
     pub fn folder(&self, id: u32) -> Option<&Folder> {

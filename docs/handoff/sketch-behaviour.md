@@ -8,9 +8,8 @@ Also touched (sketch-specific, surgical): `crates/model/src/regen/features/sketc
 `crates/model/src/sketch_feature.rs` (new `SketchData` fields: `dimension_tolerances`,
 `patterns`, `images`; `SketchText.expression`; image helpers; base64).
 
-The checklist with statuses is `docs/parity/sketch.md`. **Keep it current.** Its
-statuses were last updated before the second round of work (see "Done since the
-checklist was updated" below), so update those rows first.
+The checklist with statuses is `docs/parity/sketch.md`. **Keep it current** (it is up to
+date as of the latest handoff update: 187 ✅, 9 ⏳, 4 🔧).
 
 ## State right now
 
@@ -18,9 +17,13 @@ checklist was updated" below), so update those rows first.
 * `cargo test -p noshape-sketch` passes; app editor tests
   `cargo test -p noshape --bin noshape sketch_mode` pass (24 tests, more in round 2 not yet
   rerun after the latest edits: rerun them).
-* Nothing is half-edited. The last edit (text expressions in the model regen) compiles and
-  its unit tests pass. The app-side UI toggle for "Convert to expression" is NOT written yet
-  (see remaining items).
+* Nothing is half-edited. Latest additions: text "Convert to expression" toggle, linear
+  pattern instances linked to the seed (`ConstraintKind::PatternLink` + spacing dimension),
+  Esc never cancels the sketch (capture of `Cancel` on the root), the Sketch dialog options
+  panel (Show constraints / expressions / errors + diagnostics tools) under the dialog, user
+  sketch shortcuts via `cx.intercept_keystrokes` (`sketch-shortcuts.json`).
+* Next: compare against the live Onshape capture in `/root/onshape-research/live/`
+  (`behaviours.md`, `dom/dropdowns-sketch.json`, `sketch/`), fix differences.
 
 ## Done since the checklist was updated (update these rows in docs/parity/sketch.md)
 
@@ -82,22 +85,14 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 
 ## Remaining items (priority order)
 
-1. Rerun all tests and clippy (`--no-deps` for app; see gotchas) and GUI-verify the round-2
-   features with xdotool; update the checklist rows above.
-2. Text "Convert to expression" toggle in `render_sketch_labels` text rows
-   (`edit_text(data, id, |t| t.expression = !t.expression)`).
-3. 1.6 Orient normal to sketch on edit: the Part Studio agent added a camera-menu toggle
-   (read `part_studio/behaviors.rs`); in `sync_sketch_editor`, when a new editor is created
-   and the toggle is on, animate the view normal (`view_normal`).
-4. Pattern instances linked to their seed (a pattern constraint in the solver: instance
-   points = seed points + k * shared vector / rotation; needs aux unknowns).
-5. 2.10 Search tools in a sketch should list sketch tools (palette is in `view_tools.rs`,
-   other agent) ; 3.13 shortcut customization (no prefs system; could read a JSON keymap).
-6. 1.9 Restore bubble after cancelling a sketch (feature dialog / mod.rs, other agent).
-7. 10.6 / 4.37 colors and construction stipple come from `scene_builder.rs`
-   (`sketch_color`), owned by the render/theme agents.
-8. Use: hover preview exists for edges; silhouettes for oblique cylinders' end caps and
-   general surfaces are not handled.
+1. Diff against the live Onshape capture (`/root/onshape-research/live/`).
+2. The ⏳ rows of the checklist (implemented, GUI not re-verified): 6.14, 8.8, 8.16, 9.5,
+   9.7, 11.10, 11.20, 12.5, 13.3.
+3. Circular pattern instances are not linked to the seed (needs a rotation pattern
+   constraint: nonlinear, center/angle unknowns).
+4. 1.9 Restore bubble after cancelling a sketch (feature dialog / mod.rs, other agent).
+5. 3.13 a preferences page for sketch shortcuts (file-based works).
+6. 4.38 DWG reader (DXF only); images are drawn only when the box is upright on screen.
 
 ## How to test
 

@@ -852,3 +852,66 @@ impl Sketch {
             .min_by(|a, b| a.area().total_cmp(&b.area()))
     }
 }
+
+/// A profile problem found by [`Sketch::profile_issues`] (Profile inspector).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProfileIssue {
+    /// Where to show the issue.
+    pub position: DVec2,
+    /// The curve(s) involved.
+    pub entities: Vec<EntityId>,
+    /// Description shown in the list.
+    pub message: String,
+}
+
+impl Sketch {
+    /// Gaps that keep sketch curves from forming closed regions: loose
+    /// curve ends (unclosed loops) and curves lying on top of each other.
+    /// Construction geometry is ignored.
+    pub fn profile_issues(&self) -> Vec<ProfileIssue> {
+        let size = self.bbox().size().max_element().max(1e-6);
+        let tol = size * 1e-7;
+        let curves: Vec<(EntityId, crate::geom::Curve2)> = self
+            .entities()
+            .filter(|e| e.kind() != EntityKind::Point && !e.construction)
+            .filter_map(|e| Some((e.id, self.curve(e.id)?)))
+            .collect();
+        let mut ends: Vec<(EntityId, DVec2)> = Vec::new();
+        for (id, c) in &curves {
+            if c.is_periodic() {
+                continue;
+            }
+            if let Some((s, e)) = self.entity(*id).and_then(|x| x.endpoints()) {
+                for p in [s, e] {
+                    if let Some(q) = self.point(p) {
+                        ends.push((*id, q));
+                    }
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for (i, (id, p)) in ends.iter().enumerate() {
+            let shared = ends.iter().enumerate().any(|(j, (_, q))| j != i && (*q - *p).length() <= tol);
+            let on_other = curves.iter().any(|(cid, c)| cid != id && c.closest(*p).2 <= tol);
+            if !shared && !on_other {
+                out.push(ProfileIssue { position: *p, entities: vec![*id], message: "Unclosed loop".into() });
+            }
+        }
+        // Overlapping (coincident) lines.
+        for (i, (a, ca)) in curves.iter().enumerate() {
+            for (b, cb) in curves.iter().skip(i + 1) {
+                if let (crate::geom::Curve2::Line { a: a0, b: a1 }, crate::geom::Curve2::Line { a: b0, b: b1 }) = (ca, cb) {
+                    let len = (*a1 - *a0).length();
+                    let d = (*a1 - *a0).normalize_or_zero();
+                    let off = |p: DVec2| d.perp_dot(p - *a0).abs();
+                    let collinear = len > tol && off(*b0) <= tol && off(*b1) <= tol;
+                    let (t0, t1) = ((*b0 - *a0).dot(d), (*b1 - *a0).dot(d));
+                    if collinear && t0.max(t1) > tol && t0.min(t1) < len - tol {
+                        out.push(ProfileIssue { position: (*b0 + *b1) * 0.5, entities: vec![*a, *b], message: "Overlapping".into() });
+                    }
+                }
+            }
+        }
+        out
+    }
+}

@@ -1,7 +1,7 @@
 //! Constraint and dimension definitions.
 
 use crate::entities::{EntityKind, Geometry};
-use crate::geom::{ccw_sweep, Curve2};
+use crate::geom::Curve2;
 use crate::ids::{ConstraintId, EntityId};
 use crate::sketch::Sketch;
 use glam::DVec2;
@@ -16,6 +16,9 @@ pub enum DistanceMode {
     Center,
     Minimum,
     Maximum,
+    /// Twice the distance to a (construction) line: Onshape's centerline
+    /// dimension, used for revolve diameters.
+    Centerline,
 }
 
 /// Geometric constraints and dimensions.
@@ -69,6 +72,16 @@ pub enum ConstraintKind {
     ArcAngle { arc: EntityId, value: f64 },
     /// Major or minor radius of an ellipse.
     EllipseRadius { ellipse: EntityId, major: bool, value: f64 },
+    /// Linear pattern link: `inst - seed = k * (ref_inst - ref_seed)` for
+    /// points (Onshape's linear pattern constraint: every instance follows
+    /// its seed and one shared step).
+    PatternLink { seed: EntityId, inst: EntityId, ref_seed: EntityId, ref_inst: EntityId, k: f64 },
+    /// A point at an end of an ellipse's major (or minor) axis (Onshape's
+    /// automatic Quadrant constraint).
+    Quadrant { point: EntityId, ellipse: EntityId, major: bool },
+    /// Rho of a conic (unitless, 0 < rho < 1). The conic's shape parameter
+    /// is set directly (it is not a solver unknown).
+    Rho { conic: EntityId, value: f64 },
 }
 
 impl ConstraintKind {
@@ -87,7 +100,8 @@ impl ConstraintKind {
             | Diameter { value, .. }
             | Angle { value, .. }
             | ArcAngle { value, .. }
-            | EllipseRadius { value, .. } => Some(*value),
+            | EllipseRadius { value, .. }
+            | Rho { value, .. } => Some(*value),
             _ => None,
         }
     }
@@ -103,7 +117,8 @@ impl ConstraintKind {
             | Diameter { value, .. }
             | Angle { value, .. }
             | ArcAngle { value, .. }
-            | EllipseRadius { value, .. } => {
+            | EllipseRadius { value, .. }
+            | Rho { value, .. } => {
                 *value = v;
                 true
             }
@@ -159,6 +174,17 @@ impl ConstraintKind {
             Length { curve, .. } | Radius { curve, .. } | Diameter { curve, .. } => v.push(*curve),
             ArcAngle { arc, .. } => v.push(*arc),
             EllipseRadius { ellipse, .. } => v.push(*ellipse),
+            Rho { conic, .. } => v.push(*conic),
+            PatternLink { seed, inst, ref_seed, ref_inst, .. } => {
+                v.push(*seed);
+                v.push(*inst);
+                v.push(*ref_seed);
+                v.push(*ref_inst);
+            }
+            Quadrant { point, ellipse, .. } => {
+                v.push(*point);
+                v.push(*ellipse);
+            }
         }
         v
     }
@@ -215,6 +241,17 @@ impl ConstraintKind {
             Length { curve, .. } | Radius { curve, .. } | Diameter { curve, .. } => r(curve),
             ArcAngle { arc, .. } => r(arc),
             EllipseRadius { ellipse, .. } => r(ellipse),
+            Rho { conic, .. } => r(conic),
+            PatternLink { seed, inst, ref_seed, ref_inst, .. } => {
+                r(seed);
+                r(inst);
+                r(ref_seed);
+                r(ref_inst)
+            }
+            Quadrant { point, ellipse, .. } => {
+                r(point);
+                r(ellipse)
+            }
         }
     }
 
@@ -247,8 +284,16 @@ impl ConstraintKind {
             Angle { .. } => "Angle",
             ArcAngle { .. } => "Arc angle",
             EllipseRadius { .. } => "Ellipse radius",
+            Rho { .. } => "Rho",
+            PatternLink { .. } => "Linear pattern",
+            Quadrant { .. } => "Quadrant",
         }
     }
+}
+
+/// Distances in centerline mode measure twice the distance.
+pub(crate) fn centerline_factor(mode: DistanceMode) -> f64 {
+    if mode == DistanceMode::Centerline { 2.0 } else { 1.0 }
 }
 
 fn one() -> f64 {
@@ -366,7 +411,7 @@ pub(crate) fn fix_items(sk: &Sketch, id: EntityId) -> Vec<FixItem> {
             v.push(FixItem::Ray { center: *center, point: *end })
         }
         Geometry::BSpline { control, .. } => control.iter().for_each(|p| pt(*p, &mut v)),
-        Geometry::FitSpline { points } => points.iter().for_each(|p| pt(*p, &mut v)),
+        Geometry::FitSpline { points, .. } => points.iter().for_each(|p| pt(*p, &mut v)),
         Geometry::Conic { start, control, end, .. } => {
             pt(*start, &mut v);
             pt(*control, &mut v);
@@ -632,6 +677,14 @@ impl Sketch {
         self.measure_kind(&c.kind, &c.hints)
     }
 
+    /// Value a new dimension of this kind would measure on the current
+    /// geometry (meters / radians), e.g. the suggested value of an
+    /// on-the-fly dimension box.
+    pub fn measure_new(&self, kind: &ConstraintKind) -> Option<f64> {
+        let (h, _) = self.compute_hints(kind);
+        self.measure_kind(kind, &h)
+    }
+
     pub(crate) fn measure_kind(&self, kind: &ConstraintKind, h: &Hints) -> Option<f64> {
         use ConstraintKind as K;
         match kind {
@@ -642,12 +695,12 @@ impl Sketch {
                     (0, 0) => Some((self.point(a)? - self.point(b)?).length()),
                     (0, 1) => {
                         let (l0, l1) = self.line_pts(b)?;
-                        Some(signed_line_dist(self.point(a)?, l0, l1).abs())
+                        Some(signed_line_dist(self.point(a)?, l0, l1).abs() * centerline_factor(*mode))
                     }
                     (1, 1) => {
                         let (a0, a1) = self.line_pts(a)?;
                         let (b0, b1) = self.line_pts(b)?;
-                        Some(signed_line_dist((b0 + b1) * 0.5, a0, a1).abs())
+                        Some(signed_line_dist((b0 + b1) * 0.5, a0, a1).abs() * centerline_factor(*mode))
                     }
                     (0, 2) | (1, 2) => {
                         let c = self.center_pos(b)?;
@@ -660,6 +713,7 @@ impl Sketch {
                         };
                         Some(match mode {
                             DistanceMode::Center => d,
+                            DistanceMode::Centerline => 2.0 * d,
                             DistanceMode::Minimum => (d - r).abs(),
                             DistanceMode::Maximum => d + r,
                         })
@@ -669,7 +723,7 @@ impl Sketch {
                         let r1 = self.radius_of(a).unwrap_or(0.0);
                         let r2 = self.radius_of(b).unwrap_or(0.0);
                         Some(match mode {
-                            DistanceMode::Center => d,
+                            DistanceMode::Center | DistanceMode::Centerline => d,
                             DistanceMode::Minimum => {
                                 if h.internal { (r1 - r2).abs() - d } else { d - r1 - r2 }
                             }
@@ -704,6 +758,10 @@ impl Sketch {
                 Curve2::Arc { start_angle, end_angle, .. } => Some(end_angle - start_angle),
                 _ => None,
             },
+            K::Rho { conic, .. } => match self.entity(*conic)?.geometry {
+                Geometry::Conic { rho, .. } => Some(rho),
+                _ => None,
+            },
             K::EllipseRadius { ellipse, major, .. } => match self.entity(*ellipse)?.geometry {
                 Geometry::Ellipse { major: m, minor, .. } | Geometry::EllipticalArc { major: m, minor, .. } => {
                     Some(if *major { m.length() } else { minor })
@@ -722,7 +780,3 @@ pub fn reflect(p: DVec2, a: DVec2, b: DVec2) -> DVec2 {
     a + d * (2.0 * v.dot(d)) - v
 }
 
-#[allow(dead_code)]
-pub(crate) fn sweep_of(c: DVec2, s: DVec2, e: DVec2) -> f64 {
-    ccw_sweep((s - c).to_angle(), (e - c).to_angle())
-}

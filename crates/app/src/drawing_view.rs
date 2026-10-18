@@ -21,7 +21,7 @@ use gpui_kit::component::input::{InputState, TextareaState};
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::v_flex;
 use gpui_kit::*;
-use glam::{DQuat, DVec3};
+use glam::DVec3;
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::assembly::eval::AssemblyEvaluator;
 use noshape_model::drawing::build::{BuiltSheet, PickTarget, SheetInfo, assemble_sheet};
@@ -29,7 +29,7 @@ use noshape_model::drawing::views::{self, SourceKey, Sources, ViewCache, ViewGeo
 use noshape_model::drawing::*;
 use noshape_model::regen::Regenerator;
 use noshape_render::worker::RenderJob;
-use noshape_render::{Camera, Drawable, Instance, LinesHandle, MeshHandle, PointsHandle, Projection as CamProjection, Scene, Style, srgb, state};
+use noshape_render::{Camera, Drawable, Instance, LinesHandle, MeshHandle, PointsHandle, Projection as CamProjection, Scene, Style, state};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -46,6 +46,10 @@ pub enum DimTool {
     Angle,
     Chamfer,
     ArcLength,
+    /// Maximum / minimum (arc condition) dimension.
+    MaxMin,
+    /// Foreshortened (half) diameter from an axis.
+    Foreshorten,
 }
 
 impl DimTool {
@@ -60,6 +64,8 @@ impl DimTool {
             DimTool::Angle => "Angular dimension",
             DimTool::Chamfer => "Chamfer dimension",
             DimTool::ArcLength => "Arc length dimension",
+            DimTool::MaxMin => "Maximum / minimum dimension",
+            DimTool::Foreshorten => "Foreshortened diameter",
         }
     }
 }
@@ -79,6 +85,8 @@ pub enum Pick {
     Circle { view: ViewId, center: [f64; 2], radius: f64, r: Option<PointRef> },
     /// An arc edge: center, radius, end points and a point on the arc.
     Arc { view: ViewId, center: [f64; 2], radius: f64, a: PickedPoint, b: PickedPoint, mid: [f64; 2], r: Option<PointRef> },
+    /// A circle clicked at `at` (view coordinates; max/min dimensions).
+    CircleAt { view: ViewId, center: [f64; 2], radius: f64, r: Option<PointRef>, at: [f64; 2] },
 }
 
 /// Kinds of drawing tables the table tools create.
@@ -95,7 +103,9 @@ pub enum Tool {
     InsertView { source: TabId, orientation: ViewOrientation, part: Option<noshape_model::BodyId> },
     Projected { parent: Option<ViewId> },
     Auxiliary { parent: Option<(ViewId, [f64; 2])> },
-    Section { parent: Option<ViewId>, p0: Option<[f64; 2]>, line: Option<([f64; 2], [f64; 2])> },
+    /// Section view; `partial`: the cutting line is used as clicked (not
+    /// extended across the view) and only cuts along its length.
+    Section { parent: Option<ViewId>, p0: Option<[f64; 2]>, line: Option<([f64; 2], [f64; 2])>, partial: bool },
     Detail { parent: Option<ViewId>, center: Option<[f64; 2]>, radius: Option<f64> },
     Dimension { kind: DimTool, picks: Vec<Pick> },
     Note,
@@ -110,13 +120,22 @@ pub enum Tool {
     Crop { parent: Option<ViewId>, first: Option<[f64; 2]>, circle: bool },
     /// Break a view: two clicks give the removed band.
     Break { parent: Option<ViewId>, first: Option<[f64; 2]>, vertical: bool },
-    /// Ordinate dimensions: datum, then the side/level of the values, then points.
-    Ordinate { origin: Option<PickedPoint>, horizontal: Option<bool>, level: [f64; 2] },
+    /// Ordinate dimensions: datum, then the side/level of the values, then
+    /// points, all in one ordinate group (`group` once created).
+    Ordinate { origin: Option<PickedPoint>, horizontal: Option<bool>, group: Option<u64> },
     /// Place a table: BOM / hole tables need a view (and hole tables an origin).
     Table { kind: TableTool, view: Option<ViewId>, origin: Option<PickedPoint> },
     Gdt,
     Datum { anchor: Option<[f64; 2]> },
     SurfaceFinish,
+    /// Broken-out section: profile points in the view (view coordinates),
+    /// closed with Enter / double-click; then a depth (panel) or a depth point.
+    BrokenOut { parent: Option<ViewId>, points: Vec<[f64; 2]>, done: bool },
+    /// Polygon or spline crop: points in the view (view coordinates).
+    CropPoly { parent: Option<ViewId>, points: Vec<[f64; 2]>, spline: bool },
+    DatumTarget { anchor: Option<PickedPoint> },
+    /// Add a leader to geometric tolerance `id`.
+    GdtLeader { id: u64 },
 }
 
 impl Tool {
@@ -144,6 +163,11 @@ impl Tool {
             Tool::Gdt => "Geometric tolerance",
             Tool::Datum { .. } => "Datum",
             Tool::SurfaceFinish => "Surface finish",
+            Tool::BrokenOut { .. } => "Broken-out section",
+            Tool::CropPoly { spline: false, .. } => "Crop view (polygon)",
+            Tool::CropPoly { .. } => "Crop view (spline)",
+            Tool::DatumTarget { .. } => "Datum target",
+            Tool::GdtLeader { .. } => "Add leader",
         }
     }
 }
@@ -171,6 +195,8 @@ pub enum Drag {
     MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
     /// Move a detail view's circle in its parent.
     MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
+    /// Move one point of a section view's cutting line.
+    MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
 }
 
 /// Inline property panels shown over the canvas.
@@ -188,6 +214,13 @@ pub enum Panel {
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
     Scale { view: Option<ViewId>, input: Entity<InputState> },
     Label { view: ViewId, input: Entity<InputState> },
+    /// Depth of a new (`edit` None) or existing broken-out section.
+    BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, depth: Entity<InputState>, depth_ref: Option<PointRef> },
+    /// Angle of a straight cutting line.
+    CutAngle { view: ViewId, input: Entity<InputState> },
+    /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.
+    CellFormat { table: u64, row: usize, col: usize, scope: usize, align: CellAlign, bold: bool, height: Entity<InputState> },
+    DatumTarget { id: u64, label: Entity<InputState>, area: usize, width: Entity<InputState>, height: Entity<InputState> },
 }
 
 /// A context/dropdown menu entry acting on the editor.
@@ -530,8 +563,8 @@ impl DrawingEditor {
                 geoms.insert(v.id, g);
                 continue;
             }
-            match views::view_key(&d, sheet, v.id, &self.sources, false) {
-                Some(k) => match self.cache.get(k) {
+            if let Some(k) = views::view_key(&d, sheet, v.id, &self.sources, false) {
+                match self.cache.get(k) {
                     Some(g) => {
                         geoms.insert(v.id, g);
                         need_exact = true;
@@ -543,8 +576,7 @@ impl DrawingEditor {
                             geoms.insert(v.id, old.clone());
                         }
                     }
-                },
-                None => {}
+                }
             }
         }
         self.geoms = geoms;
@@ -598,12 +630,6 @@ impl DrawingEditor {
         [self.center[0] + (local[0] - s[0] / 2.0) / self.zoom, self.center[1] - (local[1] - s[1] / 2.0) / self.zoom]
     }
 
-    #[allow(dead_code)]
-    pub fn to_screen(&self, p: [f64; 2]) -> [f64; 2] {
-        let s = self.size_px();
-        [(p[0] - self.center[0]) * self.zoom + s[0] / 2.0, -(p[1] - self.center[1]) * self.zoom + s[1] / 2.0]
-    }
-
     pub fn local(&self, p: Point<Pixels>) -> [f64; 2] {
         [f64::from(f32::from(p.x - self.bounds.origin.x)), f64::from(f32::from(p.y - self.bounds.origin.y))]
     }
@@ -633,11 +659,7 @@ impl DrawingEditor {
 
     fn camera(&self) -> Camera {
         let s = self.size_px();
-        let mut c = Camera::default();
-        c.projection = CamProjection::Orthographic;
-        c.rotation = Camera::look_rotation(DVec3::NEG_Z, DVec3::Y);
-        let _ = DQuat::IDENTITY;
-        c.target = DVec3::new(self.center[0], self.center[1], 0.0);
+        let mut c = Camera { projection: CamProjection::Orthographic, rotation: Camera::look_rotation(DVec3::NEG_Z, DVec3::Y), target: DVec3::new(self.center[0], self.center[1], 0.0), ..Default::default() };
         let half_h = (s[1] / 2.0 / self.zoom).max(1e-3);
         c.distance = half_h / (c.fov_y * 0.5).tan();
         c
@@ -668,11 +690,13 @@ impl DrawingEditor {
     }
 
     fn rebuild_overlay(&mut self) {
-        if self.overlay.is_empty() {
+        let mut overlay = self.overlay.clone();
+        overlay.points.extend(self.selection_handles());
+        if overlay.is_empty() {
             self.overlay_handles = None;
             return;
         }
-        let (l, pts) = self.overlay.to_render([139, 124, 255, 255]);
+        let (l, pts) = overlay.to_render([139, 124, 255, 255]);
         let up = self.gpu.uploader();
         self.overlay_handles = Some((up.upload_lines(&l), up.upload_points(&pts)));
     }
@@ -707,8 +731,8 @@ impl DrawingEditor {
 
     fn build_scene(&self) -> Scene {
         let mut scene = Scene::default();
-        if let Some((shadow, paper, _)) = &self.paper {
-            scene.instances.push(Instance::new(Drawable::Mesh(shadow.clone())).with_color([0.0, 0.0, 0.0, 0.35]).unpickable().layer(-10));
+        // Onshape: the white sheet sits flat on the gray surround (no shadow).
+        if let Some((_shadow, paper, _)) = &self.paper {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unpickable().layer(-5));
         }
         if let Some(f) = &self.fills {
@@ -753,12 +777,12 @@ impl DrawingEditor {
         }
         self.rebuild_overlay();
         let mut style = Style::default();
-        let bg = srgb(0x3a, 0x3f, 0x4a);
-        let bg2 = srgb(0x2a, 0x2e, 0x36);
+        // Gray drawing area around the white sheet; Onshape highlight colors.
+        let bg = crate::theme::lin(crate::theme::viewport::DRAWING_BG);
         style.background_top = bg;
-        style.background_bottom = bg2;
-        style.hover_color = srgb(0x1f, 0x8f, 0xff);
-        style.select_color = srgb(0xff, 0x8a, 0x00);
+        style.background_bottom = bg;
+        style.hover_color = crate::theme::lin(crate::theme::viewport::PREHIGHLIGHT);
+        style.select_color = crate::theme::lin(crate::theme::viewport::SELECTION);
         style.show_edges = false;
         self.seq += 1;
         self.gpu.submit(RenderJob {
@@ -819,6 +843,8 @@ impl DrawingEditor {
                 Tool::Select
                 | Tool::Projected { parent: None }
                 | Tool::Section { parent: None, .. }
+                | Tool::BrokenOut { parent: None, .. }
+                | Tool::CropPoly { parent: None, .. }
                 | Tool::Detail { parent: None, .. }
                 | Tool::JoggedSection { parent: None, .. }
                 | Tool::AlignedSection { parent: None, .. }
@@ -888,7 +914,7 @@ impl Render for DrawingEditor {
             .min_h_0()
             .relative()
             .overflow_hidden()
-            .bg(rgb(0x2f333b))
+            .bg(rgb(crate::theme::viewport::DRAWING_BG))
             .cursor(match self.tool {
                 Tool::Select => CursorStyle::Arrow,
                 _ => CursorStyle::Crosshair,
@@ -942,8 +968,7 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &TogglePlanes, _, cx| this.set_tool(Tool::Projected { parent: None }, cx)))
             .on_key_down(cx.listener(Self::on_key))
             .child(toolbar)
-            .child(canvas_el)
-            .child(sheet_bar)
+            .child(gpui_kit::component::h_flex().flex_1().min_h_0().child(sheet_bar).child(canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border)))
             .children(menu.map(|(m, pos)| deferred(anchored().position(pos).snap_to_window().child(m)).with_priority(2)))
     }
 }

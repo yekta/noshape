@@ -83,7 +83,7 @@ pub struct PointSprite {
     pub _pad: u32,
 }
 
-fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+pub(crate) fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
     let mut min = Vec3::splat(f32::INFINITY);
     let mut max = Vec3::splat(f32::NEG_INFINITY);
     let mut any = false;
@@ -235,13 +235,15 @@ pub struct Style {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            background_top: srgb(0x2b, 0x30, 0x3a),
-            background_bottom: srgb(0x16, 0x19, 0x1f),
-            hover_color: srgb(0x4c, 0xc9, 0xf0),
-            select_color: srgb(0xff, 0xb0, 0x20),
-            accent_color: srgb(0x9d, 0x7b, 0xff),
-            error_color: srgb(0xff, 0x45, 0x45),
-            edge_color: srgb(0x0e, 0x10, 0x14),
+            // Onshape: plain white viewport (`--os-background-primary`), no gradient.
+            background_top: srgb(0xff, 0xff, 0xff),
+            background_bottom: srgb(0xff, 0xff, 0xff),
+            // Onshape PRE_HIGHLIGHT / ENTITY_HIGHLIGHT / UI_HIGHLIGHT / ERROR_HIGHLIGHT.
+            hover_color: srgb(0xff, 0xc6, 0x85),
+            select_color: srgb(0xff, 0xa9, 0x0a),
+            accent_color: srgb(0xff, 0xc2, 0x0e),
+            error_color: srgb(0xbd, 0x30, 0x39),
+            edge_color: srgb(0x00, 0x00, 0x00),
             show_edges: true,
             msaa: 4,
         }
@@ -270,6 +272,9 @@ pub struct Scene {
     /// Indexed by pick id; see [`state`].
     pub states: Vec<u32>,
     pub clip: Option<ClipPlane>,
+    /// Up to two more section planes (with `clip`): geometry is removed
+    /// where all planes clip it.
+    pub clip_extra: Vec<ClipPlane>,
 }
 
 impl Scene {
@@ -291,6 +296,33 @@ impl Scene {
         for s in &mut self.states {
             *s &= !flag;
         }
+    }
+
+    /// Whether rendering `other` would produce the same image (same GPU
+    /// buffers, instance parameters, states and clipping). Cheap: compares
+    /// handles by pointer, not geometry.
+    pub fn same_as(&self, other: &Scene) -> bool {
+        self.clip == other.clip
+            && self.clip_extra == other.clip_extra
+            && self.states == other.states
+            && self.instances.len() == other.instances.len()
+            && self.instances.iter().zip(&other.instances).all(|(a, b)| {
+                let same_drawable = match (&a.drawable, &b.drawable) {
+                    (Drawable::Mesh(x), Drawable::Mesh(y)) => Arc::ptr_eq(&x.0, &y.0),
+                    (Drawable::Lines(x), Drawable::Lines(y)) => Arc::ptr_eq(&x.0, &y.0),
+                    (Drawable::Points(x), Drawable::Points(y)) => Arc::ptr_eq(&x.0, &y.0),
+                    _ => false,
+                };
+                same_drawable
+                    && a.transform == b.transform
+                    && a.color == b.color
+                    && a.color_mode == b.color_mode
+                    && a.pickable == b.pickable
+                    && a.ignore_clip == b.ignore_clip
+                    && a.layer == b.layer
+                    && a.pick_only == b.pick_only
+                    && a.pick_base == b.pick_base
+            })
     }
 
     /// World-space bounds of all instances.

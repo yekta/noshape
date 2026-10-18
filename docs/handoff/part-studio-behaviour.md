@@ -33,6 +33,16 @@ continues.
 | Scene builder | `scene_builder.rs`: `SceneOptions.section: Vec<(n, d)>`, `vertex_colors`, `hidden_edges_visible`; `DisplayMode::Translucent`; colored-mesh and hidden-edge caches in `GpuCache` |
 | App | `part_studio/behaviors.rs` (`UiState`, picking, hide/isolate, select other, S toolbar, camera history, feature-list ops, auto Add/Remove, sketch copy/paste/export, dynamic suppression editor, Select ▸ and Create selection, selection badge), `view_cube.rs`, `section.rs`, `appearance.rs`, `analysis.rs`, `menus.rs` (graphics-area context menu), `mod.rs` (feature/parts list, actions), `view_tools.rs` (palette, shortcut sheet, named views), `config_panel.rs` (Appearance panel variant, variable hover), `feature_dialog.rs` (field behaviours), `actions.rs` (bindings), `viewport.rs` (zoom window, double middle-click, BoxSelect modifiers, `pointer_inside()`) |
 
+## Live Onshape reference
+
+A live-reference agent is capturing real Onshape into
+`/root/onshape-research/live/` (screenshots plus `behaviours.md`). When
+`behaviours.md` lands, check every parity item against it and fix
+differences. For your own checks, the credentials are in
+`/root/.config/noshape/onshape.env`. Use Chrome `/usr/bin/google-chrome`
+with the profile `/root/live-pw/profile`. Never print or commit the
+credentials.
+
 ## Remaining items (priority order) with notes
 
 1. **9.11 tangent edges.** Hidden edges visible and Translucent are done
@@ -45,49 +55,19 @@ continues.
    `feature_dialog.rs`.
 (6.25, 6.26, 7.6, 7.7, 1.25 and 1.27 are done.)
 
-7. **11.5 mass properties.** Add a Face tab (area/perimeter of selected
-   faces; kernel `area()`, edge lengths) and Override mass (use
-   `PartProperties.mass_override` in the mass rows in `menus.rs`). Reference
-   mate connector: transform the inertia by parallel axis.
-8. **6.38 nested folders.** Add `Folder.parent: Option<u32>` (serde
-   default). `new_folder` inside a folder sets the parent. Render with depth
-   indentation; a collapsed ancestor hides its descendants.
-9. **10.6 / 2.23 transparent geometry.** Add a "Select transparent geometry"
-   checkbox to the isolate panel (`render_isolate_panel`). When it's off, or
-   when Alt is held on click, re-pick via
-   `interaction::entities_along_ray` skipping the transparent bodies (see
-   `select_other` for the ray setup). For Expand by distance, sort bodies by
-   bounds distance and make the first N opaque.
-10. **11.3 measure graphics.** Draw a dotted line between the min-distance
-    points as an extra `Instance` in `refresh_scene` (see
-    `manipulator_overlay`). Add a type dropdown that filters
-    `measure_cache` rows.
-11. **3.10 midpoints.** While hovering an edge, draw a point at the polyline
-    midpoint (overlay points). A click within about 8 px of its projection
-    picks `Reference::Implicit { on: edge, inference: Midpoint }`. Check that
-    `measure`/plane features resolve `Implicit`.
-12. **9.15 rotation inertia and pivot.**
-    - Inertia: in `viewport.rs`, keep the last orbit delta. On right-button
-      up with recent motion, keep orbiting with ×0.77 per frame via
-      `request_animation_frame`.
-    - Pivot: add `pub orbit_pivot: Option<DVec3>` set by the Part Studio on
-      right-down (ray hit) and use `camera.orbit_around`.
-    - Keep these viewport edits surgical; QA works there.
-13. **5.25 preview opacity slider.** Regenerate `upto = index` (cheap, it's
-    cached) into `preview_before`. In `display_for_scene`, merge the
-    "before" bodies (alpha 1−s) with the "after" bodies (alpha s). Put the
-    slider in the dialog footer and emit a new `DialogEvent`.
-14. **5.27 movable dialog and help.**
-    - Moving: `on_drag` on the dialog title, plus an `on_drag_move` listener
-      on the Part Studio root that updates `ui.dialog_pos`. Record the
-      overlay container origin with a canvas, like `cube_origin`.
-    - Help: the "?" can show `FeatureType.description`.
-15. **5.29 tolerances.** For `Hints::CAN_BE_TOLERANT` numeric fields, add a
-    ± button and store `"<id>.tolerance"` as `ParamValue::Text` JSON (type,
-    upper, lower, precision). Show an inline row with upper/lower inputs.
-16. **5.32 more manipulators.** Use the extrude/revolve pattern in
-    `manipulators.rs` for fillet radius, chamfer distance, shell thickness
-    and plane offset.
+(11.5, 6.38, 10.6 and 2.23 are done.)
+
+(11.3 and 3.10 are done.)
+
+(9.15 is done: `viewport.rs` `orbit_pivot_fn`, inertia in `render`.)
+
+(5.25 preview slider, 5.29 tolerances, 5.27 dialog moving and help are
+done. Dialog resizing remains: add a corner handle with `on_drag` and an
+`on_drag_move` on `viewport-area` like `DialogMove`, storing a width/height
+in `UiState` and passing it to the dialog.)
+
+(5.32 done: `manipulators.rs` `param_arrow`; consumed geometry uses `ui.before_context`.)
+
 17. **6.24 remainder.** Show dimensions needs sketch dims outside edit mode,
     and Create drawing of sketch needs drawing-model support.
 18. **10.8 remainder.** Section drag manipulator (reuse the
