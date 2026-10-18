@@ -30,7 +30,7 @@ pub(super) enum PaletteItem {
 }
 
 impl PartStudioView {
-    pub(super) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools…"));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {

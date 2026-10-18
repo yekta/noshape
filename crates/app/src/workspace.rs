@@ -506,6 +506,12 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
+            // Tool search from anywhere in the window (e.g. after clicking the tab bar).
+            .on_action(cx.listener(|this, _: &SearchTools, window, cx| {
+                if let Some(s) = this.active_studio() {
+                    s.update(cx, |s, cx| s.open_palette(window, cx));
+                }
+            }))
             .child(title)
             .child(
                 h_flex()
