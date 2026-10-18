@@ -65,6 +65,7 @@ impl PartStudioView {
         let body = target_ref.as_ref().and_then(|r| self.owning_body(r));
         let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r));
         let creator_name = creator.and_then(|id| self.studio(cx).and_then(|s| s.feature(id)).map(|f| f.name.clone()));
+        let sheet_metal = body.as_ref().is_some_and(|b| self.context.as_ref().is_some_and(|c| c.sheet_metal.contains_key(b)));
         let menu = PopupMenu::build(window, cx, move |mut m, _window, _cx| {
             let v = view.clone();
             let item = |label: &str, f: Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>| {
@@ -141,6 +142,12 @@ impl PartStudioView {
                 m = m.item(item("Hide part", Box::new(move |this, _, cx| this.set_part_hidden(&b2, true, cx))));
                 let b3 = b.clone();
                 m = m.item(item("Isolate", Box::new(move |this, _, cx| this.isolate_part(&b3, cx))));
+                if sheet_metal {
+                    let b5 = b.clone();
+                    m = m.item(item("Export flat pattern (DXF)…", Box::new(move |this, w, cx| this.export_flat(b5.clone(), "dxf", w, cx))));
+                    let b6 = b.clone();
+                    m = m.item(item("Export flat pattern (SVG)…", Box::new(move |this, w, cx| this.export_flat(b6.clone(), "svg", w, cx))));
+                }
                 let b4 = b.clone();
                 m = m.item(item("Mass properties", Box::new(move |this, _, cx| {
                     this.selection = vec![Reference::Body(b4.clone())];
@@ -279,6 +286,31 @@ impl PartStudioView {
                     v.update(cx, |this, cx| this.edit_part_props(&b2, "Rename part", cx, |p| p.name = Some(n.clone()).filter(|s| !s.trim().is_empty())));
                     true
                 })
+        });
+    }
+
+    pub(super) fn export_flat(&mut self, body: BodyId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(ctx) = self.context.clone() else { return };
+        let geometry = match noshape_model::sheetmetal::flat_pattern_for(&ctx, &body) {
+            Ok(f) => f.to_sheet_geometry(),
+            Err(e) => {
+                self.message = Some((noshape_model::display::FeatureStatus::Error, e));
+                cx.notify();
+                return;
+            }
+        };
+        let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_else(|| "flat".into());
+        let view = cx.entity();
+        crate::files::request_save_path("Export flat pattern", format!("{name} flat.{ext}"), ext, window, cx, move |path, cx| {
+            let bytes = if ext == "dxf" { noshape_model::drawing::export::to_dxf(&geometry).into_bytes() } else { noshape_model::drawing::export::to_svg(&geometry).into_bytes() };
+            let msg = match std::fs::write(&path, bytes) {
+                Ok(()) => (noshape_model::display::FeatureStatus::Info, format!("Exported {}", path.display())),
+                Err(e) => (noshape_model::display::FeatureStatus::Error, format!("Export failed: {e}")),
+            };
+            view.update(cx, |this, cx| {
+                this.message = Some(msg);
+                cx.notify();
+            });
         });
     }
 

@@ -48,6 +48,7 @@ const TOOLBAR: &[&[&[&str]]] = &[
     &[&["offsetSurface", "fill", "extendSurface", "boundarySurface", "ruledSurface", "mutualTrim", "constrainedSurface", "wrap"]],
     &[&["sheetMetalStart", "sheetMetalFlange", "sheetMetalHem", "sheetMetalTab", "sheetMetalBend", "sheetMetalJog", "sheetMetalFormed", "sheetMetalMakeJoint", "sheetMetalJoint", "sheetMetalCorner", "sheetMetalBendRelief", "sheetMetalCornerBreak", "sheetMetalEnd"]],
     &[&["frame", "frameTrim", "gusset", "endcap", "cutlist", "tag"]],
+    &[&["importDerived"]],
     &[&["assignVariable", "queryVariable"]],
 ];
 
@@ -157,8 +158,12 @@ impl PartStudioView {
             DocEvent::TabChanged(t) if *t == this.tab => this.schedule_regen(window, cx),
             DocEvent::TabChanged(t) => {
                 // Variable Studio edits affect every Part Studio.
-                let is_vars = matches!(this.doc.read(cx).session.doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
-                if is_vars {
+                let doc = &this.doc.read(cx).session.doc;
+                let is_vars = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
+                // A changed Part Studio may be the source of our Derived features.
+                let is_source = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::PartStudio(_)))
+                    && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id == "importDerived" && f.params.text("partStudio") == t.to_string()));
+                if is_vars || is_source {
                     this.schedule_regen(window, cx);
                 }
             }
@@ -244,6 +249,8 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units.clone();
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
+        let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
+        let derived2 = derived.clone();
         let regen = self.regen.clone();
         let regen2 = self.regen.clone();
         self.regen_seq += 1;
@@ -255,7 +262,7 @@ impl PartStudioView {
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, derived: Some(derived), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
@@ -275,7 +282,7 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, ..Default::default() };
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, derived: Some(derived2), ..Default::default() };
                         regen2.lock().regenerate(&studio, &config, &units, &opts)
                     })
                     .await;
@@ -485,7 +492,23 @@ impl PartStudioView {
     fn open_dialog(&mut self, feature: Feature, index: usize, is_new: bool, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units.clone();
         let labeler = self.labeler(cx);
+        let is_derived = feature.type_id == "importDerived";
         let dialog = cx.new(|cx| FeatureDialog::new(feature, is_new, units, labeler, cx));
+        if is_derived {
+            let provider = self.doc.read(cx).derived_provider();
+            let doc = self.doc.read(cx).session.doc.clone();
+            let me = self.tab.to_string();
+            let sources: Vec<crate::feature_dialog::DerivedSource> = crate::derived::DocStudios::sources(&doc)
+                .into_iter()
+                .filter(|(id, _)| *id != me)
+                .map(|(id, name)| {
+                    use noshape_model::regen::derived::DerivedProvider as _;
+                    let parts = provider.context(&id).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
+                    crate::feature_dialog::DerivedSource { tab: id, name, parts }
+                })
+                .collect();
+            dialog.update(cx, |d, _| d.derived_sources = sources);
+        }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
             DialogEvent::Changed => {
                 this.schedule_regen(window, cx);

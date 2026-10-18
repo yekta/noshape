@@ -70,6 +70,8 @@ pub struct EvalCtx<'a> {
     pub warnings: Vec<String>,
     /// Sketch being edited (for display of constraint states).
     pub editing_sketch: Option<FeatureId>,
+    /// Other Part Studios of the document (for Derived).
+    pub derived: Option<std::sync::Arc<dyn super::derived::DerivedProvider>>,
     /// Every feature of the Part Studio in list order (empty outside a
     /// Part Studio regeneration).
     pub features: &'a [EffectiveFeature],
@@ -159,7 +161,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, features: &[], xform: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None }
     }
 
     // ------------------------------------------------------------ pattern transform

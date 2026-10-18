@@ -9,6 +9,7 @@
 //! cached per shape, so unchanged bodies are never re-meshed.
 
 pub mod context;
+pub mod derived;
 mod display;
 pub mod eval;
 pub mod features;
@@ -41,11 +42,13 @@ pub struct RegenOptions {
     pub document_variables: BTreeMap<String, Quantity>,
     /// Coarse meshes for immediate feedback; a later `Final` pass refines.
     pub preview_meshes: bool,
+    /// Access to other Part Studios of the document (Derived features).
+    pub derived: Option<std::sync::Arc<dyn derived::DerivedProvider>>,
 }
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None }
     }
 }
 
@@ -119,6 +122,12 @@ impl Regenerator {
             let (params, suppressed) = (&effective[i].params, effective[i].suppressed);
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
+            // Derived features depend on another Part Studio's state.
+            if f.type_id == "importDerived"
+                && let Some(p) = &opts.derived
+            {
+                key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
+            }
             live.push(f.id);
             if i >= upto {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0 });
@@ -148,6 +157,7 @@ impl Regenerator {
                         let mut ev = EvalCtx::new(f.id, &f.name, params, units, (*ctx).clone(), &outer_vars);
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = &effective;
+                        ev.derived = opts.derived.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eval_fn(&mut ev)));
                         match result {
                             Ok(Ok(())) => {

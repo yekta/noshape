@@ -10,8 +10,52 @@ use noshape_kernel::ShapeType;
 
 // TODO(app): Derived needs another Part Studio's regenerated context. The app
 // should resolve `partStudio` and hand the imported bodies to regeneration.
-pub fn import_derived(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Derived parts are resolved by the application from the source Part Studio; this build can't evaluate them inside the Part Studio yet")
+pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
+    let tab = ev.params.text("partStudio").trim().to_string();
+    if tab.is_empty() {
+        return err("Select a Part Studio to derive from");
+    }
+    let Some(provider) = ev.derived.clone() else {
+        return err("Derived parts are not available in this context");
+    };
+    let Some(src) = provider.context(&tab) else {
+        return err("The source Part Studio could not be regenerated (deleted, or a circular reference)");
+    };
+    // Selected source parts (BodyIds of the source studio); empty = all parts.
+    let wanted: Vec<crate::reference::BodyId> = ev
+        .query("parts")
+        .iter()
+        .filter_map(|r| match r {
+            crate::reference::Reference::Body(b) => Some(b.clone()),
+            _ => None,
+        })
+        .collect();
+    let mut n = 0u32;
+    for b in &src.bodies {
+        if !wanted.is_empty() && !wanted.contains(&b.id) {
+            continue;
+        }
+        // Keep the source's persistent names so references into derived
+        // geometry follow the source's edits.
+        let id = crate::reference::BodyId { feature: ev.feature, index: n };
+        n += 1;
+        let color = ev.ctx.alloc_color();
+        let body = crate::regen::context::Body::new(id, b.name.clone(), b.kind, b.shape.clone(), b.faces.clone(), color, ev.feature);
+        ev.ctx.bodies.push(std::sync::Arc::new(body));
+    }
+    if ev.bool("includeMateConnectors") {
+        for c in &src.connectors {
+            let mut c = c.clone();
+            if let crate::reference::Reference::MateConnector { index, .. } = c.reference {
+                c.reference = crate::reference::Reference::MateConnector { feature: ev.feature, index };
+            }
+            ev.ctx.connectors.push(c);
+        }
+    }
+    if n == 0 {
+        return err("The selected parts no longer exist in the source Part Studio");
+    }
+    Ok(())
 }
 
 pub fn derived_mirror(_ev: &mut EvalCtx) -> FResult<()> {

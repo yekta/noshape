@@ -105,7 +105,8 @@ impl PartStudioView {
         let result = {
             let mut regen = self.regen.lock();
             let document_variables = noshape_model::variables::document_variables(&self.doc.read(cx).session.doc);
-            regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, ..Default::default() })
+            let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
+            regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, derived: Some(derived), ..Default::default() })
         };
         self.regenerating = false;
         self.regen_task = None;

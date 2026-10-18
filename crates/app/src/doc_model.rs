@@ -21,13 +21,20 @@ pub enum DocEvent {
 
 pub struct DocModel {
     pub session: Session,
+    /// Regeneration caches of Part Studios used as Derived sources.
+    pub studio_cache: crate::derived::StudioCache,
 }
 
 impl EventEmitter<DocEvent> for DocModel {}
 
 impl DocModel {
     pub fn new(session: Session) -> Self {
-        Self { session }
+        Self { session, studio_cache: Default::default() }
+    }
+
+    /// Provider giving Derived features access to the other Part Studios.
+    pub fn derived_provider(&self) -> std::sync::Arc<crate::derived::DocStudios> {
+        crate::derived::DocStudios::new(self.session.doc.clone(), self.studio_cache.clone())
     }
 
     pub fn name(&self) -> String {

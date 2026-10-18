@@ -5,6 +5,7 @@ mod assembly_mate_dialog;
 mod assembly_scene;
 mod assembly_view;
 mod assets;
+mod derived;
 mod doc_model;
 mod drawing_scene;
 mod drawing_tools;

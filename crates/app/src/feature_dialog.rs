@@ -34,6 +34,14 @@ pub enum DialogEvent {
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
 
+/// A Part Studio that can be used as a Derived source, with its parts.
+#[derive(Clone, Debug)]
+pub struct DerivedSource {
+    pub tab: String,
+    pub name: String,
+    pub parts: Vec<(noshape_model::BodyId, String)>,
+}
+
 pub struct FeatureDialog {
     pub feature: Feature,
     pub ty: &'static FeatureType,
@@ -48,6 +56,8 @@ pub struct FeatureDialog {
     collapsed_groups: std::collections::HashSet<String>,
     focus: FocusHandle,
     renaming: Option<Entity<InputState>>,
+    /// Sources offered by the Derived feature's Part Studio picker.
+    pub derived_sources: Vec<DerivedSource>,
 }
 
 impl EventEmitter<DialogEvent> for FeatureDialog {}
@@ -82,6 +92,7 @@ impl FeatureDialog {
             collapsed_groups: Default::default(),
             focus: cx.focus_handle(),
             renaming: None,
+            derived_sources: Vec::new(),
         };
         d.active_query = d.first_visible_query();
         d
@@ -484,6 +495,7 @@ impl FeatureDialog {
                     row.child(div().flex_1().child(dd)).children(flips).into_any_element()
                 }
             }
+            ParamKind::Text { .. } if s.id == "partStudio" && self.ty.id == "importDerived" => self.render_derived_picker(cx),
             ParamKind::Num(_) | ParamKind::Text { .. } => {
                 let e = self.render_inline_value(s, path, values, window, cx)?;
                 h_flex().gap_2().w_full().child(div().w(px(96.)).flex_none().child(label_el(s.label))).child(div().flex_1().child(e)).children(flips).into_any_element()
@@ -680,6 +692,85 @@ impl FeatureDialog {
             }
         };
         Some(el)
+    }
+
+    /// Part Studio picker and part checklist for Derived.
+    fn render_derived_picker(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let current = self.feature.params.text("partStudio").to_string();
+        let selected_parts: Vec<noshape_model::BodyId> = self.feature.params.query("parts").iter().filter_map(|r| match r {
+            Reference::Body(b) => Some(b.clone()),
+            _ => None,
+        }).collect();
+        let sources = self.derived_sources.clone();
+        let label = sources.iter().find(|s| s.tab == current).map(|s| s.name.clone()).unwrap_or_else(|| "Select a Part Studio".into());
+        let view = cx.entity();
+        let picker = Button::new("derived-src")
+            .label(label)
+            .outline()
+            .small()
+            .dropdown_caret(true)
+            .dropdown_menu({
+                let sources = sources.clone();
+                move |mut m, _, _| {
+                    if sources.is_empty() {
+                        m = m.label("No other Part Studios in this document");
+                    }
+                    for s in &sources {
+                        let v = view.clone();
+                        let tab = s.tab.clone();
+                        m = m.item(gpui_kit::component::menu::PopupMenuItem::new(s.name.clone()).on_click(move |_, _, cx| {
+                            v.update(cx, |this, cx| {
+                                this.feature.params.set("parts", ParamValue::Query(Vec::new()));
+                                this.set_value("partStudio", ParamValue::Text(tab.clone()), cx);
+                            })
+                        }));
+                    }
+                    m
+                }
+            });
+        let parts = sources.iter().find(|s| s.tab == current).map(|s| s.parts.clone()).unwrap_or_default();
+        let checks: Vec<AnyElement> = parts
+            .into_iter()
+            .map(|(id, name)| {
+                let on = selected_parts.is_empty() || selected_parts.contains(&id);
+                let id2 = id.clone();
+                gpui_kit::component::checkbox::Checkbox::new(SharedString::from(format!("dp-{id}")))
+                    .label(name)
+                    .checked(on)
+                    .small()
+                    .on_click(cx.listener(move |this, v: &bool, _, cx| {
+                        let all: Vec<noshape_model::BodyId> = this
+                            .derived_sources
+                            .iter()
+                            .find(|s| s.tab == this.feature.params.text("partStudio"))
+                            .map(|s| s.parts.iter().map(|p| p.0.clone()).collect())
+                            .unwrap_or_default();
+                        let mut sel: Vec<noshape_model::BodyId> = this.feature.params.query("parts").iter().filter_map(|r| match r {
+                            Reference::Body(b) => Some(b.clone()),
+                            _ => None,
+                        }).collect();
+                        if sel.is_empty() {
+                            sel = all.clone();
+                        }
+                        sel.retain(|b| *b != id2);
+                        if *v {
+                            sel.push(id2.clone());
+                        }
+                        // All selected is stored as "all parts" (empty).
+                        let q = if sel.len() == all.len() { Vec::new() } else { sel.into_iter().map(Reference::Body).collect() };
+                        this.set_value("parts", ParamValue::Query(q), cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        v_flex()
+            .gap_1p5()
+            .w_full()
+            .child(div().text_xs().text_color(pal.text_muted).child("Part Studio"))
+            .child(picker)
+            .children(checks)
+            .into_any_element()
     }
 
     /// Input element for a numeric or text value.
