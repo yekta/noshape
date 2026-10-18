@@ -342,7 +342,19 @@ impl Workspace {
         };
         let ws = cx.entity();
         let tab = view.read(cx).tab;
-        crate::files::request_open_path("Import CAD file", "CAD files", &["step", "stp", "iges", "igs", "brep"], window, cx, move |path, cx| {
+        // Mesh files carry no unit: read them in the document's length unit.
+        let mesh_unit = {
+            use noshape_kernel::LengthUnit as K;
+            use noshape_units::LengthUnit as U;
+            match self.doc.read(cx).session.doc.settings.units.length {
+                U::Centimeter => K::Centimeter,
+                U::Meter => K::Meter,
+                U::Inch => K::Inch,
+                U::Foot | U::Yard => K::Foot,
+                _ => K::Millimeter,
+            }
+        };
+        crate::files::request_open_path("Import CAD file", "CAD and mesh files", &["step", "stp", "iges", "igs", "brep", "stl", "obj"], window, cx, move |path, cx| {
             let result = (|| -> anyhow::Result<String> {
                 use noshape_kernel as k;
                 let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
@@ -353,6 +365,8 @@ impl Workspace {
                     }
                     "iges" | "igs" => k::read_iges(&path, k::LengthUnit::Meter)?,
                     "brep" => k::read_brep(&path)?,
+                    // Small meshes get coplanar triangles merged into faces.
+                    "stl" | "obj" => k::read_mesh(&path, mesh_unit, 20_000)?,
                     other => anyhow::bail!("Unsupported file type .{other}"),
                 };
                 Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())

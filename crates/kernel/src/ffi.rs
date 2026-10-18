@@ -457,6 +457,7 @@ pub(crate) mod ffi {
             path: &str,
         ) -> Result<()>;
         fn read_iges(path: &str) -> Result<UniquePtr<OcShape>>;
+        fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
         fn write_iges(shapes: &OcShapeList, path: &str) -> Result<()>;
 
         // ---- HLR

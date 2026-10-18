@@ -119,6 +119,16 @@ pub fn read_iges(path: &Path, unit: LengthUnit) -> Result<Shape> {
     scaled(&s, 1.0 / unit.mm_per_unit())
 }
 
+/// Read an STL (ASCII or binary) or OBJ mesh whose coordinates are in
+/// `file_unit` (mesh files carry no unit) as a shape in meters: one
+/// planar face per triangle in a connected shell (a solid when closed).
+/// Meshes with at most `merge_limit` triangles get coplanar neighbours
+/// merged into larger faces.
+pub fn read_mesh(path: &Path, file_unit: LengthUnit, merge_limit: u32) -> Result<Shape> {
+    let s = Shape::from_res(ffi::read_mesh(path_str(path)?, merge_limit))?;
+    scaled(&s, file_unit.mm_per_unit() * 1e-3)
+}
+
 /// Write shapes to an IGES (BRep mode) file in millimeters.
 pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()> {
     let f = unit.mm_per_unit();

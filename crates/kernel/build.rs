@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 /// Derived from `lib/cmake/opencascade/*Targets.cmake` INTERFACE_LINK_LIBRARIES.
 const OCCT_LIBS: &[&str] = &[
     // Data exchange
+    "TKDEOBJ",
+    "TKDESTL",
+    "TKRWMesh",
     "TKDESTEP",
     "TKDEIGES",
     "TKXCAF",
@@ -59,6 +62,7 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/boolean.cpp",
     "cpp/mesh.cpp",
     "cpp/io.cpp",
+    "cpp/mesh_io.cpp",
     "cpp/hlr.cpp",
 ];
 

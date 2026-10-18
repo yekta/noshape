@@ -229,6 +229,7 @@ pub struct ExportShape   { shape, name: Option<String>, color: Option<[f32;3]> }
 fn read_step(&Path, LengthUnit) -> Result<Vec<ImportedShape>>;   // XCAF names/colors, assemblies flattened
 fn write_step(&Path, &[ExportShape], LengthUnit) -> Result<()>;  fn write_step_shapes(&Path, &[Shape], LengthUnit);
 fn read_iges(&Path, LengthUnit) -> Result<Shape>;  fn write_iges(&Path, &[Shape], LengthUnit);
+fn read_mesh(&Path, file_unit: LengthUnit, merge_limit: u32) -> Result<Shape>;  // STL/OBJ: triangle faces in one connected shell (solid if closed), coplanar faces merged when <= merge_limit triangles; coordinates in file_unit, returned in meters
 fn write_stl(&Shape, &Path, deflection, StlFormat{Binary, Ascii});  fn write_stl_mesh(&Tessellation, &Path, StlFormat);
 fn write_obj(&Shape, &Path, deflection);  fn write_obj_mesh(&Tessellation, &Path);
 fn write_brep(&Shape, &Path); fn read_brep(&Path) -> Result<Shape>;
