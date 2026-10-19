@@ -55,6 +55,8 @@ pub enum ParamKindFs {
     /// `definition.x is LookupTablePath` with a "Lookup Table" annotation:
     /// the table registered under `table` (see `hole_tables::DynLevel`).
     Lookup { table: &'static str },
+    /// `definition.x is TableData` (and the other reference types).
+    Reference { kind: crate::params::ReferenceKind },
     /// `isAnything(definition.x)` and other parameters without a UI.
     Anything,
 }
@@ -549,6 +551,19 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, roots: &[&st
                 "Query" => ParamKindFs::Query { filter: filter_of(a.get("Filter")), max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize) },
                 // Feature pattern's "Features to pattern".
                 "FeatureList" => ParamKindFs::Query { filter: QueryFilter::FEATURE, max_picks: None },
+                "TableData" | "ImageData" | "JSONData" | "TextData" | "PartStudioData" | "VariableStudioData" | "CADImportData" => {
+                    use crate::params::ReferenceKind as K;
+                    let kind = match &*q.name {
+                        "TableData" => K::Csv,
+                        "ImageData" => K::Image,
+                        "JSONData" => K::Json,
+                        "TextData" => K::Text,
+                        "PartStudioData" => K::PartStudio,
+                        "VariableStudioData" => K::VariableStudio,
+                        _ => K::CadImport,
+                    };
+                    ParamKindFs::Reference { kind }
+                }
                 "LookupTablePath" => {
                     let Some(annot::Ann::Value(table)) = a.get("Lookup Table") else { return None };
                     let level = dyn_level(table)?;
@@ -724,6 +739,7 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
             }
         }
         ParamKindFs::Lookup { table } => ParamSpec::lookup(id, label, table),
+        ParamKindFs::Reference { kind } => ParamSpec::reference(id, label, *kind),
         ParamKindFs::Anything => ParamSpec::text(id, label, "").hints(Hints::ALWAYS_HIDDEN),
     };
     let h = spec.hints | d.hints;

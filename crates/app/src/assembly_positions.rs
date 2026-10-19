@@ -481,6 +481,8 @@ impl AssemblyView {
                 .top(px(9.))
                 .left_0()
                 .right_0()
+                // Centered on the window (live), not the graphics area.
+                .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W }))
                 .flex()
                 .justify_center()
                 .child(crate::os_ui::message_bubble("np-toast", crate::os_ui::BubbleKind::Success, text, move |_, _, cx| {
@@ -614,7 +616,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.np_driver = None;
                                     cx.notify();

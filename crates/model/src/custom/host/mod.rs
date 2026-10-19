@@ -91,6 +91,8 @@ pub struct CtxState {
     /// also "created by" the creators of each merged body and by the
     /// merging operation (std query.fs, qCreatedBy).
     pub merged_creators: HashMap<BodyId, Vec<FsId>>,
+    /// The operation that created each body (exact, see `body_creator`).
+    pub body_ops: HashMap<BodyId, FsId>,
     used_ids: HashSet<FsId>,
     next_seq: u32,
     /// Feature status per id (`@functionReportFeatureStatus`).
@@ -146,6 +148,7 @@ impl FsContext {
                 transient_of: HashMap::new(),
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
+                body_ops: HashMap::new(),
                 used_ids: HashSet::new(),
                 next_seq: 1,
                 status: HashMap::new(),
@@ -210,7 +213,11 @@ impl CtxState {
     pub fn body_creator(&self, id: &BodyId) -> Option<FsId> {
         if id.feature == self.feature {
             // Operation bodies carry the operation's marker bits.
-            if let Some(op) = self.ops.iter().find(|(m, _)| ((m.0 >> 20) as u32 & 0xFFFF_F000) == (id.index & 0xFFFF_F000)) {
+            // Bodies an operation created are recorded when renamed.
+            if let Some(op) = self.body_ops.get(id) {
+                return Some(op.clone());
+            }
+            if let Some(op) = self.ops.iter().find(|(m, _)| marker_bits(**m) == (id.index & 0xFFFF_F000)) {
                 return Some(op.1.id.clone());
             }
         }
@@ -288,8 +295,19 @@ fn wrap_body_id(id: &BodyId, marker: FeatureId, feature: FeatureId) -> BodyId {
     if id.feature != marker {
         return id.clone();
     }
-    let h = (marker.0 >> 20) as u32 & 0xFFFF_F000;
-    BodyId { feature, index: h | (id.index & 0xFFF) }
+    BodyId { feature, index: marker_bits(marker) | (id.index & 0xFFF) }
+}
+
+/// 20 well-mixed bits of an operation's marker for its bodies' indices
+/// (FNV-1a's high bits hardly change between ids that differ only at the
+/// end, like `id + "a"` / `id + "b"`).
+fn marker_bits(marker: FeatureId) -> u32 {
+    // splitmix64 finalizer.
+    let mut z = marker.0;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^= z >> 31;
+    ((z >> 44) as u32) << 12
 }
 
 /// After an operation: give everything it created names of the custom
@@ -371,7 +389,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
     let mut ctx = ev.ctx;
     match r {
         Ok(v) => {
+            let created: Vec<BodyId> = ctx.bodies.iter().filter(|b| b.id.feature == marker).map(|b| wrap_body_id(&b.id, marker, st.feature)).collect();
             rename_created(&mut ctx, marker, st.feature);
+            for b in created {
+                st.body_ops.insert(b, id.to_vec());
+            }
             st.ctx = ctx;
             for w in warnings {
                 let s = status::status_map("WARNING", "CUSTOM_ERROR", Some(&w));

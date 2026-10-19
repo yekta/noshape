@@ -490,6 +490,7 @@ pub(crate) mod ffi {
         fn rhino_valid_breps(path: &str) -> Result<u32>;
         fn write_jt(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
         fn write_pvz(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
+        fn read_pvz(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
 
         // ---- surfacing (wrap, isocline, surface fitting)
         fn op_wrap_faces(faces: &OcShapeList, src: &DevSurf, dst: &DevSurf, xf: &[f64], tol: f64) -> Result<OpOut>;

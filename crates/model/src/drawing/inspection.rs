@@ -242,7 +242,7 @@ mod tests {
         s.annotations.push(Annotation { id: 1, ..lin(Tolerance::Symmetric { value: 0.0001 }) });
         s.annotations.push(Annotation { id: 2, ..lin(Tolerance::Basic) });
         s.annotations.push(Annotation { id: 3, kind: AnnotationKind::note("N", 3.5), ..Default::default() });
-        s.annotations.push(Annotation { id: 4, kind: AnnotationKind::Balloon { view: ViewId(1), anchor: [0.0, 0.0], text: "1".into() }, ..Default::default() });
+        s.annotations.push(Annotation { id: 4, kind: AnnotationKind::balloon(ViewId(1), [0.0, 0.0], "1"), ..Default::default() });
         assert_eq!(d.auto_inspection(Scope::Drawing), 2);
         let nums: Vec<Option<u32>> = d.sheets[0].annotations.iter().map(|a| a.inspection).collect();
         assert_eq!(nums, vec![Some(1), None, None, Some(2)]);

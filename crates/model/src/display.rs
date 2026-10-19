@@ -102,6 +102,17 @@ pub struct BodyDisplay {
     pub edge_refs: Vec<Reference>,
     pub vertex_refs: Vec<Reference>,
     pub bounds: Option<(DVec3, DVec3)>,
+    /// A Composite part: its members and whether it is closed.
+    pub composite: Option<CompositeInfo>,
+}
+
+/// A Composite part's members (Help PartStudio__composite_part). An open
+/// composite keeps them as parts of their own (its body is not drawn: the
+/// members are); a closed one consumed them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompositeInfo {
+    pub members: Vec<BodyId>,
+    pub closed: bool,
 }
 
 /// Constraint state of a sketch entity (drives color).

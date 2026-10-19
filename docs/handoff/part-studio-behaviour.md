@@ -260,6 +260,147 @@ the help docs.
   `ReleaseItem`), Numbering schemes (sequential part numbers and the # buttons), Release
   management's Workflows section. Full material properties wait for
   live/dom/material-library-onshape-full.csv.
+- Sweep fixes (verified unless noted): parts fields take the part and show it **outlined**
+  (render state OUTLINE, verified) and select its parts-list row / cross-highlight its feature
+  (compiled); Tab stays inside feature dialogs (`.focus_trap`, compiled); a right-clicked
+  feature row and its geometry stay highlighted while its menu is open (`ui.list_menu`) and
+  Add appearance / Delete have their icons (compiled); a selection no longer pops the Measure
+  panel: the one-line readout sits left of the evaluation tools (`selection_readout`, live
+  part-studio/81, verified), the panel opens only with `[` / the button.
+- **Material panel** (ui pixel pass): fixed 280×368 flush with the graphics bottom, "?" at the
+  bottom right, 36×32 "+", picker 2/4 px insets; the open picker becomes the blue-bordered
+  search field over a rounded 200 px list of 44 px rows (current #b2ddf6), the note hidden
+  while open (live dom/dialog-assign-material*.txt, assign-material-03). Verified.
+- **Tool search**: non-feature commands (`view_tools::COMMANDS`, `PaletteItem::Command`):
+  "Assign material" (on the selected parts; nothing selected → info message). Not yet
+  confirmed live: REQUESTS.md "psb (10-19 f)" asks which commands Onshape's Part Studio
+  search lists; analysis tools stay out (live: not searchable).
+- Test `qa_regressions::new_hole_follows_document_units_and_table` now asserts the live
+  default (Inch tab, 1/4 = 6.35 mm, in mm and inch documents).
+- Verified: Tab stays in feature dialogs (order: fields, then ✓ ✕; checkboxes and selects are
+  not tab stops yet, unlike Onshape's DOM order), the right-clicked feature row highlight.
+- **Consumed picks** (live dialogs/fillet-02…04): a fillet's / chamfer's edges (and removed
+  faces) that the preview consumed are drawn orange from the model before the feature
+  (`consumed_picks_overlay`, cached in `ui.consumed_lines`). Verified.
+- skb's in-context round: (1) Measure no longer opens on Edit in context (panel only when
+  pinned); (2) Ctrl+Alt+V → `CreateVersion` handled in workspace.rs (Create version dialog);
+  (3) the pick pass draws unlit transparent meshes (planes) before lit see-through faces
+  (context bodies), so faces win (renderer.rs draw_lists); (4) **Composite part**: Closed
+  consumes the members (as before), open keeps them (`Body.composite` /
+  `BodyDisplay.composite: CompositeInfo { members, closed }`), the open composite's body has
+  an empty mesh in the Part Studio and is skipped when a whole Part Studio is inserted; inserted
+  alone it is tessellated from its shape. Parts list: a "Composite parts (N)" section
+  (composite-part icon). Tests: `qa_regressions::open_composite_keeps_its_members`,
+  features_b composite test updated. REQUESTS "psb (10-19 g)" asks live for the Part Studio
+  list layout.
+
+## Pass 7 (19 Oct, new psb after the quota handover)
+
+- Inherited half-done edits checked: `feature_dialog.rs` Tab stops (an `#[allow]` had slid onto the
+  wrong fn) and `behaviors.rs` doc comments (Measure's comment had moved onto `consumed_picks_overlay`):
+  fixed; everything compiles.
+- **Tab stops in feature dialogs** (live behaviours.md Extrude "Keyboard" + dom/dialog-extrude-new.txt):
+  `FeatureDialog::tab_stop(key)` hands out persistent `FocusHandle`s (`tab_stops` map) and
+  `tab_stop_element` makes a div focusable with the `#1651b0` ring (a `.focus()` style) and
+  Space (+ Enter for buttons) activation. Stops: checkboxes (`cb:<path>`), tolerance buttons (`tol:`),
+  mate connector axis flip / realign (`axisflip:` / `axisturn:`), `?` help; the trailing flip buttons
+  are gpui-kit `Button`s (tab stops by default); ✓ / ✕ are `tab_stop(false)`. gpui orders stops by
+  render order, which is the DOM order. **Shared dialog components untouched**: all of it lives in
+  feature_dialog.rs. Not yet verified in the app.
+- **Material library**: `material_data.rs` regenerated from live/dom/material-library-onshape-full.csv
+  (category + Poisson / Young / tensile yield / UTS / compressive yield / UCS, values as the CSV text,
+  which is what the panel shows). Generator: /tmp/psb/scripts/gen_materials.py (csv + the old list).
+  Document / added libraries map extra columns by header (`material_libraries::materials_of` now
+  returns the whole `MaterialLibrary`).
+- **Release dialog header** (bundle release-dialog.html): "1 item needs attention" / "N items need
+  attention" + red filter button (`list-error-filter` icon, ours), ⋯ (`more`) menu with **View audit
+  log** (JSON written to the temp dir and opened with `cx.open_url(file://…)`, like Onshape's new tab;
+  entries OBJECT_CREATED / TRANSITION_STARTED / TRANSITION_COMPLETED with ordinals in the help's
+  order). "View workflow" is not offered (template: only with a workflow definition). Package of a
+  review / draft kept in `ReleaseDialog.package`.
+- **Numbering schemes**: `model::release::{NumberingSchemes, NumberScheme, Propagation}` (+ tests),
+  config_dir/numbering_schemes.json via `release_dialog::{numbering_schemes, set_numbering_schemes,
+  next_number}`; `ReleaseLog.drawing_reuse` relaxes DuplicatePartNumber for a drawing + its part.
+  Preferences: `numbering_prefs.rs` (embedded in `ReleasePrefsView`, after Release management):
+  tabs, Number generation select, the flow chart, uniqueness radios, propagation select + note, Save
+  changes (current tab only, Next never goes down). Release dialog: header # "Generate missing part
+  numbers" (drawing shares its single shown part's number with reuse on), row # "Generate next part
+  number", Release name # "Generate next release name" (not obsoletions); icon `part-number` (ours).
+  Strings from the bundle. Unknown until live "psb (10-19 e)": other tabs' exact layout, default
+  prefixes (we start empty, Manual entry), propagation notes for One / All workspaces.
+- **Add Items › Other documents / versions** (`release_add_source.rs`, a child module of
+  release_dialog): Current document | Other documents tabs; title row with Create version… (this
+  document: `CreateVersion` action; other: opens its window) and Version graph (Main = workspace for
+  this document, versions newest first); Other documents = filters / Search or paste URL / document
+  list (same widget as asb's Insert), a picked document opens at its newest version. Items get
+  `ReleaseItem.document: Option<LinkedDocument>` (`same_object` compares it); released at that version
+  → listed as Released with its revision (`reverted`, reference only); release → our log + the linked
+  document's log gets the package at the linked version (`mark_linked_versions`). Pictures render from
+  the version snapshot (`thumb_groups`, `release_thumbs::key` includes the version). Edit properties /
+  Export are inert on linked rows for now. Titles / tooltips per bundle: "Add Items to Obsoletion",
+  "Add to Release…", "Add selected items to Release", "Cancel adding items and resume editing Release".
+
+Queue still open: verify all of the above in the app; tool search (live "psb (10-19 f)" pending);
+composite parts list layout (live "psb (10-19 g)" pending); everyday-modelling sweep.
+
+## Pass 8 (19 Oct, third psb after a quota handover)
+
+- Live answers: (e) release management is not on the Free account, so the release dialogs follow the
+  bundle + help; (f) tool search lists only tools, so Assign material is out (`COMMANDS` removed;
+  "Did you mean:" chips via `tool_synonyms.rs`); (g) the composite list matches live (Parts (N), then
+  "Composite parts (N)" collapsed, tooltip "(open|closed) (N parts)", row menu = part menu).
+- **⋯ › View workflow** (`release_workflow.rs`, child module `workflow` of release_dialog): the bundle
+  shows every candidate has a published workflow (`getPublishedWorkflow(e.workflowId)`), so the item is
+  always offered (not once discarded). Featherlight lightbox: solid #333 backdrop, white content with
+  25 px padding, ✕ 25 px top right, diagram max(w−300,800)×max(h−300,400); nodes 180×60 (+10 current),
+  4 px stroke in the node-type colour (initial #def1fb, inner #90cef1, good #aee28c, bad #dc777d), only
+  the current state filled, labels 12/500 (700 current), links 2 px #ccc with Onshape's arrow marker,
+  edge labels 12 px #555 on the path at 125 px. Default "Onshape Release" (Setup → Submit → Pending,
+  Setup/Pending → Release → Released, Pending → Reject → Rejected) laid out like help image
+  enterprise/custom-workflow-ex; obsoletion the same ending in Obsoleted. zoomToFit 95 %, wheel / drag /
+  double-click zoom like d3-zoom, nodes draggable. Rendered as SVG through gpui's svg renderer. Esc /
+  ✕ / backdrop click close only the lightbox (`release_dialog_modal` turns the modal's Esc off).
+- REQUESTS "psb (10-19 h)": where Tab goes after the dialog's `?` (live: "body"); our dialog keeps a
+  focus trap until answered.
+- The diagram is rasterised with **resvg 0.46** (new direct dependency of the app, same version gpui
+  uses; Cargo.lock gains one line) and its own fontdb holding the app's Roboto, because gpui's SVG
+  renderer only has system fonts (serif fallback). `release_workflow::rasterize`.
+- **Tab stops verified** in the app (Extrude: Depth → ± → Direction → Starting offset → Symmetric → Draft
+  → Second end position → Final → ?). Focus looks from the bundle CSS (`tab_stop_element(.., Focus)`):
+  checkbox box `#1651b0` border + 3 px `#769fcc` glow (`ui::os_checkbox_focused`, used by
+  feature_dialog only), icon buttons a 2 px blue bottom line (inset shadow), `?` a ring.
+- **⋯ menu** is deferred (anchored) so the table no longer paints over it.
+- **Add Items › Other documents**: `Source::load` now lists Onshape's versions incl. the root
+  "Start" (as asb's Insert `OtherDoc`), so a document without versions opens; `Source.changes` +
+  `render_changes` = "N changes since the last version." / "Create a version in <doc>."; "No <type>
+  available." for an empty version. A linked row's **Edit properties / Export** now work:
+  `add_source::run_linked` opens that document in its window (`files::document_window`, new), views
+  the version and runs the action two frames later (the new window's tab views exist by then). Rows
+  from a version of the releasing document itself stay inert (can't switch this window's version
+  under the open dialog).
+- **Tool search**: "Did you mean:" row has 24 px below it, "No items match your search" is 42 px
+  (live tool-search-export / -material); the Assembly search (asb's `assembly_search.rs`, small
+  change) got the same chips (`tool_synonyms::ASSEMBLY`) and the no-match line.
+- **Material picker** = ui-select: `material_rows` (None filtered too), `MaterialPanel.active`,
+  hover / ↑ ↓ / Enter / Esc, bold matches (`StyledText` highlights), ✕ clears, list fits its rows;
+  property values right-aligned except Name. Verified against assign-material-04/05.
+- **Interference detection** (live analysis/80–84): field "Parts to analyze", read-only
+  "Interferences" query list ("Part 1 and Part 2", tooltip "L x W x H", click = bold + zoom
+  (`ui.interference_picked`)), no Scale slider, opens at the lower right (left = viewport − 347 −
+  220, top 571; REQUESTS "psb (10-19 i)" asks whether that is a remembered position). Parts-list
+  clicks now go to an open analysis tool (`pick_body` → `analysis_pick`). All analysis dialogs end
+  with the 22 px `?` row. Analysis query fields restyled to Onshape's query list (24 px 13.33 px
+  #555 rows with a visible ×, 12 px label).
+- **Interference look** (verified vs analysis/81–83): picked parts get render state OUTLINE; with
+  results `SceneOptions.neutral_bodies` (new) draws solids `#d1d6da` at alpha 0.2 (+ transparent);
+  the red overlap `#c71010` is an `Instance::over_transparent()` mesh (new in render: drawn with
+  `mesh_opaque` after the transparent list, so the see-through parts don't tint it); hover box
+  `#f2ff80` 6 px. **Render changes (ui's renderer, small):** `DrawLists.over_transparent`, and
+  outlines for see-through parts: `mesh_outline_depth` (depth-only, `fs_outline_depth`, OUTLINE
+  states only) + `mesh_outline` over the transparent list, at the very end of the color pass.
+- Build fixes outside my area while others were mid-edit (tell the lead): a stop-gap
+  `ParamKind::Reference` arm in feature_dialog.rs (the fs agent then replaced it with theirs), and a
+  missing `Sizable as _` import in fs's `fs_reference.rs`.
 
 ## Lint notes (19 Oct)
 

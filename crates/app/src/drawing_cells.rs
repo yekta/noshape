@@ -184,7 +184,7 @@ impl DrawingEditor {
         }
         let Some((r, _)) = b.table_layout(*id).and_then(|l| l.cell_at(self.cursor)) else { return Vec::new() };
         let item = self.cell_text(*id, r, 0);
-        if item.is_empty() || item == "ITEM" {
+        if item.is_empty() || item == "Item" {
             return Vec::new();
         }
         // Callouts whose text is the item number.
@@ -207,11 +207,11 @@ impl DrawingEditor {
     pub fn open_bom_cell(&mut self, t: &Table, window: &mut Window, cx: &mut Context<Self>) {
         let Some((r, c)) = self.built.as_ref().and_then(|b| b.table_layout(t.id)).and_then(|l| l.cell_at(self.cursor)) else { return };
         let item = self.cell_text(t.id, r, 0);
-        if item.is_empty() || item == "ITEM" {
+        if item.is_empty() || item == "Item" {
             return;
         }
         let value = self.cell_text(t.id, r, c);
-        let enabled = !self.cell_text(t.id, r, 3).trim().is_empty();
+        let enabled = !self.cell_text(t.id, r, 2).trim().is_empty();
         let over = matches!(&t.kind, TableKind::Bom { overrides, .. } if overrides.iter().any(|(i, k, _)| *i == item && *k == c));
         let input = self.input(&value, window, cx);
         self.panel = Some(Panel::BomCell { table: t.id, item, col: c, input, over, enabled });

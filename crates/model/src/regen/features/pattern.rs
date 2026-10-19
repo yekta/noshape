@@ -268,10 +268,30 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
         0.0
     };
     let orient = ev.enum_("orientationType").to_string();
-    if orient == "LOCK_FACES" {
-        return err("Curve pattern orientation \"Normal to face\" is not supported yet");
-    }
+    // Normal to face: each instance's frame is (curve tangent, the faces' normal
+    // made perpendicular to it), mapped from the frame at the seed.
+    let faces: Vec<k::Shape> = if orient == "LOCK_FACES" {
+        let f: Vec<k::Shape> = ev.resolve_faces(ev.query("lockedFaces")).into_iter().filter_map(|(bi, fi)| ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok()).collect();
+        if f.is_empty() {
+            return err("Select faces to be normal to");
+        }
+        f
+    } else {
+        Vec::new()
+    };
+    let frame = |p: DVec3, t: DVec3| -> FResult<glam::DMat3> {
+        let n = faces
+            .iter()
+            .filter_map(|f| f.project_point(p).ok().map(|pr| (f, pr)))
+            .min_by(|a, b| a.1.distance.total_cmp(&b.1.distance))
+            .and_then(|(f, pr)| f.normal_at_uv(pr.u, pr.v).ok())
+            .ok_or_else(|| fe("Could not find the faces' normal along the path"))?;
+        let x = t.normalize();
+        let z = (n - x * n.dot(x)).try_normalize().ok_or_else(|| fe("The faces' normal is along the path"))?;
+        Ok(glam::DMat3::from_cols(x, z.cross(x), z))
+    };
     let (p0, t0) = path.at(0.0);
+    let f0 = if faces.is_empty() { None } else { Some(frame(p0, t0)?) };
     let pn = path.plane_normal();
     let skip = skipped(ev, false)?;
     let mut out = Vec::new();
@@ -282,6 +302,9 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
         let (p, t) = path.at(spacing * i as f64);
         let m = if orient == "KEEP_ORIENTATION" {
             DMat4::from_translation(p - p0)
+        } else if let Some(f0) = f0 {
+            let r = frame(p, t)? * f0.transpose();
+            DMat4::from_translation(p) * DMat4::from_mat3(r) * DMat4::from_translation(-p0)
         } else {
             let rot = match pn {
                 Some(nrm) => {

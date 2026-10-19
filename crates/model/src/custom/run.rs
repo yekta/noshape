@@ -56,7 +56,7 @@ pub fn output_of(feature: FeatureId) -> Option<FeatureOutput> {
 }
 
 /// Build the definition map for `params`.
-fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx) -> FResult<Value> {
+fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<Value> {
     let mut m = Map::new();
     for d in decls {
         let v = match &d.kind {
@@ -84,7 +84,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
             ParamKindFs::Array { items, .. } => {
                 let mut arr = Vec::new();
                 for it in values.array(&d.id) {
-                    arr.push(definition(cx, items, it, ev)?);
+                    arr.push(definition(cx, items, it, ev, provider)?);
                 }
                 Value::array(arr)
             }
@@ -98,6 +98,11 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                     }
                 }
                 Value::map(m).with_tag(host::std_tag("lookupTablePath.fs", "LookupTablePath"))
+            }
+            ParamKindFs::Reference { kind } => {
+                let tab = values.text(&d.id);
+                let file = if tab.is_empty() { None } else { provider.and_then(|p| p.file(tab)) };
+                super::reference::reference_value(*kind, file.as_ref())
             }
             ParamKindFs::Anything => match values.get(&d.id) {
                 Some(ParamValue::Text(s)) => Value::str(s.as_str()),
@@ -147,8 +152,10 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
         return Err(FeatureError { faulty: vec![id], ..FeatureError::new("A parameter value is not valid.") });
     }
 
+    // Printed object numbers restart per feature run (the Context is "BuiltIn: 0").
+    noshape_featurescript::value::reset_shown_numbers();
     let cx = FsContext::new(std::mem::take(&mut ev.ctx), ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
-    let definition = match definition(&cx, &def.params, &values, ev) {
+    let definition = match definition(&cx, &def.params, &values, ev, Some(&*provider)) {
         Ok(d) => d,
         Err(e) => {
             ev.ctx = std::mem::take(&mut cx.state.lock().ctx);

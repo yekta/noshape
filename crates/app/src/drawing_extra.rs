@@ -5,6 +5,7 @@
 //! and surface finish symbols, tables (general, BOM, hole) and the drags
 //! and context menus that go with them.
 
+use noshape_model::document::TabId;
 use crate::drawing_scene::Overlay;
 use crate::drawing_view::*;
 use crate::theme::p;
@@ -181,11 +182,62 @@ impl DrawingEditor {
         }
         let Some(ViewKind::Base { source, part, .. }) = sheet.view(root).map(|v| &v.kind) else { return String::new() };
         let src = self.sources.iter().find(|(k, _)| k.tab == *source).map(|(_, m)| m);
-        match (src, part) {
+        let name = match (src, part) {
             (Some(m), Some(_)) => m.part(part.as_ref()).map(|p| p.name.clone()).unwrap_or_else(|| m.name.clone()),
             (Some(m), None) => m.name.clone(),
             (None, _) => self.doc.read(cx).session.doc.tab(*source).map(|t| t.name.clone()).unwrap_or_default(),
+        };
+        // A pinned reference: "<name>\u{1}<version name>" (its own group).
+        match sheet.view(root).and_then(|v| v.pinned.as_ref()) {
+            Some(p) => format!("{name}\u{1}{}", p.name),
+            None => name,
         }
+    }
+
+    /// The source tab and part of a view's reference.
+    fn reference_source(&self, sheet: &Sheet, id: ViewId) -> Option<(TabId, Option<noshape_model::BodyId>)> {
+        match &sheet.view(views::root_view(sheet, id)?)?.kind {
+            ViewKind::Base { source, part, .. } => Some((*source, part.clone())),
+            _ => None,
+        }
+    }
+
+    /// Pin view reference / Unpin view reference: every base view of the
+    /// source (and part), on every sheet.
+    pub fn pin_reference(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, pin: Option<noshape_model::drawing::PinnedVersion>, cx: &mut Context<Self>) {
+        let name = if pin.is_some() { "Pin view reference" } else { "Unpin view reference" };
+        self.edit(name, cx, |d| {
+            for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+                if matches!(&v.kind, ViewKind::Base { source, part: p, .. } if *source == tab && *p == part) {
+                    v.pinned = pin.clone();
+                }
+            }
+        });
+        self.ensure_sources(false, cx);
+    }
+
+    /// The reference row's menu: Pin view reference ▸ versions, or Unpin.
+    fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
+        let mut out = vec![MenuEntry::item("Reference manager…", |t, _, cx| t.open_ref_manager(cx))];
+        if pinned {
+            out.push(MenuEntry::item("Unpin view reference", move |t, _, cx| t.pin_reference(tab, part.clone(), None, cx)));
+        } else {
+            let versions = self.doc.read(cx).session.store.list_versions().unwrap_or_default();
+            let items: Vec<MenuEntry> = versions
+                .into_iter()
+                .map(|v| {
+                    let pin = noshape_model::drawing::PinnedVersion { id: v.id.to_string(), name: v.name.clone() };
+                    let part = part.clone();
+                    MenuEntry::item(v.name, move |t, _, cx| t.pin_reference(tab, part.clone(), Some(pin.clone()), cx))
+                })
+                .collect();
+            if items.is_empty() {
+                out.push(MenuEntry::item("Pin view reference (no versions)", |_, _, _| {}));
+            } else {
+                out.push(MenuEntry::Submenu("Pin view reference".into(), items));
+            }
+        }
+        out
     }
 
     /// A BOM / cut list table row of the Sheets panel, with Onshape's menu:
@@ -406,18 +458,38 @@ impl DrawingEditor {
                     }),
                 )
         };
-        let ref_row = |key: String, name: &str, indent: f32, cx: &mut Context<Self>| {
+        let ref_row = |this: &Self, key: String, name: &str, src: Option<(TabId, Option<noshape_model::BodyId>)>, indent: f32, cx: &mut Context<Self>| {
+            let (name, version) = match name.split_once('\u{1}') {
+                Some((n, v)) => (n.to_string(), Some(v.to_string())),
+                None => (name.to_string(), None),
+            };
+            let menu = src.map(|(tab, part)| this.reference_menu(tab, part, version.is_some(), cx));
             crate::ui::tree_row(SharedString::from(key), false)
                 .cursor_pointer()
                 .tooltip(crate::ui::tooltip("Reference manager"))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_ref_manager(cx)))
+                .when_some(menu, |row, entries| {
+                    row.on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                            cx.stop_propagation();
+                            let entries = entries.clone();
+                            let ed = cx.entity();
+                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                            crate::os_menu::open(e.position, menu, window, cx);
+                        }),
+                    )
+                })
                 .pl(px(indent))
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
                 .child(crate::ui::tree_icon("part", false, cx))
-                .child(div().min_w_0().truncate().child(name.to_string()))
-                // The reference is the live workspace (not a version): Onshape's badge.
-                .child(div().ml(px(8.)).px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"))
+                .child(div().min_w_0().truncate().child(name))
+                // Pinned: a pin and the version name; else Onshape's "In progress" badge.
+                .child(match version {
+                    Some(v) => div().ml(px(8.)).flex().items_center().gap(px(3.)).child(crate::ui::glyph("pin", 11., rgb(0x666666))).child(div().text_size(px(11.)).child(v)),
+                    None => div().ml(px(8.)).px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"),
+                })
                 .child(div().flex_1())
         };
         // (reference, views) groups of a sheet, in first-view order.
@@ -447,7 +519,8 @@ impl DrawingEditor {
                 }
             }
             for (k, (r, vs)) in refs.iter().enumerate() {
-                list = list.child(ref_row(format!("dr-ref-{k}"), r, 6., cx));
+                let src = vs.first().and_then(|(si, v)| self.reference_source(&self.drawing.sheets[*si], v.id));
+                list = list.child(ref_row(self, format!("dr-ref-{k}"), r, src, 6., cx));
                 // Its sheets, with their views underneath.
                 let mut last = None;
                 for (sheet_i, v) in vs {
@@ -471,7 +544,8 @@ impl DrawingEditor {
                 list = list.child(sheet_row(i, s, active, cx));
                 if active {
                     for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
-                        list = list.child(ref_row(format!("dr-sheet-ref-{k}"), r, 24., cx));
+                        let src = vs.first().and_then(|v| self.reference_source(s, v.id));
+                        list = list.child(ref_row(self, format!("dr-sheet-ref-{k}"), r, src, 24., cx));
                         for v in vs {
                             list = list.child(self.sheet_view_row(s, v, 62., cx));
                         }
@@ -764,7 +838,7 @@ impl DrawingEditor {
                     overlay.points.push(s);
                 }
             }
-            Tool::Table { kind, view, .. } if matches!(kind, TableTool::General | TableTool::Revision) || view.is_some() => {
+            Tool::Table { kind, view, .. } if matches!(kind, TableTool::General | TableTool::Revision | TableTool::Bom | TableTool::CutList) || view.is_some() => {
                 let w = if *kind == TableTool::General { 60.0 } else { 90.0 };
                 overlay.rect([self.cursor[0] - w, self.cursor[1] - 20.0], self.cursor, true);
             }
@@ -943,6 +1017,38 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ drags
 
+    /// The grips of the one selected note: sides (resize) and, without
+    /// leaders, the middle (rotate), on the sheet.
+    pub fn note_grips(&self) -> Option<(u64, Vec<NoteGrip>)> {
+        if !matches!(self.tool, Tool::Select) {
+            return None;
+        }
+        let [Sel::Annotation(id)] = self.selection.as_slice() else { return None };
+        let a = self.current_sheet().annotations.iter().find(|a| a.id == *id)?;
+        let (b, angle) = note_box(a)?;
+        let AnnotationKind::Note { style, .. } = &a.kind else { return None };
+        let mid = noshape_model::drawing::note::center(&b);
+        let rot = |p: [f64; 2]| {
+            let (s, co) = angle.sin_cos();
+            let d = sub(p, mid);
+            [mid[0] + d[0] * co - d[1] * s, mid[1] + d[0] * s + d[1] * co]
+        };
+        let mut out = vec![(0, rot([b[0], mid[1]])), (1, rot([b[2], mid[1]]))];
+        if style.leaders.is_empty() {
+            out.push((2, mid));
+        }
+        Some((*id, out))
+    }
+
+    /// A drag starting on a note grip.
+    pub fn note_grip_drag(&self, start: [f64; 2]) -> Option<Drag> {
+        let (id, grips) = self.note_grips()?;
+        let tol = self.tol_mm(6.0);
+        let (grip, _) = grips.into_iter().find(|(_, p)| len(sub(*p, start)) < tol)?;
+        let orig = self.current_sheet().annotations.iter().find(|a| a.id == id)?.clone();
+        Some(Drag::NoteGrip { id, grip, start, orig })
+    }
+
     pub fn extra_start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Option<Drag> {
         let target = self.built.as_ref()?.picks.get(pick? as usize)?.clone();
         let sheet = self.drawing.sheets.get(self.sheet)?;
@@ -1039,6 +1145,32 @@ impl DrawingEditor {
         let si = self.sheet;
         let Some(sheet) = dr.sheets.get_mut(si) else { return };
         match drag {
+            Drag::NoteGrip { id, grip, start, orig } => {
+                let Some(a) = sheet.annotations.iter_mut().find(|a| a.id == *id) else { return };
+                *a = orig.clone();
+                let Some((bbox, angle)) = note_box(orig) else { return };
+                let mid = noshape_model::drawing::note::center(&bbox);
+                // The cursor in the note's unrotated frame.
+                let local = |p: [f64; 2]| {
+                    let (s, co) = (-angle).sin_cos();
+                    let d = sub(p, mid);
+                    [mid[0] + d[0] * co - d[1] * s, mid[1] + d[0] * s + d[1] * co]
+                };
+                let AnnotationKind::Note { style, height_mm, .. } = &mut a.kind else { return };
+                let min = *height_mm * 2.0;
+                match grip {
+                    1 => style.width = Some((local(c)[0] - bbox[0]).max(min)),
+                    0 => {
+                        let x = local(c)[0].min(bbox[2] - min);
+                        style.width = Some(bbox[2] - x);
+                        a.position[0] += x - bbox[0];
+                    }
+                    _ => {
+                        let ang = |p: [f64; 2]| (p[1] - mid[1]).atan2(p[0] - mid[0]);
+                        style.angle = angle + ang(c) - ang(*start);
+                    }
+                }
+            }
             Drag::MoveTable { id, start, orig } => {
                 if let Some(t) = sheet.table_mut(*id) {
                     t.position = add(*orig, sub(c, *start));
@@ -1265,6 +1397,11 @@ impl DrawingEditor {
         } else if matches!(a.kind, AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Balloon { .. }) {
             out.push(MenuEntry::item("Edit…", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
         }
+        // With a BOM table in the drawing: Add stacked callouts….
+        if matches!(a.kind, AnnotationKind::Balloon { .. }) && self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Bom { .. })) {
+            let id = a.id;
+            out.push(MenuEntry::item("Add stacked callouts…", move |t, _, cx| t.open_stack_dlg(id, cx)));
+        }
         out
     }
 
@@ -1435,6 +1572,26 @@ impl DrawingEditor {
     }
 
     /// Double-click / "Edit cell…" on a general table: edit the cell under the cursor.
+    /// Apply the edited cell and edit the next (`step` 1) or previous (-1)
+    /// cell of a general table, row by row.
+    pub fn cell_step(&mut self, step: i32, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(Panel::Cell { table, row, col, .. }) = &self.panel else { return };
+        let (table, row, col) = (*table, *row, *col);
+        self.apply_panel(cx);
+        let Some(TableKind::General { cells, .. }) = self.current_sheet().table(table).map(|t| t.kind.clone()) else { return };
+        let ncols = cells.iter().map(|r| r.len()).max().unwrap_or(1).max(1);
+        let nrows = cells.len().max(1);
+        let at = (row * ncols + col) as i64 + step as i64;
+        if at < 0 || at >= (nrows * ncols) as i64 {
+            return;
+        }
+        let (r, c) = (at as usize / ncols, at as usize % ncols);
+        let text = cells.get(r).and_then(|x| x.get(c)).cloned().unwrap_or_default();
+        let input = self.textarea(&text, 3, window, cx);
+        self.panel = Some(Panel::Cell { table, row: r, col: c, input });
+        cx.notify();
+    }
+
     pub fn open_cell_panel(&mut self, table: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(table).cloned() else { return };
         if let TableKind::Revision { .. } = t.kind {
@@ -1494,13 +1651,7 @@ impl DrawingEditor {
                 self.panel = Some(Panel::Datum { edit: Some(a.id), anchor: *anchor, input });
                 cx.notify();
             }
-            AnnotationKind::Balloon { text, .. } => {
-                // Reuse the datum panel layout for the callout text.
-                let input = self.input(text, window, cx);
-                Self::focus_input(&input, window, cx);
-                self.panel = Some(Panel::Datum { edit: Some(a.id), anchor: [f64::NAN; 2], input });
-                cx.notify();
-            }
+            AnnotationKind::Balloon { .. } => self.open_callout_edit(a.id, window, cx),
             k if k.is_dimension() => {
                 let f = a.format.clone();
                 let angular = matches!(k, AnnotationKind::AngularDimension { .. });
@@ -1569,7 +1720,30 @@ impl DrawingEditor {
                 "Edit cell",
                 vec![
                     div().text_xs().text_color(pal.text_faint).child(if *row == usize::MAX { "Title".to_string() } else { format!("Row {}, column {} — fields like {{part.name}} allowed", row + 1, col + 1) }).into_any_element(),
-                    Textarea::new(input).w(px(300.)).into_any_element(),
+                    // Tab / Enter: the next cell, Shift+Tab: the previous one,
+                    // Alt+Enter: a new line in this cell.
+                    div()
+                        .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                            let k = &e.keystroke;
+                            let step = match (k.key.as_str(), k.modifiers.shift, k.modifiers.alt) {
+                                ("tab", false, _) | ("enter", false, false) => Some(1),
+                                ("tab", true, _) => Some(-1),
+                                ("enter", _, true) => {
+                                    if let Some(Panel::Cell { input, .. }) = &this.panel {
+                                        input.update(cx, |s, cx| s.insert("\n", window, cx));
+                                    }
+                                    cx.stop_propagation();
+                                    None
+                                }
+                                _ => None,
+                            };
+                            if let Some(step) = step {
+                                cx.stop_propagation();
+                                this.cell_step(step, window, cx);
+                            }
+                        }))
+                        .child(Textarea::new(input).w(px(300.)))
+                        .into_any_element(),
                 ],
             ),
             Panel::SurfaceFinish { input, .. } => ("Surface finish", vec![Self::label_row("Roughness", Input::new(input).small().w(px(160.)).into_any_element())]),
@@ -1845,3 +2019,13 @@ impl DrawingEditor {
         cx.notify();
     }
 }
+
+/// A note's unrotated box (sheet mm) and its rotation.
+pub fn note_box(a: &Annotation) -> Option<([f64; 4], f64)> {
+    let AnnotationKind::Note { text, height_mm, style } = &a.kind else { return None };
+    let l = noshape_model::drawing::note::layout(&noshape_model::drawing::note::fractions(text), *height_mm, style, a.position);
+    Some((l.bbox, if style.leaders.is_empty() { style.angle } else { 0.0 }))
+}
+
+/// A note grip: 0 / 1 the left / right side, 2 the middle; its sheet point.
+pub type NoteGrip = (u8, [f64; 2]);

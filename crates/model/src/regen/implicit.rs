@@ -77,6 +77,14 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             let p = ev.raw_vertex_point(on)?;
             Some(mk(p, DVec3::Z))
         }
+        // A sketch region: its area centroid, Z along the sketch normal
+        // (live assembly/601: hovering inside a sketch instance's loop).
+        Reference::SketchRegion { sketch, key } => {
+            let (s, region) = ev.resolve_region(*sketch, key)?;
+            let profile = super::eval::region_profile(&s, &region, crate::reference::Source::Region { sketch: *sketch, key: key.clone() }).ok()?;
+            let c = profile.shape.centroid().ok()?;
+            Some(Connector { reference: Reference::Implicit { on: Box::new(on.clone()), inference }, name: "Mate connector".into(), origin: c, x: s.frame.x, z: s.frame.normal })
+        }
         _ => {
             let _ = ShapeType::Face;
             None

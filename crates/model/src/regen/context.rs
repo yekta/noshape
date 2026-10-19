@@ -20,6 +20,8 @@ pub struct Body {
     pub vertices: Vec<Name>,
     /// Index into the part color palette.
     pub color: usize,
+    /// Set on Composite part bodies.
+    pub composite: Option<crate::display::CompositeInfo>,
     face_lookup: OnceLock<HashMap<Name, usize>>,
     edge_lookup: OnceLock<HashMap<Name, usize>>,
     vertex_lookup: OnceLock<HashMap<Name, usize>>,
@@ -79,6 +81,7 @@ impl Body {
             edges,
             vertices,
             color,
+            composite: None,
             face_lookup: OnceLock::new(),
             edge_lookup: OnceLock::new(),
             vertex_lookup: OnceLock::new(),
@@ -99,6 +102,7 @@ impl Body {
             edges: self.edges.clone(),
             vertices: self.vertices.clone(),
             color: self.color,
+            composite: self.composite.clone(),
             face_lookup: OnceLock::new(),
             edge_lookup: OnceLock::new(),
             vertex_lookup: OnceLock::new(),

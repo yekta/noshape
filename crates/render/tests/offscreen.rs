@@ -57,7 +57,7 @@ fn pipelined_frames_and_lazy_pick_regions() {
         r.submit_frame(7, seq, req(seq)).unwrap();
     }
     assert!(!r.can_submit(7));
-    r.submit_picks(7, &[(11, PickRect::around(200, 150, 5)), (12, PickRect { x: -10, y: -10, width: 20, height: 20 })]);
+    r.submit_picks(7, &[(11, PickRect::around(200, 150, 5)), (12, PickRect { x: -10, y: -10, width: 20, height: 20, depth_samples: 0 })]);
     let mut frames = Vec::new();
     let mut picks = Vec::new();
     while r.has_pending() {
@@ -80,6 +80,52 @@ fn pipelined_frames_and_lazy_pick_regions() {
     let corner = picks.iter().find(|p| p.0 == 12).unwrap();
     assert_eq!((corner.1.x0, corner.1.y0, corner.1.width, corner.1.height), (0, 0, 10, 10));
     assert!(corner.1.ids.iter().all(|&id| id == 0));
+}
+
+#[test]
+fn visible_depth_samples_land_on_the_geometry() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    // A box off the view centre, so the average is not trivially the target.
+    let mesh = r.upload_mesh(&primitives::box_mesh([0.004, -0.006, -0.006], [0.016, 0.006, 0.006], 1));
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh)));
+    let scene = std::sync::Arc::new(scene);
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, 4.0 / 3.0);
+    let req = FrameRequest { scene, camera: cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: Style::default(), invalidate_pick: true };
+    r.submit_frame(7, 1, req).unwrap();
+    r.submit_picks(7, &[(21, PickRect::depth_samples(2000))]);
+    let mut got = None;
+    while r.has_pending() {
+        r.wait_oldest();
+        for c in r.collect() {
+            if let Completed::Pick { token: 21, result, .. } = c {
+                got = Some(result.unwrap());
+            }
+        }
+    }
+    let buf = got.expect("sample query answered");
+    assert!(buf.ids.is_empty());
+    // About 2000 samples (a 52x39 viewport for 400x300); the box covers a fraction of them.
+    assert_eq!((buf.frame_width, buf.frame_height), noshape_render::renderer::depth_sample_size(400, 300, 2000));
+    let total = (buf.frame_width * buf.frame_height) as usize;
+    assert!(total >= 2000 && total < 2200, "{total}");
+    assert!(buf.samples.len() >= 4 && buf.samples.len() < total, "{} samples", buf.samples.len());
+    assert!(buf.samples.iter().all(|s| s.id != 0 && s.depth > 0.0 && s.depth <= 1.0));
+    // The average sample, unprojected with the pick pass's matrix, lies in the box.
+    let n = buf.samples.len() as f32;
+    let (x, y, z) = buf.samples.iter().fold((0.0, 0.0, 0.0), |a, s| (a.0 + s.x / n, a.1 + s.y / n, a.2 + s.depth / n));
+    let (fw, fh) = (buf.frame_width as f32, buf.frame_height as f32);
+    let ndc = glam::Vec4::new(x / fw * 2.0 - 1.0, 1.0 - y / fh * 2.0, z, 1.0);
+    let w = buf.view_proj.unwrap().inverse() * ndc;
+    let p = w.truncate() / w.w;
+    assert!(p.x > 0.003 && p.x < 0.017 && p.y.abs() < 0.007 && p.z.abs() < 0.007, "{p:?}");
 }
 
 /// A fan-triangulated disk (triangulation differs from the box face's).

@@ -33,6 +33,8 @@ pub struct InsertViewState {
     pub chooser: Option<u8>,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
+    /// Insert the chosen sheet metal part's flat pattern.
+    pub flat: bool,
     /// The chooser picks a replacement for this source (Sheets panel ›
     /// BOM › Replace): its views (and so its BOM) switch to the choice.
     pub replace: Option<TabId>,
@@ -40,7 +42,7 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, replace: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None }
     }
 }
 
@@ -143,6 +145,7 @@ impl DrawingEditor {
         };
         self.tool = Tool::Select;
         self.insert.sketch = None;
+        self.insert.flat = false;
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
     }
 
@@ -347,6 +350,15 @@ impl DrawingEditor {
                     list = list.child(row(SharedString::from(format!("dr-ch-ps-{id}")), 0., "part-studio", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, None, cx))));
                     if let Some(src) = self.sources.get(&SourceKey::studio(id)) {
                         for b in views::view_bodies(&src.context, None) {
+                            // Sheet metal parts: "Flat pattern of <part>" above the part.
+                            if src.context.sheet_metal.contains_key(&b.id) {
+                                let bid = b.id.clone();
+                                list = list.child(row(SharedString::from(format!("dr-ch-f-{id}-{}", b.id)), 20., "sheet-metal", format!("Flat pattern of {}", b.name), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    this.choose_source(id, Some(bid.clone()), cx);
+                                    this.insert.flat = true;
+                                    this.set_insert_orientation(ViewOrientation::Top, cx);
+                                })));
+                            }
                             let bid = b.id.clone();
                             list = list.child(row(SharedString::from(format!("dr-ch-p-{id}-{}", b.id)), 20., "part", b.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, Some(bid.clone()), cx))));
                         }

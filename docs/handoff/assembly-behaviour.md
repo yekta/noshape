@@ -293,6 +293,68 @@ Next: build + verify BOM / configurations in the app, then the remaining 🔧/�
   start) are still open.
 * D18 (help: Mates): while a mate is being defined only that mate is solved (`SolveOptions::only_mate`, set in
   `effective()` until Solve); model test `a_mate_being_defined_is_solved_alone_until_solve`.
-* Blocked at the end of the run: the shared tree's crates/render shader change (someone else's, uncommitted)
-  panics at GPU init ("entry point cannot be called", shaders.wgsl:260), so fresh builds don't start. The LA12
-  graphics menu change is compiled but not yet seen in the GUI.
+* The render shader break mid-run (someone else's) was fixed by its owner; LA12 (g3–g5) and D18 (d1–d2) are now
+  verified in the GUI.
+* Lead notes: Edit in context selects the part, and the Part Studio then opens its Measure panel; live 502 shows
+  none (Part Studio measure code, not mine). `actions::CreateVersion` (Ctrl+Alt+V) has no handler.
+
+### skb run 5 (2026-10-19 afternoon, takeover after the quota stop)
+State: all edits below are in the shared tree; `cargo check -p noshape` showed no errors in my files (other agents'
+release_dialog.rs / variable_studio.rs / drawing_drawprops.rs / numbering_prefs.rs were mid-edit). Model `assembly::`
+tests: 58/58 at the start; new tests listed below. GUI verification of this run still to do (build lock was held
+for a long time by others' kernel rebuilds).
+* Found half-done (previous run): Insert › Other documents (now rewritten, see below), Reference manager row
+  thumbnails + 20 px two-tone update icon, Insert footer `?` (`props::help_dot`), sketch dimension box
+  right-aligned 13.33 px (`part_studio/sketch.rs`, `Input…text_align(Right)`), sketch name drawn in the plane.
+* LA33 (live 545–551): `part_studio/in_context.rs` banner for a Part Studio created in context = split
+  [Insert and go to assembly][▾] (Insert and go to assembly / Go to assembly / Hide/show instances) + ✕;
+  "Select items to insert" dialog (`render_insert_go`, `InContextUi.insert_go`; hooks: `pick` / `pick_body` /
+  `highlighted_hover` in behaviors.rs, Esc and the overlay in mod.rs). `PartStudioEvent::InsertInAssembly` now has
+  `sketches`; `AssemblyView::insert_from_context(studio, parts, sketches, at)`.
+* REQUESTS 200 (Unfix all): top row Unfix all right after Show center of mass; folder rows: Dynamic suppression ▸
+  (`ListFolder.unsuppressed_if`, eval `dynamically_suppressed`; test `dynamic_suppression_of_a_folder_suppresses_its_instances`),
+  Unfix all, Expand ▸ / Collapse ▸; `DynTarget::Folder`.
+* REQUESTS 204: (1) fixed drag → `AsmUi.fixed_drag` (no-drop cursor + fix glyph, no message); (2) no snap-drag
+  message (Ctrl cycling kept: live had a single connector, so it matches); (3) mate dialog ▶ = 2 full turns once then
+  back to the start pose (`toggle_mate_preview`, `finish_mate_preview` via `AsmUi.preview_done` in render), value arc
+  shown for the preview mate; (4) implicit connector edit stays implicit (`MateConnectorRef.moved: ConnectorMove`,
+  `eval::implicit_move`, `McSession.implicit/to_implicit`, `sync_implicit_mc` called from `schedule_eval`; test
+  `implicit_connector_move_offsets_the_mate`); (5) drags enforce every mate even with `only_mate` (eval
+  `solve`; extended test `a_mate_being_defined_is_solved_alone_until_solve`); (6) configured insert split button
+  (`insert_config_button`, `release_dialog::last_viewed_config` made pub(crate)); (7) sketch regions pickable with
+  centroid + corner + mid-edge inference (`sketch_wire_result` face_ranges/face_refs, `regen/implicit.rs`
+  SketchRegion branch, `inference_candidates` SketchRegion branch, align SketchRegion in `resolve_connector_aligned`;
+  test in `sketch_instances_are_wire_occurrences_with_edges`); (8) Change to version… scoped (`RefManager.scope`,
+  `open_reference_manager(scope, cx)`), no message, dialog stays open; toolbar button disabled unless
+  `has_newer_references`; row icons `list-versioned.svg` / `inserted-version-update` badge.
+* REQUESTS 209 (Other documents, live 610–621): `assembly_panels.rs` `OtherDoc` (versions newest first + Start =
+  root microversion, changes since the last version), `render_insert_other` (categories, category view, search with
+  blue match, document view with Create version… / Version graph / Part Studios | Assemblies / info box / tree with
+  expandable Part Studios → parts via `expand_other_studio`), `insert_external(key, only, name)`. `ext_pick` removed.
+  The opened document is remembered across Insert sessions (`AsmUi.insert_other_doc`).
+* Next: build, GUI-verify everything above (⏳ rows in docs/parity/assembly.md: T10, I13, D16, D17, R3, N13, LA33,
+  LA34, L17, A4, LA39), T10 fixture document, sketch start outline size check, psb pick-order check (renderer.rs),
+  live layout of the Mate connector panel (D17 note).
+
+### skb run 6 (2026-10-19 evening, takeover after the quota stop)
+State: run 5's edits were complete (no half-done code found); everything below builds in the shared tree. App tests
+`cargo test -p noshape --bin noshape -- t10_fixture sketch_mode`: 50 pass.
+* Verified in the GUI (:103, /tmp/skb/asm): Insert dialog footer `?` (i1 = live 320), LA33 end to end (g1–g10: Origin
+  menu, "Origin of new Part Studio", banner split button, empty "Select items to insert", ✓ → "Part 1 <3>" at the Part
+  Studio position, floating icon only), psb's pick order (context faces win over the translucent planes, p5–p9).
+* New: hovered context face outlined `#ffc685` (live 503) and selected context face amber-outlined outside dialogs
+  (`context_ref_overlay`); the see-through ghost faces showed no hover/selection otherwise. LA40.
+* New: a context exists for the user only once a feature references it (LA41): `instance_contexts`, `contexts_in`,
+  `publish_stale_contexts` skip unreferenced contexts; `add_assembly_context` drops them before adding a new one;
+  the Part Studio's Assembly contexts section no longer appears just because a dialog is open in context
+  (`render_contexts_section` `pending` checks `params_use_context`).
+* Banner ✕ = 11 px btn-close (`os_ui::GLYPH_CLOSE` at 20 px, opacity 0.5), was 7 px. Dialog ✕ in Select items to
+  insert, Dynamic suppression, Reference manager, Named positions and the mate dialog = the shared `dialog-cancel`
+  icon (#bd3039, as the feature dialogs), was a faint Lucide X.
+* Assembly list filter showed two placeholders on top of each other (input placeholder + italic overlay): the input's
+  placeholder removed (assembly_behaviors.rs).
+* T10 fixture: test `assembly_view::props::tests::t10_fixture_reports_the_newer_version_of_a_referenced_document`
+  (assembly_props.rs). With `NOSHAPE_T10_DIR=<dir>` it writes "T10 source.noshape" (demo, V1, V2) and
+  "T10 assembly.noshape" (Assembly 1 with one instance of the source's Part Studio pinned at V1) there; open the
+  assembly document to check T10 / LA34 (fixture made in /tmp/skb/t10).
+* REQUESTS.md: skb (10-19 in-context look, no dialog open).

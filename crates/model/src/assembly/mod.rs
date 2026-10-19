@@ -251,20 +251,38 @@ pub struct MateConnectorRef {
     /// normal, an edge end along the edge).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub align: Option<Box<Reference>>,
+    /// Move offset of an implicit connector edited from the mate dialog
+    /// (live assembly/578–580: it stays implicit, owned by the mate).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved: Option<Box<ConnectorMove>>,
+}
+
+/// Translation and rotation of an implicit mate connector (as an assembly
+/// mate connector's Move fields).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ConnectorMove {
+    pub translation: [Option<ExprValue>; 3],
+    /// Rotation axis: 0 X, 1 Y, 2 Z.
+    pub rotation_axis: u8,
+    pub rotation: Option<ExprValue>,
+    /// Move unchecked: the values are kept but not applied (Onshape keeps
+    /// the fields of an unchecked Move).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub off: bool,
 }
 
 impl MateConnectorRef {
     /// Connector at the assembly origin (world frame).
     pub fn origin() -> Self {
-        Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None, align: None }
+        Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None, align: None, moved: None }
     }
     /// Reference to an assembly mate connector owned by `owner`.
     pub fn assembly_connector(id: MateId, owner: InstanceId) -> Self {
-        Self { instance: owner, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: Some(id), align: None }
+        Self { instance: owner, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: Some(id), align: None, moved: None }
     }
     /// Entity reference on an occurrence (implicit inference or bare entity).
     pub fn on(instance: InstanceId, path: Vec<InstanceId>, reference: Reference) -> Self {
-        Self { instance, path, reference, flip: false, rotate_quarters: 0, connector: None, align: None }
+        Self { instance, path, reference, flip: false, rotate_quarters: 0, connector: None, align: None, moved: None }
     }
     pub fn is_origin(&self) -> bool {
         self.instance == InstanceId::ORIGIN && self.connector.is_none()
@@ -292,6 +310,9 @@ pub struct AsmMateConnector {
     pub rotation_axis: u8,
     #[serde(default)]
     pub rotation: Option<ExprValue>,
+    /// Move unchecked: the translation / rotation are kept but not applied.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub move_off: bool,
     #[serde(default)]
     pub hidden: bool,
     #[serde(default)]
@@ -314,7 +335,7 @@ fn default_rot_axis() -> u8 {
 
 impl AsmMateConnector {
     pub fn new(id: MateId, name: String, on: MateConnectorRef) -> Self {
-        Self { id, name, on, flip_primary: false, reorient: 0, translation: [None, None, None], rotation_axis: 2, rotation: None, hidden: false, suppressed: false, between: None, primary_axis: None, secondary_axis: None }
+        Self { id, name, on, flip_primary: false, reorient: 0, translation: [None, None, None], rotation_axis: 2, rotation: None, move_off: false, hidden: false, suppressed: false, between: None, primary_axis: None, secondary_axis: None }
     }
     pub fn owner(&self) -> InstanceId {
         self.on.instance
@@ -701,6 +722,10 @@ pub struct ListFolder {
     pub instances: Vec<InstanceId>,
     #[serde(default)]
     pub features: Vec<MateId>,
+    /// Dynamic suppression of an instance folder (live assembly/537): its
+    /// instances are suppressed while this expression is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsuppressed_if: Option<String>,
 }
 
 impl ListFolder {

@@ -130,11 +130,11 @@ impl Workspace {
                 // In-context banner › Go to assembly.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::part_studio::PartStudioEvent, window, cx| match ev {
                     crate::part_studio::PartStudioEvent::ActivateTab(t) => this.activate(*t, window, cx),
-                    crate::part_studio::PartStudioEvent::InsertInAssembly { assembly, studio, parts, at } => {
-                        let (assembly, studio, parts, at) = (*assembly, *studio, parts.clone(), *at);
+                    crate::part_studio::PartStudioEvent::InsertInAssembly { assembly, studio, parts, sketches, at } => {
+                        let (assembly, studio, parts, sketches, at) = (*assembly, *studio, parts.clone(), sketches.clone(), *at);
                         this.activate(assembly, window, cx);
                         if let Some(TabView::Assembly(v)) = this.views.get(&assembly) {
-                            v.update(cx, |v, cx| v.insert_from_context(studio, parts, at, cx));
+                            v.update(cx, |v, cx| v.insert_from_context(studio, parts, sketches, at, cx));
                         }
                     }
                 }));
@@ -716,12 +716,16 @@ impl Workspace {
         };
         // Onshape: the tab-search cell (continuing the left rail, `#fafafa`
         // with a 1 px right border) opens the Tab manager (Alt+T).
+        // Open (live document/30): a blue icon and the rail's blue bar on the left.
+        let tm_open = self.tab_manager.is_some();
         let tab_list = cell("tab-list", cx)
             .w(px(crate::ui::RAIL_W))
+            .relative()
             .bg(pal.rail)
             .border_r_1()
             .border_color(pal.border)
-            .child(crate::assets::icon("tab-search", 20., cx))
+            .when(tm_open, |c| c.child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)).child(crate::ui::glyph("tab-search", 20., pal.accent)))
+            .when(!tm_open, |c| c.child(crate::assets::icon("tab-search", 20., cx)))
             .tooltip("Tab manager (Alt+T)")
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_tab_manager(window, cx)));
         // Onshape's "+" menu (live, document/01): a Bootstrap dropdown opening
@@ -747,7 +751,7 @@ impl Workspace {
                     .item(I::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
                     .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
                     .item(I::new("Create folder").icon_name("folder").on_click(move |_, w, cx| v8.update(cx, |t, cx| t.create_folder(w, cx))))
-                    .item(I::new("Import…").icon_name("import").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))))
+                    .item(I::new("Import…").icon_name("import-file").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))))
             });
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
@@ -800,6 +804,8 @@ impl Workspace {
             let active = self.active == Some(id);
             let view = cx.entity();
             let tab_name = name.clone();
+            let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+            let probe = bounds.clone();
             strip = strip.child(
                 h_flex()
                     .id(SharedString::from(format!("tab-{id}")))
@@ -825,6 +831,7 @@ impl Workspace {
                         None => div().truncate().child(name).into_any_element(),
                     })
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
+                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     // Drag to reorder; drop a tab on a folder to file it.
                     .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)) }, |d, _, _, cx| cx.new(|_| d.clone()))
                     .drag_over::<TabDrag>(|st, _, _, _| st.border_l_2().border_color(gpui_kit::rgb(0x1651b0)))
@@ -838,16 +845,17 @@ impl Workspace {
                             this.activate(id, window, cx);
                         }
                     }))
-                    .os_context_menu(move |menu, _, cx| {
+                    .tab_context_menu(bounds, move |menu, _, cx| {
                         use crate::doc_dialogs as dd;
                         use crate::os_menu::OsMenuItem as I;
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                         let (v5, v6, v7, v8, v9, v10, v11) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
-                        // Onshape (live): Delete | Rename, Properties…, Show code |
-                        // Duplicate, Copy to clipboard | Select as document
-                        // thumbnail | Move to document…, Export….
+                        // Onshape (live menus/rmb-tab-*): ⊗ Delete | Rename,
+                        // Properties…, Show code | Duplicate, Copy to clipboard |
+                        // (Assembly) Create Drawing of <tab>… | Select as document
+                        // thumbnail | Move to document…, Export…, Release….
                         let menu = menu
-                            .item(I::new("Delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
+                            .item(I::new("Delete").icon_name("menu-delete").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.delete_tab(id, w, cx))))
                             .separator()
                             .item(I::new("Rename").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
                             .item(I::new("Properties…").on_click(move |_, w, cx| {
@@ -870,6 +878,18 @@ impl Workspace {
                                 cx.set_global(dd::CopiedTab(t));
                             }))
                             .separator();
+                        // Live menus/rmb-tab-assembly: its own group after Copy to clipboard.
+                        let menu = if kind == "assembly" {
+                            let n = tab_name.clone();
+                            menu.item(I::new(format!("Create Drawing of {tab_name}…")).icon_name("menu-create-drawing").on_click(move |_, w, cx| {
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None });
+                                let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
+                                v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
+                            }))
+                            .separator()
+                        } else {
+                            menu
+                        };
                         // Onshape: only tabs with a picture can be the document thumbnail
                         // (the Feature Studio menu has no such item, menus/rmb-tab-feature-studio).
                         let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") {
@@ -883,11 +903,13 @@ impl Workspace {
                                 dd::move_to_document(doc, vec![id], w, cx)
                             }));
                         let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
-                        // Release management (help image Release_highlighted2: the
-                        // last entry, after Export…): Release… for any releasable
-                        // tab; Revision history once an Assembly, Drawing or
-                        // Variable Studio has revisions.
-                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing" | "variables") || kind.starts_with("file") {
+                        // Release management (help image Release_highlighted2, live
+                        // rmb-tab-assembly / -drawing: the last entry, after Export…):
+                        // Release… for Assemblies, Drawings, Variable Studios and files
+                        // (Part Studios release their parts, not the tab: live
+                        // rmb-tab-partstudio-2 has none); Revision history once one
+                        // has revisions.
+                        let menu = if matches!(kind, "assembly" | "drawing" | "variables") || kind.starts_with("file") {
                             let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
                             let pn = crate::release_dialog::tab_part_number(d1.read(cx), id);
                             let has_revisions = !pn.is_empty() && !crate::release_dialog::release_log(d1.read(cx)).revisions(&pn).is_empty();
@@ -917,21 +939,10 @@ impl Workspace {
                             menu
                         };
                         // Material Library tabs: Export… (CSV) and Update… (help: customizing part materials).
-                        let menu = if kind == "materiallibrary" {
+                        if kind == "materiallibrary" {
                             let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
                             menu.item(I::new("Export…").on_click(move |_, w, cx| crate::material_library_view::export(d1.clone(), id, w, cx)))
                                 .item(I::new("Update…").on_click(move |_, w, cx| crate::material_library_view::update(d2.clone(), id, w, cx)))
-                        } else {
-                            menu
-                        };
-                        // Onshape: Part Studio and Assembly tabs offer "Create Drawing of <tab>…".
-                        if matches!(kind, "partstudio" | "assembly") {
-                            let n = tab_name.clone();
-                            menu.item(crate::os_menu::OsMenuItem::new(format!("Create Drawing of {tab_name}…")).on_click(move |_, w, cx| {
-                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None });
-                                let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
-                                v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
-                            }))
                         } else {
                             menu
                         }
@@ -1087,6 +1098,8 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))
             // A customized key of an action without its own GPUI action.
             .on_action(cx.listener(|this, a: &crate::shortcuts::RunShortcut, window, cx| this.run_shortcut(a.id, window, cx)))
+            // Ctrl+Alt+V (Onshape "Create version"): the Create version dialog.
+            .on_action(cx.listener(|this, _: &CreateVersion, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx)))
             .on_action(cx.listener(|this, _: &ExportRequestedItem, window, cx| {
                 if let Some((t, parts)) = REQUESTED_EXPORT.lock().take() {
                     this.export_item(t, parts, window, cx);
@@ -1138,7 +1151,6 @@ impl Render for Workspace {
             .children(self.fs_search.as_ref().map(|(p, _)| p.clone()))
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
             // Onshape right-click menus opened with `os_context_menu`.
-            .children(crate::os_menu::render_host(cx))
     }
 }
 
@@ -1369,7 +1381,7 @@ static REQUESTED_EXPORT: parking_lot::Mutex<Option<(TabId, Vec<noshape_model::Bo
 pub fn request_export(tab: TabId, parts: Vec<noshape_model::BodyId>, window: &mut Window, cx: &mut App) {
     // From a modal (release dialog, revision history) an action wouldn't
     // reach the workspace: call the window's workspace directly.
-    let ws = window.root::<gpui_kit::base::Root>().flatten().and_then(|r| r.read(cx).view().clone().downcast::<Workspace>().ok());
+    let ws = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok());
     match ws {
         Some(ws) => ws.update(cx, |w, cx| w.export_item(tab, parts, window, cx)),
         None => {
@@ -1559,7 +1571,7 @@ fn tab_chip(id: impl Into<ElementId>, active: bool) -> Stateful<Div> {
 }
 
 /// File types "Import files…" translates.
-pub(crate) const IMPORT_EXTS: &[&str] = &["step", "stp", "iges", "igs", "brep", "stl", "obj"];
+pub(crate) const IMPORT_EXTS: &[&str] = &["step", "stp", "iges", "igs", "brep", "stl", "obj", "pvz"];
 
 /// Tab (and document) name of an imported file: the file name without its
 /// extension; and the full file name.
@@ -1579,7 +1591,8 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
             U::Centimeter => k::LengthUnit::Centimeter,
             U::Meter => k::LengthUnit::Meter,
             U::Inch => k::LengthUnit::Inch,
-            U::Foot | U::Yard => k::LengthUnit::Foot,
+            U::Foot => k::LengthUnit::Foot,
+            U::Yard => k::LengthUnit::Yard,
             _ => k::LengthUnit::Millimeter,
         }
     };
@@ -1593,6 +1606,8 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
         "brep" => k::read_brep(path)?,
         // Small meshes get coplanar triangles merged into faces.
         "stl" | "obj" => k::read_mesh(path, mesh_unit, 20_000)?,
+        // Onshape imports PVZ as meshes only (the file is in metres).
+        "pvz" => k::read_pvz(path, k::LengthUnit::Meter, 20_000)?,
         other => anyhow::bail!("Unsupported file type .{other}"),
     };
     Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
@@ -1609,3 +1624,25 @@ pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str,
         ps.insert_at_rollback(f);
     }
 }
+
+/// Tab right-click menus (live menus/rmb-tab-*): they open upward, the
+/// bottom on the tab bar's top edge and the left edge at the tab's.
+trait TabContextMenuExt: InteractiveElement + Sized {
+    /// `tab`: the tab's bounds from its last paint.
+    fn tab_context_menu(self, tab: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>, f: impl Fn(crate::os_menu::OsMenu, &mut Window, &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu + 'static) -> Self {
+        let f = std::rc::Rc::new(f);
+        self.on_mouse_down(MouseButton::Right, move |e, window, cx| {
+            cx.stop_propagation();
+            let f = f.clone();
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
+            if !menu.read(cx).is_empty() {
+                let h = window.viewport_size().height;
+                let b = tab.get();
+                let x = if b.size.width > px(0.) { b.left() } else { e.position.x };
+                crate::os_menu::open_anchored(point(x, h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
+            }
+        })
+    }
+}
+
+impl<E: InteractiveElement + Sized> TabContextMenuExt for E {}

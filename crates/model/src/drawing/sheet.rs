@@ -119,6 +119,32 @@ pub struct SheetGeometry {
     pub fonts: Vec<FontSpan>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
+    /// Grey areas behind property fields, on screen only (Drawing
+    /// properties › Notes › Hide property background turns them off).
+    pub field_backdrops: Vec<Vec<[f64; 2]>>,
+    /// Elements on a format layer (border frame, zones, title block; last
+    /// span wins).
+    pub layers: Vec<LayerSpan>,
+}
+
+/// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChamferStyle {
+    pub dim45: bool,
+    pub content45: super::ChamferContent,
+    pub dim: bool,
+    pub content: super::ChamferContent,
+    pub length_precision: Option<u8>,
+    pub angle_precision: Option<u8>,
+}
+
+/// Lines, texts and fills on a sheet layer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LayerSpan {
+    pub lines: std::ops::Range<usize>,
+    pub texts: std::ops::Range<usize>,
+    pub fills: std::ops::Range<usize>,
+    pub layer: super::SheetLayer,
 }
 
 /// Annotation types with their own style (Drawing properties ›
@@ -131,10 +157,24 @@ pub enum AnnType {
     GeometricTolerances,
     SurfaceFinish,
     HoleCallouts,
+    FlagNotes,
+    WeldSymbols,
+    BendNotes,
 }
 
 impl AnnType {
-    pub const ALL: [AnnType; 6] = [AnnType::Notes, AnnType::Callouts, AnnType::Datums, AnnType::GeometricTolerances, AnnType::SurfaceFinish, AnnType::HoleCallouts];
+    /// In the Annotations tab's order.
+    pub const ALL: [AnnType; 9] = [
+        AnnType::Notes,
+        AnnType::FlagNotes,
+        AnnType::Callouts,
+        AnnType::Datums,
+        AnnType::GeometricTolerances,
+        AnnType::SurfaceFinish,
+        AnnType::WeldSymbols,
+        AnnType::BendNotes,
+        AnnType::HoleCallouts,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -143,7 +183,10 @@ impl AnnType {
             AnnType::Datums => "Datums",
             AnnType::GeometricTolerances => "Geometric tolerances",
             AnnType::SurfaceFinish => "Surface finish symbols",
-            AnnType::HoleCallouts => "Hole callouts",
+            AnnType::HoleCallouts => "Hole/thread callouts",
+            AnnType::FlagNotes => "Flag notes",
+            AnnType::WeldSymbols => "Weld symbols",
+            AnnType::BendNotes => "Bend notes",
         }
     }
 
@@ -156,6 +199,7 @@ impl AnnType {
             K::Gdt { .. } => AnnType::GeometricTolerances,
             K::SurfaceFinish { .. } => AnnType::SurfaceFinish,
             K::HoleCallout { .. } => AnnType::HoleCallouts,
+            K::Weld { .. } => AnnType::WeldSymbols,
             _ => return None,
         })
     }
@@ -267,6 +311,12 @@ pub struct SheetStyle {
     /// Per annotation type overrides, and the datum triangle size (mm).
     pub ann_types: Vec<(AnnType, AnnTypeStyle)>,
     pub datum_size: f64,
+    /// Callouts: text justification, stack direction and gap (mm).
+    pub callout_justify: super::TextJustify,
+    pub callout_stack: super::StackDirection,
+    pub callout_stack_gap: f64,
+    /// Datum target areas' hatch (standard, pattern).
+    pub target_hatch: (usize, usize),
 }
 
 impl SheetStyle {
@@ -278,7 +328,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0 }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0) }
     }
 }
 
@@ -316,6 +366,51 @@ pub enum GripKind {
 impl SheetGeometry {
     pub fn new(width: f64, height: f64) -> Self {
         Self { width, height, ..Default::default() }
+    }
+
+    /// The sheet layer of line / text / fill `i` (None: the drawing).
+    pub fn line_sheet_layer(&self, i: usize) -> Option<super::SheetLayer> {
+        self.layers.iter().rev().find(|s| s.lines.contains(&i)).map(|s| s.layer)
+    }
+    pub fn text_sheet_layer(&self, i: usize) -> Option<super::SheetLayer> {
+        self.layers.iter().rev().find(|s| s.texts.contains(&i)).map(|s| s.layer)
+    }
+    pub fn fill_sheet_layer(&self, i: usize) -> Option<super::SheetLayer> {
+        self.layers.iter().rev().find(|s| s.fills.contains(&i)).map(|s| s.layer)
+    }
+
+    /// DXF / DWG layer of line `i`: its sheet layer's, else by style.
+    pub fn line_layer(&self, i: usize) -> &'static str {
+        self.layers.iter().rev().find(|s| s.lines.contains(&i)).and_then(|s| s.layer.cad_layer()).unwrap_or_else(|| self.lines[i].style.layer())
+    }
+
+    /// DXF / DWG layer of text `i` (None: the annotation layer).
+    pub fn text_layer(&self, i: usize) -> Option<&'static str> {
+        self.layers.iter().rev().find(|s| s.texts.contains(&i)).and_then(|s| s.layer.cad_layer())
+    }
+
+    /// DXF / DWG layer of fill `i` (None: the annotation layer).
+    pub fn fill_layer(&self, i: usize) -> Option<&'static str> {
+        self.layers.iter().rev().find(|s| s.fills.contains(&i)).and_then(|s| s.layer.cad_layer())
+    }
+
+    /// Rotate everything added since `mark` by `angle` (radians) about `c`.
+    pub fn rotate_since(&mut self, mark: GeomMark, c: [f64; 2], angle: f64) {
+        let (s, co) = angle.sin_cos();
+        let rot = |p: [f64; 2]| {
+            let d = [p[0] - c[0], p[1] - c[1]];
+            [c[0] + d[0] * co - d[1] * s, c[1] + d[0] * s + d[1] * co]
+        };
+        for l in &mut self.lines[mark.0..] {
+            l.points.iter_mut().for_each(|p| *p = rot(*p));
+        }
+        for t in &mut self.texts[mark.1..] {
+            t.pos = rot(t.pos);
+            t.angle += angle;
+        }
+        for f in &mut self.fills[mark.2..] {
+            f.points.iter_mut().for_each(|p| *p = rot(*p));
+        }
     }
 
     pub fn mark(&self) -> GeomMark {
@@ -407,9 +502,10 @@ impl SheetGeometry {
         let m = 10.0;
         // Onshape's templates: a thin line along the sheet edge, the frame
         // inset by the margin, and zone dividers across the band between them
-        // with the zone labels centered in it. ANSI numbers zones from the
-        // right and letters them from the bottom (A size: 2 x 2); ISO 5457
-        // uses 50 mm zones numbered from the left, lettered from the top.
+        // with the zone labels centered in it. Both ANSI and ISO templates
+        // number zones from the right and letter them from the bottom (live
+        // drawing/09 ANSI A: 2 x 2, 5 mm labels; drawing/156 ISO A3: 6 x 4,
+        // 7 mm labels).
         self.rect(0.0, 0.0, w, h, LineStyle::Thin);
         self.rect(m, m, w - m, h - m, LineStyle::Border);
         let ansi = sheet.size.is_ansi();
@@ -418,9 +514,14 @@ impl SheetGeometry {
             super::SheetSize::AnsiB => (4, 2),
             super::SheetSize::AnsiC => (4, 4),
             super::SheetSize::AnsiD | super::SheetSize::AnsiE => (8, 4),
-            _ => (((w - 2.0 * m) / 50.0).round().max(2.0) as usize, ((h - 2.0 * m) / 50.0).round().max(2.0) as usize),
+            super::SheetSize::A4 => (4, 3),
+            super::SheetSize::A3 => (6, 4),
+            super::SheetSize::A2 => (8, 6),
+            super::SheetSize::A1 => (12, 8),
+            super::SheetSize::A0 => (16, 12),
+            _ => (((w - 2.0 * m) / 66.0).round().max(2.0) as usize, ((h - 2.0 * m) / 66.0).round().max(2.0) as usize),
         };
-        let th = if ansi { 5.0 } else { 3.5 };
+        let th = if ansi { 5.0 } else { 7.0 };
         for i in 1..nx {
             let x = m + (w - 2.0 * m) * i as f64 / nx as f64;
             self.line([x, 0.0], [x, m], LineStyle::Thin);
@@ -428,7 +529,7 @@ impl SheetGeometry {
         }
         for i in 0..nx {
             let x = m + (w - 2.0 * m) * (i as f64 + 0.5) / nx as f64;
-            let n = if ansi { nx - i } else { i + 1 };
+            let n = nx - i;
             self.text([x, h - m / 2.0], th, n.to_string(), Anchor::Center);
             self.text([x, m / 2.0], th, n.to_string(), Anchor::Center);
         }
@@ -439,8 +540,7 @@ impl SheetGeometry {
         }
         for j in 0..ny {
             let y = m + (h - 2.0 * m) * (j as f64 + 0.5) / ny as f64;
-            let k = if ansi { j } else { ny - 1 - j };
-            let letter = (b'A' + k as u8) as char;
+            let letter = (b'A' + j as u8) as char;
             self.text([m / 2.0, y], th, letter.to_string(), Anchor::Center);
             self.text([w - m / 2.0, y], th, letter.to_string(), Anchor::Center);
         }
@@ -591,6 +691,7 @@ impl SheetGeometry {
                     let h = *height_mm;
                     let text = super::note::fractions(&env.expand(text));
                     let l = super::note::layout(&text, h, style, a.position);
+                    let mark = self.mark();
                     for p in &l.pieces {
                         self.note_text(p.pos, h, &p.text, pick);
                         if let Some(i) = p.item.filter(|i| p.designator && style.flags.contains(i)) {
@@ -622,6 +723,10 @@ impl SheetGeometry {
                         let last = pts[pts.len() - 2];
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
+                    }
+                    // A rotated note (no leaders) turns about its middle.
+                    if style.angle != 0.0 && style.leaders.is_empty() {
+                        self.rotate_since(mark, super::note::center(&l.bbox), style.angle);
                     }
                 }
                 AnnotationKind::LinearDimension { view, a: pa, b: pb, offset, orientation, override_text } => {
@@ -810,6 +915,18 @@ impl SheetGeometry {
                     }
                 }
                 AnnotationKind::RevisionCallout { .. } => {}
+                AnnotationKind::Weld { view, target, spec } => {
+                    let map = |l: &super::Leader| match l.view {
+                        Some(v) => env.to_sheet(v, l.point),
+                        None => l.point,
+                    };
+                    let tip = match view {
+                        Some(v) => env.to_sheet(*v, *target),
+                        None => *target,
+                    };
+                    let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
+                    super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
+                }
                 AnnotationKind::SurfaceFinish { anchor, value } => {
                     let p = *anchor;
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], p, [p[0] + 6.0, p[1] + 10.0], [p[0] + 14.0, p[1] + 10.0]], style: LineStyle::Thin, closed: false, pick });
@@ -895,9 +1012,34 @@ impl SheetGeometry {
                     let (lu, lw) = ((u[0] * u[0] + u[1] * u[1]).sqrt(), (w[0] * w[0] + w[1] * w[1]).sqrt());
                     let cosang = if lu * lw > 0.0 { ((u[0] * w[0] + u[1] * w[1]) / (lu * lw)).abs().min(1.0) } else { 1.0 };
                     let dist = lu * cosang;
+                    let other = lu * (1.0 - cosang * cosang).max(0.0).sqrt();
                     let ang = cosang.acos();
+                    // Drawing properties › Dimensions › Chamfer: style and content
+                    // for 45° chamfers and the others, and their precisions.
+                    let c = env.chamfer_style();
+                    let is45 = (ang.to_degrees() - 45.0).abs() < 0.05;
+                    let (as_dim, content) = if is45 { (c.dim45, c.content45) } else { (c.dim, if c.content == super::ChamferContent::CLength { super::ChamferContent::LengthXAngle } else { c.content }) };
+                    let mut la = a.clone();
+                    if c.length_precision.is_some() {
+                        la.format.precision = c.length_precision;
+                    }
+                    let len = |m: f64| env.text(&la, m, false, "").main;
+                    let deg = format!("{}°", super::format::format_number(ang.to_degrees(), c.angle_precision.or(a.format.precision), 0));
                     let mut t = env.text(a, dist, false, "");
-                    t.main = format!("{} × {}°", t.main, super::format::format_number(ang.to_degrees(), a.format.precision, 1));
+                    t.main = match content {
+                        super::ChamferContent::AngleXLength => format!("{deg} × {}", len(dist)),
+                        super::ChamferContent::LengthXAngle => format!("{} × {deg}", len(dist)),
+                        super::ChamferContent::LengthXLength => format!("{} × {}", len(dist), len(other)),
+                        super::ChamferContent::CLength => format!("C{}", len(dist)),
+                    };
+                    if as_dim {
+                        // Dimension style: an aligned dimension of the chamfer edge.
+                        let n = [-(pb[1] - pa[1]), pb[0] - pa[0]];
+                        let ln = (n[0] * n[0] + n[1] * n[1]).sqrt().max(1e-12);
+                        let off = ((a.position[0] - pa[0]) * n[0] + (a.position[1] - pa[1]) * n[1]) / ln;
+                        self.linear_dimension_text(pa, pb, off, DimOrientation::Aligned, &t, pick);
+                        continue;
+                    }
                     let e = a.position;
                     let left = e[0] < m[0];
                     let wtxt = self.dim_label_width(&t, dh);
@@ -1102,13 +1244,17 @@ impl SheetGeometry {
                                 let t = i as f64 / 48.0 * std::f64::consts::TAU;
                                 [p[0] + r * t.cos(), p[1] + r * t.sin()]
                             });
-                            self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Centerline, closed: true, pick });
+                            let pts: Vec<[f64; 2]> = pts.collect();
+                            self.target_hatch(&pts, pick);
+                            self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
                             env.text(a, *diameter, false, "Ø").flat()
                         }
                         DatumTargetArea::Rectangle { width, height } => {
                             let (hx, hy) = (rotate2([width / 2.0 * k, 0.0], rot), rotate2([0.0, height / 2.0 * k], rot));
                             let c = |sx: f64, sy: f64| [p[0] + hx[0] * sx + hy[0] * sy, p[1] + hx[1] * sx + hy[1] * sy];
-                            self.lines.push(Polyline2 { points: vec![c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)], style: LineStyle::Centerline, closed: true, pick });
+                            let pts = vec![c(-1.0, -1.0), c(1.0, -1.0), c(1.0, 1.0), c(-1.0, 1.0)];
+                            self.target_hatch(&pts, pick);
+                            self.lines.push(Polyline2 { points: pts, style: LineStyle::Centerline, closed: true, pick });
                             format!("{}×{}", env.text(a, *width, false, "").flat(), env.text(a, *height, false, "").flat())
                         }
                     };
@@ -1148,6 +1294,9 @@ impl SheetGeometry {
             }
             let c = if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) };
             let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
+            if !a.layer.is_drawing() {
+                self.layers.push(LayerSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, layer: a.layer });
+            }
             let font = if a.kind.is_dimension() { self.style.dim_font.clone() } else if construction { None } else { ts.font.or_else(|| self.style.ann_font.clone()) };
             if let Some(font) = font {
                 self.fonts.push(FontSpan { texts: t0..t1, font });
@@ -1243,13 +1392,29 @@ impl SheetGeometry {
         let w = font::text_width(designator, h).max(font::text_width(&"0".repeat(style.flag_chars.max(1) as usize), h));
         let c = [pos[0] + font::text_width(designator, h) / 2.0, pos[1] - h / 2.0];
         let r = w / 2.0 + h * 0.5;
+        let ring = |r: f64, n: usize, a0: f64| -> Vec<[f64; 2]> { (0..n).map(|i| a0 + i as f64 / n as f64 * std::f64::consts::TAU).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect() };
         let pts: Vec<[f64; 2]> = match style.flag_shape {
+            FlagShape::None => return,
+            FlagShape::Underline => {
+                self.lines.push(Polyline2 { points: vec![[c[0] - r, c[1] - r * 0.8], [c[0] + r, c[1] - r * 0.8]], style: LineStyle::Thin, closed: false, pick });
+                return;
+            }
             FlagShape::Triangle => vec![[c[0] - r * 1.2, c[1] - r * 0.7], [c[0] + r * 1.2, c[1] - r * 0.7], [c[0], c[1] + r * 1.3]],
-            FlagShape::Square => vec![[c[0] - r, c[1] - r], [c[0] + r, c[1] - r], [c[0] + r, c[1] + r], [c[0] - r, c[1] + r]],
-            FlagShape::Circle => (0..32).map(|i| {
-                let t = i as f64 / 32.0 * std::f64::consts::TAU;
-                [c[0] + r * t.cos(), c[1] + r * t.sin()]
-            }).collect(),
+            FlagShape::Rectangle => vec![[c[0] - r, c[1] - r * 0.8], [c[0] + r, c[1] - r * 0.8], [c[0] + r, c[1] + r * 0.8], [c[0] - r, c[1] + r * 0.8]],
+            FlagShape::Flag => vec![[c[0] - r, c[1] - r * 0.8], [c[0] + r, c[1] - r * 0.8], [c[0] + r + r * 0.6, c[1]], [c[0] + r, c[1] + r * 0.8], [c[0] - r, c[1] + r * 0.8]],
+            FlagShape::Diamond => vec![[c[0] - r * 1.3, c[1]], [c[0], c[1] - r * 1.3], [c[0] + r * 1.3, c[1]], [c[0], c[1] + r * 1.3]],
+            FlagShape::Hexagon => ring(r * 1.15, 6, 0.0),
+            FlagShape::Octagon => ring(r * 1.1, 8, std::f64::consts::PI / 8.0),
+            FlagShape::Circle => ring(r, 32, 0.0),
+            FlagShape::DoubleCircle => {
+                self.lines.push(Polyline2 { points: ring(r * 1.2, 32, 0.0), style: LineStyle::Thin, closed: true, pick });
+                ring(r, 32, 0.0)
+            }
+            FlagShape::SquareCircle => {
+                let q = r * 1.15;
+                self.lines.push(Polyline2 { points: vec![[c[0] - q, c[1] - q], [c[0] + q, c[1] - q], [c[0] + q, c[1] + q], [c[0] - q, c[1] + q]], style: LineStyle::Thin, closed: true, pick });
+                ring(r, 32, 0.0)
+            }
         };
         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
     }
@@ -1257,26 +1422,131 @@ impl SheetGeometry {
     /// A callout (balloon) centered at `c`: the circle, its leader to the
     /// anchor with a dot on the part, and its text.
     fn balloon(&mut self, a: &Annotation, c: [f64; 2], env: &dyn AnnotationEnv, ah: f64, pick: u32) {
-        let AnnotationKind::Balloon { view, anchor, text } = &a.kind else { return };
+        use super::CalloutBorder as B;
+        let AnnotationKind::Balloon { view, anchor, text, callout: cs } = &a.kind else { return };
+        let h = cs.height.unwrap_or(ah);
         let p = env.to_sheet(*view, *anchor);
-        let r = 5.0;
-        let n = 32;
-        let circle: Vec<[f64; 2]> = (0..n)
-            .map(|i| {
-                let t = i as f64 / n as f64 * std::f64::consts::TAU;
-                [c[0] + r * t.cos(), c[1] + r * t.sin()]
-            })
-            .collect();
-        self.lines.push(Polyline2 { points: circle, style: LineStyle::Thin, closed: true, pick });
-        let d = [p[0] - c[0], p[1] - c[1]];
-        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-        self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
-        // Dot on the part.
-        self.fills.push(Fill2 { points: (0..8).map(|i| {
-            let t = i as f64 / 8.0 * std::f64::consts::TAU;
-            [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
-        }).collect() });
-        self.texts.push(Text2 { pos: c, height: ah, text: env.balloon_text(a, text), angle: 0.0, anchor: Anchor::Center, pick });
+        // The callout and its stacked callouts: the same size, one gap apart.
+        let mut items = vec![env.balloon_text(a, text)];
+        items.extend(cs.stacked.iter().map(|st| env.stacked_text(a, st)));
+        let line = |main: &str| format!("{}{main}{}", cs.left, cs.right);
+        let widest_main = items.iter().map(|m| font::text_width(&line(m), h)).fold(0.0f64, f64::max);
+        // Border size: characters (Tight Fit = the text).
+        let w = if cs.chars == 0 { widest_main } else { widest_main.max(cs.chars as f64 * h * 0.6) };
+        let split = cs.border == B::SplitCircle;
+        let (rx, ry) = match cs.border {
+            B::Circle | B::DoubleCircle | B::SquareCircle | B::Octagon => {
+                let r = (w / 2.0 + h * 0.8).max(h * 1.2);
+                (r, r)
+            }
+            B::SplitCircle => {
+                let r = (w / 2.0 + h * 0.9).max(h * 1.6);
+                (r, r)
+            }
+            B::Rectangle | B::Underline | B::None | B::Flag => (w / 2.0 + h * 0.5, h * 0.8),
+            B::Hexagon => (w / 2.0 + h * 0.9, h * 0.95),
+            B::Diamond => (w / 2.0 + h * 1.2, h * 1.3),
+            B::Triangle => {
+                let r = (w / 2.0 + h * 0.6) * 1.6;
+                (r, r)
+            }
+        };
+        let step = self.style.callout_stack.step([c[0] - p[0], c[1] - p[1]]);
+        let pitch = if step[0] != 0.0 { 2.0 * rx } else { 2.0 * ry } + self.style.callout_stack_gap;
+        let just = self.style.callout_justify;
+        let leader_left = p[0] < c[0];
+        let ring = |ck: [f64; 2], r: f64, n: usize, a0: f64| -> Vec<[f64; 2]> { (0..n).map(|i| a0 + i as f64 / n as f64 * std::f64::consts::TAU).map(|t| [ck[0] + r * t.cos(), ck[1] + r * t.sin()]).collect() };
+        for (k, item) in items.iter().enumerate() {
+            let ck = [c[0] + step[0] * pitch * k as f64, c[1] + step[1] * pitch * k as f64];
+            let mut outlines: Vec<(Vec<[f64; 2]>, bool)> = match cs.border {
+                B::None => vec![],
+                B::Circle | B::SplitCircle => vec![(ring(ck, rx, 40, 0.0), true)],
+                B::DoubleCircle => vec![(ring(ck, rx, 40, 0.0), true), (ring(ck, rx * 0.82, 40, 0.0), true)],
+                B::SquareCircle => {
+                    let q = rx * 1.08;
+                    vec![(ring(ck, rx, 40, 0.0), true), (vec![[ck[0] - q, ck[1] - q], [ck[0] + q, ck[1] - q], [ck[0] + q, ck[1] + q], [ck[0] - q, ck[1] + q]], true)]
+                }
+                B::Octagon => vec![(ring(ck, rx / (std::f64::consts::PI / 8.0).cos(), 8, std::f64::consts::PI / 8.0), true)],
+                B::Rectangle => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
+                B::Underline => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry]], false)],
+                B::Flag => vec![(vec![[ck[0] - rx, ck[1] - ry], [ck[0] + rx, ck[1] - ry], [ck[0] + rx + ry, ck[1]], [ck[0] + rx, ck[1] + ry], [ck[0] - rx, ck[1] + ry]], true)],
+                B::Hexagon => {
+                    let e = ry * 0.6;
+                    vec![(vec![[ck[0] - rx, ck[1]], [ck[0] - rx + e, ck[1] - ry], [ck[0] + rx - e, ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0] + rx - e, ck[1] + ry], [ck[0] - rx + e, ck[1] + ry]], true)]
+                }
+                B::Diamond => vec![(vec![[ck[0] - rx, ck[1]], [ck[0], ck[1] - ry], [ck[0] + rx, ck[1]], [ck[0], ck[1] + ry]], true)],
+                B::Triangle => vec![(ring(ck, rx, 3, std::f64::consts::FRAC_PI_2).into_iter().map(|q| [q[0], q[1] - ry * 0.25]).collect(), true)],
+            };
+            if split {
+                outlines.push((vec![[ck[0] - rx, ck[1]], [ck[0] + rx, ck[1]]], false));
+            }
+            for (pts, closed) in outlines {
+                self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed, pick });
+            }
+            // The callout data (left + main + right) in the middle, justified
+            // in the widest row; a split circle has it in the top half and the
+            // text below in the bottom half.
+            let main = line(item);
+            let x_of = |t: &str| {
+                let tw = font::text_width(t, h);
+                ck[0] - widest_main / 2.0 + (widest_main - tw) * just.frac(cs.border != B::None, leader_left)
+            };
+            let mid_y = if split { ck[1] + ry * 0.45 } else { ck[1] };
+            self.texts.push(Text2 { pos: [x_of(&main), mid_y - h / 2.0], height: h, text: main.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+            // Texts above / below: outside the border, centred (a split
+            // circle keeps the text below inside its bottom half).
+            let gap = h * 0.4;
+            let centred = |t: &str| ck[0] - font::text_width(t, h) / 2.0;
+            if !cs.above.is_empty() {
+                let y = if cs.border == B::None { ck[1] + h * 0.9 } else { ck[1] + ry + gap };
+                self.texts.push(Text2 { pos: [centred(&cs.above), y], height: h, text: cs.above.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+            }
+            if !cs.below.is_empty() {
+                let y = if split { ck[1] - ry * 0.45 - h / 2.0 } else if cs.border == B::None { ck[1] - h * 1.9 } else { ck[1] - ry - gap - h };
+                self.texts.push(Text2 { pos: [centred(&cs.below), y], height: h, text: cs.below.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+            }
+        }
+        // The leader from the first callout to the part: an arrow on an edge,
+        // a dot on a face. Border None: a short shoulder at the middle row.
+        if cs.free {
+            return;
+        }
+        let start = if cs.border == B::None {
+            let sx = if leader_left { c[0] - w / 2.0 - h * 0.3 } else { c[0] + w / 2.0 + h * 0.3 };
+            let shoulder = [sx + if leader_left { -h * 1.2 } else { h * 1.2 }, c[1]];
+            self.lines.push(Polyline2 { points: vec![[sx, c[1]], shoulder], style: LineStyle::Thin, closed: false, pick });
+            shoulder
+        } else {
+            let d = [p[0] - c[0], p[1] - c[1]];
+            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+            let u = [d[0] / l, d[1] / l];
+            let r = match cs.border {
+                B::Circle | B::DoubleCircle | B::SplitCircle | B::Octagon | B::Triangle => rx,
+                B::SquareCircle => rx * 1.08 / u[0].abs().max(u[1].abs()).max(1e-9),
+                B::Rectangle | B::Flag | B::Underline => (rx / u[0].abs().max(1e-9)).min(ry / u[1].abs().max(1e-9)),
+                // The ellipse through the shape's extremes.
+                _ => rx * ry / (rx * u[1]).hypot(ry * u[0]).max(1e-9),
+            };
+            [c[0] + u[0] * r, c[1] + u[1] * r]
+        };
+        self.lines.push(Polyline2 { points: vec![start, p], style: LineStyle::Thin, closed: false, pick });
+        if cs.on_face {
+            self.fills.push(Fill2 { points: (0..8).map(|i| {
+                let t = i as f64 / 8.0 * std::f64::consts::TAU;
+                [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
+            }).collect() });
+        } else {
+            self.arrow(p, [p[0] - start[0], p[1] - start[1]], self.style.ann_arrow);
+        }
+    }
+
+    /// A datum target area's hatch (Drawing properties › Datums › Target
+    /// hatch pattern).
+    fn target_hatch(&mut self, area: &[[f64; 2]], pick: u32) {
+        let (std, pat) = self.style.target_hatch;
+        for l in super::sheet_sketch::hatch_pattern(area, std, pat, 0.6, 0.0) {
+            self.lines.push(Polyline2 { points: l.to_vec(), style: LineStyle::Thin, closed: false, pick });
+        }
     }
 
     /// A revision callout: an equilateral triangle around the label, base
@@ -1536,6 +1806,10 @@ pub trait AnnotationEnv {
     fn expand(&self, s: &str) -> String;
     /// Displayed text of a callout (BOM item when linked).
     fn balloon_text(&self, a: &Annotation, text: &str) -> String;
+    /// Text of a stacked callout (empty: its part's BOM item).
+    fn stacked_text(&self, _a: &Annotation, st: &super::StackedCallout) -> String {
+        if st.text.trim().is_empty() { "----".into() } else { st.text.clone() }
+    }
     /// Drawing-wide dimension / annotation style.
     fn sheet_style(&self) -> SheetStyle {
         SheetStyle::default()
@@ -1543,6 +1817,14 @@ pub trait AnnotationEnv {
     /// Inspection item bubbles' look, None while hidden.
     fn inspection_style(&self) -> Option<InspectionStyle> {
         Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, color: None, solid: false, font: None })
+    }
+    /// Weld symbols follow ANSI (else ISO).
+    fn weld_ansi(&self) -> bool {
+        true
+    }
+    /// Dimensions › Chamfer settings.
+    fn chamfer_style(&self) -> ChamferStyle {
+        ChamferStyle { dim45: false, content45: super::ChamferContent::LengthXAngle, dim: true, content: super::ChamferContent::LengthXAngle, length_precision: None, angle_precision: None }
     }
     /// Label of a revision callout ("B*" while pending), None when hidden.
     fn revision_label(&self, revision: &str) -> Option<String> {
@@ -1562,6 +1844,10 @@ pub struct PlainEnv<'a> {
 }
 
 impl AnnotationEnv for PlainEnv<'_> {
+    fn chamfer_style(&self) -> ChamferStyle {
+        let p = &self.drawing.props;
+        ChamferStyle { dim45: p.chamfer_45_dimension, content45: p.chamfer_45_content, dim: p.chamfer_dimension, content: p.chamfer_content, length_precision: p.chamfer_length_precision, angle_precision: p.chamfer_angle_precision }
+    }
     fn to_sheet(&self, _: ViewId, p: [f64; 2]) -> [f64; 2] {
         [p[0] * self.scale, p[1] * self.scale]
     }

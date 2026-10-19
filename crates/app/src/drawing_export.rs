@@ -325,20 +325,18 @@ impl DrawingEditor {
                     let mut pages = Vec::new();
                     for &i in &sheets {
                         let built = render_sheet_with(&drawing, i, &sources, &cache, true, &info).ok_or("nothing to export")?;
-                        // Explode notes: texts picked as notes.
-                        let explode: Vec<usize> = if f.cad() && s.text == 1 {
-                            let sheet = &drawing.sheets[i];
-                            built
-                                .geometry
-                                .texts
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, t)| matches!(built.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Note { .. }))))
-                                .map(|(k, _)| k)
-                                .collect()
-                        } else {
-                            vec![]
-                        };
+                        // Explode notes: all notes' texts (Text › Explode into
+                        // polylines (notes)), else the notes marked Explode.
+                        let all_notes = f.cad() && s.text == 1;
+                        let sheet = &drawing.sheets[i];
+                        let explode: Vec<usize> = built
+                            .geometry
+                            .texts
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, t)| matches!(built.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Note { style, .. } if all_notes || style.explode))))
+                            .map(|(k, _)| k)
+                            .collect();
                         let opts = ExportOptions {
                             explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text == 2) || f.raster(),
                             strokes: f.cad(),
@@ -410,6 +408,11 @@ fn rasterize(svg: &[u8], f: DrawingFormat, cx: &App) -> Result<Vec<u8>, String> 
     Ok(out.into_inner())
 }
 
+/// AutoCAD 2013 (DWT exports always use it).
+fn acadrust_2013() -> noshape_model::drawing::cad_export::CadVersion {
+    noshape_model::drawing::cad_export::VERSIONS[1].1
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_sheet_range;
@@ -422,7 +425,3 @@ mod tests {
     }
 }
 
-/// AutoCAD 2013 (DWT exports always use it).
-fn acadrust_2013() -> noshape_model::drawing::cad_export::CadVersion {
-    noshape_model::drawing::cad_export::VERSIONS[1].1
-}

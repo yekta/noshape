@@ -16,8 +16,8 @@ fn step_schemas_and_units() {
     let dir = std::env::temp_dir().join(format!("noshape-export-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     for (schema, tag) in [(StepSchema::Ap242, "AP242"), (StepSchema::Ap214, "AUTOMOTIVE_DESIGN"), (StepSchema::Ap203, "CONFIG_CONTROL_DESIGN")] {
-        for (unit, utag) in [(LengthUnit::Millimeter, "MILLI"), (LengthUnit::Inch, "INCH")] {
-            let path = dir.join(format!("{tag}-{utag}.step"));
+        for (unit, utag) in [(LengthUnit::Millimeter, "MILLI"), (LengthUnit::Inch, "INCH"), (LengthUnit::Yard, "'YARD'")] {
+            let path = dir.join(format!("{tag}-{}.step", utag.trim_matches('\'')));
             write_step_with(&path, &[ExportShape { shape: s.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter, &StepOptions { schema, file_unit: Some(unit) }).unwrap();
             let text = std::fs::read_to_string(&path).unwrap();
             let header = text.split("ENDSEC").next().unwrap();
@@ -84,9 +84,10 @@ fn parasolid_round_trip() {
             let back = read_parasolid(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name} binary={binary}: {e}"));
             assert!(back.is_valid(), "{name} binary={binary}: invalid");
             assert_eq!(back.count(ShapeType::Solid), s.count(ShapeType::Solid), "{name}");
+            // Parasolid's faces: periodic ones (a revolved spline's spun face too) whole.
+            assert_eq!(back.count(ShapeType::Face), s.count(ShapeType::Face), "{name} binary={binary}: faces");
             let v = volume_properties(&back).unwrap().mass;
-            // Exact but for tolerant edges rebuilt from their fins' curves (loft:
-            // 1.1e-6) and OCCT's B-spline form of a revolved spline (2.9e-6).
+            // Exact but for tolerant edges rebuilt from their fins' curves.
             assert!((v - want).abs() < 5e-6 * want, "{name} binary={binary}: {v} vs {want}");
         }
     }
@@ -100,7 +101,7 @@ fn parasolid_round_trip() {
 }
 
 /// Sample files for checking in Onshape (live capture): every test part as
-/// .x_t, .x_b and .sat in $NOSHAPE_XT_SAMPLES (default /tmp/noshape-xt-samples),
+/// .x_t, .x_b, .sat, .pvz, .jt, .3dm (and OCCT's .brep) in $NOSHAPE_XT_SAMPLES (default /tmp/noshape-xt-samples),
 /// with their volumes in volumes.txt (mm³).
 #[test]
 #[ignore]
@@ -117,6 +118,7 @@ fn write_xt_samples() {
         write_pvz(&dir.join(format!("{stem}.pvz")), &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter).unwrap();
         write_jt(&dir.join(format!("{stem}.jt")), &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter).unwrap();
         let _ = write_rhino(&dir.join(format!("{stem}.3dm")), &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter, 8);
+        write_brep(&s, &dir.join(format!("{stem}.brep"))).unwrap();
         list += &format!("{stem}: {:.6} mm3, {} faces\n", volume_properties(&s).unwrap().mass * 1e9, s.count(ShapeType::Face));
     }
     std::fs::write(dir.join("volumes.txt"), list).unwrap();
@@ -293,4 +295,44 @@ fn pvz_structure() {
     write_pvz(&path, &three, LengthUnit::Meter).unwrap();
     check(&path, 3, "three");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// PVZ import (Onshape imports PVZ as meshes only, live G22/G23): our own
+/// files read back as closed mesh solids within tessellation error of the
+/// exact volume; Onshape's samples (outside the repo, skipped when absent)
+/// give Onshape's own mesh volumes, and the loft whose face meshes leave
+/// gaps stays open.
+#[test]
+fn pvz_import() {
+    let dir = std::env::temp_dir().join(format!("noshape-pvz-import-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, s) in xt_parts() {
+        let path = dir.join(format!("{}.pvz", name.replace(' ', "-")));
+        write_pvz(&path, &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter).unwrap();
+        let back = read_pvz(&path, LengthUnit::Meter, 0).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(back.count(ShapeType::Solid), 1, "{name}: not a closed mesh");
+        let (v, want) = (volume_properties(&back).unwrap().mass, volume_properties(&s).unwrap().mass);
+        assert!((v - want).abs() < 5e-3 * want, "{name}: {v} vs {want}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    let samples = std::path::Path::new("/root/onshape-research/live/samples");
+    let mm3 = |s: &Shape| volume_properties(s).unwrap().mass * 1e9;
+    if let Ok(s) = read_pvz(&samples.join("pvz-fillet.pvz"), LengthUnit::Meter, 20_000) {
+        assert_eq!(s.count(ShapeType::Solid), 1);
+        assert!((mm3(&s) - 7484.089596687392).abs() < 1e-6, "{}", mm3(&s));
+    }
+    if let Ok(s) = read_pvz(&samples.join("pvz-shapes.pvz"), LengthUnit::Meter, 20_000) {
+        // Cone, Loft, Torus, Cylinder; the loft is a shell.
+        let solids: Vec<f64> = s.solids().iter().map(mm3).collect();
+        assert_eq!(solids.len(), 3, "{solids:?}");
+        for want in [1569.176626930149, 1770.239206699627, 9407.77811303131] {
+            assert!(solids.iter().any(|v| (v - want).abs() < 1e-5), "{want} not in {solids:?}");
+        }
+        assert_eq!(s.count(ShapeType::Shell), 4);
+    }
+    if let Ok(s) = read_pvz(&samples.join("pvz-rot-asm.pvz"), LengthUnit::Meter, 20_000) {
+        // Second instance: 90° about z, then +50 mm x.
+        let b = s.solids()[1].bounding_box(true).unwrap();
+        assert!((b.min - DVec3::new(0.03, 0.0, 0.0)).length() < 1e-9 && (b.max - DVec3::new(0.05, 0.04, 0.01)).length() < 1e-9, "{b:?}");
+    }
 }

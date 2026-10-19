@@ -66,7 +66,10 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let nfaces = b.faces.len() as u64;
         used.insert(key);
         let cached = meshes.get(&key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)).map(|(_, p, m)| (*p, m.clone()));
+        // An open composite's members are drawn themselves.
+        let open_composite = b.composite.as_ref().is_some_and(|c| !c.closed);
         let mesh = match cached {
+            _ if open_composite => Arc::new(MeshBuffers::default()),
             Some((preview, m)) => {
                 needs_refine |= preview;
                 m
@@ -119,6 +122,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             edge_refs: b.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
             vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
             bounds,
+            composite: b.composite.clone(),
         });
     }
     meshes.retain(|k, _| used.contains(k));

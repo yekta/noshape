@@ -64,3 +64,8 @@ debug = "line-tables-only"
 # vendor/gpui-pre-linux/src/custom_cursor.rs.
 [patch.crates-io]
 gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
+# NOSHAPE PATCH (agent nav): gpui's macOS platform exposes whether a right
+# press was a converted Ctrl+left click (`last_right_press_was_ctrl_click`),
+# so the viewport can treat it as Chrome on macOS does. Only the lines marked
+# "NOSHAPE PATCH" in src/window.rs and src/gpui_macos.rs differ from 0.3.9.
+gpui-pre-macos = { path = "vendor/gpui-pre-macos" }

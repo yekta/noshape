@@ -27,7 +27,7 @@ namespace {
 jt::Part jt_part(const TopoDS_Shape& shape, const std::string& name)
 {
   // A copy: meshing stores triangulations on the faces, which must not touch the model's.
-  const TopoDS_Shape prepared = BRepBuilderAPI_Copy(exchange_prepared(shape), true, false).Shape();
+  const TopoDS_Shape prepared = BRepBuilderAPI_Copy(exchange_prepared(shape, true), true, false).Shape();
   jt::Part           part;
   part.name = name.empty() ? "Part" : name;
   std::vector<TopoDS_Face> faces;

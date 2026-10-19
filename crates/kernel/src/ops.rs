@@ -167,6 +167,30 @@ pub fn sweep(profile: &Shape, path: &Shape, opts: &SweepOptions) -> Result<OpRes
 /// History args: sections in order, then the path.
 pub fn sweep_sections(sections: &[Shape], path: &Shape, opts: &SweepOptions) -> Result<OpResult> {
     require_nonempty(sections, "sweep sections")?;
+    let res = sweep_with(sections, path, opts);
+    // OCCT's corrected Frenet frame fails on helices; their Frenet frame is
+    // already the minimal-twist one (the profile turns with the helix, as in
+    // Parasolid: a tooth swept along a helix makes a thread).
+    if opts.mode == SweepMode::CorrectedFrenet
+        && opts.twist == 0.0
+        && !res.as_ref().is_ok_and(|r| r.shape.is_valid())
+        && let Ok(r) = sweep_with(sections, path, &SweepOptions { mode: SweepMode::Frenet, ..opts.clone() })
+        && r.shape.is_valid()
+    {
+        return Ok(r);
+    }
+    res
+}
+
+/// Sweep with the profile locked to faces (Onshape "Lock profile faces"): the
+/// profile keeps its orientation relative to the faces' normal along the
+/// path, which must lie on them. `opts.mode` is ignored. History as [`sweep`].
+pub fn sweep_locked_to_faces(sections: &[Shape], path: &Shape, faces: &Shape, opts: &SweepOptions) -> Result<OpResult> {
+    require_nonempty(sections, "sweep sections")?;
+    op(ffi::op_pipe_shell(&vec_to_list(sections), path.raw(), &sweep_opts(opts, 6), faces.raw()))
+}
+
+fn sweep_with(sections: &[Shape], path: &Shape, opts: &SweepOptions) -> Result<OpResult> {
     let (mode, dir, xdir) = match opts.mode {
         SweepMode::CorrectedFrenet => (0, DVec3::Z, DVec3::X),
         SweepMode::Frenet => (1, DVec3::Z, DVec3::X),
@@ -174,10 +198,16 @@ pub fn sweep_sections(sections: &[Shape], path: &Shape, opts: &SweepOptions) -> 
         SweepMode::Binormal(b) => (3, b, DVec3::X),
         SweepMode::Discrete => (5, DVec3::Z, DVec3::X),
     };
-    let o = ffi::SweepOpts {
+    let o = ffi::SweepOpts { dir: p3(dir), xdir: p3(xdir), ..sweep_opts(opts, mode) };
+    let l = vec_to_list(sections);
+    op(ffi::op_pipe_shell(&l, path.raw(), &o, Shape::null().raw()))
+}
+
+fn sweep_opts(opts: &SweepOptions, mode: u8) -> ffi::SweepOpts {
+    ffi::SweepOpts {
         mode,
-        dir: p3(dir),
-        xdir: p3(xdir),
+        dir: p3(DVec3::Z),
+        xdir: p3(DVec3::X),
         make_solid: opts.solid,
         transition: match opts.transition {
             SweepTransition::Transformed => 1,
@@ -187,9 +217,7 @@ pub fn sweep_sections(sections: &[Shape], path: &Shape, opts: &SweepOptions) -> 
         with_contact: opts.with_contact,
         with_correction: opts.with_correction,
         twist: opts.twist,
-    };
-    let l = vec_to_list(sections);
-    op(ffi::op_pipe_shell(&l, path.raw(), &o, Shape::null().raw()))
+    }
 }
 
 /// Simple pipe sweep (BRepOffsetAPI_MakePipe, corrected Frenet). Accepts faces

@@ -2,6 +2,7 @@
 //! and the view / dimension / annotation tools (with live previews).
 
 use crate::drawing_scene::Overlay;
+use crate::navigation as nav;
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::build::PickTarget;
@@ -135,6 +136,19 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        if self.weld_dlg.is_some() {
+            self.close_weld_dlg(false, cx);
+            return;
+        }
+        if self.stack_dlg.take().is_some() {
+            cx.notify();
+            return;
+        }
+        if self.callout_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
+            self.callout_dlg = None;
+            cx.notify();
+            return;
+        }
         if self.detail_escape(cx) {
             return;
         }
@@ -264,6 +278,7 @@ impl DrawingEditor {
             Tool::Ordinate { horizontal: None, .. } => "Move up/down (x values) or sideways (y values) and click to place the zero",
             Tool::Ordinate { .. } => "Select points to dimension (Esc to finish)",
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => "Click to place the table (top-right corner)",
+            Tool::Table { kind: TableTool::Bom | TableTool::CutList, .. } => "Click to place the table",
             Tool::Table { view: None, .. } => "Select the view the table is for",
             Tool::Table { kind: TableTool::Hole, origin: None, .. } => "Select the origin (a vertex or circle center)",
             Tool::Table { .. } => "Click to place the table (top-right corner)",
@@ -271,6 +286,8 @@ impl DrawingEditor {
             Tool::Datum { anchor: None } => "Click the edge or point the datum is attached to",
             Tool::Datum { .. } => "Click to place the datum box",
             Tool::SurfaceFinish => "Click the edge the symbol sits on",
+            Tool::Weld if self.weld_dlg.as_ref().is_some_and(|d| d.target.is_some()) => "Click to place the symbol",
+            Tool::Weld => "Select an entity to associate the symbol",
             Tool::RevisionCallout { .. } => "Click to place the revision callout",
             _ => return None,
         })
@@ -497,9 +514,16 @@ impl DrawingEditor {
             Tool::Balloon { anchor: Some(a) } => {
                 // In assembly views a callout on a part shows its BOM item (empty text = linked).
                 let linked = views::view_source(self.current_sheet(), a.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) && a.r.is_some();
-                let n = self.current_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Balloon { .. })).count() + 1;
-                let text = if linked { String::new() } else { n.to_string() };
-                Some(ann(AnnotationKind::Balloon { view: a.view, anchor: a.p, text }, vec![(0, a.r.clone())]))
+                // The Callout dialog's texts and border (empty centre = the
+                // BOM item number).
+                let (text, style) = self.callout_values_now().unwrap_or_default();
+                let mut kind = AnnotationKind::balloon(a.view, a.p, text);
+                // On an assembly part (a face): a dot instead of an arrow.
+                if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+                    *callout = style;
+                    callout.on_face = linked;
+                }
+                Some(ann(kind, vec![(0, a.r.clone())]))
             }
             _ => None,
         }
@@ -535,6 +559,10 @@ impl DrawingEditor {
                 // Insert view panel › View scale (None: the sheet scale), View simplification.
                 v.scale = self.insert.scale;
                 v.simplification = Some(self.insert.simplification);
+                v.flat = self.insert.flat;
+                // All views of a part use the same version: a pinned
+                // reference pins the new view too.
+                v.pinned = self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone());
                 // A sketch view faces its sketch plane.
                 if let Some(f) = &self.insert.sketch {
                     v.sketch = Some(*f);
@@ -624,6 +652,7 @@ impl DrawingEditor {
             | Tool::Table { kind: TableTool::Hole, origin: None, .. }
             | Tool::Datum { anchor: None }
             | Tool::Note
+            | Tool::Weld
             | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
@@ -703,6 +732,7 @@ impl DrawingEditor {
                 }
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
+            Tool::Weld => self.weld_overlay(&mut overlay),
             Tool::Note if self.note_leader.is_some() => {
                 if let Some(a) = self.note_leader.as_ref().and_then(|l| Some(self.placement(l.view?)?.to_sheet(l.point))) {
                     overlay.lines.push((vec![a, self.cursor], true));
@@ -776,6 +806,9 @@ impl DrawingEditor {
             return;
         }
         if matches!(self.tool, Tool::Detail { .. }) && self.detail_click(cx) {
+            return;
+        }
+        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) {
             return;
         }
         if self.extra_tool_click(window, cx) {
@@ -1063,9 +1096,20 @@ impl DrawingEditor {
             Tool::Balloon { anchor: None } => {
                 if let Some(p) = self.any_point(c) {
                     self.tool = Tool::Balloon { anchor: Some(p) };
+                } else {
+                    // Empty space: a callout without a leader, right there.
+                    self.refresh_callout_values(cx);
+                    let (text, style) = self.callout_values_now().unwrap_or_default();
+                    let mut kind = AnnotationKind::balloon(ViewId(0), c, text);
+                    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+                        *callout = noshape_model::drawing::CalloutStyle { free: true, ..style };
+                    }
+                    let id = self.current_sheet().next_annotation_id();
+                    self.edit_sheet("Callout", cx, |s| s.annotations.push(Annotation { id, kind, position: c, ..Default::default() }));
                 }
             }
             Tool::Balloon { anchor: Some(_) } => {
+                self.refresh_callout_values(cx);
                 if let Some(a) = self.pending_annotation() {
                     self.edit_sheet("Callout", cx, |s| s.annotations.push(a));
                     self.tool = Tool::Balloon { anchor: None };
@@ -1084,6 +1128,13 @@ impl DrawingEditor {
         window.focus(&self.focus, cx);
         if self.shortcut_toolbar.take().is_some() {
             cx.notify();
+        }
+        // Double middle click: zoom to fit (live navigation/45-46).
+        if e.button == MouseButton::Middle && e.click_count >= 2 {
+            self.drag = Drag::None;
+            self.zoom_to_fit(cx);
+            cx.stop_propagation();
+            return;
         }
         if e.button == MouseButton::Left && self.painter.is_some() && self.painter_click(cx) {
             cx.stop_propagation();
@@ -1145,7 +1196,7 @@ impl DrawingEditor {
         cx.stop_propagation();
     }
 
-    pub fn on_mouse_move(&mut self, e: &MouseMoveEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         if self.zoom_window_move(lp, cx) {
@@ -1155,7 +1206,18 @@ impl DrawingEditor {
             && len(sub(lp, start_px)) > 3.0
         {
             self.drag = match button {
-                MouseButton::Right | MouseButton::Middle => Drag::Pan { last_px: start_px },
+                MouseButton::Right | MouseButton::Middle => {
+                    // Preferences › Mouse controls, "2D Drawing" column
+                    // (default: right or middle drag, with or without Ctrl, pans).
+                    let mut buttons = nav::Buttons::default();
+                    buttons.set(button, true);
+                    let r = nav::ModeResolver::new(nav::MouseControls::current(), nav::Space::Drawing);
+                    match r.resolve(buttons, r.input_key(e.modifiers.into()), nav::Mode::None) {
+                        nav::Mode::Pan => Drag::Pan { last_px: start_px },
+                        nav::Mode::Zoom => Drag::Zoom { anchor: start_px, last_px: start_px },
+                        _ => Drag::None,
+                    }
+                }
                 MouseButton::Left if matches!(self.tool, Tool::Select) => {
                     // Alt+drag copies: a duplicate stays, the dragged one moves.
                     if e.modifiers.alt {
@@ -1167,6 +1229,12 @@ impl DrawingEditor {
             };
         }
         match self.drag.clone() {
+            Drag::Zoom { anchor, last_px } => {
+                // Drag zoom: device pixels / DRAG_ZOOM_FACTOR, up zooms in.
+                let amount = -(lp[1] - last_px[1]) * window.scale_factor() as f64 / nav::DRAG_ZOOM_FACTOR;
+                self.zoom_by(1.0 / nav::zoom_scale(amount), anchor, cx);
+                self.drag = Drag::Zoom { anchor, last_px: lp };
+            }
             Drag::Pan { last_px } => {
                 self.center[0] -= (lp[0] - last_px[0]) / self.zoom;
                 self.center[1] += (lp[1] - last_px[1]) / self.zoom;
@@ -1186,10 +1254,14 @@ impl DrawingEditor {
                             v.position = [p[0] + d[0], p[1] + d[1]];
                         }
                     }
+                    // Notes and callouts grouped with a moved view go along.
+                    for a in s.annotations.iter_mut().filter(|a| a.view_group.is_some_and(|v| orig.iter().any(|(o, _)| *o == v))) {
+                        a.position = [a.position[0] + d[0], a.position[1] + d[1]];
+                    }
                 }
                 self.set_preview(Some(dr), cx);
             }
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
@@ -1205,6 +1277,15 @@ impl DrawingEditor {
                 }
                 let a = self.dragged_annotation(&orig, start);
                 let mut dr = self.drawing.clone();
+                // Group annotation: the other members follow (not with Shift).
+                if let (Some(g), false) = (orig.ann_group, e.modifiers.shift)
+                    && let Some(s) = dr.sheets.get_mut(self.sheet)
+                {
+                    let d = sub(a.position, orig.position);
+                    for x in s.annotations.iter_mut().filter(|x| x.ann_group == Some(g) && x.id != orig.id) {
+                        x.position = [x.position[0] + d[0], x.position[1] + d[1]];
+                    }
+                }
                 if let Some(s) = dr.sheets.get_mut(self.sheet)
                     && let Some(x) = s.annotations.iter_mut().find(|x| x.id == a.id)
                 {
@@ -1365,13 +1446,15 @@ impl DrawingEditor {
                     self.commit(if matches!(drag, Drag::MoveImage { .. }) { "Move image" } else { "Move sketch" }, p, cx);
                 }
             }
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
                 let name = match drag {
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
                     Drag::ResizeTable { .. } => "Resize table",
                     Drag::MoveSectionLine { .. } => "Move cutting line",
                     Drag::MoveSectionPoint { .. } => "Edit cutting line",
+                    Drag::NoteGrip { grip: 2, .. } => "Rotate note",
+                    Drag::NoteGrip { .. } => "Resize note",
                     _ => "Move detail circle",
                 };
                 if let Some(p) = self.preview.take() {
@@ -1383,16 +1466,22 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Wheel / two-finger scroll: zoom about the pointer with Onshape's amounts
+    /// (navigation.rs); horizontal scrolls do nothing.
     pub fn on_scroll(&mut self, e: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let lp = self.local(e.position);
-        let dy = match e.delta {
-            ScrollDelta::Lines(l) => l.y as f64 * 40.0,
-            ScrollDelta::Pixels(px) => f64::from(f32::from(px.y)),
-        };
-        if dy.abs() < 0.01 {
+        let reverse = nav::MouseControls::current().reverse_scroll;
+        let Some(amount) = nav::wheel_zoom_amount(e.delta, nav::Platform::current(), reverse, e.modifiers.shift) else { return };
+        self.zoom_by(1.0 / nav::zoom_scale(amount), lp, cx);
+    }
+
+    /// Trackpad pinch: the sheet scales with the fingers about their centre.
+    pub fn on_pinch(&mut self, e: &PinchEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if e.delta == 0.0 {
             return;
         }
-        self.zoom_by((dy * 0.0025).exp(), lp, cx);
+        let lp = self.local(e.position);
+        self.zoom_by(nav::pinch_ratio(e.delta), lp, cx);
     }
 
     pub fn on_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -1519,6 +1608,9 @@ impl DrawingEditor {
     }
 
     fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
+        if let Some(d) = self.note_grip_drag(start) {
+            return d;
+        }
         if let Some(d) = self.extra_start_drag(pick, start) {
             return d;
         }
@@ -1634,6 +1726,7 @@ impl DrawingEditor {
                 let note = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 match note {
                     Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => self.open_note_panel(Some(id), position, window, cx),
+                    Some(Annotation { kind: AnnotationKind::Weld { .. }, .. }) => self.open_weld_edit(id, window, cx),
                     Some(a) => self.open_annotation_panel(&a, window, cx),
                     None => {}
                 }
@@ -1730,6 +1823,52 @@ impl DrawingEditor {
                         }));
                     }
                     out.extend(self.annotation_extra_entries(a));
+                    // Group / Remove from group (with a selected view), Group
+                    // annotation / Remove annotation from group (notes, callouts).
+                    if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. }) {
+                        let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+                        let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
+                        if a.view_group.is_some() {
+                            out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.view_group = None))));
+                        } else if let Some(v) = sel_view {
+                            let ids = anns.clone();
+                            out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.view_group = Some(v)))));
+                        }
+                        if a.ann_group.is_some() {
+                            let ids = anns.clone();
+                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = None))));
+                        } else if anns.iter().collect::<std::collections::HashSet<_>>().len() >= 2 {
+                            let ids = anns.clone();
+                            out.push(MenuEntry::item("Group annotation", move |t, _, cx| {
+                                let g = t.current_sheet().annotations.iter().filter_map(|x| x.ann_group).max().unwrap_or(0) + 1;
+                                t.edit_sheet("Group annotation", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = Some(g)));
+                            }));
+                        }
+                    }
+                    // Copy (with the rest of the selection).
+                    if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. } | AnnotationKind::HoleCallout { .. }) {
+                        out.push(MenuEntry::item("Copy", move |t, _, cx| {
+                            if !t.selection.contains(&Sel::Annotation(id)) {
+                                t.selection = vec![Sel::Annotation(id)];
+                            }
+                            t.copy_entities(cx);
+                        }));
+                    }
+                    // Move to ▸ a format layer (or back to the drawing).
+                    if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::Datum { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. }) {
+                        let cur = a.layer;
+                        let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
+                        let items = layers
+                            .filter(|l| *l != cur)
+                            .map(|l| {
+                                MenuEntry::item(l.name(), move |t, _, cx| {
+                                    let ids: Vec<u64> = t.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
+                                    t.edit_sheet("Move to", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.layer = l));
+                                })
+                            })
+                            .collect();
+                        out.push(MenuEntry::Submenu("Move to".into(), items));
+                    }
                     if !a.refs.is_empty() {
                         out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
                             t.edit_sheet("Detach", cx, |s| {

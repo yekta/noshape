@@ -7,7 +7,7 @@ use super::{FsContext, context_arg, convert::*, raise_error, run_op, run_op_with
 use crate::display::BodyKind;
 use crate::naming::{Name, ShapeNames};
 use crate::params::{ParamValue, ParamValues};
-use crate::reference::{BodyId, Reference, Role, Source};
+use crate::reference::{BodyId, Reference, Role, Source, TopoName};
 use crate::regen::context::{Connector, PlaneEntity, PointEntity};
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, err, kernel_plane, split_solids, sweep_names};
 use crate::regen::features::helpers_a::{copy_names, push_body};
@@ -47,6 +47,11 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opCreateBSplineCurve", op_create_bspline_curve),
     ("opExtractSurface", op_extract_surface),
     ("opSplitFace", op_split_face),
+    ("opSplitEdges", op_split_edges),
+    ("opExtendSheetBody", op_extend_sheet_body),
+    ("opFillSurface", op_fill_surface),
+    ("opBoundarySurface", op_boundary_surface),
+    ("opIntersectFaces", op_intersect_faces),
     ("opFlipOrientation", op_flip_orientation),
     ("opReplaceFace", op_replace_face),
     ("opMoveFace", op_move_face),
@@ -739,7 +744,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let targets = evaluate_refs(i, &cx, def.get("targets"))?;
     let tool_refs = evaluate_refs(i, &cx, def.get("tool"))?;
     let keep_tools = def_bool(&def, "keepTools", false);
-    run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
+    let split_targets = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
         let mut tools: Vec<Shape> = Vec::new();
         for r in &tool_refs {
             if let Some(p) = matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_)).then(|| ev.resolve_plane(r)).flatten() {
@@ -752,6 +757,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if tools.is_empty() {
             return err("Select a tool");
         }
+        let target_ids: Vec<BodyId> = ev.resolve_bodies(&targets).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect();
         for bi in ev.resolve_bodies(&targets).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             let res = k::split(std::slice::from_ref(&body.shape), &tools, &Default::default())?;
@@ -763,8 +769,15 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let ids: Vec<BodyId> = tool_bodies.iter().filter_map(|b| ev.ctx.bodies.get(*b).map(|x| x.id.clone())).collect();
             ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
         }
-        Ok(())
+        Ok(target_ids)
     })?;
+    // Split pieces are "created by" the split and by the original's creator
+    // (std query.fs, qCreatedBy).
+    let mut st = cx.state.lock();
+    let pieces: Vec<BodyId> = st.ctx.bodies.iter().map(|b| b.id.clone()).filter(|b| !split_targets.contains(b) && st.body_creator(b).as_deref() == Some(&id[..])).collect();
+    for piece in pieces {
+        st.record_merge(&piece, &split_targets, &id);
+    }
     Ok(Value::Undefined)
 }
 
@@ -872,6 +885,126 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
+/// opSplitEdges: split edges at parameters (one array per edge, 0..1, by
+/// arc length when asked) or where a surface / plane crosses them.
+fn op_split_edges(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let edges = evaluate_refs(i, &cx, def.get("edges"))?;
+    let surface_refs = match plane_of(def.get("splittingSurface")) {
+        Some(_) => Vec::new(),
+        None => evaluate_refs(i, &cx, def.get("splittingSurface"))?,
+    };
+    let plane = plane_of(def.get("splittingSurface"));
+    let params: Vec<Vec<f64>> = def.get("parameters").as_array().map(|a| a.iter().map(|p| p.as_array().map(|x| x.iter().filter_map(|v| v.as_number()).collect()).unwrap_or_default()).collect()).unwrap_or_default();
+    let arc = def_bool(&def, "arcLengthParameterization", true);
+    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let mut tools: Vec<Shape> = Vec::new();
+        if let Some(p) = &plane {
+            tools.push(k::make_plane_face(&kernel_plane(p), -1e3, 1e3, -1e3, 1e3)?);
+        }
+        tools.extend(ev.resolve_faces(&surface_refs).iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()));
+        let found = ev.resolve_edges(&edges);
+        let mut per_body: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
+        for (k_, (bi, ei)) in found.iter().enumerate() {
+            let body = &ev.ctx.bodies[*bi];
+            let edge = body.shape.sub_shape(ShapeType::Edge, *ei)?;
+            let info = edge.edge_info()?;
+            for t in params.get(k_).into_iter().flatten() {
+                let u = super::evaluate::edge_param(&edge, &info, *t, arc);
+                per_body.entry(*bi).or_default().push(k::make_vertex(edge.point_at(u)?)?);
+            }
+            if !tools.is_empty() {
+                per_body.entry(*bi).or_default().extend(tools.iter().cloned());
+            }
+        }
+        if per_body.is_empty() {
+            return err("Select edges to split.");
+        }
+        for (bi, cutters) in per_body.into_iter().rev() {
+            let body = ev.ctx.bodies[bi].clone();
+            let res = k::split(std::slice::from_ref(&body.shape), &cutters, &Default::default())?;
+            let names = body.shape_names();
+            let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
+            ev.replace_body(bi, res.shape, faces);
+        }
+        Ok(())
+    })?;
+    Ok(Value::Undefined)
+}
+
+/// opExtendSheetBody: Move boundary's evaluator (blind extension).
+fn op_extend_sheet_body(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let entities = evaluate_refs(i, &cx, def.get("entities"))?;
+    let blind = def_enum(&def, "endCondition").is_none_or(|e| &*e == "EXTEND_BLIND");
+    let dist = def_length_opt(&def, "extendDistance").unwrap_or(0.0);
+    let mut p = ParamValues::default();
+    p.set("entities", ParamValue::Query(entities));
+    p.set("endCondition", ParamValue::Enum(if blind { "BLIND" } else { "UP_TO_BODY" }.into()));
+    p.set("extendDistance", length_param(dist.abs()));
+    p.set("oppositeDirection", ParamValue::Bool(dist < 0.0));
+    p.set("tangentPropagation", ParamValue::Bool(def_bool(&def, "tangentPropagation", true)));
+    p.set("maintainCurvature", ParamValue::Bool(def_enum(&def, "extensionShape").is_some_and(|e| &*e == "SOFT")));
+    run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::extend_surface)?;
+    Ok(Value::Undefined)
+}
+
+/// opFillSurface: Fill's evaluator, one boundary item per continuity.
+fn op_fill_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let mut items = Vec::new();
+    for (key, continuity) in [("edgesG0", "G0"), ("edgesG1", "G1"), ("edgesG2", "G2")] {
+        let edges = evaluate_refs(i, &cx, def.get(key))?;
+        if edges.is_empty() {
+            continue;
+        }
+        let mut item = ParamValues::default();
+        item.set("entities", ParamValue::Query(edges));
+        item.set("continuity", ParamValue::Enum(continuity.into()));
+        items.push(item);
+    }
+    let guides = evaluate_refs(i, &cx, def.get("guideVertices"))?;
+    let mut p = ParamValues::default();
+    p.set("surfaceOperationType", ParamValue::Enum("NEW".into()));
+    p.set("edges", ParamValue::Array(items));
+    p.set("addGuides", ParamValue::Bool(!guides.is_empty()));
+    p.set("guideEntities", ParamValue::Query(guides));
+    p.set("constraintMode", ParamValue::Enum("PRECISE".into()));
+    run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::fill)?;
+    Ok(Value::Undefined)
+}
+
+/// opBoundarySurface: Boundary surface's evaluator, one profile item per
+/// subquery. `uDerivativeInfo` / `vDerivativeInfo` conditions are not
+/// applied yet (profiles get the default condition).
+fn op_boundary_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let mut p = ParamValues::default();
+    p.set("surfaceOperationType", ParamValue::Enum("NEW".into()));
+    for uv in ["u", "v"] {
+        let mut items = Vec::new();
+        for q in def.get(&format!("{uv}ProfileSubqueries")).as_array().map(|a| a.iter().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+            let mut item = ParamValues::default();
+            item.set(&format!("{uv}ProfileEntities"), ParamValue::Query(evaluate_refs(i, &cx, &q)?));
+            item.set(&format!("{uv}Condition"), ParamValue::Enum("DEFAULT".into()));
+            items.push(item);
+        }
+        p.set(&format!("{uv}ProfilesArray"), ParamValue::Array(items));
+    }
+    run_op_with(i, &cx, &id, "BSURF_FAILED", &p, crate::regen::features::surfaces::boundary_surface)?;
+    Ok(Value::Undefined)
+}
+
+/// opIntersectFaces: Intersection curve's evaluator (tools vs targets).
+fn op_intersect_faces(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let mut p = ParamValues::default();
+    p.set("group1", ParamValue::Query(evaluate_refs(i, &cx, def.get("tools"))?));
+    p.set("group2", ParamValue::Query(evaluate_refs(i, &cx, def.get("targets"))?));
+    run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::curves::intersection_curve)?;
+    Ok(Value::Undefined)
+}
+
 /// opFlipOrientation: reverse sheet bodies.
 fn op_flip_orientation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
@@ -903,8 +1036,32 @@ fn op_offset_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("moveFaceType", ParamValue::Enum("OFFSET".into()));
     p.set("moveFaces", ParamValue::Query(faces));
     p.set("offsetDistance", length_param(dist));
-    run_op_with(i, &cx, &id, "DIRECT_EDIT_OFFSET_FACE_FAILED", &p, crate::regen::features::direct::move_face)?;
+    run_op_with(i, &cx, &id, "DIRECT_EDIT_OFFSET_FACE_FAILED", &p, |ev| {
+        crate::regen::features::direct::move_face(ev)?;
+        keep_modified_names(ev);
+        Ok(())
+    })?;
     Ok(Value::Undefined)
+}
+
+/// A direct edit modifies the part's faces, it doesn't create them (Onshape:
+/// qCreatedBy(part feature) still finds them). OCCT's offset history reports
+/// every face as generated, so the evaluator names them `Offset(parent)` under
+/// the operation; give them their parents' names back.
+fn keep_modified_names(ev: &mut EvalCtx) {
+    let marker = ev.feature;
+    let parent = |f: &Name| match &**f {
+        TopoName::Face { feature, role: Role::Offset(p) } if *feature == marker => Some(p.clone()),
+        _ => None,
+    };
+    for bi in (0..ev.ctx.bodies.len()).rev() {
+        let b = ev.ctx.bodies[bi].clone();
+        if !b.faces.iter().any(|f| parent(f).is_some()) {
+            continue;
+        }
+        let faces: Vec<Name> = b.faces.iter().map(|f| parent(f).unwrap_or_else(|| f.clone())).collect();
+        ev.replace_body(bi, b.shape.clone(), faces);
+    }
 }
 
 /// opReplaceFace: Replace face's evaluator.

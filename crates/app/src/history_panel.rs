@@ -12,6 +12,7 @@ use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
+use noshape_model::document::{TabContent, TabId};
 use noshape_store::{BranchId, MicroversionId, VersionGraph};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -32,6 +33,61 @@ enum RowKind {
     Version,
     Start,
     Change,
+}
+
+/// The search ▾ panel's "Modified by" choices.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum ModifiedBy {
+    #[default]
+    Any,
+    OnlyMe,
+    NotMe,
+}
+
+impl ModifiedBy {
+    fn label(self) -> &'static str {
+        match self {
+            ModifiedBy::Any => "Any",
+            ModifiedBy::OnlyMe => "Only me",
+            ModifiedBy::NotMe => "Not me",
+        }
+    }
+}
+
+/// The history filter (live documents/117): tab, tab types, author and a
+/// time range (ms).
+#[derive(Clone, Default, PartialEq)]
+struct HistoryFilter {
+    tab: Option<TabId>,
+    kinds: Vec<&'static str>,
+    by: ModifiedBy,
+    from: Option<i64>,
+    to: Option<i64>,
+}
+
+impl HistoryFilter {
+    fn is_active(&self) -> bool {
+        *self != HistoryFilter::default()
+    }
+}
+
+/// Tab types of the filter panel, in Onshape's order (kind, icon, tooltip).
+const FILTER_KINDS: [(&str, &str, &str); 5] = [("partstudio", "part-studio", "Part Studio"), ("assembly", "assembly", "Assembly"), ("drawing", "drawing", "Drawing"), ("featurestudio", "feature-studio", "Feature Studio"), ("file", "file", "File")];
+
+fn filter_kind(c: &TabContent) -> &'static str {
+    match c {
+        TabContent::PartStudio(_) => "partstudio",
+        TabContent::Assembly(_) => "assembly",
+        TabContent::Drawing(_) => "drawing",
+        TabContent::FeatureStudio(_) => "featurestudio",
+        TabContent::File(_) => "file",
+        TabContent::VariableStudio(_) | TabContent::MaterialLibrary(_) => "",
+    }
+}
+
+/// Is `author` the local user (Preferences name, OS full name or login)?
+fn is_me(author: &str) -> bool {
+    !author.is_empty() && [noshape_store::local_user_name(), noshape_store::os_user_name(), noshape_store::os_login()].iter().any(|n| n == author)
 }
 
 /// One row of the table: a workspace (branch head), a version, the Start
@@ -56,9 +112,19 @@ pub struct HistoryPanel {
     query: String,
     /// Rows whose "Show changes…" is open.
     expanded: HashSet<String>,
-    show_graph: bool,
-    /// Every row shows its changes (Onshape's automatic versions toggle).
-    show_all_changes: bool,
+    /// Onshape's two toggles under the search box (live documents/118–119,
+    /// both on by default): hide merges, hide automatic versions.
+    hide_merges: bool,
+    hide_auto_versions: bool,
+    /// The search ▾ filter panel (live documents/117): open, the fields
+    /// being edited, and the filter its Search button applied.
+    filter_open: bool,
+    filter_edit: HistoryFilter,
+    filter: HistoryFilter,
+    date_from: Entity<InputState>,
+    date_to: Entity<InputState>,
+    /// Tabs each microversion changed (store diffs, for the Tab filters).
+    changed_tabs: HashMap<MicroversionId, Vec<TabId>>,
     /// Result of "Compare": (description of the older point, diff).
     compare: Option<(String, Vec<noshape_model::compare::TabDiff>)>,
     _subs: Vec<Subscription>,
@@ -79,7 +145,238 @@ impl HistoryPanel {
                 }
             }),
         ];
-        Self { doc, graph: None, search, query: String::new(), expanded: HashSet::new(), show_graph: true, show_all_changes: false, compare: None, _subs: subs }
+        let date_from = cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"));
+        let date_to = cx.new(|cx| InputState::new(window, cx).placeholder("mm/dd/yyyy, --:--"));
+        Self {
+            doc,
+            graph: None,
+            search,
+            query: String::new(),
+            expanded: HashSet::new(),
+            hide_merges: true,
+            hide_auto_versions: true,
+            filter_open: false,
+            filter_edit: HistoryFilter::default(),
+            filter: HistoryFilter::default(),
+            date_from,
+            date_to,
+            changed_tabs: HashMap::new(),
+            compare: None,
+            _subs: subs,
+        }
+    }
+
+    /// Does a microversion pass the applied filter?
+    fn change_matches(&mut self, m: &noshape_store::MicroversionInfo, cx: &App) -> bool {
+        let f = self.filter.clone();
+        match f.by {
+            ModifiedBy::Any => {}
+            ModifiedBy::OnlyMe => {
+                if !is_me(&m.author) {
+                    return false;
+                }
+            }
+            ModifiedBy::NotMe => {
+                if is_me(&m.author) {
+                    return false;
+                }
+            }
+        }
+        if f.from.is_some_and(|t| m.created < t) || f.to.is_some_and(|t| m.created > t) {
+            return false;
+        }
+        if f.tab.is_none() && f.kinds.is_empty() {
+            return true;
+        }
+        let session = &self.doc.read(cx).session;
+        let tabs = self
+            .changed_tabs
+            .entry(m.id)
+            .or_insert_with(|| {
+                let Some(parent) = m.parents.first() else { return Vec::new() };
+                session.store.diff(*parent, m.id).unwrap_or_default().iter().filter_map(|c| c.name.strip_prefix("tab/")).filter_map(|h| u64::from_str_radix(h, 16).ok()).map(TabId).collect()
+            })
+            .clone();
+        tabs.iter().any(|t| f.tab.is_none_or(|ft| ft == *t) && (f.kinds.is_empty() || session.doc.tab(*t).is_some_and(|tab| f.kinds.contains(&filter_kind(&tab.content)))))
+    }
+
+    /// Read the panel's date fields ("mm/dd/yyyy, hh:mm"; the time is optional).
+    fn read_dates(&mut self, cx: &App) {
+        let parse = |s: &str, end: bool| -> Option<i64> {
+            use chrono::{Local, NaiveDate, NaiveTime, TimeZone as _};
+            let s = s.trim();
+            let (d, t) = s.split_once(',').map(|(d, t)| (d.trim(), Some(t.trim()))).unwrap_or((s, None));
+            let date = NaiveDate::parse_from_str(d, "%m/%d/%Y").ok()?;
+            let time = match t.filter(|t| !t.is_empty() && !t.starts_with('-')) {
+                Some(t) => NaiveTime::parse_from_str(t, "%H:%M").or_else(|_| NaiveTime::parse_from_str(t, "%I:%M %p")).ok()?,
+                None if end => NaiveTime::from_hms_opt(23, 59, 59)?,
+                None => NaiveTime::MIN,
+            };
+            Local.from_local_datetime(&date.and_time(time)).single().map(|t| t.timestamp_millis())
+        };
+        self.filter_edit.from = parse(&self.date_from.read(cx).value(), false);
+        self.filter_edit.to = parse(&self.date_to.read(cx).value(), true);
+    }
+
+    /// The search ▾ panel (live documents/117, dom/documents-history-search-filter):
+    /// 260 px, white, 1 px `#d7d7d7`, radius 4, shadow 0 6 12 .2; 100 px label
+    /// column (11 px `#666`), 148 px fields; Reset | Search.
+    fn render_filter_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let doc = self.doc.read(cx).session.doc.clone();
+        let edit = self.filter_edit.clone();
+        let label = |t: &'static str| div().w(px(100.)).flex_none().pt(px(12.)).pl(px(4.)).text_size(px(11.)).text_color(rgb(0x666666)).child(t);
+        // Select lists hang under their field (bounds recorded on paint).
+        let (tab_anchor, by_anchor): (Rc<std::cell::Cell<Bounds<Pixels>>>, Rc<std::cell::Cell<Bounds<Pixels>>>) = Default::default();
+        let under = |a: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+            let b = a.get();
+            point(b.left(), b.bottom())
+        };
+        let select = |id: &'static str, text: String, anchor: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+            let probe = anchor.clone();
+            h_flex()
+                .id(id)
+                .relative()
+                .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                .w(px(148.))
+                .h(px(34.))
+                .pl(px(8.))
+                .pr(px(6.))
+                .border_b_1()
+                .border_color(rgb(0xeaeaea))
+                .cursor_pointer()
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .child(div().flex_1().min_w_0().truncate().child(text))
+                .child(os::glyph(os::GLYPH_CARET, 10., rgb(0x666666)))
+        };
+        let tab_name = edit.tab.and_then(|t| doc.tab(t)).map(|t| t.name.clone()).unwrap_or_else(|| "Any".into());
+        let view = cx.entity();
+        let tabs: Vec<(TabId, String)> = doc.tabs.iter().map(|t| (t.id, t.name.clone())).collect();
+        let ta = tab_anchor.clone();
+        let tab_select = select("hist-f-tab", tab_name, &tab_anchor).on_click(move |_: &ClickEvent, window, cx| {
+            let (view, tabs) = (view.clone(), tabs.clone());
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                m = m.select_list(148.);
+                let v = view.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new("Any").on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                    t.filter_edit.tab = None;
+                    cx.notify();
+                })));
+                for (id, name) in &tabs {
+                    let (v, id) = (view.clone(), *id);
+                    m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                        t.filter_edit.tab = Some(id);
+                        cx.notify();
+                    })));
+                }
+                m
+            });
+            crate::os_menu::open(under(&ta), menu, window, cx);
+        });
+        let view = cx.entity();
+        let ba = by_anchor.clone();
+        let by_select = select("hist-f-by", edit.by.label().into(), &by_anchor).on_click(move |_: &ClickEvent, window, cx| {
+            let view = view.clone();
+            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                m = m.select_list(148.);
+                for by in [ModifiedBy::Any, ModifiedBy::OnlyMe, ModifiedBy::NotMe] {
+                    let v = view.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(by.label()).on_click(move |_, _, cx| v.update(cx, |t, cx| {
+                        t.filter_edit.by = by;
+                        cx.notify();
+                    })));
+                }
+                m
+            });
+            crate::os_menu::open(under(&ba), menu, window, cx);
+        });
+        let mut types = h_flex().w(px(148.)).flex_wrap().gap(px(6.)).pl(px(3.)).pt(px(4.));
+        for (kind, icon, tip) in FILTER_KINDS {
+            let on = edit.kinds.contains(&kind);
+            types = types.child(crate::ui::icon_button(SharedString::from(format!("hist-f-kind-{kind}")), icon, 30., on, cx).tooltip(tip).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+                if let Some(i) = t.filter_edit.kinds.iter().position(|k| *k == kind) {
+                    t.filter_edit.kinds.remove(i);
+                } else {
+                    t.filter_edit.kinds.push(kind);
+                }
+                cx.notify();
+            })));
+        }
+        let any_kind = !edit.kinds.is_empty();
+        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().id(tip).tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
+        v_flex()
+            .id("hist-filter-panel")
+            .occlude()
+            .w(px(260.))
+            .bg(pal.panel)
+            .border_1()
+            .border_color(rgb(0xd7d7d7))
+            .rounded(px(4.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+            .px(px(5.))
+            .text_color(pal.text)
+            .on_mouse_down_out(cx.listener(|t, _: &MouseDownEvent, _, cx| {
+                if !crate::os_menu::is_open(cx) {
+                    t.filter_open = false;
+                    cx.notify();
+                }
+            }))
+            .child(h_flex().h(px(36.)).items_start().child(label("Tab")).child(tab_select))
+            .child(
+                h_flex()
+                    .mt(px(14.))
+                    .items_start()
+                    .child(label("Tab types"))
+                    .child(
+                        v_flex().w(px(148.)).child(types).child(
+                            h_flex().justify_end().pt(px(3.)).child(
+                                div()
+                                    .id("hist-f-clear")
+                                    .h(px(27.))
+                                    .px(px(7.))
+                                    .flex()
+                                    .items_center()
+                                    .rounded(px(3.5))
+                                    .border_1()
+                                    .border_color(rgb(0xaaaaaa))
+                                    .text_size(px(12.25))
+                                    .text_color(rgb(0x999999))
+                                    .when(!any_kind, |d| d.opacity(0.4))
+                                    .when(any_kind, |d| d.cursor_pointer().text_color(pal.text))
+                                    .child("Clear")
+                                    .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                        t.filter_edit.kinds.clear();
+                                        cx.notify();
+                                    })),
+                            ),
+                        ),
+                    ),
+            )
+            .child(h_flex().mt(px(14.)).h(px(36.)).items_start().child(label("Modified by")).child(by_select))
+            .child(h_flex().mt(px(14.)).items_start().child(label("Date modified")).child(v_flex().gap(px(14.)).child(date(&self.date_from, "Start date", cx)).child(date(&self.date_to, "End date", cx))))
+            .child(
+                h_flex()
+                    .justify_end()
+                    .gap(px(4.))
+                    .pt(px(14.))
+                    .pb(px(10.))
+                    .pr(px(5.))
+                    .child(os::secondary_button("hist-f-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, window, cx| {
+                        t.filter_edit = HistoryFilter::default();
+                        t.filter = HistoryFilter::default();
+                        t.date_from.update(cx, |s, cx| s.set_value("", window, cx));
+                        t.date_to.update(cx, |s, cx| s.set_value("", window, cx));
+                        cx.notify();
+                    })))
+                    .child(os::primary_button("hist-f-search", "Search").on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                        t.read_dates(cx);
+                        t.filter = t.filter_edit.clone();
+                        t.filter_open = false;
+                        cx.notify();
+                    }))),
+            )
+            .into_any_element()
     }
 
     fn graph(&mut self, cx: &App) -> VersionGraph {
@@ -450,11 +747,22 @@ impl Render for HistoryPanel {
         // Lay out rows (with open "Show changes…" lists) to place the graph.
         let mut placed: Vec<Placed> = Vec::new();
         let mut y = 0.;
+        let filtering = self.filter.is_active();
+        let hide_merges = self.hide_merges;
         for r in rows.iter().filter(|r| q.is_empty() || r.name.to_lowercase().contains(&q)) {
             placed.push(Placed { row: r.clone(), y, change: false });
             y += ROW_H;
-            if (self.show_all_changes || self.expanded.contains(&r.key)) && !r.changes.is_empty() {
-                for mv in &r.changes {
+            // Hide merges (on by default) drops merge microversions from the
+            // change lists; an applied filter lists the matching changes.
+            let changes: Vec<MicroversionId> = r
+                .changes
+                .iter()
+                .filter(|mv| info.get(*mv).is_some_and(|m| !(hide_merges && m.parents.len() > 1)))
+                .filter(|mv| !filtering || info.get(*mv).is_some_and(|m| self.change_matches(m, cx)))
+                .copied()
+                .collect();
+            if (filtering || self.expanded.contains(&r.key)) && !changes.is_empty() {
+                for mv in &changes {
                     let Some(m) = info.get(mv) else { continue };
                     let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv.short()), changes: vec![] };
                     placed.push(Placed { row: c, y, change: true });
@@ -624,7 +932,7 @@ impl Render for HistoryPanel {
             } else {
                 let changes = r.changes.len();
                 let key = r.key.clone();
-                let open_changes = self.show_all_changes || self.expanded.contains(&key);
+                let open_changes = self.filter.is_active() || self.expanded.contains(&key);
                 let name_el = match r.kind {
                     RowKind::Workspace(_) => div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(LANES[r.lane % LANES.len()])).bg(if r.lane == 0 { rgb(0xd0dbe5) } else { rgb(0xfff4d6) }).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()),
                     _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()),
@@ -637,6 +945,7 @@ impl Render for HistoryPanel {
                     .pt(px(5.))
                     .cursor_pointer()
                     .text_size(px(14.))
+                    .line_height(px(21.))
                     .text_color(pal.text_muted)
                     .when(selected, |d| d.bg(pal.accent_soft))
                     .when(!selected, |d| d.hover(|d| d.bg(pal.panel_hover)))
@@ -707,8 +1016,12 @@ impl Render for HistoryPanel {
         }
 
         let doc2 = self.doc.clone();
-        let legend_item = |icon: AnyElement, label: &'static str, faint: bool| h_flex().gap(px(6.)).child(icon).child(div().text_size(px(13.)).font_weight(if faint { FontWeight::NORMAL } else { FontWeight::SEMIBOLD }).text_color(if faint { pal.text_muted } else { pal.text }).child(label));
-        let dot = |r: f32| div().size(px(r * 2.)).rounded_full().bg(pal.accent).into_any_element();
+        let legend_item = |icon: AnyElement, label: &'static str, faint: bool| {
+            let text = div().text_size(px(14.)).font_weight(if faint { FontWeight::NORMAL } else { FontWeight::SEMIBOLD }).text_color(if faint { rgb(0x888888) } else { pal.text }).child(label);
+            // The workspace label sits in the workspace chip.
+            let text = if label == "Workspace" { text.px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)) } else { text };
+            h_flex().gap(px(4.)).child(icon).child(text)
+        };
         v_flex()
             .size_full()
             .bg(pal.panel)
@@ -719,8 +1032,8 @@ impl Render for HistoryPanel {
                     .pl(px(5.))
                     .pr(px(6.))
                     .gap(px(4.))
-                    .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Versions and history"))
-                    .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
+                    .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Versions and history"))
+                    // Live order (document/22): release, create version, compare, ×.
                     // Release management: a candidate with the active tab's objects
                     // (Release__typical_release_workflow).
                     .child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").on_click({
@@ -731,6 +1044,7 @@ impl Render for HistoryPanel {
                             crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
                         }
                     }))
+                    .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
                     .child(crate::ui::icon_button("hist-compare", "compare", 30., false, cx).tooltip("Compare with the workspace").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(r) = this.graph(cx).versions.last().map(|v| (v.microversion, v.name.clone())) {
                             this.compare_with_current(r.0, r.1, cx);
@@ -739,32 +1053,62 @@ impl Render for HistoryPanel {
                     .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
             )
             .child(
+                // Live document/22: the box with its ▾ (filter panel) and the
+                // square search button, 6 px under the header.
                 h_flex()
                     .px(px(10.))
-                    .pt(px(2.))
+                    .pt(px(6.))
                     .flex_none()
-                    .child(div().flex_1().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded_l(px(4.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))
+                    .child(
+                        div()
+                            .flex_1()
+                            .relative()
+                            .h(px(30.))
+                            .flex()
+                            .items_center()
+                            .border_1()
+                            .border_color(rgb(0xaaaaaa))
+                            .rounded_l(px(4.))
+                            .child(div().flex_1().child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))
+                            .child(
+                                div()
+                                    .id("hist-filter-caret")
+                                    .w(px(24.))
+                                    .h_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .child(os::glyph(os::GLYPH_CARET, 10., pal.text))
+                                    .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                        t.filter_open = !t.filter_open;
+                                        cx.notify();
+                                    })),
+                            )
+                            .when(self.filter_open, |d| d.child(deferred(div().absolute().top(px(29.)).right(px(-1.)).child(self.render_filter_panel(cx))).with_priority(2))),
+                    )
                     .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx))),
             )
             .child(
                 h_flex()
-                    .px(px(14.))
-                    .pt(px(8.))
+                    .px(px(12.))
+                    .pt(px(6.))
                     .gap(px(6.))
                     .flex_none()
-                    .child(crate::ui::icon_button("hist-graph", "version-graph", 30., self.show_graph, cx).tooltip("Show the versions graph").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.show_graph = !this.show_graph;
+                    .child(crate::ui::icon_button("hist-merges", "hide-merges", 30., self.hide_merges, cx).tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.hide_merges = !this.hide_merges;
                         cx.notify();
                     })))
-                    .child(crate::ui::icon_button("hist-auto", "auto-version", 30., self.show_all_changes, cx).tooltip("Show all changes").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.show_all_changes = !this.show_all_changes;
+                    .child(crate::ui::icon_button("hist-auto", "hide-auto-versions", 30., self.hide_auto_versions, cx).tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.hide_auto_versions = !this.hide_auto_versions;
                         cx.notify();
                     }))),
             )
             .child(
+                // Live DOM: the header row is 38 px, 1 px `#d0dbe5` under it, rows from y 187.
                 h_flex()
                     .h(px(38.))
-                    .mt(px(8.))
+                    .mt(px(3.))
                     .flex_none()
                     .items_end()
                     .pb(px(5.))
@@ -784,25 +1128,33 @@ impl Render for HistoryPanel {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .child(div().relative().w_full().h(px(total_h)).child(v_flex().children(list)).when(self.show_graph, |d| d.child(graph_canvas))),
+                    .child(div().relative().w_full().h(px(total_h)).child(v_flex().children(list)).child(graph_canvas)),
             )
+            // Legend (live document/22): three centred rows, 14 px semibold; the
+            // workspace label in its chip, "Change" faint. Then the 31 px `#eee`
+            // hint bar.
             .child(
                 v_flex()
                     .flex_none()
                     .items_center()
+                    // Live: rows 33 px apart; the last one 82 px above the hint bar
+                    // (Onshape's cloud "Upgrade" button sits in between).
                     .gap(px(10.))
-                    .py(px(14.))
-                    .child(
-                        h_flex()
-                            .gap(px(18.))
-                            .child(legend_item(div().size(px(11.)).rounded_full().border_2().border_color(pal.accent).into_any_element(), "Workspace", false))
-                            .child(legend_item(dot(4.5), "Version", false))
-                            .child(legend_item(dot(2.5), "Change", true))
-                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("△").into_any_element(), "Release candidate", false))
-                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("▲").into_any_element(), "Release", false))
-                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("◭").into_any_element(), "Contains obsoletion", false)),
-                    )
-                    .child(legend_item(crate::assets::icon("auto-version", 18., cx), "Automatic version", false)),
+                    .pb(px(71.))
+                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
+                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
+                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),
+            )
+            .child(
+                h_flex()
+                    .h(px(31.))
+                    .flex_none()
+                    .px(px(5.))
+                    .bg(rgb(0xeeeeee))
+                    .border_t_1()
+                    .border_color(rgb(0xcccccc))
+                    .child(div().flex_1().text_size(px(12.)).text_color(pal.text_muted).child("Right-click on a row to perform actions"))
+                    .child(crate::assets::icon("help-faint", 16., cx)),
             )
     }
 }

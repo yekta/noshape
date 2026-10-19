@@ -255,7 +255,7 @@ fn distance(a, b) -> Result<Distance>;  fn angle_between(a, b) -> Result<f64>;
 ## I/O (`io`)
 
 ```rust
-pub enum LengthUnit { Millimeter, Centimeter, Meter, Inch, Foot }   // unit of the kernel shapes
+pub enum LengthUnit { Millimeter, Centimeter, Meter, Inch, Foot, Yard }   // unit of the kernel shapes
 pub struct ImportedShape { shape, name: Option<String>, color: Option<[f32;3]> }
 pub struct ExportShape   { shape, name: Option<String>, color: Option<[f32;3]> }
 fn read_step(&Path, LengthUnit) -> Result<Vec<ImportedShape>>;   // XCAF names/colors, assemblies flattened
@@ -265,6 +265,13 @@ fn read_mesh(&Path, file_unit: LengthUnit, merge_limit: u32) -> Result<Shape>;  
 fn write_stl(&Shape, &Path, deflection, StlFormat{Binary, Ascii});  fn write_stl_mesh(&Tessellation, &Path, StlFormat);
 fn write_obj(&Shape, &Path, deflection);  fn write_obj_mesh(&Tessellation, &Path);
 fn write_brep(&Shape, &Path); fn read_brep(&Path) -> Result<Shape>;
+fn write_step_with(&Path, &[ExportShape], LengthUnit, &StepOptions { schema: StepSchema{Default, Ap242, Ap214, Ap203}, file_unit: Option<LengthUnit> });  // Yard: written as feet, unit renamed
+fn write_parasolid(&Path, &[Shape], LengthUnit, binary: bool);  fn read_parasolid(&Path, LengthUnit) -> Result<Shape>;  // XT schema 12006 (reader: our own files)
+fn write_acis(&Path, &[Shape], LengthUnit);                       // SAT 7.0, mm
+fn write_rhino(&Path, &[ExportShape], LengthUnit, version 2..8);  fn rhino_brep_count(&Path) -> Result<u32>;  // needs openNURBS (OPENNURBS_ROOT)
+fn write_jt(&Path, &[ExportShape], LengthUnit);                   // JT 9.5: mesh LOD + XT B-rep segment, like Onshape's
+fn write_pvz(&Path, &[ExportShape], LengthUnit);                  // Creo View PVZ like Onshape's
+fn read_pvz(&Path, LengthUnit, merge_limit: u32) -> Result<Shape>;  // meshes only (as Onshape imports PVZ): a body per placed part, solid if the welded (1e-8 m) mesh closes, else a shell
 impl Shape { fn to_brep_bytes(&self) -> Result<Vec<u8>>; fn from_brep_bytes(&[u8]) -> Result<Shape>;
              fn to_bin_bytes(&self, with_triangles: bool) -> Result<Vec<u8>>; fn from_bin_bytes(&[u8]) -> Result<Shape>; }
 ```

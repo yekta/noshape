@@ -465,7 +465,9 @@ fn reference_misc_point_composite_query() {
     let r = s.ok();
     assert_eq!(r.context.points.len(), 1);
     // Composite keeps face names: the top face is still found downstream.
-    assert!(r.context.bodies[0].name.starts_with("Composite part"));
+    // Open (the default): the part stays, the composite comes after it.
+    assert!(r.context.bodies.iter().any(|b| b.name.starts_with("Composite part")));
+    assert!(!r.context.bodies[0].name.starts_with("Composite part"));
     assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Surface).count(), 1);
 }
 

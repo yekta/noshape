@@ -377,6 +377,9 @@ pub fn asm_connector_offset(c: &AsmMateConnector, units: &UnitPrefs) -> Frame {
     if !c.reorient.is_multiple_of(4) {
         f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.reorient)));
     }
+    if c.move_off {
+        return f;
+    }
     let t = DVec3::new(eval_len(&c.translation[0], units), eval_len(&c.translation[1], units), eval_len(&c.translation[2], units));
     let ang = eval_angle(&c.rotation, units);
     let axis = match c.rotation_axis {
@@ -385,6 +388,18 @@ pub fn asm_connector_offset(c: &AsmMateConnector, units: &UnitPrefs) -> Frame {
         _ => DVec3::Z,
     };
     f.mul(&Frame::new(t, DQuat::from_axis_angle(axis, ang)))
+}
+
+/// The Move offset of an implicit connector (identity when it has none).
+pub fn implicit_move(c: &MateConnectorRef, units: &UnitPrefs) -> Frame {
+    let Some(m) = c.moved.as_deref().filter(|m| !m.off) else { return Frame::default() };
+    let t = DVec3::new(eval_len(&m.translation[0], units), eval_len(&m.translation[1], units), eval_len(&m.translation[2], units));
+    let axis = match m.rotation_axis {
+        0 => DVec3::X,
+        1 => DVec3::Y,
+        _ => DVec3::Z,
+    };
+    Frame::new(t, DQuat::from_axis_angle(axis, eval_angle(&m.rotation, units)))
 }
 
 fn quarter_rot(k: u8) -> DQuat {
@@ -492,13 +507,16 @@ impl Prepared {
             mates[i].hold.push((*ix, *v));
             mates[i].limits.clear();
         }
-        // A mate being defined: only it is enforced (`SolveOptions::only_mate`).
-        let enforced: Vec<bool> = self.mates.iter().map(|(id, _, _)| opts.only_mate.is_none_or(|only| only == *id)).collect();
+        // A mate being defined: only it is enforced (`SolveOptions::only_mate`),
+        // except while dragging, which moves the whole connected group (live
+        // assembly/587–589).
+        let only_mate = opts.only_mate.filter(|_| opts.drags.is_empty());
+        let enforced: Vec<bool> = self.mates.iter().map(|(id, _, _)| only_mate.is_none_or(|only| only == *id)).collect();
         let mate_index: HashMap<MateId, usize> = self.mates.iter().enumerate().map(|(i, (id, _, _))| (*id, i)).collect();
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();
         let mut rel_ids = Vec::new();
-        for r in self.relations.iter().filter(|_| opts.only_mate.is_none()) {
+        for r in self.relations.iter().filter(|_| only_mate.is_none()) {
             let (Some(&ia), Some(&ib)) = (mate_index.get(&r.a), mate_index.get(&r.b)) else { continue };
             let (base_a, base_b) = match r.base {
                 Some([x, y]) => (x, y),
@@ -726,7 +744,7 @@ impl AssemblyResult {
         if !c.rotate_quarters.is_multiple_of(4) {
             f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
         }
-        Some(f)
+        Some(f.mul(&implicit_move(c, units)))
     }
 
     /// Current values of the mates a named position stores (all mates with
@@ -897,14 +915,19 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
     let body = crate::regen::context::Body::new(id.clone(), s.name.clone(), BodyKind::Wire, shape.clone(), Vec::new(), 0, sketch);
     let mut mesh = crate::regen::tessellate_shape(&shape, 1.0).unwrap_or_default();
     // The sketch's regions fill it (live assembly/123: a translucent light
-    // gray region under thin gray curves); not pickable faces.
+    // gray region under thin gray curves); each region is a pickable face
+    // (live 601: hovering inside a loop offers its centroid).
+    let mut region_refs = Vec::new();
     if let Some(sd) = studio.display.sketches.iter().find(|d| d.feature == sketch) {
         let n = sd.frame.normal.as_vec3().to_array();
         for r in &sd.regions {
             let base = mesh.positions.len() as u32;
+            let first = mesh.indices.len() as u32;
             mesh.positions.extend_from_slice(&r.positions);
             mesh.normals.extend(std::iter::repeat_n(n, r.positions.len()));
             mesh.indices.extend(r.indices.iter().map(|i| i + base));
+            mesh.face_ranges.push((first, r.indices.len() as u32));
+            region_refs.push(Reference::SketchRegion { sketch, key: r.key.clone() });
         }
     }
     let bounds = shape.bounding_box(false).ok().map(|b| (b.min, b.max));
@@ -917,10 +940,11 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         color: [0.7230, 0.7605, 0.7913, 0.8],
         hidden: false,
         mesh: Arc::new(mesh),
-        face_refs: Vec::new(),
+        face_refs: region_refs,
         edge_refs: body.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
         vertex_refs: body.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
         bounds,
+        composite: None,
     };
     ctx.bodies = vec![Arc::new(body)];
     let mut display = studio.display.clone();
@@ -1038,6 +1062,13 @@ pub fn dynamically_suppressed(doc: &Document, asm: &Assembly) -> Assembly {
     for m in &mut out.mates {
         if is_false(m.unsuppressed_if.as_deref()) {
             m.suppressed = true;
+        }
+    }
+    for f in &asm.folders {
+        if is_false(f.unsuppressed_if.as_deref()) {
+            for i in out.instances.iter_mut().filter(|i| f.instances.contains(&i.id)) {
+                i.suppressed = true;
+            }
         }
     }
     out
@@ -1257,6 +1288,8 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
             })?;
             e.tangent_at(t).ok()?
         }
+        // Boundary points of a sketch region: Z along the sketch normal.
+        Reference::SketchRegion { sketch, .. } => ev.ctx.sketch(*sketch)?.frame.normal,
         _ => return Some(frame),
     };
     Some(connector_frame(frame.origin, z))
@@ -1373,6 +1406,48 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                 }
                 Some(noshape_kernel::Surface::Sphere { .. }) => refs.push((implicit(on, Inference::Center), None)),
                 _ => refs.push((implicit(on, Inference::Centroid), None)),
+            }
+        }
+        // A sketch instance's region (live assembly/601): its centroid, the
+        // corners and the edge midpoints of its loop, Z normal to the sketch.
+        Reference::SketchRegion { sketch, key } => {
+            refs.push((implicit(on, Inference::Centroid), None));
+            let c: Context = (**ctx).clone();
+            let params = ParamValues::default();
+            let vars = BTreeMap::new();
+            let ev = EvalCtx::new(FeatureId(0), "", &params, units, c, &vars);
+            let profile = ev.resolve_region(*sketch, key).and_then(|(s, region)| crate::regen::eval::region_profile(&s, &region, crate::reference::Source::Region { sketch: *sketch, key: key.clone() }).ok());
+            if let Some(profile) = profile {
+                let near = |a: DVec3, b: DVec3| a.distance(b) < 1e-7;
+                let mid = |e: &noshape_kernel::Shape| e.edge_info().ok().and_then(|i| e.point_at((i.first_param + i.last_param) * 0.5).ok().map(|m| (m, i)));
+                let loop_mids: Vec<DVec3> = profile.shape.edges().iter().filter_map(|e| mid(e).map(|(m, _)| m)).collect();
+                for b in bodies() {
+                    let mut open_edges: HashSet<u32> = HashSet::new();
+                    for (ei, en) in b.edges.iter().enumerate() {
+                        let Ok(e) = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei) else { continue };
+                        let Some((m, info)) = mid(&e) else { continue };
+                        if !loop_mids.iter().any(|p| near(*p, m)) {
+                            continue;
+                        }
+                        let edge_ref = Reference::Edge((**en).clone());
+                        if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
+                            refs.push((implicit(&edge_ref, Inference::Center), Some(on.clone())));
+                        }
+                        if !info.closed {
+                            open_edges.insert(ei as u32);
+                            refs.push((implicit(&edge_ref, Inference::Midpoint), Some(on.clone())));
+                        }
+                    }
+                    if let Ok(ve) = b.shape.vertex_edges() {
+                        for (vi, edges) in ve.iter().enumerate() {
+                            if edges.iter().any(|e| open_edges.contains(e))
+                                && let Some(vn) = b.vertices.get(vi)
+                            {
+                                refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(on.clone())));
+                            }
+                        }
+                    }
+                }
             }
         }
         Reference::Edge(n) => {
@@ -1546,7 +1621,10 @@ impl AssemblyEvaluator {
                 {
                     continue;
                 }
-                if leaf.body.is_none() && (b.hidden || matches!(b.kind, BodyKind::Wire | BodyKind::Point)) {
+                // An open composite isn't drawn in its Part Studio (its members
+                // are): the whole studio inserts the members only.
+                let open_composite = b.composite.as_ref().is_some_and(|c| !c.closed);
+                if leaf.body.is_none() && (b.hidden || open_composite || matches!(b.kind, BodyKind::Wire | BodyKind::Point)) {
                     continue;
                 }
                 occurrences.push(PartOccurrence {
@@ -1558,7 +1636,7 @@ impl AssemblyEvaluator {
                     body_name: b.name.clone(),
                     kind: b.kind,
                     color: b.color,
-                    mesh: match leaf.path.first().filter(|p| best.contains(p)).and_then(|_| leaf.regen.context.body(&b.id)) {
+                    mesh: match leaf.path.first().filter(|p| best.contains(p) || open_composite).and_then(|_| leaf.regen.context.body(&b.id)) {
                         Some(body) => {
                             let key = body.shape.hash_code();
                             used_fine.insert(key);
@@ -1652,7 +1730,7 @@ impl AssemblyEvaluator {
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
         // Dynamic suppression: instances whose "Unsuppressed if" is false.
         let dynamic;
-        let asm = if asm.instances.iter().any(|i| i.unsuppressed_if.is_some()) || asm.mates.iter().any(|m| m.unsuppressed_if.is_some()) {
+        let asm = if asm.instances.iter().any(|i| i.unsuppressed_if.is_some()) || asm.mates.iter().any(|m| m.unsuppressed_if.is_some()) || asm.folders.iter().any(|f| f.unsuppressed_if.is_some()) {
             dynamic = dynamically_suppressed(doc, asm);
             &dynamic
         } else {
@@ -2092,6 +2170,7 @@ impl AssemblyEvaluator {
             if !c.rotate_quarters.is_multiple_of(4) {
                 f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
             }
+            f = f.mul(&implicit_move(c, &units));
             let (bi, off) = owner_body(owner, &prepared.body_of, &prepared.nested_body_of).ok_or("Instance no longer exists")?;
             Ok((bi, off.mul(&f)))
         };
@@ -2193,7 +2272,7 @@ impl AssemblyEvaluator {
                 if !c.rotate_quarters.is_multiple_of(4) {
                     f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
                 }
-                Ok((b, f))
+                Ok((b, f.mul(&implicit_move(c, &units))))
             };
             for m in sub.mates.iter().filter(|m| !m.suppressed && m.mate_type != MateType::Tangent) {
                 if m.connectors().any(|c| c.instance != InstanceId::ORIGIN && sub.instance(c.instance).is_none_or(|i| i.suppressed)) {

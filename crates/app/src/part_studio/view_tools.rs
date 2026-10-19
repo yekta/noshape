@@ -19,13 +19,7 @@ pub(super) enum PaletteItem {
     Feature(&'static str),
     /// A sketch tool (only while a sketch is open).
     SketchTool(crate::sketch_mode::Tool),
-    /// A Part Studio command that is not a feature ([`COMMANDS`]).
-    Command(usize),
 }
-
-/// Part Studio commands in tool search besides the features: (name, icon,
-/// description). Analysis tools are not searchable (live behaviours.md).
-const COMMANDS: [(&str, &str, &str); 1] = [("Assign material", "material", "Assign a material from a material library, or a custom material, to the selected parts.")];
 
 impl PartStudioView {
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -136,14 +130,6 @@ impl PartStudioView {
                 found.push(((f, span, order), PaletteItem::Feature(t.id)));
             }
         }
-        if self.sketch.is_none() {
-            for (i, (name, ..)) in COMMANDS.iter().enumerate() {
-                order += 1;
-                if let Some((f, span)) = score(name) {
-                    found.push(((f, span, order), PaletteItem::Command(i)));
-                }
-            }
-        }
         found.sort_by_key(|(k, _)| *k);
         found.into_iter().map(|(_, i)| i).collect()
     }
@@ -153,20 +139,6 @@ impl PartStudioView {
         match item {
             PaletteItem::Feature(id) => self.start_feature(id, window, cx),
             PaletteItem::SketchTool(t) => self.activate_tool(t, window, cx),
-            PaletteItem::Command(_) => {
-                // Assign material: the parts of the selection.
-                let mut bodies: Vec<noshape_model::BodyId> = Vec::new();
-                for r in &self.selection {
-                    if let Some(b) = self.body_of(r).filter(|b| !bodies.contains(b)) {
-                        bodies.push(b);
-                    }
-                }
-                if bodies.is_empty() {
-                    self.flash_info("Select parts to assign a material to.".into(), cx);
-                } else {
-                    self.open_material_panel(bodies, window, cx);
-                }
-            }
         }
         cx.notify();
     }
@@ -189,10 +161,6 @@ impl PartStudioView {
                     (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), crate::tool_text::description(id).or(t.map(|t| t.description)).unwrap_or_default().to_string())
                 }
                 PaletteItem::SketchTool(t) => (t.icon().into(), sketch_tool_name(*t).to_string(), None, String::new()),
-                PaletteItem::Command(i) => {
-                    let (name, icon, desc) = COMMANDS[*i];
-                    (icon.into(), name.to_string(), None, desc.to_string())
-                }
             }
         };
         let chip = |t: &str| div().px(px(3.)).h(px(18.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).text_size(px(11.)).text_color(pal.text).child(t.to_string());
@@ -236,6 +204,48 @@ impl PartStudioView {
                 .child(h_flex().gap(px(6.)).child(crate::assets::icon(&icon, 28., cx)).child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name)))
                 .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(desc))
         });
+        // Live (menus/tool-search-export.png, bundle CommandSuggestions):
+        // "Did you mean:" + pill buttons for the synonyms of the search (the
+        // exact term while there are results, any term holding its letters
+        // otherwise); a pill searches for that tool.
+        let synonyms = if self.sketch.is_some() { crate::tool_synonyms::SKETCH } else { crate::tool_synonyms::PART_STUDIO };
+        let suggested = crate::tool_synonyms::suggestions(synonyms, &self.palette_query, !items.is_empty());
+        let suggestions = (!suggested.is_empty()).then(|| {
+            h_flex()
+                .px(px(14.))
+                .pt(px(10.))
+                // Live menus/tool-search-export.png: 24 px down to the results.
+                .pb(px(24.))
+                .gap(px(10.))
+                .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Did you mean:"))
+                .children(suggested.into_iter().enumerate().map(|(i, tool)| {
+                    let name = tool.trim();
+                    div()
+                        .id(SharedString::from(format!("pal-suggest-{i}")))
+                        .px(px(10.))
+                        .h(px(30.))
+                        .flex()
+                        .items_center()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0x999999))
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .cursor_pointer()
+                        .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                        .text_size(px(12.))
+                        .text_color(pal.text)
+                        .child(name.to_string())
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                            if let Some((st, _)) = &this.palette {
+                                st.clone().update(cx, |s, cx| s.set_value(name, window, cx));
+                            }
+                            this.palette_query = name.to_string();
+                            this.ui.palette_sel = 0;
+                            cx.notify();
+                        }))
+                }))
+        });
+        let nothing = items.is_empty();
         let highlight = !self.ui.palette_no_highlight;
         Some(
             div()
@@ -279,7 +289,11 @@ impl PartStudioView {
                 .when(self.palette_query.trim().is_empty(), |d| {
                     d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools"))
                 })
-                .when(!self.palette_query.trim().is_empty(), |d| d.child(
+                .children(suggestions.filter(|_| !self.palette_query.trim().is_empty()))
+                .when(!self.palette_query.trim().is_empty() && nothing, |d| {
+                    d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).text_color(pal.text).child("No items match your search"))
+                })
+                .when(!self.palette_query.trim().is_empty() && !nothing, |d| d.child(
                     h_flex()
                         .items_start()
                         .px(px(10.))

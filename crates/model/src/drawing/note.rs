@@ -76,14 +76,94 @@ pub enum NoteVAlign {
     Bottom,
 }
 
-/// Flag note shape.
+/// Flag note border shapes (Drawing properties › Flag notes › Border
+/// shape and the note editor's flag type).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlagShape {
+    None,
+    Circle,
+    Diamond,
+    DoubleCircle,
+    Flag,
+    Hexagon,
+    Octagon,
+    #[serde(alias = "Square")]
+    Rectangle,
+    SquareCircle,
     #[default]
     Triangle,
-    Circle,
-    Square,
+    Underline,
 }
+
+impl FlagShape {
+    /// Onshape's list order.
+    pub const ALL: [FlagShape; 11] = [
+        FlagShape::None,
+        FlagShape::Circle,
+        FlagShape::Diamond,
+        FlagShape::DoubleCircle,
+        FlagShape::Flag,
+        FlagShape::Hexagon,
+        FlagShape::Octagon,
+        FlagShape::Rectangle,
+        FlagShape::SquareCircle,
+        FlagShape::Triangle,
+        FlagShape::Underline,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            FlagShape::None => "None",
+            FlagShape::Circle => "Circle",
+            FlagShape::Diamond => "Diamond",
+            FlagShape::DoubleCircle => "Double Circle",
+            FlagShape::Flag => "Flag",
+            FlagShape::Hexagon => "Hexagon",
+            FlagShape::Octagon => "Octagon",
+            FlagShape::Rectangle => "Rectangle",
+            FlagShape::SquareCircle => "Square Circle",
+            FlagShape::Triangle => "Triangle",
+            FlagShape::Underline => "Underline",
+        }
+    }
+}
+
+/// Tab stop alignment (the ruler's selector cycles through them).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TabKind {
+    #[default]
+    Left,
+    Center,
+    Right,
+    Decimal,
+}
+
+impl TabKind {
+    pub const ALL: [TabKind; 4] = [TabKind::Left, TabKind::Center, TabKind::Right, TabKind::Decimal];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            TabKind::Left => "Left",
+            TabKind::Center => "Center",
+            TabKind::Right => "Right",
+            TabKind::Decimal => "Decimal",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        Self::ALL[(Self::ALL.iter().position(|k| *k == self).unwrap_or(0) + 1) % Self::ALL.len()]
+    }
+}
+
+/// A tab stop: position from the box's left (mm) and alignment.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TabStop {
+    pub pos: f64,
+    pub kind: TabKind,
+}
+
+/// Spacing of the predefined (left) tab stops when none is set (mm).
+pub const DEFAULT_TAB: f64 = 12.7;
 
 /// A note's formatting (all defaults = a plain note).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -116,6 +196,18 @@ pub struct NoteStyle {
     pub flags: Vec<usize>,
     pub flag_shape: FlagShape,
     pub flag_chars: u8,
+    /// Explode: exported as polylines.
+    pub explode: bool,
+    /// Formatting ruler: tab stops, and the first-line / left / right
+    /// indents (mm from the box's sides).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tabs: Vec<TabStop>,
+    pub first_indent: f64,
+    pub left_indent: f64,
+    pub right_indent: f64,
+    /// Rotation (radians, counter-clockwise) about the note's position;
+    /// notes with leaders don't rotate.
+    pub angle: f64,
 }
 
 impl Default for NoteStyle {
@@ -137,6 +229,12 @@ impl Default for NoteStyle {
             flags: Vec::new(),
             flag_shape: FlagShape::Triangle,
             flag_chars: 2,
+            explode: false,
+            angle: 0.0,
+            tabs: Vec::new(),
+            first_indent: 0.0,
+            left_indent: 0.0,
+            right_indent: 0.0,
         }
     }
 }
@@ -165,6 +263,11 @@ pub struct NoteLayout {
     pub bbox: [f64; 4],
     /// Each line's (left x, baseline y, width) for underline / strikethrough.
     pub runs: Vec<([f64; 2], f64)>,
+}
+
+/// The middle of a note's box (it rotates about it).
+pub fn center(bbox: &[f64; 4]) -> [f64; 2] {
+    [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0]
 }
 
 /// Note fractions: "3/4 " (horizontal bar), "3#4 " (diagonal) and "3^4 "
@@ -301,7 +404,7 @@ pub fn layout(text: &str, h: f64, style: &NoteStyle, pos: [f64; 2]) -> NoteLayou
     }
     let list = style.list != NoteList::None;
     let indent = if list { paragraphs.iter().zip(&items).filter_map(|(_, it)| it.map(|i| width_of(&style.list.designator(i)))).fold(0.0, f64::max) + h * 0.8 } else { 0.0 };
-    let wrap_w = style.width.map(|w| (w - indent).max(h));
+    let wrap_w = style.width.map(|w| (w - indent - style.first_indent.max(style.left_indent) - style.right_indent).max(h));
     // Lines: (text, designator item, last line of its paragraph, paragraph start).
     let mut lines: Vec<(String, Option<usize>, bool, bool)> = Vec::new();
     for (p, it) in paragraphs.iter().zip(&items) {
@@ -343,14 +446,40 @@ pub fn layout(text: &str, h: f64, style: &NoteStyle, pos: [f64; 2]) -> NoteLayou
     };
     let mut pieces = Vec::new();
     let mut runs = Vec::new();
-    for ((l, item, last, _), dy) in lines.iter().zip(heights) {
+    for ((l, item, last, first), dy) in lines.iter().zip(heights) {
         let ly = top - dy;
         if let Some(i) = item.filter(|_| list) {
             pieces.push(NotePiece { text: style.list.designator(i), pos: [pos[0], ly], designator: true, item: Some(i) });
         }
         let lw = width_of(l);
-        let room = box_w - indent;
-        let x0 = pos[0] + indent;
+        let ind = if *first { style.first_indent } else { style.left_indent };
+        let room = box_w - indent - ind - style.right_indent;
+        let x0 = pos[0] + indent + ind;
+        // Tabs: each segment goes to the next stop past the text so far.
+        if l.contains('\t') {
+            let mut x = x0;
+            for (k, seg) in l.split('\t').enumerate() {
+                if k > 0 {
+                    let rel = x - pos[0];
+                    let stop = style.tabs.iter().filter(|t| t.pos > rel + 1e-9).min_by(|a, b| a.pos.total_cmp(&b.pos)).copied().unwrap_or(TabStop { pos: ((rel / DEFAULT_TAB).floor() + 1.0) * DEFAULT_TAB, kind: TabKind::Left });
+                    let sw = width_of(seg);
+                    let at = pos[0] + stop.pos;
+                    x = match stop.kind {
+                        TabKind::Left => at,
+                        TabKind::Center => at - sw / 2.0,
+                        TabKind::Right => at - sw,
+                        TabKind::Decimal => at - seg.find(['.', ',', ' ']).map(|i| width_of(&seg[..i])).unwrap_or(sw),
+                    }
+                    .max(x);
+                }
+                if !seg.is_empty() {
+                    pieces.push(NotePiece { text: seg.to_string(), pos: [x, ly], designator: false, item: None });
+                }
+                x += width_of(seg);
+            }
+            runs.push(([x0, ly - h], x - x0));
+            continue;
+        }
         match style.align {
             NoteAlign::Justified if !*last && l.contains(' ') && style.width.is_some() => {
                 let words: Vec<&str> = l.split(' ').filter(|w| !w.is_empty()).collect();
@@ -406,5 +535,27 @@ mod tests {
         assert_eq!(fractions("1/2 IN"), "\u{E000}1\u{E001}2\u{E002} IN");
         assert_eq!(fractions("3#4 X"), "3\u{2044}4 X");
         assert_eq!(fractions("A1/2 "), "A1/2 ", "not after a letter");
+    }
+
+    #[test]
+    fn tab_stops_and_indents() {
+        let h = 3.5;
+        let pos = [10.0, 100.0];
+        // Default stops every DEFAULT_TAB from the box's left.
+        let l = layout("A\tB", h, &NoteStyle::default(), pos);
+        let b = l.pieces.iter().find(|p| p.text == "B").unwrap();
+        assert!((b.pos[0] - (pos[0] + DEFAULT_TAB)).abs() < 1e-9);
+        // A right stop puts the segment's end on it; a decimal stop its point.
+        let style = NoteStyle { tabs: vec![TabStop { pos: 40.0, kind: TabKind::Right }, TabStop { pos: 60.0, kind: TabKind::Decimal }], ..Default::default() };
+        let l = layout("A\tRR\t12.5", h, &style, pos);
+        let rr = l.pieces.iter().find(|p| p.text == "RR").unwrap();
+        assert!((rr.pos[0] + text_width("RR", h) - (pos[0] + 40.0)).abs() < 1e-9);
+        let d = l.pieces.iter().find(|p| p.text == "12.5").unwrap();
+        assert!((d.pos[0] + text_width("12", h) - (pos[0] + 60.0)).abs() < 1e-9);
+        // First-line and left indents.
+        let style = NoteStyle { first_indent: 5.0, left_indent: 2.0, width: Some(30.0), ..Default::default() };
+        let l = layout("WORD WORD WORD WORD WORD WORD", h, &style, pos);
+        let xs: Vec<f64> = l.pieces.iter().map(|p| p.pos[0]).collect();
+        assert!((xs[0] - 15.0).abs() < 1e-9 && xs.len() > 1 && (xs[1] - 12.0).abs() < 1e-9, "{xs:?}");
     }
 }

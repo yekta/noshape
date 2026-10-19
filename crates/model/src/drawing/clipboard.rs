@@ -1,7 +1,10 @@
-//! Copy / paste of drawing views (Onshape: view context menu Copy, Paste;
-//! Ctrl+C / Ctrl+V). A copy holds the views with their derived views and
-//! the annotations and tables attached to them, self-contained: a view
-//! copied without its parent becomes a base view showing the same thing.
+//! Copy / paste of drawing views and entities (Onshape: context menu Copy,
+//! Paste; Ctrl+C / Ctrl+V). A view copy holds the views with their derived
+//! views and the annotations and tables attached to them, self-contained:
+//! a view copied without its parent becomes a base view showing the same
+//! thing. An entity copy holds notes, callouts, GD&T frames, datums,
+//! surface finish and weld symbols and tables; pasted where their views
+//! don't exist they come loose (callouts lose their leader until attached).
 
 use super::views::Sources;
 use super::{Drawing, DrawingView, Sheet, TableKind, ViewId};
@@ -22,18 +25,41 @@ impl ViewClipboard {
 
     pub fn from_json(text: &str) -> Option<Self> {
         let c: ViewClipboard = serde_json::from_str(text).ok()?;
-        (c.noshape_drawing_views == 1 && !c.sheet.views.is_empty()).then_some(c)
+        let s = &c.sheet;
+        (c.noshape_drawing_views == 1 && !(s.views.is_empty() && s.annotations.is_empty() && s.tables.is_empty())).then_some(c)
     }
 
-    /// Center of the copied views' positions (sheet millimeters).
+    /// Center of the copied views' (else entities') positions (sheet mm).
     fn center(&self) -> [f64; 2] {
-        let n = self.sheet.views.len().max(1) as f64;
-        let (x, y) = self.sheet.views.iter().fold((0.0, 0.0), |(x, y), v| (x + v.position[0], y + v.position[1]));
+        let pts: Vec<[f64; 2]> = if self.sheet.views.is_empty() {
+            self.sheet.annotations.iter().map(|a| a.position).chain(self.sheet.tables.iter().map(|t| t.position)).collect()
+        } else {
+            self.sheet.views.iter().map(|v| v.position).collect()
+        };
+        let n = pts.len().max(1) as f64;
+        let (x, y) = pts.iter().fold((0.0, 0.0), |(x, y), p| (x + p[0], y + p[1]));
         [x / n, y / n]
+    }
+
+    /// Views copied (else only entities).
+    pub fn has_views(&self) -> bool {
+        !self.sheet.views.is_empty()
     }
 }
 
 impl Drawing {
+    /// Copy annotations and tables of sheet `sheet` (Copy on a note,
+    /// callout, GD&T frame, datum, surface finish or weld symbol, table).
+    pub fn copy_entities(&self, sheet: usize, annotations: &[u64], tables: &[u64]) -> Result<ViewClipboard, String> {
+        let src = self.sheets.get(sheet).ok_or("No sheet")?;
+        let annotations: Vec<_> = src.annotations.iter().filter(|a| annotations.contains(&a.id)).cloned().collect();
+        let tables: Vec<_> = src.tables.iter().filter(|t| tables.contains(&t.id)).cloned().collect();
+        if annotations.is_empty() && tables.is_empty() {
+            return Err("Nothing to copy".into());
+        }
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() } })
+    }
+
     /// Copy views `ids` of sheet `sheet` (with their derived views and attached
     /// annotations and tables).
     pub fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
@@ -64,15 +90,66 @@ impl Sheet {
             // Derived views follow their parent; only roots move freely.
             v.position = [v.position[0] + d[0], v.position[1] + d[1]];
         }
+        // Views the pasted entities may refer to: copied ones, else ones of
+        // this sheet (an entity copy pasted on its own sheet).
+        let exists = |v: ViewId| map.iter().any(|(o, _)| *o == v) || (clip.sheet.views.is_empty() && self.view(v).is_some());
+        let mut pasted = Vec::new();
         for (id, a) in (self.next_annotation_id()..).zip(&clip.sheet.annotations) {
             let mut a = a.clone();
             a.id = id;
-            if let Some(v) = a.kind.view_mut() {
-                *v = remap(*v);
+            a.group = None;
+            a.view_group = None;
+            a.ann_group = None;
+            match a.kind.view() {
+                Some(v) if exists(v) => {
+                    if let Some(v) = a.kind.view_mut() {
+                        *v = remap(*v);
+                    }
+                }
+                // Its view isn't here: the entity comes loose.
+                Some(_) => {
+                    a.refs.clear();
+                    if let super::AnnotationKind::Balloon { callout, .. } = &mut a.kind {
+                        callout.free = true;
+                    }
+                }
+                None => {}
+            }
+            // Leaders to views that aren't here go.
+            let keep = |l: &super::Leader| l.view.is_none_or(exists);
+            match &mut a.kind {
+                super::AnnotationKind::Note { style, .. } => style.leaders.retain(keep),
+                super::AnnotationKind::Gdt { leaders, .. } => leaders.retain(keep),
+                super::AnnotationKind::Weld { spec, view, target } => {
+                    spec.leaders.retain(keep);
+                    match view {
+                        Some(v) if exists(*v) => *v = remap(*v),
+                        // Loose: the arrow points just below-left of the symbol.
+                        Some(_) => {
+                            *view = None;
+                            *target = [a.position[0] - 10.0 + d[0], a.position[1] - 10.0 + d[1]];
+                        }
+                        None => *target = [target[0] + d[0], target[1] + d[1]],
+                    }
+                }
+                _ => {}
+            }
+            let leaders: Vec<&mut super::Leader> = match &mut a.kind {
+                super::AnnotationKind::Note { style, .. } => style.leaders.iter_mut().collect(),
+                super::AnnotationKind::Gdt { leaders, .. } => leaders.iter_mut().collect(),
+                super::AnnotationKind::Weld { spec, .. } => spec.leaders.iter_mut().collect(),
+                _ => Vec::new(),
+            };
+            for l in leaders {
+                match &mut l.view {
+                    Some(v) => *v = remap(*v),
+                    None => l.point = [l.point[0] + d[0], l.point[1] + d[1]],
+                }
             }
             a.position = [a.position[0] + d[0], a.position[1] + d[1]];
-            self.annotations.push(a);
+            pasted.push(a);
         }
+        self.annotations.extend(pasted);
         for (id, t) in (self.next_table_id()..).zip(&clip.sheet.tables) {
             let mut t = t.clone();
             t.id = id;
@@ -114,5 +191,28 @@ mod tests {
         assert_eq!(s.parent_of(ViewId(4)), Some(ViewId(3)));
         let (a, b) = (s.view(ViewId(3)).unwrap().position, s.view(ViewId(4)).unwrap().position);
         assert!(((a[0] + b[0]) * 0.5 - 300.0).abs() < 1e-9 && (a[1] - 200.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn copy_and_paste_entities() {
+        use crate::drawing::{Annotation, AnnotationKind};
+        let mut d = Drawing::default();
+        let s0 = &mut d.sheets[0];
+        s0.annotations.push(Annotation { id: 1, kind: AnnotationKind::note("COPY ME", 3.5), position: [50.0, 50.0], ..Default::default() });
+        s0.annotations.push(Annotation { id: 2, kind: AnnotationKind::balloon(ViewId(7), [0.0, 0.0], "3"), position: [80.0, 60.0], ..Default::default() });
+        let clip = d.copy_entities(0, &[1, 2], &[]).unwrap();
+        assert!(!clip.has_views());
+        let back = ViewClipboard::from_json(&clip.to_json()).expect("entity clipboards round trip");
+        // Pasted on another sheet: new ids, at the cursor; the callout's view
+        // isn't there, so it has no leader.
+        let mut other = Sheet::default();
+        other.paste_views(&back, Some([200.0, 100.0]));
+        assert_eq!(other.annotations.len(), 2);
+        let note = other.annotations.iter().find(|a| matches!(a.kind, AnnotationKind::Note { .. })).unwrap();
+        let call = other.annotations.iter().find(|a| matches!(a.kind, AnnotationKind::Balloon { .. })).unwrap();
+        assert!(matches!(&call.kind, AnnotationKind::Balloon { callout, .. } if callout.free));
+        // Centered on the cursor, keeping their spacing.
+        assert!(((note.position[0] + call.position[0]) / 2.0 - 200.0).abs() < 1e-9);
+        assert!(((call.position[0] - note.position[0]) - 30.0).abs() < 1e-9);
     }
 }

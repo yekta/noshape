@@ -125,8 +125,6 @@ pub struct UiState {
     pub create_selection: Option<super::create_selection::CreateSelection>,
     /// Where the last context menu opened (window coordinates).
     pub menu_pos: Point<Pixels>,
-    /// Last selection-badge position update (time, position).
-    pub badge_at: Option<(Instant, DVec2)>,
     /// Paused regeneration: the studio when paused (for Discard).
     pub regen_paused: Option<noshape_model::partstudio::PartStudio>,
     /// Run one regeneration although paused.
@@ -189,6 +187,9 @@ pub struct UiState {
     /// Feature whose list context menu is open: its row and geometry stay
     /// highlighted (live menus/rmb-ps-featurelist-fillet.png).
     pub list_menu: Option<FeatureId>,
+    /// Dialog picks the preview consumed (a fillet's edges), drawn from the
+    /// model before the feature: (picks, accent picks, before-model, lines).
+    pub consumed_lines: Option<(Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>)>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
     /// Entity of the hovered dialog selection row.
@@ -238,6 +239,8 @@ pub struct UiState {
     pub flatten: Option<super::flatten_tool::FlattenState>,
     /// Interference detection: the hovered row of its Interferences list.
     pub interference_hover: Option<usize>,
+    /// The clicked Interferences row (bold; the view zoomed to it).
+    pub interference_picked: Option<usize>,
     /// Curvature color map settings (while it is on).
     pub curvature_map: Option<super::thickness::CurvatureMap>,
     /// The open Draft analysis dialog.
@@ -285,11 +288,11 @@ impl UiState {
             create_selection: None,
             material_panel: None,
             menu_pos: Point::default(),
-            badge_at: None,
             regen_paused: None,
             force_regen: false,
             show_regen_times: false,
-            collapsed_sections: HashSet::new(),
+            // Live part-studio/470: "Composite parts (N)" starts collapsed.
+            collapsed_sections: HashSet::from(["composites"]),
             parts_height: None,
             // Preferences › Part Studio settings › Display parts list properties.
             show_part_props: crate::preferences_window::parts_list_properties(),
@@ -319,6 +322,7 @@ impl UiState {
             default_geometry_collapsed: false,
             menu_target: None,
             list_menu: None,
+            consumed_lines: None,
             shown_dims: None,
             query_hover: None,
             manip_hover: false,
@@ -343,6 +347,7 @@ impl UiState {
             pick_filter: None,
             flatten: None,
             interference_hover: None,
+            interference_picked: None,
             curvature_map: None,
             draft: None,
             analysis_tool: None,
@@ -463,6 +468,14 @@ impl PartStudioView {
         if let Some(r) = &self.ui.menu_target {
             return vec![r.clone()];
         }
+        // Select items to insert: a face pre-highlights its part, a curve its sketch.
+        if let Some(item) = self.hover.as_ref().filter(|_| self.insert_go_open()).and_then(|r| self.insert_go_item(r)) {
+            return match item {
+                Reference::Body(b) => self.body_geometry(&b),
+                Reference::Sketch(f) => self.feature_geometry(f),
+                _ => Vec::new(),
+            };
+        }
         match &self.hover {
             Some(Reference::Body(b)) => self.body_geometry(b),
             // A sketch curve under a region field pre-highlights its region.
@@ -530,6 +543,9 @@ impl PartStudioView {
     /// One pick from the graphics area or a list: goes to the active dialog
     /// field (with filter feedback) or toggles the selection.
     pub(super) fn pick(&mut self, target: PickTarget, cx: &mut Context<Self>) {
+        if self.insert_go_pick(&target.reference, cx) {
+            return;
+        }
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             let Some((_, filter, _)) = dialog.read(cx).active_filter() else {
@@ -663,6 +679,14 @@ impl PartStudioView {
     /// Parts list click: dialog field (parts only) or additive selection.
     pub(super) fn pick_body(&mut self, b: BodyId, cx: &mut Context<Self>) {
         let r = Reference::Body(b);
+        if self.insert_go_pick(&r, cx) {
+            return;
+        }
+        // An open analysis tool takes parts-list picks too (live analysis/81:
+        // "Picking parts (from the Parts list or the viewport) adds chips").
+        if self.edit.is_none() && self.ui.analysis_tool.is_some() && self.analysis_pick(&r, cx) {
+            return;
+        }
         if let Some(e) = &self.edit {
             let dialog = e.dialog.clone();
             let Some((_, filter, _)) = dialog.read(cx).active_filter() else { return };
@@ -1989,12 +2013,8 @@ impl PartStudioView {
 
     /// Ctrl+Shift+arrows (Onshape pans 150 px per step).
     pub(super) fn pan_by(&mut self, dx: f64, dy: f64, cx: &mut Context<Self>) {
-        self.viewport.update(cx, |vp, cx| {
-            let mut to = vp.camera;
-            let h = vp.size().y;
-            to.pan(DVec2::new(dx, dy), h);
-            vp.animate_to(to, cx);
-        });
+        let step = crate::navigation::DEFAULT_PAN_AMOUNT_PX;
+        self.viewport.update(cx, |vp, cx| vp.pan_step(dx / step, dy / step, cx));
     }
 
     /// Bounding box of the selection (parts, faces, edges, sketches, planes).
@@ -2177,25 +2197,49 @@ impl PartStudioView {
         )
     }
 
-    /// Onshape's cursor badge: the number of selected entities (up to 5,
-    /// then "5+") beside the pointer over the graphics area.
-    pub(super) fn render_selection_badge(&self, cx: &App) -> Option<AnyElement> {
-        let at = self.ui.pointer.or(self.ui.badge_at.map(|(_, p)| p)).filter(|_| self.viewport.read(cx).pointer_inside())?;
-        let n = self.selection.len() + self.selected_features.len();
-        if n == 0 || self.edit.is_some() || self.ui.select_other.is_some() || self.ui.mini_toolbar.is_some() || self.context_menu.is_some() {
-            return None;
+    /// Dialog picks that the feature's preview consumed (the edges of a
+    /// fillet or chamfer, removed faces): Onshape keeps drawing them in the
+    /// selection color where they were (live dialogs/fillet-02…04: the
+    /// sharp edges orange over the rounded preview). Taken from the model
+    /// before the feature; faces by their boundary edges.
+    pub(super) fn consumed_picks_overlay(&mut self, selection: &[Reference], accent: &[Reference]) -> Vec<noshape_render::Instance> {
+        use noshape_render::{Drawable, Instance, LineData};
+        let (Some(_), Some(before), Some(built)) = (&self.edit, self.ui.preview_before.clone(), &self.built) else {
+            self.ui.consumed_lines = None;
+            return Vec::new();
+        };
+        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && built.picks.ids_for(r).is_empty()).cloned().collect() };
+        let (sel, acc) = (missing(selection), missing(accent));
+        let key = Arc::as_ptr(&before) as usize;
+        if let Some((s, a, k, inst)) = &self.ui.consumed_lines
+            && *s == sel
+            && *a == acc
+            && *k == key
+        {
+            return inst.iter().cloned().collect();
         }
-        // Onshape draws the count into the cursor image (cursors/
-        // macSelectionCursor-N): a bold black digit with a white outline at
-        // the arrow's lower right, "5" for five or more.
-        let digit = n.min(5).to_string();
-        let glyph = |dx: f32, dy: f32, color: Rgba| div().absolute().left(px(dx)).top(px(dy)).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(color).child(digit.clone());
-        let white = gpui_kit::rgb(0xffffff);
-        let mut el = div().absolute().left(px(at.x as f32 + 11.0)).top(px(at.y as f32 + 9.0)).w(px(12.)).h(px(18.));
-        for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0), (-1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)] {
-            el = el.child(glyph(dx, dy, white));
+        let mut lines = LineData::default();
+        for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION)] {
+            let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
+            for r in refs.iter() {
+                let edges = match r {
+                    Reference::Face(_) => crate::scene_builder::face_edges(&before, r),
+                    r => vec![r.clone()],
+                };
+                for e in &edges {
+                    for b in before.bodies.iter().filter(|b| !b.hidden) {
+                        if let Some(i) = b.edge_refs.iter().position(|x| x == e)
+                            && let Some(pl) = b.mesh.edges.get(i)
+                        {
+                            lines.push_polyline(pl, rgba, 0, 3.0, 0);
+                        }
+                    }
+                }
+            }
         }
-        Some(el.child(glyph(0.0, 0.0, gpui_kit::rgb(0x000000))).into_any_element())
+        let inst = (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
+        self.ui.consumed_lines = Some((sel, acc, key, inst.clone()));
+        inst.into_iter().collect()
     }
 
     /// Measure graphics (Onshape): a dotted line between the closest points

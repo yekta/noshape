@@ -158,6 +158,8 @@ pub(crate) struct AsmUi {
     pub dynamic_suppression: Option<(super::props::DynTarget, Entity<InputState>, Subscription)>,
     /// Show instance list properties (state pills after the names).
     pub list_properties: bool,
+    /// The instance list collapsed with the toggle at the viewport's left edge.
+    pub list_collapsed: bool,
     /// Reference manager dialog (Change to version…, Update all references).
     pub ref_manager: Option<super::props::RefManager>,
     /// "Origin of new Part Studio" dialog: the chosen assembly mate
@@ -182,6 +184,24 @@ pub(crate) struct AsmUi {
     /// documents) and element tab (0 Part Studios, 1 Assemblies).
     pub insert_search: Option<Entity<InputState>>,
     pub insert_search_sub: Option<Subscription>,
+    /// Insert › Other documents (live 71): the "Search or paste URL" box, the
+    /// open category (0 Owned by me … 4 Public) and the scanned documents.
+    pub insert_url: Option<Entity<InputState>>,
+    pub insert_url_sub: Option<Subscription>,
+    pub insert_other_cat: Option<usize>,
+    pub insert_other_docs: Option<Vec<crate::start_library::DocEntry>>,
+    pub insert_other_query: Option<String>,
+    /// Latest version name of each listed document.
+    pub insert_other_versions: HashMap<std::path::PathBuf, String>,
+    /// The opened document (kept when the dialog closes: Onshape reopens
+    /// the last document and version).
+    pub insert_other_doc: Option<super::panels::OtherDoc>,
+    /// Dragging a fixed instance (live 562): the cursor position for the fix
+    /// glyph and the `no-drop` cursor; nothing moves, no message.
+    pub fixed_drag: Option<DVec2>,
+    /// The mate dialog's Animate preview ended (handled in render, which
+    /// has the window to re-evaluate).
+    pub preview_done: bool,
     pub insert_source: u8,
     pub insert_tab: u8,
     /// Part Studios tab type filters (Onshape's filter icons): show parts,
@@ -937,7 +957,8 @@ impl AssemblyView {
             m.push(item("Dissolve subassembly", move |t, _, cx| t.dissolve_subassemblies(tg.clone(), cx)));
         }
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
-            m.push(icon_item("Change to version…", "version", |t, _, cx| t.open_reference_manager(cx)));
+            let tg = targets.clone();
+            m.push(icon_item("Change to version…", "version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
         m.push(MenuEntry::Sep);
@@ -1248,7 +1269,17 @@ impl AssemblyView {
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, a3.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, a4.clone(), cx)));
             let suppressed = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.suppressed)));
-            m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.set_suppressed(a5.clone(), !suppressed, cx)));
+            if f.unsuppressed_if.is_some() {
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Folder(id), true));
+            } else {
+                m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.set_suppressed(a5.clone(), !suppressed, cx)));
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Folder(id), false));
+            }
+            // Live assembly/537: Unfix all on a folder holding fixed instances.
+            let fixed: Vec<InstanceId> = self.assembly(cx).map(|a| insts.iter().copied().filter(|i| a.instance(*i).is_some_and(|x| x.fixed)).collect()).unwrap_or_default();
+            if !fixed.is_empty() {
+                m.push(icon_item("Unfix all", "fix", move |t, _, cx| t.set_fixed(fixed.clone(), false, cx)));
+            }
             m.push(MenuEntry::Sep);
             let sel: Vec<InstanceId> = self.selected.iter().copied().filter(|s| !insts.contains(s)).collect();
             if !sel.is_empty() {
@@ -1263,16 +1294,29 @@ impl AssemblyView {
                     });
                 }));
             }
+            // Expand ▸ / Collapse ▸ (live assembly/537).
             let key = vec![InstanceId(id.0)];
             let k2 = key.clone();
-            m.push(item("Expand", move |t, _, cx| {
-                t.expanded.insert(key.clone());
-                cx.notify();
-            }));
-            m.push(item("Collapse", move |t, _, cx| {
-                t.expanded.remove(&k2);
-                cx.notify();
-            }));
+            m.push(MenuEntry::Sub {
+                label: "Expand".into(),
+                children: vec![
+                    item("Expand selected", move |t, _, cx| {
+                        t.expanded.insert(key.clone());
+                        cx.notify();
+                    }),
+                    item("Expand all", |t, _, cx| t.expand_all(true, cx)),
+                ],
+            });
+            m.push(MenuEntry::Sub {
+                label: "Collapse".into(),
+                children: vec![
+                    item("Collapse selected", move |t, _, cx| {
+                        t.expanded.remove(&k2);
+                        cx.notify();
+                    }),
+                    item("Collapse all", |t, _, cx| t.expand_all(false, cx)),
+                ],
+            });
         }
         m.push(MenuEntry::Sep);
         m.push(icon_item("Delete", "delete", move |t, _, cx| {
@@ -1433,14 +1477,16 @@ impl AssemblyView {
             MenuEntry::Sep,
             item("Rename", |t, w, cx| t.rename_tab(w, cx)),
             icon_item(if self.ui.com.as_ref().is_some_and(|(c, _)| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
-            item("Check interference…", |t, _, cx| {
-                t.selected.clear();
-                t.run_interference(cx);
-            }),
         ];
+        // Live assembly/530–532: right after Show center of mass, once an
+        // instance at this level is fixed.
         if any_fixed {
-            m.push(item("Unfix all", |t, _, cx| t.unfix_all(cx)));
+            m.push(icon_item("Unfix all", "fix", |t, _, cx| t.unfix_all(cx)));
         }
+        m.push(item("Check interference…", |t, _, cx| {
+            t.selected.clear();
+            t.run_interference(cx);
+        }));
         m.push(MenuEntry::Sep);
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         m.push(icon_item(format!("Create Drawing of {name}…"), "drawing", move |_, w, cx| {
@@ -1746,7 +1792,7 @@ impl AssemblyView {
         if self.ui.filter_input.is_some() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name"));
+        let st = cx.new(|cx| InputState::new(window, cx));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 this.ui.filter = ListFilter::parse(&st.read(cx).value());
@@ -1762,6 +1808,14 @@ impl AssemblyView {
             }
         }));
         self.ui.insert_search = Some(st);
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL"));
+        self.ui.insert_url_sub = Some(cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
+            if let InputEvent::PressEnter { .. } = ev {
+                let text = st.read(cx).value().trim().to_string();
+                this.search_other_documents(text, cx);
+            }
+        }));
+        self.ui.insert_url = Some(st);
     }
 
     /// i / toolbar Insert: open the Insert dialog, or close it when open.
@@ -1817,7 +1871,8 @@ impl AssemblyView {
             self.finish_placing(true, window, cx);
         }
         self.insert_open = false;
-        self.ext_pick = None;
+        // Rescanned next time; the opened document and category stay.
+        self.ui.insert_other_docs = None;
         self.ui.std.auto_size = false;
         self.ui.std.holes.clear();
         self.ui.std.flip = false;
@@ -1839,16 +1894,18 @@ impl AssemblyView {
         let Some(st) = self.ui.filter_input.clone() else { return div().into_any_element() };
         let view = cx.entity();
         let current = self.ui.filter.clone();
-        // Onshape filter row: funnel button, then a 28 px "Filter by name or type" box.
-        let _ = pal;
+        // Onshape filter row (live assembly/10): funnel, a 30 px "Filter by name"
+        // box (1 px #aaa, radius 3, italic gray placeholder), then the ≡ list button.
+        let empty = st.read(cx).value().is_empty();
         h_flex()
-            .h(px(34.))
+            .h(px(30.))
+            .mt(px(7.))
             .flex_none()
-            .pl(px(2.))
-            .pr(px(5.))
-            .gap(px(2.))
+            .pl(px(5.))
+            .pr(px(16.))
+            .gap(px(12.))
             .child(
-                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon("filter", 20., cx)).w(px(26.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
+                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon("filter", 20., cx)).w(px(22.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
                     for c in FilterCommand::ALL {
                         let v = view.clone();
                         let current = current.clone();
@@ -1868,7 +1925,23 @@ impl AssemblyView {
                     menu
                 }),
             )
-            .child(div().flex_1().child(Input::new(&st).small().h(px(28.)).rounded(px(2.)).cleanable(true)))
+            .child(
+                div()
+                    .w(px(122.))
+                    .flex_none()
+                    .relative()
+                    .h(px(30.))
+                    .px(px(1.))
+                    .flex()
+                    .items_center()
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xaaaaaa))
+                    .rounded(px(3.))
+                    .child(Input::new(&st).appearance(false).text_size(px(14.)))
+                    .when(empty, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter by name"))),
+            )
+            .child(div().flex_1())
+            .child(crate::assets::icon("instance-list-view", 20., cx))
             .into_any_element()
     }
 
@@ -2078,6 +2151,11 @@ impl AnimState {
     }
 }
 
+/// Full turns of the mate dialog's Animate preview (one degree per frame).
+const PREVIEW_TURNS: f64 = 2.0;
+/// Ascender of the mate value text (px; Onshape's 13.33 px dimension text).
+const VALUE_TEXT_ASC: f64 = 9.5;
+
 impl AssemblyView {
     fn anim_defaults(&self, m: &Mate, dof: usize, cx: &App) -> (String, String) {
         let units = self.units(cx);
@@ -2134,12 +2212,11 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Mate dialog Animate button: preview the mate's first degree of
-    /// freedom back and forth until pressed again or the dialog closes.
+    /// Mate dialog ▶ Animate (live 575): the mate's first degree of freedom
+    /// runs once through full turns (a span for a slider) from its current
+    /// value, then the preview returns to the start pose. ▶ stays ▶.
     pub(super) fn toggle_mate_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.anim.as_ref().is_some_and(|a| a.preview) {
-            self.anim = None;
-            self.schedule_eval(window, cx);
             return;
         }
         let Some(m) = self.mate.as_ref().and_then(|s| s.dialog.read(cx).to_mate(cx)) else {
@@ -2154,13 +2231,32 @@ impl AssemblyView {
             return;
         };
         let Some(&(dof, _)) = noshape_model::assembly::eval::mate_dofs(m.mate_type).first() else { return };
-        let (a, b) = self.anim_defaults(&m, dof, cx);
+        let now = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
+        let (a, b, steps) = if dof == 0 {
+            let deg = |v: f64| format!("{:.6} deg", v.to_degrees());
+            (deg(now), deg(now + PREVIEW_TURNS * std::f64::consts::TAU), PREVIEW_TURNS * 360.0)
+        } else {
+            let (a, b) = self.anim_defaults(&m, dof, cx);
+            (a, b, 360.0)
+        };
         let mk = |t: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).default_value(t));
         let start = mk(a, window, cx);
         let end = mk(b, window, cx);
-        let steps = mk("90".into(), window, cx);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Reciprocate, busy: false, current: 0.0, task: None, preview: true });
+        let steps = mk(format!("{steps}"), window, cx);
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Single, busy: false, current: now, task: None, preview: true });
         self.play_animation(cx);
+    }
+
+    /// The preview ran its course: back to the start pose, ▶ released.
+    pub(super) fn finish_mate_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.anim = None;
+        if let Some(d) = self.mate.as_ref().map(|s| s.dialog.clone()) {
+            d.update(cx, |d, cx| {
+                d.animating = false;
+                cx.notify();
+            });
+        }
+        self.schedule_eval(window, cx);
     }
 
     fn set_anim_dof(&mut self, dof: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -2222,6 +2318,8 @@ impl AssemblyView {
                                 a.t = a.t.clamp(0.0, 1.0);
                                 a.playing = false;
                                 a.task = None;
+                                let preview = a.preview;
+                                this.ui.preview_done = preview;
                                 cx.notify();
                                 return None;
                             }
@@ -2705,36 +2803,123 @@ impl AssemblyView {
 // ---------------------------------------------------------------- Insert: configuration inputs
 
 impl AssemblyView {
-    /// Configuration inputs of a configured Part Studio in the Insert
-    /// dialog (list and checkbox inputs; values apply to the next insert).
-    pub(super) fn render_insert_config(&mut self, studio: TabId, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use noshape_model::configuration::ConfigInputKind;
-        // Part Studios and configured assemblies (Assemblies tab).
-        let inputs = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
+    /// The configuration inputs of a configured Part Studio or assembly.
+    fn insert_config_inputs(&self, studio: TabId, cx: &App) -> Vec<noshape_model::configuration::ConfigInput> {
+        match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
             Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
             Some(TabContent::Assembly(a)) => a.configuration.inputs.clone(),
-            _ => return None,
+            _ => Vec::new(),
+        }
+    }
+
+    /// A configured row's split button (live assembly/592–594, 57x30):
+    /// "Set to last viewed configuration" and ▾ Set to last viewed | Reset
+    /// to default.
+    pub(super) fn insert_config_button(&mut self, studio: TabId, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.insert_config_inputs(studio, cx).is_empty() {
+            return None;
+        }
+        let set_last = move |this: &mut Self, cx: &mut Context<Self>| {
+            match crate::release_dialog::last_viewed_config(studio) {
+                Some(v) => {
+                    this.ui.insert_config.insert(studio, v);
+                }
+                None => this.ui.cfg_toast = Some("Could not find last viewed configuration.".into()),
+            }
+            cx.notify();
         };
+        let view = cx.entity();
+        Some(
+            h_flex()
+                .flex_none()
+                .mr(px(6.))
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("inscfg-last-{studio}")))
+                        .w(px(35.))
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .border_r_1()
+                        .border_color(rgb(0xaaaaaa))
+                        .cursor_pointer()
+                        .hover(|d| d.bg(rgb(0xeaeaea)))
+                        .tooltip(crate::ui::tooltip("Set to last viewed configuration"))
+                        .child(crate::assets::icon(&icon_path("configuration"), 20., cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            set_last(this, cx);
+                        })),
+                )
+                .child(
+                    div()
+                        .id(SharedString::from(format!("inscfg-dd-{studio}")))
+                        .w(px(20.))
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .hover(|d| d.bg(rgb(0xeaeaea)))
+                        .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x000000)))
+                        .on_click(move |ev: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            let (v1, v2) = (view.clone(), view.clone());
+                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon(Icon::empty().path(icon_path("configuration"))).on_click(move |_, _, cx| v1.update(cx, |this, cx| set_last(this, cx))))
+                                    .item(crate::os_menu::OsMenuItem::new("Reset to default").icon(Icon::empty().path(icon_path("configuration"))).on_click(move |_, _, cx| {
+                                        v2.update(cx, |this, cx| {
+                                            this.ui.insert_config.remove(&studio);
+                                            cx.notify();
+                                        })
+                                    }))
+                            });
+                            crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
+                        }),
+                )
+                .into_any_element(),
+        )
+    }
+
+    /// Configuration inputs of a configured Part Studio (shown when the
+    /// row is expanded, live 595: "Size [Default ▾]" above the parts) or
+    /// assembly: the values apply to the next insert.
+    pub(super) fn render_insert_config(&mut self, studio: TabId, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use noshape_model::configuration::ConfigInputKind;
+        let inputs = self.insert_config_inputs(studio, cx);
         if inputs.is_empty() {
             return None;
         }
         let pal = p();
         let values = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
-        let mut col = v_flex().pl(px(26.)).pr_2().py_1().gap_1();
+        let mut col = v_flex().py(px(2.)).gap(px(2.));
+        let label = |name: String| div().w(px(44.)).flex_none().truncate().text_size(px(12.)).text_color(pal.text_muted).child(name);
         for inp in &inputs {
             let id = inp.id.clone();
             match &inp.kind {
                 ConfigInputKind::List { options, default } => {
                     let cur = values.0.get(&inp.id).cloned().unwrap_or_else(|| default.clone());
-                    let mut seg = h_flex().gap_1().flex_wrap().child(div().text_xs().text_color(pal.text_muted).child(inp.name.clone()));
-                    for o in options {
-                        let (oid, id2) = (o.id.clone(), id.clone());
-                        seg = seg.child(Button::new(SharedString::from(format!("inscfg-{studio}-{}-{}", inp.id, o.id))).label(o.name.clone()).xsmall().ghost().selected(cur == o.id).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.ui.insert_config.entry(studio).or_default().0.insert(id2.clone(), oid.clone());
-                            cx.notify();
-                        })));
-                    }
-                    col = col.child(seg);
+                    let cur_name = options.iter().find(|o| o.id == cur).map(|o| o.name.clone()).unwrap_or_default();
+                    let opts: Vec<(String, String)> = options.iter().map(|o| (o.id.clone(), o.name.clone())).collect();
+                    let view = cx.entity();
+                    let select = Button::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id))).label(cur_name).outline().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("inscfg-dd-{studio}-{}", inp.id)), true, move |mut m, _, _| {
+                        for (oid, name) in &opts {
+                            let (view, oid, id2) = (view.clone(), oid.clone(), id.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).checked(oid == cur).on_click(move |_, _, cx| {
+                                view.update(cx, |this, cx| {
+                                    this.ui.insert_config.entry(studio).or_default().0.insert(id2.clone(), oid.clone());
+                                    cx.notify();
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    col = col.child(h_flex().h(px(26.)).gap(px(6.)).child(label(inp.name.clone())).child(select));
                 }
                 ConfigInputKind::Checkbox { default } => {
                     let cur = values.0.get(&inp.id).map(|v| v == "true").unwrap_or(*default);
@@ -2744,16 +2929,10 @@ impl AssemblyView {
                     })));
                 }
                 ConfigInputKind::Variable { default, .. } => {
-                    col = col.child(div().text_xs().text_color(pal.text_faint).child(format!("{} = {}", inp.name, values.0.get(&inp.id).cloned().unwrap_or_else(|| default.text.clone()))));
+                    col = col.child(h_flex().h(px(26.)).gap(px(6.)).child(label(inp.name.clone())).child(div().text_size(px(12.)).text_color(pal.text).child(values.0.get(&inp.id).cloned().unwrap_or_else(|| default.text.clone()))));
                 }
                 ConfigInputKind::Text { .. } => {}
             }
-        }
-        if !values.0.is_empty() {
-            col = col.child(div().id(SharedString::from(format!("inscfg-reset-{studio}"))).text_xs().text_color(pal.accent).cursor_pointer().child("Reset to default").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.ui.insert_config.remove(&studio);
-                cx.notify();
-            })));
         }
         Some(col.into_any_element())
     }
@@ -2778,38 +2957,152 @@ impl AssemblyView {
     /// its dashed circle (live 305z: dark blue, 3 decimals, no box), the
     /// translations as lengths; double-click one to type a value that moves
     /// the parts (help: Mate values).
-    pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let ids = self.value_mates(cx);
-        // Not while a mate dialog or the Animate dialog is open.
-        if ids.is_empty() || self.mate.is_some() || self.anim.is_some() {
-            return vec![];
+    /// The rotation value arc: the selected mate's (live 305z) or the mate
+    /// dialog's ▶ preview (live 575, whole degrees). Returns the arc, the text
+    /// and its in-plane layout (centre, x / y axes, ascender; world units).
+    pub(super) fn value_arc(&self, cx: &App) -> Option<(crate::assembly_scene::ValueArc, String, [DVec3; 3], f64)> {
+        let (id, preview) = match &self.anim {
+            Some(a) if a.preview => (a.mate, true),
+            Some(_) => return None,
+            None if self.mate.is_some() => return None,
+            None => (self.selected_mate?, false),
+        };
+        let ms = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive)?;
+        let t = self.assembly(cx)?.mate(id)?.mate_type;
+        if !noshape_model::assembly::eval::mate_dofs(t).iter().any(|(ix, _)| *ix == 0) {
+            return None;
         }
-        let units = self.units(cx);
+        let f = ms.frame_a.or(ms.frame_b)?;
         let radius = self.triad_size() * super::VALUE_ARC_SCALE;
+        let sweep = ms.values[0].rem_euclid(std::f64::consts::TAU);
+        let text = if preview { format!("{:.0}°", sweep.to_degrees()) } else { format!("{:.3}°", sweep.to_degrees()) };
         let vp = self.viewport.read(cx);
         let size = vp.size();
-        let mut out = Vec::new();
+        let asc = VALUE_TEXT_ASC * vp.camera.world_per_pixel(size.y);
+        let width = noshape_sketch::text::layout_text(&text, noshape_sketch::text::DEFAULT_FONT, false, false).width * asc;
+        // The text lies in the plane along the connector's X axis (live
+        // 305z), turned so it never reads mirrored or upside down.
+        let (mut x, mut y) = (f.rotation * DVec3::X, f.rotation * DVec3::Y);
+        let mid = sweep * 0.5;
+        let center = f.origin + f.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0);
+        if let (Some(c), Some(px_), Some(py_)) = (vp.project(center), vp.project(center + x * radius), vp.project(center + y * radius)) {
+            let (sx, sy) = (px_ - c, py_ - c);
+            if sx.x * sy.y - sx.y * sy.x > 0.0 {
+                y = -y;
+            }
+            if sx.x < 0.0 {
+                x = -x;
+                y = -y;
+            }
+        }
+        // The arc breaks where it crosses the text box (3 px margin).
+        let pad = 3.0 * asc / VALUE_TEXT_ASC;
+        let (hw, hh) = (width * 0.5 + pad, asc * 0.65 + pad);
+        let (tx, ty) = (mid.sin().abs(), mid.cos().abs());
+        let along = (if tx > 1e-9 { hw / tx } else { f64::INFINITY }).min(if ty > 1e-9 { hh / ty } else { f64::INFINITY });
+        let gap = along.is_finite().then(|| (mid, along / radius));
+        let arc = crate::assembly_scene::ValueArc { frame: f, radius, sweep, gap };
+        Some((arc, text, [center, x, y], asc))
+    }
+
+    /// The value text drawn in the arc's plane, plus a hit box over it for
+    /// double-click editing.
+    fn render_value_text(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some((_, text, [center, x, y], asc)) = self.value_arc(cx) else { return vec![] };
+        let Some(id) = self.anim.as_ref().map(|a| a.mate).or(self.selected_mate) else { return vec![] };
+        let layout = noshape_sketch::text::layout_text(&text, noshape_sketch::text::DEFAULT_FONT, false, false);
+        let base = center - x * (layout.width * asc * 0.5) - y * (asc * 0.5);
+        let vp = self.viewport.read(cx);
+        let mut polys: Vec<Vec<Point<Pixels>>> = Vec::new();
+        let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+        for contour in layout.polylines(6) {
+            let mut poly = Vec::with_capacity(contour.len());
+            for q in contour {
+                let Some(s) = vp.project(base + x * (q.x * asc) + y * (q.y * asc)) else {
+                    poly.clear();
+                    break;
+                };
+                lo = lo.min(s);
+                hi = hi.max(s);
+                poly.push(point(px(s.x as f32), px(s.y as f32)));
+            }
+            if poly.len() >= 3 {
+                polys.push(poly);
+            }
+        }
+        if polys.is_empty() {
+            return vec![];
+        }
+        let color: Hsla = rgb(0x1a35b8).into();
+        let mut out = vec![canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                let o = bounds.origin;
+                let mut b = PathBuilder::fill();
+                for poly in &polys {
+                    b.move_to(point(o.x + poly[0].x, o.y + poly[0].y));
+                    for q in &poly[1..] {
+                        b.line_to(point(o.x + q.x, o.y + q.y));
+                    }
+                    b.close();
+                }
+                if let Ok(path) = b.build() {
+                    window.paint_path(path, color);
+                }
+            },
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .into_any_element()];
+        if self.anim.is_some() {
+            return out;
+        }
+        let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == 0).map(|(_, _, st, _)| st.clone());
+        let hit = div().id("mv-rot").absolute().left(px(lo.x as f32 - 3.)).top(px(lo.y as f32 - 3.)).w(px((hi.x - lo.x) as f32 + 6.)).h(px((hi.y - lo.y) as f32 + 6.));
+        out.push(
+            match editing {
+                Some(st) => hit.child(div().w(px(80.)).bg(rgb(0xffffff)).child(Input::new(&st).xsmall())),
+                None => hit.cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                    if ev.click_count() >= 2 {
+                        this.start_value_edit(id, 0, window, cx);
+                    }
+                })),
+            }
+            .occlude()
+            .into_any_element(),
+        );
+        out
+    }
+
+    pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        // The rotation value is an in-plane angular dimension (also during
+        // the mate dialog's ▶ preview).
+        let mut out = self.render_value_text(cx);
+        let ids = self.value_mates(cx);
+        // Lengths: not while a mate dialog or the Animate dialog is open.
+        if ids.is_empty() || self.mate.is_some() || self.anim.is_some() {
+            return out;
+        }
+        let units = self.units(cx);
+        let vp = self.viewport.read(cx);
+        let size = vp.size();
         for id in ids {
             let Some(ms) = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive) else { continue };
             let Some(t) = self.assembly(cx).and_then(|a| a.mate(id)).map(|m| m.mate_type) else { continue };
             let Some(f) = ms.frame_b else { continue };
-            for (k, (ix, _)) in noshape_model::assembly::eval::mate_dofs(t).iter().enumerate() {
+            // Lengths stack beside the connector.
+            for (k, (ix, _)) in noshape_model::assembly::eval::mate_dofs(t).iter().enumerate().filter(|(_, (ix, _))| *ix != 0) {
                 let ix = *ix;
                 let v = ms.values[ix];
-                // The rotation label sits on the circle's far side; lengths
-                // stack beside the connector.
-                let anchor = if ix == 0 { f.origin + f.rotation * DVec3::new(-radius, -radius * 0.3, 0.0) } else { f.origin };
-                let Some(at) = vp.project(anchor) else { continue };
+                let Some(at) = vp.project(f.origin) else { continue };
                 if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
                     continue;
                 }
-                let text = if ix == 0 {
-                    format!("{:.3}°", v.to_degrees())
-                } else {
-                    noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units)
-                };
+                let text = noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units);
                 let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == ix).map(|(_, _, st, _)| st.clone());
-                let (x, y) = if ix == 0 { (at.x as f32 - 60., at.y as f32 - 8.) } else { (at.x as f32 + 12., at.y as f32 + 14. * k as f32) };
+                let (x, y) = (at.x as f32 + 12., at.y as f32 + 14. * k as f32);
                 let label = div()
                     .id(SharedString::from(format!("mv-{}-{ix}", id.0)))
                     .absolute()

@@ -301,14 +301,14 @@ fn bom_hole_table_and_linked_balloons() {
     let pin = pin.expect("pin vertex snap");
     drawing.sheets[si].annotations.push(Annotation {
         id: 1,
-        kind: AnnotationKind::Balloon { view: ViewId(1), anchor: pin.p, text: String::new() },
+        kind: AnnotationKind::balloon(ViewId(1), pin.p, ""),
         position: [220.0, 220.0],
         refs: vec![AnnotationRef { slot: 0, point: pin.point.clone().unwrap() }],
         ..Default::default()
     });
     let built = render_sheet(&drawing, si, &sources, &cache, false).unwrap();
     let t = texts(&built);
-    for want in ["BILL OF MATERIALS", "ITEM", "QTY", "Part 1", "2"] {
+    for want in ["Item", "Quantity", "Part number", "2"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
     let bp = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
@@ -1053,7 +1053,7 @@ fn bom_split_order_and_structured_rows() {
     // Bottom to top: rows reversed, header last.
     let rev = data(bom(false, true), None);
     assert!(rev.header_bottom && rev.rows.first() == all.rows.last());
-    assert_eq!(rev.all_rows().last().map(|r| r[0].as_str()), Some("ITEM"));
+    assert_eq!(rev.all_rows().last().map(|r| r[0].as_str()), Some("Item"));
     assert!(!data(bom(true, false), None).rows.is_empty());
     // An override replaces the cell's value and is marked.
     let item = all.rows[0][0].clone();
@@ -1068,7 +1068,7 @@ fn grouped_callout_follows_its_annotation() {
     let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
     let mut s = Sheet::default();
     let note = |p: [f64; 2]| Annotation { id: 1, kind: AnnotationKind::note("NOTE", 3.5), position: p, ..Default::default() };
-    let callout = Annotation { id: 2, kind: AnnotationKind::Balloon { view: ViewId(1), anchor: [0.0, 0.0], text: "7".into() }, position: [6.0, 4.0], group: Some(1), ..Default::default() };
+    let callout = Annotation { id: 2, kind: AnnotationKind::balloon(ViewId(1), [0.0, 0.0], "7"), position: [6.0, 4.0], group: Some(1), ..Default::default() };
     let at = |s: &Sheet| {
         let mut g = sheet::SheetGeometry::new(420.0, 297.0);
         g.add_annotations(s, &env);
@@ -1107,4 +1107,245 @@ fn center_of_mass_needs_a_material() {
     // A snap point at it, inside the view's extent.
     assert!(g.snaps.iter().any(|s| s.p == c));
     assert!(c[0] >= g.min[0] && c[0] <= g.max[0] && c[1] >= g.min[1] && c[1] <= g.max[1]);
+}
+
+#[test]
+fn pinned_views_use_their_version() {
+    use crate::params::ParamValue;
+    use noshape_units::ExprValue;
+    let (v1, mut drawing) = demo();
+    // The live document changes after the version: a thicker plate.
+    let mut live = v1.clone();
+    if let TabContent::PartStudio(ps) = &mut live.tabs[0].content {
+        let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
+        ex.params.set("depth", ParamValue::Expr(ExprValue::new("20 mm")));
+    }
+    let vid = drawing.sheets[0].views[0].id;
+    let pin = PinnedVersion { id: "v1".into(), name: "V1".into() };
+    drawing.sheets[0].views[0].pinned = Some(pin.clone());
+    let (key, _) = views::view_source(&drawing.sheets[0], vid).unwrap();
+    assert_eq!(key.version.as_deref(), Some("v1"), "the key carries the version");
+    let versions = |id: &str| (id == "v1").then(|| v1.clone());
+    let sources = views::regenerate_sources_with(&live, &drawing, &versions);
+    let src = &sources[&key];
+    // Regenerated from the version, not the live document.
+    assert_eq!(Some(src.hash), views::source_hash(&v1, &key));
+    assert_ne!(Some(src.hash), views::source_hash(&live, &key));
+    // An unknown version leaves the source out.
+    drawing.sheets[0].views[0].pinned = Some(PinnedVersion { id: "nope".into(), name: "?".into() });
+    let none = views::regenerate_sources_with(&live, &drawing, &versions);
+    assert!(none.keys().all(|k| k.version.as_deref() != Some("nope")));
+}
+
+#[test]
+fn callouts_stack_and_justify() {
+    let (doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    let mut kind = AnnotationKind::balloon(vid, [0.0, 0.0], "K1");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.stacked = ["K2", "K3333"].iter().map(|t| StackedCallout { text: t.to_string(), body: None }).collect();
+        callout.above = "TOP".into();
+        callout.below = "QTY 22".into();
+    }
+    drawing.sheets[0].annotations.push(Annotation { id: 900, kind, position: [300.0, 200.0], ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let texts = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry.texts;
+    let pos = |d: &Drawing, t: &str| texts(d).iter().find(|x| x.text == t).map(|x| x.pos).unwrap();
+    drawing.props.callout_stack = StackDirection::Right;
+    drawing.props.callout_stack_gap = 2.0;
+    let (p1, p2) = (pos(&drawing, "K1"), pos(&drawing, "K2"));
+    assert!((p1[1] - p2[1]).abs() < 1e-9, "a row");
+    let pitch = p2[0] - p1[0];
+    assert!(pitch > 2.0);
+    // A bigger gap spreads them by the difference.
+    drawing.props.callout_stack_gap = 5.0;
+    assert!(((pos(&drawing, "K2")[0] - pos(&drawing, "K1")[0]) - (pitch + 3.0)).abs() < 1e-9);
+    drawing.props.callout_stack = StackDirection::Up;
+    let (u1, u2) = (pos(&drawing, "K1"), pos(&drawing, "K2"));
+    assert!((u1[0] - u2[0]).abs() < 1e-9 && u2[1] > u1[1], "a column going up");
+    // Texts above / below sit outside the border, centred.
+    let (top, below, k1) = (pos(&drawing, "TOP"), pos(&drawing, "QTY 22"), pos(&drawing, "K1"));
+    assert!(top[1] > k1[1] + 3.5 && below[1] < k1[1] - 3.5);
+    // Justification of the callout data in the widest item.
+    let width = |t: &str| font::text_width(t, 3.5);
+    drawing.props.callout_stack = StackDirection::Right;
+    drawing.props.callout_justify = TextJustify::Left;
+    let (a, b) = (pos(&drawing, "K1"), pos(&drawing, "K2"));
+    let pitch = b[0] - a[0];
+    let c3 = pos(&drawing, "K3333");
+    assert!(((c3[0] - b[0]) - pitch).abs() < 1e-6, "left edges one pitch apart");
+    drawing.props.callout_justify = TextJustify::Right;
+    let (b, c3) = (pos(&drawing, "K2"), pos(&drawing, "K3333"));
+    assert!(((c3[0] + width("K3333")) - (b[0] + width("K2")) - pitch).abs() < 1e-6, "right edges one pitch apart");
+}
+
+#[test]
+fn property_fields_have_a_grey_background_on_screen() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let backdrops = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry.field_backdrops;
+    assert!(!backdrops(&drawing).is_empty(), "title block fields are grey");
+    drawing.props.hide_property_background = true;
+    assert!(backdrops(&drawing).is_empty());
+}
+
+#[test]
+fn datum_target_areas_are_hatched() {
+    let (doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    drawing.sheets[0].annotations.push(Annotation { id: 901, kind: AnnotationKind::DatumTarget { view: vid, anchor: [0.0, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [300.0, 200.0], ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let lines = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry.lines.len();
+    let hatched = lines(&drawing);
+    // General › Solid draws no hatch lines.
+    drawing.props.target_hatch = (2, 0);
+    assert!(lines(&drawing) + 3 < hatched);
+}
+
+/// The demo drawing's first view on a sheet metal L bracket (50 x 30 mm
+/// legs, 20 mm deep, T 2, R 3) as a flat pattern view.
+fn flat_bracket() -> (crate::Document, Drawing) {
+    use crate::params::ParamValue;
+    use crate::reference::{DatumPlane, Reference};
+    use glam::DVec2;
+    use noshape_units::{ExprValue, UnitPrefs};
+    let (mut doc, mut drawing) = demo();
+    let tab = match &drawing.sheets[0].views[0].kind {
+        ViewKind::Base { source, .. } => *source,
+        _ => unreachable!(),
+    };
+    let units = UnitPrefs::default();
+    let mut ps = crate::partstudio::PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts: Vec<_> = [(0.0, 0.0), (0.05, 0.0), (0.05, 0.03)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+    let lines: Vec<u32> = (0..2).map(|i| sk.add_line_between(pts[i], pts[i + 1]).unwrap().0).collect();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(crate::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    let sid = f.id;
+    ps.features.push(f);
+    let mut f = ps.new_feature("sheetMetalStart", &units).unwrap();
+    f.params.set("process", ParamValue::Enum("EXTRUDE".into()));
+    f.params.set("sketchCurves", ParamValue::Query(lines.iter().map(|&e| Reference::SketchEntity { sketch: sid, entity: e }).collect()));
+    for (k, v) in [("depth", "20 mm"), ("thickness", "2 mm"), ("radius", "3 mm"), ("kFactor", "0.45")] {
+        f.params.set(k, ParamValue::Expr(ExprValue::new(v)));
+    }
+    ps.features.push(f);
+    doc.tab_mut(tab).unwrap().content = TabContent::PartStudio(ps);
+    let sources = regenerate_sources(&doc, &drawing);
+    let (key, _) = views::view_source(&drawing.sheets[0], drawing.sheets[0].views[0].id).unwrap();
+    let body = sources[&key].context.bodies[0].id.clone();
+    let v = &mut drawing.sheets[0].views[0];
+    if let ViewKind::Base { part, .. } = &mut v.kind {
+        *part = Some(body);
+    }
+    v.flat = true;
+    drawing.sheets[0].views.truncate(1);
+    drawing.sheets[0].annotations.clear();
+    (doc, drawing)
+}
+
+#[test]
+fn flat_pattern_view_shows_bend_lines_and_notes() {
+    let (doc, mut drawing) = flat_bracket();
+    let vid = drawing.sheets[0].views[0].id;
+    let sources = regenerate_sources(&doc, &drawing);
+    let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    assert_eq!(g.bends.len(), 1);
+    // The developed length: (50 - 5) + (30 - 5) + 90° × (3 + 0.45 × 2) mm.
+    let expected = 0.045 + 0.025 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
+    let (w, h) = (g.max[0] - g.min[0], g.max[1] - g.min[1]);
+    assert!((w.max(h) - expected).abs() < 1e-6 && (w.min(h) - 0.02).abs() < 1e-9, "{w} x {h}");
+    let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
+    let g1 = built(&drawing);
+    let note = g1.texts.iter().find(|t| t.text.starts_with("UP ") || t.text.starts_with("DOWN ")).expect("a bend note");
+    assert!(note.text.contains("90°") && note.text.contains("R3"), "{}", note.text);
+    let centerlines = |g: &sheet::SheetGeometry| g.lines.iter().filter(|l| l.style == sheet::LineStyle::Centerline).count();
+    // Show/Hide bend lines and bend notes.
+    drawing.sheets[0].views[0].hide_bend_lines = true;
+    drawing.sheets[0].views[0].hide_bend_notes = true;
+    let g2 = built(&drawing);
+    assert_eq!(centerlines(&g2) + 1, centerlines(&g1));
+    assert!(!g2.texts.iter().any(|t| t.text.starts_with("UP ") || t.text.starts_with("DOWN ")));
+}
+
+#[test]
+fn annotations_moved_to_format_layers() {
+    let (doc, mut drawing) = demo();
+    drawing.sheets[0].annotations.push(Annotation { id: 902, kind: AnnotationKind::note("LAYERED NOTE", 3.5), position: [60.0, 40.0], layer: SheetLayer::TitleBlock, ..Default::default() });
+    drawing.props.title_block_color = Some([200, 0, 0]);
+    drawing.props.formats_locked = false;
+    let sources = regenerate_sources(&doc, &drawing);
+    let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
+    let g = built(&drawing);
+    let i = g.texts.iter().position(|t| t.text == "LAYERED NOTE").unwrap();
+    // The title block's color, layer and pickability.
+    assert_eq!(g.text_color(i), Some([200, 0, 0]));
+    assert_eq!(g.text_layer(i), Some("TITLE_BLOCK"));
+    assert_ne!(g.texts[i].pick, 0);
+    // Exported on that layer (also after exploding the text).
+    let dxf = export::to_dxf(&g);
+    assert!(dxf.contains("TITLE_BLOCK") && dxf.contains("BORDER_ZONES"));
+    let exploded = export::prepare(&g, &export::ExportOptions { explode_all: true, ..Default::default() });
+    assert!(exploded.layers.iter().any(|s| s.layer == SheetLayer::TitleBlock && (!s.lines.is_empty() || !s.fills.is_empty())));
+    // Locked formats: not pickable.
+    drawing.props.formats_locked = true;
+    let g = built(&drawing);
+    let i = g.texts.iter().position(|t| t.text == "LAYERED NOTE").unwrap();
+    assert_eq!(g.texts[i].pick, 0);
+}
+
+#[test]
+fn rotated_notes_turn_about_their_position() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut s = Sheet::default();
+    let mut kind = AnnotationKind::note("TURN", 3.5);
+    if let AnnotationKind::Note { style, .. } = &mut kind {
+        style.angle = std::f64::consts::FRAC_PI_2;
+    }
+    s.annotations.push(Annotation { id: 1, kind, position: [100.0, 100.0], ..Default::default() });
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &env);
+    let t = g.texts.iter().find(|t| t.text == "TURN").unwrap();
+    assert!((t.angle - std::f64::consts::FRAC_PI_2).abs() < 1e-9);
+    // The text runs up, turned about the note's middle.
+    let b = font::text_box(t);
+    let span = |k: usize| b.iter().map(|p| p[k]).fold(f64::MIN, f64::max) - b.iter().map(|p| p[k]).fold(f64::MAX, f64::min);
+    assert!(span(1) > span(0), "{b:?}");
+    let l = note::layout("TURN", 3.5, &note::NoteStyle::default(), [100.0, 100.0]);
+    let mid = note::center(&l.bbox);
+    let c = [b.iter().map(|p| p[0]).sum::<f64>() / 4.0, b.iter().map(|p| p[1]).sum::<f64>() / 4.0];
+    assert!((c[0] - mid[0]).abs() < 1.5 && (c[1] - mid[1]).abs() < 1.5, "{c:?} vs {mid:?}");
+}
+
+#[test]
+fn thread_designations_give_major_diameters() {
+    let d = |s: &str| views::thread_major_diameter(s).map(|m| (m * 1e7).round() / 1e7);
+    assert_eq!(d("M6x1.0"), Some(0.006));
+    assert_eq!(d("M10"), Some(0.01));
+    assert_eq!(d("1/4-20"), Some((0.25f64 * 0.0254 * 1e7).round() / 1e7));
+    assert_eq!(d("#10-24"), Some(((0.06 + 0.13) * 0.0254 * 1e7f64).round() / 1e7));
+    assert_eq!(d("garbage"), None);
+}
+
+#[test]
+fn chamfer_dimension_style_and_content() {
+    let drawing = Drawing::default();
+    let mut d2 = drawing.clone();
+    let texts = |d: &Drawing, kind: AnnotationKind| {
+        let s = Sheet { annotations: vec![Annotation { id: 1, kind, position: [60.0, 60.0], ..Default::default() }], ..Default::default() };
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        let env = sheet::PlainEnv { drawing: d, scale: 1000.0 };
+        g.add_annotations(&s, &env);
+        g.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>()
+    };
+    // A 45° chamfer of 2 mm legs (edge a-b, adjacent edge c-d).
+    let k = AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.0, 0.0], d: [0.01, 0.0] };
+    assert!(texts(&drawing, k.clone()).iter().any(|t| t.contains("× 45°")), "{:?}", texts(&drawing, k.clone()));
+    d2.props.chamfer_45_content = ChamferContent::CLength;
+    assert!(texts(&d2, k.clone()).iter().any(|t| t.starts_with('C')));
+    d2.props.chamfer_45_content = ChamferContent::AngleXLength;
+    assert!(texts(&d2, k).iter().any(|t| t.starts_with("45° ×")));
 }

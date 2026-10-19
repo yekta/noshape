@@ -494,12 +494,8 @@ impl PartStudioView {
 
     /// Roll the view about the line of sight (cube arc arrows).
     pub(super) fn roll_view(&mut self, deg: f64, cx: &mut Context<Self>) {
-        self.viewport.update(cx, |vp, cx| {
-            let mut to = vp.camera;
-            let q = DQuat::from_axis_angle(to.forward(), deg.to_radians());
-            to.rotation = (q * to.rotation).normalize();
-            vp.animate_to(to, cx);
-        });
+        let dir = if deg > 0.0 { crate::navigation::RotateDir::CounterClockwise } else { crate::navigation::RotateDir::Clockwise };
+        self.viewport.update(cx, |vp, cx| vp.rotate_step(dir, deg.abs(), cx));
     }
 
     pub(super) fn render_view_cube(&mut self, cx: &mut Context<Self>) -> AnyElement {

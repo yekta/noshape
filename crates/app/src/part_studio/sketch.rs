@@ -245,7 +245,14 @@ impl PartStudioView {
         });
         let Some(frame) = frame else { return };
         match &mut self.sketch {
-            Some(ed) if ed.feature == id => ed.frame = frame,
+            Some(ed) if ed.feature == id => {
+                // A new sketch plane places the frame again (Onshape
+                // `onPlaneChange`).
+                if ed.frame != frame {
+                    ed.frame = frame;
+                    ed.frame_bounds = None;
+                }
+            }
             _ => {
                 self.sketch = Some(SketchEditor::new(id, frame));
                 let length = self.doc.read(cx).session.doc.settings.units.length;
@@ -257,6 +264,7 @@ impl PartStudioView {
                 // plane is picked).
             }
         }
+        self.place_sketch_frame(plane.as_ref(), cx);
         self.update_conflicts();
         self.opts.editing_sketch = Some(id);
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = true);
@@ -413,6 +421,57 @@ impl PartStudioView {
                 ((s - cursor_s).length() <= radius_px).then_some(ExternalSnap::Edge { position: q, reference: r.clone() })
             }
             _ => None,
+        }
+    }
+
+    /// Fixes the sketch frame like Onshape's sketch plane display
+    /// (`updateBounds`): centred on the bounds centre of the sketch plane's
+    /// entity (a plane, face or mate connector), or, when that is off screen,
+    /// where the ray through the graphics area's centre meets the plane.
+    fn place_sketch_frame(&mut self, plane: Option<&Reference>, cx: &App) {
+        let Some(ed) = self.sketch.as_ref().filter(|ed| ed.frame_bounds.is_none()) else { return };
+        let vp = self.viewport.read(cx);
+        let size = vp.size();
+        if size.y < 1.0 {
+            return;
+        }
+        let frame = ed.frame;
+        let center = plane.and_then(|r| {
+            if let Some(pl) = self.display.planes.iter().find(|p| &p.reference == r) {
+                return Some(pl.frame.origin);
+            }
+            if let Some(c) = self.display.connectors.iter().find(|c| &c.reference == r) {
+                return Some(c.origin);
+            }
+            let body = self.display.bodies.iter().chain(&self.display.context_bodies).find(|b| b.face_refs.contains(r))?;
+            let face = body.face_refs.iter().position(|f| f == r)?;
+            let &(first, count) = body.mesh.face_ranges.get(face)?;
+            let idx = body.mesh.indices.get(first as usize..(first + count) as usize)?;
+            let mut lo = DVec3::splat(f64::INFINITY);
+            let mut hi = DVec3::splat(f64::NEG_INFINITY);
+            for &i in idx {
+                let q = DVec3::from(body.mesh.positions[i as usize].map(f64::from));
+                lo = lo.min(q);
+                hi = hi.max(q);
+            }
+            (lo.x <= hi.x).then(|| (lo + hi) * 0.5)
+        });
+        let mut center = center.map_or(DVec2::ZERO, |c| frame.to_local(c));
+        let on_screen = vp.project(frame.to_world(center)).is_some_and(|q| q.x >= 0.0 && q.x < size.x && q.y >= 0.0 && q.y < size.y);
+        if !on_screen {
+            // Onshape intersects only rays at least 15 degrees off the plane
+            // (sin 15 = 0.258819).
+            let (o, d) = vp.ray(size * 0.5);
+            if d.normalize_or_zero().dot(frame.normal).abs() >= 0.258819
+                && let Some(q) = frame.intersect_ray(o, d)
+            {
+                center = frame.to_local(q);
+            }
+        }
+        let wpp = vp.camera.world_per_pixel(size.y);
+        if let Some(ed) = &mut self.sketch {
+            ed.world_per_px = wpp;
+            ed.place_frame(center, size.y);
         }
     }
 
@@ -2408,10 +2467,26 @@ impl PartStudioView {
 
         // ---- the sketch frame's name ("Sketch 1", light blue, top-left inside)
         {
-            let (lo, hi) = ed.sketch_box(&data);
+            let (lo, hi) = ed.sketch_box();
             let name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_default();
-            if let Some((x, y)) = project(DVec2::new(lo.x, hi.y)) {
-                out.push(div().absolute().left(px(x + 7.0)).top(px(y + 4.0)).text_size(px(18.)).text_color(rgb(crate::sketch_mode::SKETCH_BOX_COLOR)).whitespace_nowrap().child(name).into_any_element());
+            // Onshape `updateText`: drawn in the sketch plane, a 20 px label
+            // (`PLANE_TEXT_HEIGHT_PX`, 2 px padding) 5 px inside the top-left
+            // corner (`PLANE_TEXT_MARGIN`), shrunk to fit a small frame.
+            let mut polys = Vec::new();
+            let wpp = ed.world_per_px;
+            let width = noshape_sketch::text::layout_text(&name, noshape_sketch::text::DEFAULT_FONT, false, false).width;
+            let (text_w, text_h) = ((width * 16.5 + 4.0) * wpp, 24.0 * wpp);
+            let (avail_w, avail_h) = (hi.x - lo.x - 10.0 * wpp, hi.y - lo.y - 10.0 * wpp);
+            let scale = if text_w > avail_w || text_h > avail_h { (avail_w / text_w).min(avail_h / text_h) } else { 1.0 };
+            if scale > 0.0 {
+                // `in_plane_text` puts the ascender 0.25 asc right of and
+                // 0.3 asc below the point it is given.
+                let (asc, inset) = (16.5 * wpp * scale, (5.0 + 2.0 * scale) * wpp);
+                let top_left = DVec2::new(lo.x + inset - 0.25 * asc, hi.y - inset + 0.3 * asc);
+                super::in_plane_text(vp, &name, frame.to_world(top_left), frame.x, frame.y, asc, &mut polys);
+            }
+            if !polys.is_empty() {
+                out.push(super::paint_paths(polys, rgb(crate::sketch_mode::SKETCH_BOX_COLOR).into()));
             }
         }
 
@@ -2440,11 +2515,11 @@ impl PartStudioView {
                     // with "◻◻◻" over a 209 x 34 white panel (1 px `#ccc`,
                     // shadow) holding the disabled ">" expander, the 100 px
                     // underlined value field, the ± toggle and 22 px ✓ / ✗.
-                    // The field is centered on the label position.
+                    // The box is centered on the label position (live sketch/12-13).
                     v_flex()
                         .absolute()
-                        .left(px(x - 70.0))
-                        .top(px(y - 27.0))
+                        .left(px(x - 104.0))
+                        .top(px(y - 30.0))
                         .w(px(209.))
                         .occlude()
                         .child(
@@ -2476,7 +2551,8 @@ impl PartStudioView {
                                         .h(px(24.))
                                         .border_b_1()
                                         .border_color(pal.accent)
-                                        .child(Input::new(st).appearance(false).text_size(px(14.)).text_right().h(px(24.))),
+                                        // Live sketch/141: right-aligned, ~13.33 px, ending 7 px from the field's edge.
+                                        .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).h(px(24.))),
                                 )
                                 .child(
                                     div()
@@ -2487,8 +2563,9 @@ impl PartStudioView {
                                         .items_center()
                                         .justify_center()
                                         .rounded(px(3.))
-                                        .text_size(px(12.))
-                                        .text_color(with_alpha(rgb(0x101010), 0.3))
+                                        // Live dom/dimension-input-box.txt: `parameter-state-toggle`,
+                                        // the hole-tolerance-precision icon at opacity 0.5.
+                                        .opacity(0.5)
                                         .when(allowed, |d| {
                                             d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Tolerance and precision")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                                 if let Some(ui) = this.ui_mut() {
@@ -2499,7 +2576,7 @@ impl PartStudioView {
                                                 cx.notify();
                                             }))
                                         })
-                                        .child("±"),
+                                        .child(crate::assets::icon("hole-tolerance-precision", 20., cx)),
                                 )
                                 .child(div().flex_1())
                                 .child(
@@ -2537,7 +2614,7 @@ impl PartStudioView {
                                         .border_color(rgb(0xcccccc))
                                         .cursor_pointer()
                                         .hover(|d| d.bg(pal.panel_hover))
-                                        .child(Icon::new(gpui_kit::component::IconName::Close).with_size(px(14.)).text_color(pal.cancel))
+                                        .child(crate::assets::icon("dialog-cancel", 22., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                             this.sketch_cancel(cx);
                                             window.focus(&this.focus, cx);
@@ -2840,20 +2917,30 @@ impl PartStudioView {
                 );
                 continue;
             }
-            let est_w = value.chars().count() as f32 * 6.6 + 14.0;
+            // Live (sketch/06): the other values stay plain like the rubber
+            // band's (13 px `#449ccd`); the active one is a 24 px box, white
+            // 90%, 1 px `#788188` border and gray 14 px text.
+            if !active {
+                let w = crate::sketch_mode::label_width_px(&value) as f32 * 13.0 / 14.0;
+                out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 9.0)).text_size(px(13.)).text_color(rgb(0x449ccd)).whitespace_nowrap().child(value).into_any_element());
+                continue;
+            }
+            let est_w = crate::sketch_mode::label_width_px(&value) as f32 * 14.0 / 16.0 + 12.0;
             out.push(
                 div()
                     .absolute()
                     .left(px(x - est_w * 0.5))
-                    .top(px(y - 10.0))
-                    .px_1p5()
-                    .py_0p5()
-                    .rounded(px(3.))
-                    .bg(pal.panel_raised)
+                    .top(px(y - 12.0))
+                    .h(px(24.))
+                    .px(px(5.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(1.))
+                    .bg(with_alpha(rgb(0xffffff), 0.9))
                     .border_1()
-                    .border_color(if active { pal.accent } else { pal.border_strong })
-                    .text_xs()
-                    .text_color(if active { pal.text } else { pal.text_muted })
+                    .border_color(rgb(0x788188))
+                    .text_size(px(14.))
+                    .text_color(rgb(0x788188))
                     .whitespace_nowrap()
                     .child(value)
                     .into_any_element(),
@@ -2871,8 +2958,11 @@ impl PartStudioView {
         if let Some((kind, pos, v)) = ed.dimension_preview(&data)
             && let Some((x, y)) = project(pos)
         {
+            // Live (sketch/12): like a placed value, 16 px black in the
+            // dimension line's gap at the cursor, no box.
             let text = crate::sketch_mode::dim_value_text(&kind, v / crate::sketch_mode::dim_display_scale(&kind), &units);
-            out.push(div().absolute().left(px(x + 8.0)).top(px(y - 22.0)).px_1().rounded(px(3.)).bg(with_alpha(pal.panel_raised, 0.85)).text_xs().text_color(pal.text).whitespace_nowrap().child(text).into_any_element());
+            let est_w = crate::sketch_mode::label_width_px(&text) as f32 + 8.0;
+            out.push(div().absolute().left(px(x - est_w * 0.5)).top(px(y - 11.0)).h(px(22.)).px(px(4.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
         }
 
         // ---- offset distance box at the direction arrow
@@ -2993,23 +3083,30 @@ impl PartStudioView {
         let group = |bar: gpui_kit::Div, group: &'static [Tool], cx: &mut Context<Self>| -> gpui_kit::Div {
             // The active member, else the last used one, is the group's face.
             let face = group.iter().copied().find(|t| *t == active).unwrap_or_else(|| group_face(group));
-            let mut bar = bar.child(tool_btn(face, cx));
-            if group.len() > 1 {
-                let view = cx.entity();
-                let members: Vec<Tool> = group.to_vec();
-                bar = bar.child(
-                    crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for t in &members {
-                                let v = view.clone();
-                                let t = *t;
-                                menu = menu.item(PopupMenuItem::new(t.label()).icon(Icon::empty().path(icon_path(t.icon()))).on_click(move |_, window, cx| v.update(cx, |this, cx| this.activate_tool(t, window, cx))));
-                            }
-                            menu
-                        }),
-                );
+            if group.len() == 1 {
+                return bar.child(tool_btn(face, cx));
             }
-            bar
+            // Live: a split tool (icon + 18 px caret, no gap, group hover)
+            // whose dropdown lists the group with shortcut chips.
+            let main = crate::ui::with_tool_tooltip(
+                SharedString::from(format!("skt-{face:?}")),
+                face.label(),
+                crate::ui::split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+            );
+            let view = cx.entity();
+            let members: Vec<Tool> = group.to_vec();
+            let caret = crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx).dropdown_menu(move |mut menu, _, _| {
+                menu = menu.min_w(px(180.));
+                for t in &members {
+                    let (v, t) = (view.clone(), *t);
+                    let label: &'static str = t.label();
+                    let shortcut = label.rsplit_once(" (").map(|(_, k)| k.trim_end_matches(')')).filter(|k| k.len() <= 7);
+                    let name = label.split(" (").next().unwrap_or_default();
+                    menu = menu.item(crate::ui::menu_tool_item(name, t.icon(), shortcut).on_click(move |_, window, cx| v.update(cx, |this, cx| this.activate_tool(t, window, cx))));
+                }
+                menu
+            });
+            bar.child(crate::ui::tool_group(SharedString::from(format!("skg-{:?}", group[0])), main, caret))
         };
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {
             crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
@@ -3029,7 +3126,7 @@ impl PartStudioView {
         // "Coincident ▾"; Dimension stays.
         let (cell, caret) = (crate::ui::TOOL_CELL + 2., crate::ui::TOOL_CARET_W);
         let groups_w = |gs: &[&[Tool]]| gs.iter().map(|g| cell + if g.len() > 1 { caret } else { 0. }).sum::<f32>();
-        let full = 4. * cell + 6. * 4. + groups_w(DRAW_TOOLS) + groups_w(USE_TOOLS) + cell + groups_w(EDIT_TOOLS) + groups_w(INSERT_TOOLS) + cell + CONSTRAINT_TOOLS.len() as f32 * cell;
+        let full = 4. * cell + 5. * 4. + groups_w(DRAW_TOOLS) + groups_w(USE_TOOLS) + cell + groups_w(EDIT_TOOLS) + groups_w(INSERT_TOOLS) + cell + CONSTRAINT_TOOLS.len() as f32 * cell;
         if full > viewport_w - crate::ui::RAIL_W - 4. - 172. {
             let draw: Vec<Tool> = DRAW_TOOLS.iter().chain(USE_TOOLS).flat_map(|g| g.iter().copied()).collect();
             let edit: Vec<Tool> = EDIT_TOOLS.iter().chain(INSERT_TOOLS).flat_map(|g| g.iter().copied()).collect();
@@ -3047,7 +3144,6 @@ impl PartStudioView {
         for g in DRAW_TOOLS {
             bar = group(bar, g, cx);
         }
-        bar = bar.child(sep());
         for g in USE_TOOLS {
             bar = group(bar, g, cx);
         }

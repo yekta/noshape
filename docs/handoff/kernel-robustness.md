@@ -186,6 +186,73 @@ curvature, partial, edge overflow and smooth corners are still ignored by the ev
   other curves into it with the same slope; at the ends the chord slope, 1.5× next to a peak/dip (done, all 8
   Onshape cases within 0.1 mm³).
 
+### Round 5 (2026-10-19, kern resumed on a new account)
+- **Y Threads** (`custom_features::real_onshape_feature_y_threads`, un-ignored, passes): the helix's 3D curve was
+  approximated to an absolute 1e-6 (1 µm in metres), enough for the tooth's edges on the core cylinder to wobble
+  across it and break the union; now relative to the radius (`build.cpp::make_helix`). `sweep_sections` falls back to
+  the Frenet frame when OCCT's corrected Frenet fails on a helix (the helix's Frenet frame is Parasolid's screw
+  motion). Kernel test `tests/thread.rs` (core + clipped teeth = Pappus volume within 0.01 mm³).
+- **G21 (JT volumes)**: our volumes are right: an independent divergence-theorem quadrature over the exact surfaces
+  (`/root/kern-scratch/divvol.cpp`) gives loft 6125.618663 and revolved spline 1726.080764 = OCCT. Onshape's own mass
+  properties of spline faces are approximate (its Rhino imports of the same exact NURBS show the same −0.055 /
+  +0.018). What was ours, fixed in the XT writer (used by .x_t/.x_b and JT): (a) the revolved spline is now one
+  **spun surface** face (XT type 68, periodic like Parasolid's own; was split in two B-spline halves → 4 faces);
+  `exchange_prepared(shape, keep_spun)`; reader handles type 68 (round trip asserts face counts now). (b) OCCT's
+  approximated intersection edges (crossing cylinders, 4e-8 off) get a curve **refitted through exact
+  surface-surface points** (`xt.cpp::refit`, Newton on both faces) so they're accurate instead of tolerant (+0.032 mm³
+  in Onshape). ACIS still splits the spun face (G14: 4 faces); G26 asks for Onshape's own SAT of the part to copy.
+- **PVZ**: G22/G23 = Onshape imports PVZ as meshes only, and our writer's files import exactly like Onshape's. New
+  **PVZ reader** (`cpp/pvz_reader.{hpp,cpp}`, std-only incl. inflate; `read_pvz` in io.rs): every part instance's
+  tessellation (OL section 1), placed by the PVS tree, nodes within Parasolid's precision 1e-8 m welded,
+  T-junctions split (`mesh_io.cpp::mesh_shape`); closed → solid, open → shell. Reproduces Onshape's import volumes
+  of all samples to 1e-8 mm³ (block 7999.999463558, fillet 7484.089596687, shapes cylinder/cone/torus) and leaves
+  Onshape's loft (face meshes 7.8 µm apart) open, as Onshape does (it shows a massless "Composite part 1"; G27 asks
+  what's inside). App: `.pvz` in IMPORT_EXTS / `read_foreign` / Import feature / `FileKind::Cad`.
+- **G8 corner — exact** (`cpp/vertex_blend.cpp`, `exact_vertex_blends`, called after OCCT's fillet in `op_fillet`):
+  Parasolid's corner face where a loop filleted R runs over corner fillets Rc < R is a **rolling-ball blend of
+  radius Rc between the two R cylinders**: the ball centre runs on the intersection of the two cylinders offset
+  inwards by R − Rc (spine(θ) = q + l0 cosθ b + (R−Rc) sinθ n, q = where the R axes meet, l0 = distance to the
+  corner axis), sections are circles of radius Rc normal to the spine, the sides are ellipses on the R cylinders,
+  the face closes in a point at the top face's corner. Found from Onshape's STEP export of the face (G25: a
+  rational B-spline, cubic along the spine angle 2π..2.5π, exact circle arcs across, weights cos(half arc)); our
+  corner face areas match Onshape's to 1e-7 for all of G24 a–e and F1 R4/R6, section points to their 1e-4 mm.
+  OCCT's patch (same topology) is replaced in place: new face (rational B-spline through 64+ exact sections, checked
+  between them to 2.5e-8 R) and side/bottom edges with pcurves on the neighbours (ShapeFix_Edge::FixAddPCurve +
+  SameParameter), all-or-nothing per corner, whole result BRepCheck-valid or OCCT's kept; ReShape history composed
+  into the fillet's. Kernel test `blend.rs::vertex_blends_match_onshape`. Volumes: our volume is this geometry's exact
+  volume (divergence theorem over the exact faces, `/root/kern-scratch/g8/exactvol.py`, = OCCT's to 1e-6); Onshape's
+  differ by −0.04..+0.10 mm³ with varying sign: its mass properties of the procedural face are approximate (like the
+  loft's −0.055 on an exactly known volume), so the area (1e-7) is the exact check. Gotchas met on the way: replace
+  vertices as FORWARD shapes (TopExp::LastVertex is REVERSED; ReShape composes orientations → unclosed wires
+  everywhere), give new vertices the old tolerance (OCCT's untouched edges end 1e-4 away), clear the SameParameter
+  flag before BRepLib::SameParameter on an edge that got a new pcurve. Scratch: /root/kern-scratch/vb.cpp, g8/*.py.
+
+- **compose() fix** (`features.cpp`): a shape removed in step 1 (a filleted edge) lost its *generated* images
+  (the fillet faces) when composing with a second step; it never showed because blends composed only after a scaling
+  step. Now its Generated images go through step 2.
+- **Yard** (`LengthUnit::Yard`, 914.4 mm): STEP export in yards (OCCT has no yard: shapes written a third the size as
+  feet, then the file's FOOT conversion unit becomes YARD 914.4 mm; read back exactly), app Export STEP "Yard" and STL/OBJ
+  import in yards (was feet).
+- **Sweep "Lock profile faces"** (was an error): `sweep_locked_to_faces` (kernel, OCCT spine-support mode: the
+  trihedron's binormal follows the faces' normal; each path edge gets a pcurve on the face it lies on, on a copy of the
+  path); model `solid_a.rs::sweep` uses `lockFaces`. A path off the faces fails ("the sweep path must lie on the faces
+  to lock"; Onshape's text unknown — G33a). Kernel test `features.rs::sweep_locked_to_cylinder_face`.
+- **Live requests filed, pending**: G26 (JT/XT recheck + Onshape's own SAT of a spun face), G27 (PVZ import composite
+  details), G28 (offset surface with vanishing faces = old "O3"), G29 (STEP preprocessing reference files), G30 (chamfer
+  two-distance face rule + directionOverrides), G31 (corner screenshots), G32 (loft end conditions/guides/path exact
+  definitions), G33 (sweep lock faces, curve pattern normal-to-face, rib draft, body draft, face blend options).
+
+**Round 5 state / next (kern, 2026-10-19 evening):** all of the above compiles and is tested: `noshape-kernel` full suite
+green (blend 8, export 7, features 20, thread, shell, …), `noshape-model` full suite green, kernel clippy `-D warnings`
+clean. In-app check of the F1 R4 corner done (/tmp/kern/f1r4-corner-noshape.png; side by side pending G31). Earlier note: in-app visual check of the F1 R4 corner (`write_kern_clips` now also writes
+`noshape-clip-f1-r4.json`; paste with Ctrl+V) — the app build was blocked by another agent's `fs_reference.rs`.
+Curve pattern "Normal to face" is now evaluated (`pattern.rs::curve_instances`: frame = tangent + the faces' normal
+made perpendicular to it, mapped from the seed's frame) — to verify against G33b. Next, in order: apply G26–G33 as they
+arrive (ACIS whole spun face from Onshape's own SAT; PVZ open-mesh → Onshape's massless "Composite part 1"; offset
+surface vanishing faces; STEP preprocessing; chamfer two-distance face rule + directionOverrides; loft end
+conditions/guides/path; rib draft; body draft; face blend asymmetric/conic/curvature and non-adjacent faces), then
+sheet metal gaps (closed corners, side-face joins, loft into existing), slab-shell speed: profiled 19 Oct on an idle machine: `bench_kernel_ops` full regen 1.2 s (22 hole extrudes 0.56 s, shell 0.44 s, fillet 0.07 s); the 3–5 s seen earlier was machine load. Flat profile (BRepMesh, Gauss integration, malloc), no single hotspot; `perf` is installed (/usr/bin/perf; use `--call-graph dwarf`, frame pointers are off).
+
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,
 shell.rs), `noshape-model` (kernel_robustness.rs 14/14), `noshape` app (`cargo check` clean). Nothing half-done;

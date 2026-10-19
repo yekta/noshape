@@ -389,7 +389,7 @@ pub fn demo_document_with_drawing() -> Document {
     // Front view: width and thickness.
     add(sheet, lin(1, [-0.05, 0.0], [0.05, 0.0], -10.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);
-    add(sheet, AnnotationKind::Balloon { view: ViewId(4), anchor: [0.0, 0.0], text: "1".into() }, [385.0, 255.0], vec![(0, v(DVec3::new(0.05, -0.03, 0.0)))]);
+    add(sheet, AnnotationKind::balloon(ViewId(4), [0.0, 0.0], "1"), [385.0, 255.0], vec![(0, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, AnnotationKind::note("NOTES:\n1. BREAK ALL SHARP EDGES.\n2. DIMENSIONS IN MILLIMETERS.", 3.5), [25.0, 75.0], vec![]);
     let _ = d.add_tab("Drawing 1", TabContent::Drawing(drawing));
     d

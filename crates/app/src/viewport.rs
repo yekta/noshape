@@ -1,14 +1,16 @@
 //! 3D viewport element: shows frames from the shared render worker and turns
 //! mouse input into camera navigation and pick events.
 //!
-//! Navigation (Onshape conventions):
-//! * right-drag: rotate (turntable about world Z), right-click: context menu
-//! * middle-drag or Ctrl+right-drag: pan
-//! * scroll: zoom at cursor
-//! * left-click: select, left-drag on empty space: box select
-//!   (left→right = window, right→left = crossing)
+//! Navigation follows Onshape exactly (see `navigation.rs` for the mapping
+//! and docs/parity/navigation.md): with the default mouse controls,
+//! right-drag rotates about the geometry under the cursor (Alt: constrained
+//! rotate), Ctrl+right-drag or middle-drag pans, the wheel / two-finger
+//! scroll / pinch zoom about the cursor, double middle click zooms to fit;
+//! right-click opens the context menu; left-click selects and left-drag on
+//! empty space box-selects (left→right = window, right→left = crossing).
 
 use crate::gpu::Gpu;
+use crate::navigation::{self as nav, Buttons, Inertia, Keys, Mode, ModeResolver, MouseControls, RotateDir, RotationSpeed, StepRotation, Zoom};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use glam::{DVec2, DVec3};
@@ -43,8 +45,8 @@ enum Drag {
     None,
     /// Button pressed, not yet moved beyond the click threshold.
     Pending(MouseButton),
-    Rotate,
-    Pan,
+    /// Rotating / panning / zooming (`Viewport::nav_mode`).
+    Nav,
     Box,
     Tool,
 }
@@ -56,6 +58,8 @@ enum PickPurpose {
     Click { position: DVec2, modifiers: Modifiers },
     ContextMenu { position: DVec2, window_position: Point<Pixels> },
     Box { a: DVec2, b: DVec2, crossing: bool, modifiers: Modifiers },
+    /// Visible-depth samples for the rotate centre (nothing under the cursor).
+    DepthPivot,
 }
 
 /// Half size (device pixels) of the pick rectangle read around the cursor:
@@ -134,9 +138,33 @@ pub struct Viewport {
     /// rotates about it (Onshape rotates about the geometry under the cursor).
     pub orbit_pivot_fn: Option<OrbitPivotFn>,
     orbit_pivot: Option<DVec3>,
-    /// Last orbit step and when (for rotation inertia), and the inertia step.
-    last_orbit: Option<(DVec2, Instant)>,
-    inertia: Option<DVec2>,
+    /// Pressed buttons, the navigation drag's mode and its resolver (the
+    /// mouse controls preference), and the modifiers it last saw.
+    buttons: Buttons,
+    nav_mode: Mode,
+    nav_resolver: Option<ModeResolver>,
+    nav_keys: Keys,
+    /// Where a drag zoom zooms (the press point).
+    zoom_anchor: DVec2,
+    /// Depth-averaged rotate centre for a pick epoch (`None` inside: too few
+    /// visible samples), the epoch a query is out for, and whether the
+    /// running drag's centre is a stand-in waiting for that query.
+    depth_pivot: Option<(u64, Option<DVec3>)>,
+    depth_pivot_asked: Option<u64>,
+    pivot_awaits_depth: bool,
+    /// macOS: the pending right press is a Ctrl+left click converted by the
+    /// platform (Chrome reports it as a left click with Ctrl, which never
+    /// navigates: clicking still opens the context menu, dragging does nothing).
+    ctrl_click_press: bool,
+    /// Rotation speed, last rotate step time, and the post-release inertia
+    /// with the time of its last step.
+    rotation_speed: RotationSpeed,
+    last_rotation: Option<Instant>,
+    inertia: Option<(Inertia, Instant)>,
+    /// Running keyboard / view cube rotation steps (they add up while a key
+    /// is held) and the time they were last advanced.
+    step_rotations: Vec<StepRotation>,
+    step_clock: Option<Instant>,
     /// World-space manipulator handles (segments): pressing the left button
     /// near one routes it to the tool events even when `tool_captures_left`
     /// is false.
@@ -271,8 +299,20 @@ impl Viewport {
             zoom_window: false,
             orbit_pivot_fn: None,
             orbit_pivot: None,
-            last_orbit: None,
+            buttons: Buttons::default(),
+            nav_mode: Mode::None,
+            nav_resolver: None,
+            nav_keys: Keys::default(),
+            zoom_anchor: DVec2::ZERO,
+            depth_pivot: None,
+            depth_pivot_asked: None,
+            pivot_awaits_depth: false,
+            ctrl_click_press: false,
+            rotation_speed: RotationSpeed::default(),
+            last_rotation: None,
             inertia: None,
+            step_rotations: Vec::new(),
+            step_clock: None,
             manipulators: Vec::new(),
             pick_priority: Arc::new(|_| 0),
             fit_bounds: None,
@@ -301,11 +341,6 @@ impl Viewport {
     }
 
     /// Size of the viewport in logical pixels.
-    /// Whether the pointer is over the viewport.
-    pub fn pointer_inside(&self) -> bool {
-        self.pointer_inside
-    }
-
     pub fn size(&self) -> DVec2 {
         DVec2::new(f64::from(f32::from(self.bounds.size.width)), f64::from(f32::from(self.bounds.size.height)))
     }
@@ -422,8 +457,15 @@ impl Viewport {
     }
 
     pub fn animate_to(&mut self, to: Camera, cx: &mut Context<Self>) {
-        // Live (behaviours.md "N"): Onshape's view changes take about half a second.
-        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration: Duration::from_millis(500) });
+        // Live (behaviours.md "N"): Onshape's view changes take about half a
+        // second (`CAMERA_LONG_ANIMATION_TIME_MS`).
+        self.animate_to_with(to, nav::CAMERA_LONG_ANIMATION, cx);
+    }
+
+    /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
+    pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
+        self.inertia = None;
+        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration });
         self.dirty = true;
         cx.notify();
     }
@@ -501,7 +543,7 @@ impl Viewport {
     /// Refresh the hover id at the last pointer position from the GPU (one
     /// query in flight at a time).
     fn request_hover(&mut self) {
-        if matches!(self.drag, Drag::Rotate | Drag::Pan) || self.anim.is_some() || !self.pointer_inside {
+        if self.drag == Drag::Nav || self.anim.is_some() || !self.pointer_inside {
             return;
         }
         if self.hover_query {
@@ -516,7 +558,7 @@ impl Viewport {
 
     fn whole_frame_rect(&self) -> PickRect {
         let s = self.size() * self.scale as f64;
-        PickRect { x: 0, y: 0, width: s.x.ceil() as u32 + 1, height: s.y.ceil() as u32 + 1 }
+        PickRect { x: 0, y: 0, width: s.x.ceil() as u32 + 1, height: s.y.ceil() as u32 + 1, depth_samples: 0 }
     }
 
     fn on_pick(&mut self, token: u64, result: Result<Arc<PickBuffer>, String>, cx: &mut Context<Self>) {
@@ -530,7 +572,10 @@ impl Viewport {
             }
         };
         let current = epoch == self.pick_epoch;
-        if current && let Some(b) = &buf {
+        if current
+            && let Some(b) = &buf
+            && !matches!(purpose, PickPurpose::DepthPivot)
+        {
             self.pick_cache = Some(b.clone());
         }
         let r = (PICK_RADIUS * self.scale as f64) as i32;
@@ -571,6 +616,27 @@ impl Viewport {
                     None => Vec::new(),
                 };
                 cx.emit(ViewportEvent::BoxSelect { ids, modifiers });
+            }
+            PickPurpose::DepthPivot => {
+                let frame = buf.as_ref().map(|b| (b.frame_width, b.frame_height)).unwrap_or_default();
+                let pivot = buf.as_ref().and_then(|b| nav::depth_average_pivot(&b.samples, frame, b.view_proj?));
+                if self.depth_pivot_asked == Some(epoch) {
+                    self.depth_pivot_asked = None;
+                }
+                if current {
+                    self.depth_pivot = Some((epoch, pivot));
+                }
+                // A drag that started meanwhile picks the centre up now (the
+                // samples show the view at the press; a world point stays valid).
+                if std::mem::take(&mut self.pivot_awaits_depth)
+                    && self.drag == Drag::Nav
+                    && let Some(p) = pivot
+                {
+                    self.orbit_pivot = Some(p);
+                    if let Some((inertia, _)) = &mut self.inertia {
+                        inertia.pivot = p;
+                    }
+                }
             }
         }
     }
@@ -623,7 +689,7 @@ impl Viewport {
     fn schedule_hover_refresh(&mut self, cx: &mut Context<Self>) {
         const SETTLE: Duration = Duration::from_millis(60);
         self.pick_changed_at = Instant::now();
-        if self.hover_refresh_pending || matches!(self.drag, Drag::Rotate | Drag::Pan) || self.anim.is_some() {
+        if self.hover_refresh_pending || self.drag == Drag::Nav || self.anim.is_some() {
             return;
         }
         self.hover_refresh_pending = true;
@@ -709,7 +775,7 @@ impl Viewport {
             b.frames_at_start = self.frames_presented;
             b.zoom = std::env::var("NOSHAPE_PERF_BENCH").is_ok_and(|m| m == "zoom");
             if !b.zoom {
-                self.drag = Drag::Rotate;
+                self.drag = Drag::Nav;
             }
         }
         let presented = self.frames_presented - b.frames_at_start;
@@ -741,12 +807,153 @@ impl Viewport {
 
     // ------------------------------------------------------------ input
 
+    /// The bounds Onshape's zoom limits are measured on (the scene).
+    fn zoom_bounds(&self) -> Option<(DVec3, DVec3)> {
+        self.scene.bounds().map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())).or(self.fit_bounds)
+    }
+
+    /// Rotate / pan centre for a drag starting at `at` (Onshape's
+    /// `getRotateCenterForCanvasLocation`): the geometry under the cursor,
+    /// else the model's centre when it fits in the view, else the point on
+    /// the cursor ray at the model's depth.
+    fn pivot_at(&mut self, at: DVec2) -> DVec3 {
+        let (o, d) = self.ray(at);
+        if let Some(p) = self.orbit_pivot_fn.as_ref().and_then(|f| f(o, d)) {
+            return p;
+        }
+        // Visible-depth average (asked for at the press).
+        match self.depth_pivot {
+            Some((e, Some(p))) if e == self.pick_epoch => return p,
+            Some((e, None)) if e == self.pick_epoch => {}
+            _ => self.pivot_awaits_depth = self.depth_pivot_asked.is_some(),
+        }
+        let Some((lo, hi)) = self.fit_bounds.or_else(|| self.zoom_bounds()) else { return self.camera.target };
+        let center = (lo + hi) * 0.5;
+        let size = self.size();
+        let slack = size * 0.1;
+        let fits = (0..8).all(|i| {
+            let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z });
+            self.project(c).is_some_and(|p| p.x >= -slack.x && p.y >= -slack.y && p.x <= size.x + slack.x && p.y <= size.y + slack.y)
+        });
+        if fits {
+            return center;
+        }
+        let min = 0.01 * (hi - lo).length();
+        o + d * d.dot(center - o).max(min)
+    }
+
+    /// At a navigation press with no geometry under the cursor, ask the
+    /// render thread for visible-depth samples (Onshape's rotate centre falls
+    /// back to their average); answered before most drags start.
+    fn request_depth_pivot(&mut self, at: DVec2) {
+        if self.depth_pivot.is_some_and(|(e, _)| e == self.pick_epoch) || self.depth_pivot_asked == Some(self.pick_epoch) {
+            return;
+        }
+        let (o, d) = self.ray(at);
+        if self.orbit_pivot_fn.as_ref().and_then(|f| f(o, d)).is_some() {
+            return;
+        }
+        self.depth_pivot_asked = Some(self.pick_epoch);
+        self.request_pick(PickRect::depth_samples(nav::DEPTH_SAMPLES_PER_VIEWPORT), PickPurpose::DepthPivot);
+    }
+
+    /// Switch the navigation drag to `mode` (`updateManipulationMode`).
+    fn set_nav_mode(&mut self, mode: Mode, at: DVec2) {
+        let prev = std::mem::replace(&mut self.nav_mode, mode);
+        if prev == mode {
+            return;
+        }
+        if nav::needs_new_pivot(prev, mode) {
+            let perspective_pan = mode == Mode::Pan && self.camera.projection == noshape_render::Projection::Perspective;
+            self.orbit_pivot = (mode != Mode::Pan || perspective_pan).then(|| self.pivot_at(at));
+        }
+        if mode == Mode::Rotate {
+            self.last_rotation = Some(Instant::now());
+            self.rotation_speed = RotationSpeed::default();
+        }
+    }
+
+    /// Re-resolve the mode when the buttons or a bound modifier changed.
+    fn update_nav_mode(&mut self, modifiers: Modifiers, at: DVec2) {
+        let Some(resolver) = &self.nav_resolver else { return };
+        let keys = resolver.input_key(modifiers.into());
+        let mode = resolver.resolve(self.buttons, keys, self.nav_mode);
+        self.nav_keys = keys;
+        self.set_nav_mode(mode, at);
+    }
+
+    /// End a navigation drag: a rotation still moving at release keeps
+    /// turning (inertia).
+    fn end_nav(&mut self, cx: &mut Context<Self>) {
+        if self.nav_mode == Mode::Rotate
+            && self.last_rotation.is_some_and(|t| t.elapsed() < nav::INERTIA_RELEASE_WINDOW)
+            && let Some(pivot) = self.orbit_pivot
+        {
+            self.inertia = Some((Inertia { speed: self.rotation_speed.0, factor: 1.0, pivot }, Instant::now()));
+        } else {
+            self.orbit_pivot = None;
+        }
+        self.nav_mode = Mode::None;
+        self.nav_resolver = None;
+        self.drag = Drag::None;
+        cx.emit(ViewportEvent::CameraChanged);
+        // Settled: refresh the hover (renders the pick buffer lazily).
+        self.request_hover();
+        cx.notify();
+    }
+
+    /// Apply one drag step of the current navigation mode.
+    fn nav_drag(&mut self, delta: DVec2, cx: &mut Context<Self>) {
+        let size = self.size();
+        let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
+        match self.nav_mode {
+            Mode::None => return,
+            Mode::Rotate => {
+                nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                self.rotation_speed.push(delta);
+                self.last_rotation = Some(Instant::now());
+            }
+            Mode::AxisRotate => {
+                // The view is first animated to the nearest floor-down view
+                // (drags wait for that), then turns about world Z.
+                if self.anim.is_some() {
+                    return;
+                }
+                match nav::level_view(&self.camera, pivot) {
+                    (level, None) => {
+                        self.camera = level;
+                        nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
+                    }
+                    (level, Some(duration)) => {
+                        self.animate_to_with(level, duration, cx);
+                        return;
+                    }
+                }
+            }
+            Mode::Pan => nav::pan(&mut self.camera, delta, size, self.orbit_pivot),
+            Mode::Zoom => {
+                // `zoomOnDrag`: device pixels / DRAG_ZOOM_FACTOR, up zooms in.
+                let amount = -delta.y * self.scale as f64 / nav::DRAG_ZOOM_FACTOR;
+                let bounds = self.zoom_bounds();
+                if amount.abs() < 1e-12 || !nav::zoom_at(&mut self.camera, Zoom::Amount(amount), self.zoom_anchor, size, bounds) {
+                    return;
+                }
+            }
+        }
+        self.camera_changed(cx);
+    }
+
     fn on_mouse_down(&mut self, e: &MouseDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let p = self.local(e.position);
+        self.buttons.set(e.button, true);
+        cx.stop_propagation();
+        if self.drag == Drag::Nav {
+            // Another button joined the drag.
+            self.update_nav_mode(e.modifiers, p);
+            return;
+        }
         self.press_pos = p;
         self.last_pos = p;
-        self.anim = None;
-        self.inertia = None;
         match e.button {
             MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) => {
                 self.drag = Drag::Tool;
@@ -758,11 +965,14 @@ impl Viewport {
                 self.zoom_to_fit(true, cx);
             }
             MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
+                self.ctrl_click_press = e.button == MouseButton::Right && converted_ctrl_click();
+                if e.button != MouseButton::Left && !self.ctrl_click_press {
+                    self.request_depth_pivot(p);
+                }
                 self.drag = Drag::Pending(e.button);
             }
             _ => {}
         }
-        cx.stop_propagation();
     }
 
     fn on_hover_change(&mut self, hovered: &bool, _window: &mut Window, cx: &mut Context<Self>) {
@@ -782,37 +992,45 @@ impl Viewport {
         if self.selection_count > 0 {
             cx.notify();
         }
-        let height = self.size().y;
+        // A release we did not see (outside the window): the drag is over.
+        if e.pressed_button.is_none() && self.buttons.any() {
+            self.buttons = Buttons::default();
+            if self.drag == Drag::Nav {
+                self.end_nav(cx);
+                return;
+            }
+        }
         if let Drag::Pending(button) = self.drag
-            && p.distance(self.press_pos) > 3.0
+            && p.distance(self.press_pos) > nav::DRAG_THRESHOLD_PX
         {
-            self.drag = match button {
-                MouseButton::Right if e.modifiers.control || e.modifiers.shift => Drag::Pan,
-                MouseButton::Right if self.orbit_pivot_fn.is_some() => {
-                    let (o, d) = self.ray(self.press_pos);
-                    self.orbit_pivot = self.orbit_pivot_fn.as_ref().and_then(|f| f(o, d));
-                    Drag::Rotate
-                }
-                MouseButton::Right => Drag::Rotate,
-                MouseButton::Middle => Drag::Pan,
+            // `onDragStart`: what this button + modifier combination does.
+            let resolver = ModeResolver::new(MouseControls::current(), nav::Space::ThreeD);
+            let keys = resolver.input_key(e.modifiers.into());
+            let mode = if self.ctrl_click_press { Mode::None } else { resolver.resolve(self.buttons, keys, Mode::None) };
+            if mode != Mode::None {
+                self.drag = Drag::Nav;
+                self.anim = None;
+                self.inertia = None;
+                self.nav_resolver = Some(resolver);
+                self.nav_keys = keys;
+                self.zoom_anchor = self.press_pos;
+                self.pivot_awaits_depth = false;
+                self.set_nav_mode(mode, self.press_pos);
+            } else {
                 // Dragging from geometry with no tool is a box select too
-                // (Onshape only drags geometry inside sketches/assemblies).
-                MouseButton::Left => Drag::Box,
-                _ => Drag::None,
-            };
+                // (Onshape only drags geometry inside sketches/assemblies);
+                // other unbound drags do nothing (and open no menu).
+                self.drag = if button == MouseButton::Left { Drag::Box } else { Drag::None };
+            }
         }
         match self.drag {
-            Drag::Rotate => {
-                match self.orbit_pivot {
-                    Some(pivot) => self.camera.orbit_around(pivot, delta, height),
-                    None => self.camera.orbit(delta, height),
+            Drag::Nav => {
+                if let Some(resolver) = &self.nav_resolver
+                    && resolver.input_key(e.modifiers.into()) != self.nav_keys
+                {
+                    self.update_nav_mode(e.modifiers, p);
                 }
-                self.last_orbit = Some((delta, Instant::now()));
-                self.camera_changed(cx);
-            }
-            Drag::Pan => {
-                self.camera.pan(delta, height);
-                self.camera_changed(cx);
+                self.nav_drag(delta, cx);
             }
             Drag::Box => {
                 self.box_rect = Some((self.press_pos, p));
@@ -834,6 +1052,17 @@ impl Viewport {
 
     fn on_mouse_up(&mut self, e: &MouseUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let p = self.local(e.position);
+        self.buttons.set(e.button, false);
+        if self.drag == Drag::Nav {
+            if self.buttons.any() {
+                self.update_nav_mode(e.modifiers, p);
+                if self.nav_mode != Mode::None {
+                    return;
+                }
+            }
+            self.end_nav(cx);
+            return;
+        }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
         match drag {
             Drag::Pending(MouseButton::Left) => match self.pick_at(p) {
@@ -864,7 +1093,7 @@ impl Viewport {
                         let s = self.scale as f64;
                         let (x0, y0) = ((a.x.min(b.x) * s).floor() as i32, (a.y.min(b.y) * s).floor() as i32);
                         let (x1, y1) = ((a.x.max(b.x) * s).ceil() as i32, (a.y.max(b.y) * s).ceil() as i32);
-                        PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1 }
+                        PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1, depth_samples: 0 }
                     } else {
                         self.whole_frame_rect()
                     };
@@ -872,47 +1101,102 @@ impl Viewport {
                 }
             }
             Drag::Tool => cx.emit(ViewportEvent::ToolUp { position: p, modifiers: e.modifiers }),
-            Drag::Rotate | Drag::Pan => {
-                // Rotation inertia: a flick keeps the view turning briefly.
-                if drag == Drag::Rotate
-                    && let Some((d, t)) = self.last_orbit.take()
-                    && t.elapsed() < Duration::from_millis(60)
-                    && d.length() > 2.0
-                {
-                    self.inertia = Some(d);
-                    cx.notify();
-                } else {
-                    self.orbit_pivot = None;
-                }
-                // Settled: refresh the hover (renders the pick buffer lazily).
-                self.request_hover();
-            }
             _ => {}
         }
         cx.notify();
     }
 
+    /// A button released outside the viewport: finish a drag that started in
+    /// it (a press that never moved is dropped).
+    fn on_mouse_up_out(&mut self, e: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match self.drag {
+            Drag::Nav | Drag::Box | Drag::Tool => self.on_mouse_up(e, window, cx),
+            _ => {
+                self.buttons.set(e.button, false);
+                if !self.buttons.any() {
+                    self.drag = Drag::None;
+                }
+            }
+        }
+    }
+
+    /// Mouse wheel, two-finger trackpad scroll (and its momentum): zoom about
+    /// the cursor, never pan (Onshape's `zoomOnMouseWheelScroll`).
     fn on_scroll(&mut self, e: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
-        let p = self.local(e.position);
-        let dy = match e.delta {
-            ScrollDelta::Lines(l) => l.y as f64 * 40.0,
-            ScrollDelta::Pixels(px) => f64::from(f32::from(px.y)),
-        };
-        if dy.abs() < 0.01 {
+        cx.stop_propagation();
+        if self.drag == Drag::Box {
             return;
         }
-        if let ScrollDelta::Pixels(px) = e.delta
-            && e.modifiers.shift
-        {
-            let d = DVec2::new(f64::from(f32::from(px.x)), f64::from(f32::from(px.y)));
-            self.camera.pan(-d, self.size().y);
-        } else {
-            let factor = (-dy * 0.0025).exp();
-            self.camera.zoom_at(factor, p, self.size());
+        let reverse = MouseControls::current().reverse_scroll;
+        let Some(amount) = nav::wheel_zoom_amount(e.delta, nav::Platform::current(), reverse, e.modifiers.shift) else { return };
+        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
+        if nav::zoom_at(&mut self.camera, Zoom::Amount(amount), p, size, bounds) {
+            self.anim = None;
+            self.camera_changed(cx);
         }
-        self.anim = None;
-        self.camera_changed(cx);
     }
+
+    /// Trackpad pinch (macOS magnify, Windows precision touchpad, Linux
+    /// gestures): the model scales with the fingers about the pinch centre.
+    fn on_pinch(&mut self, e: &PinchEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        cx.stop_propagation();
+        if self.drag == Drag::Box || e.delta == 0.0 {
+            return;
+        }
+        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
+        if nav::zoom_at(&mut self.camera, Zoom::Pinch(nav::pinch_ratio(e.delta)), p, size, bounds) {
+            self.anim = None;
+            self.camera_changed(cx);
+        }
+    }
+
+    // ------------------------------------------------------------ keyboard
+
+    /// Arrow keys and the view cube arrows (`rotateInDirection`): turn the
+    /// view `degrees` over 250 ms about the camera target. Steps run side by
+    /// side, so a held key (key repeat) keeps the view turning.
+    pub fn rotate_step(&mut self, dir: RotateDir, degrees: f64, cx: &mut Context<Self>) {
+        let (axis, angle) = nav::rotate_step_axis(&self.camera, dir, degrees);
+        if self.step_rotations.is_empty() {
+            self.step_clock = Some(Instant::now());
+        }
+        self.step_rotations.push(StepRotation::new(axis, angle, self.camera.target));
+        self.dirty = true;
+        cx.notify();
+    }
+
+    /// Ctrl+Shift+arrows (`animatePan`): the model moves 150 px toward the
+    /// arrow (`dx`, `dy` = ±1). Ignored while the camera animates.
+    pub fn pan_step(&mut self, dx: f64, dy: f64, cx: &mut Context<Self>) {
+        if self.anim.is_some() {
+            return;
+        }
+        let center = self.zoom_bounds().map(|(lo, hi)| (lo + hi) * 0.5).unwrap_or(self.camera.target);
+        let to = nav::pan_step(&self.camera, dx, dy, self.size(), center);
+        self.animate_to_with(to, nav::CAMERA_SHORT_ANIMATION, cx);
+    }
+
+    /// Shift+Z / Z (`zoomIn` / `zoomOut`): ×1.75 about the view centre,
+    /// animated. Ignored while the camera animates.
+    pub fn zoom_step(&mut self, zoom_in: bool, cx: &mut Context<Self>) {
+        if self.anim.is_some() {
+            return;
+        }
+        let to = nav::zoom_step(&self.camera, zoom_in, self.zoom_bounds(), self.size());
+        self.animate_to_with(to, nav::CAMERA_SHORT_ANIMATION, cx);
+    }
+}
+
+/// macOS: whether the newest right press is a Ctrl+left click the platform
+/// converted (vendor/gpui-pre-macos).
+#[cfg(target_os = "macos")]
+fn converted_ctrl_click() -> bool {
+    gpui_macos::last_right_press_was_ctrl_click()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn converted_ctrl_click() -> bool {
+    false
 }
 
 /// Distinct ids for a box selection from a pick rectangle: crossing selects
@@ -954,7 +1238,7 @@ impl Render for Viewport {
         // Advance camera animation.
         if let Some(anim) = &self.anim {
             let t = anim.start.elapsed().as_secs_f64() / anim.duration.as_secs_f64();
-            self.camera = anim.from.lerp(&anim.to, t);
+            self.camera = anim.from.interpolate(&anim.to, nav::ease(t));
             self.dirty = true;
             self.pick_dirty = true;
             if t >= 1.0 {
@@ -964,22 +1248,40 @@ impl Render for Viewport {
                 window.request_animation_frame();
             }
         }
-        // Rotation inertia (decays ×0.77 per frame, Onshape ROTATION_INERTIA).
-        if let Some(d) = self.inertia {
-            let h = self.size().y;
-            match self.orbit_pivot {
-                Some(pivot) => self.camera.orbit_around(pivot, d, h),
-                None => self.camera.orbit(d, h),
-            }
-            let next = d * 0.77;
-            self.inertia = (next.length() > 0.3).then_some(next);
-            if self.inertia.is_none() {
-                self.orbit_pivot = None;
-                cx.emit(ViewportEvent::CameraChanged);
+        // Rotation inertia (Onshape's post-rotation animation: ×0.77 per
+        // 60 Hz frame until under a pixel per step).
+        if let Some((mut inertia, last)) = self.inertia.take() {
+            let now = Instant::now();
+            match inertia.step(now - last) {
+                Some(d) => {
+                    let size = self.size();
+                    nav::drag_rotate(&mut self.camera, d, size, inertia.pivot, false);
+                    self.inertia = Some((inertia, now));
+                    window.request_animation_frame();
+                }
+                None => {
+                    self.orbit_pivot = None;
+                    cx.emit(ViewportEvent::CameraChanged);
+                }
             }
             self.dirty = true;
             self.pick_dirty = true;
-            window.request_animation_frame();
+        }
+        // Keyboard / view cube rotation steps.
+        if !self.step_rotations.is_empty() {
+            let now = Instant::now();
+            let dt = self.step_clock.map(|t| now - t).unwrap_or_default();
+            self.step_clock = Some(now);
+            let camera = &mut self.camera;
+            self.step_rotations.retain_mut(|s| s.advance(camera, dt));
+            if self.step_rotations.is_empty() {
+                self.step_clock = None;
+                cx.emit(ViewportEvent::CameraChanged);
+            } else {
+                window.request_animation_frame();
+            }
+            self.dirty = true;
+            self.pick_dirty = true;
         }
         self.scale = window.scale_factor();
         self.submit_if_ready(cx);
@@ -988,15 +1290,6 @@ impl Render for Viewport {
         let box_rect = self.box_rect;
         let image = self.image.clone();
         self.sync_cursor(window, cx);
-        // Where the platform can't set an image cursor (Wayland), the digit
-        // is drawn at the pointer instead.
-        let count_badge = (!self.cursor_platform && self.selection_count > 0 && self.pointer_inside && matches!(self.drag, Drag::None | Drag::Pending(_))).then(|| {
-            let digit: SharedString = self.selection_count.min(5).to_string().into();
-            let (x, y) = (self.last_pos.x as f32 + 10., self.last_pos.y as f32 + 9.);
-            let text = |dx: f32, dy: f32, color: Rgba| div().absolute().left(px(x + dx)).top(px(y + dy)).text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(color).child(digit.clone());
-            let halo = [(-1., 0.), (1., 0.), (0., -1.), (0., 1.), (-1., -1.), (1., 1.), (-1., 1.), (1., -1.)];
-            div().absolute().inset_0().children(halo.map(|(dx, dy)| text(dx, dy, rgb(0xffffff)))).child(text(0., 0., rgb(0x000000)))
-        });
         div()
             .id("viewport")
             .size_full()
@@ -1041,7 +1334,6 @@ impl Render for Viewport {
                     .border_color(color)
                     .bg(if crossing { rgb(0xfff3cf) } else { rgb(0xd0dcef) }.opacity(0.5))
             }))
-            .children(count_badge)
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
@@ -1050,7 +1342,11 @@ impl Render for Viewport {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))
+            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up_out))
+            .on_mouse_up_out(MouseButton::Right, cx.listener(Self::on_mouse_up_out))
+            .on_mouse_up_out(MouseButton::Middle, cx.listener(Self::on_mouse_up_out))
             .on_scroll_wheel(cx.listener(Self::on_scroll))
+            .on_pinch(cx.listener(Self::on_pinch))
     }
 }
 

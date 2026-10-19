@@ -478,7 +478,6 @@ fn new_feature_studio_template_compiles() {
 
 /// The user's own Onshape feature (Y Threads) on a Ø10 x 20 mm cylinder.
 #[test]
-#[ignore = "FeatureScript: runs to the end, but the kernel's helical thread sweep fuses badly (addTeeth union keeps only the teeth, the chamfer cut then leaves a 0-volume solid); needs sweep/boolean robustness"]
 fn real_onshape_feature_y_threads() {
     let Ok(src) = std::fs::read_to_string("/root/onshape-featurescripts/y-threads.fs") else { return };
     let cylinder = studio(
@@ -711,6 +710,7 @@ fn std_feature_dialogs_match_builtin_schemas() {
             ParamKind::Array { item, .. } => format!("array[{}]", item.iter().map(|i| format!("{}:{}", i.id, kind(i))).collect::<Vec<_>>().join(", ")),
             ParamKind::Lookup { table } => format!("lookup {table}"),
             ParamKind::Sketch => "sketch".into(),
+            ParamKind::Reference { kind } => format!("reference {kind:?}"),
         }
     }
     let describe = |t: &noshape_model::features::FeatureType| {
@@ -823,4 +823,89 @@ export const boltSize = defineFeature(function(context is Context, id is Id, def
     assert_ok(&fx.regen(&mut reg, &ps));
     let out = custom::run::output_of(fid).unwrap().output;
     assert_eq!(out, "{ size : #6 , standard : ANSI }\n0.0035052000000000004 meter\n", "{out}");
+}
+
+/// Operations and evaluations called directly from a custom feature
+/// (tests/fs/ops_harness.fs checks values and prints one line per check).
+#[test]
+fn ops_and_evaluations_run_in_custom_features() {
+    let fx = Fixture::new(include_str!("fs/ops_harness.fs"));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("opsHarness"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let _ = fx.regen(&mut reg, &ps);
+    let out = custom::run::output_of(fid).expect("output");
+    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
+    let bad: Vec<&str> = out.output.lines().filter(|l| !l.ends_with(" ok") && *l != "done").collect();
+    assert!(bad.is_empty() && out.output.ends_with("done\n"), "{}\n{}", out.output, notices.join("\n"));
+}
+
+/// More standard library features called from a custom feature.
+#[test]
+fn std_features_run_in_custom_features_2() {
+    let fx = Fixture::new(include_str!("fs/std_harness2.fs"));
+    let compiled = custom::compile(fx.fs, include_str!("fs/std_harness2.fs"));
+    assert!(!compiled.has_errors(), "{:?}", compiled.diagnostics);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("stdHarness2"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let _ = fx.regen(&mut reg, &ps);
+    let out = custom::run::output_of(fid).expect("output");
+    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
+    let bad: Vec<&str> = out.output.lines().filter(|l| !l.ends_with(" ok") && !l.starts_with("parts ")).collect();
+    assert!(bad.is_empty(), "{}\n{}", out.output, notices.join("\n"));
+}
+
+/// Reference parameters (live dom/fs-refparams.txt): CSV / image / JSON file
+/// tabs as TableData / ImageData / JSONData; an unset one is `{}`.
+#[test]
+fn reference_parameters_read_file_tabs() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "FS refs" }
+export const fsRefs = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Table" }
+        definition.table is TableData;
+        annotation { "Name" : "Picture" }
+        definition.picture is ImageData;
+        annotation { "Name" : "Json" }
+        definition.json is JSONData;
+        annotation { "Name" : "Unset" }
+        definition.unset is TableData;
+    }
+    {
+        println(definition.table.csvData);
+        println([definition.picture.imageWidth, definition.picture.imageHeight, definition.picture.mediaType, definition.picture.blobType]);
+        println(definition.json.jsonData);
+        println(definition.unset);
+        println([definition.table.documentId, definition.table.versionId, definition.table.elementId, definition.picture.documentId, definition.json.microversionId]);
+    });
+"#,
+    );
+    let mut fx = Fixture::new(&src);
+    let csv = fx.doc.add_tab("fsrefs.csv", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.csv", b"1,2,a\n3.5,4,b\nx,y,z\n", 0)));
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend_from_slice(&[0, 0, 0, 16, 0, 0, 0, 8, 8, 2, 0, 0, 0]);
+    let pic = fx.doc.add_tab("fsrefs.png", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.png", &png, 0)));
+    let json = fx.doc.add_tab("fsrefs.json", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.json", br#"{"a": [1, 2], "b": "c"}"#, 0)));
+    let t = noshape_model::features::get(&fx.ty("fsRefs")).unwrap();
+    assert!(matches!(t.params[0].kind, noshape_model::params::ParamKind::Reference { kind: noshape_model::params::ReferenceKind::Csv }));
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("fsRefs"), &fx.units).unwrap();
+    f.params.set("table", ParamValue::Text(csv.to_string()));
+    f.params.set("picture", ParamValue::Text(pic.to_string()));
+    f.params.set("json", ParamValue::Text(json.to_string()));
+    let fid = f.id;
+    ps.features.push(f);
+    let opts = RegenOptions { custom_features: Some(DocumentScripts::from_document(&fx.doc)), ..Default::default() };
+    let mut reg = Regenerator::new();
+    assert_ok(&reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts));
+    let out = custom::run::output_of(fid).unwrap().output;
+    assert_eq!(out, "[ [ 1 , 2 , a ] , [ 3.5 , 4 , b ] , [ x , y , z ] ]\n[ 16 , 8 , image/png , IMAGE ]\n{ a : [ 1 , 2 ] , b : c }\n{}\n[ BuiltIn: 1 , BuiltIn: 2 , BuiltIn: 3 , BuiltIn: 5 , BuiltIn: 12 ]\n", "{out}");
 }

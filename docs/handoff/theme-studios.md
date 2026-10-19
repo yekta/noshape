@@ -3,9 +3,87 @@
 Goal: everything outside the Part Studio chrome looks exactly like Onshape: sketch visuals, assembly,
 drawing, start window / documents page, Variable Studio, versions panel, tab manager, generic dialogs and
 toasts. The Part Studio chrome and theme.rs belong to agent "ui" (docs/handoff/theme-layout.md).
-Build dir /root/target-ui2, display :105. Side-by-side shots (ours | Onshape) in /tmp/ui2-shots/.
+Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side-by-side shots (ours | Onshape) in /tmp/ui2-shots/.
 
-## State (2026-10-19 06:00 UTC)
+## State (2026-10-19 17:30 UTC) — pixel pass done for every non-Part-Studio screen (third ui2 of the day)
+
+Taken over at 13:40. Queue items 0 (Learning Center → README) and 2 (clippy) were already done. Pixel pass
+(queue 1) done so far, all in the tree, **not all verified in the app yet** (the shared tree kept failing in
+other agents' files: mouse_prefs, config_panel, assembly_behaviors:2821, release_dialog `Corner`):
+- **Create Drawing dialog** (drawing_create.rs, asb's; visual only): hangs 11 px under the window top
+  (live drawing/01), underlined active page/standard tabs, `#555` other tab, 14 px list, bold selected row,
+  Owner column shows "…" (too narrow, as live), unselected option tile white with `#ccc` outline,
+  os_ui OK / gray Cancel.
+- **Sheet zones** (model drawing/sheet.rs, asb's file, self-contained): ISO is numbered from the right and
+  lettered from the bottom like ANSI (live drawing/156), A3 = 6x4 zones (A4 4x3, A2 8x6, A1 12x8, A0 16x12
+  guessed, capture requested), ISO labels 7 mm.
+- **Assembly** (assembly_view/behaviors/panels): filter row = the Part Studio's (30 px box, italic
+  "Filter by name", + the ≡ list button, inert until live says what it does), "Instances (n)" row 30 px,
+  top row without caret column (icon x 47, name x 66), Origin row = Part Studio's (dot icon), instance rows
+  +2 px, list-collapse toggle at the viewport's left edge (`ui.list_collapsed`), bottom-right evaluation
+  tools (Measure → toggle_measure, Analysis → run_interference, Mass properties: no action yet).
+- **Versions and history** (history_panel.rs): search box ▾ opens Onshape's filter panel (Tab, Tab types,
+  Modified by, Date modified, Reset/Search; `HistoryFilter`, tab changes from store diffs `tab/<id>`);
+  the two toggles are now Onshape's Hide merges / Hide automatic versions (on by default; our old
+  graph / show-all-changes toggles are gone); legend 14 px, rows 33 px apart, last row 82 px above the hint
+  bar (where Onshape's cloud Upgrade sits); footer ? icon `help-faint.svg`.
+- **Tab manager** (tab_manager.rs): header search toggle, sort ▾ (Tab order / Name A→Z / Z→A / Type),
+  filter-row toggle, list view / detailed view, footer preview toggle + ?; selected row name bold.
+- **Feature Studio**: snippet buttons use Onshape's icons (fs-snip-*.svg), pale Commit = 50 % (#8aa8d7),
+  editor 13 px / 16 px lines, no top padding, Monitor box sized to its text.
+- **Tab menus** (workspace.rs): open upward from the tab's left edge with the bottom on the tab bar (live
+  menus/rmb-tab-*); ⊗ Delete icon; Part Studio menu has no Release… / Create Drawing… (live); Assembly has
+  "Create Drawing of <tab>…" (icon) in its own group after Copy to clipboard.
+- **Documents page**: advanced search (new start_search.rs + start_window wiring: ▾ in the search box,
+  360 px panel, Type multiselect, Name, Description, Part number, State, Revision, Add criteria, Results
+  from; content criteria read off the UI thread into `DocFacts`); right strip Properties (Name *,
+  Description, Category, Library label, ↶↷, Apply; `lib::set_doc_properties`, meta `library_label`) and
+  Document notes (read-only, "No notes available") panels; italic search placeholder.
+- Sketch region fill alpha 0.32 (live rgb(221,226,230) with our linear blending).
+- Verified in the app (15:45 build): advanced search (panel + Name / Type searches), Properties and
+  Document notes panels, Details spacing, assembly list + list toggle + eval tools, tab manager (sort,
+  list view), versions panel + its filter panel, Create Drawing dialog, tab menus. Export modal and the
+  "+" menu already matched live. Later edits (sort menu as live's compact list, history icons
+  hide-merges / hide-auto-versions / compare / calendar, Feature Studio editor clipped 8 px up,
+  props spacing) wait for the next build.
+- 16:02 build verified too: tab manager sort menu (live's compact 19 px list), history icons, Feature
+  Studio editor (first line now at live's y; the gutter stays 10 px wider than Ace's 42 px because the
+  kit's fold hitbox is a hard 18 px constant in gpui-base — needs a kit patch, lead's call), Details panel
+  spacing, ISO zones on the demo drawing.
+- 17:14 build (green, no warnings) verified: toasts centred on the window instead of the graphics area
+  (live document/01: centre x 959; Part Studio toast in ui's part_studio/mod.rs, surgical; assembly /
+  config / named-position toasts; final-toast.png), sketch region alpha 0.34.
+- Clippy: nothing from my files. `clippy -D warnings` currently stops in others' code:
+  render/renderer.rs:201 (type_complexity), model document.rs:30 and drawing/mod.rs:471.
+- Next (when resumed): live answers in REQUESTS.md (assembly ≡ button, tab manager tooltips / ?, ISO
+  A4/A2/A1/A0 zones); Feature Studio gutter (kit patch); documents page advanced search "Results from"
+  Versions/All only searches the latest workspace state; the Details panel's "Document labels" chevron
+  doesn't collapse yet.
+- Final shots (ours | live) in /tmp/ui2-shots/: final-documents.png, final-documents-advanced-search.png,
+  final-documents-properties.png, final-documents-notes.png, final-sketch.png, final-assembly.png,
+  final-drawing.png, final-create-drawing.png, final-variable-studio.png, final-versions.png,
+  final-tab-manager.png, final-tab-manager-sort.png, final-feature-studio.png, final-export-dialog.png,
+  final-menus-tab.png.
+- Surgical fix in asb's drawing_callout.rs: `Selectable as _` import (the tree had been broken there for
+  17 min).
+- Requests for other agents (I can't message them; lead please forward):
+  - asb: Onshape's ISO templates use the ANSI-style title block (live drawing/156: UNLESS OTHERWISE
+    SPECIFIED… MILLIMETERS, NAME | SIGNATURE | DATE, FIRST ANGLE PROJECTION, Onshape logo cell, SIZE "A3",
+    SHEET "1 of 1"); ours draws an ISO 7200 block (LEGAL OWNER, DOCUMENT TYPE…). Drawing tab menu needs
+    "Change to version…" (live menus/rmb-tab-drawing; give me a fn and I wire the row).
+  - skb: assembly Analysis tools ▾ menu and Mass properties for the new bottom-right buttons
+    (`asm-eval-analysis`, `asm-eval-mass` in assembly_view.rs `render_evaluation_tools`).
+  - ui: the list toggle sits at y 563, live 554 (Part Studio and assembly).
+
+## State (2026-10-19 12:40 UTC)
+
+Taken over at 12:35 by a fresh "ui2" (previous one ran out of quota mid pixel pass). Uncommitted ui2 work found in
+the tree: Learning Center → noshape README (queue item 0 done), clippy `sort_by_key` (material_library_view.rs)
+and `BoundsCell` type alias (feature_studio.rs) (queue item 2 done), documents page pixel tweaks (nav 14.67 px /
+20 px glyphs, search centred, 267x68 "Last opened" tiles, 10 px section toggles, workspace chip on rows),
+Variable Studio footer `?▴` popover (live 42/45) and checked-checkbox icon. Now: pixel pass (queue item 1).
+
+## Earlier state (06:00 UTC)
 
 Taken over at 04:35 by a fresh "ui2" (previous one ran out of quota). Nothing was half done: the tree built.
 The previous agent had already finished (not yet in this doc): "From import" variables (variable_import.rs,
@@ -56,7 +134,7 @@ This round (all checked in the app, shots in /tmp/ui2-shots/final-*):
   **Empty trash**, no toast; the notice line hides when the trash is empty. Restore toast "**name** has been
   restored." (fades after 3 s, `Toast.brief`) and the document's Modified becomes the restore time (store meta
   `modified`). Empty states: Created by me "Get started by clicking the **Create** button, or follow the
-  self-paced courses in the **Learning Center.**" (link opens learn.onshape.com), "No documents in <folder>.",
+  self-paced courses in the **Learning Center.**" (link opens noshape's README, https://github.com/yekta/noshape#readme), "No documents in <folder>.",
   folders "No folders owned by you." / "No folders in <folder>." / "No folders in Trash."; the table header stays
   above the empty state. Folders row: sort ▾ (✓ Name: A → Z / Name: Z → A / Last modified; grid only), grid
   (tiles, default) / list (Name | Modified | Modified by table, headers sort); they act on folders only
@@ -68,7 +146,6 @@ This round (all checked in the app, shots in /tmp/ui2-shots/final-*):
 - Cargo: `trash = "5"` removed from crates/app/Cargo.toml (Cargo.lock updated by the build).
 
 ## Next (when resumed): full-screen pixel pass of every non-Part-Studio screen against live (documents
-- (lead) The empty-state "Learning Center" link must open noshape's own docs (https://github.com/yekta/noshape#readme), not learn.onshape.com, because Onshape's learning site is cloud content.
 page incl. Created by me empty state not yet seen in the app, Variable Studio, versions, tab manager,
 Feature Studio, import/export, assembly, drawing, sketch), at 1919x1079 like the live shots.
 

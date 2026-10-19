@@ -3,6 +3,9 @@
 // All STEP/IGES exchange happens in OCCT's default session unit (millimeter);
 // unit conversion is done by the Rust layer.
 #include "internal.hpp"
+#include <BRepBuilderAPI_Transform.hxx>
+#include <iterator>
+#include <regex>
 
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
@@ -305,10 +308,15 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
     fail_op("could not create XCAF document");
   occ::handle<XCAFDoc_ShapeTool> st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
   occ::handle<XCAFDoc_ColorTool> ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
+  // Yards (file unit 100): OCCT has no such unit; the shapes go in a third
+  // the size as feet and the file's foot unit becomes a yard (0.9144 m).
+  const bool yard = file_unit == 100;
+  gp_Trsf    third;
+  third.SetScale(gp_Pnt(0, 0, 0), 1.0 / 3.0);
   for (size_t i = 0; i < shapes.items.size(); ++i)
   {
-    const TopoDS_Shape& s = shapes.items[i];
-    require_non_null(s, "exported shape");
+    require_non_null(shapes.items[i], "exported shape");
+    const TopoDS_Shape s = yard ? BRepBuilderAPI_Transform(shapes.items[i], third, true).Shape() : shapes.items[i];
     TDF_Label l = st->AddShape(s, false);
     if (i < names.size() && !names[i].empty())
     {
@@ -341,12 +349,29 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
     default:
       break; // OCCT's default (AP214 IS)
   }
+  if (yard)
+    file_unit = UnitsMethods_LengthUnit_Foot;
   if (file_unit != 0)
     params.WriteUnit = static_cast<UnitsMethods_LengthUnit>(file_unit);
   bool ok = w.Perform(doc, p.c_str(), params);
   app->Close(doc);
   if (!ok)
     fail_io("could not write STEP file " + p);
+  if (yard)
+  {
+    std::ifstream in(p, std::ios::binary);
+    std::string   text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+    // ( CONVERSION_BASED_UNIT('FOOT',#n) ... ) with #n = LENGTH_MEASURE_WITH_UNIT(304.8,#mm).
+    const std::regex unit("CONVERSION_BASED_UNIT\\('FOOT'"), measure("LENGTH_MEASURE_WITH_UNIT\\((LENGTH_MEASURE\\()?304\\.8[0-9]*");
+    if (!std::regex_search(text, unit) || !std::regex_search(text, measure))
+      fail_io("could not write the yard unit in " + p);
+    text = std::regex_replace(std::regex_replace(text, unit, "CONVERSION_BASED_UNIT('YARD'"), measure, "LENGTH_MEASURE_WITH_UNIT($01914.4");
+    std::ofstream out(p, std::ios::binary | std::ios::trunc);
+    out << text;
+    if (!out)
+      fail_io("could not write STEP file " + p);
+  }
 }
 
 // ---------------------------------------------------------------- IGES

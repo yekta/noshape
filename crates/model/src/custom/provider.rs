@@ -12,6 +12,10 @@ use std::sync::{Arc, LazyLock};
 /// Most recently compiled studio per tab id string: the fallback for
 /// regenerations that get no provider (assembly and drawing evaluation).
 static LATEST: LazyLock<RwLock<HashMap<String, Arc<CompiledStudio>>>> = LazyLock::new(Default::default);
+/// File tabs seen by the latest [`DocumentScripts::from_document`] calls,
+/// by tab id string (reference parameters in those regenerations).
+static LATEST_FILES: LazyLock<RwLock<HashMap<String, crate::file_tab::FileTab>>> = LazyLock::new(Default::default);
+static LATEST_FILES_HASH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Fallback provider backed by the most recently compiled studios.
 #[derive(Debug)]
@@ -21,6 +25,12 @@ impl CustomFeatureProvider for Latest {
     fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>> {
         LATEST.read().get(tab).cloned()
     }
+    fn file(&self, tab: &str) -> Option<crate::file_tab::FileTab> {
+        LATEST_FILES.read().get(tab).cloned()
+    }
+    fn version(&self, tab: &str) -> u64 {
+        self.studio(tab).map(|s| s.hash).unwrap_or(0) ^ LATEST_FILES_HASH.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 /// Supplies compiled Feature Studios by tab id string (the `<tab>` part of
@@ -28,6 +38,10 @@ impl CustomFeatureProvider for Latest {
 /// `RegenOptions::custom_features`, like the Derived provider.
 pub trait CustomFeatureProvider: Send + Sync + std::fmt::Debug {
     fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>>;
+    /// A file tab of the document, by tab id string (reference parameters).
+    fn file(&self, _tab: &str) -> Option<crate::file_tab::FileTab> {
+        None
+    }
     /// Changes whenever the studio's compiled result may change.
     fn version(&self, tab: &str) -> u64 {
         self.studio(tab).map(|s| s.hash).unwrap_or(0)
@@ -58,6 +72,10 @@ impl Resolver for DocResolver<'_> {
 #[derive(Debug, Default)]
 pub struct DocumentScripts {
     studios: Vec<(TabId, String, Arc<CompiledStudio>)>,
+    /// File tabs (reference parameters: CSV, image, JSON, ...).
+    files: Vec<(TabId, crate::file_tab::FileTab)>,
+    /// Changes when a file tab is added, removed or updated.
+    files_hash: u64,
 }
 
 impl DocumentScripts {
@@ -94,7 +112,24 @@ impl DocumentScripts {
             compiled.insert(*tab, c.clone());
             studios.push((*tab, name.clone(), c));
         }
-        Arc::new(Self { studios })
+        let files = doc
+            .ordered_tabs()
+            .into_iter()
+            .filter_map(|t| match &t.content {
+                TabContent::File(f) => Some((t.id, f.clone())),
+                _ => None,
+            })
+            .collect::<Vec<(TabId, crate::file_tab::FileTab)>>();
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let mut latest = LATEST_FILES.write();
+        for (t, f) in &files {
+            (t, &f.file_name, f.size, f.uploaded).hash(&mut h);
+            latest.insert(t.to_string(), f.clone());
+        }
+        drop(latest);
+        let files_hash = h.finish();
+        LATEST_FILES_HASH.store(files_hash, std::sync::atomic::Ordering::Relaxed);
+        Arc::new(Self { studios, files, files_hash })
     }
 
     /// (tab, tab name, compiled studio) in tab order.
@@ -112,5 +147,13 @@ impl DocumentScripts {
 impl CustomFeatureProvider for DocumentScripts {
     fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>> {
         self.studios.iter().find(|(t, _, _)| t.to_string() == tab).map(|(_, _, c)| c.clone())
+    }
+    fn file(&self, tab: &str) -> Option<crate::file_tab::FileTab> {
+        self.files.iter().find(|(t, _)| t.to_string() == tab).map(|(_, f)| f.clone())
+    }
+    /// Reference parameters read file tabs: a changed file re-runs the
+    /// custom features too.
+    fn version(&self, tab: &str) -> u64 {
+        self.studio(tab).map(|s| s.hash).unwrap_or(0) ^ self.files_hash
     }
 }

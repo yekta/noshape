@@ -2726,8 +2726,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-macos"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c988b7e49775cc8542dbe48d5a10e073d8e898a023ef3ff3d24f33363e9863"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -4319,6 +4317,7 @@ dependencies = [
  "glam 0.34.1",
  "gpui-kit",
  "gpui-pre-linux",
+ "gpui-pre-macos",
  "image",
  "log",
  "noshape-kernel",
@@ -4334,6 +4333,7 @@ dependencies = [
  "parking_lot",
  "raw-window-handle",
  "regex",
+ "resvg 0.46.0",
  "rfd",
  "rusqlite",
  "rust-embed",

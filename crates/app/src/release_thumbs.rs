@@ -12,20 +12,23 @@ use noshape_model::release::{ItemKind, ReleaseItem};
 use noshape_model::Document;
 use std::sync::Arc;
 
-/// A row's picture key: tab, part and configuration.
+/// A row's picture key: tab, part, configuration and the version a linked
+/// item comes from.
 pub fn key(item: &ReleaseItem) -> String {
-    format!("{}/{}/{}", item.tab.0, item.part.as_ref().map(|b| b.to_string()).unwrap_or_default(), serde_json::to_string(&item.config).unwrap_or_default())
+    let version = item.document.as_ref().map(|d| format!("{}@{}", d.path, d.version)).unwrap_or_default();
+    format!("{}/{}/{}/{version}", item.tab.0, item.part.as_ref().map(|b| b.to_string()).unwrap_or_default(), serde_json::to_string(&item.config).unwrap_or_default())
 }
 
 /// Render the pictures of `items` (in the background).
-pub async fn render(doc: Document, items: Vec<ReleaseItem>, gpu: crate::gpu::Gpu) -> Vec<(String, Arc<RenderImage>)> {
+/// `versions`: the documents at the versions pinned drawing views show.
+pub async fn render(doc: Document, versions: std::collections::HashMap<String, Document>, items: Vec<ReleaseItem>, gpu: crate::gpu::Gpu) -> Vec<(String, Arc<RenderImage>)> {
     let mut evaluator = AssemblyEvaluator::default();
     let mut out = Vec::new();
     for item in &items {
         let Some(tab) = doc.tab(item.tab) else { continue };
         let scene = match (&tab.content, item.kind, &item.part) {
             (TabContent::Drawing(d), ItemKind::Drawing, _) => {
-                if let Some(img) = crate::tab_manager::drawing_thumbnail(&doc, d, tab.name.clone()) {
+                if let Some(img) = crate::tab_manager::drawing_thumbnail(&doc, &versions, d, tab.name.clone()) {
                     out.push((key(item), img));
                 }
                 continue;

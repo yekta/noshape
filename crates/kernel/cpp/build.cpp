@@ -518,7 +518,10 @@ std::unique_ptr<OcShape> make_helix(const PlaneF& frame, double radius, double p
     fail_op("could not build helix edge");
   TopoDS_Edge e     = mk.Edge();
   int         nseg  = std::max(16, (int)std::ceil(turns * 8.0));
-  if (!BRepLib::BuildCurves3d(e, 1e-6, GeomAbs_C2, 8, nseg))
+  // Relative to the radius: an absolute 1e-6 is 1 um on a metre-scale model,
+  // enough for a thread's tooth (whose edges lie on the core cylinder) to
+  // wobble across the cylinder and break the boolean that adds it.
+  if (!BRepLib::BuildCurves3d(e, std::max(1e-12, radius * 1e-8), GeomAbs_C2, 8, nseg))
     fail_op("helix 3D curve approximation failed");
   BRep_Builder b;
   TopoDS_Wire  w;

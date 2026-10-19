@@ -261,7 +261,7 @@ impl DrawingEditor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{hsv, parse_hex};
 
     #[test]
     fn hex_and_hsv() {

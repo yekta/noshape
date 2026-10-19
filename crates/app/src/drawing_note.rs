@@ -123,18 +123,27 @@ impl DrawingEditor {
             .child(select("note-list", 130., st.list.name().into(), lists))
             .child(div().text_size(px(11.)).text_color(pal.text_muted).child("Note order"))
             .child(select("note-order", 110., if st.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, order));
-        let mut rows = vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element(), Textarea::new(&input).w(px(420.)).into_any_element()];
+        // The formatting ruler over the text (the laid-out box width).
+        let h = height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().unwrap_or(3.5);
+        let text_w = {
+            let l = noshape_model::drawing::note::layout(&noshape_model::drawing::note::fractions(&input.read(cx).value()), h, &st, [0.0, 0.0]);
+            l.bbox[2] - l.bbox[0]
+        };
+        let ruler = self.note_ruler(&st, text_w, cx);
+        let mut rows = vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element(), ruler, Textarea::new(&input).w(px(420.)).into_any_element()];
         // Flag notes: per list item, with the flag type and size.
         if st.list != NoteList::None {
             let text = input.read(cx).value().to_string();
             let items: Vec<String> = text.split('\n').filter(|l| !l.trim().is_empty()).map(|l| l.to_string()).collect();
-            let shapes: Vec<(String, bool, Set)> = [("Triangle", FlagShape::Triangle), ("Circle", FlagShape::Circle), ("Square", FlagShape::Square)].iter().map(|&(n, k)| (n.to_string(), st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k) as Set)).collect();
+            let shapes: Vec<(String, bool, Set)> = FlagShape::ALL.iter().map(|&k| (k.name().to_string(), st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k) as Set)).collect();
+            // The first flag takes Drawing properties › Flag notes › Border shape.
+            let default_shape = self.drawing.props.flag_shape;
             let sizes: Vec<(String, bool, Set)> = (1..=4u8).map(|n| (format!("{n} Character{}", if n > 1 { "s" } else { "" }), st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n) as Set)).collect();
             rows.push(
                 h_flex()
                     .gap(px(3.))
                     .child(div().text_size(px(11.)).text_color(pal.text_muted).child("Flag notes"))
-                    .child(select("note-flag-shape", 90., format!("{:?}", st.flag_shape), shapes))
+                    .child(select("note-flag-shape", 90., st.flag_shape.name().into(), shapes))
                     .child(select("note-flag-size", 110., format!("{} Character{}", st.flag_chars, if st.flag_chars > 1 { "s" } else { "" }), sizes))
                     .into_any_element(),
             );
@@ -146,6 +155,9 @@ impl DrawingEditor {
                     this.note_style(&move |s: &mut NoteStyle| {
                         s.flags.retain(|x| *x != i);
                         if v {
+                            if s.flags.is_empty() {
+                                s.flag_shape = default_shape;
+                            }
                             s.flags.push(i);
                         }
                     }, cx)

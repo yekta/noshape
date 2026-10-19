@@ -151,6 +151,7 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-datum", "datum", "Datum", matches!(t, Tool::Datum { .. } | Tool::DatumTarget { .. }), || Tool::Datum { anchor: None }, cx))
             .child(self.tool_btn("dr-gdt", "gdt", "Geometric tolerance", matches!(t, Tool::Gdt), || Tool::Gdt, cx))
             .child(self.tool_btn("dr-sf", "surface-finish", "Surface finish symbol", matches!(t, Tool::SurfaceFinish), || Tool::SurfaceFinish, cx))
+            .child(self.tool_btn("dr-weld", "weld-symbol", "Weld symbol", matches!(t, Tool::Weld), || Tool::Weld, cx))
             .child(sep())
             .child(self.tool_btn("dr-note", "note", "Note (n)", matches!(t, Tool::Note), || Tool::Note, cx))
             .child(self.tool_btn("dr-balloon", "callout", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }, cx))
@@ -360,6 +361,8 @@ impl DrawingEditor {
             style.leaders.push(l);
         }
         let input = self.textarea(&text, 5, window, cx);
+        // Tab moves the text to the next tab stop of the ruler.
+        input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
         let height = self.input(&format!("{} mm", noshape_model::drawing::format::format_number(h, None, 2)), window, cx);
         self.panel = Some(Panel::Note { input, edit, pos, height, style });
         cx.notify();

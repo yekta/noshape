@@ -27,6 +27,8 @@ pub struct DocEntry {
     pub owner: String,
     /// Document description (the "Description" column).
     pub description: String,
+    /// The workspace it opens in (the row's "⚲ Main" chip).
+    pub workspace: String,
     pub thumbnail: Option<Arc<RenderImage>>,
     /// Position in the recent list.
     pub recent_rank: Option<usize>,
@@ -50,6 +52,7 @@ struct Cached {
     modified_by: String,
     owner: String,
     description: String,
+    workspace: String,
     thumbnail: Option<Arc<RenderImage>>,
     broken: bool,
 }
@@ -131,7 +134,7 @@ fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, dirs: &mut Vec<Pat
     }
 }
 
-fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
+pub(crate) fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
     let img = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
     let mut rgba = img.to_rgba8();
     // GPUI render images are BGRA. The white background becomes
@@ -191,6 +194,7 @@ impl Library {
                 modified_by: cached.modified_by.clone(),
                 owner: cached.owner.clone(),
                 description: cached.description.clone(),
+                workspace: cached.workspace.clone(),
                 thumbnail: cached.thumbnail.clone(),
                 recent_rank: recent.iter().position(|r| *r == path),
                 broken: cached.broken,
@@ -214,6 +218,7 @@ impl Library {
 struct MetaRead {
     name: String,
     description: String,
+    workspace: String,
     modified: i64,
     owner: String,
     modified_by: String,
@@ -228,7 +233,8 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     if wal_path(path).exists() {
         let doc = noshape_store::Document::open_read_only(path)?;
         let (meta, (owner, modified_by)) = (doc.meta()?, doc.owner_and_last_author()?);
-        return Ok(MetaRead { name: meta.name, description: meta.description, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
+        let workspace = doc.list_branches()?.into_iter().next().map(|b| b.name).unwrap_or_default();
+        return Ok(MetaRead { name: meta.name, description: meta.description, workspace, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
     }
     use rusqlite::{Connection, OpenFlags, OptionalExtension as _};
     let mut uri = url_escape(&path.to_string_lossy());
@@ -242,7 +248,13 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     let get = |key: &str| -> anyhow::Result<Option<Vec<u8>>> { Ok(conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?) };
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
     let (owner, modified_by) = noshape_store::owner_and_last_author(&conn)?;
-    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
+    let workspace: String = conn.query_row("SELECT name FROM branches WHERE is_default = 1 LIMIT 1", [], |r| r.get(0)).optional()?.unwrap_or_default();
+    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), workspace, modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
+}
+
+/// A document file's thumbnail (Reference manager rows).
+pub(crate) fn file_thumbnail(path: &Path) -> Option<Arc<RenderImage>> {
+    read_meta(path).ok()?.thumbnail.as_deref().and_then(decode_thumbnail)
 }
 
 /// Percent-encode the characters that are special in SQLite URIs.
@@ -268,12 +280,13 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
             modified_by: meta.modified_by,
             owner: meta.owner,
             description: meta.description,
+            workspace: meta.workspace,
             thumbnail: meta.thumbnail.as_deref().and_then(decode_thumbnail),
             broken: false,
         },
         Err(e) => {
             log::warn!("cannot read {}: {e}", path.display());
-            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), description: String::new(), thumbnail: None, broken: true }
+            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), description: String::new(), workspace: String::new(), thumbnail: None, broken: true }
         }
     }
 }
@@ -347,12 +360,29 @@ pub struct DocDetails {
     pub modified: i64,
     /// Workspaces and versions, newest first: (name, is_workspace, author, time).
     pub history: Vec<(String, bool, String, i64)>,
+    /// Document notes (markdown, the rail's Notes panel) and the Properties
+    /// panel's Library label.
+    pub notes: String,
+    pub library_label: String,
+}
+
+/// Store meta key of the Properties panel's Library label.
+pub const LIBRARY_LABEL_KEY: &str = "library_label";
+
+/// Save the documents page Properties panel's description and library label.
+pub fn set_doc_properties(path: &Path, description: &str, library_label: &str) -> anyhow::Result<()> {
+    let mut store = noshape_store::Document::open(path)?;
+    store.set_description(description)?;
+    store.set_meta(LIBRARY_LABEL_KEY, Some(library_label.as_bytes()).filter(|b| !b.is_empty()))?;
+    Ok(())
 }
 
 pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
     let store = noshape_store::Document::open_read_only(path)?;
     let meta = store.meta()?;
     let graph = store.graph()?;
+    let text = |k: &str| store.get_meta(k).ok().flatten().map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+    let (notes, library_label) = (text("notes"), text(LIBRARY_LABEL_KEY));
     let first = graph.microversions.iter().min_by_key(|m| m.seq);
     let last = graph.microversions.iter().max_by_key(|m| m.seq);
     let mut history: Vec<(String, bool, String, i64)> = Vec::new();
@@ -375,6 +405,8 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
         modified_by: last.map(|m| m.author.clone()).unwrap_or_default(),
         modified: last.map(|m| m.created).unwrap_or(meta.modified),
         history,
+        notes,
+        library_label,
     })
 }
 

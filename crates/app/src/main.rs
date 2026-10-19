@@ -8,6 +8,8 @@ mod assembly_scene;
 mod assembly_view;
 mod assets;
 mod material_libraries;
+mod numbering_prefs;
+mod tool_synonyms;
 mod release_prefs;
 mod release_thumbs;
 mod derived;
@@ -38,6 +40,10 @@ mod drawing_note;
 mod drawing_cells;
 mod drawing_refs;
 mod drawing_color;
+mod drawing_callout;
+mod drawing_ruler;
+mod drawing_table_dlg;
+mod drawing_weld;
 mod file_tab_view;
 mod drawing_props;
 mod drawing_scene;
@@ -49,6 +55,7 @@ mod drawing_view;
 mod feature_dialog;
 mod feature_studio;
 mod fs_notices;
+mod fs_reference;
 mod fs_search;
 mod import_dialog;
 mod material_library_view;
@@ -59,6 +66,8 @@ mod graphics_prefs_dialog;
 mod history_panel;
 mod doc_panels;
 mod cursor;
+mod mouse_prefs;
+mod navigation;
 mod os_menu;
 mod os_select;
 mod os_ui;
@@ -70,6 +79,7 @@ mod scene_builder;
 mod session;
 mod sketch_mode;
 mod start_library;
+mod start_search;
 mod start_thumbnail;
 mod start_trash;
 mod shortcuts;
@@ -215,6 +225,8 @@ fn main() {
             let path = path.clone().unwrap_or_else(files::new_document_path);
             let initial = if args.iter().any(|a| a == "--demo-drawing-full") {
                 Some(noshape_model::drawing::showcase::showcase_document())
+            } else if args.iter().any(|a| a == "--demo-fab") {
+                Some(noshape_model::demo_fab::fabrication_document())
             } else if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
             files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
         } else {

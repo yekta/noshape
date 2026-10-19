@@ -15,7 +15,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
-use noshape_model::material_library::LibraryMaterial;
+use noshape_model::material_library::MaterialLibrary;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -43,13 +43,13 @@ pub fn set_added(list: &[AddedLibrary]) {
 }
 
 /// The materials of an added library (its document's current state).
-pub fn materials_of(lib: &AddedLibrary) -> Vec<LibraryMaterial> {
-    (|| -> anyhow::Result<Vec<LibraryMaterial>> {
+pub fn materials_of(lib: &AddedLibrary) -> MaterialLibrary {
+    (|| -> anyhow::Result<MaterialLibrary> {
         let store = noshape_store::Document::open_read_only(&lib.path)?;
         let head = store.head(store.default_branch()?)?;
         let doc = noshape_model::Document::from_blobs(&store.read_all(head)?)?;
         Ok(doc.tabs.iter().find(|t| t.id.0 == lib.tab).and_then(|t| match &t.content {
-            TabContent::MaterialLibrary(m) => Some(m.materials.clone()),
+            TabContent::MaterialLibrary(m) => Some(m.clone()),
             _ => None,
         }).unwrap_or_default())
     })()
@@ -88,8 +88,11 @@ pub struct AddLibraryDialog {
     local: Vec<(AddedLibrary, bool)>,
     me: String,
     selected: Option<usize>,
-    on_add: std::rc::Rc<dyn Fn(Option<AddedLibrary>, &mut Window, &mut App)>,
+    on_add: OnAdd,
 }
+
+/// What [Add] does with the picked library (None = the Onshape library).
+type OnAdd = std::rc::Rc<dyn Fn(Option<AddedLibrary>, &mut Window, &mut App)>;
 
 /// Open the modal; `on_add` gets the picked library (None = the Onshape
 /// Material Library).

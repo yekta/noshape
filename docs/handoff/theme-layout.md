@@ -537,6 +537,104 @@ shared tree.
   (clippy too_many_arguments; the outline flag is psb's part-outline pass, noted in
   part-studio-behaviour.md). New render flags go into `DrawMode`.
 
+- **Mate connector dialog** (final-dialog-mate-connector.png vs live dialogs/mate-connector-01):
+  new hints `PRIMARY_AXIS` (1<<21) and `MATE_CONNECTOR_AXIS_TYPE` (1<<22) in model params.rs
+  (FeatureScript UIHint names); flipPrimary is a PRIMARY_AXIS bool and secondaryAxisType a
+  MATE_CONNECTOR_AXIS_TYPE enum, drawn as one 28 px row of two 26 px icon buttons
+  (`FeatureDialog::render_axis_buttons`: the flip arrow shows the direction; "Reorient secondary
+  axis" steps +X, +Y, -X, -Y); Origin entity has NO_MATE_CONNECTOR_BUTTON. Own icon
+  realign-mate-dialog.svg.
+
+- **Selection count only in the cursor image** (lead/psb): removed the Part Studio's overlay digit
+  (`render_selection_badge` + `badge_at`) and the viewport's fallback `count_badge`. The count is
+  drawn only by the platform cursor (cursor.rs: X11 RENDER cursor, Wayland via the patched pointer,
+  macOS/Windows native); where a platform can't set it, no count shows.
+
+## Round 9 (2026-10-19 12:10-, new "ui" agent after the reboot; /tmp was wiped)
+
+- Verified done and compiling (from the previous agent): `DrawMode` for `draw_lists` (clippy clean in
+  crates/render), `Viewport::pointer_inside()` removed (field still used), the selection count only in
+  the cursor image (no overlay digit / `count_badge` anywhere), Mate connector one-row axis buttons,
+  preview lighting + `feature_preview_shading_matches_onshape` (all 13 offscreen tests pass).
+- Mate connector axis buttons sit 2 px lower (row `items_end`), matching live mate-connector-01.
+  final-dialog-mate-connector.png (ours | live).
+- Icons redrawn after Onshape's art: `menu-section-view.svg` = the cut hollow cylinder with hatched
+  cut faces (icons-master__lui-section-view@3x / section-view-icon@1x), `add-appearance.svg` = blue +
+  with the flat swatch fan over a 3-cell bar (add-appearance-button@1x), both sized to fill live's
+  pixels at the 16 px menu slot. final-context-menu.png (ours | live rmb-ps-face).
+- Sketch toolbar: split tools are Onshape's split tool (`split_tool_button` + caret, no gap, group
+  hover; dropdown = `menu_tool_item` rows with shortcut chips), pitch 52 like live
+  (dom/toolbar-sketch.txt); no separator between Text and Use (live).
+- Sketch frame name ("Sketch 1") is drawn in the sketch plane like the plane names (shared helpers
+  `part_studio::in_plane_text` + `paint_paths`, used by the plane labels too), ascender 2.5% of the
+  frame height (live sketch/01 skewed, sketch/03 normal view).
+- Sketch frame: an empty sketch's frame is 202 x 113.7 mm (`EMPTY_SKETCH_BOX_HALF_HEIGHT` 0.05685,
+  live sketch/03 measured line to line; skb's file, constant only).
+- Corner rectangle (sketch_mode.rs, surgical): the rubber band's values and the on-the-fly boxes sit on
+  the two edges through the **first** corner (live sketch/05-06); the rubber band shows all four
+  corner dots; preview lines 2 px. On-the-fly boxes (part_studio/sketch.rs): only the active one is a
+  box (24 px, white 90%, 1 px `#788188`, gray 14 px text); the others are plain 13 px `#449ccd`
+  values. Edited-sketch vertices are 7 px dots (scene_builder.rs); the origin stays on top of the
+  edge-on planes while sketching. final-sketch-rectangle.png (ours left, live right; top = rubber
+  band, bottom = after the second click).
+- Right panels (config_panel.rs, live 182/183/164): 1 px `#d7d7d7` divider + 5 px white gutter + 712 px
+  pane (`#ccc` top line), so the pane starts at x 1207 like live; strip buttons white while no panel
+  is open, `#eaeaea` with one open and the open one white without a right border (no blue bar); tabs
+  share the width by label (`flex_grow`). Configurations: 44 px filter row (funnel, 30 px box, three
+  window-style toggles `cfg-filter-list/checkbox/variable.svg` 36 px apart, ⋯). Left Configurations
+  box: 35x28 + 20x28 halves, white while the panel is open, icon `config-show.svg` redrawn after live
+  (blue grid + eye), 19 px under the last input. Variable table: flush with the pane, the first header
+  2 px under the underline, gray only on the header cells, the italic "Name" row after the Part
+  Studio's variables too, ⋯ icon. final-configurations-list.png (ours top, live bottom),
+  final-variable-table.png.
+- Feature dialog value rows (feature_dialog.rs): labels start at the dialog edge with 5 px padding on
+  both sides (live dom/dialog-variable, dialog-thicken: label x = dialog x, field = label end).
+  Verify Extrude/Thicken against live after the next build (the old note said "no right padding").
+- For the lead / psb: the left Configurations box button is "Modify visibility conditions" in live
+  (tooltip and action); ours opens the Configurations panel. Enter in the Variable dialog's Value
+  field didn't close the dialog in my test.
+- Feature dialog value rows, verified: Variable (Name/Value/Description) and Extrude Depth (label 31,
+  field 68-170, ± at 176.5) now land on live's x positions; the tolerance toggle has 4 px after it
+  (live 5 px gap before the right column). Rows are still 1-2 px lower than live (open).
+- Region hover fixes (scene_builder.rs, part_studio/mod.rs): hover/selection outlines of sketch
+  regions are drawn back on the plane (the region mesh is 1 µm above it), which made the edited
+  sketch's own curves count as occluded and turn `#4040ff`; while a drawing tool is active, regions
+  under the cursor don't light up (live sketch/08-09).
+- Circle tool preview (sketch_mode.rs, surgical): circle + center point, no dashed radius line, no
+  point at the cursor (live sketch/09). final-sketch-circle.png.
+- Toolbar tooltips re-verified against live 10/11 (final-tooltips.png).
+- Open (small): the Front/Right planes seen edge-on in a sketch's normal view read darker in live
+  (both outline edges blend; our second edge fails the depth test); live's "Top" plane label looks
+  bolder (Onshape's font); dimension preview text is 13 px in live's font, ours slightly narrower.
+
+### Side-by-side shots of this round (/tmp/ui-shots, ours | live unless noted)
+
+final-context-menu.png (face menu with the new Section view / Add appearance icons),
+final-dialog-mate-connector.png, final-sketch-start.png (ours top, live bottom),
+final-sketch-rectangle.png, final-sketch-circle.png, final-configurations-list.png (ours top),
+final-variable-table.png (ours top), final-dialog-variable.png, final-feature-dialog.png (Extrude),
+final-tooltips.png, final-sketch-dimension.png (ours left).
+
+- **os_menu in every window** (lead/nav request): the open menu remembers its window
+  (`OsMenuHost` holds the `WindowId`); every app window is opened with `os_menu::open_window`
+  (files.rs, start_window.rs, preferences_window.rs), which wraps the content in a `MenuLayer` view
+  that draws that window's menu; the old `render_host` calls in workspace.rs / start_window.rs are
+  gone. `os_menu::content_view(window, cx)` returns a window's content view (used by workspace.rs
+  and release_add_source.rs to find the Workspace; they used `Root::view()` before). A new window
+  must use `os_menu::open_window`, not `gpui_kit::open_window`. New `OsMenu::native_select(width)`
+  (browser `<select>` lists); nav's Mouse controls preset select uses it (navigation.md).
+- Dimension tool (sketch): the dimension being placed is drawn like a placed one (black, line broken
+  around a 16 px value at the cursor; sketch_mode.rs `dim_preview`, sketch.rs label); arrowheads
+  16 x 7 px like live (all dimensions); the value box is centered on the label (live 13).
+  final-sketch-dimension.png (ours left: placing, box, applied). Open: live highlights the measured
+  edge while placing; live 15 shows the applied dimension unselected while skb keeps it selected
+  (their sketch/148 evidence); the value in the box isn't shown selected/right-aligned like live.
+- Tools: /tmp/ui-tools/build.sh (shared build + copy to /tmp/ui/noshape), start.sh [file|--demo]
+  (starts on :101 and resizes the window to 1919x1079 like the live shots), x.sh <name> [xdotool…]
+  (screenshot to /tmp/ui/<name>.png). Icon scratch work in /tmp/ui/icon.
+- Note: the demo document's toolbar is collapsed at 1919 px because its custom features don't fit
+  (Onshape collapses the same way); compare toolbars on a new document.
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting

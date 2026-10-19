@@ -278,6 +278,28 @@ pub enum ParamKind {
     Lookup { table: &'static str },
     /// Sketch payload; only for the Sketch feature.
     Sketch,
+    /// A reference to another tab (FeatureScript `TableData`, `ImageData`,
+    /// `PartStudioData`, ...): the tab id as text, empty when unset.
+    Reference { kind: ReferenceKind },
+}
+
+/// What a reference parameter selects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceKind {
+    /// A CSV file tab (`TableData`).
+    Csv,
+    /// An image file tab (`ImageData`).
+    Image,
+    /// A JSON file tab (`JSONData`).
+    Json,
+    /// A text file tab (`TextData`).
+    Text,
+    /// A Part Studio (`PartStudioData`).
+    PartStudio,
+    /// A Variable Studio (`VariableStudioData`).
+    VariableStudio,
+    /// An imported CAD file tab (`CADImportData`).
+    CadImport,
 }
 
 #[derive(Clone)]
@@ -335,6 +357,9 @@ impl ParamSpec {
     pub fn lookup(id: &'static str, label: &'static str, table: &'static str) -> Self {
         Self::new(id, label, ParamKind::Lookup { table })
     }
+    pub fn reference(id: &'static str, label: &'static str, kind: ReferenceKind) -> Self {
+        Self::new(id, label, ParamKind::Reference { kind })
+    }
     pub fn sketch(id: &'static str) -> Self {
         Self::new(id, "Sketch", ParamKind::Sketch).hints(Hints::ALWAYS_HIDDEN)
     }
@@ -373,6 +398,7 @@ impl ParamSpec {
             ParamKind::Array { .. } => ParamValue::Array(Vec::new()),
             ParamKind::Lookup { .. } => ParamValue::Lookup(Vec::new()),
             ParamKind::Sketch => ParamValue::Sketch(Box::default()),
+            ParamKind::Reference { .. } => ParamValue::Text(String::new()),
         }
     }
 }

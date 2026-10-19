@@ -1,3 +1,4 @@
+use glam::DVec3;
 use noshape_kernel::*;
 use std::f64::consts::PI;
 
@@ -487,4 +488,28 @@ fn interpolated_spline_keeps_tangent_magnitudes() {
         (0..=100).map(|k| e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 100.0).unwrap().y.abs()).fold(0.0, f64::max)
     };
     assert!(span(&e) > span(&e1) * 2.0);
+}
+
+/// Sweep with the profile locked to faces ("Lock profile faces"): a 2 x 4 mm
+/// rectangle swept a quarter turn round a Ø40 cylinder on its side face stays
+/// radial, so it sweeps the Pappus volume of a revolve.
+#[test]
+fn sweep_locked_to_cylinder_face() {
+    let mm = 1e-3;
+    let cyl = make_cylinder(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 20.0 * mm, 20.0 * mm, std::f64::consts::TAU).unwrap();
+    let side: Vec<Shape> = cyl.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect();
+    let path = make_wire(&[make_arc(DVec3::new(0.0, 0.0, 10.0) * mm, DVec3::Z, DVec3::X, 20.0 * mm, 0.0, std::f64::consts::FRAC_PI_2).unwrap()]).unwrap();
+    let p = |x: f64, z: f64| DVec3::new(x, 0.0, z) * mm;
+    let pts = [p(19.0, 8.0), p(21.0, 8.0), p(21.0, 12.0), p(19.0, 12.0)];
+    let edges: Vec<Shape> = (0..4).map(|i| make_line(pts[i], pts[(i + 1) % 4]).unwrap()).collect();
+    let profile = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let res = sweep_locked_to_faces(&[profile], &path, &Shape::compound(&side), &SweepOptions::default()).unwrap();
+    assert!(res.shape.is_valid());
+    let v = volume_properties(&res.shape).unwrap().mass / mm.powi(3);
+    let want = 8.0 * std::f64::consts::FRAC_PI_2 * 20.0;
+    assert!((v - want).abs() < 1e-3, "{v} vs {want}");
+    // A path off the faces is refused.
+    let off = make_wire(&[make_arc(DVec3::new(0.0, 0.0, 10.0) * mm, DVec3::Z, DVec3::X, 25.0 * mm, 0.0, 1.0).unwrap()]).unwrap();
+    let face = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    assert!(sweep_locked_to_faces(&[face], &off, &Shape::compound(&side), &SweepOptions::default()).is_err());
 }

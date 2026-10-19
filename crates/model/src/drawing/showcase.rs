@@ -209,7 +209,7 @@ pub fn showcase_document() -> Document {
             let off = if item % 2 == 1 { [-30.0, 18.0] } else { [35.0, 28.0] };
             let top = drawing.sheets[s2].size.size_mm().1 - 20.0;
             let pos = [(at[0] + off[0]).clamp(25.0, 400.0), (at[1] + off[1]).clamp(25.0, top)];
-            drawing.sheets[s2].annotations.push(Annotation { id: next, kind: AnnotationKind::Balloon { view: ViewId(1), anchor: sn.p, text: String::new() }, position: pos, refs: vec![AnnotationRef { slot: 0, point: sn.point.clone().unwrap() }], ..Default::default() });
+            drawing.sheets[s2].annotations.push(Annotation { id: next, kind: AnnotationKind::balloon(ViewId(1), sn.p, ""), position: pos, refs: vec![AnnotationRef { slot: 0, point: sn.point.clone().unwrap() }], ..Default::default() });
             next += 1;
         }
     }
@@ -241,7 +241,7 @@ mod tests {
             std::fs::write(format!("/tmp/drw/showcase{}.svg", si + 1), export::to_svg(&b.geometry)).unwrap();
             if si == 1 {
                 let t: Vec<&str> = b.geometry.texts.iter().map(|t| t.text.as_str()).collect();
-                assert!(t.contains(&"BILL OF MATERIALS") && t.contains(&"1") && t.contains(&"2"), "{t:?}");
+                assert!(t.contains(&"Quantity") && t.contains(&"1") && t.contains(&"2"), "{t:?}");
                 assert!(drawing.sheets[1].annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::Balloon { .. })).count() == 2);
             }
         }

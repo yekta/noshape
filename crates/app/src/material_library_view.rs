@@ -124,7 +124,7 @@ impl Render for MaterialLibraryView {
         let mut mats: Vec<LibraryMaterial> = self.library(cx).map(|l| l.materials.clone()).unwrap_or_default();
         mats.retain(|m| q.is_empty() || m.name.to_lowercase().contains(&q) || m.category.to_lowercase().contains(&q));
         if let Some(asc) = self.sort {
-            mats.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            mats.sort_by_key(|m| m.name.to_lowercase());
             if !asc {
                 mats.reverse();
             }

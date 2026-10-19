@@ -127,23 +127,29 @@ impl PartStudioView {
         // header whose title is one full-width active tab (13.33 px / 500
         // blue, 2 px blue underline); a 40 px `#eee` footer with `?`. The
         // panel closes from its strip button (no ×).
+        // Live (183): a 1 px `#d7d7d7` divider and a 5 px white resize
+        // gutter left of the 712 px pane; `#ccc` line over gutter and pane.
         Some(
             v_flex()
-                .w(px(712.))
+                .w(px(718.))
                 .max_w(relative(0.5))
                 .h_full()
                 .flex_none()
                 .bg(pal.panel)
                 .border_l_1()
                 .border_color(pal.border)
+                .pl(px(5.))
+                .child(div().h(px(1.)).ml(px(-5.)).flex_none().bg(gpui_kit::rgb(0xcccccc)))
                 .child(
                     div().h(px(30.)).flex_none().pt(px(4.)).relative().child(if configured {
                         // Configured Part Studio (live 182): two tabs.
                         let on = self.ui.cfg_properties_tab;
                         let tab = |id: &'static str, label: &'static str, active: bool, props: bool| {
+                            // Live: the tabs share the width by their labels
+                            // (Configurations 336 px, Configured properties 376).
                             div()
                                 .id(id)
-                                .flex_1()
+                                .flex_grow(1.)
                                 .h(px(26.))
                                 .flex()
                                 .items_center()
@@ -224,15 +230,17 @@ impl PartStudioView {
         };
         let header = h_flex()
             .h(px(35.))
-            .px(px(6.))
+            .pl(px(4.))
+            .pr(px(6.))
             .gap(px(3.))
             .bg(gpui_kit::rgb(0xeaeaea))
             .border_1()
             .border_color(grid)
-            .child(crate::ui::glyph("ui-chevron-down", 11., pal.text))
+            .child(crate::ui::glyph("ui-chevron-down", 14., pal.text))
             .child(div().flex_1().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(tab_name))
-            .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"));
-        let columns = h_flex().border_l_1().border_color(grid).bg(gpui_kit::rgb(0xeaeaea)).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.))));
+            .child(crate::assets::icon("more", 20., cx));
+        // Live (164): only the header cells are gray, not the rest of the row.
+        let columns = h_flex().border_l_1().border_color(grid).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.)).bg(gpui_kit::rgb(0xeaeaea))));
         let rows = vars.into_iter().map(|(name, q)| {
             let (n1, n2) = (name.clone(), name.clone());
             let view = cx.entity();
@@ -288,14 +296,19 @@ impl PartStudioView {
             tables.push(div().pt(px(10.)).child(view.clone()).into_any_element());
         }
         let empty = self.display.variables.is_empty() && studios.is_empty();
+        // Live (164): the tables run flush with the pane (the body has 5 px
+        // padding), the first header 2 px under the title's underline, and
+        // every table ends with the italic "Name" row.
         v_flex()
+            .mx(px(-5.))
+            .mt(px(-3.))
             .child(header)
             .child(columns)
             .children(rows)
+            .child(h_flex().border_l_1().border_color(grid).child(cell(SharedString::default(), false).child(div().text_color(pal.text_faint).italic().child("Name"))))
             .children(tables)
             .when(empty, |d| {
-                d.child(h_flex().border_l_1().border_color(grid).child(cell(SharedString::default(), false).child(div().text_color(pal.text_faint).italic().child("Name"))))
-                    .child(
+                d.child(
                         v_flex()
                             .items_center()
                             .pt(px(60.))
@@ -442,8 +455,9 @@ impl PartStudioView {
         };
         let query = filter.read(cx).value().trim().to_lowercase();
         // Filter row: funnel, "Filter inputs", kind toggles, ⋯.
-        let kinds = [("table", "List"), ("checkbox-input", "Checkbox"), ("variable", "Configuration variable")];
-        let mut toggles = h_flex().gap(px(4.));
+        // Live (183): window-style icons (dark frame with a header band).
+        let kinds = [("cfg-filter-list", "List"), ("cfg-filter-checkbox", "Checkbox"), ("cfg-filter-variable", "Configuration variable")];
+        let mut toggles = h_flex().ml(px(9.)).gap(px(10.));
         // Live: plain icons; clicking one shows only inputs of that kind.
         for (k, (icon, tip)) in kinds.iter().enumerate() {
             let only = self.ui.cfg_only_kinds[k];
@@ -468,25 +482,30 @@ impl PartStudioView {
         }
         // Live: the tables run flush with the panel's left edge (the panel
         // body has 5 px padding).
+        // Live (183): a 44 px row; 15 px funnel 10 px in, a 30 px box from
+        // x 39, the three toggles 36 px apart, ⋯ 3 px from the edge.
         let mut col = v_flex().mx(px(-5.)).mt(px(-5.)).child(
             h_flex()
-                .h(px(34.))
-                .gap(px(6.))
-                .px(px(4.))
-                .child(crate::ui::glyph("filter", 16., pal.text))
+                .h(px(44.))
+                .pl(px(8.))
+                .pr(px(3.))
+                .child(crate::ui::glyph("filter", 19., pal.text))
                 .child(
                     div()
                         .flex_1()
                         .relative()
-                        .h(px(24.))
+                        .ml(px(11.))
+                        .h(px(30.))
                         .border_1()
                         .border_color(pal.border_strong)
                         .rounded(px(2.))
-                        .child(Input::new(&filter).appearance(false).xsmall().text_size(px(13.)))
-                        .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(13.)).italic().text_color(pal.text_faint).child("Filter inputs"))),
+                        .flex()
+                        .items_center()
+                        .child(Input::new(&filter).appearance(false).small().text_size(px(14.)))
+                        .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter inputs"))),
                 )
                 .child(toggles)
-                .child(div().id("cfg-panel-more").size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).os_context_menu(|m, _, _| m.item(crate::os_menu::OsMenuItem::new("Copy all inputs").disabled(true)))),
+                .child(div().id("cfg-panel-more").ml(px(6.)).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).os_context_menu(|m, _, _| m.item(crate::os_menu::OsMenuItem::new("Copy all inputs").disabled(true)))),
         );
         for input in &cfg.inputs {
             let kind_ix = match input.kind {
@@ -857,21 +876,21 @@ impl PartStudioView {
         }
         let border = gpui_kit::rgb(0xaaaaaa);
         let view = cx.entity();
-        let open = self.right_panel == Some(RightPanel::Configurations);
         let split = h_flex()
             .rounded(px(3.))
             .border_1()
             .border_color(border)
             .child(
+                // Live (dom/panel-configuration-left-box): 35 x 28 and 20 x 28
+                // halves in a 1 px `#aaa` box, white even while the panel is open.
                 div()
                     .id("cfgbox-panel")
-                    .w(px(36.))
-                    .h(px(26.))
+                    .w(px(35.))
+                    .h(px(28.))
                     .flex()
                     .items_center()
                     .justify_center()
                     .cursor_pointer()
-                    .when(open, |d| d.bg(pal.panel_active))
                     .hover(|d| d.bg(pal.panel_hover))
                     .child(crate::assets::icon("config-show", 20., cx))
                     .tooltip(crate::ui::tooltip("Configurations"))
@@ -881,7 +900,7 @@ impl PartStudioView {
                 div()
                     .id("cfgbox-more")
                     .w(px(20.))
-                    .h(px(26.))
+                    .h(px(28.))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -906,7 +925,8 @@ impl PartStudioView {
             .flex_none()
             .px(px(5.))
             .pt(px(6.))
-            .pb(px(6.))
+            // Live (183): 19 px under the last input to the line.
+            .pb(px(18.))
             .border_b_1()
             .border_color(pal.border)
             .child(h_flex().h(px(30.)).justify_between().child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(split));
@@ -944,7 +964,7 @@ impl PartStudioView {
             };
             col = col.child(
                 h_flex()
-                    .min_h(px(28.))
+                    .min_h(px(26.))
                     .gap(px(4.))
                     .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone()))
                     .child(div().flex_1().min_w_0().child(control)),
@@ -1133,13 +1153,16 @@ impl PartStudioView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(if on { pal.row_hover } else { pal.panel })
+                // Live (00, 183): white while no panel is open; with one
+                // open the others turn `#eaeaea` and the open one stays white
+                // and joins the panel (no right border).
+                .bg(if on || active.is_none() { pal.panel } else { gpui_kit::rgb(0xeaeaea) })
                 .hover(|d| d.bg(pal.panel_hover))
                 .cursor_pointer()
                 .border_1()
                 .border_color(pal.border_strong)
+                .when(on, |d| d.border_r_0())
                 .child(crate::assets::icon(icon, 20., cx))
-                .when(on, |d| d.child(div().absolute().right_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
                 .tooltip(crate::ui::tooltip(tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.toggle_panel(panel, w, cx)))
         };

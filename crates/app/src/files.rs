@@ -104,6 +104,11 @@ pub fn is_document_open(path: &Path, cx: &App) -> bool {
     cx.try_global::<OpenDocs>().is_some_and(|o| o.0.contains_key(&canonical(path)))
 }
 
+/// The window showing the document at `path`, if it is open.
+pub fn document_window(path: &Path, cx: &App) -> Option<AnyWindowHandle> {
+    cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(path)).copied())
+}
+
 /// App-level window lifecycle: keeps the open-document registry current and
 /// shows the start window when the last document window closes. Quits when
 /// the start window is the last window closed (macOS keeps running and
@@ -163,7 +168,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    let (handle, _) = gpui_kit::open_window(options, cx, move |window, cx| {
+    let (handle, _) = crate::os_menu::open_window(options, cx, move |window, cx| {
         window.set_window_title(&format!("{} — noshape", session.name()));
         let doc = cx.new(|_| doc_model::DocModel::new(session));
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));

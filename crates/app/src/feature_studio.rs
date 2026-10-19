@@ -22,6 +22,9 @@ use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
+/// A popup anchor: the trigger's bounds from the last paint.
+type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
+
 actions!(feature_studio, [Commit, CommitAll, SearchStudios]);
 
 /// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt).
@@ -100,13 +103,13 @@ fn outline(src: &str) -> Vec<Symbol> {
 }
 
 /// Onshape's snippet menus (live dom/feature-studio-toolbar-menus.txt):
-/// tooltip, the letter of the button glyph, and per item the FeatureScript
+/// tooltip, the button icon, and per item the FeatureScript
 /// it inserts (the standard library's calls with example arguments).
 type Snippets = &'static [(&'static str, &'static str)];
 const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     (
         "Feature parameters",
-        "p",
+        "fs-snip-p",
         &[
             ("Length parameter", "annotation { \"Name\" : \"My length\" }\nisLength(definition.myLength, LENGTH_BOUNDS);"),
             ("Angle parameter", "annotation { \"Name\" : \"My angle\" }\nisAngle(definition.myAngle, ANGLE_360_BOUNDS);"),
@@ -127,7 +130,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
     (
         "Query functions",
-        "q",
+        "fs-snip-q",
         &[
             ("qEverything", "qEverything(EntityType.BODY)"),
             ("qCreatedBy", "qCreatedBy(id + \"extrude1\", EntityType.FACE)"),
@@ -146,7 +149,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
     (
         "Evaluate functions",
-        "e",
+        "fs-snip-e",
         &[
             ("evVertexPoint", "evVertexPoint(context, { \"vertex\" : query })"),
             ("evLine", "evLine(context, { \"edge\" : query })"),
@@ -166,7 +169,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
     (
         "Math functions",
-        "m",
+        "fs-snip-math",
         &[
             ("vector", "vector(0, 0, 0)"),
             ("line", "line(vector(0, 0, 0) * meter, vector(0, 0, 1))"),
@@ -181,7 +184,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
     (
         "Sketch functions",
-        "s",
+        "fs-snip-sketch",
         &[
             ("Sketch", "var sketch1 = newSketch(context, id + \"sketch1\", {\n        \"sketchPlane\" : qCreatedBy(makeId(\"Top\"), EntityType.FACE)\n});\n// Create sketch entities here\nskSolve(sketch1);"),
             ("skLineSegment", "skLineSegment(sketch1, \"line1\", {\n        \"start\" : vector(0, 0) * inch,\n        \"end\" : vector(1, 1) * inch\n});"),
@@ -196,7 +199,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
     (
         "Operation functions",
-        "o",
+        "fs-snip-op",
         &[
             ("fCuboid", "fCuboid(context, id + \"cuboid1\", {\n        \"corner1\" : vector(0, 0, 0) * inch,\n        \"corner2\" : vector(1, 1, 1) * inch\n});"),
             ("fCylinder", "fCylinder(context, id + \"cylinder1\", {\n        \"topCenter\" : vector(0, 0, 1) * inch,\n        \"bottomCenter\" : vector(0, 0, 0) * inch,\n        \"radius\" : 0.5 * inch\n});"),
@@ -626,11 +629,12 @@ impl FeatureStudioView {
                     .rounded_l(px(5.25))
                     .rounded_r(px(0.))
                     .child(div().text_size(px(14.)).child("Commit"))
-                    .when(clean, |b| b.opacity(0.65))
+                    // Live document/70: #8aa8d7 = the primary blue at 50%.
+                    .when(clean, |b| b.opacity(0.5))
                     .tooltip("Commit Feature Studio (cmd+s/ctrl+s)")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
             )
-            .child(div().w(px(1.)).h(px(30.)).bg(rgb(0x0e3f8c)))
+            .child(div().w(px(1.)).h(px(30.)).bg(rgb(0x0e3f8c)).when(clean, |d| d.opacity(0.5)))
             .child(
                 Button::new("fs-commit-menu")
                     .primary()
@@ -640,7 +644,7 @@ impl FeatureStudioView {
                     .rounded_r(px(5.25))
                     .rounded_l(px(0.))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., rgb(0xffffff)))
-                    .when(clean, |b| b.opacity(0.65))
+                    .when(clean, |b| b.opacity(0.5))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let b = anchor.get();
                         this.open_commit_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
@@ -778,8 +782,9 @@ impl Render for FeatureStudioView {
                 cell(SharedString::from(format!("fs-snip-{i}")))
                     .w(px(50.))
                     .tooltip(crate::ui::tooltip(*tip))
-                    .child(div().text_size(px(13.)).italic().text_color(pal.text).child(*letter))
-                    .child(os::glyph(os::GLYPH_LINES, 12., pal.text))
+                    // Live document/70: Onshape's 20 px menu icon (letter / glyph and
+                    // the ▸≡ list), then the chevron.
+                    .child(crate::assets::icon(letter, 20., cx))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text))
                     .child(probe(&anchor))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -821,7 +826,7 @@ impl Render for FeatureStudioView {
         let symbols = outline(self.editor.read(cx).value().as_ref());
         let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
         let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
-        let (mon_anchor, out_anchor): (Rc<std::cell::Cell<Bounds<Pixels>>>, Rc<std::cell::Cell<Bounds<Pixels>>>) = Default::default();
+        let (mon_anchor, out_anchor): (BoundsCell, BoundsCell) = Default::default();
         let ma = mon_anchor.clone();
         toolbar = toolbar
             .child(
@@ -830,7 +835,7 @@ impl Render for FeatureStudioView {
                     .relative()
                     .flex_none()
                     .h(px(29.))
-                    .w(px(168.))
+                    .max_w(px(220.))
                     .pl(px(6.))
                     .gap(px(6.))
                     .border_1()
@@ -892,7 +897,14 @@ impl Render for FeatureStudioView {
                 div()
                     .flex_1()
                     .min_h_0()
-                    .child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full())
+                    .relative()
+                    .overflow_hidden()
+                    .child(
+                        // Live document/70 (Ace): 13 px monospace on 16 px lines, the first
+                        // line right under the toolbar. The kit editor keeps an 8 px top
+                        // padding (its size's), clipped off here.
+                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
+                    )
                     // After the editor placed the caret at the click.
                     .on_mouse_down(MouseButton::Right, cx.listener(|_, e: &MouseDownEvent, window, cx| {
                         let at = e.position;

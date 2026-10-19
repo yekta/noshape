@@ -20,6 +20,7 @@ pub struct ReleasePrefsView {
     /// Custom scheme labels, comma separated.
     custom: Entity<InputState>,
     suffix: Entity<InputState>,
+    numbering: Entity<crate::numbering_prefs::NumberingPrefsView>,
     _subs: Vec<Subscription>,
 }
 
@@ -40,7 +41,8 @@ impl ReleasePrefsView {
                 }
             }));
         }
-        Self { edited: saved.clone(), saved, scheme_open: false, custom, suffix, _subs: subs }
+        let numbering = cx.new(|cx| crate::numbering_prefs::NumberingPrefsView::new(window, cx));
+        Self { edited: saved.clone(), saved, scheme_open: false, custom, suffix, numbering, _subs: subs }
     }
 
     fn sync(&mut self, cx: &mut Context<Self>) {
@@ -166,6 +168,7 @@ impl Render for ReleasePrefsView {
                         ),
                     ),
             )
+            .child(self.numbering.clone())
             .child(
                 heading("Material libraries")
                     .mt(px(38.))

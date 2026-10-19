@@ -405,3 +405,26 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   Row 14.47; the extended test `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value` checks it.
 * The dimension box text now uses 6 decimals for lengths and 7 for angles (live sketch/13, 141, 143), so the
   unit fits the 100 px input; Enter on an untouched box closes it without re-applying the rounded value.
+  Verified (test + GUI dm3). For ui2: the box's Input renders the text left-aligned and clips the unit's last letter
+  ("16.825693 m"); live right-aligns "1.725582 in" inside the same 100 px field.
+
+## skb run 6 (2026-10-19 evening, takeover after the quota stop)
+* Sketch frame = Onshape's `SketchPlaneDisplay` (bundle webgl class `oM`, `updateBounds` / `updateText`; constants in
+  woolsthorpe: `VIEWPORT_HEIGHT_TO_PLANE_HEIGHT_RATIO` .7, `PLANE_DEFAULT_WIDTH_HEIGHT_RATIO` 1.77777,
+  `PLANE_TEXT_HEIGHT_PX` 20, `PLANE_TEXT_MARGIN` 5, `PLANE_TEXT_BACKGROUND_PADDING` 2, colour `--os-color-seaport-500`
+  #90cef1): placed ONCE when first drawn, centred on the sketch plane entity's bounds centre (plane origin / face mesh
+  bounds / connector; if off screen, the ray through the graphics centre, ≥15° to the plane), 0.7 × graphics height
+  tall at the current zoom, then fixed in the plane (no growth with geometry, zoom doesn't change it); a new sketch
+  plane re-places it. Code: `SketchEditor::frame_bounds` / `place_frame` / `sketch_box()` (no data arg any more),
+  `PartStudioView::place_sketch_frame` (sketch.rs, called from `sync_sketch_editor`). GUI n1: 2.02 × 1.14 of the Top
+  plane, same as live 501. Label: 16.5 px ascender in the plane, 7 px inside the top-left corner, shrinks to fit.
+* Sketch dialog options are user settings (bundle: `sketchShowConstraints || false`, `sketchShowExpressions || false`,
+  `sketchShowErrors !== false`; `commitFeature` saves them when they differ from the opened ones): `SketchOptions`,
+  `sketch_options()`, `SketchEditor::save_options_if_changed` (called from `accept_edit` in part_studio/mod.rs, one
+  surgical line), file `<config>/sketch-options.json`. So a fresh install starts with Show constraints OFF (live 00);
+  live 501 had it on because that account saved it.
+* Dimension value box: tolerance button is now Onshape's `hole-tolerance-precision` icon (new asset, copied from
+  ui-ref/icons-svg) at opacity 0.5 (was a "±" glyph). Text right-aligned, ends 4 px from the field end (live 3 px).
+  For the lead / theme: the focused input's text selection is the global `t.selection` #b2ddf6 (main.rs) with dark
+  text; live Chrome shows #3367d1 with white text in the dimension box (live 13, 141).
+* No tool active after picking the plane: verified (GUI n1, a click in empty space does nothing).

@@ -848,6 +848,7 @@ mod tests {
             edge_refs: vec![edge.clone()],
             vertex_refs: vec![],
             bounds: None,
+            composite: None,
         };
         let d = StudioDisplay { bodies: vec![body], ..Default::default() };
         let hits = entities_along_ray(&d, DVec3::new(0.0, 0.01, 5.0), DVec3::NEG_Z, 0.05, &|_| false, 20);

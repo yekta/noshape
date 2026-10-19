@@ -290,6 +290,7 @@ impl DrawingEditor {
                 self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
                     Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
                     Some(AnnotationKind::Note { style, .. }) => style.leaders.push(leader),
+                    Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
                     _ => {}
                 });
                 self.tool = Tool::Select;
@@ -346,6 +347,9 @@ impl DrawingEditor {
             let (Some(pts), Some(parent)) = (sheet.section_points(*v), sheet.parent_of(*v)) else { continue };
             let Some(pl) = self.placement(parent) else { continue };
             out.extend(pts.iter().map(|p| pl.to_sheet(*p)));
+        }
+        if let Some((_, grips)) = self.note_grips() {
+            out.extend(grips.into_iter().map(|(_, p)| p));
         }
         out
     }
@@ -447,6 +451,19 @@ impl DrawingEditor {
                     }));
                 }
             }
+            AnnotationKind::Weld { spec, .. } => {
+                out.push(MenuEntry::item("Edit…", move |t, w, cx| t.open_weld_edit(id, w, cx)));
+                out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                if !spec.leaders.is_empty() {
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                        t.edit_sheet("Remove leaders", cx, |s| {
+                            if let Some(AnnotationKind::Weld { spec, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                                spec.leaders.clear();
+                            }
+                        })
+                    }));
+                }
+            }
             AnnotationKind::Note { style, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !style.leaders.is_empty() {
@@ -458,6 +475,15 @@ impl DrawingEditor {
                         })
                     }));
                 }
+                // Explode: the note exports as polylines (a check item).
+                let on = style.explode;
+                out.push(MenuEntry::check("Explode", on, move |t, _, cx| {
+                    t.edit_sheet("Explode", cx, |s| {
+                        if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                            style.explode = !on;
+                        }
+                    })
+                }));
             }
             &AnnotationKind::RadialDimension { view, center, radius, angle, .. } => {
                 let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);

@@ -416,14 +416,18 @@ pub fn create_studio(doc: &Entity<DocModel>, element: TabId, cx: &mut App) {
     });
 }
 
-/// The Variable table footer of a Part Studio / Assembly (live,
-/// part-studio/77): a split button "Create Variable Studio | ▴"; the menu
-/// has Create Variable Studio and Insert Variable Studio.
+/// The Variable table footer of a Part Studio / Assembly: a split button
+/// whose main part is "Create Variable Studio" while the document has no
+/// Variable Studio (live part-studio/77) and "Insert Variable Studio" once
+/// it has one (156); the ▴ menu has Insert Variable Studio and Create
+/// Variable Studio (157).
 pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyElement {
     use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
     let pal = p();
     let variant = ButtonCustomVariant::new(cx).color(rgb(0xffffff).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
     let d1 = doc.clone();
+    let any_studio = doc.read(cx).session.doc.tabs.iter().any(|t| matches!(t.content, TabContent::VariableStudio(_)));
+    let (icon, label) = if any_studio { ("insert-variable", "Insert Variable Studio") } else { ("create-variable", "Create Variable Studio") };
     h_flex()
         .child(
             Button::new("vt-create")
@@ -434,8 +438,8 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
                 .rounded_r(px(0.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
-                .child(h_flex().gap(px(3.)).child(crate::assets::icon("variable-studio", 20., cx)).child(div().text_size(px(14.)).child("Create Variable Studio")))
-                .on_click(move |_, _, cx| create_studio(&d1, element, cx)),
+                .child(h_flex().gap(px(3.)).child(crate::assets::icon(icon, 20., cx)).child(div().text_size(px(14.)).child(label)))
+                .on_click(move |_, window, cx| if any_studio { open(d1.clone(), InsertTarget::Element(element), window, cx) } else { create_studio(&d1, element, cx) }),
         )
         .child(
             Button::new("vt-more")
@@ -452,8 +456,8 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
                     let (d2, d3) = (doc.clone(), doc.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         m.dropdown()
-                            .item(crate::os_menu::OsMenuItem::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, _, cx| create_studio(&d2, element, cx)))
-                            .item(crate::os_menu::OsMenuItem::new("Insert Variable Studio").icon_name("variable-studio").on_click(move |_, window, cx| open(d3.clone(), InsertTarget::Element(element), window, cx)))
+                            .item(crate::os_menu::OsMenuItem::new("Insert Variable Studio").icon_name("insert-variable").on_click(move |_, window, cx| open(d3.clone(), InsertTarget::Element(element), window, cx)))
+                            .item(crate::os_menu::OsMenuItem::new("Create Variable Studio").icon_name("create-variable").on_click(move |_, _, cx| create_studio(&d2, element, cx)))
                     });
                     crate::os_menu::open_anchored(point(e.position().x + px(13.), e.position().y - px(18.)), Anchor::BottomRight, menu, window, cx);
                 }),
@@ -519,7 +523,7 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
         .w(px(25.))
         .h(px(22.))
         .p_0()
-        .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"))
+        .child(div().mt(px(3.)).child(os::glyph(os::GLYPH_OVERFLOW, 20., pal.text)))
         .on_click(move |e, window, cx| {
             let (d, ext, name) = (d.clone(), ext.clone(), name.clone());
             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {

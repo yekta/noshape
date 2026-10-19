@@ -22,6 +22,7 @@ pub enum LengthUnit {
     Meter,
     Inch,
     Foot,
+    Yard,
 }
 
 impl LengthUnit {
@@ -33,6 +34,7 @@ impl LengthUnit {
             LengthUnit::Meter => 1000.0,
             LengthUnit::Inch => 25.4,
             LengthUnit::Foot => 304.8,
+            LengthUnit::Yard => 914.4,
         }
     }
 }
@@ -139,6 +141,8 @@ pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, op
         Some(LengthUnit::Foot) => 4,
         Some(LengthUnit::Meter) => 6,
         Some(LengthUnit::Centimeter) => 10,
+        // Not an OCCT unit: written in feet, then turned into yards (io.cpp).
+        Some(LengthUnit::Yard) => 100,
     };
     ck(ffi::write_step(&l, &names, &colors, &has, path_str(path)?, schema, file_unit))
 }
@@ -230,6 +234,15 @@ pub fn write_pvz(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Resul
     let names: Vec<String> = shapes.iter().map(|s| s.name.clone().unwrap_or_default()).collect();
     let l = vec_to_list(&v);
     ck(ffi::write_pvz(&l, &names, path_str(path)?))
+}
+
+/// Read a PTC Creo View .pvz file as Onshape imports it: meshes only, one
+/// body per part instance (placed), a solid where the mesh is closed, else a
+/// shell; planar triangle faces, coplanar neighbours merged in meshes of at
+/// most `merge_limit` triangles. Returned in `unit` (the file is in metres).
+pub fn read_pvz(path: &Path, unit: LengthUnit, merge_limit: u32) -> Result<Shape> {
+    let s = Shape::from_res(ffi::read_pvz(path_str(path)?, merge_limit))?;
+    scaled(&s, 1e3 / unit.mm_per_unit())
 }
 
 /// Read a Parasolid transmit file written by [`write_parasolid`] (schema

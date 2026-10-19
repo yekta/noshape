@@ -377,6 +377,7 @@ impl MateDialog {
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };
             let text: SharedString = (self.labeler)(c).into();
+            let text_del = text.clone();
             rows.push(
                 os::query_row(SharedString::from(format!("mc-field-{field}")), text)
                     .hover(|d| d.bg(pal.row_hover))
@@ -386,7 +387,8 @@ impl MateDialog {
                             div()
                                 .id(SharedString::from(format!("mc-edit-{field}")))
                                 .tooltip(crate::ui::tooltip("Edit mate connector"))
-                                .child(svg().path(icon_path("mate-connector")).size(px(14.)).text_color(pal.accent_hover))
+                                // Live: `mate-connector-qlv-item`, 15 px.
+                                .child(crate::assets::icon("mate-connector-qlv-item", 15., cx))
                                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     cx.emit(MateDialogEvent::EditConnector(field));
@@ -397,8 +399,12 @@ impl MateDialog {
                         d.child(
                             div()
                                 .id(SharedString::from(format!("mc-clear-{field}")))
-                                .tooltip(crate::ui::tooltip("Remove"))
-                                .child(Icon::new(IconName::Close).with_size(px(12.)).text_color(pal.text_muted))
+                                .tooltip(crate::ui::tooltip(format!("Delete {text_del}")))
+                                // Live: a 16.67 px "×" (#666), 5 px padding.
+                                .px(px(5.))
+                                .text_size(px(16.67))
+                                .text_color(gpui_kit::rgb(0x666666))
+                                .child("×")
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     *this.slot_mut(field) = None;
@@ -427,12 +433,14 @@ impl MateDialog {
                     div()
                         .id("mate-swap")
                         .absolute()
-                        .top(px(3.))
+                        .top(px(1.))
                         .right(px(5.))
                         .cursor_pointer()
-                        .tooltip(crate::ui::tooltip("Swap mate connectors"))
-                        .child(Icon::new(IconName::ArrowUp).with_size(px(10.)).text_color(pal.text_muted))
-                        .child(div().mt(px(-4.)).child(Icon::new(IconName::ArrowDown).with_size(px(10.)).text_color(pal.text_muted)))
+                        // Live: `os-param-query-list-reorder-button`, the 20 px
+                        // reorder-items icon at opacity 0.5, "Reorder items".
+                        .opacity(0.5)
+                        .tooltip(crate::ui::tooltip("Reorder items"))
+                        .child(crate::assets::icon("reorder-items-button", 20., cx))
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             cx.stop_propagation();
                             std::mem::swap(&mut this.a, &mut this.b);
@@ -461,13 +469,16 @@ impl Render for MateDialog {
                     .active(gpui_kit::transparent_white())
                     .shadow(false),
             )
-            .w_full()
+            // Live (dom/assembly-revolute-dialog-both.txt): the 194 px first
+            // column, 26 px, 14 px text 6 px in, a 8 px caret 6 px from the end.
+            .w(px(194.))
             .h(px(26.))
-            .px(px(5.))
+            .pl(px(6.))
+            .pr(px(6.))
             .rounded(px(0.))
             .border_b_1()
             .border_color(pal.border)
-            .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(t.name())).child(os::glyph(os::GLYPH_CARET, 9., gpui_kit::rgb(0x000000))))
+            .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(t.name())).child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0x333333))))
             .os_dropdown_menu("mate-type-dd", true, move |mut menu, _, _| {
                 // Onshape's order in the type select (live behaviours: Slider,
                 // Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened,
@@ -480,7 +491,7 @@ impl Render for MateDialog {
                 }
                 menu
             })
-            .w_full();
+            .w(px(194.));
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -565,7 +576,8 @@ impl Render for MateDialog {
             MateType::Width => vec![self.query_box("mate-q-tab", "Tab mate connectors", &[0, 3], cx), self.query_box("mate-q-width", "Width mate connectors", &[1, 2], cx)],
             _ => vec![self.query_box("mate-q-mc", "Mate connectors", &[0, 1], cx)],
         };
-        let (flip_icon, reorient_icon) = (crate::assets::icon("flip", 20., cx), crate::assets::icon("flip-circular", 20., cx));
+        // Live dialog-mate-revolute: flip-direction-opposite, realign-mate-dialog.
+        let (flip_icon, reorient_icon) = (crate::assets::icon("flip-direction-opposite", 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
             div()
                 .id(id)
@@ -585,7 +597,7 @@ impl Render for MateDialog {
             .id("mate-dialog")
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
-            .w(px(232.))
+            .w(px(220.))
             // Onshape feature dialog frame (§3.9): white at 95%, no border or
             // radius, shadow 0 5 10 rgba(0,0,0,.2).
             .bg(pal.dialog_bg)
@@ -597,7 +609,7 @@ impl Render for MateDialog {
             .on_action(cx.listener(|_, _: &crate::actions::AcceptAndRepeat, _, cx| cx.emit(MateDialogEvent::AcceptAndNew)))
             .child(
                 h_flex()
-                    .h(px(28.))
+                    .h(px(29.))
                     .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
@@ -627,7 +639,7 @@ impl Render for MateDialog {
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                            .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Cancel))),
                     ),
             )
@@ -688,8 +700,9 @@ impl Render for MateDialog {
                                         .cursor_pointer()
                                         .hover(|d| d.bg(pal.panel_hover))
                                         .when(self.animating, |d| d.bg(pal.panel_active))
-                                        .tooltip(crate::ui::tooltip("Animate"))
-                                        .child(Icon::new(IconName::Play).with_size(px(16.)).text_color(pal.text))
+                                        // Live: `ns-mate-play`, the play-dialog icon.
+                                        .tooltip(crate::ui::tooltip("Animate mate degree of freedom"))
+                                        .child(crate::assets::icon("play-dialog", 20., cx))
                                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                             if !can {
                                                 return;

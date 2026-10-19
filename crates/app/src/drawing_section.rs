@@ -133,14 +133,14 @@ impl DrawingEditor {
                 d.depth_ref = Some(r);
                 d.picking = 0;
             }
-        } else if let Some(body) = self.edge_body_at(self.cursor) {
-            if let Some(d) = &mut self.section_dlg {
-                match d.exclude.iter().position(|b| *b == body) {
-                    Some(i) => {
-                        d.exclude.remove(i);
-                    }
-                    None => d.exclude.push(body),
+        } else if let Some(body) = self.edge_body_at(self.cursor)
+            && let Some(d) = &mut self.section_dlg
+        {
+            match d.exclude.iter().position(|b| *b == body) {
+                Some(i) => {
+                    d.exclude.remove(i);
                 }
+                None => d.exclude.push(body),
             }
         }
         self.update_preview(cx);

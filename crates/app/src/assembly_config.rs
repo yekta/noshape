@@ -180,6 +180,8 @@ impl AssemblyView {
                 .top(px(9.))
                 .left_0()
                 .right_0()
+                // Centered on the window (live), not the graphics area.
+                .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W }))
                 .flex()
                 .justify_center()
                 .child(crate::os_ui::message_bubble("cfg-toast", crate::os_ui::BubbleKind::Info, text, move |_, _, cx| {

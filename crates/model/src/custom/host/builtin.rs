@@ -14,6 +14,8 @@ use std::sync::Arc;
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opModifyFillet", |i, a| builtin_op(i, a, "modifyFillet", "DIRECT_EDIT_MODIFY_FILLET_FAILED", &[("reFillet", ParamValue::Bool(false))], crate::regen::features::detail_a::modify_fillet)),
     ("opEnclose", |i, a| builtin_op(i, a, "enclose", "ENCLOSE_CANNOT_CREATE_SOLID", &[], crate::regen::features::solid_a::enclose)),
+    ("opCreateCompositePart", |i, a| builtin_op(i, a, "compositePart", "CREATE_COMPOSITE_PART_FAILED", &[], crate::regen::features::refgeom::composite_part)),
+    ("opNameEntity", |i, a| builtin_op(i, a, "nameEntity", "REGEN_ERROR", &[], crate::regen::features::refgeom::name_entity)),
 ];
 
 fn expr(s: String) -> ParamValue {
@@ -47,7 +49,7 @@ fn params_of(i: &mut Interp, cx: &Arc<FsContext>, specs: &[ParamSpec], def: &Val
                 }
                 Some(ParamValue::Array(items))
             }
-            ParamKind::Lookup { .. } | ParamKind::Sketch => None,
+            ParamKind::Lookup { .. } | ParamKind::Sketch | ParamKind::Reference { .. } => None,
         };
         match pv {
             Some(pv) => out.set(s.id, pv),

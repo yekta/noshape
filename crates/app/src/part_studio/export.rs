@@ -505,6 +505,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
                     "Foot" => Some(k::LengthUnit::Foot),
                     "Inch" => Some(k::LengthUnit::Inch),
                     "Meter" => Some(k::LengthUnit::Meter),
+                    "Yard" => Some(k::LengthUnit::Yard),
                     _ => Some(k::LengthUnit::Millimeter),
                 }
             } else {

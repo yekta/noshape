@@ -129,6 +129,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             "step" | "stp" => k::read_step(path, k::LengthUnit::Meter)?.into_iter().map(|s| s.shape).collect(),
             "iges" | "igs" => vec![k::read_iges(path, k::LengthUnit::Meter)?],
             "brep" | "brp" => vec![k::read_brep(path)?],
+            "pvz" => vec![k::read_pvz(path, k::LengthUnit::Meter, 20_000)?],
             other => return err(format!("Unsupported import format .{other}")),
         }
     };

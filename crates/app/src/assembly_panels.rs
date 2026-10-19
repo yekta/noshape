@@ -5,6 +5,7 @@
 //! and the extra list rows (origin, connectors, patterns).
 
 use super::*;
+use crate::os_ui as os;
 use gpui_kit::component::input::InputEvent;
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use noshape_model::configuration::ConfigInputKind;
@@ -71,10 +72,33 @@ pub(crate) struct McSession {
     pub realign: bool,
     /// Between entity, primary and secondary axis entities.
     pub extra: [Option<MateConnectorRef>; 3],
+    /// Editing a mate dialog field's implicit connector: changes go into the
+    /// mate's reference and it stays implicit (live 578–580; ✕ only).
+    pub implicit: bool,
+    /// Move checked (the X/Y/Z translation and rotation apply).
+    pub moving: bool,
+    /// Origin type and Rotation axis selects.
+    origin_sel: Entity<crate::os_select::OsSelect>,
+    axis_sel: Entity<crate::os_select::OsSelect>,
     _subs: Vec<Subscription>,
 }
 
 impl McSession {
+    /// The implicit connector reference with this session's flip, reorient
+    /// and Move values.
+    pub fn to_implicit(&self, cx: &App) -> Option<MateConnectorRef> {
+        let mut r = self.on.clone()?;
+        let expr = |i: usize| {
+            let t = self.inputs[i].read(cx).value().to_string();
+            (!t.trim().is_empty()).then(|| ExprValue::new(t))
+        };
+        r.flip = self.flip;
+        r.rotate_quarters = self.reorient;
+        let m = noshape_model::assembly::ConnectorMove { translation: [expr(0), expr(1), expr(2)], rotation_axis: self.rot_axis, rotation: expr(3), off: !self.moving };
+        r.moved = (m.translation.iter().any(|t| t.is_some()) || m.rotation.is_some()).then(|| Box::new(m));
+        Some(r)
+    }
+
     pub fn to_connector(&self, cx: &App) -> Option<AsmMateConnector> {
         let on = self.on.clone()?;
         let expr = |i: usize| {
@@ -87,6 +111,7 @@ impl McSession {
         c.translation = [expr(0), expr(1), expr(2)];
         c.rotation_axis = self.rot_axis;
         c.rotation = expr(3);
+        c.move_off = !self.moving;
         c.hidden = self.hidden;
         if self.between {
             c.between = self.extra[0].clone();
@@ -204,21 +229,29 @@ impl AssemblyView {
         let existing = match c.connector {
             Some(id) => self.assembly(cx).and_then(|a| a.connector(id).cloned()),
             None => {
-                let Some(asm) = self.assembly(cx) else { return };
+                // An implicit connector stays implicit: the panel edits the
+                // mate's own reference (live 578–580).
                 let mut on = c.clone();
                 on.flip = false;
                 on.rotate_quarters = 0;
-                let mut mc = AsmMateConnector::new(MateId(asm.next_id()), asm.next_feature_name("Mate connector"), on);
-                mc.flip_primary = c.flip;
-                mc.reorient = c.rotate_quarters;
+                on.moved = None;
                 self.open_mc_inner(None, Some(field), window, cx);
+                let text = |e: &Option<ExprValue>| e.as_ref().map(|e| e.text.clone()).unwrap_or_default();
                 if let Some(m) = &mut self.mc {
-                    m.id = mc.id;
-                    m.name = mc.name.clone();
-                    m.on = Some(mc.on.clone());
+                    m.implicit = true;
+                    m.name = "Mate connector".into();
+                    m.on = Some(on);
                     m.active = false;
-                    m.flip = mc.flip_primary;
-                    m.reorient = mc.reorient;
+                    m.flip = c.flip;
+                    m.reorient = c.rotate_quarters;
+                    if let Some(mv) = c.moved.as_deref() {
+                        m.moving = !mv.off;
+                        m.rot_axis = mv.rotation_axis;
+                        let vals = [text(&mv.translation[0]), text(&mv.translation[1]), text(&mv.translation[2]), text(&mv.rotation)];
+                        for (st, v) in m.inputs.clone().iter().zip(vals) {
+                            st.update(cx, |s, cx| s.set_value(v, window, cx));
+                        }
+                    }
                 }
                 self.schedule_eval(window, cx);
                 return;
@@ -258,6 +291,35 @@ impl AssemblyView {
             }));
         }
         let active = existing.is_none();
+        let origin_sel = cx.new(|_| crate::os_select::OsSelect::new("mcd-origin-type"));
+        let axis_sel = cx.new(|_| crate::os_select::OsSelect::new("mcd-rot-axis"));
+        subs.push(cx.subscribe_in(&origin_sel, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, window, cx| {
+            let crate::os_select::OsSelectEvent::Picked(id) = ev;
+            let between = id.as_ref() == "BETWEEN_ENTITIES";
+            if let Some(m) = &mut this.mc {
+                m.between = between;
+                if between && m.extra[0].is_none() {
+                    m.active = true;
+                    m.slot = 1;
+                }
+            }
+            this.update_capture(cx);
+            this.schedule_eval(window, cx);
+            cx.notify();
+        }));
+        subs.push(cx.subscribe_in(&axis_sel, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, window, cx| {
+            let crate::os_select::OsSelectEvent::Picked(id) = ev;
+            if let Some(m) = &mut this.mc {
+                m.rot_axis = match id.as_ref() {
+                    "ABOUT_X" => 0,
+                    "ABOUT_Y" => 1,
+                    _ => 2,
+                };
+            }
+            this.schedule_eval(window, cx);
+            cx.notify();
+        }));
+        let moving = existing.as_ref().is_some_and(|c| !c.move_off && (c.translation.iter().any(|t| t.is_some()) || c.rotation.is_some()));
         self.mc = Some(McSession {
             id,
             editing,
@@ -274,6 +336,10 @@ impl AssemblyView {
             between: existing.as_ref().is_some_and(|c| c.between.is_some()),
             realign: existing.as_ref().is_some_and(|c| c.primary_axis.is_some() || c.secondary_axis.is_some()),
             extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
+            implicit: false,
+            moving,
+            origin_sel,
+            axis_sel,
             _subs: subs,
         });
         self.insert_open = false;
@@ -282,7 +348,18 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Implicit connector edits go straight into the mate dialog's field.
+    pub(super) fn sync_implicit_mc(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = self.mc.as_ref().filter(|s| s.implicit) else { return };
+        let (Some(field), Some(r)) = (s.for_mate, s.to_implicit(cx)) else { return };
+        let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) else { return };
+        if d.read(cx).field(field) != Some(&r) {
+            d.update(cx, |d, cx| d.replace_field(field, r, cx));
+        }
+    }
+
     pub(super) fn close_mc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.sync_implicit_mc(cx);
         if self.mc.take().is_some() {
             self.infer = None;
             window.focus(&self.focus, cx);
@@ -293,6 +370,10 @@ impl AssemblyView {
     }
 
     fn accept_mc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.mc.as_ref().is_some_and(|s| s.implicit) {
+            self.close_mc(window, cx);
+            return;
+        }
         let Some(s) = &self.mc else { return };
         let Some(c) = s.to_connector(cx) else {
             self.message = Some((false, "Pick an origin entity (geometry, an inference point or the assembly origin).".into()));
@@ -338,102 +419,218 @@ impl AssemblyView {
         self.schedule_eval(window, cx);
     }
 
+    /// The Mate connector dialog, Onshape's 220 px feature dialog (live
+    /// dom/dialog-mate-connector.txt, assembly-mate-chip-connector-dialog.txt;
+    /// fields of the std `mateConnector` feature without the owner entity):
+    /// Origin type ▾, Origin entity (+ Between entity), ☐ Realign (Primary /
+    /// Secondary axis entity), ☐ Move (X / Y / Z translation, Rotation axis ▾,
+    /// Rotation angle), then the flip / reorient icons and `?`. An implicit
+    /// connector opened from a mate dialog chip has a close button only.
     pub(super) fn render_mc_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.mc else { return div().into_any_element() };
-        let field = self.conn_field("mcd-origin", &s.on, s.active && s.slot == 0, "Select origin entity", cx, |this, _| {
-            if let Some(m) = &mut this.mc {
-                m.active = true;
-                m.slot = 0;
+        let labeler = self.labeler(cx);
+        // The field names the entity itself ("Face of Part 1 <3>", live 578).
+        let entity = move |r: &MateConnectorRef| -> SharedString {
+            if r.instance == InstanceId::ORIGIN && r.connector.is_none() {
+                return "Origin".into();
             }
-        });
-        let extra_field = |this: &Self, slot: usize, id: &'static str, ph: &'static str, cx: &mut Context<Self>| {
-            let s = this.mc.as_ref()?;
-            Some(this.conn_field(id, &s.extra[slot - 1], s.active && s.slot == slot, ph, cx, move |this, _| {
-                if let Some(m) = &mut this.mc {
-                    m.active = true;
-                    m.slot = slot;
-                }
-            }))
+            let mut r = r.clone();
+            if let Reference::Implicit { on, .. } = &r.reference {
+                r.reference = (**on).clone();
+            }
+            labeler(&r).into()
         };
-        let (between, realign) = (s.between, s.realign);
-        let between_field = if between { extra_field(self, 1, "mcd-between", "Select between entity", cx) } else { None };
-        let primary_field = if realign { extra_field(self, 2, "mcd-primary", "Primary axis entity", cx) } else { None };
-        let secondary_field = if realign { extra_field(self, 3, "mcd-secondary", "Secondary axis entity", cx) } else { None };
-        let Some(s) = &self.mc else { return div().into_any_element() };
-        let origin_type = |k: bool, label: &'static str, cx: &mut Context<Self>| {
-            Button::new(SharedString::from(format!("mcd-type-{k}"))).label(label).ghost().xsmall().selected(between == k).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                if let Some(m) = &mut this.mc {
-                    m.between = k;
-                    if k && m.extra[0].is_none() {
+        let field = |this: &Self, slot: usize, id: &'static str, label: &'static str, cx: &mut Context<Self>| -> AnyElement {
+            let Some(s) = this.mc.as_ref() else { return div().into_any_element() };
+            let value = if slot == 0 { s.on.as_ref() } else { s.extra[slot - 1].as_ref() };
+            let active = s.active && s.slot == slot;
+            let rows: Vec<AnyElement> = value
+                .map(|v| {
+                    let text = entity(v);
+                    os::query_row(SharedString::from(format!("{id}-row")), text.clone())
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("{id}-del")))
+                                .px(px(5.))
+                                .text_size(px(16.67))
+                                .text_color(rgb(0x666666))
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip(format!("Delete {text}")))
+                                .child("×")
+                                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(m) = &mut this.mc {
+                                        if slot == 0 {
+                                            m.on = None;
+                                        } else {
+                                            m.extra[slot - 1] = None;
+                                        }
+                                        m.active = true;
+                                        m.slot = slot;
+                                    }
+                                    this.update_capture(cx);
+                                    this.schedule_eval(window, cx);
+                                    cx.notify();
+                                })),
+                        )
+                        .into_any_element()
+                })
+                .into_iter()
+                .collect();
+            div()
+                .px(px(3.))
+                .pt(px(5.))
+                .child(os::query_box(SharedString::from(id.to_string()), label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(m) = &mut this.mc {
                         m.active = true;
-                        m.slot = 1;
+                        m.slot = slot;
                     }
+                    this.update_capture(cx);
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                })))
+                .into_any_element()
+        };
+        let (between, realign, moving, implicit) = (s.between, s.realign, s.moving, s.implicit);
+        let origin = field(self, 0, "mcd-origin", "Origin entity", cx);
+        let between_field = between.then(|| field(self, 1, "mcd-between", "Between entity", cx));
+        let realign_fields = realign.then(|| [field(self, 2, "mcd-primary", "Primary axis entity", cx), field(self, 3, "mcd-secondary", "Secondary axis entity", cx)]);
+        let Some(s) = &self.mc else { return div().into_any_element() };
+        s.origin_sel.update(cx, |sel, _| sel.set_items(vec![("ON_ENTITY".into(), "On entity".into()), ("BETWEEN_ENTITIES".into(), "Between entities".into())], if between { "BETWEEN_ENTITIES" } else { "ON_ENTITY" }));
+        let axis_id = ["ABOUT_X", "ABOUT_Y", "ABOUT_Z"][s.rot_axis.min(2) as usize];
+        s.axis_sel.update(cx, |sel, _| sel.set_items(vec![("ABOUT_X".into(), "Rotate about X".into()), ("ABOUT_Y".into(), "Rotate about Y".into()), ("ABOUT_Z".into(), "Rotate about Z".into())], axis_id));
+        let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut McSession, bool)| {
+            os::checkbox(id, label, on).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                if let Some(m) = &mut this.mc {
+                    f(m, !on);
                 }
                 this.update_capture(cx);
                 this.schedule_eval(window, cx);
                 cx.notify();
             }))
         };
-        let axis_btn = |k: u8, label: &'static str, cur: u8, cx: &mut Context<Self>| {
-            Button::new(SharedString::from(format!("mcd-ax-{k}"))).label(label).ghost().xsmall().selected(cur == k).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                if let Some(m) = &mut this.mc {
-                    m.rot_axis = k;
-                }
-                this.schedule_eval(window, cx);
-                cx.notify();
-            }))
+        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)));
+        let icon_tool = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .size(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .border_b_1()
+                .border_color(gpui_kit::transparent_white())
+                .hover(|d| d.bg(pal.panel_hover).border_color(pal.accent))
+                .when(on, |d| d.bg(pal.panel_active))
+                .tooltip(crate::ui::tooltip(tip))
+                .child(crate::assets::icon(icon, 20., cx))
         };
-        let (flip, reorient, rot_axis) = (s.flip, s.reorient, s.rot_axis);
+        let (flip, reorient) = (s.flip, s.reorient);
         let body = v_flex()
-            .p_3()
-            .gap_2()
-            // Origin type: On entity / Between entities (Onshape).
-            .child(h_flex().gap_1().child(origin_type(false, "On entity", cx)).child(origin_type(true, "Between entities", cx)))
-            .child(div().text_xs().text_color(pal.text_muted).child("Origin entity (geometry inference point, or the assembly origin)"))
-            .child(field)
+            .pb(px(1.))
+            .child(div().id("mcd-origin-type-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Origin type")).child(s.origin_sel.clone()))
+            .child(origin)
             .children(between_field)
+            .child(div().h(px(5.)))
+            .child(check("mcd-realign", "Realign", realign, |m, v| {
+                m.realign = v;
+                if v && m.extra[1].is_none() {
+                    m.active = true;
+                    m.slot = 2;
+                }
+            }))
+            .children(realign_fields.into_iter().flatten())
+            .child(check("mcd-move", "Move", moving, |m, v| m.moving = v))
+            .when(moving, |d| {
+                d.child(value_row("X translation", &s.inputs[0]))
+                    .child(value_row("Y translation", &s.inputs[1]))
+                    .child(value_row("Z translation", &s.inputs[2]))
+                    .child(div().id("mcd-rot-axis-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Rotation axis")).child(s.axis_sel.clone()))
+                    .child(value_row("Rotation angle", &s.inputs[3]))
+            })
             .child(
                 h_flex()
-                    .gap_1()
-                    .child(Button::new("mcd-flip").icon(Icon::empty().path(icon_path("flip"))).ghost().small().selected(flip).label("Flip primary").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    .h(px(28.))
+                    .child(icon_tool("mcd-flip", "flip-direction-opposite", "Flip primary axis", flip, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                         if let Some(m) = &mut this.mc {
                             m.flip = !m.flip;
                         }
                         this.schedule_eval(window, cx);
                         cx.notify();
                     })))
-                    .child(Button::new("mcd-reorient").icon(Icon::empty().path(icon_path("flip-circular"))).ghost().small().label(format!("Reorient {}°", (reorient % 4) as u32 * 90)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    .child(icon_tool("mcd-reorient", "realign-mate-dialog", "Reorient secondary axis", !reorient.is_multiple_of(4), cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                         if let Some(m) = &mut this.mc {
                             m.reorient = (m.reorient + 1) % 4;
                         }
                         this.schedule_eval(window, cx);
                         cx.notify();
-                    }))),
+                    })))
+                    .child(div().flex_1())
+                    .child(div().mr(px(4.)).child(super::props::help_dot())),
+            );
+        let title = if implicit { "Mate connector".to_string() } else { s.name.clone() };
+        let ok = s.on.is_some();
+        let header = h_flex()
+            .h(px(29.))
+            .flex_none()
+            .bg(rgb(0xffffff))
+            .border_b_1()
+            .border_color(rgb(0xd7d7d7))
+            .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title));
+        let header = if implicit {
+            // Live 578: a Bootstrap close button at opacity 0.5.
+            header.child(
+                div()
+                    .id("mcd-close")
+                    .size(px(28.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .opacity(0.5)
+                    .cursor_pointer()
+                    .child(os::glyph(os::GLYPH_CLOSE, 20., rgb(0x000000)))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx))),
             )
-            .child(Checkbox::new("mcd-realign").label("Realign").checked(realign).on_click(cx.listener(|this, v: &bool, window, cx| {
-                if let Some(m) = &mut this.mc {
-                    m.realign = *v;
-                    if *v && m.extra[1].is_none() {
-                        m.active = true;
-                        m.slot = 2;
-                    }
-                }
-                this.update_capture(cx);
-                this.schedule_eval(window, cx);
-                cx.notify();
-            })))
-            .children(primary_field)
-            .children(secondary_field)
-            .child(section("MOVE"))
-            .child(field_row("X translation", Input::new(&s.inputs[0]).xsmall()))
-            .child(field_row("Y translation", Input::new(&s.inputs[1]).xsmall()))
-            .child(field_row("Z translation", Input::new(&s.inputs[2]).xsmall()))
-            .child(field_row("Rotation axis", h_flex().gap_1().child(axis_btn(0, "X", rot_axis, cx)).child(axis_btn(1, "Y", rot_axis, cx)).child(axis_btn(2, "Z", rot_axis, cx))))
-            .child(field_row("Rotation angle", Input::new(&s.inputs[3]).xsmall()))
-            .child(h_flex().justify_end().gap_2().child(Button::new("mcd-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mc(window, cx)))));
-        let title = s.name.clone();
-        Self::panel_frame(&title, body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx)), "mcd-close").into_any_element()
+        } else {
+            header
+                .child(
+                    div()
+                        .id("mcd-ok")
+                        .size(px(28.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(pal.accept)
+                        .when(!ok, |d| d.opacity(0.2))
+                        .when(ok, |d| d.cursor_pointer())
+                        .tooltip(crate::ui::tooltip("Accept (Enter)"))
+                        .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mc(window, cx))),
+                )
+                .child(
+                    div()
+                        .id("mcd-cancel")
+                        .size(px(28.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .tooltip(crate::ui::tooltip("Cancel (Esc)"))
+                        .child(crate::assets::icon("dialog-cancel", 18., cx))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx))),
+                )
+        };
+        v_flex()
+            .id("mc-dialog")
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(header)
+            .child(body)
+            .into_any_element()
     }
 
     // ------------------------------------------------------------ list rows
@@ -442,15 +639,15 @@ impl AssemblyView {
         let pal = p();
         h_flex()
             .id("asm-origin-row")
-            .h(px(24.))
-            .pl(px(18.))
-            .pr_1()
-            .gap_1p5()
-            .rounded_sm()
-            .text_sm()
-            .text_color(pal.text_muted)
-            .hover(|d| d.bg(pal.panel_hover))
-            .child(svg().path(icon_path("datum")).size_3p5().text_color(pal.text_muted))
+            // Live assembly/10: the Part Studio's origin row (dot icon x 73, name x 86).
+            .h(px(crate::ui::ROW_H))
+            .pl(px(22.))
+            .pr(px(3.))
+            .gap(px(3.))
+            .text_size(px(crate::ui::ROW_TEXT))
+            .text_color(pal.text)
+            .hover(|d| d.bg(pal.row_hover))
+            .child(crate::ui::tree_icon("origin", self.ui.origin_hidden, cx))
             .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child("Origin"))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
@@ -1904,13 +2101,13 @@ impl AssemblyView {
         if !s.started {
             if position.distance(s.press) <= 3.0 || fixed {
                 if fixed && position.distance(s.press) > 3.0 {
-                    self.message = Some((false, "Snap: fixed instances cannot be dragged; drag the other instance onto them.".into()));
+                    self.ui.fixed_drag = Some(position);
                     cx.notify();
                 }
                 return;
             }
+            // Live 569: no message while snap-dragging.
             s.started = true;
-            self.message = Some((false, "Snap: drop onto a mate connector of another instance (Ctrl cycles the dragged connector).".into()));
         }
         self.pointer = position;
         let top = s.top;
@@ -2135,76 +2332,578 @@ impl AssemblyView {
     }
 }
 
+/// Insert › Other documents categories (live assembly/71).
+const OTHER_SOURCES: [(&str, &str); 5] = [("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
+
+/// A document opened in Insert › Other documents (live assembly/612–619):
+/// its versions (named ones newest first, then Start), the one shown, and
+/// that version's Part Studios and assemblies.
+#[derive(Clone)]
+pub(crate) struct OtherDoc {
+    pub path: std::path::PathBuf,
+    pub name: String,
+    pub versions: Vec<crate::derived::VersionChoice>,
+    /// Microversions in the workspace since its last version.
+    pub changes: usize,
+    pub version: usize,
+    /// The Version graph view replaces the list.
+    pub graph: bool,
+    /// (tab id, name, is an assembly) of the shown version.
+    pub tabs: Vec<(String, String, bool)>,
+    /// Parts of the expanded Part Studios (tab id → (body, name)).
+    pub parts: HashMap<String, Vec<(BodyId, String)>>,
+    pub expanded: HashSet<String>,
+}
+
+impl OtherDoc {
+    /// Read another document's versions, Onshape style: only versions can be
+    /// inserted; the root microversion is the "Start" version.
+    fn open(path: &std::path::Path) -> anyhow::Result<Self> {
+        let store = noshape_store::Document::open_read_only(path)?;
+        let graph = store.graph()?;
+        let mut versions: Vec<crate::derived::VersionChoice> = graph.versions.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
+        if let Some(root) = graph.microversions.iter().find(|m| m.parents.is_empty()) {
+            versions.push(crate::derived::VersionChoice { label: "Start".into(), microversion: root.id });
+        }
+        // Changes since the last version: steps back from the head to a
+        // versioned microversion (or the start).
+        let marks: HashSet<noshape_store::MicroversionId> = versions.iter().map(|v| v.microversion).collect();
+        let parent: HashMap<noshape_store::MicroversionId, Option<noshape_store::MicroversionId>> = graph.microversions.iter().map(|m| (m.id, m.parents.first().copied())).collect();
+        let mut at = Some(store.head(store.default_branch()?)?);
+        let mut changes = 0;
+        while let Some(mv) = at.filter(|mv| !marks.contains(mv)) {
+            changes += 1;
+            at = parent.get(&mv).copied().flatten();
+        }
+        let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
+        let mut d = OtherDoc { path: path.to_path_buf(), name, versions, changes, version: 0, graph: false, tabs: Vec::new(), parts: HashMap::new(), expanded: HashSet::new() };
+        d.load_tabs();
+        Ok(d)
+    }
+
+    fn load_tabs(&mut self) {
+        self.parts.clear();
+        self.expanded.clear();
+        self.tabs = self
+            .versions
+            .get(self.version)
+            .and_then(|v| crate::derived::external_snapshot(&self.path, v.microversion).ok())
+            .map(|d| {
+                d.tabs
+                    .iter()
+                    .filter_map(|t| match &t.content {
+                        noshape_model::TabContent::PartStudio(_) => Some((t.id.to_string(), t.name.clone(), false)),
+                        noshape_model::TabContent::Assembly(_) => Some((t.id.to_string(), t.name.clone(), true)),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
+
+    fn key(&self, tab: &str) -> Option<String> {
+        let v = self.versions.get(self.version)?;
+        Some(crate::derived::ExternalRef { path: self.path.clone(), microversion: v.microversion, tab: tab.to_string() }.key())
+    }
+}
+
 impl AssemblyView {
     // ------------------------------------------------------------ insert from another document
 
-    /// Version and Part Studio chooser after picking another document.
-    pub(super) fn render_ext_insert_chooser(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (info, vi) = self.ext_pick.clone()?;
-        let pal = p();
-        let version = info.versions.get(vi)?.clone();
-        let studios: Vec<(String, String)> = crate::derived::external_snapshot(&info.path, version.microversion).map(|d| crate::derived::DocStudios::sources(&d)).unwrap_or_default();
-        let view = cx.entity();
-        let versions = info.versions.clone();
-        let version_menu = Button::new("ins-ext-version").label(version.label.clone()).outline().xsmall().dropdown_caret(true).os_dropdown_menu("ins-ext-version-dd", true, move |mut m, _, _| {
-            for (i, v) in versions.iter().enumerate() {
-                let view = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(v.label.clone()).checked(i == vi).on_click(move |_, _, cx| {
-                    view.update(cx, |this, cx| {
-                        if let Some(p) = &mut this.ext_pick {
-                            p.1 = i;
-                        }
-                        cx.notify();
-                    })
-                }));
+    /// Scan the local document library (background) for the Other
+    /// documents lists; once per Insert session.
+    fn ensure_other_docs(&mut self, cx: &mut Context<Self>) {
+        if self.ui.insert_other_docs.is_some() {
+            return;
+        }
+        self.ui.insert_other_docs = Some(Vec::new());
+        cx.spawn(async move |this, cx| {
+            let (docs, versions) = cx
+                .background_spawn(async {
+                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    // Each document's latest version name (grey under the name).
+                    let versions: HashMap<std::path::PathBuf, String> = docs.iter().filter_map(|d| OtherDoc::open(&d.path).ok().and_then(|o| o.versions.first().map(|v| (d.path.clone(), v.label.clone())))).collect();
+                    (docs, versions)
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.ui.insert_other_docs = Some(docs);
+                this.ui.insert_other_versions = versions;
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// "Search or paste URL" › Enter / 🔍: a pasted document path opens that
+    /// document, other text lists the documents whose name contains it.
+    pub(super) fn search_other_documents(&mut self, text: String, cx: &mut Context<Self>) {
+        let path = std::path::PathBuf::from(text.trim_start_matches("file://"));
+        if path.extension().is_some_and(|e| e == crate::start_library::EXT) && path.exists() {
+            self.pick_other_document(path, cx);
+            return;
+        }
+        self.ensure_other_docs(cx);
+        self.ui.insert_other_doc = None;
+        self.ui.insert_other_query = (!text.is_empty()).then_some(text);
+        cx.notify();
+    }
+
+    fn pick_other_document(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
+        match OtherDoc::open(&path) {
+            Ok(d) => self.ui.insert_other_doc = Some(d),
+            Err(e) => self.message = Some((true, format!("Could not open {}: {e:#}", path.display()))),
+        }
+        cx.notify();
+    }
+
+    /// Back to the document filters (home) or one level up (‹).
+    fn other_docs_back(&mut self, home: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if home || self.ui.insert_other_doc.take().is_none() {
+            self.ui.insert_other_cat = None;
+            self.ui.insert_other_query = None;
+            self.ui.insert_other_doc = None;
+            if let Some(st) = &self.ui.insert_url {
+                st.update(cx, |s, cx| s.set_value("", window, cx));
             }
-            m
-        });
-        let empty = studios.is_empty();
-        let mut col = v_flex()
-            .gap_1()
-            .p_1p5()
-            .rounded_md()
-            .border_1()
-            .border_color(pal.border_strong)
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(div().flex_1().text_xs().font_weight(FontWeight::SEMIBOLD).truncate().child(info.name.clone()))
-                    .child(version_menu)
-                    .child(Button::new("ins-ext-x").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.ext_pick = None;
-                        cx.notify();
-                    }))),
-            )
-            .when(empty, |d| d.child(div().text_xs().text_color(pal.text_faint).child("No Part Studios in this version")));
-        for (tab, name) in studios {
-            let r = crate::derived::ExternalRef { path: info.path.clone(), microversion: version.microversion, tab: tab.clone() };
-            let n2 = name.clone();
+        }
+        self.sync_other_placeholder(window, cx);
+        cx.notify();
+    }
+
+    /// The search box reads 'Search in "<category>"' inside a category.
+    fn sync_other_placeholder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let ph = match self.ui.insert_other_cat {
+            Some(c) if self.ui.insert_other_query.is_none() => format!("Search in \"{}\"", OTHER_SOURCES[c].0),
+            _ => "Search or paste URL".to_string(),
+        };
+        if let Some(st) = &self.ui.insert_url {
+            st.update(cx, |s, cx| s.set_placeholder(ph, window, cx));
+        }
+    }
+
+    /// Expand a Part Studio of the opened document: its parts (background).
+    fn expand_other_studio(&mut self, tab: String, cx: &mut Context<Self>) {
+        let Some(d) = &mut self.ui.insert_other_doc else { return };
+        if !d.expanded.remove(&tab) {
+            d.expanded.insert(tab.clone());
+        }
+        if d.parts.contains_key(&tab) {
+            cx.notify();
+            return;
+        }
+        let Some(key) = d.key(&tab) else { return };
+        d.parts.insert(tab.clone(), Vec::new());
+        let evaluator = self.evaluator.clone();
+        cx.spawn(async move |this, cx| {
+            let parts: Vec<(BodyId, String)> = cx
+                .background_spawn(async move { evaluator.lock().external_studio(&key, &ConfigValues::default()).map(|(_, r)| r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && !b.hidden).map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default() })
+                .await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if let Some(d) = &mut this.ui.insert_other_doc {
+                    d.parts.insert(tab, parts);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Insert › Other documents (live assembly/610–619): the search row, then
+    /// the categories, a category's documents, search results, or the opened
+    /// document (version header, Part Studios | Assemblies, its tree or the
+    /// Version graph).
+    pub(super) fn render_insert_other(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let blue = rgb(0x1651b0);
+        if (self.ui.insert_other_cat.is_some() || self.ui.insert_other_query.is_some()) && self.ui.insert_other_docs.is_none() {
+            self.ensure_other_docs(cx);
+        }
+        let mut col = v_flex().flex_none();
+        let searching = self.ui.insert_other_query.is_some();
+        let has_text = self.ui.insert_url.as_ref().is_some_and(|s| !s.read(cx).value().trim().is_empty());
+        let header_btn = |id: &'static str, icon: &'static str, tip: &'static str| {
+            div().id(id).size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).cursor_pointer().hover(|d| d.bg(rgb(0xeaeaea))).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph(icon, 20., blue))
+        };
+        // The opened document: home · ‹ · name / ⑂ version, Create version…,
+        // Version graph; Part Studios | Assemblies; search; tree.
+        if let Some(d) = self.ui.insert_other_doc.clone() {
+            let back_tip = self.ui.insert_other_query.as_ref().map(|q| format!("Results for \"{q}\"")).or_else(|| self.ui.insert_other_cat.map(|c| OTHER_SOURCES[c].0.to_string())).unwrap_or_else(|| "Go to document filters".into());
+            let version = d.versions.get(d.version).map(|v| v.label.clone()).unwrap_or_default();
+            let square = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App| {
+                div()
+                    .id(id)
+                    .size(px(30.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(3.))
+                    .border_1()
+                    .border_color(rgb(0xaaaaaa))
+                    .cursor_pointer()
+                    .when(on, |d| d.bg(rgb(0xeaeaea)))
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .child(crate::assets::icon(&icon_path(icon), 20., cx))
+                    .tooltip(crate::ui::tooltip(tip))
+            };
             col = col.child(
                 h_flex()
-                    .id(SharedString::from(format!("ins-ext-{tab}")))
-                    .h(px(24.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
+                    .h(px(40.))
+                    .pl(px(5.))
+                    .pr(px(5.))
+                    .gap(px(3.))
+                    .border_b_1()
+                    .border_color(rgb(0xeeeeee))
+                    .child(header_btn("ins-other-home", "home", "Go to document filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
+                    .child(header_btn("ins-other-back", "chevron-left", "").tooltip(crate::ui::tooltip(back_tip)).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(false, w, cx))))
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(d.name.clone()))
+                            .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)),
+                    )
+                    .child(square("ins-other-create-version", "version", "Create version…", false, cx).on_click({
+                        let path = d.path.clone();
+                        let gpu = self.gpu.clone();
+                        move |_, _, cx| {
+                            let _ = crate::files::open_document_window(path.clone(), None, gpu.clone(), cx);
+                        }
+                    }))
+                    .child(square("ins-other-graph", "version-graph", "Version graph", d.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(d) = &mut this.ui.insert_other_doc {
+                            d.graph = !d.graph;
+                        }
+                        cx.notify();
+                    }))),
+            );
+            if d.graph {
+                // Version graph: ○ Workspace ◆ Version, then Main (not
+                // selectable) and the versions (live 613, 618).
+                col = col.child(
+                    h_flex()
+                        .h(px(36.))
+                        .pl(px(6.))
+                        .gap(px(4.))
+                        .text_size(px(11.))
+                        .text_color(pal.text)
+                        .border_b_1()
+                        .border_color(rgb(0xeeeeee))
+                        .child(div().size(px(9.)).rounded_full().border_1().border_color(pal.text))
+                        .child("Workspace")
+                        .child(div().ml(px(4.)).size(px(7.)).rounded_full().bg(pal.text))
+                        .child("Version"),
+                );
+                let node = |hollow: bool, last: bool| {
+                    div()
+                        .w(px(140.))
+                        .h_full()
+                        .relative()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(div().absolute().left(px(69.5)).w(px(1.5)).top(px(if hollow { 18. } else { 0. })).bottom(px(if last { 18. } else { 0. })).bg(blue))
+                        .child(div().size(px(if hollow { 13. } else { 9. })).rounded_full().border_1().border_color(blue).bg(if hollow { rgb(0xffffff) } else { blue }))
+                };
+                col = col.child(h_flex().h(px(36.)).child(node(true, d.versions.is_empty())).child(div().flex_1().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child("Main")));
+                let n = d.versions.len();
+                for (i, v) in d.versions.iter().enumerate() {
+                    let on = i == d.version;
+                    col = col.child(
+                        h_flex()
+                            .id(SharedString::from(format!("ins-other-v-{i}")))
+                            .h(px(36.))
+                            .cursor_pointer()
+                            .when(on, |r| r.bg(rgb(0xb2ddf6)))
+                            .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
+                            .child(node(false, i + 1 == n))
+                            .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(v.label.clone()))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if let Some(d) = &mut this.ui.insert_other_doc {
+                                    d.version = i;
+                                    d.graph = false;
+                                    d.load_tabs();
+                                }
+                                cx.notify();
+                            })),
+                    );
+                }
+                return col.into_any_element();
+            }
+            let tab = self.ui.insert_tab;
+            let dtab = |id: &'static str, label: &'static str, ix: u8, cx: &mut Context<Self>| {
+                let on = tab == ix;
+                div()
+                    .id(id)
+                    .w(px(150.))
+                    .h(px(32.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(12.))
                     .cursor_pointer()
-                    .text_sm()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path("part-studio")).size_3p5().text_color(pal.accent))
-                    .child(div().flex_1().truncate().child(name))
-                    .child(div().text_xs().text_color(pal.text_faint).child(if self.insert_rigid { "rigid" } else { "parts" }))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_external(r.key(), n2.clone(), cx))),
+                    .text_color(if on { pal.accent } else { pal.text })
+                    .when(on, |d| d.font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                    .child(label)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.ui.insert_tab = ix;
+                        let ph = if ix == 0 { "Search Part Studios" } else { "Search Assemblies" };
+                        if let Some(st) = &this.ui.insert_search {
+                            st.update(cx, |s, cx| s.set_placeholder(ph, window, cx));
+                        }
+                        cx.notify();
+                    }))
+            };
+            col = col.child(h_flex().h(px(32.)).border_b_1().border_color(rgb(0xeeeeee)).child(dtab("ins-other-ps", "Part Studios", 0, cx)).child(dtab("ins-other-asm", "Assemblies", 1, cx)));
+            if let Some(st) = &self.ui.insert_search {
+                col = col.child(div().pt(px(6.)).px(px(6.)).pb(px(6.)).child(Input::new(st).small().cleanable(true)));
+            }
+            // Unversioned work in the document (live 612).
+            if d.changes > 0 {
+                let path = d.path.clone();
+                let gpu = self.gpu.clone();
+                col = col.child(
+                    v_flex()
+                        .mx(px(4.))
+                        .mb(px(4.))
+                        .p(px(4.))
+                        .rounded(px(5.25))
+                        .border_1()
+                        .border_color(rgb(0xb2ddf6))
+                        .bg(rgb(0xdef1fb))
+                        .text_size(px(14.))
+                        .text_color(rgb(0x094174))
+                        .child(div().px(px(1.)).child(format!("{} change{} since the last version.", d.changes, if d.changes == 1 { "" } else { "s" })))
+                        .child(
+                            div()
+                                .id("ins-other-create-link")
+                                .pt(px(4.))
+                                .pb(px(2.))
+                                .flex()
+                                .justify_center()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .underline()
+                                .cursor_pointer()
+                                .child(format!("Create a version in {}.", d.name))
+                                .on_click(move |_, _, cx| {
+                                    let _ = crate::files::open_document_window(path.clone(), None, gpu.clone(), cx);
+                                }),
+                        ),
+                );
+            }
+            let query = self.ui.insert_search.as_ref().map(|s| s.read(cx).value().trim().to_lowercase()).unwrap_or_default();
+            let tabs: Vec<(String, String, bool)> = d.tabs.iter().filter(|t| t.2 == (tab == 1) && (query.is_empty() || t.1.to_lowercase().contains(&query))).cloned().collect();
+            if tabs.is_empty() {
+                col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(if tab == 0 { "No Part Studios available." } else { "No Assemblies available." }));
+            }
+            let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, name: String, cx: &App| {
+                h_flex()
+                    .id(id)
+                    .flex_none()
+                    .h(px(40.))
+                    .pl(px(4. + indent))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.row_hover))
+                    .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
+                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(&icon_path(icon), 28., cx)))
+                    .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
+            };
+            for (t, name, is_asm) in tabs {
+                let key = d.key(&t);
+                if is_asm {
+                    col = col.child(item_row(SharedString::from(format!("ins-other-a-{t}")), 0., None, "sub-assembly", name, cx));
+                    continue;
+                }
+                let open = d.expanded.contains(&t);
+                let t2 = t.clone();
+                let expander = div()
+                    .id(SharedString::from(format!("ins-other-x-{t}")))
+                    .child(crate::ui::glyph(if open { "chevron-down" } else { "chevron-right" }, 12., pal.text_muted))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        this.expand_other_studio(t2.clone(), cx);
+                    }))
+                    .into_any_element();
+                let (k2, n2) = (key.clone(), name.clone());
+                col = col.child(item_row(SharedString::from(format!("ins-other-s-{t}")), 0., Some(expander), "part-studio", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(k) = k2.clone() {
+                        this.insert_external(k, None, n2.clone(), cx);
+                    }
+                })));
+                if open {
+                    for (i, (b, pname)) in d.parts.get(&t).cloned().unwrap_or_default().into_iter().enumerate() {
+                        let k3 = key.clone();
+                        let n3 = pname.clone();
+                        col = col.child(item_row(SharedString::from(format!("ins-other-p-{t}-{i}")), 14., None, "part", pname, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(k) = k3.clone() {
+                                this.insert_external(k, Some(b.clone()), n3.clone(), cx);
+                            }
+                        })));
+                    }
+                }
+            }
+            return col.into_any_element();
+        }
+        // The search row: funnel (blue while showing results), the field
+        // and the 🔍 button.
+        col = col.child(
+            h_flex()
+                .h(px(39.))
+                .pt(px(6.))
+                .px(px(6.))
+                .child(div().w(px(32.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("filter", 20., if searching { blue } else { rgb(0x666666) })))
+                .child(
+                    div()
+                        .ml(px(6.))
+                        .flex_1()
+                        .h(px(30.))
+                        .rounded_l(px(3.))
+                        .border_1()
+                        .border_color(rgb(0xcccccc))
+                        .children(self.ui.insert_url.as_ref().map(|st| Input::new(st).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.)))),
+                )
+                .child(
+                    div()
+                        .id("ins-other-search")
+                        .w(px(34.))
+                        .h(px(30.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_r(px(3.))
+                        .border_1()
+                        .border_l_0()
+                        .border_color(if has_text { rgb(0x90cef1) } else { rgb(0xeaeaea) })
+                        .cursor_pointer()
+                        .child(crate::ui::glyph("search", 20., if has_text { blue } else { rgb(0xcccccc) }))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            let text = this.ui.insert_url.as_ref().map(|s| s.read(cx).value().trim().to_string()).unwrap_or_default();
+                            this.search_other_documents(text, cx);
+                            this.sync_other_placeholder(window, cx);
+                        })),
+                ),
+        );
+        let listing = self.ui.insert_other_query.clone().map(|q| (None, Some(q))).or_else(|| self.ui.insert_other_cat.map(|c| (Some(c), None)));
+        let Some((cat, query)) = listing else {
+            // Top level: the categories (32 px rows, 20 px icons).
+            for (i, (label, icon)) in OTHER_SOURCES.iter().enumerate() {
+                col = col.child(
+                    h_flex()
+                        .id(SharedString::from(format!("ins-other-cat-{i}")))
+                        .h(px(32.))
+                        .pl(px(16.))
+                        .gap(px(6.))
+                        .cursor_pointer()
+                        .text_size(px(14.67))
+                        .text_color(pal.text)
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .child(crate::assets::icon(&icon_path(icon), 20., cx))
+                        .child(div().truncate().child(label.to_string()))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            this.ensure_other_docs(cx);
+                            this.ui.insert_other_cat = Some(i);
+                            this.sync_other_placeholder(window, cx);
+                            cx.notify();
+                        })),
+                );
+            }
+            return col.into_any_element();
+        };
+        // A category: home · ‹ · its name (live 611).
+        if let Some(c) = cat {
+            col = col.child(
+                h_flex()
+                    .h(px(36.))
+                    .pl(px(2.))
+                    .gap(px(3.))
+                    .border_b_1()
+                    .border_color(rgb(0xeeeeee))
+                    .child(header_btn("ins-other-home", "home", "Go to document filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
+                    .child(header_btn("ins-other-back", "chevron-left", "Filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
+                    .child(div().pl(px(3.)).text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(OTHER_SOURCES[c].0)),
             );
         }
-        Some(col.into_any_element())
+        let me = self.doc.read(cx).session.path.clone();
+        let loading = self.ui.insert_other_docs.as_ref().is_none_or(|d| d.is_empty()) && self.ui.insert_other_versions.is_empty();
+        let mut docs: Vec<crate::start_library::DocEntry> = self.ui.insert_other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
+        let q = query.as_ref().map(|q| q.to_lowercase());
+        match (cat, &q) {
+            // Local documents are all the user's own; nothing is shared or public.
+            (Some(3 | 4), _) => docs.clear(),
+            (Some(1), _) => {
+                docs.retain(|d| d.recent_rank.is_some());
+                docs.sort_by_key(|d| d.recent_rank);
+            }
+            (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(q.as_str())),
+            _ => docs.sort_by_key(|d| std::cmp::Reverse(d.modified)),
+        }
+        // Owned by me lists the folders first (folder outline + bold name).
+        if cat == Some(0) {
+            let mut dirs: Vec<std::path::PathBuf> = docs.iter().map(|d| d.folder().to_path_buf()).collect();
+            dirs.sort();
+            dirs.dedup();
+            if dirs.len() > 1 {
+                for (i, dir) in dirs.iter().enumerate() {
+                    let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    col = col.child(
+                        h_flex()
+                            .id(SharedString::from(format!("ins-other-dir-{i}")))
+                            .h(px(51.))
+                            .pl(px(2.))
+                            .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., rgb(0x666666))))
+                            .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name)),
+                    );
+                }
+            }
+        }
+        if docs.is_empty() && !loading {
+            col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("No documents found"));
+        }
+        for (i, d) in docs.into_iter().enumerate() {
+            let path = d.path.clone();
+            let thumb = match d.thumbnail.clone() {
+                Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                None => crate::assets::icon(&icon_path("document"), 32., cx).into_any_element(),
+            };
+            // Search results: the matched text in blue (live 615).
+            let name_el = match q.as_ref().and_then(|q| d.name.to_lowercase().find(q.as_str()).map(|at| (at, q.len()))) {
+                Some((at, len)) if d.name.is_char_boundary(at) && d.name.is_char_boundary(at + len) => h_flex()
+                    .child(d.name[..at].to_string())
+                    .child(div().text_color(blue).child(d.name[at..at + len].to_string()))
+                    .child(d.name[at + len..].to_string())
+                    .into_any_element(),
+                _ => div().child(d.name.clone()).into_any_element(),
+            };
+            let version = self.ui.insert_other_versions.get(&d.path).cloned();
+            col = col.child(
+                h_flex()
+                    .id(SharedString::from(format!("ins-other-doc-{i}")))
+                    .h(px(51.))
+                    .pl(px(2.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .tooltip(crate::ui::tooltip(match &version {
+                        Some(v) => format!("{} -- {v}", d.name),
+                        None => d.name.clone(),
+                    }))
+                    .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(thumb))
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(name_el))
+                            .children(version.map(|v| div().opacity(0.5).text_size(px(12.)).line_height(px(16.)).text_color(pal.text).child(v))),
+                    )
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_other_document(path.clone(), cx))),
+            );
+        }
+        col.into_any_element()
     }
 
     /// Insert the parts (or the whole Part Studio, rigid) of an external Part Studio.
-    fn insert_external(&mut self, key: String, studio_name: String, cx: &mut Context<Self>) {
+    fn insert_external(&mut self, key: String, only: Option<BodyId>, studio_name: String, cx: &mut Context<Self>) {
         let evaluator = self.evaluator.clone();
-        let rigid = self.insert_rigid;
-        self.ext_pick = None;
+        let rigid = self.insert_rigid && only.is_none();
         let k2 = key.clone();
         cx.spawn(async move |this, cx| {
             let parts: Vec<(BodyId, String)> = cx
@@ -2222,7 +2921,7 @@ impl AssemblyView {
                     cx.notify();
                     return;
                 }
-                let items: Vec<(Option<BodyId>, String)> = if rigid { vec![(None, studio_name.clone())] } else { parts.into_iter().map(|(b, n)| (Some(b), n)).collect() };
+                let items: Vec<(Option<BodyId>, String)> = if rigid { vec![(None, studio_name.clone())] } else { parts.into_iter().filter(|(b, _)| only.as_ref().is_none_or(|o| o == b)).map(|(b, n)| (Some(b), n)).collect() };
                 let ids = this.edit(&format!("Insert : {studio_name} (other document)"), cx, |a| {
                     let mut ids = Vec::new();
                     for (k, (body, name)) in items.into_iter().enumerate() {
@@ -2259,15 +2958,5 @@ impl AssemblyView {
             })
             .detach();
         }
-    }
-
-    /// Update every instance of an external reference to a newer version.
-    pub(super) fn update_external(&mut self, key: &str, to: &crate::derived::VersionChoice, cx: &mut Context<Self>) {
-        let Some(r) = crate::derived::ExternalRef::parse(key) else { return };
-        let new_key = crate::derived::ExternalRef { microversion: to.microversion, ..r }.key();
-        let from = key.to_string();
-        let n = self.edit(&format!("Update to {}", to.label), cx, |a| a.update_external(&from, &new_key)).unwrap_or(0);
-        self.message = Some((false, format!("Updated {n} instance(s) to {}.", to.label)));
-        cx.notify();
     }
 }

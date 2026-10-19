@@ -12,7 +12,7 @@ type Run = fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>);
 struct AsmTool(&'static str, &'static str, Option<&'static str>, &'static str, Run);
 
 const TOOLS: &[AsmTool] = &[
-    AsmTool("update-all-button", "Update all references to latest versions", None, "Update all unpinned references to the latest versions or revisions.", |t, _, cx| t.open_reference_manager(cx)),
+    AsmTool("update-all-button", "Update all references to latest versions", None, "Update all unpinned references to the latest versions or revisions.", |t, _, cx| t.open_reference_manager(None, cx)),
     AsmTool("insert", "Insert", Some("i"), "Insert parts, assemblies, sketches, or surfaces into this Assembly. Insert from this document, other documents, or standard content.", |t, w, cx| t.toggle_insert(w, cx)),
     AsmTool("mate-connector-assembly", "Mate connector", Some("ctrl+m"), "Create a mate connector on or between parts, surfaces, or sketches. Mate connectors are used to locate and orient entities within an assembly mate.", |t, w, cx| t.open_mc(None, w, cx)),
     AsmTool("fastened", "Fastened mate", Some("m"), "Remove all degrees of freedom between 2 entities.", |t, w, cx| t.start_mate(MateType::Fastened, w, cx)),
@@ -179,6 +179,43 @@ impl AssemblyView {
                 .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(t.3))
         });
         let n = items.len();
+        // "Did you mean:" + a pill per tool the search stands for (as in the
+        // Part Studio, bundle CommandSuggestions); a pill searches for it.
+        let suggested = crate::tool_synonyms::suggestions(crate::tool_synonyms::ASSEMBLY, &self.ui.tool_query, n > 0);
+        let st3 = st.clone();
+        let suggestions = (!suggested.is_empty() && !self.ui.tool_query.trim().is_empty()).then(|| {
+            h_flex()
+                .px(px(14.))
+                .pt(px(10.))
+                // Live menus/tool-search-export.png: 24 px down to the results.
+                .pb(px(24.))
+                .gap(px(10.))
+                .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Did you mean:"))
+                .children(suggested.into_iter().enumerate().map(|(i, name)| {
+                    let st = st3.clone();
+                    div()
+                        .id(SharedString::from(format!("asm-suggest-{i}")))
+                        .px(px(10.))
+                        .h(px(30.))
+                        .flex()
+                        .items_center()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(rgb(0x999999))
+                        .bg(rgb(0xffffff))
+                        .cursor_pointer()
+                        .hover(|d| d.bg(rgb(0xeaeaea)))
+                        .text_size(px(12.))
+                        .text_color(pal.text)
+                        .child(name)
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                            st.update(cx, |s, cx| s.set_value(name, window, cx));
+                            this.ui.tool_query = name.to_string();
+                            this.ui.tool_sel = 0;
+                            cx.notify();
+                        }))
+                }))
+        });
         Some(
             div()
                 .id("asm-tool-search")
@@ -212,7 +249,11 @@ impl AssemblyView {
                     ),
                 )
                 .when(self.ui.tool_query.trim().is_empty(), |d| d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools")))
-                .when(!self.ui.tool_query.trim().is_empty(), |d| {
+                .children(suggestions)
+                .when(!self.ui.tool_query.trim().is_empty() && n == 0, |d| {
+                    d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).text_color(pal.text).child("No items match your search"))
+                })
+                .when(!self.ui.tool_query.trim().is_empty() && n > 0, |d| {
                     d.child(
                         h_flex()
                             .items_start()

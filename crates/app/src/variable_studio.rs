@@ -29,6 +29,31 @@ pub struct VariableStudioView {
     /// Shown as a table in this Part Studio's / Assembly's Variable table
     /// panel (no toolbar, button or footer; reference menu).
     host: Option<TabId>,
+    /// The footer's `?` popover is open, and the footer group's bounds.
+    help_open: bool,
+    footer_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    /// Same-document studios inserted into this one: editable tables
+    /// (Onshape edits the inserted studio itself, live document/50–51).
+    inserted_views: HashMap<TabId, Entity<VariableStudioView>>,
+    /// The last "Collapse all tables" seen ([collapse_generation]).
+    collapse_seen: u64,
+}
+
+thread_local! {
+    /// "Collapse all tables" per table group (a Variable Studio tab, or the
+    /// Part Studio / Assembly whose Variable table panel shows the tables).
+    static COLLAPSE_ALL: std::cell::RefCell<HashMap<TabId, u64>> = Default::default();
+}
+
+/// How many times "Collapse all tables" ran in `group`'s tables.
+pub fn collapse_generation(group: TabId) -> u64 {
+    COLLAPSE_ALL.with(|c| c.borrow().get(&group).copied().unwrap_or(0))
+}
+
+/// The "…" menu's "Collapse all tables": every table of `group` collapses.
+pub fn collapse_all_tables(group: TabId, cx: &mut App) {
+    COLLAPSE_ALL.with(|c| *c.borrow_mut().entry(group).or_default() += 1);
+    cx.refresh_windows();
 }
 
 impl Focusable for VariableStudioView {
@@ -40,14 +65,45 @@ impl Focusable for VariableStudioView {
 impl VariableStudioView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify())];
-        Self { tab, doc, inputs: HashMap::new(), subs, focus: cx.focus_handle(), collapsed: false, renaming: None, host: None }
+        Self {
+            tab,
+            doc,
+            inputs: HashMap::new(),
+            subs,
+            focus: cx.focus_handle(),
+            collapsed: false,
+            renaming: None,
+            host: None,
+            help_open: false,
+            footer_bounds: Default::default(),
+            inserted_views: HashMap::new(),
+            collapse_seen: collapse_generation(tab),
+        }
     }
 
     /// The studio's table inside `host`'s Variable table panel.
     pub fn new_in_panel(doc: Entity<DocModel>, tab: TabId, host: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut v = Self::new(doc, tab, window, cx);
         v.host = Some(host);
+        v.collapse_seen = collapse_generation(host);
         v
+    }
+
+    /// The table group this table collapses with (its host, else itself).
+    fn group(&self) -> TabId {
+        self.host.unwrap_or(self.tab)
+    }
+
+    /// Where this table is inserted (its host), as an insert target, with
+    /// the host's references: a Variable Studio's `inserted` list, or a
+    /// Part Studio's / Assembly's shown studios.
+    fn host_refs(&self, cx: &App) -> Option<(crate::variable_insert::InsertTarget, Vec<noshape_model::variables::StudioRef>)> {
+        let host = self.host?;
+        let d = &self.doc.read(cx).session.doc;
+        Some(match d.tab(host).map(|t| &t.content) {
+            Some(TabContent::VariableStudio(v)) => (crate::variable_insert::InsertTarget::Studio(host), v.inserted.clone()),
+            _ => (crate::variable_insert::InsertTarget::Element(host), noshape_model::variables::element_studios(d, host)),
+        })
     }
 
     fn studio<'a>(&self, cx: &'a App) -> Option<&'a VariableStudio> {
@@ -190,19 +246,26 @@ impl VariableStudioView {
         cx.notify();
     }
 
-    /// Tables of the Variable Studios inserted into this one: read-only,
-    /// titled with the studio's name; more menu: Switch to <studio>, Move up,
-    /// Move down, Remove reference.
-    fn render_inserted_tables(&self, studio: &VariableStudio, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    /// Tables of the Variable Studios inserted into this one, above its own
+    /// (live document/48). Same-document ones are editable (edits change
+    /// the inserted studio, live document/50–51); another document's are
+    /// read-only.
+    fn render_inserted_tables(&mut self, studio: &VariableStudio, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let n = studio.inserted.len();
         let target = crate::variable_insert::InsertTarget::Studio(self.tab);
-        studio
-            .inserted
-            .iter()
-            .enumerate()
-            .filter_map(|(k, r)| crate::variable_insert::readonly_table(&self.doc, target, r, k, n, cx))
-            .map(|t| div().w(px(COL_W * 4. + 1.)).mb(px(12.)).child(t).into_any_element())
-            .collect()
+        self.inserted_views.retain(|k, _| studio.inserted.iter().any(|r| r.external.is_none() && r.studio == *k));
+        let mut out = Vec::new();
+        for (k, r) in studio.inserted.iter().enumerate() {
+            let table = if r.external.is_some() {
+                crate::variable_insert::readonly_table(&self.doc, target, r, k, n, cx)
+            } else {
+                let (doc, s, host) = (self.doc.clone(), r.studio, self.tab);
+                let view = self.inserted_views.entry(s).or_insert_with(|| cx.new(|cx| VariableStudioView::new_in_panel(doc, s, host, window, cx)));
+                Some(view.clone().into_any_element())
+            };
+            out.extend(table.map(|t| div().w(px(COL_W * 4. + 1.)).mb(px(12.)).child(t).into_any_element()));
+        }
+        out
     }
 
     /// Onshape's footer (live DOM): a 40 px `#eee` bar, 1 px `#ccc` top rule,
@@ -212,11 +275,13 @@ impl VariableStudioView {
     fn render_footer(&self, on: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let variant = ButtonCustomVariant::new(cx).color(rgb(0xffffff).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
+        // Live: `svg-icon-comments-checked-checkbox` (green #009400, the tick overshoots the box).
         let check = if on {
-            div().size(px(14.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(rgb(0x2b8a3e)).child(crate::ui::glyph("check", 12., rgb(0x2b8a3e)))
+            div().size(px(20.)).child(crate::assets::icon("checked-checkbox", 20., cx)).into_any_element()
         } else {
-            div().size(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0x888888))
+            div().size(px(20.)).flex().items_center().justify_center().child(div().size(px(13.)).rounded(px(2.)).border_1().border_color(rgb(0x888888))).into_any_element()
         };
+        let probe = self.footer_bounds.clone();
         h_flex()
             .h(px(40.))
             .flex_none()
@@ -226,14 +291,16 @@ impl VariableStudioView {
             .border_color(rgb(0xcccccc))
             .child(
                 Button::new("vs-insert-all")
+                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     .custom(variant)
                     .h(px(35.))
                     .px(px(10.5))
                     .rounded_l(px(5.25))
                     .rounded_r(px(0.))
+                    .bg(rgb(0xffffff))
                     .border_1()
                     .border_color(rgb(RULE))
-                    .child(h_flex().gap(px(9.)).child(div().w(px(20.)).flex().justify_center().child(check)).child(div().text_size(px(14.)).child("Insert into all Part Studios and Assemblies")))
+                    .child(h_flex().gap(px(4.)).child(check).child(div().text_size(px(14.)).child("Insert into all Part Studios and Assemblies")))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.edit(if on { "Do not insert into all Part Studios and Assemblies" } else { "Insert into all Part Studios and Assemblies" }, cx, |s| s.insert_into_all = !on)
                     })),
@@ -246,19 +313,75 @@ impl VariableStudioView {
                     .rounded_r(px(5.25))
                     .rounded_l(px(0.))
                     .border_1()
-                    .border_l_0()
-                    .border_color(rgb(RULE))
-                    .child(h_flex().gap(px(4.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 7., pal.text)))
-                    .on_click(|e, window, cx| {
-                        let menu = crate::os_menu::OsMenu::build(window, cx, |m, _, _| {
-                            m.dropdown()
-                                .item(crate::os_menu::OsMenuItem::new("Checked: the variables can be used in every Part Studio and Assembly of the workspace.").disabled(true))
-                                .item(crate::os_menu::OsMenuItem::new("Unchecked: only where the studio is inserted (keep it unchecked while the variables are a draft).").disabled(true))
-                        });
-                        crate::os_menu::open_anchored(point(e.position().x + px(20.), e.position().y - px(20.)), Anchor::BottomRight, menu, window, cx);
-                    }),
+                    .when(!self.help_open, |b| b.border_l_0())
+                    .bg(rgb(0xffffff))
+                    .border_color(if self.help_open { pal.accent } else { rgb(RULE) })
+                    // ▴: the popover opens upward (live document/12, 42).
+                    .child(h_flex().gap(px(4.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET_UP, 7., pal.text)))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.help_open = !this.help_open;
+                        cx.notify();
+                    })),
             )
+            .children(self.help_open.then(|| self.render_help(on, cx)))
             .into_any_element()
+    }
+
+    /// The footer `?` popover (live document/42, 45; dom/variable-studio-help-
+    /// dropdown): a 355 px Bootstrap dropdown holding an info alert (14 px pad,
+    /// `#def1fb` / `#b2ddf6`, `#094174`): bold title, text, "Learn more about
+    /// Variable Studios" (opens noshape's README; Onshape's help is cloud).
+    fn render_help(&self, on: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let (title, body) = if on {
+            ("This Variable Studio is automatically referenced in this workspace", "New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio.")
+        } else {
+            (
+                "Automatically insert this Variable Studio into all Part Studios and Assemblies in this workspace",
+                "Automatic references enable you to insert this Variable Studio into multiple tabs. References to this Variable Studio will be placed in every new and existing Part Studio and Assembly in this workspace.",
+            )
+        };
+        let b = self.footer_bounds.get();
+        deferred(
+            anchored().anchor(Anchor::BottomLeft).position(point(b.left(), b.top() - px(1.))).snap_to_window_with_margin(px(4.)).child(
+                div()
+                    .occlude()
+                    .w(px(355.))
+                    .p(px(1.))
+                    .bg(rgb(0xffffff))
+                    .border_1()
+                    .border_color(rgb(0xd7d7d7))
+                    .rounded(px(5.25))
+                    .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        this.help_open = false;
+                        cx.notify();
+                    }))
+                    .child(
+                        v_flex()
+                            .p(px(14.))
+                            .gap(px(21.))
+                            .bg(pal.info_fill)
+                            .border_1()
+                            .border_color(pal.info_outline)
+                            .rounded(px(5.25))
+                            .text_size(px(14.))
+                            .text_color(pal.info_text)
+                            .child(div().font_weight(FontWeight::BOLD).child(title))
+                            .child(div().child(body))
+                            .child(
+                                div()
+                                    .id("vs-help-learn")
+                                    .cursor_pointer()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .underline()
+                                    .child("Learn more about Variable Studios")
+                                    .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
+                            ),
+                    ),
+            ),
+        )
+        .with_priority(100)
+        .into_any_element()
     }
 
     /// Tab-separated copy of the table (Onshape's "Copy table").
@@ -275,6 +398,12 @@ impl VariableStudioView {
 impl Render for VariableStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        // "Collapse all tables" ran in this table's group.
+        let generation = collapse_generation(self.group());
+        if generation != self.collapse_seen {
+            self.collapse_seen = generation;
+            self.collapsed = true;
+        }
         let studio = self.studio(cx).cloned().unwrap_or_default();
         let (units, title) = {
             let d = &self.doc.read(cx).session.doc;
@@ -287,9 +416,8 @@ impl Render for VariableStudioView {
         let plain = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(gpui_kit::transparent_white()).active(gpui_kit::transparent_white()).shadow(false);
         let mut rows: Vec<AnyElement> = Vec::new();
         // In a panel, a reference to single variables shows only those.
-        let only: Option<Vec<String>> = self.host.and_then(|host| {
-            noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, host).into_iter().find(|r| r.studio == self.tab).and_then(|r| r.variables)
-        });
+        let host_refs = self.host_refs(cx);
+        let only: Option<Vec<String>> = host_refs.as_ref().and_then(|(_, refs)| refs.iter().find(|r| r.studio == self.tab).and_then(|r| r.variables.clone()));
         for (i, v) in studio.variables.iter().enumerate() {
             if only.as_ref().is_some_and(|o| !o.contains(&v.name)) {
                 continue;
@@ -386,14 +514,16 @@ impl Render for VariableStudioView {
                             })
                             .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
                             .child(
-                            Button::new(("vs-kind", i))
-                                .custom(plain)
+                            // A plain cell (a kit Button centres its label): text 7 px in, as live.
+                            div()
+                                .id(("vs-kind", i))
                                 .size_full()
-                                .rounded_none()
-                                .justify_start()
+                                .flex()
+                                .items_center()
+                                .cursor_pointer()
                                 .pl(px(7.))
                                 .pt(px(2.))
-                                .child(div().text_size(px(14.)).child(kind_label(kind)))
+                                .child(div().text_size(px(14.)).text_color(pal.text).child(kind_label(kind)))
                                 .on_click(move |_, window, cx| {
                                     let kinds = kinds.clone();
                                     let b = cell_bounds.get();
@@ -447,12 +577,11 @@ impl Render for VariableStudioView {
         });
         let collapsed = self.collapsed;
         let more_view = view.clone();
-        let host_menu = self.host.map(|host| {
-            let d = &self.doc.read(cx).session.doc;
-            let list = noshape_model::variables::element_studios(d, host);
+        let host_menu = host_refs.map(|(target, list)| {
             let k = list.iter().position(|r| r.studio == self.tab).unwrap_or(0);
-            (self.doc.clone(), host, self.tab, title.clone(), k, list.len())
+            (self.doc.clone(), target, self.tab, title.clone(), k, list.len())
         });
+        let group = self.group();
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
         let table = v_flex()
@@ -470,7 +599,9 @@ impl Render for VariableStudioView {
                             .id("vs-collapse")
                             .gap(px(3.))
                             .cursor_pointer()
-                            .child(crate::ui::glyph(if collapsed { "ui-chevron-right" } else { "ui-chevron-down" }, 11., pal.text))
+                            .child(crate::os_ui::glyph(if collapsed { crate::os_ui::GLYPH_COLLAPSED } else { crate::os_ui::GLYPH_EXPANDED }, 10., pal.text))
+                            // An inserted studio's title starts with the studio icon (live part-studio/160).
+                            .when(in_panel, |r| r.child(crate::assets::icon("variable-studio", 20., cx)))
                             .child(match &self.renaming {
                                 Some(st) => div().w(px(260.)).text_size(px(16.)).child(Input::new(st).h(px(26.)).text_size(px(16.))).into_any_element(),
                                 None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title).into_any_element(),
@@ -487,22 +618,33 @@ impl Render for VariableStudioView {
                             .w(px(25.))
                             .h(px(22.))
                             .p_0()
-                            .child(div().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.info_text).child("•••"))
+                            // Live: `#333` dots 7 px apart (the svg ignores the link colour).
+                            .child(div().mt(px(3.)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_OVERFLOW, 20., pal.text)))
                             .on_click(move |e, window, cx| {
                                 let (more_view, host_menu) = (more_view.clone(), host_menu.clone());
+                                // Live document/15 (own: Copy table, Rename, Collapse all tables) and
+                                // part-studio/161, 165 (inserted: + Switch to, Move up/down, Edit
+                                // reference…, Remove reference). "Create task…" is cloud.
                                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                                 let (v, v2) = (more_view.clone(), more_view.clone());
-                                let m = m.dropdown().item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v.update(cx, |t, cx| t.copy_table(cx))));
+                                let item = crate::os_menu::OsMenuItem::new;
+                                let m = m
+                                    .dropdown()
+                                    .item(item("Copy table").on_click(move |_, _, cx| v.update(cx, |t, cx| t.copy_table(cx))))
+                                    .item(item("Rename").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.start_rename(window, cx))));
+                                let collapse = item("Collapse all tables").on_click(move |_, _, cx| collapse_all_tables(group, cx));
                                 match host_menu.clone() {
-                                    // In a Part Studio / Assembly panel: the reference's menu.
-                                    Some((doc, host, me, name, k, n)) => {
-                                        let (d1, d2, d3) = (doc.clone(), doc.clone(), doc.clone());
+                                    // An inserted table: the reference's items.
+                                    Some((doc, target, me, name, k, n)) => {
+                                        let (d1, d2, d3, d4) = (doc.clone(), doc.clone(), doc.clone(), doc.clone());
                                         let m = m.item(crate::os_menu::OsMenuItem::new(format!("Switch to {name}")).on_click(move |_, window, cx| crate::workspace::request_activate_tab(me, window, cx)));
-                                        let m = if k > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| crate::variable_insert::move_table(&d1, host, me, false, cx))) } else { m };
-                                        let m = if k + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| crate::variable_insert::move_table(&d2, host, me, true, cx))) } else { m };
-                                        m.item(crate::os_menu::OsMenuItem::new("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, crate::variable_insert::InsertTarget::Element(host), me, None, cx)))
+                                        let m = if k > 0 { m.item(item("Move up").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d1, target, me, false, cx))) } else { m };
+                                        let m = if k + 1 < n { m.item(item("Move down").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d2, target, me, true, cx))) } else { m };
+                                        m.item(collapse)
+                                            .item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open(d4.clone(), target, window, cx)))
+                                            .item(item("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, target, me, None, cx)))
                                     }
-                                    None => m.item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.start_rename(window, cx)))),
+                                    None => m.item(collapse),
                                 }
                             });
                                 crate::os_menu::open_anchored(point(e.position().x + px(12.), e.position().y + px(12.)), Anchor::TopRight, menu, window, cx);
@@ -538,10 +680,10 @@ impl Render for VariableStudioView {
             .rounded(px(5.25))
             .border_1()
             .border_color(rgb(RULE))
-            .child(h_flex().gap(px(3.)).child(crate::assets::icon("variable-studio", 20., cx)).child(div().text_size(px(14.)).child("Insert Variable Studio")))
+            .child(h_flex().gap(px(3.)).child(crate::assets::icon("insert-variable", 20., cx)).child(div().text_size(px(14.)).child("Insert Variable Studio")))
             .tooltip("Insert Variable Studio")
             .on_click(move |_, window, cx| crate::variable_insert::open(doc.clone(), crate::variable_insert::InsertTarget::Studio(me), window, cx));
-        let inserted = self.render_inserted_tables(&studio, cx);
+        let inserted = self.render_inserted_tables(&studio, window, cx);
         let footer = self.render_footer(studio.insert_into_all, cx);
         // Onshape: the undo / redo toolbar, then the button and the table.
         v_flex()

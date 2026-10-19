@@ -7,8 +7,8 @@
 //!
 //! The builder API mirrors the kit's `PopupMenu` (`item`, `separator`,
 //! `submenu`), so a menu builder switches by changing its import.
-//! [`OsContextMenuExt::os_context_menu`] opens one on right-click; the
-//! window root draws it with [`render_host`].
+//! [`OsContextMenuExt::os_context_menu`] opens one on right-click; each
+//! window opened with [`open_window`] draws its own open menu.
 
 use crate::theme::p;
 use gpui_kit::component::{Icon, Sizable as _, h_flex, v_flex};
@@ -145,6 +145,10 @@ pub struct OsMenu {
     /// 14 px `#666` text 10 px in; the hovered (else the checked) row is
     /// `#1651b0` with white text.
     select: Option<f32>,
+    /// With `select`: a browser `<select>` list instead (the account pages,
+    /// live preferences 62): 27 px rows, 14 px `#333` text, `#1e63d0`
+    /// highlight, 1 px `#767676` border, no shadow.
+    native: bool,
     /// Onshape's drawing toolbar lists: 26 px rows, 18 px icons 4 px in,
     /// 13.33 px text 30 px in.
     toolbar: bool,
@@ -170,12 +174,21 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, toolbar: false, dropdown: false, on_escape: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, on_escape: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
     pub fn select_list(mut self, width: f32) -> Self {
         self.select = Some(width);
+        self
+    }
+
+    /// A browser `<select>` list, `width` wide (see `native`). Open it with
+    /// [`open_anchored`] at the field's bottom-left; mark the current value
+    /// `checked` (it is highlighted until the pointer moves over a row).
+    pub fn native_select(mut self, width: f32) -> Self {
+        self.select = Some(width);
+        self.native = true;
         self
     }
 
@@ -338,6 +351,7 @@ impl Render for OsMenu {
         let pal = p();
         let dropdown = self.dropdown;
         let select = self.select;
+        let native = self.native;
         let no_hover = self.hovered.is_none();
         let any_icon = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { icon: Some(_), .. } | OsMenuItem::Submenu { icon: Some(_), .. }));
         // In dropdowns a ✓ takes the icon place too (documents Folders sort menu).
@@ -347,6 +361,8 @@ impl Render for OsMenu {
             (33., 4., 18., 14., 14.)
         } else if dropdown {
             (27., 20., 20., if any_icon || any_check { 43. } else { 20. }, 14.)
+        } else if native {
+            (27., 6., 18., 10., 14.)
         } else if self.select.is_some() {
             // Selects with icons (assembly mate type) put the text after the icon.
             (26., 6., 18., if any_icon { 30. } else { 10. }, 14.)
@@ -408,9 +424,9 @@ impl Render for OsMenu {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
                     OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
-                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() { gpui_kit::rgb(0x666666) } else { pal.text })
+                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
-                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)))
+                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1e63d0 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
@@ -494,15 +510,17 @@ impl Render for OsMenu {
             .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
             // 0 5px 10px rgba(0,0,0,.2); GPUI blurs twice as far as CSS.
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+            .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb(0x767676)))
             .text_color(pal.text)
             .children(rows)
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
     }
 }
 
-/// The open right-click menu of a window (see [`render_host`]).
+/// The open right-click menu and the window it belongs to (see
+/// [`render_host`]); one menu is open at a time, app-wide.
 #[derive(Default)]
-struct OsMenuHost(Option<(Point<Pixels>, Anchor, Entity<OsMenu>, Subscription)>);
+struct OsMenuHost(Option<(WindowId, Point<Pixels>, Anchor, Entity<OsMenu>, Subscription)>);
 
 impl Global for OsMenuHost {}
 
@@ -521,7 +539,12 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
     let prev = window.focused(cx);
     menu.update(cx, |m, _| m.return_focus = prev);
     window.focus(&menu.focus_handle(cx), cx);
-    cx.default_global::<OsMenuHost>().0 = Some((position, anchor, menu, sub));
+    let id = window.window_handle().window_id();
+    let prev = cx.default_global::<OsMenuHost>().0.replace((id, position, anchor, menu, sub));
+    if prev.is_some_and(|p| p.0 != id) {
+        // A menu still open in another window goes away.
+        cx.refresh_windows();
+    }
     window.refresh();
 }
 
@@ -530,11 +553,49 @@ pub fn is_open(cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().is_some_and(|h| h.0.is_some())
 }
 
-/// The open menu, for the window root to draw on top of everything.
-pub fn render_host(cx: &App) -> Option<AnyElement> {
-    let (pos, anchor, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+/// The menu open in `window`, drawn on top of everything. Windows opened
+/// with [`open_window`] draw it themselves.
+fn render_host(window: &Window, cx: &App) -> Option<AnyElement> {
+    let (id, pos, anchor, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    if *id != window.window_handle().window_id() {
+        return None;
+    }
     // Live: a menu that doesn't fit below the pointer opens above it.
     Some(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element())
+}
+
+/// The layer every app window's content sits in: the content plus the
+/// window's open [`OsMenu`].
+struct MenuLayer(AnyView);
+
+impl Render for MenuLayer {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(self.0.clone()).children(render_host(window, cx))
+    }
+}
+
+/// The content view of a window opened with [`open_window`] (under the
+/// kit's Root and the menu layer), e.g. to find a window's Workspace.
+pub fn content_view(window: &Window, cx: &App) -> Option<AnyView> {
+    let root = window.root::<gpui_kit::base::Root>().flatten()?;
+    let view = root.read(cx).view().clone();
+    match view.clone().downcast::<MenuLayer>() {
+        Ok(layer) => Some(layer.read(cx).0.clone()),
+        Err(_) => Some(view),
+    }
+}
+
+/// `gpui_kit::open_window` with the Onshape menus wired in: right-click and
+/// dropdown menus opened in this window draw in it (above its dialogs).
+/// Open every app window with this.
+pub fn open_window<V: Render>(options: WindowOptions, cx: &mut App, build: impl FnOnce(&mut Window, &mut App) -> Entity<V>) -> anyhow::Result<(AnyWindowHandle, Entity<V>)> {
+    let mut built = None;
+    let (handle, _) = gpui_kit::open_window(options, cx, |window, cx| {
+        let view = build(window, cx);
+        built = Some(view.clone());
+        cx.new(|_| MenuLayer(view.into()))
+    })?;
+    Ok((handle, built.expect("open_window ran its build closure")))
 }
 
 /// Right-click opens an Onshape menu built by `f` at the pointer.

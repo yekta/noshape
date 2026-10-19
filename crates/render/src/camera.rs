@@ -253,7 +253,13 @@ impl Camera {
     /// Interpolate between two cameras (for animated view changes).
     pub fn lerp(&self, other: &Camera, t: f64) -> Camera {
         let t = t.clamp(0.0, 1.0);
-        let s = t * t * (3.0 - 2.0 * t);
+        self.interpolate(other, t * t * (3.0 - 2.0 * t))
+    }
+
+    /// Interpolate without easing (`s` = 0..1 along the path); callers apply
+    /// their own easing curve.
+    pub fn interpolate(&self, other: &Camera, s: f64) -> Camera {
+        let s = s.clamp(0.0, 1.0);
         Camera {
             target: self.target.lerp(other.target, s),
             rotation: self.rotation.slerp(other.rotation, s),

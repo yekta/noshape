@@ -349,13 +349,28 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
     };
     let id = BodyId { feature: ev.feature, index: 0 };
     let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
-    let mut body = Body::new(id, name, kind, compound, faces, members[0].color, ev.feature);
+    // A new part: the next colour of the rotation (live part-studio/472:
+    // after Part 1 light blue and Part 2 gray, the closed composite is dark
+    // blue #4e6fb7).
+    let color = ev.ctx.alloc_color();
+    let mut body = Body::new(id, name, kind, compound, faces, color, ev.feature);
     body.edges = edges;
     body.vertices = vertices;
     let ids: Vec<BodyId> = members.iter().map(|b| b.id.clone()).collect();
-    let pos = idx[0];
-    ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
-    ev.ctx.bodies.insert(pos.min(ev.ctx.bodies.len()), Arc::new(body));
+    // Help (PartStudio__composite_part): Closed consumes the bodies (only the
+    // composite is listed; graphically they are still there); an open
+    // composite leaves them as separate parts "in addition to being part of
+    // the composite part" (live: "Composite test" keeps Part 1 and Part 2).
+    let closed = ev.bool("closed");
+    body.composite = Some(crate::display::CompositeInfo { members: ids.clone(), closed });
+    if closed {
+        let pos = idx[0];
+        ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
+        ev.ctx.bodies.insert(pos.min(ev.ctx.bodies.len()), Arc::new(body));
+    } else {
+        // After the members: entity lookups find the members first.
+        ev.ctx.bodies.push(Arc::new(body));
+    }
     Ok(())
 }
 

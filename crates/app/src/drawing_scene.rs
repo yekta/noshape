@@ -168,10 +168,15 @@ pub fn sheet_fills(built: &BuiltSheet) -> MeshData {
     m
 }
 
+/// Onshape's grey behind property fields in title blocks and notes.
+const PROPERTY_BACKGROUND: [u8; 3] = [0xe6, 0xe6, 0xe6];
+
 /// Backdrops (colored areas under all the ink), one mesh per color.
 pub fn sheet_backdrops(built: &BuiltSheet) -> ColoredMeshes {
     let mut out: ColoredMeshes = Vec::new();
-    for (pts, c) in &built.geometry.backdrops {
+    // Property fields' grey background (screen only) under the rest.
+    let fields = built.geometry.field_backdrops.iter().map(|p| (p, &PROPERTY_BACKGROUND));
+    for (pts, c) in fields.chain(built.geometry.backdrops.iter().map(|(p, c)| (p, c))) {
         if pts.len() < 3 {
             continue;
         }

@@ -96,9 +96,44 @@ pub trait Builtin: Any + Send + Sync + std::fmt::Debug {
 
 static SERIAL: AtomicU64 = AtomicU64::new(1);
 
-/// A fresh creation serial for boxes and builtins.
+/// Low bits of a serial: the number Onshape prints ("Box: 0", "BuiltIn: 3"),
+/// counted per feature run and separately for boxes and builtins (live: the
+/// Context is "BuiltIn: 0", a reference parameter's handles 1…12, the first
+/// box "Box: 0"). The high bits keep serials unique and in creation order.
+const SHOWN_BITS: u32 = 24;
+
+thread_local! {
+    /// Next printed number of a builtin and of a box on this thread.
+    static SHOWN: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+/// Restart the printed numbers (at the start of each feature run).
+pub fn reset_shown_numbers() {
+    SHOWN.with(|c| c.set((0, 0)));
+}
+
+fn make_serial(boxed: bool) -> u64 {
+    let shown = SHOWN.with(|c| {
+        let (b, x) = c.get();
+        c.set(if boxed { (b, x + 1) } else { (b + 1, x) });
+        if boxed { x } else { b }
+    });
+    (SERIAL.fetch_add(1, AtomicOrdering::Relaxed) << SHOWN_BITS) | (shown & ((1 << SHOWN_BITS) - 1))
+}
+
+/// A fresh creation serial for a builtin.
 pub fn next_serial() -> u64 {
-    SERIAL.fetch_add(1, AtomicOrdering::Relaxed)
+    make_serial(false)
+}
+
+/// A fresh creation serial for a box.
+pub fn next_box_serial() -> u64 {
+    make_serial(true)
+}
+
+/// The number a serial prints as.
+pub fn shown_number(serial: u64) -> u64 {
+    serial & ((1 << SHOWN_BITS) - 1)
 }
 
 /// A shared reference to a box's cell or a function. Map keys order these
@@ -265,7 +300,7 @@ impl Value {
         Value::Map(Arc::new(m), Tag::NONE)
     }
     pub fn new_box(v: Value) -> Value {
-        Value::Box(Shared::new(BoxCell { serial: next_serial(), value: Mutex::new(v) }))
+        Value::Box(Shared::new(BoxCell { serial: next_box_serial(), value: Mutex::new(v) }))
     }
     /// A map from string keys.
     pub fn map_from<'a>(entries: impl IntoIterator<Item = (&'a str, Value)>) -> Value {
@@ -542,16 +577,16 @@ fn write_display(out: &mut String, v: &Value, top: bool) {
             }
             out.push_str(" }");
         }
-        // Live: "Box: 0", "Context : BuiltIn: 0", "<function 6>" (Onshape's
-        // own object numbers; ours are creation serials).
+        // Live: "Box: 0", "Context : BuiltIn: 0", "<function 6>" (numbered
+        // per feature run, see `shown_number`).
         Value::Box(b) => {
-            let _ = write!(out, "Box: {}", b.serial);
+            let _ = write!(out, "Box: {}", shown_number(b.serial));
         }
         Value::Builtin(b, t) => {
             if !t.is_none() {
                 let _ = write!(out, "{} : ", tag_name(*t));
             }
-            let _ = write!(out, "BuiltIn: {}", b.serial());
+            let _ = write!(out, "BuiltIn: {}", shown_number(b.serial()));
         }
         Value::Function(f) => {
             let line = match &**f {

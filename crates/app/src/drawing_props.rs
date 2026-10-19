@@ -113,8 +113,16 @@ impl DrawingEditor {
             MenuEntry::item(if hidden_lines { "Hide hidden lines" } else { "Show hidden lines" }, move |t, _, cx| {
                 t.edit_view("Hidden lines", id, cx, |v| v.style = if hidden_lines { RenderStyle::HiddenLinesRemoved } else { RenderStyle::HiddenLinesVisible })
             }),
-            MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_view("Shaded view", id, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })),
         ];
+        // Flat pattern views: bend lines and bend notes (shown by default).
+        if v.flat {
+            let (bl, bn) = (!v.hide_bend_lines, !v.hide_bend_notes);
+            show.push(MenuEntry::item(if bl { "Hide bend lines" } else { "Show bend lines" }, move |t, _, cx| t.edit_view("Bend lines", id, cx, |v| v.hide_bend_lines = bl)));
+            show.push(MenuEntry::item(if bn { "Hide bend notes" } else { "Show bend notes" }, move |t, _, cx| t.edit_view("Bend notes", id, cx, |v| v.hide_bend_notes = bn)));
+        }
+        show.push(MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_view("Shaded view", id, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })));
+        let threads = !v.hide_threads;
+        show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
         let cl = v.show_centerlines;
         show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| v.show_centerlines = !cl)));
         let al = v.auto_centerlines.unwrap_or(cl);
@@ -247,6 +255,7 @@ impl DrawingEditor {
             ids = vec![id];
         }
         if ids.is_empty() {
+            self.copy_entities(cx);
             return;
         }
         match self.drawing.copy_views(self.sheet, &ids, Some(&self.sources)) {
@@ -258,6 +267,16 @@ impl DrawingEditor {
             Err(e) => self.status = Some(e.into()),
         }
         cx.notify();
+    }
+
+    /// Copy the selected annotations and tables (Ctrl+C, context menu Copy).
+    pub fn copy_entities(&mut self, cx: &mut Context<Self>) {
+        let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
+        let tables: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Table(t) = s { Some(*t) } else { None }).collect();
+        if let Ok(c) = self.drawing.copy_entities(self.sheet, &anns, &tables) {
+            cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
+            cx.notify();
+        }
     }
 
     /// Paste (view menu, Ctrl+V): copied views centered on the cursor.

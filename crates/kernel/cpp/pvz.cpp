@@ -7,6 +7,7 @@
 // triangle mesh. Everything in metres.
 
 #include "internal.hpp"
+#include "pvz_reader.hpp"
 #include "pvz_writer.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
@@ -18,6 +19,7 @@
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BSplCLib.hxx>
 #include <Bnd_Box.hxx>
@@ -40,6 +42,7 @@
 #include <TopoDS.hxx>
 
 #include <fstream>
+#include <iterator>
 
 namespace noshape {
 
@@ -329,6 +332,52 @@ void write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names,
   out.write(data.data(), (std::streamsize)data.size());
   if (!out)
     fail_op("writing " + std::string(path) + " failed");
+}
+
+// Onshape imports a PVZ as meshes only (live G22): each part instance's
+// tessellation, placed, nodes within Parasolid's precision (1e-8 m) welded;
+// a closed mesh is a solid, an open one (a loft whose faces' meshes leave
+// gaps) stays a shell. Metres.
+std::unique_ptr<OcShape> read_pvz(rust::Str path, uint32_t merge_limit)
+{
+  const std::string p(path.data(), path.size());
+  std::ifstream     in(p, std::ios::binary);
+  if (!in)
+    fail_io("could not open " + p);
+  const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  std::vector<pvz::MeshInstance> meshes;
+  try
+  {
+    meshes = pvz::read_meshes(bytes);
+  }
+  catch (const std::exception& e)
+  {
+    fail_io(std::string(e.what()) + " (" + p + ")");
+  }
+  BRep_Builder    b;
+  TopoDS_Compound c;
+  b.MakeCompound(c);
+  int n = 0;
+  for (const auto& m : meshes)
+  {
+    const auto&         T = m.placement;
+    std::vector<gp_Pnt> nodes;
+    for (size_t i = 0; i + 2 < m.positions.size(); i += 3)
+    {
+      const double x = m.positions[i], y = m.positions[i + 1], z = m.positions[i + 2];
+      nodes.emplace_back(T[0] * x + T[1] * y + T[2] * z + T[3], T[4] * x + T[5] * y + T[6] * z + T[7], T[8] * x + T[9] * y + T[10] * z + T[11]);
+    }
+    std::vector<std::array<int, 3>> tris;
+    for (size_t i = 0; i + 2 < m.triangles.size(); i += 3)
+      tris.push_back({(int)m.triangles[i], (int)m.triangles[i + 1], (int)m.triangles[i + 2]});
+    if (tris.empty())
+      continue;
+    b.Add(c, mesh_shape(nodes, tris, merge_limit, 1e-8));
+    ++n;
+  }
+  if (n == 0)
+    fail_io("no meshes in " + p);
+  return wrap(c);
 }
 
 } // namespace noshape

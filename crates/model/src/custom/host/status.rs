@@ -8,6 +8,9 @@ use noshape_featurescript::value::{Map, Value};
 use noshape_units::{Dim, Quantity};
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
+    ("getTolerantParameterIds", get_tolerant_parameter_ids),
+    ("getParameterToleranceInfo", get_parameter_tolerance_info),
+    ("validateToleranceSchema", |_, _| Ok(Value::array(Vec::new()))),
     ("newContext", new_context),
     ("isContext", is_context),
     ("convert", convert),
@@ -455,4 +458,16 @@ fn remove_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         !hit
     });
     Ok(Value::Undefined)
+}
+
+/// Tolerant quantity parameters of the running feature with a tolerance set.
+/// Feature parameter values carry no tolerances yet, so there are none.
+fn get_tolerant_parameter_ids(_: &mut Interp, _: Vec<Value>) -> R<Value> {
+    Ok(Value::map(Map::new()))
+}
+
+/// The tolerance of a parameter: `ToleranceType.NONE` (see above).
+fn get_parameter_tolerance_info(_: &mut Interp, _: Vec<Value>) -> R<Value> {
+    let none = super::std_enum("toleranceTypes.fs", "ToleranceType", "NONE").unwrap_or_else(|| Value::str("NONE"));
+    Ok(Value::map_from([("toleranceType", none)]))
 }

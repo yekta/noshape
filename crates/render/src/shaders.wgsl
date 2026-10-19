@@ -285,6 +285,14 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     return vec4(g.select.rgb, 1.0);
 }
 
+// Depth of outlined parts only (no color): see mesh_outline_depth.
+@fragment
+fn fs_outline_depth(i: MeshOut) -> @location(0) vec4<f32> {
+    let st = state_of(i.pick);
+    if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(0.0);
+}
+
 struct SectionOut {
     @location(0) color: vec4<f32>,
     @builtin(frag_depth) depth: f32,

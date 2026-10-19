@@ -58,6 +58,8 @@ pub(super) struct InContextUi {
     body_tops: Vec<InstanceId>,
     /// The amber banner's split button shows Go to assembly (last used).
     pub split_go_to_assembly: bool,
+    /// Insert and go to assembly's "Select items to insert" dialog is open.
+    pub insert_go: bool,
 }
 
 /// A Part Studio menu action.
@@ -85,7 +87,7 @@ pub enum PartStudioEvent {
     /// "Go to assembly" in the in-context banner.
     ActivateTab(noshape_model::document::TabId),
     /// "Insert and go to assembly" (Part Studio created in context).
-    InsertInAssembly { assembly: noshape_model::document::TabId, studio: noshape_model::document::TabId, parts: Vec<BodyId>, at: noshape_model::assembly::Placement },
+    InsertInAssembly { assembly: noshape_model::document::TabId, studio: noshape_model::document::TabId, parts: Vec<BodyId>, sketches: Vec<FeatureId>, at: noshape_model::assembly::Placement },
 }
 
 impl EventEmitter<PartStudioEvent> for PartStudioView {}
@@ -123,7 +125,7 @@ impl PartStudioView {
                 .context
                 .and_then(|id| self.studio(cx).and_then(|s| s.contexts.iter().find(|c| c.id == id)).map(|c| c.bodies.iter().map(|b| InstanceId(b.path.first().copied().unwrap_or(0))).collect()))
                 .unwrap_or_default();
-            InContextUi { ctx, gpu, hidden: HashSet::new(), show_internal: false, select_transparent: true, slider: DEFAULT_SLIDER, hide_show_open: false, slider_bounds: Default::default(), body_tops, split_go_to_assembly: false }
+            InContextUi { ctx, gpu, hidden: HashSet::new(), show_internal: false, select_transparent: true, slider: DEFAULT_SLIDER, hide_show_open: false, slider_bounds: Default::default(), body_tops, split_go_to_assembly: false, insert_go: false }
         });
         self.refresh_scene(false, cx);
         cx.notify();
@@ -156,14 +158,27 @@ impl PartStudioView {
                 outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::SELECTION), &mut lines);
             }
         }
+        // The see-through context faces don't show the usual hover / selection
+        // tint: a hovered one gets the preselection outline (`#ffc685`, live
+        // assembly/503), a selected one (outside a dialog) the selection outline.
+        if self.edit.is_none() {
+            for r in selection {
+                if let Some((b, fi)) = face(r) {
+                    outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::SELECTION), &mut lines);
+                }
+            }
+        }
+        if let Some((b, fi)) = self.hover.as_ref().filter(|r| !selection.contains(r)).and_then(|r| face(r)) {
+            outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::PREHIGHLIGHT), &mut lines);
+        }
         if let Some(f) = self.ui.context_arrow_hover.and_then(|id| self.studio(cx)?.features.iter().find(|f| f.id == id)) {
             for r in noshape_model::in_context::context_refs(&f.params) {
                 if let Some((b, fi)) = face(&r) {
                     outline_face(b, fi, CONTEXT_REF_OUTLINE, &mut lines);
-                } else if let Some((b, ei)) = bodies.iter().filter(|b| !b.hidden).find_map(|b| b.edge_refs.iter().position(|e| *e == r).map(|i| (b, i))) {
-                    if let Some(pl) = b.mesh.edges.get(ei) {
-                        lines.push_polyline(pl, CONTEXT_REF_OUTLINE, 0, 2.0, noshape_render::LineSegment::ON_TOP);
-                    }
+                } else if let Some((b, ei)) = bodies.iter().filter(|b| !b.hidden).find_map(|b| b.edge_refs.iter().position(|e| *e == r).map(|i| (b, i)))
+                    && let Some(pl) = b.mesh.edges.get(ei)
+                {
+                    lines.push_polyline(pl, CONTEXT_REF_OUTLINE, 0, 2.0, noshape_render::LineSegment::ON_TOP);
                 }
             }
         }
@@ -365,59 +380,61 @@ impl PartStudioView {
                         .child(div().w(px(10.)))
                     })
                     .when(amber.is_none(), |d| d.child(match c.ctx.insert_at {
-                        // A Part Studio created in context: Go to assembly ▾
-                        // offers Insert and go to assembly.
-                        Some(at) => small_button("ctx-go", "Go to assembly ▾")
-                            .on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
+                        // A Part Studio created in context (live assembly/551):
+                        // [Insert and go to assembly][▾] (Insert and go to
+                        // assembly, Go to assembly, Hide/show instances) and ✕.
+                        Some(_) => h_flex()
+                            .child(small_button("ctx-insert-go", "Insert and go to assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_go(cx))))
+                            .child(small_button("ctx-insert-caret", "").w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
                                 let view = cx.entity();
                                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                    let (v1, v2) = (view.clone(), view.clone());
-                                    m.item(crate::os_menu::OsMenuItem::new("Insert and go to assembly").on_click(move |_, _, cx| {
-                                        v1.update(cx, |this, cx| {
-                                            let studio = this.tab;
-                                            // The selected parts, else every part.
-                                            let mut parts: Vec<BodyId> = this.selection.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
-                                            if parts.is_empty() {
-                                                parts = this.display.bodies.iter().filter(|b| matches!(b.kind, noshape_model::display::BodyKind::Solid) && !b.hidden).map(|b| b.id.clone()).collect();
-                                            }
-                                            this.exit_context(cx);
-                                            cx.emit(PartStudioEvent::InsertInAssembly { assembly, studio, parts, at });
-                                        })
-                                    }))
-                                    .item(crate::os_menu::OsMenuItem::new("Go to assembly").on_click(move |_, _, cx| {
-                                        v2.update(cx, |this, cx| {
-                                            this.exit_context(cx);
-                                            cx.emit(PartStudioEvent::ActivateTab(assembly));
-                                        })
-                                    }))
+                                    let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                                    m.list_no_icons()
+                                        .item(crate::os_menu::OsMenuItem::new("Insert and go to assembly").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.open_insert_go(cx))))
+                                        .item(crate::os_menu::OsMenuItem::new("Go to assembly").on_click(move |_, _, cx| {
+                                            v2.update(cx, |this, cx| {
+                                                this.exit_context(cx);
+                                                cx.emit(PartStudioEvent::ActivateTab(assembly));
+                                            })
+                                        }))
+                                        .item(crate::os_menu::OsMenuItem::new("Hide/show instances").on_click(move |_, _, cx| {
+                                            v3.update(cx, |this, cx| {
+                                                if let Some(c) = &mut this.ui.in_context {
+                                                    c.hide_show_open = !c.hide_show_open;
+                                                }
+                                                cx.notify();
+                                            })
+                                        }))
                                 });
                                 crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
-                            }))
+                            })))
                             .into_any_element(),
-                        None => small_button("ctx-go", "Go to assembly")
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        None => h_flex()
+                            .child(small_button("ctx-go", "Go to assembly").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.exit_context(cx);
                                 cx.emit(PartStudioEvent::ActivateTab(assembly));
-                            }))
+                            })))
+                            .child(div().w(px(10.)))
+                            .child(small_button("ctx-hide-show", "Hide/show instances").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(c) = &mut this.ui.in_context {
+                                    c.hide_show_open = !c.hide_show_open;
+                                }
+                                cx.notify();
+                            })))
                             .into_any_element(),
                     }))
-                    .when(amber.is_none(), |d| d.child(div().w(px(10.)))
-                    .child(small_button("ctx-hide-show", "Hide/show instances").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(c) = &mut this.ui.in_context {
-                            c.hide_show_open = !c.hide_show_open;
-                        }
-                        cx.notify();
-                    })))
+                    .when(amber.is_none(), |d| d
                     .child(
                         div()
                             .id("ctx-exit")
-                            .ml(px(11.))
-                            .mr(px(8.))
-                            .size(px(13.))
+                            .ml(px(7.5))
+                            .mr(px(4.5))
+                            .size(px(20.))
                             .opacity(0.5)
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Exit context"))
-                            .child(Icon::new(IconName::Close).size(px(13.)).text_color(rgb(0x000000)))
+                            // Bootstrap `btn-close` (live 551: an 11 px ✕).
+                            .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., rgb(0x000000)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.exit_context(cx))),
                     )),
             )
@@ -507,6 +524,199 @@ impl PartStudioView {
             banner = banner.child(list);
         }
         Some(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner).into_any_element())
+    }
+}
+
+impl PartStudioView {
+    /// Insert and go to assembly (live assembly/545): the "Select items to
+    /// insert" dialog, its field empty (no preselection).
+    pub(super) fn open_insert_go(&mut self, cx: &mut Context<Self>) {
+        let Some(c) = &mut self.ui.in_context else { return };
+        c.insert_go = true;
+        self.selection.clear();
+        self.selected_features.clear();
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    pub(super) fn insert_go_open(&self) -> bool {
+        self.ui.in_context.as_ref().is_some_and(|c| c.insert_go)
+    }
+
+    /// What a pick adds to "Select parts/surfaces/sketches": the part of a
+    /// face, edge or vertex, the sketch of a curve or region.
+    pub(super) fn insert_go_item(&self, r: &Reference) -> Option<Reference> {
+        match r {
+            Reference::Body(_) | Reference::Sketch(_) => Some(r.clone()),
+            Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) => self.body_of(r).map(Reference::Body),
+            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(Reference::Sketch(*sketch)),
+            _ => None,
+        }
+    }
+
+    /// A graphics or list pick while the dialog is open toggles its item;
+    /// `false` when the dialog isn't open.
+    pub(super) fn insert_go_pick(&mut self, r: &Reference, cx: &mut Context<Self>) -> bool {
+        if !self.insert_go_open() {
+            return false;
+        }
+        match self.insert_go_item(r) {
+            Some(item) => match self.selection.iter().position(|x| *x == item) {
+                Some(i) => {
+                    self.selection.remove(i);
+                }
+                None => self.selection.push(item),
+            },
+            None => self.flash_info("Select parts/surfaces/sketches".into(), cx),
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
+    /// The dialog's items: picked parts, surfaces and sketches.
+    fn insert_go_items(&self) -> Vec<Reference> {
+        let mut out: Vec<Reference> = Vec::new();
+        for r in self.selection.iter().filter_map(|r| self.insert_go_item(r)).chain(self.selected_features.iter().filter(|f| self.display.sketches.iter().any(|s| s.feature == **f)).map(|f| Reference::Sketch(*f))) {
+            if !out.contains(&r) {
+                out.push(r);
+            }
+        }
+        out
+    }
+
+    /// Esc / ✕: close the dialog (stays in the Part Studio).
+    pub(super) fn close_insert_go(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(c) = self.ui.in_context.as_mut().filter(|c| c.insert_go) else { return false };
+        c.insert_go = false;
+        self.selection.clear();
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
+    /// ✓: nothing picked closes the dialog and stays (live 546); otherwise
+    /// the items go into the assembly at the Part Studio's origin and the
+    /// assembly opens (live 547–550).
+    fn accept_insert_go(&mut self, cx: &mut Context<Self>) {
+        let items = self.insert_go_items();
+        let target = self.ui.in_context.as_ref().and_then(|c| c.ctx.insert_at.map(|at| (c.ctx.assembly, at)));
+        self.close_insert_go(cx);
+        let Some((assembly, at)) = target.filter(|_| !items.is_empty()) else { return };
+        let parts = items.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
+        let sketches = items.iter().filter_map(|r| if let Reference::Sketch(f) = r { Some(*f) } else { None }).collect();
+        let studio = self.tab;
+        self.exit_context(cx);
+        cx.emit(PartStudioEvent::InsertInAssembly { assembly, studio, parts, sketches, at });
+    }
+
+    /// The 220 px feature-style dialog "Select items to insert" (live
+    /// dom/assembly-insert-and-go-dialog.txt): ✓ ✕, the blue query field
+    /// "Select parts/surfaces/sketches" with one chip per item, `?`.
+    pub(super) fn render_insert_go(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.insert_go_open() {
+            return None;
+        }
+        let pal = p();
+        let items = self.insert_go_items();
+        let name = |r: &Reference| match r {
+            Reference::Body(b) => self.display.body(b).map(|b| b.name.clone()).unwrap_or_default(),
+            Reference::Sketch(f) => self.studio(cx).and_then(|s| s.features.iter().find(|x| x.id == *f).map(|x| x.name.clone())).unwrap_or_default(),
+            _ => String::new(),
+        };
+        let mut field = v_flex()
+            .rounded(px(2.))
+            .border_1()
+            .border_color(rgb(0x1651b0))
+            .bg(rgb(0xdef1fb))
+            .text_color(rgb(0x555555));
+        if items.is_empty() {
+            field = field.child(div().h(px(24.)).px(px(6.)).flex().items_center().text_size(px(12.)).child("Select parts/surfaces/sketches"));
+        } else {
+            field = field.child(div().px(px(6.)).pt(px(5.)).text_size(px(10.)).child("Select parts/surfaces/sketches"));
+            for (i, r) in items.into_iter().enumerate() {
+                let label = name(&r);
+                field = field.child(
+                    h_flex()
+                        .h(px(24.))
+                        .pl(px(6.))
+                        .pr(px(5.))
+                        .text_size(px(13.33))
+                        .child(div().flex_1().truncate().child(label.clone()))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("insert-go-del-{i}")))
+                                .px(px(5.))
+                                .text_size(px(16.67))
+                                .text_color(rgb(0x666666))
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                                .child("×")
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    let keep: Vec<Reference> = this.selection.iter().filter(|x| this.insert_go_item(x).as_ref() != Some(&r)).cloned().collect();
+                                    this.selection = keep;
+                                    if let Reference::Sketch(f) = &r {
+                                        this.selected_features.retain(|x| x != f);
+                                    }
+                                    this.refresh_scene(false, cx);
+                                    cx.notify();
+                                })),
+                        ),
+                );
+            }
+        }
+        let help = div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+        Some(
+            v_flex()
+                .id("insert-go")
+                .occlude()
+                .absolute()
+                .top(px(3.))
+                .left_0()
+                .w(px(220.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .bg(rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Select items to insert"))
+                        .child(
+                            div()
+                                .id("insert-go-ok")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(pal.accept)
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
+                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_insert_go(cx))),
+                        )
+                        .child(
+                            div()
+                                .id("insert-go-cancel")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.close_insert_go(cx);
+                                })),
+                        ),
+                )
+                .child(div().px(px(3.)).pt(px(5.)).child(field))
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(help))
+                .into_any_element(),
+        )
     }
 }
 
@@ -655,7 +865,7 @@ impl PartStudioView {
         // While a feature dialog picks context geometry the section shows
         // that context greyed, without ⋯ (live 504).
         let editing = self.edit.is_some();
-        let pending = self.ui.in_context.as_ref().and_then(|c| c.ctx.context).filter(|_| editing);
+        let pending = self.ui.in_context.as_ref().and_then(|c| c.ctx.context).filter(|id| self.edit.as_ref().is_some_and(|e| noshape_model::in_context::params_use_context(&e.dialog.read(cx).feature.params, Some(*id))));
         let mut referenced = noshape_model::in_context::referenced_contexts(&studio.features);
         referenced.extend(pending);
         let contexts: Vec<(u32, String, String)> = studio.contexts.iter().filter(|c| referenced.contains(&c.id)).map(|c| (c.id, c.name.clone(), self.assembly_name(c.assembly, cx))).collect();

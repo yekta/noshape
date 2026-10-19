@@ -159,6 +159,9 @@ pub struct SceneOptions {
     pub editing_sketch: Option<FeatureId>,
     /// Bodies rendered dimmed (e.g. features below the rolled-back bar preview).
     pub transparent_bodies: bool,
+    /// Solid bodies drawn light gray instead of their colour (Interference
+    /// detection results, live analysis/82: `#d1d6da`, see-through).
+    pub neutral_bodies: bool,
     pub display_mode: DisplayMode,
     /// Section view clipping planes (normal, offset along normal), up to
     /// three; geometry is cut away where all of them clip it.
@@ -253,6 +256,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             )
         };
         let mut color = b.color;
+        if opts.neutral_bodies && b.kind == BodyKind::Solid {
+            // The overlap shows through nearly unchanged (live analysis/83).
+            color = theme::lin(0xd1d6da);
+            color[3] = 0.2;
+        }
         if opts.transparent_bodies || b.kind == BodyKind::Surface {
             color[3] = color[3].min(if b.kind == BodyKind::Surface { 0.85 } else { 0.35 });
         }
@@ -404,7 +412,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     if opts.show_origin && display.show_origin {
         let id = picks.push(PickTarget { reference: Reference::Origin, kind: PickKind::Origin, anchor: Some(DVec3::ZERO) });
         // Onshape draws the origin as an 11 px ring with a center dot (point style 4).
-        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::viewport::ORIGIN), pick_id: id, size: 12.0, style: 4, _pad: 0 }] };
+        // While sketching it stays over the edge-on planes crossing it (live
+        // sketch/06 shows the whole ring and dot).
+        let style = 4 | if opts.editing_sketch.is_some() { LineSegment::ON_TOP } else { 0 };
+        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::viewport::ORIGIN), pick_id: id, size: 12.0, style, _pad: 0 }] };
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().ignore_clip().layer(6));
     }
 
@@ -442,7 +453,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some(c) => lin_to_u8(c),
                     None => sketch_color(&opts.graphics, p.state, false, editing, false),
                 };
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { 5.5 };
+                // Live (sketch/06): vertices of the edited sketch are 7 px dots.
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { 7.0 };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
@@ -484,7 +496,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     hidden.push_polyline(&c.points, oc, 0, opts.graphics.sketch_line_width, style);
                 }
                 let hidden_pts = PointData {
-                    points: sk.points.iter().filter(|p| p.state == SketchEntityState::Under).map(|p| PointSprite { position: p.position, color: oc, pick_id: 0, size: if p.standalone { 7.0 } else if p.handle { 3.5 } else { 5.5 }, style: 0, _pad: 0 }).collect(),
+                    points: sk.points.iter().filter(|p| p.state == SketchEntityState::Under).map(|p| PointSprite { position: p.position, color: oc, pick_id: 0, size: if p.standalone { 7.0 } else if p.handle { 3.5 } else { 7.0 }, style: 0, _pad: 0 }).collect(),
                 };
                 if !hidden.segments.is_empty() {
                     scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&hidden))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(10));
@@ -508,10 +520,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             if !mesh.indices.is_empty() {
                 // The sketch being edited shows its closed regions filled
-                // (`#9aa5af` at about a quarter, Onshape's region fill).
+                // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
+                // rgb(245,248,250), which our linear blending reaches at 0.34).
                 let fill = if editing {
                     let c = theme::lin(theme::viewport::SKETCH_REGION);
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.26])
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.34])
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
@@ -637,8 +650,14 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         // amber with an amber boundary.
                         let hovered = flag == state::HOVER;
                         let c = if hovered { hov_color } else { sel_color };
+                        // Region meshes sit 1 µm above the plane (regen
+                        // display.rs); the outline goes back onto the plane so
+                        // it doesn't count as hiding the sketch's own curves
+                        // (the underconstrained-occluded pass drew them #4040ff).
+                        let down = (sk.frame.normal * 1e-6).as_vec3();
+                        let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
                         for (a, b) in region_outline(&reg.positions, &reg.indices) {
-                            overlay_lines.segments.push(LineSegment { a, b, color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+                            overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
                         }
                         if !hovered {
                             let n: [f32; 3] = sk.frame.normal.as_vec3().into();
@@ -748,7 +767,7 @@ fn laminar_edges(m: &noshape_model::display::MeshBuffers) -> Vec<bool> {
 /// The edges bounding a body face: those whose polyline points are all
 /// vertices of the face's triangles (the mesher shares edge points with the
 /// faces it bounds).
-fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
+pub(crate) fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
     let Some((body, fi)) = display.bodies.iter().filter(|b| !b.hidden).find_map(|b| b.face_refs.iter().position(|f| f == r).map(|i| (b, i))) else { return Vec::new() };
     let m = &body.mesh;
     let Some(&(first, count)) = m.face_ranges.get(fi) else { return Vec::new() };

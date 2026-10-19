@@ -9,6 +9,8 @@ use noshape_kernel as k;
 use noshape_kernel::ShapeType;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
+    ("clusterBodies", cluster_bodies),
+    ("evApproximateBSplineCurve", ev_approximate_bspline_curve),
     ("evVertexPoint", ev_vertex_point),
     ("evLine", ev_line),
     ("evAxis", ev_axis),
@@ -113,7 +115,7 @@ fn ev_owner_sketch_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// Edge parameter (0..1) to curve parameter, by arc length when asked.
-fn edge_param(s: &k::Shape, info: &k::EdgeInfo, t: f64, arc_length: bool) -> f64 {
+pub(super) fn edge_param(s: &k::Shape, info: &k::EdgeInfo, t: f64, arc_length: bool) -> f64 {
     let lin = info.first_param + (info.last_param - info.first_param) * t;
     if !arc_length || matches!(info.curve, k::Curve::Line { .. } | k::Curve::Circle { .. }) {
         return lin;
@@ -488,24 +490,47 @@ fn ev_curve_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 ("minorRadius", length_value(minor_radius)),
             ])
             .with_tag(std_tag("curveGeometry.fs", "Ellipse")),
-            _ => {
-                let b = s.edge_bspline().ok()?;
-                let poles: Vec<Value> = b.poles.iter().map(|p| point_value(*p)).collect();
-                let mut knots = Vec::new();
-                for (kv, m) in b.knots.iter().zip(&b.mults) {
-                    for _ in 0..*m {
-                        knots.push(Value::num(*kv));
-                    }
-                }
-                let mut entries = vec![("degree", Value::num(b.degree as f64)), ("dimension", Value::num(3.0)), ("isRational", Value::bool(b.weights.is_some())), ("isPeriodic", Value::bool(b.periodic)), ("controlPoints", Value::array(poles)), ("knots", Value::array(knots).with_tag(std_tag("splineUtils.fs", "KnotArray")))];
-                if let Some(w) = &b.weights {
-                    entries.push(("weights", Value::array(w.iter().map(|x| Value::num(*x)).collect())));
-                }
-                Value::map_from(entries).with_tag(std_tag("curveGeometry.fs", "BSplineCurve"))
-            }
+            _ => bspline_value(&s.edge_bspline().ok()?),
         })
     })?;
     Ok(v)
+}
+
+/// A std `BSplineCurve` (knots expanded by multiplicity).
+fn bspline_value(b: &k::BSplineCurveData) -> Value {
+    let poles: Vec<Value> = b.poles.iter().map(|p| point_value(*p)).collect();
+    let mut knots = Vec::new();
+    for (kv, m) in b.knots.iter().zip(&b.mults) {
+        for _ in 0..*m {
+            knots.push(Value::num(*kv));
+        }
+    }
+    let mut entries = vec![("degree", Value::num(b.degree as f64)), ("dimension", Value::num(3.0)), ("isRational", Value::bool(b.weights.is_some())), ("isPeriodic", Value::bool(b.periodic)), ("controlPoints", Value::array(poles)), ("knots", Value::array(knots).with_tag(std_tag("splineUtils.fs", "KnotArray")))];
+    if let Some(w) = &b.weights {
+        entries.push(("weights", Value::array(w.iter().map(|x| Value::num(*x)).collect())));
+    }
+    Value::map_from(entries).with_tag(std_tag("curveGeometry.fs", "BSplineCurve"))
+}
+
+/// The edge as a B-spline: exact when possible; with `forceCubic` /
+/// `forceNonRational` that the exact form doesn't meet, a cubic
+/// non-rational interpolation through samples of the edge.
+fn ev_approximate_bspline_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let cubic = field(&a, "forceCubic").as_bool().unwrap_or(false);
+    let non_rational = field(&a, "forceNonRational").as_bool().unwrap_or(false);
+    on_first(i, &cx, &a, "edge", "INVALID_INPUT", |q, e| {
+        let s = q.shape(e)?;
+        let exact = s.edge_bspline().ok()?;
+        if (!cubic || exact.degree == 3) && (!non_rational || exact.weights.is_none()) {
+            return Some(bspline_value(&exact));
+        }
+        let info = s.edge_info().ok()?;
+        let n = (exact.poles.len() * 4).clamp(16, 200);
+        let pts: Vec<DVec3> = (0..=n).filter_map(|j| s.point_at(info.first_param + (info.last_param - info.first_param) * j as f64 / n as f64).ok()).collect();
+        let fit = k::make_interpolated_spline(&pts, &[], false).ok()?;
+        Some(bspline_value(&fit.edges().first()?.edge_bspline().ok()?))
+    })
 }
 
 fn surface_type(name: &str) -> Value {
@@ -760,4 +785,50 @@ fn ev_face_periodicity(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         })
     })?;
     Ok(Value::array(vec![Value::bool(r[0]), Value::bool(r[1])]))
+}
+
+/// std topologyUtils clusterBodies: groups of bodies with identical topology
+/// and geometry up to a rigid motion (not reflection), as indices into the
+/// evaluated `bodies`. Compared by entity counts, the measure (volume, area
+/// or length) and the inertia tensor's rotation invariants, each within
+/// `relativeTolerance`.
+fn cluster_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let tol = field(&a, "relativeTolerance").as_number().unwrap_or(1e-6);
+    let signatures = with_ents(i, &cx, &field(&a, "bodies"), |_, q, ents| {
+        Ok(ents
+            .iter()
+            .map(|e| {
+                let s = q.shape(e)?;
+                let props = if !s.solids().is_empty() {
+                    k::volume_properties(&s)
+                } else if !s.faces().is_empty() {
+                    k::surface_properties(&s)
+                } else {
+                    k::linear_properties(&s)
+                }
+                .ok()?;
+                let m = props.inertia;
+                let tr = m.x_axis.x + m.y_axis.y + m.z_axis.z;
+                let tr2 = (m * m).x_axis.x + (m * m).y_axis.y + (m * m).z_axis.z;
+                let counts = [s.count(ShapeType::Face), s.count(ShapeType::Edge), s.count(ShapeType::Vertex)];
+                Some((counts, [props.mass, tr, 0.5 * (tr * tr - tr2), m.determinant()]))
+            })
+            .collect::<Vec<_>>())
+    })?;
+    let same = |x: f64, y: f64| (x - y).abs() <= tol * x.abs().max(y.abs()) + 1e-30;
+    let mut clusters: Vec<Vec<usize>> = Vec::new();
+    for (k, sig) in signatures.iter().enumerate() {
+        let found = sig.as_ref().and_then(|(c, v)| {
+            clusters.iter().position(|cl| match &signatures[cl[0]] {
+                Some((c0, v0)) => c0 == c && v0.iter().zip(v).all(|(x, y)| same(*x, *y)),
+                None => false,
+            })
+        });
+        match found {
+            Some(ci) => clusters[ci].push(k),
+            None => clusters.push(vec![k]),
+        }
+    }
+    Ok(Value::array(clusters.into_iter().map(|cl| Value::array(cl.into_iter().map(|k| Value::num(k as f64)).collect())).collect()))
 }

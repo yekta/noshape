@@ -22,6 +22,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include <array>
 #include <functional>
 #include <sstream>
 
@@ -120,17 +121,29 @@ std::string algo_errors(const Algo& a)
 // they are tuned for millimetre-sized parts. 1 = none (set_working_scale).
 double working_scale();
 
+// Corner faces of a fillet over smaller corner fillets rebuilt as Parasolid's
+// rolling-ball vertex blends (vertex_blend.cpp); `s` unchanged (and the
+// history null) when there are none or the result wouldn't be valid.
+TopoDS_Shape exact_vertex_blends(const TopoDS_Shape& s, occ::handle<BRepTools_History>& history);
+
 // Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
 GProp_GProps volume_props(const TopoDS_Shape& s);
 
 // B-rep exchange writers (xt.cpp): a shape with elementary surfaces where it
-// can, B-splines for swept/revolved/offset ones and closed B-spline faces
-// split; whether a face lies on a cylinder/cone/sphere/torus; a face's
+// can, B-splines for swept/offset ones (revolved ones too unless `keep_spun`)
+// and closed B-spline faces split; whether a face lies on a cylinder/cone/
+// sphere/torus (or a kept surface of revolution); a face's
 // boundary as oriented edge cycles without seams of such surfaces and
 // without degenerate edges.
-TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s);
+TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s, bool keep_spun);
 bool                                  exchange_periodic_analytic(const TopoDS_Face& f);
 std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f);
+
+// Mesh import (mesh_io.cpp): a shell (solid when closed) of planar triangle
+// faces; nodes closer than `weld` are one vertex and T-junctions are split
+// (`weld` 0: STL's grid merge). Meshes with at most `merge_limit` triangles
+// get coplanar neighbours merged.
+TopoDS_Shape mesh_shape(const std::vector<gp_Pnt>& nodes, const std::vector<std::array<int, 3>>& tris, uint32_t merge_limit, double weld);
 // One prepared shape as a Parasolid neutral-binary transmit body (from "PS\0\0",
 // no text header: what JT embeds), and its faces in XT order (node ids).
 std::string parasolid_binary_body(const TopoDS_Shape& prepared, std::vector<TopoDS_Face>& faces);

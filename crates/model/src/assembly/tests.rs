@@ -211,6 +211,36 @@ fn a_mate_being_defined_is_solved_alone_until_solve() {
     // Solve (and accepting): every mate, so block 3 follows.
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!((origin_of(&res, 3) - DVec3::new(0.0, 0.0, 0.02)).length() < 1e-6, "{:?}", origin_of(&res, 3));
+    // Dragging during the edit moves the connected group (live 587–589):
+    // every mate is enforced while a drag is solved.
+    let drag = SolveOptions { only_mate: Some(MateId(10)), drags: vec![(InstanceId(2), DVec3::ZERO, DVec3::new(0.0, 0.0, 0.01))], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &drag, None);
+    assert!((origin_of(&res, 3) - DVec3::new(0.0, 0.0, 0.02)).length() < 1e-6, "{:?}", origin_of(&res, 3));
+}
+
+#[test]
+fn implicit_connector_move_offsets_the_mate() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.07, 0.03, -0.02), false),
+        ],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    let z = |ev: &mut AssemblyEvaluator, asm: &Assembly| origin_of(&ev.evaluate(&f.doc, asm, &SolveOptions::default(), None), 2).z;
+    let z0 = z(&mut ev, &asm);
+    // The first connector moved 5 mm along its Z: the second part follows,
+    // and the connector stays implicit (no assembly mate connector).
+    asm.mates[0].a.moved = Some(Box::new(super::ConnectorMove { translation: [None, None, Some(noshape_units::ExprValue::new("5 mm"))], rotation_axis: 2, rotation: None, off: false }));
+    let z1 = z(&mut ev, &asm);
+    assert!((z1 - z0 - 0.005).abs() < 1e-6, "{z0} -> {z1}");
+    assert!(asm.connectors.is_empty());
 }
 
 #[test]
@@ -2106,9 +2136,24 @@ fn sketch_instances_are_wire_occurrences_with_edges() {
     assert_eq!(occ.kind, crate::display::BodyKind::Wire);
     assert_eq!(occ.edge_refs.len(), 4, "the rectangle's four lines");
     assert_eq!(occ.mesh.edges.len(), 4, "drawable edge polylines");
-    // The region fill (live assembly/123): triangles, but no pickable faces.
+    // The region fill (live assembly/123), one pickable face per region
+    // (live 601).
     assert!(!occ.mesh.indices.is_empty(), "the sketch region is filled");
-    assert!(occ.mesh.face_ranges.is_empty() && occ.face_refs.is_empty(), "no faces");
+    assert_eq!(occ.mesh.face_ranges.len(), 1);
+    assert!(matches!(occ.face_refs.as_slice(), [Reference::SketchRegion { .. }]), "{:?}", occ.face_refs);
+    // Hovering inside the loop: the region centroid plus the rectangle's
+    // 4 corners and 4 edge midpoints, all with Z along the sketch normal.
+    let units = UnitPrefs::default();
+    let pts = eval::inference_candidates(&occ.context, Some(&occ.body), &occ.face_refs[0], &units);
+    assert_eq!(pts.len(), 9, "{pts:?}");
+    let normal = r.context.sketches[0].frame.normal;
+    assert!(pts.iter().all(|p| (p.frame.rotation * DVec3::Z).dot(normal) > 1.0 - 1e-6));
+    // The centroid connector resolves for a mate.
+    let mut asm3 = asm.clone();
+    asm3.instances[0].fixed = true;
+    asm3.connectors.push(crate::assembly::AsmMateConnector::new(MateId(6), "Mate connector 2".into(), pts[0].connector(&[InstanceId(1)])));
+    let res3 = ev.evaluate(&f.doc, &asm3, &SolveOptions::default(), None);
+    assert!(res3.connectors.iter().find(|c| c.id == MateId(6)).is_some_and(|c| c.local.is_some()), "the region centroid resolves");
     // Placed with its instance.
     let p = occ.transform.transform_point3(DVec3::ZERO);
     assert!((p.x - 0.1).abs() < 1e-9);
@@ -2143,6 +2188,28 @@ fn dynamic_suppression_suppresses_while_the_expression_is_false() {
     // An expression that doesn't evaluate leaves the instance as it is.
     asm.instances[1].unsuppressed_if = Some("#nope".into());
     assert_eq!(count(&mut ev, &asm), 2);
+}
+
+#[test]
+fn dynamic_suppression_of_a_folder_suppresses_its_instances() {
+    let f = doc_with(vec![pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (pin, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Pin <1>", f.studios[0], pin.clone(), DVec3::ZERO, true),
+            part_instance(2, "Pin <2>", f.studios[0], pin.clone(), DVec3::new(0.05, 0.0, 0.0), false),
+            part_instance(3, "Pin <3>", f.studios[0], pin, DVec3::new(0.1, 0.0, 0.0), false),
+        ],
+        folders: vec![super::ListFolder { id: MateId(20), name: "New folder".into(), instances: vec![InstanceId(2), InstanceId(3)], features: Vec::new(), unsuppressed_if: None }],
+        ..Default::default()
+    };
+    let count = |ev: &mut AssemblyEvaluator, asm: &Assembly| ev.evaluate(&f.doc, asm, &SolveOptions::default(), None).occurrences.len();
+    assert_eq!(count(&mut ev, &asm), 3);
+    asm.folders[0].unsuppressed_if = Some("1 > 2".into());
+    assert_eq!(count(&mut ev, &asm), 1, "a false expression suppresses the folder's instances");
+    asm.folders[0].unsuppressed_if = Some("3 > 2".into());
+    assert_eq!(count(&mut ev, &asm), 3);
 }
 
 #[test]

@@ -7,6 +7,7 @@
 //! "+" menu); the workspace shows the dialog, creates the Drawing tab and,
 //! for No views, starts placing a view of the source at the cursor.
 
+use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
@@ -212,7 +213,8 @@ impl CreateDrawingDialog {
                 .text_size(px(13.))
                 .cursor_pointer()
                 .text_color(if on { pal.accent } else { pal.text })
-                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).border_b_2().border_color(pal.accent))
+                // Live drawing/01: the current standard is blue, semibold and underlined.
+                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).underline())
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.standard = label;
@@ -231,11 +233,12 @@ impl CreateDrawingDialog {
                 .flex_none()
                 .h(px(30.))
                 .px(px(10.))
-                .text_size(px(13.))
+                .text_size(px(14.))
                 .font_weight(FontWeight::SEMIBOLD)
+                // Live drawing/01: the list is too narrow for Owner, which shows as "…".
                 .child(div().w(px(209.)).child("Template"))
-                .child(div().w(px(209.)).child("Document"))
-                .child(div().flex_1().child("Owner")),
+                .child(div().w(px(200.)).child("Document"))
+                .child(div().flex_1().child("…")),
         );
         let visible = self.visible_rows();
         if visible.is_empty() {
@@ -250,14 +253,14 @@ impl CreateDrawingDialog {
                     .flex_none()
                     .h(px(30.))
                     .px(px(10.))
-                    .text_size(px(13.))
+                    .text_size(px(14.))
                     .cursor_pointer()
-                    // Live (drawing/01): the chosen row is `#b2ddf6`.
-                    .when(sel, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
+                    // Live (drawing/01): the chosen row is `#b2ddf6` and bold.
+                    .when(sel, |d| d.bg(gpui_kit::rgb(0xb2ddf6)).font_weight(FontWeight::SEMIBOLD))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.row_hover)))
                     .child(div().w(px(209.)).truncate().child(r.file))
-                    .child(div().w(px(209.)).pr_2().truncate().child(r.document))
-                    .child(div().flex_1().truncate().child("Onshape"))
+                    .child(div().w(px(200.)).truncate().child(r.document))
+                    .child(div().flex_1().child("…"))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         this.selected = i;
                         if ev.click_count() >= 2 {
@@ -305,7 +308,7 @@ impl CreateDrawingDialog {
                     .h_full()
                     .min_h_0()
                     .pl_3()
-                    .child(h_flex().border_b_1().border_color(pal.border).child(std_tab("All", cur, cx)).child(std_tab("ANSI", cur, cx)).child(std_tab("ISO", cur, cx)).child(std_tab("JIS", cur, cx)))
+                    .child(h_flex().h(px(42.)).flex_none().border_b_1().border_color(pal.border).child(std_tab("All", cur, cx)).child(std_tab("ANSI", cur, cx)).child(std_tab("ISO", cur, cx)).child(std_tab("JIS", cur, cx)))
                     .child(list),
             )
             .into_any_element()
@@ -360,12 +363,13 @@ impl Render for CreateDrawingDialog {
         let page_tab = |label: &'static str, on: bool, cx: &mut Context<Self>, value: bool| {
             div()
                 .id(SharedString::from(format!("cd-page-{label}")))
-                .mr(px(20.))
-                .pb(px(2.))
-                .text_size(px(15.))
+                .mr(px(19.))
+                .pb(px(6.))
+                .text_size(px(16.))
                 .cursor_pointer()
-                .text_color(if on { pal.accent } else { pal.text })
-                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).border_b_2().border_color(pal.accent))
+                // Live drawing/01: blue, semibold and underlined; the other tab `#555`.
+                .text_color(if on { pal.accent } else { gpui_kit::rgb(0x555555) })
+                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).underline())
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.custom = value;
@@ -383,8 +387,11 @@ impl Render for CreateDrawingDialog {
                 .gap_1()
                 .rounded(px(4.))
                 .text_size(px(12.))
-                .bg(if on { gpui_kit::rgb(0x9ccef0) } else { pal.panel_hover })
+                // Live drawing/01: the chosen tile `#9ccef0` with a 2 px blue bottom edge,
+                // the other white with a 1 px `#ccc` outline.
+                .bg(if on { gpui_kit::rgb(0x9ccef0) } else { pal.panel })
                 .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
+                .when(!on, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
                 .when(!enabled, |d| d.opacity(0.5))
                 .child(crate::assets::icon(&crate::assets::icon_path(icon), 40., cx))
                 .child(label)
@@ -403,8 +410,10 @@ impl Render for CreateDrawingDialog {
             .absolute()
             .inset_0()
             .flex()
-            .items_center()
+            .items_start()
             .justify_center()
+            // Onshape's modals hang 11 px under the window top (live drawing/01).
+            .pt(px(11.))
             .bg(pal.modal_backdrop)
             .occlude()
             .key_context("CreateDrawing")
@@ -427,7 +436,7 @@ impl Render for CreateDrawingDialog {
                             .border_b_1()
                             .border_color(pal.border)
                             .child(div().text_size(px(18.)).child("Create Drawing:"))
-                            .child(div().w(px(320.)).child(Input::new(&self.name).appearance(false).text_size(px(18.)).font_weight(FontWeight::SEMIBOLD)))
+                            .child(div().w(px(320.)).ml(px(-6.)).child(Input::new(&self.name).appearance(false).text_size(px(18.)).font_weight(FontWeight::SEMIBOLD)))
                             .child(div().flex_1())
                             .child(Button::new("cd-close").ghost().child(crate::ui::glyph("close", 16., pal.text_muted)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(CreateDrawingEvent::Cancel)))),
                     )
@@ -454,8 +463,8 @@ impl Render for CreateDrawingDialog {
                             .justify_end()
                             .border_t_1()
                             .border_color(pal.border)
-                            .child(Button::new("cd-ok").label("OK").primary().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))))
-                            .child(Button::new("cd-cancel").label("Cancel").on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(CreateDrawingEvent::Cancel)))),
+                            .child(os::primary_button("cd-ok", "OK").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))))
+                            .child(os::cancel_button("cd-cancel", "Cancel", cx).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(CreateDrawingEvent::Cancel)))),
                     ),
             )
     }

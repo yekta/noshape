@@ -312,6 +312,18 @@ pub struct DrawingView {
     /// Show/Hide center of mass.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub show_com: bool,
+    /// Flat pattern view of a sheet metal part (a root base view with a
+    /// part; inserted from the Insert view chooser's flat pattern filter),
+    /// with Show/Hide bend lines and bend notes (both shown by default).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flat: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_bend_lines: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_bend_notes: bool,
+    /// Show/Hide threads (cosmetic threads of tapped holes; shown by default).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_threads: bool,
     /// Parts left out of this view (Show/hide parts › Hidden parts).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_parts: Vec<BodyId>,
@@ -432,6 +444,10 @@ impl Default for DrawingView {
             hide_sketch_points: false,
             hidden_parts: Vec::new(),
             show_com: false,
+            flat: false,
+            hide_bend_lines: false,
+            hide_bend_notes: false,
+            hide_threads: false,
             pinned: None,
             detail_profile: None,
             detail_style: 0,
@@ -482,8 +498,26 @@ pub enum AnnotationKind {
     HoleCallout { view: ViewId, center: [f64; 2], radius: f64 },
     /// Virtual sharp: where two straight edges (`a1`-`b1`, `a2`-`b2`) meet.
     VirtualSharp { view: ViewId, a1: [f64; 2], b1: [f64; 2], a2: [f64; 2], b2: [f64; 2] },
-    Balloon { view: ViewId, anchor: [f64; 2], text: String },
+    /// Callout: `text` empty = the BOM / cut list item of the part at the
+    /// anchor (refs slot 0); `callout` holds the dialog's other settings and
+    /// the stacked callouts (refs slots 1..).
+    Balloon {
+        view: ViewId,
+        anchor: [f64; 2],
+        text: String,
+        #[serde(default, skip_serializing_if = "CalloutStyle::is_default")]
+        callout: CalloutStyle,
+    },
     SurfaceFinish { anchor: [f64; 2], value: String },
+    /// Weld symbol: the arrow points at `target` (view coordinates in
+    /// `view`, else sheet), the reference line starts at the annotation's
+    /// position.
+    Weld {
+        #[serde(default)]
+        view: Option<ViewId>,
+        target: [f64; 2],
+        spec: Box<weld::WeldSpec>,
+    },
     /// Revision callout: a triangle with the revision label (Add revision
     /// callout; shown while the drawing has a revision table). Grouped with
     /// a dimension (`group`, dropped onto it), `anchor` is the offset from
@@ -1066,11 +1100,70 @@ pub struct Annotation {
     /// that annotation's text, so it moves with it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<u64>,
+    /// Move to: the format layer it is on (its color applies, it locks with
+    /// the format and exports on that DXF / DWG layer).
+    #[serde(default, skip_serializing_if = "SheetLayer::is_drawing")]
+    pub layer: SheetLayer,
+    /// Group (a note or callout with a view): it moves with the view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view_group: Option<ViewId>,
+    /// Group annotation (notes and callouts): members move together.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ann_group: Option<u64>,
 }
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, group: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None }
+    }
+}
+
+/// Sheet layers (Move to): the drawing, or the format's border frame,
+/// border zones and title block.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SheetLayer {
+    #[default]
+    Drawing,
+    BorderFrame,
+    BorderZones,
+    TitleBlock,
+}
+
+impl SheetLayer {
+    /// The format layers, in the Move to menu's order.
+    pub const FORMAT: [SheetLayer; 3] = [SheetLayer::BorderFrame, SheetLayer::BorderZones, SheetLayer::TitleBlock];
+
+    pub fn is_drawing(&self) -> bool {
+        *self == SheetLayer::Drawing
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            SheetLayer::Drawing => "Drawing",
+            SheetLayer::BorderFrame => "Border frame",
+            SheetLayer::BorderZones => "Border zones",
+            SheetLayer::TitleBlock => "Title block",
+        }
+    }
+
+    /// DXF / DWG layer name (None: by line style).
+    pub fn cad_layer(self) -> Option<&'static str> {
+        match self {
+            SheetLayer::Drawing => None,
+            SheetLayer::BorderFrame => Some("BORDER_FRAME"),
+            SheetLayer::BorderZones => Some("BORDER_ZONES"),
+            SheetLayer::TitleBlock => Some("TITLE_BLOCK"),
+        }
+    }
+
+    /// Its Formats color (Drawing properties › Formats).
+    pub fn color(self, p: &DrawingProps) -> Option<[u8; 3]> {
+        match self {
+            SheetLayer::Drawing => None,
+            SheetLayer::BorderFrame => p.border_color,
+            SheetLayer::BorderZones => p.zone_color,
+            SheetLayer::TitleBlock => p.title_block_color,
+        }
     }
 }
 
@@ -1085,6 +1178,11 @@ impl ViewKind {
 }
 
 impl AnnotationKind {
+    /// A callout with the default settings.
+    pub fn balloon(view: ViewId, anchor: [f64; 2], text: impl Into<String>) -> Self {
+        AnnotationKind::Balloon { view, anchor, text: text.into(), callout: CalloutStyle::default() }
+    }
+
     /// A plain note.
     pub fn note(text: impl Into<String>, height_mm: f64) -> Self {
         AnnotationKind::Note { text: text.into(), height_mm, style: note::NoteStyle::default() }
@@ -1198,6 +1296,7 @@ impl AnnotationKind {
             AnnotationKind::HoleCallout { .. } => "Hole callout",
             AnnotationKind::Balloon { .. } => "Callout",
             AnnotationKind::SurfaceFinish { .. } => "Surface finish",
+            AnnotationKind::Weld { .. } => "Weld symbol",
             AnnotationKind::RevisionCallout { .. } => "Revision callout",
             AnnotationKind::Gdt { .. } => "Geometric tolerance",
             AnnotationKind::OrdinateDimension { .. } => "Ordinate dimension",
@@ -1529,10 +1628,53 @@ pub struct DrawingProps {
     pub hide_placeholder: bool,
     /// Views tab per view type and the Construction geometry tab.
     #[serde(default)]
-    pub view_tab: ViewTabProps,
+    pub view_tab: Box<ViewTabProps>,
     /// Annotations › Center of mass › indicator diameter (mm).
     #[serde(default = "com_diameter")]
     pub com_diameter: f64,
+    /// Annotations › Weld symbols › standard: Some(true) ANSI, Some(false)
+    /// ISO; None: the drawing's standard (its sheet size).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weld_ansi: Option<bool>,
+    /// Dimensions › Chamfer: style (true: Dimension, false: Note) and
+    /// content of 45° chamfers and of others, length and angle precision.
+    #[serde(default)]
+    pub chamfer_45_dimension: bool,
+    #[serde(default)]
+    pub chamfer_45_content: ChamferContent,
+    #[serde(default = "yes")]
+    pub chamfer_dimension: bool,
+    #[serde(default)]
+    pub chamfer_content: ChamferContent,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chamfer_length_precision: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chamfer_angle_precision: Option<u8>,
+    /// Annotations › Notes › Hide property background (the grey shown
+    /// behind property fields on screen).
+    #[serde(default)]
+    pub hide_property_background: bool,
+    /// Annotations › Flag notes › Border shape of new flag notes.
+    #[serde(default = "flag_shape")]
+    pub flag_shape: note::FlagShape,
+    /// Annotations › Callouts › Text justification, Stack direction and
+    /// Stack gap size (mm).
+    #[serde(default)]
+    pub callout_justify: TextJustify,
+    #[serde(default)]
+    pub callout_stack: StackDirection,
+    #[serde(default = "stack_gap")]
+    pub callout_stack_gap: f64,
+    /// Annotations › Datums › Target hatch pattern: indices into
+    /// `sheet_sketch::HATCH_PATTERNS` (standard, pattern).
+    #[serde(default)]
+    pub target_hatch: (usize, usize),
+    /// Annotations › Hole/thread callouts › Indicator (the count's "X")
+    /// and Fit standard (ISO, else ANSI).
+    #[serde(default = "hole_indicator")]
+    pub hole_indicator: String,
+    #[serde(default)]
+    pub fit_iso: bool,
     /// The color dialog's Custom colors.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_colors: Vec<[u8; 3]>,
@@ -1580,6 +1722,16 @@ pub struct ViewTabProps {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub centerline_color: Option<[u8; 3]>,
     pub centermark_extension: f64,
+    /// Flat pattern views: up / down bend line styles (0 Solid, 1 Dashed,
+    /// 2 Center) and colors, and the bend tangent edges' color.
+    pub bend_up_line: u8,
+    pub bend_down_line: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bend_up_color: Option<[u8; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bend_down_color: Option<[u8; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bend_tangent_color: Option<[u8; 3]>,
 }
 
 impl Default for ViewTabProps {
@@ -1601,12 +1753,232 @@ impl Default for ViewTabProps {
             centermark_color: None,
             centerline_color: None,
             centermark_extension: 1.0,
+            bend_up_line: 2,
+            bend_down_line: 2,
+            bend_up_color: None,
+            bend_down_color: None,
+            bend_tangent_color: None,
         }
     }
 }
 
 fn datum_size() -> f64 {
     3.0
+}
+
+/// What a chamfer dimension reads (Drawing properties › Dimensions ›
+/// Chamfer content).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChamferContent {
+    AngleXLength,
+    #[default]
+    LengthXAngle,
+    LengthXLength,
+    /// "C2" (45° chamfers only).
+    CLength,
+}
+
+impl ChamferContent {
+    pub const ALL: [ChamferContent; 4] = [ChamferContent::AngleXLength, ChamferContent::LengthXAngle, ChamferContent::LengthXLength, ChamferContent::CLength];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            ChamferContent::AngleXLength => "Angle x Length",
+            ChamferContent::LengthXAngle => "Length x Angle",
+            ChamferContent::LengthXLength => "Length x Length",
+            ChamferContent::CLength => "C Length",
+        }
+    }
+}
+
+fn flag_shape() -> note::FlagShape {
+    note::FlagShape::Flag
+}
+
+fn stack_gap() -> f64 {
+    1.27
+}
+
+fn hole_indicator() -> String {
+    "X".into()
+}
+
+/// Callout border shapes (the Callout dialog's Border shape).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CalloutBorder {
+    None,
+    #[default]
+    Circle,
+    Diamond,
+    DoubleCircle,
+    Flag,
+    Hexagon,
+    Octagon,
+    #[serde(alias = "Box")]
+    Rectangle,
+    SplitCircle,
+    SquareCircle,
+    Triangle,
+    Underline,
+}
+
+impl CalloutBorder {
+    /// Onshape's list order.
+    pub const ALL: [CalloutBorder; 12] = [
+        CalloutBorder::None,
+        CalloutBorder::Circle,
+        CalloutBorder::Diamond,
+        CalloutBorder::DoubleCircle,
+        CalloutBorder::Flag,
+        CalloutBorder::Hexagon,
+        CalloutBorder::Octagon,
+        CalloutBorder::Rectangle,
+        CalloutBorder::SplitCircle,
+        CalloutBorder::SquareCircle,
+        CalloutBorder::Triangle,
+        CalloutBorder::Underline,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            CalloutBorder::None => "None",
+            CalloutBorder::Circle => "Circle",
+            CalloutBorder::Diamond => "Diamond",
+            CalloutBorder::DoubleCircle => "Double Circle",
+            CalloutBorder::Flag => "Flag",
+            CalloutBorder::Hexagon => "Hexagon",
+            CalloutBorder::Octagon => "Octagon",
+            CalloutBorder::Rectangle => "Rectangle",
+            CalloutBorder::SplitCircle => "Split Circle",
+            CalloutBorder::SquareCircle => "Square Circle",
+            CalloutBorder::Triangle => "Triangle",
+            CalloutBorder::Underline => "Underline",
+        }
+    }
+}
+
+/// A callout's settings beyond its main text (Callout dialog): texts
+/// above / below (outside the border) and left / right (beside the main
+/// text), the border shape and size (characters), text height, and the
+/// stacked callouts.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CalloutStyle {
+    pub above: String,
+    pub below: String,
+    pub left: String,
+    pub right: String,
+    pub border: CalloutBorder,
+    /// Border size in characters (0: Tight Fit).
+    pub chars: u8,
+    /// Attached to a face (an assembly part): the leader ends in a dot,
+    /// else (an edge or point) in an arrow.
+    pub on_face: bool,
+    /// Placed in empty space: no leader.
+    pub free: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    /// Stacked callouts (Add stacked callouts), in order.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub stacked: Vec<StackedCallout>,
+}
+
+/// One stacked callout: its instance (part) and text (empty = that part's
+/// BOM item number).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StackedCallout {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<BodyId>,
+}
+
+impl Default for CalloutStyle {
+    fn default() -> Self {
+        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new() }
+    }
+}
+
+impl CalloutStyle {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// Text justification (Callouts).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TextJustify {
+    Left,
+    #[default]
+    Center,
+    Right,
+    /// Toward the leader (centered inside a border).
+    Auto,
+}
+
+impl TextJustify {
+    pub const ALL: [TextJustify; 4] = [TextJustify::Left, TextJustify::Center, TextJustify::Right, TextJustify::Auto];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            TextJustify::Left => "Left",
+            TextJustify::Center => "Center",
+            TextJustify::Right => "Right",
+            TextJustify::Auto => "Auto",
+        }
+    }
+
+    /// Horizontal anchor fraction (0 left, 0.5 center, 1 right); Auto
+    /// follows the leader: `leader_left` when it leaves to the left, or
+    /// centers inside a border (`bordered`).
+    pub fn frac(self, bordered: bool, leader_left: bool) -> f64 {
+        match self {
+            TextJustify::Left => 0.0,
+            TextJustify::Center => 0.5,
+            TextJustify::Right => 1.0,
+            TextJustify::Auto if bordered => 0.5,
+            TextJustify::Auto => if leader_left { 0.0 } else { 1.0 },
+        }
+    }
+}
+
+/// Where stacked callouts go from the first one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StackDirection {
+    #[default]
+    Auto,
+    Right,
+    Left,
+    Up,
+    Down,
+}
+
+impl StackDirection {
+    pub const ALL: [StackDirection; 5] = [StackDirection::Auto, StackDirection::Right, StackDirection::Left, StackDirection::Up, StackDirection::Down];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            StackDirection::Auto => "Auto",
+            StackDirection::Right => "Right",
+            StackDirection::Left => "Left",
+            StackDirection::Up => "Up",
+            StackDirection::Down => "Down",
+        }
+    }
+
+    /// The unit step on the sheet; Auto stacks away from the leader
+    /// (`from_anchor`: callout center minus anchor), horizontally unless
+    /// the leader is mostly vertical.
+    pub fn step(self, from_anchor: [f64; 2]) -> [f64; 2] {
+        match self {
+            StackDirection::Right => [1.0, 0.0],
+            StackDirection::Left => [-1.0, 0.0],
+            StackDirection::Up => [0.0, 1.0],
+            StackDirection::Down => [0.0, -1.0],
+            StackDirection::Auto if from_anchor[1].abs() > from_anchor[0].abs() * 2.0 => [0.0, from_anchor[1].signum()],
+            StackDirection::Auto => [if from_anchor[0] < 0.0 { -1.0 } else { 1.0 }, 0.0],
+        }
+    }
 }
 
 impl DrawingProps {
@@ -1754,8 +2126,23 @@ impl Default for DrawingProps {
             ann_types: Vec::new(),
             datum_size: datum_size(),
             hide_placeholder: false,
-            view_tab: ViewTabProps::default(),
+            view_tab: Box::default(),
             custom_colors: Vec::new(),
+            weld_ansi: None,
+            hide_property_background: false,
+            chamfer_45_dimension: false,
+            chamfer_45_content: ChamferContent::default(),
+            chamfer_dimension: true,
+            chamfer_content: ChamferContent::default(),
+            chamfer_length_precision: None,
+            chamfer_angle_precision: None,
+            flag_shape: flag_shape(),
+            callout_justify: TextJustify::Center,
+            callout_stack: StackDirection::Auto,
+            callout_stack_gap: stack_gap(),
+            target_hatch: (0, 0),
+            hole_indicator: hole_indicator(),
+            fit_iso: false,
             com_diameter: com_diameter(),
             dim_font: None,
             ann_font: None,
@@ -1765,6 +2152,12 @@ impl Default for DrawingProps {
 }
 
 impl Drawing {
+    /// Weld symbols follow ANSI (else ISO): Drawing properties › Weld
+    /// symbols › Standard, else the drawing's standard (its sheet size).
+    pub fn weld_ansi(&self) -> bool {
+        self.props.weld_ansi.unwrap_or_else(|| self.sheets.first().is_none_or(|s| s.size.is_ansi()))
+    }
+
     /// "SheetN" with the smallest N not used by another sheet.
     pub fn unique_sheet_name(&self) -> String {
         (1..).map(|n| format!("Sheet{n}")).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded")
@@ -1957,6 +2350,7 @@ pub mod font;
 pub mod format;
 pub mod inspection;
 pub mod note;
+pub mod weld;
 pub mod painter;
 pub mod sheet;
 pub mod showcase;

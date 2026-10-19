@@ -3,30 +3,68 @@
 Goal: Feature Studios take real FeatureScript and behave like Onshape's; custom features written in
 FeatureScript run in Part Studios. Replaces the Rhai custom features (`crates/model/src/custom/`).
 
-## Status (19 Oct 08:20 resumed; ~09:30 blockers green)
+## Status (19 Oct ~18:00)
 
-Build only in /root/target-shared (TEAM-RULES "Build"); prefer `cargo check` / single tests.
+Build only in /root/target-shared (TEAM-RULES "Build"); prefer `cargo check` / single tests. Green:
+`cargo test -p noshape-featurescript` (29), `cargo test -p noshape-model --test custom_features` (14 + 1
+ignored y_threads, kernel sweep), clippy `-p noshape-model -p noshape-featurescript --all-targets`.
 
-- **Green:** `cargo clippy --workspace --exclude noshape --all-targets -- -D warnings`;
-  `cargo test -p noshape-featurescript` (25); `cargo test -p noshape-model --test custom_features`
-  (9 passed, 1 ignored). My app edits (fs_notices, feature_studio Notice.info, fs_search) compile with no
-  warnings from my lines.
-- `fs_probe_matches_onshape` passes after: **global overload resolution** (exported functions of every
-  loaded module join same-named overload sets at call time — std's println uses units.fs / surfaceGeometry.fs
-  toString; `compile::exported_overloads`, `Interp::candidates`, ties go to the overload visible at the call)
-  and evPlane of a planar face → origin at the middle of the face's UV box (Onshape's exact 0.01).
-- `real_onshape_feature_y_threads` is `#[ignore]`d: the feature now runs to the end (qCreatedBy on wire
-  edges, helix sweep frame fallback, merged-body creators), but our kernel's helical tooth sweep fuses badly
-  (addTeeth union keeps only the teeth volume; the chamfer cut then leaves a 0-volume solid). Kernel robustness
-  (kern) — un-ignore when sweep/boolean of that body is fixed.
-- Parked (not built): docs/handoff/fs-pending/spline.rs.txt (`@evaluateSpline`), needs clippy-style loops.
-- errors3 (dom/fs-errors3.txt) being applied: runtime texts/positions, throw notices, Java-style numbers,
-  "Non-numeric operand"/"Non-boolean operand" parse warnings, arity-aware call resolution, precondition
-  texts (`Stmt.text`, annotation "Message"), native errors "@evPlane: CODE" with faultyParameters, timers,
-  Monitor ordering. Test `fs_errors_match_onshape` (model) is `#[ignore]`d until it passes. Featurescript
-  tests use unique module paths (parallel tests raced on the per-path operator/export registries).
-- Gotcha: never `open(p,'w').write(open(p).read())` in edit scripts (truncates first); backups of my untracked
-  sources go to /tmp/fs-backup/<HHMM>/.
+Done since the blockers:
+- errors3 applied (dom/fs-errors3.txt) and pinned by `fs_errors_match_onshape` (runtime texts/positions,
+  printed values) and `notices_match_onshape` (compile/parse warnings).
+- `@evaluateSpline` back in (crates/featurescript/src/spline.rs, NURBS + derivatives, 2 tests).
+- **Naming fix (shared core, naming.rs):** a merged face keeps the name of its first parent by
+  (argument, face index) instead of the smallest name. The smallest name depended on random feature ids,
+  so a flush Extrude-add randomly gave the cube's side faces the boss's identity and broke
+  qCreatedBy(cube) for ~half of documents. Model lib suite (208) still green.
+- Std harness tests (tests/fs/std_harness.fs, ops_harness.fs): extrude, fillet, chamfer, linear/circular
+  patterns, mirror, shell, draft, boolean, split, skText, delete + op*/ev* value checks all pass from a
+  custom feature. Fixes on the way: merged-face naming, `number * Matrix`, OWNED_BY_PART only for bodies
+  (evLength of an edge summed the whole body), split pieces "created by" the original's creator.
+- New natives: skText (Liberation fonts by family/style), skConicSegment, opSplitFace, opExtractSurface,
+  opFlipOrientation, opCreateBSplineCurve, opModifyFillet/opEnclose (builtin adapter), pattern transforms.
+- Dialog generator: computed keys (`definition[KEY]`), predicates with literal arguments
+  (`isProfile(profile, "u")`), FeatureList, **lookup tables** ("Lookup Table" annotation → run-time table in
+  hole_tables `register_dynamic_table`, dialog unchanged; the feature gets a LookupTablePath). The dialog
+  of every std feature is compared with our built-in schemas (`std_feature_dialogs_match_builtin_schemas`,
+  44/65 identical and pinned; deviations listed below for the schema owners).
+- `replace()` keeps backslashes in the replacement (std's lookupTableEvaluate depends on it).
+- After the reboot (main 756ef78, kern's sweep fix): `real_onshape_feature_y_threads` passes (un-ignored by
+  the lead). More: tests/fs/std_harness2.fs (revolve, cPlane, thicken, transform copy, moveFace, deleteFace,
+  offsetSurface, loft, sweep), ops harness adds opCreateCompositePart and clusterBodies.
+- New natives: getTolerantParameterIds / getParameterToleranceInfo / validateToleranceSchema (no
+  tolerances on parameter values yet: empty / NONE / []), opCreateCompositePart, opNameEntity (builtin
+  adapter; the built-in nameEntity is a no-op), clusterBodies (counts + measure + inertia invariants).
+- opOffsetFace keeps the part's face names (`keep_modified_names`; see the naming note for psb).
+- **Flaky qCreatedBy(op, BODY) fixed (~40% of harness runs failed some check):** bodies created by an
+  operation got index bits from FNV's high bits, which barely change between sibling ids (`id + "a"` /
+  `id + "b"`), so ops collided and `body_creator` picked one by HashMap order. Now the bits come from a
+  splitmix64 finalizer (`marker_bits`) and each created body's op is recorded exactly
+  (`CtxState::body_ops`). 25/25 + 10/10 repeated runs green. **Lead:** custom-feature body ids changed
+  once with this (stored references to custom-feature bodies made since 756ef78 may need reselecting).
+- More ops: opSplitEdges (vertices as split tools; arc-length parameters), opExtendSheetBody (Move
+  boundary, blind), opFillSurface (Fill), opBoundarySurface (profiles; derivative conditions not yet),
+  opIntersectFaces (Intersection curve), evApproximateBSplineCurve (exact, or cubic non-rational fit).
+- **Reference parameters (live dom/fs-refparams*.txt, part-studio/480–488), done:** `ParamKind::Reference`
+  (params.rs `ReferenceKind`), values from file tabs (custom/reference.rs: csvData typed cells, image
+  size/mediaType, jsonData, textData, dataId + BuiltIn handles; unset `{}`), pinned by
+  `reference_parameters_read_file_tabs` (17 green). Dialog UI: crates/app/src/fs_reference.rs: the labelled
+  214×27 field (type icon, "Select CSV file…" at 60%, the chosen tab's name, blue border + 500 weight while its
+  panel is open) and the 300×559 "Select …" panel beside the dialog (title, Current/Other documents tabs,
+  document row with Create version… / Version graph, search "Search CSV files"…, 40 px rows, Part Studio
+  rows expand to their parts, "Import…" for CSV/image adds a file tab and picks it). Stored value: the
+  tab id, or `tab#body` for one part of a Part Studio. Hooks: feature_dialog.rs `ParamKind::Reference`
+  arm, `ref_*` fields, `DialogEvent::ImportReference`; part_studio/mod.rs `set_reference_sources`,
+  `import_reference_file`. Verified on :108 (/tmp/fs/s10–s18, d4–d5): the Monitor prints the live lines.
+  **Fix on the way:** regenerations without a provider (assembly eval.rs 1551/1578, thumbnails, sketch
+  regen) used the fallback provider, which had no file tabs, and overwrote the Monitor output with `{}`.
+  The fallback (`provider.rs Latest`) now serves the latest document's file tabs, and file changes are part
+  of custom features' regen version.
+  **Still open:** 70×40 thumbnails of Part Studios/parts in the panel (shows the Part Studio / part icon;
+  assembly_thumbs.rs has the renderer but it's AssemblyView-only); "Other documents" tab is empty; Create
+  version… / Version graph buttons do nothing; search placeholder not italic; `PartStudioData` value is
+  still `{}` (needs buildFunction = instantiate the other studio, partQuery); `BuiltIn: n` serials are
+  global (live starts at 1 per regeneration: ours print 15…).
 
 **Rhai:** it is already gone in the working tree — the previous "fs" deleted `custom/{api,compile,eval,schema}.rs`
 and dropped `rhai` from Cargo.toml before I took over; the FeatureScript path replaced it everywhere
@@ -160,6 +198,26 @@ FeatureScript replacing Rhai now is acceptable (tests were 8/8 at the previous a
    Ctrl+Shift+F symbol search/rename. Side-by-side screenshots for the lead.
 6. Field hover text for out-of-bounds values ("Enter a value between 1.00 and 100. Current value is 0.5.")
    in the feature dialog (ui's file) — lead decision since built-ins share it (see Session 2).
+
+## App verification (19 Oct ~12:00, binary /tmp/fs/noshape, display :108)
+
+- Feature Studio tab looks like Onshape's (toolbar, colors, gutter). Committing a studio with
+  `function f() { x = 1; }` lists "Variable x not found." 3:16 and "Unused declaration: f" 3:10 with ⚠
+  icons under the studio in the FeatureScript notices panel — identical to live case 6
+  (/tmp/fs/shot4.png). Hovering `x` shows the message.
+- **For ui2 (editor rendering):** squiggles are not drawn at all (errors or warnings), although the
+  diagnostics are set (hover finds them; crates/app/src/feature_studio.rs `recompile`). And the hover
+  popover has no background (text overlaps the line above, /tmp/fs/shot7-crop.png). Onshape: 4 px wave
+  PNG squiggles and an Ace tooltip (live document/fs-squiggles-zoom8x.png, fs-gutter-error-hover).
+
+## Naming issue for psb (found by tests/fs/std_harness2.fs)
+
+After a Move face **offset** (regen/features/direct.rs `move_face`), *every* face of the part (OCCT's
+offset history reports them all as Generated) is renamed `Offset(parent)` under the Move face feature, so
+"created by the part's feature" no longer holds for any of them. In Onshape a direct edit modifies faces,
+it doesn't create them (std query.fs qCreatedBy doc). FeatureScript's opOffsetFace now restores the parent
+names afterwards (`ops.rs keep_modified_names`); the built-in Move face still renames (psb: consider the
+same, carefully, since stored references use these names).
 
 ## Built-in schemas that deviate from the std (for psb / whoever owns features/*.rs)
 

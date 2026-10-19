@@ -201,6 +201,10 @@ pub struct Instance {
     /// Lines / points drawn only where geometry hides them (color pass
     /// only): the active sketch's "underconstrained occluded" color.
     pub hidden_only: bool,
+    /// Opaque meshes drawn after the transparent ones (color pass), so
+    /// see-through parts around them don't tint them: the red overlaps of
+    /// Interference detection.
+    pub over_transparent: bool,
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
@@ -249,11 +253,17 @@ impl Instance {
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
+            over_transparent: false,
             pick_only: false,
             pick_base: 0,
             zebra: None,
             reflection: None,
         }
+    }
+    /// Draw an opaque mesh after the transparent meshes ([`Instance::over_transparent`]).
+    pub fn over_transparent(mut self) -> Self {
+        self.over_transparent = true;
+        self
     }
     /// Draw only the parts hidden behind other geometry (lines and points).
     pub fn hidden_only(mut self) -> Self {

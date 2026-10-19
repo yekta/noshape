@@ -13,5 +13,5 @@ pub mod scene;
 pub mod worker;
 
 pub use camera::{Camera, Projection, StandardView};
-pub use renderer::{Completed, Frame, FrameRequest, PickBuffer, PickRect, RenderError, RenderParams, Renderer};
+pub use renderer::{Completed, DepthSample, Frame, FrameRequest, PickBuffer, PickRect, RenderError, RenderParams, Renderer};
 pub use scene::*;

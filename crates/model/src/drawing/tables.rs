@@ -201,6 +201,9 @@ fn tag_letters(i: usize) -> String {
 /// Resolve a table's content. `view_geo`: geometry of the table's view;
 /// `source`: the view's source; `origin`: resolved hole table origin;
 /// `revisions`: the drawing's revisions (revision tables).
+/// The BOM table's header row.
+pub const BOM_HEADER: [&str; 4] = ["Item", "Quantity", "Part number", "Description"];
+
 pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, revisions: &[RevisionRow], expand: &dyn Fn(&str) -> String) -> TableData {
     let mut data = match &table.kind {
         TableKind::General { cells, title, header } => {
@@ -209,14 +212,24 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
         }
         TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
-            let header = Some(vec!["ITEM".into(), "QTY".into(), "PART NAME".into(), "PART NUMBER".into(), "MATERIAL".into()]);
+            // Onshape's BOM table columns (live drawing/189): Item, Quantity,
+            // Part number, Description; no title row.
+            let header = Some(BOM_HEADER.map(String::from).to_vec());
+            let description = |s: &SourceModel, body: Option<&crate::reference::BodyId>| body.and_then(|b| s.part(Some(b))).map(|p| p.description.clone()).unwrap_or_default();
             let mut rows: Vec<Vec<String>> = match source {
-                // Structured: nested rows ("3.1"), names indented by level.
-                Some(s) if s.assembly && *structured => s.bom_structured.iter().map(|r| vec![r.item.clone(), r.quantity.to_string(), format!("{}{}", "  ".repeat(r.depth), r.name), r.number.clone(), r.material.clone()]).collect(),
-                Some(s) if s.assembly => s.bom.iter().map(|r| vec![r.item.to_string(), r.quantity.to_string(), r.name.clone(), r.number.clone(), r.material.clone()]).collect(),
+                // Structured: nested rows ("3.1").
+                Some(s) if s.assembly && *structured => s
+                    .bom_structured
+                    .iter()
+                    .map(|r| {
+                        let body = s.bom.iter().find(|e| e.name == r.name && e.number == r.number).and_then(|e| e.bodies.first());
+                        vec![r.item.clone(), r.quantity.to_string(), r.number.clone(), description(s, body)]
+                    })
+                    .collect(),
+                Some(s) if s.assembly => s.bom.iter().map(|r| vec![r.item.to_string(), r.quantity.to_string(), r.number.clone(), description(s, r.bodies.first())]).collect(),
                 Some(s) => {
                     // A Part Studio view: one row per part.
-                    s.parts.iter().enumerate().map(|(i, p)| vec![(i + 1).to_string(), "1".into(), p.name.clone(), p.number.clone(), p.material.clone()]).collect()
+                    s.parts.iter().enumerate().map(|(i, p)| vec![(i + 1).to_string(), "1".into(), p.number.clone(), p.description.clone()]).collect()
                 }
                 None => vec![],
             };
@@ -235,7 +248,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                     }
                 }
             }
-            TableData { title: Some("BILL OF MATERIALS".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden }
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden }
         }
         TableKind::Hole { precision, origin: stored, flip_x, flip_y, .. } => {
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
@@ -253,21 +266,23 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
         }
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
         TableKind::CutList { bottom_to_top, .. } => {
-            let header = Some(["ITEM", "QTY", "STANDARD", "DESCRIPTION", "LENGTH", "ANGLE 1", "ANGLE 2"].map(String::from).to_vec());
+            // Onshape's cut list table (help cutlist-table-indrawing): Item,
+            // Qty, Description, Length ("675.444 mm"), Angle 1 / 2 ("45 deg").
+            let header = Some(["Item", "Qty", "Description", "Length", "Angle 1", "Angle 2"].map(String::from).to_vec());
             let f = DimFormat::default();
             let u = length_units(drawing, &f);
-            let len = |m: Option<f64>| m.map(|m| format_number(m / u.meters(), None, default_digits(u))).unwrap_or_default();
-            let ang = |a: Option<f64>| a.map(|a| format!("{}°", format_number(a.to_degrees(), None, 1))).unwrap_or_default();
+            let len = |m: Option<f64>| m.map(|m| format!("{} {}", format_number(m / u.meters(), None, 3), u.symbol())).unwrap_or_default();
+            let ang = |a: Option<f64>| a.map(|a| format!("{} deg", format_number(a.to_degrees(), None, 3))).unwrap_or_default();
             let mut rows: Vec<Vec<String>> = source
                 .map(|s| crate::regen::features::frames::cut_list(&s.context, None))
                 .unwrap_or_default()
                 .into_iter()
-                .map(|r| vec![r.item.to_string(), r.qty.to_string(), r.standard, r.description, len(r.length), ang(r.angle1), ang(r.angle2)])
+                .map(|r| vec![r.item.to_string(), r.qty.to_string(), if r.standard.is_empty() { r.description } else { format!("{} {}", r.standard, r.description) }, len(r.length), ang(r.angle1), ang(r.angle2)])
                 .collect();
             if *bottom_to_top {
                 rows.reverse();
             }
-            TableData { title: Some("CUT LIST".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new() }
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new() }
         }
     };
     // A split table shows its part of the rows.
@@ -543,7 +558,7 @@ mod tests {
     fn revision_table_rows() {
         use crate::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
         let tab = crate::document::TabId(7);
-        let item = |rev: &str| ReleaseItem { tab, part: None, name: "Drawing 1".into(), kind: ItemKind::Drawing, part_number: "DRW-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default() };
+        let item = |rev: &str| ReleaseItem { tab, part: None, name: "Drawing 1".into(), kind: ItemKind::Drawing, part_number: "DRW-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
         let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false };
         let mut log = ReleaseLog::default();
         log.packages.push(pkg(1, PackageKind::Release, "A", "Initial release", 20744));

@@ -155,6 +155,30 @@ pub struct ReleaseItem {
     /// own revisionable object (Help: Releasing a configuration).
     #[serde(default, skip_serializing_if = "crate::configuration::ConfigValues::is_empty")]
     pub config: crate::configuration::ConfigValues,
+    /// Linked from a version (Add Items › a version of this document, or
+    /// Other documents): the item is that version's (Help
+    /// Release__selecting_parts_for_a_release_candidate: "an icon appears
+    /// beside the added item indicating it is linked from another version").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<LinkedDocument>,
+}
+
+/// The document version a linked release item comes from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinkedDocument {
+    /// The document file; empty for a version of the releasing document.
+    pub path: String,
+    pub name: String,
+    /// The version's microversion (store id as text) and name.
+    pub version: String,
+    pub version_name: String,
+}
+
+impl ReleaseItem {
+    /// The same object (tab, part, type, configuration and source).
+    pub fn same_object(&self, o: &ReleaseItem) -> bool {
+        self.tab == o.tab && self.part == o.part && self.kind == o.kind && self.config == o.config && self.document == o.document
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -223,6 +247,10 @@ pub struct ReleaseLog {
     /// with the log; set by the app).
     #[serde(skip)]
     pub scheme: RevisionScheme,
+    /// Numbering schemes › Part number uniqueness: "Drawing can reuse part
+    /// number from an assembly or part in the release" (set by the app).
+    #[serde(skip)]
+    pub drawing_reuse: bool,
 }
 
 /// A problem with an item of a candidate ("N item(s) needs attention").
@@ -319,7 +347,10 @@ impl ReleaseLog {
                     v.push(Issue::MissingPartNumber);
                     return v;
                 }
-                if items.iter().enumerate().any(|(j, o)| j != i && o.part_number == it.part_number) {
+                // A drawing may share the number of a part or assembly when
+                // the numbering scheme allows it.
+                let reuse = |a: &ReleaseItem, b: &ReleaseItem| self.drawing_reuse && (a.kind == ItemKind::Drawing) != (b.kind == ItemKind::Drawing) && [a.kind, b.kind].iter().all(|k| matches!(k, ItemKind::Drawing | ItemKind::Part | ItemKind::Assembly));
+                if items.iter().enumerate().any(|(j, o)| j != i && o.part_number == it.part_number && !reuse(it, o)) {
                     v.push(Issue::DuplicatePartNumber);
                 }
                 if it.not_revision_managed || it.reverted {
@@ -389,6 +420,105 @@ impl ReleaseLog {
     }
 }
 
+/// Company settings › Numbering schemes (Help Plans/numbering_schemes,
+/// accounts/co-numschemes-03.png): one tab per object type.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NumberingSchemes {
+    pub release_objects: NumberScheme,
+    pub standard_content: NumberScheme,
+    pub items: NumberScheme,
+    pub release_names: NumberScheme,
+    /// Part number uniqueness: "Drawing can reuse part number from an
+    /// assembly or part in the release" (else all must be unique).
+    #[serde(default)]
+    pub drawing_reuse: bool,
+    #[serde(default)]
+    pub propagation: Propagation,
+}
+
+impl Default for NumberingSchemes {
+    fn default() -> Self {
+        Self {
+            release_objects: NumberScheme::new(&["", "", "", "", ""]),
+            standard_content: NumberScheme::new(&[""]),
+            items: NumberScheme::new(&[""]),
+            release_names: NumberScheme::new(&[""]),
+            drawing_reuse: false,
+            propagation: Propagation::Never,
+        }
+    }
+}
+
+/// Part number propagation (Release objects only).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Propagation {
+    #[default]
+    Never,
+    OneWorkspace,
+    AllWorkspaces,
+}
+
+impl Propagation {
+    pub const ALL: [Propagation; 3] = [Propagation::Never, Propagation::OneWorkspace, Propagation::AllWorkspaces];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Propagation::Never => "Never",
+            Propagation::OneWorkspace => "One workspace",
+            Propagation::AllWorkspaces => "All workspaces",
+        }
+    }
+}
+
+/// One tab of the Numbering schemes: Manual entry or Sequential part
+/// number generation with a prefix per object type, a minimum length and
+/// the next number. Object types of a tab share the counter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NumberScheme {
+    pub sequential: bool,
+    pub prefixes: Vec<String>,
+    pub min_length: usize,
+    pub next: u64,
+}
+
+impl NumberScheme {
+    fn new(prefixes: &[&str]) -> Self {
+        Self { sequential: false, prefixes: prefixes.iter().map(|p| p.to_string()).collect(), min_length: 3, next: 1 }
+    }
+
+    /// The number the next generation gives the object type `ty` (index
+    /// into the prefixes): "PRT-062".
+    pub fn preview(&self, ty: usize) -> String {
+        let prefix = self.prefixes.get(ty).map(String::as_str).unwrap_or_default();
+        format!("{prefix}{:0width$}", self.next, width = self.min_length)
+    }
+
+    /// Generates a number for `ty` and advances the shared counter (numbers
+    /// never go back, even when they are not used).
+    pub fn generate(&mut self, ty: usize) -> Option<String> {
+        if !self.sequential {
+            return None;
+        }
+        let n = self.preview(ty);
+        self.next += 1;
+        Some(n)
+    }
+}
+
+impl ItemKind {
+    /// Index of the kind's prefix in the Release objects scheme (Parts,
+    /// Assemblies, Drawings, Variable Studios, Files).
+    pub fn prefix_index(self) -> usize {
+        match self {
+            ItemKind::Part => 0,
+            ItemKind::Assembly => 1,
+            ItemKind::Drawing => 2,
+            ItemKind::VariableStudio => 3,
+            ItemKind::File => 4,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -414,7 +544,7 @@ mod tests {
     }
 
     fn item(pn: &str, rev: &str) -> ReleaseItem {
-        ReleaseItem { tab: TabId(1), part: None, name: "Part 1".into(), kind: ItemKind::Part, part_number: pn.into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default() }
+        ReleaseItem { tab: TabId(1), part: None, name: "Part 1".into(), kind: ItemKind::Part, part_number: pn.into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None }
     }
 
     fn package(kind: PackageKind, name: &str, items: Vec<ReleaseItem>) -> Package {
@@ -472,5 +602,31 @@ mod tests {
         assert!(log2.drafts.is_empty());
         assert_eq!(log2.at_version("v-R3").len(), 1);
         assert_eq!(log2.suggested_name(), "Release 4");
+    }
+
+    #[test]
+    fn sequential_numbers_share_the_counter() {
+        let mut n = NumberingSchemes::default();
+        assert_eq!(n.release_objects.generate(0), None, "manual entry generates nothing");
+        n.release_objects.sequential = true;
+        n.release_objects.prefixes = ["PRT-", "ASM-", "DRW-", "VS-", "FILE-"].map(String::from).to_vec();
+        n.release_objects.next = 62;
+        assert_eq!(n.release_objects.preview(0), "PRT-062");
+        assert_eq!(n.release_objects.generate(2).as_deref(), Some("DRW-062"));
+        assert_eq!(n.release_objects.generate(0).as_deref(), Some("PRT-063"));
+        n.release_objects.min_length = 1;
+        assert_eq!(n.release_objects.preview(1), "ASM-64");
+    }
+
+    #[test]
+    fn drawings_may_reuse_a_part_number() {
+        let item = |kind, pn: &str| ReleaseItem { tab: TabId(1), part: None, name: "x".into(), kind, part_number: pn.into(), revision: "A".into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
+        let items = [item(ItemKind::Part, "P1"), item(ItemKind::Drawing, "P1")];
+        let mut log = ReleaseLog::default();
+        assert!(log.validate(&items)[1].contains(&Issue::DuplicatePartNumber));
+        log.drawing_reuse = true;
+        assert!(log.validate(&items).iter().all(|v| v.is_empty()));
+        let parts = [item(ItemKind::Part, "P1"), item(ItemKind::Part, "P1")];
+        assert!(log.validate(&parts)[0].contains(&Issue::DuplicatePartNumber));
     }
 }

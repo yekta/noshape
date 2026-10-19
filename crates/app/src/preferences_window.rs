@@ -1,7 +1,8 @@
 //! Onshape's "My account › Preferences" page as a window (live:
 //! shortcuts/32-47, dom/customize-keyboard-shortcuts.txt): the account
 //! header, the left navigation (the local pages Profile and Preferences),
-//! and the Preferences sections that apply locally: Part Studio settings,
+//! and the Preferences sections that apply locally: Mouse controls
+//! (mouse_prefs.rs), Part Studio settings,
 //! Assembly settings, Keyboard shortcuts (tabs, the 472x456 list with
 //! Edit / Reset on hover, the legend, Reset all, the "Edit shortcut"
 //! popup) and Shortcut toolbars. Opened from the documents page's account
@@ -122,7 +123,7 @@ pub fn show(page: Page, cx: &mut App) {
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    match gpui_kit::open_window(options, cx, |window, cx| {
+    match crate::os_menu::open_window(options, cx, |window, cx| {
         window.set_window_title("My account — noshape");
         let view = cx.new(|cx| PreferencesView::new(page, window, cx));
         let fh = view.read(cx).focus.clone();
@@ -182,6 +183,8 @@ pub struct PreferencesView {
     name_saved: String,
     /// Release management and Material libraries sections (release_prefs.rs).
     release: Entity<crate::release_prefs::ReleasePrefsView>,
+    /// Mouse controls section (mouse_prefs.rs).
+    mouse: Entity<crate::mouse_prefs::MousePrefsView>,
     _subs: Vec<Subscription>,
 }
 
@@ -216,6 +219,7 @@ impl PreferencesView {
             name,
             name_saved,
             release: cx.new(|cx| crate::release_prefs::ReleasePrefsView::new(window, cx)),
+            mouse: cx.new(|_| crate::mouse_prefs::MousePrefsView::new()),
             _subs: subs,
         };
         this.go_to(page, cx);
@@ -225,7 +229,7 @@ impl PreferencesView {
     fn go_to(&mut self, page: Page, cx: &mut Context<Self>) {
         self.page = page;
         match page {
-            // The sections are the scroll area's children: Keyboard shortcuts is the third.
+            // The sections are the scroll area's children: Keyboard shortcuts is the fourth.
             Page::KeyboardShortcuts => self.scroll_to_shortcuts = true,
             _ => self.scroll.set_offset(point(px(0.), px(0.))),
         }
@@ -918,8 +922,8 @@ impl Render for PreferencesView {
         let pal = p();
         crate::assets::set_scale_factor(window.scale_factor());
         if self.scroll_to_shortcuts {
-            // The sections are the scroll area's children: Keyboard shortcuts is the third.
-            match self.scroll.bounds_for_item(2) {
+            // The sections are the scroll area's children: Keyboard shortcuts is the fourth.
+            match self.scroll.bounds_for_item(3) {
                 Some(section) if self.page != Page::Profile => {
                     let off = self.scroll.offset();
                     let top = section.top() - self.scroll.bounds().top() - off.y;
@@ -934,7 +938,7 @@ impl Render for PreferencesView {
             vec![self.render_profile(cx)]
         } else {
             let (ps, asm) = self.render_list_settings(cx);
-            vec![ps, asm, self.render_shortcuts(window, cx), self.render_toolbars(cx), self.release.clone().into_any_element()]
+            vec![self.mouse.clone().into_any_element(), ps, asm, self.render_shortcuts(window, cx), self.render_toolbars(cx), self.release.clone().into_any_element()]
         };
         v_flex()
             .size_full()

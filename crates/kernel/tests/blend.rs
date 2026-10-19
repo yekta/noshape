@@ -39,10 +39,10 @@ fn blend_over_smaller_fillets_at_metre_scale() {
     setup();
     let s = filleted_block();
     // OCCT fails these in metres (absolute blend tolerances); the working scale fixes it.
-    for (r, want, tol) in [(4.0, 7545.734690323423, 4.0), (6.0, 7094.739677144683, 8.0)] {
+    for (r, want) in [(4.0, 7545.734690323423), (6.0, 7094.739677144683)] {
         let res = fillet_checked(&s, &top_loop(&s), &[r * MM]).expect("fillet");
         assert!(res.shape.is_valid());
-        assert!((vol_mm3(&res.shape) - want).abs() < tol, "R{r}: {}", vol_mm3(&res.shape));
+        assert!((vol_mm3(&res.shape) - want).abs() < 0.12, "R{r}: {}", vol_mm3(&res.shape));
     }
     // A chamfer as wide as the corner fillets: OCCT fails, a hair smaller works.
     let res = chamfer_checked(&s, &top_loop(&s), ChamferSpec::Equal(3.0 * MM), &[]).expect("chamfer 3");
@@ -51,6 +51,51 @@ fn blend_over_smaller_fillets_at_metre_scale() {
     // Wider: Onshape's "Distance of chamfer on face too large.".
     let e = chamfer_checked(&s, &top_loop(&s), ChamferSpec::Equal(4.0 * MM), &[]).unwrap_err();
     assert!(e.to_string().contains("chamfer distance too large"), "{e}");
+}
+
+/// A top-loop fillet R over vertical corner fillets Rc < R: Parasolid's corner
+/// face is a rolling ball of radius Rc between the two R cylinders (G24/G25).
+/// Onshape's corner face areas match to 1e-7. Volumes: `exact` is this
+/// geometry's volume by the divergence theorem over the exact faces
+/// (/root/kern-scratch/g8/exactvol.py); Onshape's mass properties of its
+/// procedural corner face are off from that by -0.04..+0.10 mm³.
+#[test]
+fn vertex_blends_match_onshape() {
+    setup();
+    // (H, Rc, R, Onshape's volume mm³, exact volume, Onshape's corner face area mm²)
+    for (h, rc, r, want, exact, area) in [
+        (10.0, 3.0, 6.0, 7094.739677144684, 7094.796033, 29.7034992),
+        (10.0, 2.0, 4.0, 7582.912205, 7583.000811, 13.2015552),
+        (10.0, 1.0, 4.0, 7605.12518, 7605.162120, 6.7595739),
+        (12.0, 3.0, 8.0, 8077.548982, 8077.509672, 40.0810543),
+        (10.0, 3.0, 3.5, 7632.777402, 7632.875233, 16.7315556),
+        (10.0, 3.0, 4.0, 7545.734690323423, 7545.834615, 19.3259443),
+    ] {
+        let b = bx([0.0; 3], [40.0, 20.0, h]);
+        let v = edges_where(&b, |i| (i.start.z - i.end.z).abs() > 1e-9);
+        let s = fillet_checked(&b, &v, &[rc * MM]).unwrap().shape;
+        let top = edges_where(&s, |i| i.start.z > (h - 0.01) * MM && i.end.z > (h - 0.01) * MM);
+        let res = fillet_checked(&s, &top, &[r * MM]).unwrap_or_else(|e| panic!("H{h} Rc{rc} R{r}: {e}"));
+        assert!(res.shape.is_valid());
+        let faces = res.shape.faces();
+        assert_eq!(faces.len(), 18, "H{h} Rc{rc} R{r}");
+        // The corner face at the origin: inside (0,0,H-R)..(R,R,H).
+        let corner: Vec<f64> = faces
+            .iter()
+            .filter(|f| {
+                let bb = f.bounding_box(true).unwrap();
+                bb.max.x < (r + 0.01) * MM && bb.max.y < (r + 0.01) * MM && bb.min.z > (h - r - 0.01) * MM && !matches!(f.face_surface(), Ok(Surface::Cylinder { .. } | Surface::Plane { .. }))
+            })
+            .map(|f| f.area().unwrap() / (MM * MM))
+            .collect();
+        assert_eq!(corner.len(), 1, "H{h} Rc{rc} R{r}: {corner:?}");
+        assert!((corner[0] - area).abs() < 2e-6 * area, "H{h} Rc{rc} R{r}: area {} vs {area}", corner[0]);
+        let v = vol_mm3(&res.shape);
+        assert!((v - exact).abs() < 2e-4 && (v - want).abs() < 0.12, "H{h} Rc{rc} R{r}: volume {v} vs {exact} (Onshape {want})");
+        for i in 0..faces.len() as u32 {
+            assert!(res.history.of_output(ShapeType::Face, i).next().is_some(), "H{h} Rc{rc} R{r}: face {i} has no parent");
+        }
+    }
 }
 
 #[test]

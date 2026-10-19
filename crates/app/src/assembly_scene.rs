@@ -150,7 +150,8 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         let sketch = o.kind == BodyKind::Wire;
         if !sketch || !o.mesh.indices.is_empty() {
             let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base);
-            if (dimmed && !opts.pick_dimmed) || sketch {
+            // Sketch regions are pickable faces (live 601).
+            if dimmed && !opts.pick_dimmed {
                 inst = inst.unpickable();
             }
             scene.instances.push(inst);
@@ -229,9 +230,21 @@ pub struct Highlights {
     pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
     pub trails: Vec<(DVec3, DVec3)>,
-    /// Selected mate's rotation value (live 305): a blue dashed circle
-    /// with two arrowheads in the connector's XY plane (frame, radius).
-    pub value_arcs: Vec<(Frame, f64)>,
+    /// Selected mate's rotation value (live 305z, 575).
+    pub value_arcs: Vec<ValueArc>,
+}
+
+/// A mate's rotation value as Onshape's angular dimension (live 305z): a
+/// blue dashed arc in the first connector's XY plane from its X axis
+/// counter-clockwise through `sweep`, an arrowhead at each end pointing
+/// out of the arc, broken around the value text at `gap` (centre angle,
+/// half width; radians).
+#[derive(Clone, Copy, Debug)]
+pub struct ValueArc {
+    pub frame: Frame,
+    pub radius: f64,
+    pub sweep: f64,
+    pub gap: Option<(f64, f64)>,
 }
 
 /// Manipulator handle: translate along axis k, rotate about axis k,
@@ -362,23 +375,30 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for (a, b, strong) in &h.mate_lines {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: theme::rgb8(theme::viewport::SELECTION), pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP });
     }
-    for (f, r) in &h.value_arcs {
-        const N: usize = 64;
+    for arc in &h.value_arcs {
+        let (f, r) = (&arc.frame, arc.radius);
         let blue = [26, 53, 184, 255];
         let at = |a: f64| f.origin + f.rotation * DVec3::new(a.cos() * r, a.sin() * r, 0.0);
-        for i in 0..N {
-            let (a0, a1) = (i as f64 / N as f64 * std::f64::consts::TAU, (i + 1) as f64 / N as f64 * std::f64::consts::TAU);
+        let n = ((arc.sweep / std::f64::consts::TAU * 64.0).ceil() as usize).max(1);
+        let in_gap = |a: f64| arc.gap.is_some_and(|(c, w)| (a - c).abs() < w);
+        for i in 0..n {
+            let (a0, a1) = (arc.sweep * i as f64 / n as f64, arc.sweep * (i + 1) as f64 / n as f64);
+            if in_gap(a0) || in_gap(a1) {
+                continue;
+            }
             lines.segments.push(LineSegment { a: at(a0).as_vec3().into(), b: at(a1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
         }
-        // Arrowheads pointing along the circle (counter-clockwise).
-        for a in [0.35f64, std::f64::consts::PI + 0.35] {
-            let tip = at(a);
-            let tangent = f.rotation * DVec3::new(-a.sin(), a.cos(), 0.0);
-            let radial = f.rotation * DVec3::new(a.cos(), a.sin(), 0.0);
-            let len = r * 0.18;
-            for side in [1.0, -1.0] {
-                let base = tip - tangent * len + radial * (side * len * 0.4);
-                lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+        // Arrowheads at both ends, pointing away from the arc.
+        if arc.sweep > 1e-6 {
+            for (a, dir) in [(0.0, -1.0), (arc.sweep, 1.0)] {
+                let tip = at(a);
+                let tangent = f.rotation * DVec3::new(-a.sin(), a.cos(), 0.0) * dir;
+                let radial = f.rotation * DVec3::new(a.cos(), a.sin(), 0.0);
+                let len = r * 0.18;
+                for side in [1.0, -1.0] {
+                    let base = tip - tangent * len + radial * (side * len * 0.4);
+                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                }
             }
         }
     }

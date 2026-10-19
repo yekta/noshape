@@ -8,7 +8,8 @@ use super::format::{self, DimText};
 use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2, format_scale};
 use super::tables::{self, TableLayout};
 use super::views::{self, Sources, ViewCache, ViewGeometry, dist_to_segment, resolve_in_view, rotate2};
-use super::{Annotation, AnnotationKind, BreakStyle, Drawing, RenderStyle, Sheet, TableKind, ViewId, ViewKind};
+use super::sheet::LayerSpan;
+use super::{Annotation, AnnotationKind, BreakStyle, Drawing, RenderStyle, Sheet, SheetLayer, TableKind, ViewId, ViewKind};
 use noshape_kernel::EdgeClass;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -566,7 +567,7 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     let hole = ctx.holes.iter().find(|h| h.matches_circle(c, radius, tol))?;
     let same = ctx.holes.iter().filter(|h| h.feature == hole.feature && (h.diameter - hole.diameter).abs() < 1e-9 && h.depth.map(|d| (d * 1e6).round()) == hole.depth.map(|d| (d * 1e6).round())).count();
     let len = |m: f64| format::format_len(drawing, &a.format, m);
-    let count = if same > 1 { format!("{same}X ") } else { String::new() };
+    let count = if same > 1 { format!("{same}{} ", drawing.props.hole_indicator) } else { String::new() };
     let depth = |d: Option<f64>| match (hole.through, d) {
         (true, _) => " THRU".to_string(),
         (false, Some(d)) => format!(" ↧ {}", len(d)),
@@ -611,6 +612,9 @@ struct Env<'a> {
     sources: &'a Sources,
     fields: &'a dyn Fn(&str) -> Option<String>,
     revisions: &'a [tables::RevisionRow],
+    /// Lines of expanded texts that hold property fields (for their grey
+    /// background on screen).
+    used: &'a std::cell::RefCell<Vec<String>>,
 }
 
 impl AnnotationEnv for Env<'_> {
@@ -630,15 +634,26 @@ impl AnnotationEnv for Env<'_> {
         format::dim_text(self.drawing, &f, value, angular, symbol)
     }
     fn expand(&self, s: &str) -> String {
-        format::expand_fields_with(s, self.fields, if self.drawing.props.hide_placeholder { "" } else { "----" })
+        let out = format::expand_fields_with(s, self.fields, if self.drawing.props.hide_placeholder { "" } else { "----" });
+        if s.contains('{') {
+            self.used.borrow_mut().extend(out.lines().map(str::to_string));
+        }
+        out
     }
     fn sheet_style(&self) -> super::sheet::SheetStyle {
         let p = &self.drawing.props;
-        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size }
+        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch }
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
         (!p.hide_inspection).then(|| super::sheet::InspectionStyle { shape: p.inspection_shape, text_height: p.inspection_text_height, border: p.inspection_border_size, color: p.inspection_color, solid: p.inspection_solid_fill, font: p.inspection_font.clone() })
+    }
+    fn weld_ansi(&self) -> bool {
+        self.drawing.weld_ansi()
+    }
+    fn chamfer_style(&self) -> super::sheet::ChamferStyle {
+        let p = &self.drawing.props;
+        super::sheet::ChamferStyle { dim45: p.chamfer_45_dimension, content45: p.chamfer_45_content, dim: p.chamfer_dimension, content: p.chamfer_content, length_precision: p.chamfer_length_precision, angle_precision: p.chamfer_angle_precision }
     }
     fn revision_label(&self, revision: &str) -> Option<String> {
         tables::revision_callout_label(self.drawing, self.revisions, revision)
@@ -647,18 +662,40 @@ impl AnnotationEnv for Env<'_> {
         hole_callout_marked(self.drawing, self.sheet, self.sources, a).unwrap_or_else(|| vec!["⌀?".into()])
     }
     fn balloon_text(&self, a: &Annotation, text: &str) -> String {
+        let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone());
+        self.callout_text(a, body.as_ref(), text)
+    }
+    fn stacked_text(&self, a: &Annotation, st: &super::StackedCallout) -> String {
+        self.callout_text(a, st.body.as_ref(), &st.text)
+    }
+}
+
+impl Env<'_> {
+    /// A callout's text: its own (empty: the BOM item number), with the
+    /// properties of its part `body` (`{part.*}`) and that part's BOM row
+    /// (`{bom.*}`) filled in; "----" when there is none.
+    fn callout_text(&self, a: &Annotation, body: Option<&crate::reference::BodyId>, text: &str) -> String {
         let t = text.trim();
-        if !(t.is_empty() || t == "#") {
-            return self.expand(text);
-        }
-        let item = (|| {
-            let view = a.kind.view()?;
-            let (key, _) = views::view_source(self.sheet, view)?;
-            let src = self.sources.get(&key)?;
-            let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone())?;
-            src.bom_item(&body)
-        })();
-        item.map(|i| i.to_string()).unwrap_or_else(|| "?".into())
+        let text = if t.is_empty() || t == "#" { "{bom.item}" } else { text };
+        let src = a.kind.view().and_then(|v| views::view_source(self.sheet, v)).and_then(|(key, _)| self.sources.get(&key));
+        let part = src.zip(body).and_then(|(s, b)| s.part(Some(b)));
+        let row = src.zip(body).and_then(|(s, b)| s.bom.iter().find(|r| r.bodies.contains(b)));
+        let lookup = |k: &str| -> Option<String> {
+            Some(match k {
+                "part.name" => part.map(|p| p.name.clone()).unwrap_or_default(),
+                "part.number" => part.map(|p| p.number.clone()).unwrap_or_default(),
+                "part.material" => part.map(|p| p.material.clone()).unwrap_or_default(),
+                "part.description" => part.map(|p| p.description.clone()).unwrap_or_default(),
+                "bom.item" => row.map(|r| r.item.to_string()).unwrap_or_default(),
+                "bom.quantity" => row.map(|r| r.quantity.to_string()).unwrap_or_default(),
+                "bom.number" => row.map(|r| r.number.clone()).unwrap_or_default(),
+                "bom.name" => row.map(|r| r.name.clone()).unwrap_or_default(),
+                "bom.material" => row.map(|r| r.material.clone()).unwrap_or_default(),
+                "instance.designator" => String::new(),
+                _ => return (self.fields)(k),
+            })
+        };
+        format::expand_fields_with(text, &lookup, "----")
     }
 }
 
@@ -671,7 +708,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let mut picks = Picks { table: vec![PickTarget::None], index: HashMap::new() };
     let fields = |k: &str| field_value(drawing, si, info, sources, k);
     let placeholder = if drawing.props.hide_placeholder { "" } else { "----" };
-    let expand = |s: &str| format::expand_fields_with(s, &fields, placeholder);
+    let used = std::cell::RefCell::new(Vec::<String>::new());
+    // Title block values are properties (the drawing's or the part's).
+    let expand = |s: &str| {
+        let out = format::expand_fields_with(s, &fields, placeholder);
+        used.borrow_mut().extend(out.lines().map(str::to_string));
+        out
+    };
 
     // Border and title block; everything inside the title block is pickable
     // as the title block.
@@ -691,9 +734,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if in_block {
             l.pick = tb;
         }
-        // Formats colors: border frame, zones (sheet edge, dividers), title block.
-        let c = if in_block { fp.title_block_color } else if l.style == LineStyle::Border { fp.border_color } else { fp.zone_color };
-        if let Some(rgb) = c {
+        // Formats layers and colors: border frame, zones (sheet edge,
+        // dividers), title block.
+        let layer = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
+        g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
+        if let Some(rgb) = layer.color(fp) {
             g.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb });
         }
     }
@@ -702,7 +747,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if in_block {
             g.texts[i].pick = tb;
         }
-        if let Some(rgb) = if in_block { fp.title_block_color } else { fp.zone_color } {
+        let layer = if in_block { SheetLayer::TitleBlock } else { SheetLayer::BorderZones };
+        g.layers.push(LayerSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, layer });
+        if let Some(rgb) = layer.color(fp) {
             g.colors.push(super::sheet::ColorSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, rgb });
         }
     }
@@ -840,6 +887,83 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             g.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick: view_pick });
             g.lines.push(Polyline2 { points: vec![[c[0], c[1] - r], [c[0], c[1] + r]], style: LineStyle::Thin, closed: false, pick: view_pick });
+        }
+        // Flat pattern views: each bend region's two tangent edges (solid)
+        // with its bend line between them (Views › Flat pattern views: up /
+        // down line style and color), the bend note along it on its left
+        // ("UP 90.0° R.091"), and form centermarks.
+        let vt = &drawing.props.view_tab;
+        if !v.hide_bend_lines {
+            for b in &geo.bends {
+                let d = [b.b[0] - b.a[0], b.b[1] - b.a[1]];
+                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+                let n = [-d[1] / l * b.width / 2.0, d[0] / l * b.width / 2.0];
+                let mark = g.mark();
+                for k in [-1.0, 1.0] {
+                    let side = [[b.a[0] + n[0] * k, b.a[1] + n[1] * k], [b.b[0] + n[0] * k, b.b[1] + n[1] * k]];
+                    for piece in map_polyline(&pl, &side) {
+                        g.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick: view_pick });
+                    }
+                }
+                if let Some(c) = vt.bend_tangent_color {
+                    g.color_since(mark, c);
+                }
+                let (kind, color) = if b.up { (vt.bend_up_line, vt.bend_up_color) } else { (vt.bend_down_line, vt.bend_down_color) };
+                let style = match kind {
+                    0 => LineStyle::Thin,
+                    1 => LineStyle::Hidden,
+                    _ => LineStyle::Centerline,
+                };
+                let mark = g.mark();
+                for piece in map_polyline(&pl, &[b.a, b.b]) {
+                    g.lines.push(Polyline2 { points: piece, style, closed: false, pick: view_pick });
+                }
+                if let Some(c) = color {
+                    g.color_since(mark, c);
+                }
+            }
+        }
+        if !v.hide_bend_notes && !geo.bends.is_empty() {
+            let ts = drawing.props.ann_type(super::sheet::AnnType::BendNotes);
+            let th = ts.height.unwrap_or(drawing.props.ann_text_height);
+            let mark = g.mark();
+            for b in &geo.bends {
+                let (pa, pb) = (pl.to_sheet(b.a), pl.to_sheet(b.b));
+                let mut ang = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
+                if ang > std::f64::consts::FRAC_PI_2 + 1e-9 {
+                    ang -= std::f64::consts::PI;
+                } else if ang <= -std::f64::consts::FRAC_PI_2 + 1e-9 {
+                    ang += std::f64::consts::PI;
+                }
+                let f = super::DimFormat::default();
+                let text = format!("{} {} R{}", if b.up { "UP" } else { "DOWN" }, format::dim_text(drawing, &f, b.angle, true, "").main, format::format_len(drawing, &f, b.radius));
+                let mid = [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0];
+                // Beside the bend region, on its left.
+                let off = b.width / 2.0 * pl.scale * 1000.0 + th * 0.4;
+                g.texts.push(Text2 { pos: [mid[0] - ang.sin() * off, mid[1] + ang.cos() * off], height: th, text, angle: ang, anchor: Anchor::BottomCenter, pick: view_pick });
+            }
+            if let Some(c) = ts.color.or(drawing.props.ann_color) {
+                g.color_since(mark, c);
+            }
+        }
+        // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
+        // a thin three-quarter circle (the gap in the upper right).
+        if !geo.threads.is_empty() {
+            let ansi = sheet.size.is_ansi();
+            for (c, r) in &geo.threads {
+                let (a0, a1) = if ansi { (0.0, std::f64::consts::TAU) } else { (std::f64::consts::FRAC_PI_2, std::f64::consts::TAU) };
+                let n = 48;
+                let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
+                for piece in map_polyline(&pl, &pts) {
+                    g.lines.push(Polyline2 { points: piece, style: if ansi { LineStyle::Hidden } else { LineStyle::Thin }, closed: false, pick: view_pick });
+                }
+            }
+        }
+        for m in &geo.form_marks {
+            let c = pl.to_sheet(*m);
+            let arm = 1.5;
+            g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+            g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: view_pick });
         }
         // Break lines.
         for br in pl.breaks() {
@@ -1044,7 +1168,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Annotations with resolved references.
     let (resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
     let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
-    let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields, revisions: &info.revisions };
+    let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields, revisions: &info.revisions, used: &used };
     g.add_annotations(&resolved, &env);
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
@@ -1058,6 +1182,18 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     for t in &mut g.texts[mt..] {
         t.pick = remap.get(&t.pick).copied().unwrap_or(0);
+    }
+    // Annotations moved to a format layer take its color and lock with the
+    // format (Formats › Locked).
+    let moved: Vec<LayerSpan> = g.layers.iter().filter(|s| s.lines.start >= ml && s.texts.start >= mt).cloned().collect();
+    for s in moved {
+        if let Some(rgb) = s.layer.color(&drawing.props) {
+            g.colors.push(super::sheet::ColorSpan { lines: s.lines.clone(), texts: s.texts.clone(), fills: s.fills.clone(), rgb });
+        }
+        if drawing.props.formats_locked {
+            g.lines[s.lines.clone()].iter_mut().for_each(|l| l.pick = 0);
+            g.texts[s.texts.clone()].iter_mut().for_each(|t| t.pick = 0);
+        }
     }
     for gr in &mut g.grips[mg..] {
         gr.pick = remap.get(&gr.pick).copied().unwrap_or(0);
@@ -1143,6 +1279,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         }
     }
 
+    // Notes › property background: grey behind property fields (screen only).
+    if !drawing.props.hide_property_background {
+        let used = used.into_inner();
+        // Only title block texts and annotation texts (not zone labels that
+        // happen to read like a value).
+        let candidate = |i: usize, t: &Text2| (i >= mark_t && i < end_t && in_tb(&t.pos)) || i >= mt;
+        g.field_backdrops = g.texts.iter().enumerate().filter(|(i, t)| candidate(*i, t) && !t.text.trim().is_empty() && used.iter().any(|u| u.trim() == t.text.trim())).map(|(_, t)| super::font::text_box(t).to_vec()).collect();
+    }
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
 }
 

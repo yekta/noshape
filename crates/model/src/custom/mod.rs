@@ -16,6 +16,7 @@
 
 pub mod host;
 mod provider;
+mod reference;
 pub mod run;
 pub mod studio;
 

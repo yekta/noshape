@@ -371,9 +371,10 @@ fn status(t: &mut T, id: FeatureId) -> (FeatureStatus, Option<String>, f64) {
 }
 
 /// Blends against Onshape's volumes and messages (live capture F1–F5).
-/// `tol` is 1e-3 mm³ where we build Onshape's exact solid; the remaining
-/// differences are noted (corner shapes of blends larger than the blends
-/// they run over, edge overflow) and tracked in docs/handoff/kernel-robustness.md.
+/// `tol` is 1e-3 mm³ where we build Onshape's exact solid; 0.12 for the
+/// rolling-ball corners of a fillet over smaller corner fillets (the same
+/// face as Onshape's, areas equal to 1e-7, our volume exact; Onshape's mass
+/// properties of that procedural face are ~0.1 off). See kernel/tests/blend.rs.
 #[test]
 fn blends_match_onshape() {
     fn check(t: &mut T, id: FeatureId, want: Result<f64, &str>, tol: f64, what: &str) {
@@ -396,7 +397,7 @@ fn blends_match_onshape() {
     let v = base.edges_where(vertical);
     base.fillet(v, "3 mm");
     let first_top = base.edges_where(top_loop)[0].clone();
-    for (r, want, tol) in [("1 mm", 7898.39759874477, 1e-3), ("2.9 mm", 7722.808308754831, 1e-3), ("3 mm", 7709.053018116171, 1e-3), ("4 mm", 7545.734690323423, 4.0), ("6 mm", 7094.739677144683, 8.0)] {
+    for (r, want, tol) in [("1 mm", 7898.39759874477, 1e-3), ("2.9 mm", 7722.808308754831, 1e-3), ("3 mm", 7709.053018116171, 1e-3), ("4 mm", 7545.734690323423, 0.12), ("6 mm", 7094.739677144683, 0.12)] {
         let mut t = base.fork();
         let f = t.fillet(vec![first_top.clone()], r);
         check(&mut t, f, Ok(want), tol, &format!("F1 fillet {r}"));
@@ -496,6 +497,15 @@ fn write_kern_clips() {
     let s = t.shell(top, "2.5 mm");
     t.ok(s);
     std::fs::write(dir.join("noshape-clip-shell-a.json"), serde_json::json!({ "noshape_features": t.ps.features }).to_string()).unwrap();
+    // F1 R4: the top loop over the R3 corners (rolling-ball corner faces).
+    let mut t = T::new();
+    t.block(40.0, 20.0, 10.0);
+    let v = t.edges_where(vertical);
+    t.fillet(v, "3 mm");
+    let top = t.edges_where(|i| i.start.z > 0.00999 && i.end.z > 0.00999);
+    let f = t.fillet(top, "4 mm");
+    t.ok(f);
+    std::fs::write(dir.join("noshape-clip-f1-r4.json"), serde_json::json!({ "noshape_features": t.ps.features }).to_string()).unwrap();
 }
 
 /// F4: variable fillet of one top 40 mm edge, R1 at the x = 0 vertex and R4 at

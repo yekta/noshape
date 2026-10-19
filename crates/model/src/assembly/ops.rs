@@ -554,7 +554,7 @@ impl Assembly {
         let name = self.next_feature_name("Folder");
         // Members keep the list order.
         let inst: Vec<InstanceId> = self.instances.iter().map(|i| i.id).filter(|i| instances.contains(i)).collect();
-        self.folders.push(super::ListFolder { id, name, instances: inst, features: features.to_vec() });
+        self.folders.push(super::ListFolder { id, name, instances: inst, features: features.to_vec(), unsuppressed_if: None });
         id
     }
 

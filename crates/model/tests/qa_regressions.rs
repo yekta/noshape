@@ -324,3 +324,29 @@ fn reference_to_split_pieces_survives_when_the_split_goes_away() {
     assert_eq!(b.find_faces(&wall_name).len(), 1, "hole wall not resolved");
 }
 
+
+/// In-context QA: a Composite part always consumed its members. Help
+/// (PartStudio__composite_part) and live ("Composite test": Part 1, Part 2
+/// and Composite part 1, not closed): an open composite leaves the bodies as
+/// parts of their own and isn't drawn itself; Closed consumes them.
+#[test]
+fn open_composite_keeps_its_members() {
+    let mut t = T::new();
+    t.block();
+    t.block();
+    let r = t.regen();
+    let ids: Vec<_> = r.context.bodies.iter().map(|b| b.id.clone()).collect();
+    assert_eq!(ids.len(), 2);
+    let c = t.add("compositePart", &[("bodies", q(ids.iter().cloned().map(Reference::Body).collect()))]);
+    let r = t.regen();
+    assert_eq!(r.context.bodies.len(), 3, "members kept");
+    let comp = r.display.bodies.iter().find(|b| b.id.feature == c).expect("composite");
+    let info = comp.composite.as_ref().expect("composite info");
+    assert!(!info.closed && info.members == ids);
+    assert!(comp.mesh.indices.is_empty(), "the members are drawn, not the composite");
+    t.set(c, "closed", ParamValue::Bool(true));
+    let r = t.regen();
+    assert_eq!(r.context.bodies.len(), 1, "closed consumes the members");
+    let comp = &r.display.bodies[0];
+    assert!(comp.composite.as_ref().is_some_and(|i| i.closed) && !comp.mesh.indices.is_empty());
+}

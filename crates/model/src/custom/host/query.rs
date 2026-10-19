@@ -768,7 +768,9 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             }
         }
         "OWNED_BY_PART" => {
-            let parts = sub(i, "part")?;
+            // Only bodies own entities: evLength's std code passes
+            // qOwnedByBody(<the edges>, EDGE), which must add nothing.
+            let parts: Vec<Ent> = sub(i, "part")?.into_iter().filter(|p| entity_type_of(p) == EType::Body).collect();
             let mut out = Vec::new();
             if query.get("subquery").is_undefined() {
                 for p in &parts {

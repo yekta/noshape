@@ -372,6 +372,13 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
 /// from the left (1 px `#888`, radius 3; checked `#1651b0` with a white
 /// check), then the 13.33 px `#666` label 4 px after it. Add `.on_click`.
 pub fn os_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    os_checkbox_focused(id, label, on, false)
+}
+
+/// [`os_checkbox`] with keyboard focus (feature dialogs, bundle CSS
+/// `input.ns-parameter-checkbox:focus + label.os-checkbox`): the box gets a
+/// `#1651b0` border and a 3 px `#769fcc` glow.
+pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool, focused: bool) -> Stateful<Div> {
     let pal = p();
     h_flex()
         .id(id)
@@ -392,7 +399,8 @@ pub fn os_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on:
                 .justify_center()
                 .rounded(px(3.))
                 .border_1()
-                .border_color(if on { pal.accent } else { gpui_kit::rgb(0x888888) })
+                .border_color(if on || focused { pal.accent } else { gpui_kit::rgb(0x888888) })
+                .when(focused, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x769fcc).into(), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]))
                 .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
                 .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)))),
         )

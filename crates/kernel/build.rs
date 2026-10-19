@@ -73,6 +73,8 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/jt_writer.cpp",
     "cpp/pvz.cpp",
     "cpp/pvz_writer.cpp",
+    "cpp/pvz_reader.cpp",
+    "cpp/vertex_blend.cpp",
 ];
 
 /// openNURBS static libraries (scripts/build-opennurbs.sh), dependents first.
@@ -92,6 +94,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/noshape_occt.hpp");
     println!("cargo:rerun-if-changed=cpp/jt_writer.hpp");
     println!("cargo:rerun-if-changed=cpp/pvz_writer.hpp");
+    println!("cargo:rerun-if-changed=cpp/pvz_reader.hpp");
     for s in BRIDGE_SOURCES {
         println!("cargo:rerun-if-changed={s}");
     }

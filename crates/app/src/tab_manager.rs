@@ -79,7 +79,38 @@ pub struct TabManager {
     collapsed: HashSet<TabId>,
     /// Folder being renamed in place.
     renaming: Option<(TabId, Entity<InputState>, Subscription)>,
+    /// Header toggles (live document/41–46): sort order, search box, type
+    /// filter row, one-line list rows, and the preview (footer).
+    sort: TabSort,
+    /// The sort menu is open; the sort button's bounds (the menu hangs under it).
+    sort_open: bool,
+    sort_anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    show_search: bool,
+    show_filters: bool,
+    compact: bool,
+    show_preview: bool,
     _subs: Vec<Subscription>,
+}
+
+/// The sort ▾ menu (live document/42).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TabSort {
+    TabOrder,
+    NameAsc,
+    NameDesc,
+    Type,
+}
+
+impl TabSort {
+    const ALL: [TabSort; 4] = [TabSort::TabOrder, TabSort::NameAsc, TabSort::NameDesc, TabSort::Type];
+    fn label(self) -> &'static str {
+        match self {
+            TabSort::TabOrder => "Tab order",
+            TabSort::NameAsc => "Name: A → Z",
+            TabSort::NameDesc => "Name: Z → A",
+            TabSort::Type => "Type",
+        }
+    }
 }
 
 impl TabManager {
@@ -105,7 +136,7 @@ impl TabManager {
             cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify()),
         ];
         search.update(cx, |s, cx| s.focus(window, cx));
-        Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, _subs: subs }
+        Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
     }
 
     /// The workspace's active tab changed (keep it selected, like Onshape).
@@ -116,7 +147,7 @@ impl TabManager {
 
     /// Folders show only with no search and no type filter.
     fn tree_mode(&self) -> bool {
-        self.query.trim().is_empty() && self.kinds.is_empty()
+        self.query.trim().is_empty() && self.kinds.is_empty() && self.sort == TabSort::TabOrder
     }
 
     /// Tabs and folders in folder order with their depth; `all` includes
@@ -139,12 +170,19 @@ impl TabManager {
         let q = self.query.trim().to_lowercase();
         let d = &self.doc.read(cx).session.doc;
         let order: Vec<TabId> = if self.tree_mode() { self.tree(true, cx).into_iter().map(|t| t.0).collect() } else { d.ordered_tabs().iter().map(|t| t.id).collect() };
-        order
+        let mut out: Vec<(TabId, String, &'static str)> = order
             .into_iter()
             .filter_map(|id| d.tab(id))
             .map(|t| (t.id, t.name.clone(), kind_of(&t.content)))
             .filter(|(_, n, k)| (q.is_empty() || n.to_lowercase().contains(&q)) && (self.kinds.is_empty() || self.kinds.contains(k)))
-            .collect()
+            .collect();
+        match self.sort {
+            TabSort::TabOrder => {}
+            TabSort::NameAsc => out.sort_by_key(|t| t.1.to_lowercase()),
+            TabSort::NameDesc => out.sort_by_key(|t| std::cmp::Reverse(t.1.to_lowercase())),
+            TabSort::Type => out.sort_by_key(|t| KINDS.iter().position(|k| k.0 == t.2)),
+        }
+        out
     }
 
     /// The rows a context menu acts on: the Ctrl+click selection if `id` is in it.
@@ -277,6 +315,7 @@ impl TabManager {
             return;
         }
         let doc = self.doc.read(cx).session.doc.clone();
+        let versions = self.doc.read(cx).session.pinned_documents();
         // Assemblies depend on their Part Studios: hash the whole document for them.
         let whole = {
             let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -306,7 +345,7 @@ impl TabManager {
                     for (tab, _, assembly) in &todo {
                         if let Some(TabContent::Drawing(d)) = doc.tab(*tab).map(|t| &t.content) {
                             let name = doc.tab(*tab).map(|t| t.name.clone()).unwrap_or_default();
-                            if let Some(img) = drawing_thumbnail(&doc, d, name) {
+                            if let Some(img) = drawing_thumbnail(&doc, &versions, d, name) {
                                 out.push((*tab, img));
                             }
                             continue;
@@ -377,27 +416,33 @@ impl Render for TabManager {
                 let (icon, label) = kind_info(kind);
                 let sel = self.selected == Some(id) || self.multi.contains(&id);
                 let view = cx.entity();
+                let compact = self.compact;
+                // Live document/41: the selected row's name is bold; 45: list
+                // view rows are one line (25.5 px), icon + name.
                 Some(h_flex()
                     .id(SharedString::from(format!("tm-{id}")))
                     .relative()
-                    .h(px(54.))
+                    .h(px(if compact { 25.5 } else { 54. }))
                     .flex_none()
-                    .pl(px(22. + depth as f32 * 20.))
+                    .pl(px(if compact { 16. } else { 22. } + depth as f32 * 20.))
                     .cursor_pointer()
-                    .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().top_0().bottom_0().w(px(6.)).bg(pal.accent)))
+                    .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).child(div().absolute().left_0().top_0().bottom_0().w(px(6.)).bg(pal.accent)))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.panel_hover)))
-                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match self.thumbs.images.get(&id) {
-                        Some(img) => gpui_kit::img(img.clone()).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
-                        None => crate::assets::icon(icon, 30., cx),
-                    }))
-                    .child(
-                        v_flex()
-                            .pl(px(7.))
-                            .flex_1()
-                            .min_w_0()
-                            .child(h_flex().gap(px(4.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().child(name.clone())))
-                            .child(div().text_size(px(12.6)).italic().text_color(pal.text_muted).child(label)),
-                    )
+                    .when(compact, |d| d.gap(px(6.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(name.clone())))
+                    .when(!compact, |d| {
+                        d.child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match self.thumbs.images.get(&id) {
+                            Some(img) => gpui_kit::img(img.clone()).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                            None => crate::assets::icon(icon, 30., cx),
+                        }))
+                        .child(
+                            v_flex()
+                                .pl(px(7.))
+                                .flex_1()
+                                .min_w_0()
+                                .child(h_flex().h(px(21.)).gap(px(4.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(name.clone())))
+                                .child(div().h(px(19.)).text_size(px(12.6)).line_height(px(18.9)).italic().text_color(pal.text_muted).child(label)),
+                        )
+                    })
                     .tooltip(crate::ui::tooltip(format!("Click to navigate to {name}")))
                     .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
                         // Ctrl+click: select several (Onshape); a click opens the tab.
@@ -449,7 +494,7 @@ impl Render for TabManager {
                 cx.notify();
             }))
         });
-        let preview = self.selected.and_then(|s| matches.iter().find(|t| t.0 == s)).map(|(id, name, kind)| {
+        let preview = self.selected.filter(|_| self.show_preview).and_then(|s| matches.iter().find(|t| t.0 == s)).map(|(id, name, kind)| {
             let (icon, _) = kind_info(kind);
             let picture = self.thumbs.images.get(id).cloned();
             v_flex()
@@ -482,16 +527,45 @@ impl Render for TabManager {
                     .h(px(37.))
                     .flex_none()
                     .pl(px(5.))
-                    .pr(px(6.))
-                    .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Tabs"))
-                    .child(crate::ui::icon_button("tm-search", "search", 30., true, cx).tooltip("Search tabs"))
+                    .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Tabs"))
+                    // Live document/41: search, sort ▾, filter | list, detailed | × (centers
+                    // 246, 284, 319, 352, 376, 405 px into the panel).
+                    .child(crate::ui::icon_button("tm-search", "search", 30., self.show_search, cx).mr(px(8.)).tooltip("Search tabs").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.show_search = !this.show_search;
+                        cx.notify();
+                    })))
+                    .child({
+                        let probe = self.sort_anchor.clone();
+                        div()
+                            .relative()
+                            .mr(px(5.))
+                            .child(crate::ui::icon_button("tm-sort", "tm-sort", 30., false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip("Sort").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.sort_open = !this.sort_open;
+                                cx.notify();
+                            })))
+                            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                    })
+                    .child(crate::ui::icon_button("tm-filter", "filter", 30., self.show_filters, cx).mr(px(6.)).tooltip("Filter by tab type").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.show_filters = !this.show_filters;
+                        cx.notify();
+                    })))
+                    .child(div().when(!self.compact, |d| d.opacity(0.4)).child(crate::ui::icon_button("tm-list", "tm-list", 24., false, cx).tooltip("List view").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.compact = true;
+                        cx.notify();
+                    }))))
+                    .child(div().mr(px(2.)).when(self.compact, |d| d.opacity(0.4)).child(crate::ui::icon_button("tm-detailed", "tm-detailed", 24., false, cx).tooltip("Detailed view").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.compact = false;
+                        cx.notify();
+                    }))))
                     .child(crate::ui::icon_button("tm-close", "close", 30., false, cx).tooltip("Close").on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TabManagerEvent::Close)))),
             )
-            .child(div().px(px(6.)).pt(px(2.)).flex_none().child(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(4.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic())))
-            .child(
+            // Live document/30: the search box 6 px under the header, the filter row
+            // 40 px, rows from y 154.
+            .when(self.show_search, |d| d.child(div().px(px(6.)).pt(px(6.)).flex_none().child(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(4.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))))
+            .when(self.show_filters, |d| d.child(
                 h_flex()
+                    .h(px(41.))
                     .px(px(6.))
-                    .py(px(4.))
                     .gap(px(4.))
                     .flex_none()
                     .border_b_1()
@@ -517,8 +591,9 @@ impl Render for TabManager {
                                 cx.notify();
                             })),
                     ),
-            )
+            ))
             .child(v_flex().id("tm-rows").flex_1().min_h_0().overflow_y_scroll().children(rows))
+            .when(self.sort_open, |d| d.child(self.render_sort_menu(cx)))
             .children(preview)
             .child(
                 h_flex()
@@ -537,8 +612,61 @@ impl Render for TabManager {
                     .child("to navigate")
                     .child(div().w(px(10.)))
                     .child(key("↵"))
-                    .child("to open"),
+                    .child("to open")
+                    .child(div().flex_1())
+                    // Live document/41, 46: the preview toggle and help.
+                    .child(crate::ui::icon_button("tm-preview", "tm-preview", 22., self.show_preview, cx).tooltip(if self.show_preview { "Hide preview" } else { "Show preview" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.show_preview = !this.show_preview;
+                        cx.notify();
+                    })))
+                    .child(crate::assets::icon("help-faint", 16., cx)),
             )
+    }
+}
+
+impl TabManager {
+    /// The sort menu (live document/42): 119 px under the sort button,
+    /// 19 px rows of 12 px `#555` text, the current order bold on `#b2ddf6`.
+    fn render_sort_menu(&self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let b = self.sort_anchor.get();
+        let mut list = v_flex()
+            .id("tm-sort-menu")
+            .occlude()
+            .w(px(119.))
+            .py(px(1.))
+            .bg(pal.panel)
+            .border_1()
+            .border_color(rgb(0xd7d7d7))
+            .rounded(px(3.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                this.sort_open = false;
+                cx.notify();
+            }));
+        for s in TabSort::ALL {
+            let cur = s == self.sort;
+            list = list.child(
+                div()
+                    .id(SharedString::from(format!("tm-sort-{}", s.label())))
+                    .h(px(19.))
+                    .px(px(16.))
+                    .flex()
+                    .items_center()
+                    .text_size(px(12.))
+                    .cursor_pointer()
+                    .text_color(if cur { pal.text } else { rgb(0x555555).into() })
+                    .when(cur, |d| d.bg(rgb(0xb2ddf6)).font_weight(FontWeight::BOLD))
+                    .when(!cur, |d| d.hover(|d| d.bg(pal.row_hover)))
+                    .child(s.label())
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.sort = s;
+                        this.sort_open = false;
+                        cx.notify();
+                    })),
+            );
+        }
+        deferred(anchored().position(point(b.left(), b.bottom() + px(1.))).child(list)).with_priority(1).into_any_element()
     }
 }
 
@@ -558,10 +686,11 @@ pub(crate) fn decode(png: &[u8]) -> Option<std::sync::Arc<RenderImage>> {
 
 /// A drawing's first sheet, rasterized (paper white, ink black) to the
 /// thumbnail size: Onshape shows drawings as their sheet in the Tab manager.
-pub(crate) fn drawing_thumbnail(doc: &noshape_model::Document, drawing: &noshape_model::drawing::Drawing, name: String) -> Option<std::sync::Arc<RenderImage>> {
+/// `versions`: the documents at the versions pinned views show.
+pub(crate) fn drawing_thumbnail(doc: &noshape_model::Document, versions: &std::collections::HashMap<String, noshape_model::Document>, drawing: &noshape_model::drawing::Drawing, name: String) -> Option<std::sync::Arc<RenderImage>> {
     use noshape_model::drawing::{build, font, sheet::LineStyle, views};
     use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
-    let sources = views::regenerate_sources(doc, drawing);
+    let sources = views::regenerate_sources_with(doc, drawing, &|id| versions.get(id).cloned());
     let info = build::SheetInfo { doc_name: String::new(), drawing_name: name, ..Default::default() };
     let g = build::render_sheet_with(drawing, 0, &sources, &views::ViewCache::new(), false, &info)?.geometry;
     let (w, h) = crate::gpu::THUMBNAIL_SIZE;

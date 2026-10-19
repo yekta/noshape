@@ -1,6 +1,9 @@
 // Feature operations: prism, revolve, sweep, loft, thicken, shell, fillet,
 // chamfer, draft, defeaturing, offsets, sewing, filling, rib.
 #include "internal.hpp"
+#include <Precision.hxx>
+#include <ShapeFix_Edge.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
@@ -514,6 +517,44 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     return hb.finish();
   }
 
+  if (o.mode == 6)
+  {
+    // Lock profile faces: the trihedron's binormal follows the faces' normal
+    // (BRepFill_EdgeOnSurfLaw), so each path edge needs its curve on one of
+    // them; added on a copy (same sub-shape order, so the history still maps).
+    require_non_null(aux.shape, "faces to lock");
+    sw = TopoDS::Wire(BRepBuilderAPI_Copy(sw).Shape());
+    Bnd_Box sb;
+    BRepBndLib::Add(sw, sb);
+    const double tol = std::max(Precision::Confusion(), (sb.IsVoid() ? 1.0 : std::sqrt(sb.SquareExtent())) * 1e-6);
+    for (TopExp_Explorer ee(sw, TopAbs_EDGE); ee.More(); ee.Next())
+    {
+      const TopoDS_Edge& e  = TopoDS::Edge(ee.Current());
+      bool               on = false;
+      for (TopExp_Explorer ef(aux.shape, TopAbs_FACE); ef.More() && !on; ef.Next())
+      {
+        const TopoDS_Face& f = TopoDS::Face(ef.Current());
+        double             a, b;
+        if (BRep_Tool::Curve(e, a, b).IsNull())
+          continue;
+        BRepAdaptor_Curve c(e);
+        on = true;
+        for (int i = 0; i <= 8 && on; ++i)
+        {
+          BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(c.Value(a + (b - a) * i / 8)).Vertex(), f);
+          on = d.IsDone() && d.Value() <= tol;
+        }
+        if (on)
+        {
+          ShapeFix_Edge sfe;
+          sfe.FixAddPCurve(e, f, false, tol);
+          on = !BRep_Tool::CurveOnSurface(e, f, a, b).IsNull();
+        }
+      }
+      if (!on)
+        fail_invalid("the sweep path must lie on the faces to lock");
+    }
+  }
   BRepOffsetAPI_MakePipeShell mk(sw);
   {
     // OCCT's defaults (1e-4 absolute) are tuned for millimetre parts: in metres
@@ -1488,6 +1529,10 @@ HHist compose(const TopoDS_Shape& input, const HHist& h12, const HHist& h23)
       const TopoDS_Shape& x = in(i);
       if (!h12.IsNull() && h12->IsRemoved(x))
       {
+        // Removed in step 1 (a filleted edge) but with generated images.
+        const ShapeList g = h12->Generated(x);
+        for (ShapeList::Iterator it(g); it.More(); it.Next())
+          step2(x, it.Value(), true);
         r->Remove(x);
         continue;
       }
@@ -1618,6 +1663,11 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
         return false;
       out = mk.Shape();
       h   = history_of({sc.shape}, mk);
+      // OCCT's patch where the loop runs over smaller corner fillets -> Parasolid's.
+      HHist corners;
+      out = exact_vertex_blends(out, corners);
+      if (!corners.IsNull())
+        h = compose(sc.shape, h, corners);
       return true;
     };
   });

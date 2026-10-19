@@ -183,6 +183,21 @@ pub fn source_hash(doc: &Document, key: &SourceKey) -> Option<u64> {
 
 /// Every source (tab + configuration + explode) used by a drawing's base
 /// views, in first-use order.
+/// Version ids the document's drawings pin view references to.
+pub fn pinned_versions(doc: &Document) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for t in &doc.tabs {
+        if let crate::document::TabContent::Drawing(d) = &t.content {
+            for id in d.sheets.iter().flat_map(|s| &s.views).filter_map(|v| v.pinned.as_ref().map(|p| &p.id)) {
+                if !out.contains(id) {
+                    out.push(id.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
 pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
     let mut out: Vec<SourceKey> = Vec::new();
     for sheet in &drawing.sheets {
@@ -776,6 +791,12 @@ pub struct ViewGeometry {
     pub clip_poly: Option<Vec<[f64; 2]>>,
     /// Center of mass (view coordinates) when shown.
     pub com: Option<[f64; 2]>,
+    /// Flat pattern views: bend lines and form centermarks.
+    pub bends: Vec<FlatBend>,
+    /// Cosmetic threads of tapped holes seen end-on: center and major
+    /// radius (view coordinates).
+    pub threads: Vec<([f64; 2], f64)>,
+    pub form_marks: Vec<[f64; 2]>,
     /// Crop boundary of a cropped view (view coordinates).
     pub crop: Option<Crop>,
     /// Axes of cylindrical faces seen from the side (for automatic
@@ -789,6 +810,21 @@ pub struct ViewGeometry {
     /// Aligned sections: how model points map into the view (the revolved
     /// leg), for associative annotations.
     pub aligned: Option<AlignedMap>,
+}
+
+/// A bend line of a flat pattern view (view coordinates) with what its
+/// bend note says.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatBend {
+    pub a: [f64; 2],
+    pub b: [f64; 2],
+    /// Bends toward the viewer.
+    pub up: bool,
+    /// Bend angle (radians), inner radius and the bend region's width in
+    /// the flat (m).
+    pub angle: f64,
+    pub radius: f64,
+    pub width: f64,
 }
 
 /// Point mapping of an aligned section view: model points on the revolved
@@ -1327,6 +1363,8 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     v.hide_sketch_points.hash(&mut h);
     v.hidden_parts.hash(&mut h);
     v.show_com.hash(&mut h);
+    v.flat.hash(&mut h);
+    v.hide_threads.hash(&mut h);
     let fx = |x: f64, h: &mut std::collections::hash_map::DefaultHasher| ((x * 1e9).round() as i64).hash(h);
     match &v.kind {
         ViewKind::Section { parent, .. } | ViewKind::AlignedSection { parent, .. } => {
@@ -1422,6 +1460,7 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             let pf = view_frame(drawing, sheet, *parent).expect("parent frame");
             aligned_section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, exact)
         }
+        ViewKind::Base { .. } if v.flat => flat_geometry(id, &ctx, part.as_ref(), &frame),
         // Sketch views (and views projected from them): the sketch's curves.
         ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } if sketch_of(sheet, id).is_some() => sketch_geometry(id, &ctx, &sketch_of(sheet, id).expect("checked"), &frame),
         _ if !v.broken_out.is_empty() => broken_out_geometry(id, &ctx, part.as_ref(), &frame, &v.broken_out, exact),
@@ -1442,6 +1481,19 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             let p = frame.project(m.center_of_mass);
             g.com = Some(p);
             g.snaps.push(Snap { p, kind: SnapKind::Vertex, point: None });
+        }
+    }
+    // Cosmetic threads: tapped holes whose entrance (or exit, through)
+    // faces the viewer; holes seen from the side are inside the material.
+    if !v.hide_threads && !matches!(v.kind, ViewKind::Detail { .. }) {
+        let boxes: Vec<_> = view_bodies(&ctx, part.as_ref()).iter().filter_map(|b| b.shape.bounding_box(false).ok()).collect();
+        for hole in &ctx.holes {
+            let Some(major) = hole.thread.as_deref().and_then(thread_major_diameter) else { continue };
+            let along = hole.dir.normalize().dot(frame.dir);
+            let inside = |p: DVec3| boxes.iter().any(|bb| p.cmpge(bb.min - DVec3::splat(1e-6)).all() && p.cmple(bb.max + DVec3::splat(1e-6)).all());
+            if (along > 0.999 || (hole.through && along < -0.999)) && inside(hole.start) {
+                g.threads.push((frame.project(hole.start), major / 2.0));
+            }
         }
     }
     // Shown source sketches, drawn over the model; their free points as
@@ -2303,6 +2355,72 @@ pub fn sketch_frame(ctx: &Context, feature: &crate::FeatureId) -> Option<[[f64; 
 
 /// A sketch view: the sketch's (non-construction) curves projected into the
 /// view; its points are snap points.
+/// Major diameter (m) of a thread designation: metric "M6x1.0" / "M10",
+/// unified "1/4-20" or numbered "#10-24".
+pub fn thread_major_diameter(designation: &str) -> Option<f64> {
+    let d = designation.trim();
+    if let Some(m) = d.strip_prefix('M') {
+        let n: String = m.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
+        return n.parse::<f64>().ok().map(|v| v * 1e-3);
+    }
+    let size = d.split('-').next()?.trim();
+    let inch = if let Some(n) = size.strip_prefix('#') {
+        // Numbered sizes: 0.060 + 0.013 × n.
+        0.060 + 0.013 * n.parse::<f64>().ok()?
+    } else if let Some((a, b)) = size.split_once('/') {
+        // "1/4", "1 1/4".
+        let (whole, num) = match a.trim().split_once(' ') {
+            Some((w, n)) => (w.parse::<f64>().ok()?, n.parse::<f64>().ok()?),
+            None => (0.0, a.trim().parse::<f64>().ok()?),
+        };
+        whole + num / b.trim().parse::<f64>().ok()?
+    } else {
+        size.parse::<f64>().ok()?
+    };
+    Some(inch * 0.0254)
+}
+
+/// A flat pattern view: the unfolded part's outline (cut edges), form
+/// outlines and centermarks, and its bend lines (seen from the flat's
+/// reference side, view X along the flat's X).
+fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame) -> ViewGeometry {
+    let mut g = ViewGeometry { id, frame: Some(*frame), exact: true, ..Default::default() };
+    let flat = match part.ok_or_else(|| "Select a sheet metal part".to_string()).and_then(|p| crate::sheetmetal::flat_pattern_for(ctx, p)) {
+        Ok(f) => f,
+        Err(e) => {
+            g.error = Some(e);
+            return g;
+        }
+    };
+    let pt = |p: DVec2| [p.x, p.y];
+    for l in flat.loops.iter().filter(|l| l.len() >= 2) {
+        let mut pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
+        pts.push(pts[0]);
+        for w in pts.windows(2) {
+            g.snaps.push(Snap { p: w[0], kind: SnapKind::Vertex, point: None });
+        }
+        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None });
+    }
+    for f in &flat.forms {
+        for l in f.loops.iter().filter(|l| l.len() >= 2) {
+            let mut pts: Vec<[f64; 2]> = l.iter().map(|p| pt(*p)).collect();
+            pts.push(pts[0]);
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+        }
+        g.form_marks.push(pt(f.center));
+        g.snaps.push(Snap { p: pt(f.center), kind: SnapKind::Center, point: None });
+    }
+    for b in &flat.bend_lines {
+        g.bends.push(FlatBend { a: pt(b.a), b: pt(b.b), up: b.up, angle: b.angle, radius: b.radius, width: b.allowance });
+        g.snaps.push(Snap { p: pt(b.a), kind: SnapKind::Vertex, point: None });
+        g.snaps.push(Snap { p: pt(b.b), kind: SnapKind::Vertex, point: None });
+    }
+    let (lo, hi) = flat.bounds();
+    g.origin = [(lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0];
+    g.update_bounds();
+    g
+}
+
 fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame: &ViewFrame) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: Some(*frame), exact: true, ..Default::default() };
     let Some(s) = ctx.sketches.iter().find(|s| &s.feature == feature) else {

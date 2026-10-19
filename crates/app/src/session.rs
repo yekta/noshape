@@ -177,6 +177,19 @@ impl Session {
         self.reload(after)
     }
 
+    /// The document as it was at a version (`id` as text), for drawing views
+    /// pinned to it (drawings, asb). None when there is no such version.
+    pub fn document_at_version(&self, id: &str) -> Result<Option<Document>> {
+        let Some(v) = self.store.list_versions()?.into_iter().find(|v| v.id.to_string() == id) else { return Ok(None) };
+        Ok(Some(Document::from_blobs(&self.store.read_all(v.microversion)?)?))
+    }
+
+    /// The documents at the versions the drawings pin views to (for work
+    /// off the main thread, e.g. drawing thumbnails).
+    pub fn pinned_documents(&self) -> std::collections::HashMap<String, Document> {
+        noshape_model::drawing::views::pinned_versions(&self.doc).into_iter().filter_map(|id| Some((id.clone(), self.document_at_version(&id).ok().flatten()?))).collect()
+    }
+
     pub fn create_version(&mut self, name: &str, description: &str) -> Result<VersionId> {
         let head = self.head()?;
         Ok(self.store.create_version(head, name, description)?)
@@ -235,5 +248,41 @@ mod tests {
         drop(s);
         let s2 = Session::open(&path).unwrap();
         assert_eq!(s2.doc.tab(tab).unwrap().name, "Renamed");
+    }
+
+    #[test]
+    fn document_at_a_version() {
+        let dir = std::env::temp_dir().join(format!("noshape-session-v-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("v.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut s = Session::create(&path, Document::new()).unwrap();
+        let tab = s.doc.tabs[0].id;
+        let v = s.create_version("V1", "").unwrap();
+        s.doc.tab_mut(tab).unwrap().name = "Later".into();
+        s.commit(&[tab], false, "Rename tab").unwrap();
+        // The version keeps the old name; unknown ids give None.
+        let at = s.document_at_version(&v.to_string()).unwrap().unwrap();
+        assert_eq!(at.tab(tab).unwrap().name, "Part Studio 1");
+        assert!(s.document_at_version("no-such-version").unwrap().is_none());
+    }
+
+    #[test]
+    fn pinned_drawing_views_get_their_version() {
+        use noshape_model::document::TabContent;
+        let dir = std::env::temp_dir().join(format!("noshape-session-pin-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("p.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut s = Session::create(&path, noshape_model::demo::demo_document_with_drawing()).unwrap();
+        assert!(s.pinned_documents().is_empty());
+        let v = s.create_version("V1", "").unwrap().to_string();
+        let tab = s.doc.tabs.iter().find(|t| matches!(t.content, TabContent::Drawing(_))).unwrap().id;
+        if let Some(TabContent::Drawing(d)) = s.doc.tab_mut(tab).map(|t| &mut t.content) {
+            d.sheets[0].views[0].pinned = Some(noshape_model::drawing::PinnedVersion { id: v.clone(), name: "V1".into() });
+        }
+        s.commit(&[tab], false, "Pin view reference").unwrap();
+        let docs = s.pinned_documents();
+        assert_eq!(docs.keys().collect::<Vec<_>>(), vec![&v]);
     }
 }

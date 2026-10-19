@@ -70,7 +70,7 @@ pub fn cad_document_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVer
         lt.pattern_length = pattern.iter().map(|p: &f64| p.abs() * k).sum();
         let _ = doc.line_types.add(lt);
     }
-    for st in STYLES.iter().map(|s| s.layer()).chain(["ANNOTATION"]).collect::<std::collections::BTreeSet<_>>() {
+    for st in STYLES.iter().map(|s| s.layer()).chain(["ANNOTATION", "BORDER_ZONES", "TITLE_BLOCK"]).collect::<std::collections::BTreeSet<_>>() {
         let mut layer = Layer::new(st);
         layer.color = Color::from_index(7);
         layer.line_type = STYLES.iter().find(|s| s.layer() == st).map(|s| line_type_of(*s)).unwrap_or("Continuous").to_string();
@@ -104,13 +104,13 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         let c = color(g.line_color(li));
         if l.points.len() == 2 && !l.closed {
             let mut e = Line::from_points(p3(l.points[0]), p3(l.points[1]));
-            e.common.layer = l.style.layer().to_string();
+            e.common.layer = g.line_layer(li).to_string();
             e.common.color = c;
             add(doc, EntityType::Line(e))?;
         } else {
             let mut e = LwPolyline::from_points(l.points.iter().map(|p| p2(*p)).collect());
             e.is_closed = l.closed;
-            e.common.layer = l.style.layer().to_string();
+            e.common.layer = g.line_layer(li).to_string();
             e.common.color = c;
             add(doc, EntityType::LwPolyline(e))?;
         }
@@ -122,7 +122,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         for i in 1..f.points.len() - 1 {
             let (a, b, c) = (p3(f.points[0]), p3(f.points[i]), p3(f.points[i + 1]));
             let mut e = Solid::new(a, b, c, c);
-            e.common.layer = "ANNOTATION".into();
+            e.common.layer = g.fill_layer(fi).unwrap_or("ANNOTATION").into();
             e.common.color = color(g.fill_color(fi));
             add(doc, EntityType::Solid(e))?;
         }
@@ -132,7 +132,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         if needs_strokes(t) {
             for st in font::text_strokes(t).into_iter().filter(|s| s.len() >= 2) {
                 let mut e = LwPolyline::from_points(st.iter().map(|p| p2(*p)).collect());
-                e.common.layer = "ANNOTATION".into();
+                e.common.layer = g.text_layer(ti).unwrap_or("ANNOTATION").into();
                 e.common.color = c;
                 add(doc, EntityType::LwPolyline(e))?;
             }
@@ -154,7 +154,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         }
         e.horizontal_alignment = h;
         e.vertical_alignment = v;
-        e.common.layer = "ANNOTATION".into();
+        e.common.layer = g.text_layer(ti).unwrap_or("ANNOTATION").into();
         e.common.color = c;
         add(doc, EntityType::Text(e))?;
     }

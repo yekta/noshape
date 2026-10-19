@@ -12,11 +12,13 @@ use std::rc::Rc;
 pub(crate) enum DynTarget {
     Instance(InstanceId),
     Mate(MateId),
+    /// An instance folder (its instances).
+    Folder(MateId),
 }
 use noshape_model::assembly::BomBehavior;
 
 /// The dialogs' gray "?" help button (14 px, `#888`).
-fn help_dot() -> Div {
+pub(super) fn help_dot() -> Div {
     div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")
 }
 
@@ -205,6 +207,7 @@ impl AssemblyView {
             .and_then(|a| match target {
                 DynTarget::Instance(id) => a.instance(id).and_then(|i| i.unsuppressed_if.clone()),
                 DynTarget::Mate(id) => a.mate(id).and_then(|m| m.unsuppressed_if.clone()),
+                DynTarget::Folder(id) => a.folders.iter().find(|f| f.id == id).and_then(|f| f.unsuppressed_if.clone()),
             })
             .unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
@@ -235,6 +238,11 @@ impl AssemblyView {
             DynTarget::Mate(id) => {
                 if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
                     m.unsuppressed_if = text.clone();
+                }
+            }
+            DynTarget::Folder(id) => {
+                if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
+                    f.unsuppressed_if = text.clone();
                 }
             }
         });
@@ -298,7 +306,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.dynamic_suppression = None;
                                     cx.notify();
@@ -335,7 +343,10 @@ impl AssemblyView {
     /// Assembly contexts of this assembly in a Part Studio: (id, name).
     pub(super) fn contexts_in(&self, studio: TabId, cx: &App) -> Vec<(u32, String)> {
         match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
-            Some(TabContent::PartStudio(ps)) => ps.contexts.iter().filter(|c| c.assembly == self.tab).map(|c| (c.id, c.name.clone())).collect(),
+            Some(TabContent::PartStudio(ps)) => {
+                let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+                ps.contexts.iter().filter(|c| c.assembly == self.tab && referenced.contains(&c.id)).map(|c| (c.id, c.name.clone())).collect()
+            }
             _ => Vec::new(),
         }
     }
@@ -380,9 +391,12 @@ impl AssemblyView {
             _ => return Vec::new(),
         };
         let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) else { return Vec::new() };
+        // A context exists for the user only once a feature references it
+        // (live assembly/548: Edit in context alone adds no context arrow).
+        let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
         ps.contexts
             .iter()
-            .filter(|c| c.assembly == self.tab)
+            .filter(|c| c.assembly == self.tab && referenced.contains(&c.id))
             .filter_map(|c| {
                 let primary = c.primary == vec![top.0];
                 if !primary && (body.is_none() || c.primary_body != body) {
@@ -402,7 +416,8 @@ impl AssemblyView {
         let mut flags: Vec<((TabId, u32), bool)> = Vec::new();
         for t in &self.doc.read(cx).session.doc.tabs {
             let TabContent::PartStudio(ps) = &t.content else { continue };
-            for c in ps.contexts.iter().filter(|c| c.assembly == self.tab) {
+            let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+            for c in ps.contexts.iter().filter(|c| c.assembly == self.tab && referenced.contains(&c.id)) {
                 let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
                 let current = noshape_model::in_context::state_hash(&self.result, &path);
                 flags.push(((t.id, c.id), c.state != 0 && current.is_some_and(|h| h != c.state)));
@@ -514,7 +529,11 @@ impl AssemblyView {
             Some(_) => None,
             None => {
                 let (id, name) = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
-                    Some(TabContent::PartStudio(ps)) => noshape_model::in_context::next_context(&ps.contexts),
+                    Some(TabContent::PartStudio(ps)) => {
+                        let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+                        let kept: Vec<_> = ps.contexts.iter().filter(|c| referenced.contains(&c.id)).cloned().collect();
+                        noshape_model::in_context::next_context(&kept)
+                    }
                     _ => return None,
                 };
                 Some(match &primary_path {
@@ -528,6 +547,10 @@ impl AssemblyView {
             d.edit_document_not_undoable("Edit in context", cx, |doc| {
                 if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(studio).map(|t| &mut t.content) {
                     if let Some(c) = new_context {
+                        // Contexts no feature references don't persist
+                        // (Onshape); a new one replaces them.
+                        let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+                        ps.contexts.retain(|c| referenced.contains(&c.id));
                         ps.contexts.push(c);
                     }
                     ps.active_context = Some(id);
@@ -554,11 +577,15 @@ pub(crate) struct RefDoc {
     /// references).
     pub keys: Vec<String>,
     pub path: std::path::PathBuf,
+    /// The document thumbnail (66x40 in the row, live 111).
+    pub thumbnail: Option<std::sync::Arc<RenderImage>>,
 }
 
 /// The open Reference manager: tab (0 Update to latest, 1 Selective
 /// update), documents, checked rows and per-row chosen versions.
 pub(crate) struct RefManager {
+    /// Change to version…: only these instances (else every reference).
+    pub scope: Option<Vec<InstanceId>>,
     pub tab: u8,
     pub docs: Vec<RefDoc>,
     pub checked: HashSet<usize>,
@@ -567,21 +594,23 @@ pub(crate) struct RefManager {
 
 impl AssemblyView {
     /// Referenced documents that have newer versions.
-    fn referenced_docs(&self, cx: &App) -> Vec<RefDoc> {
+    fn referenced_docs(&self, scope: Option<&[InstanceId]>, cx: &App) -> Vec<RefDoc> {
         let mut out = Vec::new();
         let Some(asm) = self.assembly(cx) else { return out };
         let dm = self.doc.read(cx);
+        let in_scope = |i: &Instance| scope.is_none_or(|s| s.contains(&i.id));
         // This document's workspace references (Main) and its versions.
-        let local = asm.instances.iter().any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }));
+        let local = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }));
         if local && let Ok(vs) = dm.session.store.list_versions() {
             let versions: Vec<crate::derived::VersionChoice> = vs.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
             if !versions.is_empty() {
-                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone() });
+                let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::start_library::decode_thumbnail);
+                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail });
             }
         }
         // Other documents (and this one pinned to a version).
         let mut by_path: Vec<(std::path::PathBuf, Vec<String>, noshape_store::MicroversionId)> = Vec::new();
-        for i in &asm.instances {
+        for i in asm.instances.iter().filter(|i| in_scope(i)) {
             let Some(k) = i.source.external_key() else { continue };
             let Some(r) = crate::derived::ExternalRef::parse(k) else { continue };
             match by_path.iter_mut().find(|(p, _, mv)| *p == r.path && *mv == r.microversion) {
@@ -600,29 +629,41 @@ impl AssemblyView {
                 continue;
             }
             let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).unwrap_or_else(|| format!("state {}", mv.short()));
-            out.push(RefDoc { name: info.name, current, versions, keys, path });
+            let thumbnail = crate::start_library::file_thumbnail(&path);
+            out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail });
         }
         out
     }
 
     /// Instance menu › Change to version… and the toolbar's Update all
     /// references: Onshape's Reference manager dialog.
-    pub(super) fn open_reference_manager(&mut self, cx: &mut Context<Self>) {
-        let docs = self.referenced_docs(cx);
-        self.ui.ref_manager = Some(RefManager { tab: 0, docs, checked: HashSet::new(), chosen: HashMap::new() });
+    /// `scope`: Change to version… on these instances (live 604–607: Update
+    /// all then changes only them).
+    pub(super) fn open_reference_manager(&mut self, scope: Option<Vec<InstanceId>>, cx: &mut Context<Self>) {
+        let docs = self.referenced_docs(scope.as_deref(), cx);
+        self.ui.ref_manager = Some(RefManager { scope, tab: 0, docs, checked: HashSet::new(), chosen: HashMap::new() });
         cx.notify();
     }
 
+    /// Whether another document referenced here has a newer version (the
+    /// toolbar's Update all references button is enabled then; live 621).
+    pub(super) fn has_newer_references(&self, cx: &App) -> bool {
+        let own = &self.doc.read(cx).session.path;
+        self.ext_updates.iter().any(|(k, v)| v.is_some() && crate::derived::ExternalRef::parse(k).is_some_and(|r| r.path != *own))
+    }
+
     /// Move one document's references to `version` (index into its versions).
-    fn update_reference(&mut self, d: &RefDoc, version: usize, cx: &mut Context<Self>) -> usize {
+    fn update_reference(&mut self, d: &RefDoc, version: usize, scope: Option<&[InstanceId]>, cx: &mut Context<Self>) -> usize {
         let Some(to) = d.versions.get(version).cloned() else { return 0 };
+        let scope: Option<Vec<InstanceId>> = scope.map(|s| s.to_vec());
+        let in_scope = move |i: &Instance| scope.as_ref().is_none_or(|s| s.contains(&i.id));
         if d.keys.is_empty() {
             // Workspace references of this document become version references.
             let path = d.path.clone();
             return self
                 .edit(&format!("Change to version : {}", to.label), cx, |a| {
                     let mut n = 0;
-                    for i in &mut a.instances {
+                    for i in a.instances.iter_mut().filter(|i| in_scope(i)) {
                         let (tab, body, config) = match &i.source {
                             InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
                             InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
@@ -640,22 +681,38 @@ impl AssemblyView {
         for k in &d.keys {
             let Some(r) = crate::derived::ExternalRef::parse(k) else { continue };
             let new_key = crate::derived::ExternalRef { microversion: to.microversion, ..r }.key();
-            n += self.edit(&format!("Update to {}", to.label), cx, |a| a.update_external(k, &new_key)).unwrap_or(0);
+            n += self
+                .edit(&format!("Update to {}", to.label), cx, |a| {
+                    let mut n = 0;
+                    for i in a.instances.iter_mut().filter(|i| in_scope(i)) {
+                        if let InstanceSource::External { key, .. } = &mut i.source
+                            && key == k
+                        {
+                            *key = new_key.clone();
+                            n += 1;
+                        }
+                    }
+                    n
+                })
+                .unwrap_or(0);
             self.ext_updates.remove(k);
         }
         n
     }
 
+    /// Update all / Update selected: no message; the dialog stays open and
+    /// lists what is still out of date (live 606–607).
     fn apply_reference_manager(&mut self, cx: &mut Context<Self>) {
         let Some(m) = self.ui.ref_manager.take() else { return };
-        let mut n = 0;
         for (i, d) in m.docs.iter().enumerate() {
             if m.tab == 1 && !m.checked.contains(&i) {
                 continue;
             }
-            n += self.update_reference(d, m.chosen.get(&i).copied().unwrap_or(0), cx);
+            self.update_reference(d, m.chosen.get(&i).copied().unwrap_or(0), m.scope.as_deref(), cx);
         }
-        self.message = Some((false, format!("Updated {n} instance(s).")));
+        let docs = self.referenced_docs(m.scope.as_deref(), cx);
+        self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
+        self.check_external_updates(cx);
         self.refresh_scene(true, cx);
         cx.notify();
     }
@@ -713,7 +770,10 @@ impl AssemblyView {
                             ),
                         )
                     })
-                    .child(div().w(px(70.)).h(px(40.)).px(px(2.)).flex().items_center().justify_center().child(crate::assets::icon(&icon_path("document"), 32., cx)))
+                    .child(div().w(px(70.)).h(px(40.)).px(px(2.)).flex_none().flex().items_center().justify_center().child(match d.thumbnail.clone() {
+                        Some(img) => gpui_kit::img(img).w(px(66.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                        None => crate::assets::icon(&icon_path("document"), 32., cx).into_any_element(),
+                    }))
                     .child(
                         v_flex()
                             .flex_1()
@@ -762,7 +822,8 @@ impl AssemblyView {
             );
         }
         let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
-        let info = if n == 0 { "All references are up to date".to_string() } else { format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" }) };
+        // Live 607: the line stays, "Newer versions available for 0 documents".
+        let info = format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" });
         Some(
             v_flex()
                 .w(px(330.))
@@ -785,7 +846,8 @@ impl AssemblyView {
                                 .justify_center()
                                 .opacity(0.5)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).size(px(14.)).text_color(rgb(0x000000)))
+                                // Bootstrap `btn-close` (live 111: an 11 px ✕).
+                                .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., rgb(0x000000)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.ref_manager = None;
                                     cx.notify();
@@ -794,6 +856,7 @@ impl AssemblyView {
                 )
                 .child(
                     h_flex()
+                        .bg(rgb(0xffffff))
                         .border_b_1()
                         .border_color(rgb(0xeeeeee))
                         .child(tab_button("rm-tab-latest", "Update to latest", 0).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -819,10 +882,10 @@ impl AssemblyView {
                             h_flex()
                                 .h(px(30.))
                                 .px(px(3.))
-                                .gap(px(2.))
                                 .border_b_1()
                                 .border_color(rgb(0xeaeaea))
-                                .when(n > 0, |d| d.child(crate::ui::glyph("inserted-version-update", 18., rgb(0x1651b0))))
+                                // Live dialog-reference-manager: the two-tone 20 px icon, text right after it.
+                                .child(crate::assets::icon(&icon_path("inserted-version-update"), 20., cx))
                                 .child(div().text_size(px(12.)).text_color(rgb(0x333333)).child(info)),
                         )
                         .child(list),
@@ -905,13 +968,19 @@ impl AssemblyView {
 
     /// "Insert and go to assembly" from a Part Studio created in context:
     /// its parts are inserted at the Part Studio's origin connector.
-    pub fn insert_from_context(&mut self, studio: TabId, parts: Vec<BodyId>, at: Placement, cx: &mut Context<Self>) {
+    pub fn insert_from_context(&mut self, studio: TabId, parts: Vec<BodyId>, sketches: Vec<FeatureId>, at: Placement, cx: &mut Context<Self>) {
         let names: HashMap<BodyId, String> = self.evaluator.lock().studio(&self.doc.read(cx).session.doc, studio, &ConfigValues::default()).map(|r| r.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
+        let sketch_names: HashMap<FeatureId, String> = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
+            Some(noshape_model::TabContent::PartStudio(ps)) => ps.features.iter().map(|f| (f.id, f.name.clone())).collect(),
+            _ => HashMap::new(),
+        };
         self.edit("Insert and go to assembly", cx, |a| {
-            for b in &parts {
+            let sources = parts.iter().map(|b| (names.get(b).map(|s| s.as_str()).unwrap_or("Part"), InstanceSource::Part { studio, body: b.clone(), config: ConfigValues::default() }));
+            let sketch_sources = sketches.iter().map(|f| (sketch_names.get(f).map(|s| s.as_str()).unwrap_or("Sketch"), InstanceSource::Sketch { studio, sketch: *f, config: ConfigValues::default() }));
+            for (base, source) in sources.chain(sketch_sources) {
                 let id = InstanceId(a.next_id());
-                let name = a.next_instance_name(names.get(b).map(|s| s.as_str()).unwrap_or("Part"));
-                let mut inst = Instance::new(id, name, InstanceSource::Part { studio, body: b.clone(), config: ConfigValues::default() }, at);
+                let name = a.next_instance_name(base);
+                let mut inst = Instance::new(id, name, source, at);
                 inst.hidden = false;
                 a.instances.push(inst);
             }
@@ -983,7 +1052,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.ps_in_context = None;
                                     cx.notify();
@@ -1013,3 +1082,51 @@ impl AssemblyView {
 pub struct StaleContexts(pub std::collections::HashSet<(TabId, u32)>);
 
 impl Global for StaleContexts {}
+
+#[cfg(test)]
+mod tests {
+    //! T10 fixture: a document whose assembly references another
+    //! document's Part Studio at V1 while that document has a V2. With
+    //! `NOSHAPE_T10_DIR` set, the two documents are written there (for the
+    //! app check: open "T10 source" once so it gets its thumbnail, then
+    //! "T10 assembly": the toolbar's Update all references is enabled and
+    //! the row shows the newer-version badge).
+    use std::prelude::v1::test;
+
+    #[test]
+    fn t10_fixture_reports_the_newer_version_of_a_referenced_document() {
+        use noshape_model::assembly::{Assembly, Instance, InstanceId, InstanceSource, Placement};
+        use noshape_model::document::{Document, TabContent};
+        let dir = std::env::var_os("NOSHAPE_T10_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join(format!("noshape-t10-{}", std::process::id())));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (src_path, asm_path) = (dir.join("T10 source.noshape"), dir.join("T10 assembly.noshape"));
+        for p in [&src_path, &asm_path] {
+            let _ = std::fs::remove_file(p);
+        }
+        let mut src = crate::session::Session::create(&src_path, noshape_model::demo::demo_document()).unwrap();
+        src.create_version("V1", "").unwrap();
+        let v1 = src.head().unwrap();
+        let tab = src.doc.tabs[0].id;
+        src.doc.tabs[0].name = "Plate".into();
+        src.commit_all("Rename tab").unwrap();
+        src.create_version("V2", "").unwrap();
+        let v2 = src.head().unwrap();
+
+        let key = crate::derived::ExternalRef { path: src_path.clone(), microversion: v1, tab: tab.to_string() }.key();
+        let mut doc = Document::new();
+        let mut asm = Assembly::default();
+        asm.instances.push(Instance::new(InstanceId(1), "Part Studio 1 <1>".into(), InstanceSource::External { key: key.clone(), body: None, config: Default::default() }, Placement::default()));
+        let tab = doc.tabs.iter_mut().find(|t| matches!(t.content, TabContent::Assembly(_))).expect("a new document has Assembly 1");
+        tab.content = TabContent::Assembly(Box::new(asm));
+        drop(crate::session::Session::create(&asm_path, doc).unwrap());
+
+        let r = crate::derived::ExternalRef::parse(&key).unwrap();
+        let newer = crate::derived::newer_version(&r).expect("V2 is newer");
+        assert_eq!((newer.label.as_str(), newer.microversion), ("V2", v2));
+        // Once pinned to V2 there is nothing newer.
+        assert!(crate::derived::newer_version(&crate::derived::ExternalRef { microversion: v2, ..r }).is_none());
+        if std::env::var_os("NOSHAPE_T10_DIR").is_none() {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+}

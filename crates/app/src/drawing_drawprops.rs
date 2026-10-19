@@ -68,7 +68,6 @@ type Act = std::rc::Rc<dyn Fn(&mut DrawingProps)>;
 #[derive(Clone, Copy)]
 enum FontOf {
     Dims,
-    Annotations,
     Inspection,
     Type(AnnType),
 }
@@ -76,21 +75,48 @@ enum FontOf {
 fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawing::sheet::TextFont> {
     match w {
         FontOf::Dims => &mut p.dim_font,
-        FontOf::Annotations => &mut p.ann_font,
         FontOf::Inspection => &mut p.inspection_font,
         FontOf::Type(t) => &mut p.ann_type_mut(t).font,
     }
 }
 
 /// Element ids of the per-type rows (font select, bold, italic, color).
-const TYPE_IDS: [[&str; 4]; 6] = [
+const TYPE_IDS: [[&str; 4]; 9] = [
     ["dp-t0-font", "dp-t0-b", "dp-t0-i", "dp-t0-color"],
     ["dp-t1-font", "dp-t1-b", "dp-t1-i", "dp-t1-color"],
     ["dp-t2-font", "dp-t2-b", "dp-t2-i", "dp-t2-color"],
     ["dp-t3-font", "dp-t3-b", "dp-t3-i", "dp-t3-color"],
     ["dp-t4-font", "dp-t4-b", "dp-t4-i", "dp-t4-color"],
     ["dp-t5-font", "dp-t5-b", "dp-t5-i", "dp-t5-color"],
+    ["dp-t6-font", "dp-t6-b", "dp-t6-i", "dp-t6-color"],
+    ["dp-t7-font", "dp-t7-b", "dp-t7-i", "dp-t7-color"],
+    ["dp-t8-font", "dp-t8-b", "dp-t8-i", "dp-t8-color"],
 ];
+
+/// Datums › Target hatch pattern: the ANSI list's names.
+const TARGET_ANSI: [&str; 8] = ["ANSI31 general", "ANSI32 steel", "ANSI33 bronze/ brass/ copper", "ANSI34 rubber/ plastic", "ANSI35", "ANSI36", "ANSI37 lead/ alloys", "ANSI38 aluminium"];
+
+/// Hole/thread callouts › Indicator choices (the count's sign: "4X").
+const HOLE_INDICATORS: [&str; 3] = ["X", "x", "-"];
+
+/// A typed length in mm: "0.12 in", "3 mm", or a bare number in the
+/// drawing's units (`inch`). None unless positive.
+fn length_mm(text: &str, inch: bool) -> Option<f64> {
+    let t = text.trim();
+    let (num, k) = if let Some(n) = t.strip_suffix("in") {
+        (n, 25.4)
+    } else if let Some(n) = t.strip_suffix("mm") {
+        (n, 1.0)
+    } else {
+        (t, if inch { 25.4 } else { 1.0 })
+    };
+    num.trim().parse::<f64>().ok().map(|v| v * k).filter(|v| *v > 0.0)
+}
+
+/// Sets annotation type `I`'s text height.
+fn set_type_height<const I: usize>(p: &mut DrawingProps, v: f64) {
+    p.ann_type_mut(AnnType::ALL[I]).height = Some(v);
+}
 
 impl DrawingEditor {
     pub fn open_drawing_props(&mut self, cx: &mut Context<Self>) {
@@ -112,11 +138,15 @@ impl DrawingEditor {
             return;
         }
         let p = &self.drawing.props;
-        let field = |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} mm", noshape_model::drawing::format::format_number(v, None, 2))));
+        // Lengths in the drawing's units ("0.1200 in", "3 mm"); typing a unit
+        // overrides them.
+        let inch = !self.drawing.units_mm;
+        let field = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
+            let shown = if inch { format!("{:.4} in", v / 25.4) } else { format!("{} mm", noshape_model::drawing::format::format_number(v, None, 2)) };
+            let st = cx.new(|cx| InputState::new(window, cx).default_value(shown));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur)
-                    && let Some(v) = st.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.0)
+                    && let Some(v) = length_mm(&st.read(cx).value(), inch)
                 {
                     this.set_drawing_prop(&move |p| set(p, v), cx);
                 }
@@ -157,22 +187,16 @@ impl DrawingEditor {
             2 => {
                 let (h, a) = (p.ann_text_height, p.ann_arrow);
                 let mut f = vec![field(h, |p, v| p.ann_text_height = v, window, cx), field(a, |p, v| p.ann_arrow = v, window, cx)];
-                // Per type text heights (shown: the type's, else All annotations'), then Datum size.
-                let setters: [fn(&mut DrawingProps, f64); 6] = [
-                    |p, v| p.ann_type_mut(AnnType::ALL[0]).height = Some(v),
-                    |p, v| p.ann_type_mut(AnnType::ALL[1]).height = Some(v),
-                    |p, v| p.ann_type_mut(AnnType::ALL[2]).height = Some(v),
-                    |p, v| p.ann_type_mut(AnnType::ALL[3]).height = Some(v),
-                    |p, v| p.ann_type_mut(AnnType::ALL[4]).height = Some(v),
-                    |p, v| p.ann_type_mut(AnnType::ALL[5]).height = Some(v),
-                ];
+                // Per type text heights (shown: the type's, else All annotations'),
+                // then Datum size, the center of mass diameter, the stack gap.
+                let setters: [fn(&mut DrawingProps, f64); 9] = [set_type_height::<0>, set_type_height::<1>, set_type_height::<2>, set_type_height::<3>, set_type_height::<4>, set_type_height::<5>, set_type_height::<6>, set_type_height::<7>, set_type_height::<8>];
                 for (t, set) in AnnType::ALL.iter().zip(setters) {
                     f.push(field(p.ann_type(*t).height.unwrap_or(h), set, window, cx));
                 }
-                let ds = p.datum_size;
+                let (ds, cd, gap) = (p.datum_size, p.com_diameter, p.callout_stack_gap);
                 f.push(field(ds, |p, v| p.datum_size = v, window, cx));
-                let cd = p.com_diameter;
                 f.push(field(cd, |p, v| p.com_diameter = v, window, cx));
+                f.push(field(gap, |p, v| p.callout_stack_gap = v, window, cx));
                 f
             }
             6 => {
@@ -281,7 +305,6 @@ impl DrawingEditor {
             let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
             let id = match w {
                 FontOf::Dims => ("dp-dfont", "dp-dfont-b", "dp-dfont-i"),
-                FontOf::Annotations => ("dp-afont", "dp-afont-b", "dp-afont-i"),
                 FontOf::Inspection => ("dp-ifont", "dp-ifont-b", "dp-ifont-i"),
                 FontOf::Type(t) => {
                     let ids = TYPE_IDS[AnnType::ALL.iter().position(|x| *x == t).unwrap_or(0)];
@@ -341,63 +364,137 @@ impl DrawingEditor {
                 .child(check("dp-tz", "Length trailing zeros", props.trailing_zeros, |p, v| p.trailing_zeros = v, cx))
                 .child(check("dp-tlz", "Length tolerance leading zeros", props.tolerance_leading_zeros, |p, v| p.tolerance_leading_zeros = v, cx))
                 .child(check("dp-ttz", "Length tolerance trailing zeros", props.tolerance_trailing_zeros, |p, v| p.tolerance_trailing_zeros = v, cx));
-        } else if self.drawing_props.tab == 1 || self.drawing_props.tab == 2 {
-            // Dimensions › All dimensions / Annotations › All annotations.
-            let dims = self.drawing_props.tab == 1;
+        } else if self.drawing_props.tab == 1 {
+            // Dimensions › All dimensions, Gaps and extensions.
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
                 Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
                 None => div().into_any_element(),
             };
-            let (color, arrow) = if dims { (props.dim_color, props.dim_arrow_type) } else { (props.ann_color, props.ann_arrow_type) };
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
                 .iter()
-                .map(|&t| (t.name().to_string(), t == arrow, std::rc::Rc::new(move |p: &mut DrawingProps| if dims { p.dim_arrow_type = t } else { p.ann_arrow_type = t }) as Act))
+                .map(|&t| (t.name().to_string(), t == props.dim_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.dim_arrow_type = t) as Act))
                 .collect();
+            let horiz = props.dim_text_horizontal;
+            let align_items: Vec<(String, bool, Act)> = vec![
+                ("With dimension line".into(), !horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = false) as Act),
+                ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
+            ];
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child(if dims { "Dimensions" } else { "Annotations" }))
-                .child(section(if dims { "All dimensions" } else { "All annotations" }))
-                .child(row("Font", font_row(if dims { FontOf::Dims } else { FontOf::Annotations }, if dims { props.dim_font.clone() } else { props.ann_font.clone() }, cx)))
+                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Dimensions"))
+                .child(section("All dimensions"))
+                .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
                 .child(row("Text height", field(0)))
-                .child(row("Color", swatch(if dims { "dp-dcolor" } else { "dp-acolor" }, color, std::rc::Rc::new(move |p: &mut DrawingProps, c| if dims { p.dim_color = c } else { p.ann_color = c }))))
+                .child(row("Color", swatch("dp-dcolor", props.dim_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.dim_color = c))))
                 .child(row("Arrowhead", field(1)))
-                .child(row("Arrowhead type", select(if dims { "dp-darrow" } else { "dp-aarrow" }, arrow.name().into(), arrow_items)));
-            if !dims {
-                for (i, t) in AnnType::ALL.iter().copied().enumerate() {
-                    let ts = props.ann_type(t);
-                    let ids = TYPE_IDS[i];
-                    let cur = ts.color;
-                    body = body
-                        .child(section(t.name()))
-                        .child(row("Font", font_row(FontOf::Type(t), ts.font.clone(), cx)))
-                        .child(row("Text height", field(2 + i)))
-                        .child(row("Color", swatch(ids[3], cur, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c))));
-                    if t == AnnType::Notes {
-                        let hide = props.hide_placeholder;
-                        body = body.child(div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-hide-ph").label("Hide property placeholder").checked(hide).on_click(cx.listener(|this, v: &bool, _, cx| {
-                            let v = *v;
-                            this.set_drawing_prop(&move |p| p.hide_placeholder = v, cx);
-                        }))));
-                    }
-                    if t == AnnType::Datums {
-                        body = body.child(row("Datum size", field(8)));
-                    }
-                    if t == AnnType::Callouts {
-                        body = body.child(section("Center of mass")).child(row("Indicator diameter", field(9)));
-                    }
-                }
+                .child(row("Arrowhead type", select("dp-darrow", props.dim_arrow_type.name().into(), arrow_items)))
+                .child(section("Gaps and extensions"))
+                .child(row("Text alignment", select("dp-dalign", if horiz { "Horizontal".into() } else { "With dimension line".into() }, align_items)))
+                .child(row("Text gap", field(2)))
+                .child(row("Geometry gap", field(3)))
+                .child(row("Extension past line", field(4)));
+            // Chamfer: 45 degree style / content, the others', precisions.
+            let style_items = |cur: bool, set: fn(&mut DrawingProps, bool), dim_first: bool| -> Vec<(String, bool, Act)> {
+                let opts = if dim_first { [("Dimension", true), ("Note", false)] } else { [("Note", false), ("Dimension", true)] };
+                opts.iter().map(|&(n, v)| (n.to_string(), cur == v, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
+            };
+            let content_items = |cur: ChamferContent, set: fn(&mut DrawingProps, ChamferContent), with_c: bool| -> Vec<(String, bool, Act)> {
+                ChamferContent::ALL.iter().filter(|c| with_c || **c != ChamferContent::CLength).map(|&c| (c.name().to_string(), cur == c, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, c)) as Act)).collect()
+            };
+            let style_name = |d: bool| if d { "Dimension".to_string() } else { "Note".to_string() };
+            body = body
+                .child(section("Chamfer"))
+                .child(row("45 degree style", select("dp-ch45s", style_name(props.chamfer_45_dimension), style_items(props.chamfer_45_dimension, |p, v| p.chamfer_45_dimension = v, false))))
+                .child(row("45 degree content", select("dp-ch45c", props.chamfer_45_content.name().into(), content_items(props.chamfer_45_content, |p, v| p.chamfer_45_content = v, true))))
+                .child(row("Non 45 degree style", select("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v, true))))
+                .child(row("Non 45 degree content", select("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false))))
+                .child(row("Length precision", select("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v))))
+                .child(row("Angle precision", select("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v))));
+        } else if self.drawing_props.tab == 2 {
+            // Annotations, in Onshape's groups: All annotations (Arrowhead),
+            // then each type's font, text height and color with its extras.
+            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                None => div().into_any_element(),
+            };
+            let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
+                .iter()
+                .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
+                .collect();
+            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    let v = *v;
+                    this.set_drawing_prop(&move |p| f(p, v), cx);
+                })))
+            };
+            // A select of named values.
+            fn choices<T: Copy + PartialEq + 'static>(all: &[T], cur: T, name: fn(T) -> &'static str, set: fn(&mut DrawingProps, T)) -> Vec<(String, bool, Act)> {
+                all.iter().map(|&v| (name(v).to_string(), v == cur, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
             }
-            if dims {
-                let horiz = props.dim_text_horizontal;
-                let align_items: Vec<(String, bool, Act)> = vec![
-                    ("With dimension line".into(), !horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = false) as Act),
-                    ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
-                ];
-                body = body
-                    .child(section("Gaps and extensions"))
-                    .child(row("Text alignment", select("dp-dalign", if horiz { "Horizontal".into() } else { "With dimension line".into() }, align_items)))
-                    .child(row("Text gap", field(2)))
-                    .child(row("Geometry gap", field(3)))
-                    .child(row("Extension past line", field(4)));
+            body = body
+                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Annotations"))
+                .child(section("All annotations"))
+                .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-aarrow", props.ann_arrow_type.name().into(), arrow_items)).into_any_element()));
+            for (i, t) in AnnType::ALL.iter().copied().enumerate() {
+                let ts = props.ann_type(t);
+                let ids = TYPE_IDS[i];
+                let color = row("Color", swatch(ids[3], ts.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c)));
+                body = body.child(section(t.name()));
+                if t == AnnType::WeldSymbols {
+                    // The weld standard (separate from the drawing's; it
+                    // follows the drawing's until set).
+                    let ansi = self.drawing.weld_ansi();
+                    let items: Vec<(String, bool, Act)> = [("ANSI", true), ("ISO", false)].iter().map(|&(n, v)| (n.to_string(), ansi == v, std::rc::Rc::new(move |p: &mut DrawingProps| p.weld_ansi = Some(v)) as Act)).collect();
+                    body = body.child(row("Standard", select("dp-weld-std", if ansi { "ANSI".into() } else { "ISO".into() }, items)));
+                }
+                body = body.child(row("Font", font_row(FontOf::Type(t), ts.font.clone(), cx)));
+                if t == AnnType::FlagNotes {
+                    let shapes = choices(&noshape_model::drawing::note::FlagShape::ALL, props.flag_shape, |s| s.name(), |p, v| p.flag_shape = v);
+                    body = body.child(row("Border shape", select("dp-flag-shape", props.flag_shape.name().into(), shapes))).child(color);
+                    continue;
+                }
+                body = body.child(row("Text height", field(2 + i)));
+                if t == AnnType::Datums {
+                    body = body.child(row("Datum size", field(2 + AnnType::ALL.len())));
+                }
+                body = body.child(color);
+                match t {
+                    AnnType::Notes => {
+                        body = body
+                            .child(check("dp-hide-ph", "Hide property placeholder", props.hide_placeholder, |p, v| p.hide_placeholder = v, cx))
+                            .child(check("dp-hide-pbg", "Hide property background", props.hide_property_background, |p, v| p.hide_property_background = v, cx));
+                    }
+                    AnnType::Callouts => {
+                        let just = choices(&TextJustify::ALL, props.callout_justify, |j| j.name(), |p, v| p.callout_justify = v);
+                        let stack = choices(&StackDirection::ALL, props.callout_stack, |d| d.name(), |p, v| p.callout_stack = v);
+                        body = body
+                            .child(row("Text justification", select("dp-co-just", props.callout_justify.name().into(), just)))
+                            .child(row("Stack direction", select("dp-co-stack", props.callout_stack.name().into(), stack)))
+                            .child(row("Stack gap size", field(4 + AnnType::ALL.len())))
+                            .child(section("Center of mass"))
+                            .child(row("Diameter size", field(3 + AnnType::ALL.len())));
+                    }
+                    AnnType::Datums => {
+                        use noshape_model::drawing::sheet_sketch::HATCH_PATTERNS;
+                        let (std, pat) = props.target_hatch;
+                        let stds: Vec<(String, bool, Act)> = HATCH_PATTERNS.iter().enumerate().map(|(k, (n, _))| (n.to_string(), k == std, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch = (k, 0)) as Act)).collect();
+                        // The ANSI patterns go by their target-hatch names.
+                        let name = |s: usize, k: usize| if s == 0 { TARGET_ANSI.get(k).copied() } else { HATCH_PATTERNS.get(s).and_then(|p| p.1.get(k)).copied() };
+                        let pats: Vec<(String, bool, Act)> = (0..HATCH_PATTERNS.get(std).map(|s| s.1.len()).unwrap_or(0)).filter_map(|k| Some((name(std, k)?.to_string(), k == pat, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch.1 = k) as Act))).collect();
+                        let std_name = HATCH_PATTERNS.get(std).map(|s| s.0).unwrap_or("ANSI");
+                        let pat_name = name(std, pat).unwrap_or("");
+                        body = body
+                            .child(row("Target hatch pattern", select("dp-th-std", std_name.into(), stds)))
+                            .child(row("", select("dp-th-pat", pat_name.into(), pats)));
+                    }
+                    AnnType::HoleCallouts => {
+                        let ind: Vec<(String, bool, Act)> = HOLE_INDICATORS.iter().map(|&n| (n.to_string(), props.hole_indicator == n, std::rc::Rc::new(move |p: &mut DrawingProps| p.hole_indicator = n.into()) as Act)).collect();
+                        let fit: Vec<(String, bool, Act)> = [("ISO", true), ("ANSI", false)].iter().map(|&(n, v)| (n.to_string(), props.fit_iso == v, std::rc::Rc::new(move |p: &mut DrawingProps| p.fit_iso = v) as Act)).collect();
+                        body = body
+                            .child(row("Indicator", select("dp-hc-ind", props.hole_indicator.clone(), ind)))
+                            .child(row("Fit standard", select("dp-hc-fit", if props.fit_iso { "ISO".into() } else { "ANSI".into() }, fit)));
+                    }
+                    _ => {}
+                }
             }
         } else if self.drawing_props.tab == 3 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
@@ -474,6 +571,19 @@ impl DrawingEditor {
                 .child(row("View label prefix", field(3)))
                 .child(row("View label style", select("dp-alabel", if vt.aux_double_label { "A-A".into() } else { "A".into() }, aux_styles)))
                 .child(row("View label suffix", field(4)));
+            // Flat pattern views: up / down bend lines (style + color), bend tangent edges.
+            const BEND_LINES: [&str; 3] = ["Solid", "Dashed", "Center"];
+            let bend = |id: &'static str, cur: u8, set: fn(&mut DrawingProps, u8)| {
+                let items: Vec<(String, bool, Act)> = BEND_LINES.iter().enumerate().map(|(i, n)| (n.to_string(), cur == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, i as u8)) as Act)).collect();
+                select(id, BEND_LINES[cur.min(2) as usize].into(), items)
+            };
+            body = body
+                .child(section("Flat pattern views"))
+                .child(row("Up bend lines", bend("dp-bup", vt.bend_up_line, |p, v| p.view_tab.bend_up_line = v)))
+                .child(row("", swatch("dp-bupc", vt.bend_up_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_up_color = c))))
+                .child(row("Down bend lines", bend("dp-bdown", vt.bend_down_line, |p, v| p.view_tab.bend_down_line = v)))
+                .child(row("", swatch("dp-bdownc", vt.bend_down_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_down_color = c))))
+                .child(row("Bend tangent edges", swatch("dp-btanc", vt.bend_tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_tangent_color = c))));
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
@@ -601,5 +711,19 @@ impl DrawingEditor {
                 .child(body)
                 .into_any_element(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::length_mm;
+
+    #[test]
+    fn lengths_in_drawing_units() {
+        assert_eq!(length_mm("0.12 in", false), Some(0.12 * 25.4));
+        assert_eq!(length_mm("3 mm", true), Some(3.0));
+        assert_eq!(length_mm("0.5", true), Some(0.5 * 25.4));
+        assert_eq!(length_mm("2", false), Some(2.0));
+        assert_eq!(length_mm("-1", false), None);
     }
 }

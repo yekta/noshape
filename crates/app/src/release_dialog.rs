@@ -16,7 +16,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabId;
 use noshape_model::reference::BodyId;
-use noshape_model::release::{Issue, ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
+use noshape_model::release::{Issue, ItemKind, NumberingSchemes, Package, PackageKind, ReleaseItem, ReleaseLog};
 
 const META_KEY: &str = "releases";
 
@@ -28,7 +28,7 @@ pub fn note_viewed_config(tab: TabId, values: &noshape_model::configuration::Con
     LAST_VIEWED.lock().get_or_insert_with(Default::default).insert(tab, values.clone());
 }
 
-fn last_viewed_config(tab: TabId) -> Option<noshape_model::configuration::ConfigValues> {
+pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configuration::ConfigValues> {
     LAST_VIEWED.lock().as_ref().and_then(|m| m.get(&tab).cloned())
 }
 
@@ -65,10 +65,34 @@ pub fn set_release_settings(s: &ReleaseSettings) {
     let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
 }
 
-/// The document's release log (with the settings' revision scheme).
+fn numbering_path() -> std::path::PathBuf {
+    crate::files::config_dir().join("numbering_schemes.json")
+}
+
+/// Company settings › Numbering schemes (here the account preferences).
+pub fn numbering_schemes() -> NumberingSchemes {
+    std::fs::read(numbering_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+pub fn set_numbering_schemes(s: &NumberingSchemes) {
+    let _ = std::fs::write(numbering_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
+}
+
+/// Generates the next number of a sequential scheme (`pick` chooses the
+/// scheme and object type) and saves the advanced counter.
+pub fn next_number(pick: impl FnOnce(&mut NumberingSchemes) -> Option<String>) -> Option<String> {
+    let mut n = numbering_schemes();
+    let out = pick(&mut n)?;
+    set_numbering_schemes(&n);
+    Some(out)
+}
+
+/// The document's release log (with the settings' revision scheme and
+/// part number uniqueness).
 pub fn release_log(doc: &DocModel) -> ReleaseLog {
     let mut log: ReleaseLog = doc.session.store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
     log.scheme = release_settings().scheme;
+    log.drawing_reuse = numbering_schemes().drawing_reuse;
     log
 }
 
@@ -99,7 +123,7 @@ pub fn part_items(doc: &DocModel, tab: TabId, parts: &[BodyId], names: &[String]
             let nrm = p.is_some_and(|p| p.meta.not_revision_managed);
             let imported = p.and_then(|p| p.revision.clone()).filter(|r| !r.trim().is_empty() && log.revisions(&pn).is_empty());
             let name = if desc.is_empty() { name.clone() } else { format!("{name} ({desc})") };
-            ReleaseItem { tab, part: Some(b.clone()), name, kind: ItemKind::Part, revision: if nrm { String::new() } else { imported.unwrap_or_else(|| log.next_revision(&pn)) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: if desc.is_empty() { Default::default() } else { config.clone() } }
+            ReleaseItem { tab, part: Some(b.clone()), name, kind: ItemKind::Part, revision: if nrm { String::new() } else { imported.unwrap_or_else(|| log.next_revision(&pn)) }, part_number: pn, not_revision_managed: nrm, reverted: false, config: if desc.is_empty() { Default::default() } else { config.clone() }, document: None }
         })
         .collect()
 }
@@ -132,7 +156,7 @@ pub fn tab_items(doc: &DocModel, tab: TabId) -> Vec<ReleaseItem> {
     let mut out: Vec<ReleaseItem> = Vec::new();
     fn push(out: &mut Vec<ReleaseItem>, items: Vec<ReleaseItem>) {
         for it in items {
-            if !out.iter().any(|o| o.tab == it.tab && o.part == it.part && o.kind == it.kind && o.config == it.config) {
+            if !out.iter().any(|o| o.same_object(&it)) {
                 out.push(it);
             }
         }
@@ -140,7 +164,7 @@ pub fn tab_items(doc: &DocModel, tab: TabId) -> Vec<ReleaseItem> {
     let tab_item = |t: TabId, kind: ItemKind| {
         let name = doc.session.doc.tab(t).map(|x| x.name.clone()).unwrap_or_default();
         let pn = tab_part_number(doc, t);
-        ReleaseItem { tab: t, part: None, name, kind, revision: log.next_revision(&pn), part_number: pn, not_revision_managed: false, reverted: false, config: Default::default() }
+        ReleaseItem { tab: t, part: None, name, kind, revision: log.next_revision(&pn), part_number: pn, not_revision_managed: false, reverted: false, config: Default::default(), document: None }
     };
     let all_parts = |studio: TabId, config: &noshape_model::configuration::ConfigValues| {
         let (ids, names) = studio_parts(doc, studio, config);
@@ -235,6 +259,12 @@ pub struct AddItemsDialog {
     /// Row pictures (release_thumbs) and the ones asked for.
     thumbs: std::collections::HashMap<String, std::sync::Arc<RenderImage>>,
     requested: std::collections::HashSet<String>,
+    /// The Other documents tab is active.
+    other: bool,
+    /// Items come from a version (of this or another document).
+    source: Option<add_source::Source>,
+    browse: add_source::Browse,
+    error: Option<String>,
     _sub: Subscription,
 }
 
@@ -261,14 +291,16 @@ fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, on_add: impl Fn(Vec<Re
                 cx.notify();
             }
         });
-        AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), _sub: sub }
+        let url = cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL"));
+        let browse = add_source::Browse { filter: None, query: None, docs: None, url };
+        AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, source: None, browse, error: None, _sub: sub }
     });
     window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
 }
 
 impl AddItemsDialog {
     fn toggle(&mut self, item: ReleaseItem, cx: &mut Context<Self>) {
-        match self.picked.iter().position(|p| p.tab == item.tab && p.part == item.part && p.kind == item.kind && p.config == item.config) {
+        match self.picked.iter().position(|p| p.same_object(&item)) {
             Some(i) => {
                 self.picked.remove(i);
             }
@@ -411,6 +443,40 @@ impl AddItemsDialog {
     }
 }
 
+/// Items grouped by the document their pictures are rendered from: the
+/// workspace, or the version a linked item comes from.
+fn thumb_groups(doc: &DocModel, items: Vec<ReleaseItem>) -> Vec<(noshape_model::Document, Vec<ReleaseItem>)> {
+    let mut groups: Vec<(Option<noshape_model::release::LinkedDocument>, Vec<ReleaseItem>)> = Vec::new();
+    for it in items {
+        match groups.iter_mut().find(|(d, _)| *d == it.document) {
+            Some((_, v)) => v.push(it),
+            None => groups.push((it.document.clone(), vec![it])),
+        }
+    }
+    groups
+        .into_iter()
+        .filter_map(|(d, items)| {
+            let snapshot = match d {
+                None => doc.session.doc.clone(),
+                Some(_) => (*add_source::linked_snapshot(doc, &items[0])?).clone(),
+            };
+            Some((snapshot, items))
+        })
+        .collect()
+}
+
+/// A row of the Add Items list, collected before building elements: a
+/// Part Studio with its parts (and configuration), or a tab item.
+enum Entry {
+    Studio(TabId, String, Vec<ReleaseItem>, Option<noshape_model::configuration::Configuration>),
+    Tab(ReleaseItem, &'static str),
+}
+
+#[path = "release_add_source.rs"]
+mod add_source;
+#[path = "release_workflow.rs"]
+mod workflow;
+
 impl Render for AddItemsDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         use noshape_model::document::TabContent;
@@ -418,12 +484,7 @@ impl Render for AddItemsDialog {
         let blue = gpui_kit::rgb(0xb5dcf5);
         let query = self.search.read(cx).value().trim().to_lowercase();
         let matches = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
-        // The rows of the chosen type, collected before building elements.
-        enum Entry {
-            Studio(TabId, String, Vec<ReleaseItem>, Option<noshape_model::configuration::Configuration>),
-            Tab(ReleaseItem, &'static str),
-        }
-        let (entries, doc_name, branch) = {
+        let (mut entries, doc_name, branch) = {
             let doc = self.doc.read(cx);
             let log = release_log(doc);
             let mut entries = Vec::new();
@@ -479,7 +540,7 @@ impl Render for AddItemsDialog {
                             _ => (ItemKind::File, "file"),
                         };
                         let pn = tab_part_number(doc, tab);
-                        entries.push(Entry::Tab(ReleaseItem { tab, part: None, name: t.name.clone(), kind, revision: log.next_revision(&pn), part_number: pn, not_revision_managed: false, reverted: false, config: Default::default() }, icon));
+                        entries.push(Entry::Tab(ReleaseItem { tab, part: None, name: t.name.clone(), kind, revision: log.next_revision(&pn), part_number: pn, not_revision_managed: false, reverted: false, config: Default::default(), document: None }, icon));
                     }
                     _ => {}
                 }
@@ -487,9 +548,19 @@ impl Render for AddItemsDialog {
             let branch = doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
             (entries, doc.name(), branch)
         };
-        let is_picked = |picked: &[ReleaseItem], it: &ReleaseItem| picked.iter().any(|p| p.tab == it.tab && p.part == it.part && p.kind == it.kind && p.config == it.config);
+        // A version (Version graph, Other documents) lists its own items.
+        if self.source.is_some() || self.other {
+            entries = self.source_entries(self.kind, &matches, cx);
+        }
+        // A version without items of the type (live assembly/612: "No Part
+        // Studios available.").
+        let none_available = (self.source.is_some() && entries.is_empty()).then(|| {
+            div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(p().text).child(format!("No {} available.", ADD_KINDS[self.kind].0)).into_any_element()
+        });
+        let is_picked = |picked: &[ReleaseItem], it: &ReleaseItem| picked.iter().any(|p| p.same_object(it));
         // Pictures of the listed rows (a Part Studio row shows the whole studio).
-        let studio_item = |tab: TabId, config: noshape_model::configuration::ConfigValues| ReleaseItem { tab, part: None, name: String::new(), kind: ItemKind::Part, part_number: String::new(), revision: String::new(), not_revision_managed: false, reverted: false, config };
+        let linked = self.source.as_ref().and_then(|s| s.linked());
+        let studio_item = |tab: TabId, config: noshape_model::configuration::ConfigValues| ReleaseItem { tab, part: None, name: String::new(), kind: ItemKind::Part, part_number: String::new(), revision: String::new(), not_revision_managed: false, reverted: false, config, document: linked.clone() };
         let mut wanted: Vec<ReleaseItem> = self.picked.clone();
         for e in &entries {
             match e {
@@ -504,16 +575,19 @@ impl Render for AddItemsDialog {
         }
         let todo: Vec<ReleaseItem> = wanted.into_iter().filter(|it| matches!(it.kind, ItemKind::Part | ItemKind::Assembly | ItemKind::Drawing) && self.requested.insert(crate::release_thumbs::key(it))).collect();
         if !todo.is_empty() && cx.has_global::<crate::gpu::GpuGlobal>() {
-            let doc = self.doc.read(cx).session.doc.clone();
             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-            cx.spawn(async move |this, cx| {
-                let made = cx.background_spawn(crate::release_thumbs::render(doc, todo, gpu)).await;
-                let _ = this.update(cx, |this: &mut Self, cx| {
-                    this.thumbs.extend(made);
-                    cx.notify();
-                });
-            })
-            .detach();
+            for (doc, items) in thumb_groups(self.doc.read(cx), todo) {
+                let versions = self.doc.read(cx).session.pinned_documents();
+                let gpu = gpu.clone();
+                cx.spawn(async move |this, cx| {
+                    let made = cx.background_spawn(crate::release_thumbs::render(doc, versions, items, gpu)).await;
+                    let _ = this.update(cx, |this: &mut Self, cx| {
+                        this.thumbs.extend(made);
+                        cx.notify();
+                    });
+                })
+                .detach();
+            }
         }
         // Help image add-item-to-release-01: the picture, or "Generating
         // preview" on gray until it is made; Variable Studios and files show
@@ -551,6 +625,7 @@ impl Render for AddItemsDialog {
                                     this.expanded.remove(i);
                                 } else {
                                     this.expanded.push(tab);
+                                    this.load_source_parts(tab, cx);
                                 }
                                 cx.notify();
                             })),
@@ -638,7 +713,56 @@ impl Render for AddItemsDialog {
                 }))
         };
         let _ = window;
-        let title = if self.obsolete { "Add Items to Obsolete candidate" } else { "Add Items to Release" };
+        // Bundle (release dialog getTitle): "Add Items to Release" /
+        // "Add Items to Obsoletion".
+        let title = if self.obsolete { "Add Items to Obsoletion" } else { "Add Items to Release" };
+        // The select-item widget: Current document | Other documents; the
+        // document's title row; the Version graph or the type tabs, search
+        // and tree; Other documents first browse the documents.
+        let doc_tab = |id: &'static str, label: &'static str, on: bool, other: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .flex_1()
+                .py(px(6.))
+                .text_size(px(13.))
+                .text_center()
+                .cursor_pointer()
+                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xdddddd)))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if this.other != other {
+                        this.other = other;
+                        this.source = None;
+                        this.expanded.clear();
+                        this.error = None;
+                    }
+                    cx.notify();
+                }))
+        };
+        let kind_tabs = h_flex().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(ADD_KINDS.iter().enumerate().map(|(i, (l, _))| tab_button(i, l, cx)).collect::<Vec<_>>());
+        let mut left = v_flex().w(px(404.)).h_full().border_r_1().border_color(gpui_kit::rgb(0xdddddd));
+        if !self.obsolete {
+            left = left.child(h_flex().child(doc_tab("add-current-doc", "Current document", !self.other, false, cx)).child(doc_tab("add-other-docs", "Other documents", self.other, true, cx)));
+        } else {
+            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
+        }
+        if self.other && self.source.is_none() {
+            left = left.child(div().id("add-browser").flex_1().overflow_y_scroll().child(self.render_browser(cx)));
+        } else {
+            left = left.child(self.render_title_row(doc_name, branch, cx));
+            match self.render_graph(cx) {
+                Some(graph) => left = left.child(div().id("add-graph").flex_1().overflow_y_scroll().child(graph)),
+                None => {
+                    left = left
+                        .child(kind_tabs)
+                        .child(div().p(px(6.)).child(div().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small())))
+                        .children(self.render_changes(cx))
+                        .children(none_available)
+                        .child(div().id("add-tree").flex_1().overflow_y_scroll().child(tree));
+                }
+            }
+        }
         v_flex()
             .w_full()
             .child(h_flex().h(px(56.)).px(px(10.)).child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title)))
@@ -648,26 +772,7 @@ impl Render for AddItemsDialog {
                     .border_t_1()
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xdddddd))
-                    .child(
-                        v_flex()
-                            .w(px(404.))
-                            .h_full()
-                            .border_r_1()
-                            .border_color(gpui_kit::rgb(0xdddddd))
-                            .child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")))
-                            .child(
-                                v_flex()
-                                    .px(px(6.))
-                                    .py(px(4.))
-                                    .border_b_1()
-                                    .border_color(gpui_kit::rgb(0xdddddd))
-                                    .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(doc_name))
-                                    .child(h_flex().gap(px(3.)).text_size(px(13.)).text_color(pal.text_muted).child(crate::assets::icon("branch", 12., cx)).child(branch)),
-                            )
-                            .child(h_flex().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(ADD_KINDS.iter().enumerate().map(|(i, (l, _))| tab_button(i, l, cx)).collect::<Vec<_>>()))
-                            .child(div().p(px(6.)).child(div().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small())))
-                            .child(div().id("add-tree").flex_1().overflow_y_scroll().child(tree)),
-                    )
+                    .child(left)
                     .child(v_flex().id("add-picked").flex_1().h_full().overflow_y_scroll().children(picked)),
             )
             .child(
@@ -676,13 +781,13 @@ impl Render for AddItemsDialog {
                     .px(px(12.))
                     .gap_2()
                     .justify_end()
-                    .child(os::primary_button("add-ok", "Add").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    .child(os::primary_button("add-ok", "Add").tooltip(if self.obsolete { "Add selected items to Obsoletion" } else { "Add selected items to Release" }).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                         let items = std::mem::take(&mut this.picked);
                         let f = this.on_add.clone();
                         window.close_dialog(cx);
                         f(items, window, cx);
                     })))
-                    .child(os::cancel_button("add-cancel", "Cancel", cx).on_click(|_, window, cx| window.close_dialog(cx))),
+                    .child(os::cancel_button("add-cancel", "Cancel", cx).tooltip(if self.obsolete { "Cancel adding items and resume editing Obsoletion" } else { "Cancel adding items and resume editing Release" }).on_click(|_, window, cx| window.close_dialog(cx))),
             )
     }
 }
@@ -789,6 +894,10 @@ enum SinceRelease {
 /// None when it was never released or its geometry changed.
 fn since_release(doc: &DocModel, log: &ReleaseLog, item: &ReleaseItem) -> Option<SinceRelease> {
     use noshape_model::document::TabContent;
+    // A version never changes.
+    if item.document.is_some() {
+        return None;
+    }
     let rev = log.latest_revision(&item.part_number)?;
     let version = log.release_version_of(&item.part_number, &rev)?;
     let mv = doc.session.store.list_versions().ok()?.into_iter().find(|v| v.id.to_string() == version)?.microversion;
@@ -841,6 +950,8 @@ fn refreshed_items(doc: &DocModel, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
     items
         .iter()
         .map(|it| match &it.part {
+            // Versions don't change.
+            _ if it.document.is_some() => it.clone(),
             Some(b) => {
                 let (ids, names) = studio_parts(doc, it.tab, &it.config);
                 let name = ids.iter().position(|x| x == b).map(|i| names[i].clone()).unwrap_or_else(|| it.name.clone());
@@ -917,6 +1028,19 @@ pub struct ReleaseDialog {
     /// Row pictures (release_thumbs), by `release_thumbs::key`.
     thumbs: std::collections::HashMap<String, std::sync::Arc<RenderImage>>,
     thumbs_started: bool,
+    /// The recorded package (review, draft): its audit log.
+    package: Option<Package>,
+    /// When the dialog created its candidate (ms since the epoch).
+    opened: i64,
+    /// The ⋯ menu is open.
+    overflow_open: bool,
+    /// ⋯ › View workflow: the diagram lightbox, and what had the focus.
+    workflow: Option<workflow::Lightbox>,
+    workflow_return: Option<FocusHandle>,
+    /// Numbering schemes: sequential part numbers / release names (the #
+    /// buttons).
+    seq_parts: bool,
+    seq_names: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -965,13 +1089,14 @@ impl ReleaseDialog {
                 this.record_typing(st.entity_id(), cx);
             }
         }));
+        let numbering = numbering_schemes();
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -987,12 +1112,106 @@ impl ReleaseDialog {
         self.record_typing(st.entity_id(), cx);
     }
 
+    /// The row's # button ("Generate next part number"): the next number of
+    /// the Release objects scheme for the item's type.
+    fn generate_part_number(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(row) = self.rows.get(i) else { return };
+        let ty = row.item.kind.prefix_index();
+        if let Some(n) = next_number(|s| s.release_objects.generate(ty)) {
+            let st = row.part_number.clone();
+            st.update(cx, |s, cx| s.set_value(n, window, cx));
+        }
+    }
+
+    /// The header's # button ("Generate missing part numbers"). With
+    /// "Drawing can reuse part number…", a drawing of one listed part or
+    /// assembly shares its number: whichever of the two has one gives it to
+    /// the other, else both get a new one (Help Release__typical_release_workflow).
+    fn generate_missing_part_numbers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let reuse = numbering_schemes().drawing_reuse;
+        let pn = |r: &Row, cx: &App| r.part_number.read(cx).value().trim().to_string();
+        for i in 0..self.rows.len() {
+            if let Some(j) = self.drawing_partner(i, cx).filter(|_| reuse) {
+                let (a, b) = (pn(&self.rows[i], cx), pn(&self.rows[j], cx));
+                let ty = self.rows[j].item.kind.prefix_index();
+                let shared = match (a.is_empty(), b.is_empty()) {
+                    (true, true) => next_number(|s| s.release_objects.generate(ty)),
+                    (true, false) => Some(b),
+                    (false, true) => Some(a),
+                    (false, false) => None,
+                };
+                for k in [i, j] {
+                    if let Some(n) = &shared
+                        && pn(&self.rows[k], cx).is_empty()
+                    {
+                        let st = self.rows[k].part_number.clone();
+                        st.update(cx, |s, cx| s.set_value(n.clone(), window, cx));
+                    }
+                }
+                continue;
+            }
+            if pn(&self.rows[i], cx).is_empty() {
+                self.generate_part_number(i, window, cx);
+            }
+        }
+    }
+
+    /// The listed part or assembly a drawing row shows, when the drawing
+    /// shows exactly one object.
+    fn drawing_partner(&self, i: usize, cx: &App) -> Option<usize> {
+        let r = self.rows.get(i).filter(|r| r.item.kind == ItemKind::Drawing)?;
+        let shown: Vec<ReleaseItem> = tab_items(self.doc.read(cx), r.item.tab).into_iter().filter(|it| it.kind != ItemKind::Drawing).collect();
+        let [one] = &shown[..] else { return None };
+        self.rows.iter().position(|o| o.item.kind != ItemKind::Drawing && o.item.tab == one.tab && o.item.part == one.part)
+    }
+
+    /// The audit trail of the candidate's workflow object (Help: "View audit
+    /// log to see an audit trail of the workflow objects and their
+    /// significant events, for example, creation and transition"). Types are
+    /// BTWorkflowAuditEntryType ordinals.
+    fn audit_log(&self, cx: &App) -> serde_json::Value {
+        let iso = |ms: i64| chrono::DateTime::from_timestamp_millis(ms).map(|t| t.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)).unwrap_or_default();
+        let entry = |ms: i64, ty: u32, name: &str, state: &str, transition: Option<&str>| {
+            let mut e = serde_json::json!({ "timestamp": iso(ms), "type": ty, "typeName": name, "state": state });
+            if let Some(t) = transition {
+                e["transition"] = t.into();
+            }
+            e
+        };
+        let obsoletion = self.mode == Mode::Obsolete || self.package.as_ref().is_some_and(|p| p.kind == PackageKind::Obsoletion);
+        let (id, created) = self.package.as_ref().map_or((format!("{:x}", self.opened), self.opened), |p| (format!("{:024x}", p.id), p.created));
+        let mut entries = vec![entry(created, 0, "OBJECT_CREATED", "SETUP", None)];
+        let done = self.package.as_ref().filter(|p| p.version.is_some());
+        if let Some(p) = done {
+            let (transition, state) = if obsoletion { ("OBSOLETE", "OBSOLETED") } else { ("RELEASE", "RELEASED") };
+            entries.push(entry(p.created, 7, "TRANSITION_STARTED", "SETUP", Some(transition)));
+            entries.push(entry(p.created, 8, "TRANSITION_COMPLETED", state, Some(transition)));
+        }
+        let state = if done.is_some() { if obsoletion { "OBSOLETED" } else { "RELEASED" } } else { "SETUP" };
+        serde_json::json!({
+            "objectId": id,
+            "objectType": if obsoletion { "OBSOLETION" } else { "RELEASE" },
+            "name": self.name.read(cx).value().to_string(),
+            "workflow": { "name": if obsoletion { "Onshape Obsoletion" } else { "Onshape Release" }, "isDebug": false, "state": state },
+            "entries": entries,
+        })
+    }
+
+    /// ⋯ › View audit log: Onshape opens the log in a new browser tab.
+    fn view_audit_log(&self, cx: &mut Context<Self>) {
+        let json = serde_json::to_vec_pretty(&self.audit_log(cx)).unwrap_or_default();
+        let path = std::env::temp_dir().join(format!("noshape-auditlog-{}.json", self.package.as_ref().map_or(self.opened as u64, |p| p.id)));
+        if std::fs::write(&path, json).is_ok() {
+            cx.open_url(&format!("file://{}", path.display()));
+        }
+    }
+
     /// Add items (Add Items to Release, associated drawings), skipping
     /// ones already listed.
     fn add_items(&mut self, items: Vec<ReleaseItem>, window: &mut Window, cx: &mut Context<Self>) {
         let mut added = Vec::new();
         for item in items {
-            if self.rows.iter().any(|r| r.item.tab == item.tab && r.item.part == item.part && r.item.kind == item.kind && r.item.config == item.config) {
+            if self.rows.iter().any(|r| r.item.same_object(&item)) {
                 continue;
             }
             added.push(item.clone());
@@ -1028,16 +1247,19 @@ impl ReleaseDialog {
         if items.is_empty() || !cx.has_global::<crate::gpu::GpuGlobal>() {
             return;
         }
-        let doc = self.doc.read(cx).session.doc.clone();
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-        cx.spawn(async move |this, cx| {
-            let made = cx.background_spawn(crate::release_thumbs::render(doc, items, gpu)).await;
-            let _ = this.update(cx, |this: &mut Self, cx| {
-                this.thumbs.extend(made);
-                cx.notify();
-            });
-        })
-        .detach();
+        for (doc, items) in thumb_groups(self.doc.read(cx), items) {
+            let versions = self.doc.read(cx).session.pinned_documents();
+            let gpu = gpu.clone();
+            cx.spawn(async move |this, cx| {
+                let made = cx.background_spawn(crate::release_thumbs::render(doc, versions, items, gpu)).await;
+                let _ = this.update(cx, |this: &mut Self, cx| {
+                    this.thumbs.extend(made);
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
     }
 
     /// Revert a row to its last revision (or back): it is listed with that
@@ -1185,10 +1407,11 @@ impl ReleaseDialog {
         let r = self.doc.update(cx, |doc, cx| -> anyhow::Result<()> {
             // The part numbers go onto the parts (one change per Part Studio).
             if kind == PackageKind::Release {
-                let mut tabs: Vec<TabId> = pkg.items.iter().map(|i| i.tab).collect();
+                // Items linked from versions keep theirs (versions don't change).
+                let mut tabs: Vec<TabId> = pkg.items.iter().filter(|i| i.document.is_none()).map(|i| i.tab).collect();
                 tabs.dedup();
                 for tab in tabs {
-                    let items: Vec<ReleaseItem> = pkg.items.iter().filter(|i| i.tab == tab && i.part.is_some()).cloned().collect();
+                    let items: Vec<ReleaseItem> = pkg.items.iter().filter(|i| i.tab == tab && i.part.is_some() && i.document.is_none()).cloned().collect();
                     let changed = doc.session.doc.tab(tab).is_some_and(|t| match &t.content {
                         noshape_model::document::TabContent::PartStudio(ps) => items.iter().any(|i| i.part.as_ref().and_then(|b| ps.part_properties.get(b)).and_then(|p| p.part_number.as_deref()) != Some(i.part_number.as_str())),
                         _ => false,
@@ -1207,7 +1430,7 @@ impl ReleaseDialog {
             // Tab items keep their part numbers: an Assembly in its
             // Properties, other tabs in their metadata.
             if kind == PackageKind::Release {
-                for i in pkg.items.iter().filter(|i| i.part.is_none()) {
+                for i in pkg.items.iter().filter(|i| i.part.is_none() && i.document.is_none()) {
                     if tab_part_number(doc, i.tab) == i.part_number {
                         continue;
                     }
@@ -1231,6 +1454,9 @@ impl ReleaseDialog {
                 Some(v) => v,
                 None => doc.session.create_version(&pkg.name, &pkg.notes)?.to_string(),
             });
+            if kind == PackageKind::Release {
+                add_source::mark_linked_versions(&pkg)?;
+            }
             let mut log = release_log(doc);
             log.record(pkg);
             save_log(doc, &log)?;
@@ -1254,7 +1480,7 @@ const COL_PART_NUMBER: f32 = 150.;
 const GRID: u32 = 0xdddddd;
 
 impl Render for ReleaseDialog {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.thumbs_started {
             self.thumbs_started = true;
             let items = self.rows.iter().map(|r| r.item.clone()).collect();
@@ -1284,7 +1510,7 @@ impl Render for ReleaseDialog {
                 .cursor_pointer()
                 .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
                 .child(crate::assets::icon(icon, 18., cx))
-                .tooltip(crate::ui::tooltip(tip))
+                .when(!tip.is_empty(), |d| d.tooltip(crate::ui::tooltip(tip)))
         };
         let small = |id: &'static str, icon: &'static str, tip: &'static str, cx: &mut Context<Self>| {
             div()
@@ -1329,14 +1555,14 @@ impl Render for ReleaseDialog {
                             let extra = associated_drawings(this.doc.read(cx), &this.items(cx));
                             this.add_items(extra, window, cx);
                         })))
-                        .child(small("rel-add-items", "plus", "Add items", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        .child(small("rel-add-items", "plus", "Add to Release…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let me = cx.entity();
                             open_add_items(this.doc.clone(), move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
                         })))
                     })
                     // Obsolete candidate: "Add to Obsolete candidate" (Help step 5).
                     .when(self.mode == Mode::Obsolete, |d| {
-                        d.child(small("rel-add-obsolete", "plus", "Add to Obsolete candidate", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        d.child(small("rel-add-obsolete", "plus", "Add to Obsoletion…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let me = cx.entity();
                             open_add_obsolete_items(this.doc.clone(), move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
                         })))
@@ -1356,20 +1582,84 @@ impl Render for ReleaseDialog {
                         })),
                 )
             }))
-            .child(head(COL_PART_NUMBER).child("Part number"))
+            .child(head(COL_PART_NUMBER).justify_between().child("Part number").when(self.seq_parts && self.mode == Mode::Release, |d| {
+                // Bundle release-dialog.html: the header's "Generate missing
+                // part numbers" (icon partnumber), disabled when none is missing.
+                let missing = self.rows.iter().any(|r| !r.item.reverted && r.part_number.read(cx).value().trim().is_empty());
+                d.child(
+                    boxed("rel-gen-all".into(), "part-number", "Generate missing part numbers", cx)
+                        .when(!missing, |d| d.opacity(0.4).cursor_default())
+                        .when(missing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.generate_missing_part_numbers(window, cx)))),
+                )
+            }))
             .child(div().flex_1().h_full().border_l_1().border_color(gpui_kit::rgb(GRID)));
-        let attention_link = (attention > 0).then(|| {
-            div()
-                .id("rel-attention")
-                .cursor_pointer()
-                .text_size(px(13.))
-                .text_color(red)
-                .child(format!("{attention} item(s) needs attention ⬇"))
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.problems_only = !this.problems_only;
-                    cx.notify();
-                }))
+        // Bundle release-dialog.html (.link-container): the error-filter label
+        // "1 item needs attention" / "N items need attention", the filter
+        // button (shown while there are errors or it is on) and the ⋯ menu.
+        let attention_label = (attention > 0).then(|| {
+            div().text_size(px(13.)).text_color(pal.text).whitespace_nowrap().child(if attention == 1 { "1 item needs attention".to_string() } else { format!("{attention} items need attention") })
         });
+        let attention_filter = (attention > 0 || self.problems_only).then(|| {
+            boxed("rel-attention".into(), "list-error-filter", "Show only items that need attention", cx).when(self.problems_only, |d| d.bg(gpui_kit::rgb(0xd7d7d7))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.problems_only = !this.problems_only;
+                cx.notify();
+            }))
+        });
+        let overflow = div()
+            .relative()
+            .child(boxed("rel-overflow".into(), "more", "", cx).when(self.overflow_open, |d| d.bg(gpui_kit::rgb(0xd7d7d7))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.overflow_open = !this.overflow_open;
+                cx.notify();
+            })))
+            .when(self.overflow_open, |d| {
+                // Bootstrap dropdown-menu-end: View audit log, View workflow
+                // (every candidate has a published workflow; not once discarded).
+                // Deferred: the table below would paint over it.
+                d.child(div().absolute().top(px(32.)).right_0().child(deferred(anchored().anchor(Anchor::TopRight).child(
+                    v_flex()
+                        .id("rel-overflow-menu")
+                        .occlude()
+                        .py(px(4.))
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xcccccc))
+                        .rounded(px(4.))
+                        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.18), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+                        .child(
+                            div()
+                                .id("rel-audit-log")
+                                .px(px(16.))
+                                .py(px(4.))
+                                .text_size(px(14.))
+                                .text_color(pal.text)
+                                .whitespace_nowrap()
+                                .cursor_pointer()
+                                .hover(|d| d.bg(gpui_kit::rgb(0xe9ecef)))
+                                .child("View audit log")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.overflow_open = false;
+                                    this.view_audit_log(cx);
+                                    cx.notify();
+                                })),
+                        )
+                        .child(
+                            div()
+                                .id("rel-view-workflow")
+                                .px(px(16.))
+                                .py(px(4.))
+                                .text_size(px(14.))
+                                .text_color(pal.text)
+                                .whitespace_nowrap()
+                                .cursor_pointer()
+                                .hover(|d| d.bg(gpui_kit::rgb(0xe9ecef)))
+                                .child("View workflow")
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                    this.overflow_open = false;
+                                    this.toggle_workflow(window, cx);
+                                })),
+                        ),
+                ))))
+            });
         // Type icons toggle a filter; Clear removes it.
         let filter_row = self.filter_open.then(|| {
             let kind_button = |k: ItemKind, icon: &'static str, cx: &mut Context<Self>| {
@@ -1488,6 +1778,17 @@ impl Render for ReleaseDialog {
                                         window.close_dialog(cx);
                                         crate::workspace::request_activate_tab(t, window, cx);
                                     })
+                                })
+                                // Help (add-item-version2): an item linked from another
+                                // version shows the version icon after its name.
+                                .when_some(row.item.document.as_ref(), |d, l| {
+                                    d.child(
+                                        div()
+                                            .id(SharedString::from(format!("rel-linked-{i}")))
+                                            .flex_none()
+                                            .child(crate::assets::icon("list-versioned", 14., cx))
+                                            .tooltip(crate::ui::tooltip(format!("{} - {}", l.name, l.version_name))),
+                                    )
                                 }))
                                 .child(div().pl(px(20.)).text_size(px(13.)).italic().text_color(pal.text_muted).child(row.item.kind.label())),
                         )
@@ -1516,7 +1817,27 @@ impl Render for ReleaseDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_reverted(i, !reverted, window, cx))),
                     )
                 }))
-                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).child(field(&row.part_number, missing, pn_modified, reverted)))
+                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).child(field(&row.part_number, missing, pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
+                    // The field's # ("Generate next part number"), greyed once
+                    // the item has a number.
+                    let empty = pn.trim().is_empty();
+                    d.child(
+                        div()
+                            .id(SharedString::from(format!("rel-gen-{i}")))
+                            .w(px(28.))
+                            .h_full()
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .border_l_1()
+                            .border_color(gpui_kit::rgb(0xcccccc))
+                            .child(crate::assets::icon("part-number", 18., cx))
+                            .tooltip(crate::ui::tooltip("Generate next part number"))
+                            .when(!empty, |d| d.opacity(0.4))
+                            .when(empty, |d| d.cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.generate_part_number(i, window, cx)))),
+                    )
+                })))
                 // Help image: per-row Edit properties and Export buttons.
                 .child(
                     h_flex()
@@ -1526,7 +1847,16 @@ impl Render for ReleaseDialog {
                         .child({
                             let item = row.item.clone();
                             let me = cx.entity();
-                            boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).on_click(move |_, window, cx| {
+                            // A row from another document's version: its
+                            // document, at that version, in its window. A
+                            // version of this document isn't reachable from
+                            // here (the buttons stay inert).
+                            let inert = item.document.as_ref().is_some_and(|l| l.path.is_empty());
+                            boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).when(inert, |d| d.opacity(0.4).cursor_default()).on_click(move |_, window, cx| {
+                                if item.document.is_some() {
+                                    add_source::run_linked(&item, add_source::LinkedAction::Properties, cx);
+                                    return;
+                                }
                                 let me = me.clone();
                                 let doc = me.read(cx).doc.clone();
                                 open_item_properties(doc, item.clone(), move |pn, window, cx| me.update(cx, |this, cx| {
@@ -1539,7 +1869,14 @@ impl Render for ReleaseDialog {
                         })
                         .child({
                             let item = row.item.clone();
-                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export", cx).on_click(move |_, window, cx| crate::workspace::request_export(item.tab, item.part.iter().cloned().collect(), window, cx))
+                            let inert = item.document.as_ref().is_some_and(|l| l.path.is_empty());
+                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export", cx).when(inert, |d| d.opacity(0.4).cursor_default()).on_click(move |_, window, cx| {
+                                if item.document.is_some() {
+                                    add_source::run_linked(&item, add_source::LinkedAction::Export, cx);
+                                } else {
+                                    crate::workspace::request_export(item.tab, item.part.iter().cloned().collect(), window, cx)
+                                }
+                            })
                         }),
                 );
             let note = |text: SharedString, color: Hsla| div().pl(px(COL_ITEM + 10.)).pb(px(4.)).text_size(px(12.)).text_color(color).child(text).into_any_element();
@@ -1588,7 +1925,27 @@ impl Render for ReleaseDialog {
                     .w(px(380.))
                     .gap(px(4.))
                     .child(label(name_label, true, name_empty))
-                    .child(div().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only)))
+                    .child(
+                        h_flex()
+                            .gap(px(4.))
+                            .child(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only)))
+                            // Numbering schemes › Release names: "Generate next
+                            // release name" (not for obsoletions).
+                            .when(self.seq_names && self.mode == Mode::Release, |d| {
+                                d.child(
+                                    boxed("rel-gen-name".into(), "part-number", "Generate next release name", cx)
+                                        .rounded_full()
+                                        .when(!name_empty, |d| d.opacity(0.4).cursor_default())
+                                        .when(name_empty, |d| {
+                                            d.on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                                if let Some(n) = next_number(|s| s.release_names.generate(0)) {
+                                                    this.name.update(cx, |s, cx| s.set_value(n, window, cx));
+                                                }
+                                            }))
+                                        }),
+                                )
+                            }),
+                    )
                     .child(div().pt(px(6.)).child(label(notes_label, self.mode == Mode::Obsolete, false)))
                     .child(Textarea::new(&self.notes).disabled(read_only))
                     .when(self.mode == Mode::Obsolete, |d| {
@@ -1734,8 +2091,10 @@ impl Render for ReleaseDialog {
             Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
             Mode::Obsolete => "Create Obsolete candidate".into(),
         };
+        let workflow = self.render_workflow(window, cx);
         v_flex()
             .w_full()
+            .children(workflow)
             // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (not taken by a text field) undo
             // and redo the form.
             .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
@@ -1758,7 +2117,9 @@ impl Render for ReleaseDialog {
                     // Help: Refresh "to make sure you have the latest iteration of the objects".
                     .when(self.mode == Mode::Release, |d| d.child(boxed("rel-refresh".into(), "refresh", "Refresh", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.refresh(window, cx)))))
                     .child(div().flex_1())
-                    .children(attention_link),
+                    .children(attention_label)
+                    .children(attention_filter)
+                    .child(overflow),
             )
             .child(v_flex().border_t_1().border_b_1().border_color(gpui_kit::rgb(GRID)).child(header).children(filter_row).child(list))
             .child(form)
@@ -1772,6 +2133,12 @@ fn release_modal(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::compo
     dialog.w(px(820.)).margin_top(px(26.)).close_button(false).p_0().gap_0().rounded(px(4.)).border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
 }
 
+/// A ReleaseDialog's modal. While the workflow lightbox is open, Esc
+/// closes only the lightbox (bundle: preventEscapeFromClosingDialog).
+fn release_dialog_modal(dialog: gpui_kit::component::dialog::Dialog, view: &Entity<ReleaseDialog>, cx: &App) -> gpui_kit::component::dialog::Dialog {
+    release_modal(dialog).keyboard(view.read(cx).workflow.is_none()).child(view.clone())
+}
+
 /// Open "Create Release candidate" for items (parts list or versions panel).
 pub fn open_release_candidate(doc: Entity<DocModel>, items: Vec<ReleaseItem>, window: &mut Window, cx: &mut App) {
     // The required Release name starts empty (Onshape fills it only with
@@ -1781,12 +2148,18 @@ pub fn open_release_candidate(doc: Entity<DocModel>, items: Vec<ReleaseItem>, wi
 
 /// Review a recorded package.
 pub fn open_review(doc: Entity<DocModel>, package: &Package, window: &mut Window, cx: &mut App) {
-    open(doc, Mode::Review, package.items.clone(), package.name.clone(), package.notes.clone(), window, cx);
+    let package = package.clone();
+    let view = cx.new(|cx| {
+        let mut d = ReleaseDialog::new(doc, Mode::Review, package.items.clone(), package.name.clone(), package.notes.clone(), window, cx);
+        d.package = Some(package);
+        d
+    });
+    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
 }
 
 fn open(doc: Entity<DocModel>, mode: Mode, items: Vec<ReleaseItem>, name: String, notes: String, window: &mut Window, cx: &mut App) {
     let view = cx.new(|cx| ReleaseDialog::new(doc, mode, items, name, notes, window, cx));
-    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).child(view.clone()));
+    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
 }
 
 /// A saved draft from the Release drafts panel: "Review Release", editable.
@@ -1794,11 +2167,12 @@ pub fn open_draft(doc: Entity<DocModel>, draft: &Package, window: &mut Window, c
     let name = draft.name.clone();
     let view = cx.new(|cx| {
         let mut d = ReleaseDialog::new(doc, Mode::Release, draft.items.clone(), draft.name.clone(), draft.notes.clone(), window, cx);
+        d.package = Some(draft.clone());
         d.applied = true;
         d.draft = Some(name);
         d
     });
-    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).child(view.clone()));
+    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
 }
 
 /// The left panel "Release drafts" (help releasedraftspanel.png): one row

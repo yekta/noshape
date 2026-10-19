@@ -319,6 +319,7 @@ void     write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> 
 uint32_t rhino_valid_breps(rust::Str path);
 void     write_jt(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
 void     write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
+std::unique_ptr<OcShape> read_pvz(rust::Str path, uint32_t merge_limit);
 
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,

@@ -46,7 +46,6 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     };
     let mut opts = k::SweepOptions { scale_end: if ev.bool("hasScale") { ev.real("scaleFactor")? } else { 1.0 }, twist, ..Default::default() };
     let lock_dir = match ev.enum_("profileControl") {
-        "LOCK_FACES" => return err("Sweep \"Lock profile faces\" is not supported yet"),
         "LOCK_DIRECTION" => {
             let Some(r) = ev.query("lockDirectionQuery").first() else { return err("Select a direction to lock") };
             Some(ev.resolve_direction(r).ok_or_else(|| fe("The lock direction could not be resolved"))?)
@@ -54,6 +53,21 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         _ => None,
     };
     let keep = ev.is("profileControl", "KEEP_ORIENTATION");
+    // Lock profile faces: the profile keeps its orientation relative to the
+    // faces' normal along the path (which lies on them).
+    let lock_faces = if ev.is("profileControl", "LOCK_FACES") {
+        let faces: Vec<Shape> = ev.resolve_faces(ev.query("lockFaces")).into_iter().filter_map(|(bi, fi)| ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok()).collect();
+        if faces.is_empty() {
+            return err("Select faces to lock");
+        }
+        Some(Shape::compound(&faces))
+    } else {
+        None
+    };
+    let sweep = |profile: &Shape, opts: &k::SweepOptions| match &lock_faces {
+        Some(f) => k::sweep_locked_to_faces(std::slice::from_ref(profile), &path, f, opts),
+        None => k::sweep(profile, &path, opts),
+    };
     let mut tools = Vec::new();
     if body_type == "SURFACE" {
         let edges = resolve_curves(ev, ev.query("surfaceProfiles"))?;
@@ -68,7 +82,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             } else if let Some(d) = lock_dir {
                 opts.mode = k::SweepMode::Binormal(d);
             }
-            let res = k::sweep(&p.shape, &path, &opts).map_err(kerr("Sweep failed"))?;
+            let res = sweep(&p.shape, &opts).map_err(kerr("Sweep failed"))?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
         }
@@ -92,7 +106,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         } else if let Some(d) = lock_dir {
             opts.mode = k::SweepMode::Binormal(d);
         }
-        let res = k::sweep(&p.shape, &path, &opts).map_err(kerr("Sweep failed"))?;
+        let res = sweep(&p.shape, &opts).map_err(kerr("Sweep failed"))?;
         if res.shape.count(ShapeType::Solid) == 0 {
             return err("Sweep did not produce a solid (check that the profile is closed and the path is valid)");
         }

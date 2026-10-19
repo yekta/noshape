@@ -72,7 +72,7 @@ pub fn show(cx: &mut App) {
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    match gpui_kit::open_window(options, cx, |window, cx| {
+    match crate::os_menu::open_window(options, cx, |window, cx| {
         window.set_window_title("Documents — noshape");
         let view = cx.new(|cx| StartView::new(window, cx));
         let fh = view.read(cx).focus.clone();
@@ -273,6 +273,18 @@ pub struct StartView {
     dirs: Vec<PathBuf>,
     /// The search box placeholder shown ("Search in <place>").
     placeholder: String,
+    /// Advanced search (the ▾ in the search box): the panel, open or not,
+    /// the applied query, the search box bounds (the panel hangs under
+    /// it) and the documents' contents read for it (by path, with the
+    /// modified time they were read at).
+    adv: Entity<crate::start_search::AdvancedSearch>,
+    adv_open: bool,
+    adv_query: Option<crate::start_search::Query>,
+    adv_anchor: Rc<std::cell::Cell<Bounds<Pixels>>>,
+    /// The Properties panel's fields (for the selected document).
+    props: Option<PropsEdit>,
+    facts: std::collections::HashMap<PathBuf, (i64, crate::start_search::DocFacts)>,
+    facts_task: Option<Task<()>>,
     scan_task: Option<Task<()>>,
     _poll: Task<()>,
     _subs: Vec<Subscription>,
@@ -321,6 +333,20 @@ impl StartView {
                 }
             }
         });
+        let adv = cx.new(|cx| crate::start_search::AdvancedSearch::new(window, cx));
+        let adv_sub = cx.subscribe(&adv, |this: &mut Self, _, ev: &crate::start_search::SearchEvent, cx| {
+            match ev {
+                crate::start_search::SearchEvent::Search(q) => {
+                    this.adv_query = Some(q.clone()).filter(|q| *q != crate::start_search::Query::default());
+                    this.adv_open = false;
+                    this.load_facts(cx);
+                }
+                crate::start_search::SearchEvent::Reset => this.adv_query = None,
+            }
+            cx.notify();
+        });
+        let mut subs = subs;
+        subs.push(adv_sub);
         let prefs = load_prefs();
         let source = prefs.source.clone().unwrap_or(if crate::files::recent().is_empty() { Source::All } else { Source::Recent });
         let mut this = Self {
@@ -356,6 +382,13 @@ impl StartView {
             trash: crate::start_trash::Trash::load(),
             dirs: Vec::new(),
             placeholder: String::new(),
+            adv,
+            adv_open: false,
+            adv_query: None,
+            adv_anchor: Rc::default(),
+            props: None,
+            facts: Default::default(),
+            facts_task: None,
             scan_task: None,
             _poll: poll,
             _subs: subs,
@@ -422,6 +455,33 @@ impl StartView {
         }
     }
 
+    /// Advanced search: read what the documents hold (tabs, part
+    /// properties) off the UI thread, for the documents not read yet.
+    fn load_facts(&mut self, cx: &mut Context<Self>) {
+        if !self.adv_query.as_ref().is_some_and(|q| q.needs_facts()) {
+            return;
+        }
+        let todo: Vec<(PathBuf, i64)> = self.docs.iter().filter(|d| !d.trashed && self.facts.get(&d.path).is_none_or(|f| f.0 != d.modified)).map(|d| (d.path.clone(), d.modified)).collect();
+        if todo.is_empty() {
+            return;
+        }
+        self.facts_task = Some(cx.spawn(async move |this, cx| {
+            let read = cx.background_spawn(async move { todo.into_iter().filter_map(|(p, m)| crate::start_search::facts(&p).map(|f| (p, (m, f)))).collect::<Vec<_>>() }).await;
+            let _ = this.update(cx, |t, cx| {
+                t.facts.extend(read);
+                t.facts_task = None;
+                cx.notify();
+            });
+        }));
+    }
+
+    /// Does a document pass the applied advanced search?
+    fn adv_matches(&self, d: &DocEntry) -> bool {
+        let Some(q) = &self.adv_query else { return true };
+        let labels: Vec<String> = self.labels.labels.iter().filter(|l| self.labels.has(&d.path, l)).cloned().collect();
+        crate::start_search::matches(q, &d.name, &d.description, &d.owner, &labels, self.facts.get(&d.path).map(|f| &f.1))
+    }
+
     /// Documents shown: current source, filtered by the search, sorted.
     fn visible(&self) -> Vec<DocEntry> {
         let q = self.query.trim().to_lowercase();
@@ -429,6 +489,7 @@ impl StartView {
             .docs
             .iter()
             .filter(|d| self.in_source(d, &self.source))
+            .filter(|d| self.adv_matches(d))
             .filter(|d| q.is_empty() || d.name.to_lowercase().contains(&q) || d.path.file_name().is_some_and(|n| n.to_string_lossy().to_lowercase().contains(&q)))
             .cloned()
             .collect();
@@ -1108,18 +1169,20 @@ impl StartView {
         let labels = labels.clone();
         let query = search.read(cx).value().trim().to_lowercase();
         let mut col = v_flex().gap(px(2.)).child(
+            // Live documents/24: the field 20 px into the box, italic placeholder.
             div()
                 .mx(px(15.))
-                .my(px(5.))
+                .mt(px(20.))
+                .mb(px(5.))
                 .h(px(30.))
-                .rounded(px(5.25))
+                .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
                 .bg(rgb(0xffffff))
-                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.))),
+                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.)).italic()),
         );
         if labels.labels.is_empty() {
-            col = col.child(div().py(px(1.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
+            col = col.child(div().pt(px(6.)).pb(px(34.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
         }
         for (k, l) in labels.labels.iter().enumerate().filter(|(_, l)| query.is_empty() || l.to_lowercase().contains(&query)) {
             let on = labels.has(path, l);
@@ -1133,7 +1196,7 @@ impl StartView {
         col.child(
             h_flex()
                 .id("label-create")
-                .h(px(30.))
+                .h(px(31.))
                 .gap(px(6.))
                 .pl(px(20.))
                 .border_t_1()
@@ -1160,16 +1223,16 @@ impl StartView {
                 .pr(px(8.))
                 .gap(px(4.))
                 .cursor_pointer()
-                .text_size(px(14.))
+                .text_size(px(14.67))
                 .text_color(pal.text)
                 .hover(|d| d.bg(rgb(0xf5f5f5)))
                 .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 10., pal.text))
-                .child(os::glyph(os::GLYPH_LABEL, 18., pal.text))
+                .child(os::glyph(os::GLYPH_LABEL, 20., pal.text))
                 .child(div().flex_1().child("Labels"))
                 .child(
                     div()
                         .id("nav-label-add")
-                        .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.accent))
+                        .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.text))
                         .tooltip(crate::ui::tooltip("Create label"))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             cx.stop_propagation();
@@ -1253,7 +1316,13 @@ impl StartView {
             .border_l_1()
             .border_color(pal.border)
             .child(btn("doc-strip-details", "info", "Details", DocPanel::Details, cx))
-            .child(btn("doc-strip-versions", "history", "Versions and history", DocPanel::Versions, cx))
+            // Live documents/24 vs 26: the document panels show only while a document is
+            // selected (113: details, (share), properties, versions, notes).
+            .when(self.selected_entry().is_some(), |s| {
+                s.child(btn("doc-strip-properties", "properties", "Properties", DocPanel::Properties, cx))
+                    .child(btn("doc-strip-versions", "branch", "Versions and history", DocPanel::Versions, cx))
+                    .child(btn("doc-strip-notes", "doc-notes", "Document notes", DocPanel::Notes, cx))
+            })
             .into_any_element()
     }
 
@@ -1271,21 +1340,80 @@ impl StartView {
         let title = match panel {
             DocPanel::Details => "Details",
             DocPanel::Versions => "Versions and history",
+            DocPanel::Properties => "Properties",
+            DocPanel::Notes => "Document notes",
         };
+        let name_row = |name: String| {
+            h_flex()
+                .h(px(32.))
+                .px(px(15.))
+                .mt(px(11.))
+                .gap(px(4.))
+                .child(os::glyph(os::GLYPH_DOCUMENT, 20., pal.text))
+                .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name))
+        };
+        // Live documents/24: a section is 53 px with one value (label and value
+        // 20 px apart, values 25 px apart), `#ccc` rule above.
         let section = |label: &'static str, lines: Vec<String>| {
             v_flex()
-                .py(px(6.))
+                .pt(px(4.))
+                .pb(px(7.))
                 .border_t_1()
                 .border_color(rgb(0xcccccc))
-                .child(div().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label))
-                .children(lines.into_iter().map(|l| div().pt(px(4.)).text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(l)))
+                .child(div().line_height(px(21.)).text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(label))
+                .children(lines.into_iter().enumerate().map(|(i, l)| div().when(i > 0, |d| d.pt(px(4.))).line_height(px(20.)).text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(l)))
         };
         let body: AnyElement = match (&entry, &details) {
+            (Some(_), Some(d)) if panel == DocPanel::Notes => {
+                // Live documents/114: a 140 px grey notepad and "No notes available".
+                if d.notes.trim().is_empty() {
+                    v_flex()
+                        .child(name_row(d.name.clone()))
+                        .child(v_flex().items_center().pt(px(43.)).gap(px(20.)).child(svg().path(crate::assets::icon_path("notes-empty")).size(px(140.)).text_color(rgb(0xebebeb))).child(div().text_size(px(14.67)).text_color(rgb(0x666666)).child("No notes available")))
+                        .into_any_element()
+                } else {
+                    v_flex()
+                        .child(name_row(d.name.clone()))
+                        .child(v_flex().px(px(15.)).pt(px(15.)).gap(px(6.)).text_size(px(14.)).text_color(pal.text).children(d.notes.lines().map(|l| div().child(l.to_string()))))
+                        .into_any_element()
+                }
+            }
+            (Some(_), Some(d)) if panel == DocPanel::Properties => match &self.props {
+                Some(pe) => {
+                    let label = |t: &'static str, required: bool| h_flex().h(px(26.)).items_end().pb(px(4.)).text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(t).when(required, |d| d.child(div().ml(px(4.)).text_color(rgb(0xaa252d)).child("*")));
+                    let boxed = |el: AnyElement, h: f32| div().h(px(h)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).px(px(10.)).flex().items_center().child(el);
+                    // Live documents/113: 32 px fields, 21 px between a field and the next label.
+                    let gap = || div().h(px(9.));
+                    v_flex()
+                        .child(name_row(d.name.clone()))
+                        .child(
+                            v_flex()
+                                .px(px(15.))
+                                .pt(px(14.))
+                                .w(px(325.))
+                                .child(label("Name", true))
+                                .child(boxed(Input::new(&pe.name).appearance(false).text_size(px(14.)).into_any_element(), 32.))
+                                .child(gap())
+                                .child(label("Description", false))
+                                .child(boxed(Input::new(&pe.description).appearance(false).text_size(px(14.)).into_any_element(), 52.))
+                                .child(gap())
+                                .child(label("Category", false))
+                                // The category picker reads as disabled (one local category).
+                                .child(boxed(h_flex().w_full().text_size(px(14.)).child(div().flex_1().child("Onshape Document")).child(os::glyph(os::GLYPH_CARET, 8., rgb(0x666666))).into_any_element(), 32.).bg(rgb(0xeeeeee)))
+                                .child(gap())
+                                .child(label("Library label", false))
+                                .child(boxed(Input::new(&pe.label).appearance(false).text_size(px(14.)).into_any_element(), 32.)),
+                        )
+                        .into_any_element()
+                }
+                None => div().into_any_element(),
+            },
             (Some(e), Some(d)) if panel == DocPanel::Details => v_flex()
-                .px(px(10.))
+                .px(px(14.))
                 .child(
                     h_flex()
                         .h(px(32.))
+                        .mt(px(13.))
                         .gap(px(4.))
                         .child(os::glyph(os::GLYPH_DOCUMENT, 20., pal.text))
                         .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(d.name.clone())),
@@ -1306,7 +1434,7 @@ impl StartView {
                         .py(px(6.))
                         .border_t_1()
                         .border_color(rgb(0xcccccc))
-                        .child(div().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Document labels"))
+                        .child(h_flex().gap(px(6.)).line_height(px(21.)).text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_EXPANDED, 10., pal.text)).child("Document labels"))
                         .child(div().mt(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), &e.path, &self.label_search, &self.labels, cx))),
                 )
                 .child(section("Created by", vec![who(&d.created_by), lib::format_onshape_time(d.created)]))
@@ -1359,12 +1487,14 @@ impl StartView {
                     .child(section("Last modified by", vec!["me".into(), lib::format_onshape_time(modified)]))
                     .into_any_element()
             }
+            // Live documents/26: a 200x95 `#eee` illustration 35 px under the header, the
+            // text one line (14.67 px `#666`) 24 px below it.
             _ => v_flex()
                 .items_center()
-                .pt(px(120.))
-                .gap(px(12.))
-                .child(os::glyph(os::GLYPH_EMPTY, 90., rgb(0xcccccc)))
-                .child(div().max_w(px(240.)).text_center().text_size(px(14.)).text_color(pal.text_muted).child("Select a document or folder to view its details"))
+                .pt(px(35.))
+                .gap(px(24.))
+                .child(svg().path(crate::assets::icon_path("documents-empty")).w(px(200.)).h(px(95.)).text_color(rgb(0xeeeeee)))
+                .child(div().text_center().text_size(px(14.67)).text_color(rgb(0x666666)).child("Select a document or folder to view its details"))
                 .into_any_element(),
         };
         Some(
@@ -1376,8 +1506,11 @@ impl StartView {
                 .border_color(pal.border)
                 .child(
                     h_flex()
-                        .h(px(30.))
+                        .h(px(32.))
+                        .flex_none()
                         .px(px(10.))
+                        .border_b_1()
+                        .border_color(rgb(0xd0dbe5))
                         .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
                         .child(
                             div()
@@ -1392,8 +1525,93 @@ impl StartView {
                         ),
                 )
                 .child(div().id("doc-panel-body").flex_1().min_h_0().overflow_y_scroll().child(body))
+                .when(panel == DocPanel::Properties && entry.is_some(), |d| d.children(self.render_props_footer(cx)))
                 .into_any_element(),
         )
+    }
+
+    /// The Properties panel's fields follow the selected document.
+    fn ensure_props(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.panel != Some(DocPanel::Properties) {
+            return;
+        }
+        let Some(e) = self.selected_entry() else {
+            self.props = None;
+            return;
+        };
+        if self.props.as_ref().is_some_and(|p| p.path == e.path) {
+            return;
+        }
+        let Some(d) = self.details_of(&e.path) else { return };
+        let field = |v: &str, window: &mut Window, cx: &mut Context<Self>| {
+            let v = v.to_string();
+            let st = cx.new(|cx| InputState::new(window, cx).default_value(v));
+            cx.observe(&st, |_, _, cx| cx.notify()).detach();
+            st
+        };
+        self.props = Some(PropsEdit {
+            path: e.path.clone(),
+            name: field(&d.name, window, cx),
+            description: field(&d.description, window, cx),
+            label: field(&d.library_label, window, cx),
+            saved: (d.name.clone(), d.description.clone(), d.library_label.clone()),
+        });
+    }
+
+    /// Live documents/113: ↶ ↷ (pale) and Apply, disabled until a field changes.
+    fn render_props_footer(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let pe = self.props.as_ref()?;
+        let now = (pe.name.read(cx).value().to_string(), pe.description.read(cx).value().to_string(), pe.label.read(cx).value().to_string());
+        let changed = now != pe.saved && !now.0.trim().is_empty();
+        Some(
+            h_flex()
+                .h(px(64.))
+                .flex_none()
+                .px(px(20.))
+                .gap(px(3.))
+                .justify_end()
+                .child(div().opacity(0.25).child(crate::ui::icon_button("props-undo", "undo", 30., false, cx)))
+                .child(div().opacity(0.25).child(crate::ui::icon_button("props-redo", "redo", 30., false, cx)))
+                .child(os::primary_button("props-apply", "Apply").when(!changed, |b| b.opacity(0.5)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    if changed {
+                        this.apply_props(window, cx);
+                    }
+                })))
+                .into_any_element(),
+        )
+    }
+
+    fn apply_props(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(pe) = &self.props else { return };
+        let path = pe.path.clone();
+        let (name, desc, label) = (pe.name.read(cx).value().trim().to_string(), pe.description.read(cx).value().to_string(), pe.label.read(cx).value().trim().to_string());
+        if crate::files::is_document_open(&path, cx) {
+            Self::notify(window, cx, AlertKind::Warning, format!("{name}: Close the document's window before changing its properties"));
+            return;
+        }
+        if let Err(e) = lib::set_doc_properties(&path, &desc, &label) {
+            Self::notify(window, cx, AlertKind::Error, format!("Could not save the properties: {e:#}"));
+            return;
+        }
+        let mut dest = path.clone();
+        if name != pe.saved.0 {
+            match lib::rename_document(&path, &name) {
+                Ok(d) => {
+                    crate::files::replace_recent(&path, &d);
+                    self.labels.moved(&path, &d);
+                    self.labels.save();
+                    dest = d.canonicalize().unwrap_or(d);
+                }
+                Err(e) => {
+                    Self::notify(window, cx, AlertKind::Error, format!("Rename failed: {e:#}"));
+                    return;
+                }
+            }
+        }
+        self.props = None;
+        self.details = None;
+        self.selected = Some(dest);
+        self.force_rescan(cx);
     }
 
     /// "Move to…": Onshape's folder picker; moves the (closed) document.
@@ -1499,7 +1717,7 @@ impl StartView {
 
     /// Onshape documents page top bar: 40 px `#eaeaea`, logo at the left,
     /// the search box (390 px, with its square search button) centered.
-    fn render_title_bar(&self, cx: &App) -> AnyElement {
+    fn render_title_bar(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         TitleBar::new()
             .h(px(crate::ui::NAVBAR_H))
@@ -1524,16 +1742,35 @@ impl StartView {
                             h_flex()
                                 .w(px(390.))
                                 .h(px(28.))
-                                .child(
-                                    div()
+                                .child({
+                                    let probe = self.adv_anchor.clone();
+                                    // Live documents/23: italic placeholder, the advanced search ▾ at the right.
+                                    h_flex()
+                                        .relative()
                                         .flex_1()
                                         .h_full()
                                         .bg(pal.panel)
                                         .border_1()
                                         .border_color(pal.border_strong)
                                         .rounded_l(px(2.))
-                                        .child(Input::new(&self.search).appearance(false).small().h(px(26.)).cleanable(true)),
-                                )
+                                        .child(div().flex_1().child(Input::new(&self.search).appearance(false).small().h(px(26.)).italic().cleanable(true)))
+                                        .child(
+                                            div()
+                                                .id("adv-caret")
+                                                .w(px(20.))
+                                                .h_full()
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .cursor_pointer()
+                                                .child(os::glyph(os::GLYPH_CARET, 9., pal.text))
+                                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                    this.adv_open = !this.adv_open;
+                                                    cx.notify();
+                                                })),
+                                        )
+                                        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                                })
                                 .child(
                                     div()
                                         .id("search-go")
@@ -1556,7 +1793,9 @@ impl StartView {
                                 ),
                         ),
                     )
-                    .child(div().w(px(220.)).flex_none().flex().justify_end().pr(px(10.)).child(user_menu(cx))),
+                    // Live documents/23: the search box is centred between the 220 px left
+                    // column and a 388 px right block (x 681–1071 at 1919 px).
+                    .child(div().w(px(388.)).flex_none().flex().justify_end().pr(px(10.)).child(user_menu(cx))),
             )
             .into_any_element()
     }
@@ -1574,14 +1813,14 @@ impl StartView {
             .id(id)
             .relative()
             .h(px(32.))
-            .pl(px(20.))
-            .gap(px(7.))
+            .pl(px(19.))
+            .gap(px(6.))
             .cursor_pointer()
-            .text_size(px(14.))
+            .text_size(px(14.67))
             .text_color(color)
             .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)))
             .when(!active, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
-            .child(os::glyph(glyph, 18., color))
+            .child(os::glyph(glyph, 20., color))
             .child(label)
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx)))
     }
@@ -1767,7 +2006,7 @@ impl StartView {
         let list_view = self.view == ViewMode::List;
         let folder_rows = if list_view && !tiles_list.is_empty() { Some(self.render_folder_rows(&tiles_list, cx)) } else { None };
         let has_tiles = !tiles_list.is_empty();
-        let mut tiles = div().flex().flex_wrap().gap(px(10.)).pl(px(14.)).pr(px(10.));
+        let mut tiles = div().flex().flex_wrap().gap(px(12.)).pl(px(18.)).pr(px(10.));
         for (i, (f, trash_id)) in tiles_list.into_iter().enumerate() {
             let view = cx.entity();
             let selected = self.selected.as_ref() == Some(&f);
@@ -1842,15 +2081,15 @@ impl StartView {
                                     h_flex()
                                         .id("folders-caption")
                                         .h_full()
-                                        .pl(px(12.))
+                                        .pl(px(23.))
                                         .gap(px(7.))
                                         .cursor_pointer()
                                         .text_size(px(14.))
                                         .font_weight(FontWeight::MEDIUM)
                                         .text_color(pal.text)
-                                        .child(os::glyph(if expanded { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 12., pal.text))
+                                        .child(os::glyph(if expanded { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text))
                                         .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-                                        .child(caption)
+                                        .child(div().ml(px(1.)).child(caption))
                                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_folders(cx))),
                                 )
                                 .child(div().flex_1())
@@ -2003,7 +2242,7 @@ impl StartView {
         }
         recent.sort_by_key(|d| d.recent_rank);
         let open = self.recent_open;
-        let mut tiles = div().h(px(60.)).overflow_hidden().flex().flex_wrap().gap(px(12.)).pl(px(6.)).pr(px(10.));
+        let mut tiles = div().h(px(80.)).overflow_hidden().flex().flex_wrap().gap(px(12.)).pl(px(18.)).pr(px(10.));
         for (i, d) in recent.into_iter().take(8).enumerate() {
             let selected = self.selected.as_ref() == Some(&d.path);
             let (d1, d2, v) = (d.clone(), d.clone(), cx.entity());
@@ -2011,18 +2250,18 @@ impl StartView {
                 h_flex()
                     .id(("recent-tile", i))
                     .w(px(267.))
-                    .h(px(48.))
+                    .h(px(68.))
                     .mt(px(6.))
-                    .px(px(4.))
-                    .gap(px(10.))
+                    .px(px(6.))
+                    .gap(px(8.))
                     .rounded(px(4.))
                     .border_1()
                     .cursor_pointer()
                     .when(selected, |t| t.bg(pal.accent_soft).border_color(pal.accent_soft))
-                    .when(!selected, |t| t.bg(rgb(0xf5f5f5)).border_color(rgb(0xeeeeee)).hover(|t| t.bg(pal.row_hover)))
+                    .when(!selected, |t| t.bg(rgb(0xffffff)).border_color(rgb(0xeeeeee)).hover(|t| t.bg(pal.row_hover)))
                     .text_size(px(14.))
                     .text_color(pal.text)
-                    .child(self.thumbnail(&d, 64., 38., false))
+                    .child(div().w(px(82.)).h(px(54.)).flex_none().rounded(px(4.)).bg(rgb(0xf5f5f5)).flex().items_center().justify_center().child(self.thumbnail(&d, 76., 48., false)))
                     .child(div().flex_1().min_w_0().truncate().child(d.name.clone()))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     .os_context_menu(move |menu, _, _| Self::doc_menu(v.clone(), d2.clone(), menu)),
@@ -2035,15 +2274,15 @@ impl StartView {
                     h_flex()
                         .id("recent-caption")
                         .h(px(36.))
-                        .pl(px(12.))
+                        .pl(px(23.))
                         .gap(px(7.))
                         .cursor_pointer()
                         .text_size(px(14.))
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(pal.text)
-                        .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 12., pal.text))
+                        .child(os::glyph(if open { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text))
                         .child(os::glyph(os::GLYPH_RECENT, 20., pal.text))
-                        .child("Last opened by me")
+                        .child(div().ml(px(1.)).child("Last opened by me"))
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.recent_open = !this.recent_open;
                             cx.notify();
@@ -2327,6 +2566,10 @@ impl StartView {
                             .gap(px(14.))
                             .child(self.thumbnail(d, 64.0, 36.0, false))
                             .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(d.name.clone()))
+                            // The workspace chip (live documents-list: 14 px workspace icon, 11 px name).
+                            .when(!d.workspace.is_empty(), |r| {
+                                r.child(h_flex().flex_none().ml(px(-7.)).gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(d.workspace.clone()))
+                            })
                             .when(open, |r| r.child(Self::open_badge())),
                     )
                     .children(cols.iter().map(|c| {
@@ -2351,7 +2594,8 @@ impl StartView {
             .pl(px(10.))
             .pr(px(12.))
             // The row above the table with Onshape's "+ Add" column button.
-            .child(h_flex().h(px(36.)).flex_none().pr(px(14.)).child(div().flex_1()).child(self.render_add_columns(cx)))
+            // (live documents-list DOM: "+ Add" 57 px and the header 92 px below the page top)
+            .child(h_flex().h(px(42.)).flex_none().items_start().pt(px(4.)).pr(px(14.)).child(div().flex_1()).child(self.render_add_columns(cx)))
             // Wider than the pane (more columns): the table scrolls sideways.
             .child(
                 div().id("doc-table").flex_1().min_h_0().w_full().overflow_x_scroll().child(
@@ -2398,7 +2642,7 @@ impl StartView {
                                 .font_weight(FontWeight::BOLD)
                                 .underline()
                                 .child("Learning Center.")
-                                .on_click(|_, _, cx| cx.open_url("https://learn.onshape.com/")),
+                                .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
                         )
                         .into_any_element()
                 }
@@ -2449,8 +2693,10 @@ impl Render for StartView {
         }
         let docs = self.visible();
         let header = self.render_header(cx);
-        let folders = if self.query.trim().is_empty() { self.render_folders(cx) } else { None };
+        // Searching hides the folder area, except an advanced search for folders.
+        let folders = if self.query.trim().is_empty() && self.adv_query.as_ref().is_none_or(|q| q.folders_only()) { self.render_folders(cx) } else { None };
         let strip = self.render_strip(cx);
+        self.ensure_props(window, cx);
         let panel = self.render_doc_panel(cx);
         let content = self.render_list(&docs, cx);
         v_flex()
@@ -2530,8 +2776,20 @@ impl Render for StartView {
                     .children(panel),
             )
             .child(self.render_footer())
+            // Advanced search: under the search box, left-aligned with it (live documents/110).
+            .when(self.adv_open, |d| {
+                let b = self.adv_anchor.get();
+                d.child(
+                    deferred(anchored().position(point(b.left(), b.bottom() + px(1.))).child(div().on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        if !crate::os_menu::is_open(cx) {
+                            this.adv_open = false;
+                            cx.notify();
+                        }
+                    })).child(self.adv.clone())))
+                    .with_priority(1),
+                )
+            })
             // Onshape right-click menus (`os_context_menu`).
-            .children(crate::os_menu::render_host(cx))
             .children(cx.try_global::<StartToast>().and_then(|t| t.0.clone()).map(|t| {
                 // Onshape: top center, 8 px from the top of the page (over the top bar).
                 let text = match &t.bold {
@@ -2577,6 +2835,19 @@ impl Global for StartToast {}
 enum DocPanel {
     Details,
     Versions,
+    /// Live documents/113: Name *, Description, Category, Library label; Apply.
+    Properties,
+    /// Live documents/114: the document notes, read-only.
+    Notes,
+}
+
+/// The Properties panel's fields for one document, and their saved values.
+struct PropsEdit {
+    path: PathBuf,
+    name: Entity<InputState>,
+    description: Entity<InputState>,
+    label: Entity<InputState>,
+    saved: (String, String, String),
 }
 
 /// Onshape's account button at the top-right (avatar, name, ▾). Its menu

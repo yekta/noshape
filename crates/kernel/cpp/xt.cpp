@@ -8,15 +8,19 @@
 // back face of its solid region's shell and a front face of the void side's
 // shell. Surfaces and curves are written as planes, cylinders, cones,
 // spheres, tori, lines, circles and ellipses where they are, otherwise as
-// non-periodic B-splines; surfaces of extrusion, revolution and offset are
-// converted first (same parameterisation), and faces closed on a B-spline
-// surface are split (an XT B-surface attached to a face may not be closed).
-// Seam and degenerate edges of the periodic analytic surfaces are dropped: an
-// XT cylinder face is bounded by its two circles alone.
+// non-periodic B-splines; surfaces of revolution are spun surfaces (periodic
+// like Parasolid's own: a revolved spline is one face, Onshape G21), surfaces
+// of extrusion and offset are converted first (same parameterisation), and
+// faces closed on a B-spline surface are split (an XT B-surface attached to a
+// face may not be closed). Seam and degenerate edges of the periodic surfaces
+// are dropped: an XT cylinder face is bounded by its two circles alone.
 //
 // Edges whose curve lies on both faces within Parasolid's precision (1e-8 m)
-// are accurate; the others (approximated intersections) are tolerant: no edge
-// curve, each fin carries a trimmed SP-curve (the OCCT pcurve on the XT
+// are accurate. OCCT's approximated intersections (crossing cylinders: 4e-8)
+// get a curve refitted through exact intersection points, as Parasolid's own
+// intersection edges are exact (Onshape G21: the tolerant edges cost +0.03 mm³
+// on the crossing cylinders' volume). Edges that still miss are tolerant: no
+// edge curve, each fin carries a trimmed SP-curve (the OCCT pcurve on the XT
 // surface), and their vertices are tolerant too. Accurate edges at tolerant
 // vertices carry trimmed curves.
 //
@@ -45,7 +49,14 @@
 #include <Geom_Ellipse.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
+#include <Geom_BezierCurve.hxx>
+#include <Precision.hxx>
+#include <GeomAPI_Interpolate.hxx>
+#include <math_Gauss.hxx>
+#include <math_Matrix.hxx>
+#include <math_Vector.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
 #include <Geom_SphericalSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -139,6 +150,12 @@ Field ff(double v)
 Field ff_null()
 {
   Field f{'f'};
+  f.null = true;
+  return f;
+}
+Field fv_null()
+{
+  Field f{'v'};
   f.null = true;
   return f;
 }
@@ -353,11 +370,13 @@ std::string header(bool binary)
 // ---------------------------------------------------------------- geometry
 
 // An XT surface: its node, how OCCT (u, v) map to XT (u, v) (u' = su u + ou,
-// v' = sv v), and its natural normal at a point.
+// v' = sv v; swapped first for spun surfaces, whose XT u runs along the
+// profile), and its natural normal at a point.
 struct XSurface
 {
   int                                       index = 0;
   double                                    su = 1, ou = 0, sv = 1;
+  bool                                      swap = false;
   std::function<gp_Vec(const gp_Pnt&, double, double)> natural; // point, OCCT u, v
 };
 
@@ -466,10 +485,29 @@ occ::handle<Geom_Surface> basis_surface(occ::handle<Geom_Surface> s)
   return s;
 }
 
+occ::handle<Geom_Curve> basis_curve(occ::handle<Geom_Curve> c)
+{
+  while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  return c;
+}
+
+// A surface of revolution written as an XT spun surface: its profile is a
+// curve the writer keeps with its parameterisation.
+bool spun(const occ::handle<Geom_Surface>& s)
+{
+  auto r = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+  if (r.IsNull())
+    return false;
+  const occ::handle<Geom_Curve> c = basis_curve(r->BasisCurve());
+  return !occ::down_cast<Geom_Line>(c).IsNull() || !occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull() ||
+         !occ::down_cast<Geom_BSplineCurve>(c).IsNull() || !occ::down_cast<Geom_BezierCurve>(c).IsNull();
+}
+
 bool periodic_analytic(const occ::handle<Geom_Surface>& s)
 {
   return !occ::down_cast<Geom_CylindricalSurface>(s).IsNull() || !occ::down_cast<Geom_ConicalSurface>(s).IsNull() ||
-         !occ::down_cast<Geom_SphericalSurface>(s).IsNull() || !occ::down_cast<Geom_ToroidalSurface>(s).IsNull();
+         !occ::down_cast<Geom_SphericalSurface>(s).IsNull() || !occ::down_cast<Geom_ToroidalSurface>(s).IsNull() || spun(s);
 }
 
 // ---------------------------------------------------------------- body
@@ -502,6 +540,8 @@ struct BodyWriter
   std::vector<int>       edge_idx, vertex_idx, vertex_point;
   std::vector<double>    edge_tol, vertex_tol; // 0 = accurate
   std::vector<int>       edge_curve;
+  std::vector<occ::handle<Geom_Curve>> edge_fit;          // refitted curves (same range), or null
+  std::map<int, gp_XYZ>                vertex_fit;        // vertex index -> point on refitted ends
   std::vector<int>       chain_surface, chain_curve, chain_point; // boundary chains (node indices)
 
   BodyWriter(Writer& w_, int body_, bool solid_) : w(w_), body(body_), solid_body(solid_) {}
@@ -607,6 +647,48 @@ struct BodyWriter
       };
       return xs;
     }
+    if (spun(s))
+    {
+      // R(u, v) = Z(u) + (C(u) - Z(u)) cos v + A x (C(u) - Z(u)) sin v: OCCT's
+      // revolution with u and v swapped (same turning sense about A).
+      auto                          r = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+      const gp_Ax1                  a = r->Axis();
+      const occ::handle<Geom_Curve> c = basis_curve(r->BasisCurve());
+      const gp_XYZ                  A = a.Direction().XYZ(), O = a.Location().XYZ();
+      double                        u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const double cf = c->IsPeriodic() || Precision::IsInfinite(c->FirstParameter()) ? v0 : c->FirstParameter();
+      const double cl = c->IsPeriodic() || Precision::IsInfinite(c->LastParameter()) ? v1 : c->LastParameter();
+      bool         closed = false;
+      const int    prof   = curve_node(body, c, cf, cl, closed);
+      auto radial = [&](const gp_XYZ& q) { return q - O - A * (q - O).Dot(A); };
+      // Degeneracies where the profile meets the axis at an end.
+      const gp_XYZ pf = c->Value(cf).XYZ(), pl = c->Value(cl).XYZ();
+      const bool   df = radial(pf).Modulus() < kPrecision, dl = radial(pl).Modulus() < kPrecision;
+      // x_axis when the profile is planar in a plane through the axis.
+      gp_XYZ x;
+      for (int i = 0; i <= 8 && x.Modulus() < 1e-12; ++i)
+      {
+        const gp_XYZ rq = radial(c->Value(cf + (cl - cf) * (0.5 + i / 17.0)).XYZ());
+        if (rq.Modulus() > kPrecision)
+          x = rq.Normalized();
+      }
+      bool planar = x.Modulus() > 0.5;
+      for (int i = 0; i <= 32 && planar; ++i)
+        planar = std::abs((c->Value(cf + (cl - cf) * i / 32.0).XYZ() - O).Dot(A.Crossed(x))) < kPrecision;
+      Node& nd = head(68);
+      nd.fields.insert(nd.fields.end(), {fp(prof), fv(O), fv(A), df ? fv(pf) : fv_null(), dl ? fv(pl) : fv_null(), df ? ff(cf) : ff_null(),
+                                         dl ? ff(cl) : ff_null(), planar ? fv(x) : fv_null(), ff_null()});
+      depend(prof, idx);
+      xs.swap    = true;
+      xs.natural = [r](const gp_Pnt&, double u, double v) {
+        gp_Pnt q;
+        gp_Vec du, dv;
+        r->D1(u, v, q, du, dv);
+        return dv.Crossed(du);
+      };
+      return xs;
+    }
     // Anything else: a B-spline surface over the face's range (not closed:
     // closed faces were split beforehand).
     occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s);
@@ -659,6 +741,25 @@ struct BodyWriter
   }
 
   // ---- curves
+
+  // A vertex's point (moved onto refitted edge ends).
+  gp_Pnt vertex_pnt(int vi) const
+  {
+    auto it = vertex_fit.find(vi);
+    return it != vertex_fit.end() ? gp_Pnt(it->second) : BRep_Tool::Pnt(TopoDS::Vertex(vertices(vi + 1)));
+  }
+
+  // Edge i's curve: the refitted one, or the edge's own.
+  occ::handle<Geom_Curve> curve_of(const TopoDS_Edge& e, int i, double& f, double& l) const
+  {
+    if (!edge_fit[i].IsNull())
+    {
+      f = edge_fit[i]->FirstParameter();
+      l = edge_fit[i]->LastParameter();
+      return edge_fit[i];
+    }
+    return curve_of(e, f, l);
+  }
 
   // The edge's 3D curve (location applied, trims removed) and its range.
   static occ::handle<Geom_Curve> curve_of(const TopoDS_Edge& e, double& f, double& l)
@@ -771,7 +872,8 @@ struct BodyWriter
     {
       const gp_Pnt2d q  = b->Pole(i);
       const double   wt = rat ? b->Weight(i) : 1.0;
-      const double   u = xs.su * q.X() + xs.ou, v = xs.sv * q.Y();
+      const double   qu = xs.swap ? q.Y() : q.X(), qv = xs.swap ? q.X() : q.Y();
+      const double   u = xs.su * qu + xs.ou, v = xs.sv * qv;
       p.insert(p.end(), {u * wt, v * wt});
       if (rat)
         p.push_back(wt);
@@ -787,6 +889,106 @@ struct BodyWriter
     occ::handle<Geom_Surface> surf = BRep_Tool::Surface(F, loc);
     auto at = [&](double t) { return surf->Value(pc->Value(t).X(), pc->Value(t).Y()).Transformed(loc.Transformation()); };
     return trimmed(fin_node, sp, at(f), at(l), f, l);
+  }
+
+  // The point on both faces' surfaces in the plane through x0 normal to t
+  // (Newton from the pcurves' (u, v)).
+  static bool on_both(const BRepAdaptor_Surface& a1, const BRepAdaptor_Surface& a2, gp_Pnt2d& p1, gp_Pnt2d& p2, const gp_Pnt& x0,
+                      const gp_Vec& t, gp_Pnt& out)
+  {
+    double u1 = p1.X(), v1 = p1.Y(), u2 = p2.X(), v2 = p2.Y();
+    for (int it = 0; it < 40; ++it)
+    {
+      gp_Pnt q1, q2;
+      gp_Vec s1u, s1v, s2u, s2v;
+      a1.D1(u1, v1, q1, s1u, s1v);
+      a2.D1(u2, v2, q2, s2u, s2v);
+      const gp_Vec d(q2, q1);
+      const double g = t.Dot(gp_Vec(x0, q1));
+      math_Matrix  J(1, 4, 1, 4);
+      math_Vector  F(1, 4), X(1, 4);
+      for (int k = 1; k <= 3; ++k)
+      {
+        J(k, 1) = s1u.Coord(k);
+        J(k, 2) = s1v.Coord(k);
+        J(k, 3) = -s2u.Coord(k);
+        J(k, 4) = -s2v.Coord(k);
+        F(k)    = -d.Coord(k);
+      }
+      J(4, 1) = t.Dot(s1u);
+      J(4, 2) = t.Dot(s1v);
+      J(4, 3) = J(4, 4) = 0;
+      F(4)              = -g;
+      math_Gauss G(J);
+      if (!G.IsDone())
+        return false;
+      G.Solve(F, X);
+      u1 += X(1), v1 += X(2), u2 += X(3), v2 += X(4);
+      if (d.Magnitude() < 1e-14 && std::abs(g) < 1e-14 && X.Norm() < 1e-12)
+      {
+        out = a1.Value(u1, v1);
+        p1.SetCoord(u1, v1);
+        p2.SetCoord(u2, v2);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // An edge's curve through exact intersection points of its two faces (same
+  // parameter range; ends in the normal planes through its vertices), or null
+  // when that doesn't come within a tenth of Parasolid's precision.
+  static occ::handle<Geom_Curve> refit(const TopoDS_Edge& e, const TopoDS_Face& F1, const TopoDS_Face& F2)
+  {
+    double                    f, l, f1, l1, f2, l2;
+    occ::handle<Geom_Curve>   c  = BRep_Tool::Curve(e, f, l); // location applied
+    occ::handle<Geom2d_Curve> q1 = BRep_Tool::CurveOnSurface(e, F1, f1, l1), q2 = BRep_Tool::CurveOnSurface(e, F2, f2, l2);
+    if (c.IsNull() || q1.IsNull() || q2.IsNull() || F1.IsSame(F2) || std::abs(f1 - f) + std::abs(l1 - l) + std::abs(f2 - f) + std::abs(l2 - l) > 1e-9 * (1 + std::abs(l - f)))
+      return {};
+    const BRepAdaptor_Surface a1(F1, false), a2(F2, false);
+    const gp_Pnt              vf = BRep_Tool::Pnt(TopExp::FirstVertex(e)), vl = BRep_Tool::Pnt(TopExp::LastVertex(e));
+    // Exact point at t, from x0 (the curve's point, or a vertex at the ends).
+    auto exact = [&](double t, const gp_Pnt* x0, gp_Pnt& out) {
+      gp_Pnt p;
+      gp_Vec d;
+      c->D1(t, p, d);
+      if (d.Magnitude() < 1e-12)
+        return false;
+      gp_Pnt2d p1 = q1->Value(t), p2 = q2->Value(t);
+      return on_both(a1, a2, p1, p2, x0 ? *x0 : p, d.Normalized(), out);
+    };
+    for (int n = 64; n <= 1024; n *= 2)
+    {
+      occ::handle<NCollection_HArray1<gp_Pnt>> P = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+      occ::handle<NCollection_HArray1<double>> T = new NCollection_HArray1<double>(1, n + 1);
+      for (int j = 0; j <= n; ++j)
+      {
+        const double t = j == n ? l : f + (l - f) * j / n;
+        gp_Pnt       o;
+        if (!exact(t, j == 0 ? &vf : j == n ? &vl : nullptr, o))
+          return {};
+        P->SetValue(j + 1, o);
+        T->SetValue(j + 1, t);
+      }
+      GeomAPI_Interpolate in(P, T, false, 1e-12);
+      in.Perform();
+      if (!in.IsDone())
+        return {};
+      occ::handle<Geom_BSplineCurve> b = in.Curve();
+      double                         dev = 0;
+      for (int j = 0; j < 2 * n && dev <= kPrecision / 10; ++j)
+      {
+        const double t = f + (l - f) * (j + 0.5) / (2 * n);
+        gp_Pnt       o;
+        const gp_Pnt x0 = b->Value(t);
+        if (!exact(t, &x0, o))
+          return {};
+        dev = std::max(dev, o.Distance(x0));
+      }
+      if (dev <= kPrecision / 10)
+        return b;
+    }
+    return {};
   }
 
   // Largest distance between the edge's curve and its faces (same parameter).
@@ -939,6 +1141,7 @@ struct BodyWriter
     const int ne = edges.Extent();
     edge_idx.resize(ne);
     edge_tol.assign(ne, 0.0);
+    edge_fit.assign(ne, occ::handle<Geom_Curve>());
     for (int i = 0; i < ne; ++i)
     {
       edge_idx[i] = w.alloc();
@@ -953,7 +1156,19 @@ struct BodyWriter
       for (int k : edge_fins[i])
         fs.push_back(TopoDS::Face(faces(fins[k].face + 1)));
       const double dev = deviation(e, fs);
-      if (dev > kPrecision)
+      if (dev > kPrecision && fs.size() == 2 && !(edge_fit[i] = refit(e, fs[0], fs[1])).IsNull())
+        for (int end = 0; end < 2; ++end)
+        {
+          // The vertex moves onto the refitted end (exact points, closer than its tolerance).
+          const TopoDS_Vertex v   = end ? TopExp::LastVertex(e) : TopExp::FirstVertex(e);
+          const gp_Pnt        p   = edge_fit[i]->Value(end ? edge_fit[i]->LastParameter() : edge_fit[i]->FirstParameter());
+          const int           vi  = vertices.FindIndex(v) - 1;
+          if (p.Distance(BRep_Tool::Pnt(v)) > BRep_Tool::Tolerance(v))
+            edge_fit[i].Nullify();
+          else if (!vertex_fit.count(vi))
+            vertex_fit[vi] = p.XYZ();
+        }
+      if (dev > kPrecision && edge_fit[i].IsNull())
         edge_tol[i] = std::max(BRep_Tool::Tolerance(e), 2 * dev);
     }
     for (auto& [fi, v] : apexes)
@@ -982,12 +1197,12 @@ struct BodyWriter
     {
       const TopoDS_Edge& e = TopoDS::Edge(edges(i + 1));
       double             f, l;
-      occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+      occ::handle<Geom_Curve> c = curve_of(e, i, f, l);
       for (int end = 0; end < 2; ++end)
       {
         const TopoDS_Vertex v  = end ? TopExp::LastVertex(e) : TopExp::FirstVertex(e);
         const int           vi = vertices.FindIndex(v) - 1;
-        double              gap = c.IsNull() ? 1e9 : c->Value(end ? l : f).Distance(BRep_Tool::Pnt(v));
+        double              gap = c.IsNull() ? 1e9 : c->Value(end ? l : f).Distance(vertex_pnt(vi));
         if (edge_tol[i] > 0 || gap > kPrecision / 2) // accurate vertices: half the resolution
           vertex_tol[vi] = std::max({vertex_tol[vi], BRep_Tool::Tolerance(v), edge_tol[i], 2 * gap});
       }
@@ -1084,7 +1299,7 @@ struct BodyWriter
         continue;
       }
       double                  f, l;
-      occ::handle<Geom_Curve> c = curve_of(e, f, l);
+      occ::handle<Geom_Curve> c = curve_of(e, i, f, l);
       const int               vf = vertices.FindIndex(TopExp::FirstVertex(e)) - 1;
       const int               vl = vertices.FindIndex(TopExp::LastVertex(e)) - 1;
       const bool              trim_ends = vertex_tol[vf] > 0 || vertex_tol[vl] > 0;
@@ -1200,7 +1415,7 @@ struct BodyWriter
     {
       const int pt = w.alloc();
       Node&     p  = add(29, pt);
-      p.fields     = {fd(w.next_id++), fp(0), fp(vertex_idx[i]), fp(0), fp(0), fv(BRep_Tool::Pnt(TopoDS::Vertex(vertices(i + 1))).XYZ())};
+      p.fields     = {fd(w.next_id++), fp(0), fp(vertex_idx[i]), fp(0), fp(0), fv(vertex_pnt(i).XYZ())};
       chain_point.push_back(pt);
       Node& n  = add(18, vertex_idx[i]);
       n.fields = {fd(w.next_id++), fp(0), fp(vertex_fin[i]), fp(i ? vertex_idx[i - 1] : 0), fp(i + 1 < nv ? vertex_idx[i + 1] : 0), fp(pt), vertex_tol[i] > 0 ? ff(vertex_tol[i]) : ff_null(), fp(body)};
@@ -1226,12 +1441,19 @@ struct BodyWriter
 };
 
 // Prepare a shape for XT: elementary surfaces where swept/revolved ones are,
-// B-splines for the other swept, revolved and offset surfaces (same
-// parameterisation), and faces closed on a surface that isn't periodic-analytic split.
-TopoDS_Shape prepared(const TopoDS_Shape& s)
+// B-splines for the other swept and offset surfaces (same parameterisation),
+// revolved ones too unless `keep_spun` (and all of them when one has a profile
+// the writer can't keep), and faces closed on a surface that isn't periodic split.
+TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun)
 {
   TopoDS_Shape r = ShapeCustom::SweptToElementary(s);
-  r              = ShapeCustom::ConvertToBSpline(r, true, true, true, false);
+  for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && keep_spun; ef.Next())
+  {
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(TopoDS::Face(ef.Current()), loc));
+    keep_spun = occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull() || spun(fs);
+  }
+  r = ShapeCustom::ConvertToBSpline(r, true, !keep_spun, true, false);
   bool split     = false;
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && !split; ef.Next())
   {
@@ -1278,9 +1500,9 @@ TopoDS_Shape prepared(const TopoDS_Shape& s)
 
 // ---------------------------------------------------------------- shared with other B-rep writers
 
-TopoDS_Shape exchange_prepared(const TopoDS_Shape& s)
+TopoDS_Shape exchange_prepared(const TopoDS_Shape& s, bool keep_spun)
 {
-  return prepared(s);
+  return prepared(s, keep_spun);
 }
 
 bool exchange_periodic_analytic(const TopoDS_Face& f)
@@ -1361,7 +1583,7 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary)
   for (const auto& s : shapes.items)
   {
     require_non_null(s, "shape");
-    const TopoDS_Shape p = prepared(s);
+    const TopoDS_Shape p = prepared(s, true);
     bool               solid = false;
     for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
       solid = true;
@@ -1406,7 +1628,7 @@ const std::map<int, std::string>& schema()
     {16, "dpfppppppp"}, {17, "pppppppppc"}, {18, "dpppppfp"}, {19, "dpppppc"},
     {29, "dppppv"}, {30, "dpppppcvv"}, {31, "dpppppcvvvf"}, {32, "dpppppcvvvff"},
     {45, "F"}, {50, "dpppppcvvv"}, {51, "dpppppcvvfv"}, {52, "dpppppcvvfffv"},
-    {53, "dpppppcvfvv"}, {54, "dpppppcvvffv"}, {74, "dpP"}, {124, "dpppppcpp"},
+    {53, "dpppppcvfvv"}, {54, "dpppppcvvffv"}, {68, "dpppppcpvvvvffvf"}, {74, "dpP"}, {124, "dpppppcpp"},
     {126, "llnnddUUddlllunppppp"}, {127, "N"}, {128, "F"}, {133, "dpppppcpvvff"},
     {134, "dpppppcpp"}, {136, "ndndullluppp"}, {137, "dpppppcpppf"}, {141, "pppp"},
   };
@@ -1688,6 +1910,9 @@ struct Builder
       case 54:
         s = new Geom_ToroidalSurface(gp_Ax3(P(f[7]), D(f[8]), D(f[11])), f[9].x[0], f[10].x[0]);
         break;
+      case 68:
+        s = new Geom_SurfaceOfRevolution(curve((int)f[7].i), gp_Ax1(P(f[8]), D(f[9])));
+        break;
       case 124:
       {
         const PNode& ns = r.at_index(f[7].i);
@@ -1729,8 +1954,9 @@ struct Builder
     return surf[idx] = s;
   }
 
-  // XT natural normal agrees with OCCT's except for cones.
-  bool natural_flipped(int idx) { return r.at_index(idx).type == 52; }
+  // XT natural normal agrees with OCCT's except for cones and spun surfaces
+  // (u and v swapped).
+  bool natural_flipped(int idx) { return r.at_index(idx).type == 52 || r.at_index(idx).type == 68; }
 
   // B_CURVE (3D or 2D) as poles, weights, knots.
   void b_curve(int idx, int& degree, int& dim, bool& rat, std::vector<double>& p, std::vector<double>& knots, std::vector<int>& mults)
@@ -1796,12 +2022,15 @@ struct Builder
     NCollection_Array1<gp_Pnt2d> poles(1, np);
     NCollection_Array1<double>   w(1, np);
     const double                 cc = cone_cos.count(surface) ? cone_cos[surface] : 0;
+    const bool                   swap = r.at_index(surface).type == 68;
     for (int i = 0; i < np; ++i)
     {
       const double wt = rat ? p[(size_t)(i * dim + 2)] : 1.0;
       double       u = p[(size_t)(i * dim)] / wt, v = p[(size_t)(i * dim + 1)] / wt;
       if (cc)
         u = -u, v = v / cc;
+      if (swap)
+        std::swap(u, v);
       poles(i + 1) = gp_Pnt2d(u, v);
       w(i + 1)     = wt;
     }

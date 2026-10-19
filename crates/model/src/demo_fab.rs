@@ -119,3 +119,12 @@ mod clip_revolve {
         std::fs::write(std::env::temp_dir().join("noshape-revolve-clip.json"), v.to_string()).unwrap();
     }
 }
+
+/// A document whose Part Studio is [`fabrication_studio`] (`--demo-fab`).
+pub fn fabrication_document() -> crate::document::Document {
+    let mut doc = crate::document::Document::new();
+    if let Some(t) = doc.tabs.iter_mut().find(|t| matches!(t.content, crate::document::TabContent::PartStudio(_))) {
+        t.content = crate::document::TabContent::PartStudio(fabrication_studio());
+    }
+    doc
+}

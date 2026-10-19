@@ -143,6 +143,8 @@ pub enum Tool {
     Gdt,
     Datum { anchor: Option<[f64; 2]> },
     SurfaceFinish,
+    /// Weld symbol (drawing_weld.rs): click the joint, then the place.
+    Weld,
     /// Place a revision callout of `revision` (drawing_revision.rs).
     RevisionCallout { revision: String },
     /// Broken-out section: profile points in the view (view coordinates),
@@ -194,6 +196,7 @@ impl Tool {
             Tool::Gdt => "Geometric tolerance",
             Tool::Datum { .. } => "Datum",
             Tool::SurfaceFinish => "Surface finish",
+            Tool::Weld => "Weld symbol",
             Tool::RevisionCallout { .. } => "Revision callout",
             Tool::BrokenOut { .. } => "Broken-out section",
             Tool::CropPoly { spline: false, .. } => "Crop view (polygon)",
@@ -226,6 +229,8 @@ pub enum Drag {
     None,
     Pending { button: MouseButton, start: [f64; 2], start_px: [f64; 2], pick: Option<u32> },
     Pan { last_px: [f64; 2] },
+    /// Drag zoom about `anchor` (mouse-control presets with a zoom drag).
+    Zoom { anchor: [f64; 2], last_px: [f64; 2] },
     MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])> },
     MoveAnnotation { start: [f64; 2], orig: Annotation },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
@@ -244,6 +249,9 @@ pub enum Drag {
     MoveInspection(u64),
     /// Move an inserted image.
     MoveImage { id: u64, start: [f64; 2], orig: [f64; 2] },
+    /// A selected note's grip: 0 / 1 the left / right side (bounding box
+    /// width), 2 the middle (rotate; notes without leaders).
+    NoteGrip { id: u64, grip: u8, start: [f64; 2], orig: Annotation },
     /// Drag a drawing sketch entity (from `orig`).
     MoveSketch { id: u32, start: [f64; 2], orig: noshape_model::drawing::sheet_sketch::SheetSketch },
 }
@@ -428,6 +436,8 @@ pub struct DrawingEditor {
     /// Note editor › Insert property: the text format and date time format
     /// (indices into `format::TEXT_FORMATS` / `DATE_FORMATS`).
     pub note_field_fmt: (usize, usize),
+    /// Documents at versions, for pinned view references.
+    pub version_docs: HashMap<String, noshape_model::Document>,
     /// Color dialog (drawing_color.rs).
     pub color_dlg: Option<crate::drawing_color::ColorDlg>,
     /// Reference manager (drawing_refs.rs).
@@ -438,6 +448,15 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// Weld symbol dialog (drawing_weld.rs).
+    pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
+    /// The note editor's formatting ruler (drawing_ruler.rs).
+    pub ruler: crate::drawing_ruler::RulerState,
+    /// Callout dialog and Add stacked callouts panel (drawing_callout.rs).
+    pub callout_dlg: Option<crate::drawing_callout::CalloutDlg>,
+    pub stack_dlg: Option<crate::drawing_callout::StackDlg>,
+    /// BOM / cut list table dialog (drawing_table_dlg.rs).
+    pub table_dlg: Option<crate::drawing_table_dlg::TableDlg>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
     pub detail_label: String,
@@ -569,10 +588,16 @@ impl DrawingEditor {
             revision_dlg: None,
             view_sketches: None,
             hide_parts: None,
+            weld_dlg: None,
+            ruler: Default::default(),
+            callout_dlg: None,
+            stack_dlg: None,
+            table_dlg: None,
             note_leader: None,
             cell_sel: None,
             ref_manager: None,
             color_dlg: None,
+            version_docs: HashMap::new(),
             paste_table: None,
             note_field_fmt: (4, 0),
             detail_label: String::new(),
@@ -684,13 +709,24 @@ impl DrawingEditor {
     fn studio_changed(&mut self, tab: TabId, cx: &mut Context<Self>) {
         let doc = self.doc.read(cx);
         let stale = self.sources.iter().any(|(k, src)| {
-            let depends = k.tab == tab || src.assembly;
+            // Pinned references never go out of date.
+            let depends = k.version.is_none() && (k.tab == tab || src.assembly);
             depends && views::source_hash(&doc.session.doc, k) != Some(src.hash)
         });
         if stale && !self.out_of_date {
             self.out_of_date = true;
             cx.notify();
         }
+    }
+
+    /// The document at a version (cached; versions don't change).
+    pub fn version_doc(&mut self, id: &str, cx: &App) -> Option<noshape_model::Document> {
+        if let Some(d) = self.version_docs.get(id) {
+            return Some(d.clone());
+        }
+        let d = self.doc.read(cx).session.document_at_version(id).ok().flatten()?;
+        self.version_docs.insert(id.to_string(), d.clone());
+        Some(d)
     }
 
     /// Regenerate referenced sources that are missing (or all, for Update).
@@ -712,7 +748,14 @@ impl DrawingEditor {
             if self.regenerating.contains(&key) || (!all && self.sources.contains_key(&key)) {
                 continue;
             }
-            let doc = self.doc.read(cx).session.doc.clone();
+            // Pinned sources come from the document at their version.
+            let doc = match &key.version {
+                Some(v) => match self.version_doc(v, cx) {
+                    Some(d) => d,
+                    None => continue,
+                },
+                None => self.doc.read(cx).session.doc.clone(),
+            };
             if doc.tab(key.tab).is_none() {
                 continue;
             }
@@ -846,6 +889,16 @@ impl DrawingEditor {
         self.zoom = ((s[0] - 40.0) / w).min((s[1] - 40.0) / h).max(0.05);
         self.center = [w / 2.0, h / 2.0];
         self.fitted = true;
+        self.frame_dirty = true;
+        cx.notify();
+    }
+
+    /// Ctrl+Shift+arrow: move the sheet a tenth of the canvas width toward
+    /// the arrow (`dx`, `dy` = ±1).
+    pub fn pan_step(&mut self, dx: f64, dy: f64, cx: &mut Context<Self>) {
+        let step = self.size_px()[0] * 0.1 / self.zoom;
+        self.center[0] -= dx * step;
+        self.center[1] += dy * step;
         self.frame_dirty = true;
         cx.notify();
     }
@@ -1243,6 +1296,9 @@ impl Render for DrawingEditor {
         self.sync_aux_dlg(window, cx);
         self.sync_detail_dlg(window, cx);
         self.sync_revision_dlg(window, cx);
+        self.sync_weld_dlg(window, cx);
+        self.sync_callout_dlg(window, cx);
+        self.sync_table_dlg();
         // The label typed in the Auxiliary view dialog (pending_view has no cx).
         if let Some(d) = &self.aux_dlg {
             self.aux_letter = d.label.read(cx).value().trim().to_string();
@@ -1305,6 +1361,11 @@ impl Render for DrawingEditor {
             .children(self.render_aux_edit(cx))
             .children(self.render_detail_dlg(cx))
             .children(self.render_revision_dlg(cx))
+            .children(self.render_weld_dlg(cx))
+            .children(self.render_callout_dlg(cx))
+            .children(self.render_stack_dlg(cx))
+            .children(self.render_table_dlg(cx))
+            .children(self.render_stack_banner(cx))
             .children(self.render_view_sketches(cx))
             .children(self.render_hide_parts(cx))
             .children(self.render_centermark_dlg(cx))
@@ -1325,7 +1386,8 @@ impl Render for DrawingEditor {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))
-            .on_scroll_wheel(cx.listener(Self::on_scroll));
+            .on_scroll_wheel(cx.listener(Self::on_scroll))
+            .on_pinch(cx.listener(Self::on_pinch));
         v_flex()
             .size_full()
             .bg(pal.app_bg)
@@ -1349,14 +1411,21 @@ impl Render for DrawingEditor {
                 }
             }))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))
+            // Live (navigation/50-55): Shift+Z / Z zoom ×2 / ×½ about the view
+            // centre; Ctrl+Shift+arrows move the sheet 10 % of the canvas
+            // width toward the arrow; plain arrows do nothing in drawings.
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {
                 let s = this.size_px();
-                this.zoom_by(1.25, [s[0] / 2.0, s[1] / 2.0], cx)
+                this.zoom_by(2.0, [s[0] / 2.0, s[1] / 2.0], cx)
             }))
             .on_action(cx.listener(|this, _: &ZoomOut, _, cx| {
                 let s = this.size_px();
-                this.zoom_by(0.8, [s[0] / 2.0, s[1] / 2.0], cx)
+                this.zoom_by(0.5, [s[0] / 2.0, s[1] / 2.0], cx)
             }))
+            .on_action(cx.listener(|this, _: &PanLeft, _, cx| this.pan_step(-1.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &PanRight, _, cx| this.pan_step(1.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &PanUp, _, cx| this.pan_step(0.0, -1.0, cx)))
+            .on_action(cx.listener(|this, _: &PanDown, _, cx| this.pan_step(0.0, 1.0, cx)))
             .on_action(cx.listener(|this, _: &DrawingUpdate, _, cx| this.update_drawing(cx)))
             // Onshape drawing letters that collide with Part Studio bindings.
             .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.set_tool(Tool::Note, cx)))

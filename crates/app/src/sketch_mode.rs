@@ -442,10 +442,12 @@ pub struct SketchEditor {
     pub construction: bool,
     /// Show every constraint glyph (toolbar toggle).
     pub show_constraints: bool,
-    /// Show dimension expressions (not remembered between sessions).
+    /// Show dimension expressions.
     pub show_expressions: bool,
     /// Show errors (over-defined constraints in red; on by default).
     pub show_errors: bool,
+    /// The saved options this sketch opened with (see [`SketchOptions`]).
+    opened_options: SketchOptions,
     /// Shift held while moving: show all glyphs temporarily (Onshape).
     pub shift_held: bool,
     pub polygon_sides: usize,
@@ -535,6 +537,9 @@ pub struct SketchEditor {
     pub conflicting: Vec<ConstraintId>,
     /// World units per pixel at the sketch (for snap radii).
     pub world_per_px: f64,
+    /// The sketch frame (lower-left, upper-right in sketch coordinates),
+    /// fixed in the plane once first drawn (see [`Self::place_frame`]).
+    pub frame_bounds: Option<(DVec2, DVec2)>,
     pub message: Option<String>,
     /// Profile inspector: the focused issue (position and curves), drawn red.
     pub issue_highlight: Option<(DVec2, Vec<EntityId>)>,
@@ -571,10 +576,44 @@ fn is_angle_kind(k: &ConstraintKind) -> bool {
     matches!(k, ConstraintKind::Angle { .. } | ConstraintKind::ArcAngle { .. })
 }
 
-/// Last Show constraints setting (the Sketch dialog remembers its options).
-/// Live Onshape starts with it off and then shows no constraint glyphs
-/// (sketch/00, 01, 10).
-static SHOW_CONSTRAINTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// The Sketch dialog's options, kept as user settings (Onshape
+/// `UserSettingsService`: `sketchShowConstraints || false`,
+/// `sketchShowExpressions || false`, `sketchShowErrors !== false`; saved when
+/// a sketch is accepted with options that differ from those it opened with).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct SketchOptions {
+    pub show_constraints: bool,
+    pub show_expressions: bool,
+    pub show_errors: bool,
+}
+
+impl Default for SketchOptions {
+    fn default() -> Self {
+        Self { show_constraints: false, show_expressions: false, show_errors: true }
+    }
+}
+
+static SKETCH_OPTIONS: std::sync::Mutex<Option<SketchOptions>> = std::sync::Mutex::new(None);
+
+fn sketch_options_path() -> std::path::PathBuf {
+    crate::files::config_dir().join("sketch-options.json")
+}
+
+/// The saved sketch options (read once).
+pub fn sketch_options() -> SketchOptions {
+    let mut saved = SKETCH_OPTIONS.lock().unwrap_or_else(|e| e.into_inner());
+    *saved.get_or_insert_with(|| if cfg!(test) { SketchOptions::default() } else { std::fs::read(sketch_options_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default() })
+}
+
+fn save_sketch_options(o: SketchOptions) {
+    *SKETCH_OPTIONS.lock().unwrap_or_else(|e| e.into_inner()) = Some(o);
+    if !cfg!(test)
+        && let Ok(b) = serde_json::to_vec_pretty(&o)
+    {
+        let _ = std::fs::write(sketch_options_path(), b);
+    }
+}
 
 /// Inference guide lines and snap markers (`INFERENCE_SNAP_LINE_COLOR`).
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
@@ -726,6 +765,7 @@ pub fn inference_icon(k: InferenceKind) -> &'static str {
 
 impl SketchEditor {
     pub fn new(feature: FeatureId, frame: PlaneFrame) -> Self {
+        let opened_options = sketch_options();
         Self {
             feature,
             frame,
@@ -750,9 +790,10 @@ impl SketchEditor {
             picks_placed: Vec::new(),
             dim_edit: None,
             construction: false,
-            show_constraints: SHOW_CONSTRAINTS.load(std::sync::atomic::Ordering::Relaxed),
-            show_expressions: false,
-            show_errors: true,
+            show_constraints: opened_options.show_constraints,
+            show_expressions: opened_options.show_expressions,
+            show_errors: opened_options.show_errors,
+            opened_options,
             shift_held: false,
             polygon_sides: 6,
             fillet_radius: 0.005,
@@ -809,6 +850,7 @@ impl SketchEditor {
             pressed_glyph: None,
             conflicting: Vec::new(),
             world_per_px: 1e-4,
+            frame_bounds: None,
             message: None,
             issue_highlight: None,
             issue_markers: Vec::new(),
@@ -1072,10 +1114,18 @@ impl SketchEditor {
         }
     }
 
-    /// Show constraints toggle (remembered for the next sketch, Onshape).
+    /// Show constraints toggle.
     pub fn set_show_constraints(&mut self, on: bool) {
         self.show_constraints = on;
-        SHOW_CONSTRAINTS.store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Accepting the sketch saves its dialog options when they changed
+    /// (Onshape `commitFeature`: `sketchOptionsWereChanged` → `saveSketchOptions`).
+    pub fn save_options_if_changed(&self) {
+        let now = SketchOptions { show_constraints: self.show_constraints, show_expressions: self.show_expressions, show_errors: self.show_errors };
+        if now != self.opened_options {
+            save_sketch_options(now);
+        }
     }
 
     /// Polygon waiting for its side count (circumference locked).
@@ -1929,9 +1979,20 @@ impl SketchEditor {
                 }
                 self.finish_create(data, &ids.curves);
                 let w = self.world_per_px;
-                let mut fields = vec![length_field(&data.sketch, ids.curves[0], w)];
+                // Live (sketch/05-06): the width and height boxes sit on the
+                // two edges through the first corner (edges run bottom,
+                // right, top, left).
+                let (horizontal, vertical) = if self.tool == Tool::CornerRect {
+                    let (lo, hi) = (first.pos.min(click.pos), first.pos.max(click.pos));
+                    let top = (first.pos.y - hi.y).abs() < (first.pos.y - lo.y).abs();
+                    let left = (first.pos.x - lo.x).abs() < (first.pos.x - hi.x).abs();
+                    (ids.curves[if top { 2 } else { 0 }], ids.curves[if left { 3 } else { 1 }])
+                } else {
+                    (ids.curves[0], ids.curves[1])
+                };
+                let mut fields = vec![length_field(&data.sketch, horizontal, w)];
                 if !self.alt_held {
-                    fields.push(length_field(&data.sketch, ids.curves[1], w));
+                    fields.push(length_field(&data.sketch, vertical, w));
                 }
                 self.set_otf(data, fields);
                 EditOutcome::changed()
@@ -3688,11 +3749,14 @@ impl SketchEditor {
                     let (lo, hi) = if self.tool == Tool::CornerRect { (a.min(c), a.max(c)) } else { let d = (c - *a).abs(); (*a - d, *a + d) };
                     let mid = (lo + hi) * 0.5;
                     let (w, h) = (hi.x - lo.x, hi.y - lo.y);
+                    // Corner rectangle (live sketch/05): the values sit on the
+                    // two edges through the first corner.
+                    let (ey, ex) = if self.tool == Tool::CornerRect { (a.y, a.x) } else { (hi.y, hi.x) };
                     if valid(w) {
-                        out.push((beside(DVec2::new(lo.x, hi.y), DVec2::new(hi.x, hi.y), Some(mid)), len(w)));
+                        out.push((beside(DVec2::new(lo.x, ey), DVec2::new(hi.x, ey), Some(mid)), len(w)));
                     }
                     if valid(h) {
-                        out.push((beside(DVec2::new(hi.x, lo.y), DVec2::new(hi.x, hi.y), Some(mid)), len(h)));
+                        out.push((beside(DVec2::new(ex, lo.y), DVec2::new(ex, hi.y), Some(mid)), len(h)));
                     }
                 }
             }
@@ -3773,7 +3837,7 @@ impl SketchEditor {
         let on_top = LineSegment::ON_TOP;
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
-            lines.push_polyline(&pts3, color, 0, 1.5, on_top | if dashed { LineSegment::DASHED } else { 0 });
+            lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
         };
         let circle_pts = |c: DVec2, r: f64, n: usize| -> Vec<DVec2> { (0..=n).map(|i| c + DVec2::from_angle(i as f64 / n as f64 * TAU) * r).collect() };
         let cursor = self.snapped().map(|s| s.0);
@@ -3832,6 +3896,10 @@ impl SketchEditor {
                 Tool::CornerRect => {
                     if let Some(a) = anchors.first() {
                         poly(&[*a, DVec2::new(c.x, a.y), c, DVec2::new(a.x, c.y), *a], preview_color, false);
+                        // Live (sketch/05): every corner shows its point.
+                        for q in [*a, DVec2::new(c.x, a.y), DVec2::new(a.x, c.y)] {
+                            points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                        }
                     }
                 }
                 Tool::CenterRect => {
@@ -3854,9 +3922,11 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Circle => {
+                    // Live (sketch/09): the circle and its center point; no
+                    // radius line and no point at the cursor.
                     if let Some(a) = anchors.first() {
                         poly(&circle_pts(*a, (c - *a).length(), 72), preview_color, false);
-                        poly(&[*a, c], preview_color, true);
+                        points.points.push(PointSprite { position: w(*a), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
                     }
                 }
                 Tool::Polygon | Tool::CircumPolygon => {
@@ -4008,7 +4078,7 @@ impl SketchEditor {
                 }
                 _ => {}
             }
-            if self.tool.draws() {
+            if self.tool.draws() && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
         }
@@ -4057,13 +4127,15 @@ impl SketchEditor {
         {
             poly(path, crate::theme::rgb8(0x555555), false);
         }
-        // Dimension being placed.
-        if let Some((kind, pos, _)) = self.dimension_preview(data) {
+        let mut dim_preview: Vec<[DVec2; 2]> = Vec::new();
+        // Dimension being placed: drawn like a placed one (live sketch/12:
+        // black, the line broken around the 16 px value at the cursor).
+        if let Some((kind, pos, v)) = self.dimension_preview(data) {
             let mut segs = Vec::new();
             dim_segments(&data.sketch, &kind, pos, self.world_per_px, &mut segs);
-            for sg in segs {
-                poly(&sg, preview_color, false);
-            }
+            let text = dim_value_text(&kind, v / dim_display_scale(&kind), units);
+            let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
+            dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, pos, half)));
         }
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
@@ -4221,9 +4293,12 @@ impl SketchEditor {
         }
         // The sketch frame.
         {
-            let (lo, hi) = self.sketch_box(data);
+            let (lo, hi) = self.sketch_box();
             let pts3: Vec<[f32; 3]> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y), lo].iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, crate::theme::rgb8(SKETCH_BOX_COLOR), 0, 1.0, 0);
+        }
+        for sg in &dim_preview {
+            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::theme::rgb8(crate::theme::viewport::SKETCH_FULL), pick_id: 0, width: 1.0, style: on_top });
         }
         // Dimension graphics. The dimension line is broken around its value
         // (Onshape draws no box behind the text).
@@ -4722,13 +4797,13 @@ fn default_label_pos(sk: &Sketch, k: &ConstraintKind, wpp: f64) -> Option<DVec2>
 
 fn arrow(out: &mut Vec<[DVec2; 2]>, tip: DVec2, dir: DVec2, s: f64) {
     // `dir` is the direction the arrow travels (pointing at `tip`). Onshape's
-    // arrowheads are filled, narrow triangles (about 10 x 4 px): hatched with
-    // 1 px lines from the tip to the base so they read as solid.
+    // arrowheads are filled, narrow triangles (live sketch/12: 16 x 7 px):
+    // hatched with 1 px lines from the tip to the base so they read as solid.
     let d = dir.try_normalize().unwrap_or(DVec2::X);
     let n = d.perp();
-    let (len, half) = (s * 10.0, s * 2.2);
+    let (len, half) = (s * 16.0, s * 3.5);
     let base = tip - d * len;
-    let steps = 6;
+    let steps = 12;
     for i in 0..=steps {
         let t = i as f64 / steps as f64 * 2.0 - 1.0;
         out.push([tip, base + n * half * t]);
@@ -5319,32 +5394,40 @@ impl SketchEditor {
     }
 }
 
-/// Onshape's frame around the sketch being edited.
-pub const SKETCH_BOX_COLOR: u32 = 0xb2ddf6;
-/// Half height of an empty sketch's frame (metres).
-const EMPTY_SKETCH_BOX_HALF_HEIGHT: f64 = 0.05625;
+/// Onshape's frame around the sketch being edited (`SKETCH_PLANE_LINE_COLOR`
+/// = `--os-color-seaport-500`; the name uses the same colour).
+pub const SKETCH_BOX_COLOR: u32 = 0x90cef1;
+/// Onshape `VIEWPORT_HEIGHT_TO_PLANE_HEIGHT_RATIO`: the frame's height as a
+/// fraction of the graphics area's height when it is first drawn.
+const SKETCH_FRAME_VIEWPORT_RATIO: f64 = 0.7;
+/// Onshape `PLANE_DEFAULT_WIDTH_HEIGHT_RATIO`.
+const SKETCH_FRAME_ASPECT: f64 = 1.77777;
 
 impl SketchEditor {
-    /// The light-blue frame Onshape draws around the sketch being edited
-    /// (with the sketch's name at its top-left): 16:9, centered on the
-    /// sketch origin, enclosing the geometry with a margin. Returns the
-    /// lower-left and upper-right corners in sketch coordinates.
-    pub fn sketch_box(&self, data: &SketchData) -> (DVec2, DVec2) {
-        let mut half = DVec2::ZERO;
-        for e in data.sketch.entities() {
-            for p in data.sketch.tessellate(e.id, self.world_per_px * 4.0) {
-                half = half.max(p.abs());
-            }
-            if let Some(p) = data.sketch.point(e.id) {
-                half = half.max(p.abs());
-            }
+    /// Fixes the sketch frame in the plane the way Onshape's sketch plane
+    /// display does on its first draw: centred on `center` (the sketch
+    /// plane entity's bounds centre, in sketch coordinates), 0.7 of the
+    /// graphics area's height tall at the current zoom, 16:9. It then stays
+    /// put while zooming or drawing; a new sketch plane places it again.
+    pub fn place_frame(&mut self, center: DVec2, viewport_height_px: f64) {
+        if self.frame_bounds.is_some() {
+            return;
         }
-        // An empty (or small) sketch's frame is 200 x 112.5 mm, twice the
-        // width of the default planes (live sketch/00, 44 and ui's pixel
-        // comparison: 2.0x the Top plane across, 1.15x along).
-        let h = (half.y.max(half.x * 9.0 / 16.0) * 1.55).max(EMPTY_SKETCH_BOX_HALF_HEIGHT).max(self.world_per_px * 150.0);
-        let half = DVec2::new(h * 16.0 / 9.0, h);
-        (-half, half)
+        let h = SKETCH_FRAME_VIEWPORT_RATIO * viewport_height_px * self.world_per_px;
+        let half = DVec2::new(h * SKETCH_FRAME_ASPECT, h) * 0.5;
+        self.frame_bounds = Some((center - half, center + half));
+    }
+
+    /// The light-blue frame Onshape draws around the sketch being edited
+    /// (with the sketch's name at its top-left). Returns the lower-left and
+    /// upper-right corners in sketch coordinates; before the view placed it,
+    /// a frame of 0.7 x 1000 px at the current zoom around the origin.
+    pub fn sketch_box(&self) -> (DVec2, DVec2) {
+        self.frame_bounds.unwrap_or_else(|| {
+            let h = SKETCH_FRAME_VIEWPORT_RATIO * 1000.0 * self.world_per_px;
+            let half = DVec2::new(h * SKETCH_FRAME_ASPECT, h) * 0.5;
+            (-half, half)
+        })
     }
 }
 

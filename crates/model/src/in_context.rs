@@ -278,6 +278,7 @@ pub fn display_bodies(c: &AssemblyContext, bodies: &[Arc<Body>]) -> Vec<crate::d
             edge_refs: b.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
             vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
             bounds,
+            composite: None,
         });
     }
     out

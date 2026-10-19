@@ -556,6 +556,7 @@ impl PartStudioView {
         }
         if kind == ToolKind::Interference {
             self.ui.interference_hover = None;
+            self.ui.interference_picked = None;
             self.rebuild_scene(cx);
         }
         self.refresh_scene(false, cx);
@@ -625,14 +626,17 @@ impl PartStudioView {
             let (lo, hi) = i.bounds;
             let c = |k: usize| DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z });
             for (a, b) in [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)] {
-                lines.push_polyline(&[f(c(a)), f(c(b))], [200, 30, 30, 255], 0, 1.5, LineSegment::ON_TOP);
+                // Live analysis/83: the query-hover yellow #f2ff80, ~6 px.
+                lines.push_polyline(&[f(c(a)), f(c(b))], [242, 255, 128, 255], 0, 6.0, LineSegment::ON_TOP);
             }
         }
         let up = self.gpu.uploader();
         let mut out = vec![Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(35)];
         // The interfering material, red (seen through the translucent parts).
+        // Live analysis/82–83 shows it vivid: drawn after the see-through
+        // parts (its faces are coplanar with theirs).
         for m in &res.interference_meshes {
-            out.push(Instance::new(Drawable::Mesh(m.clone())).with_color([0.8, 0.02, 0.02, 1.0]).unpickable().layer(34));
+            out.push(Instance::new(Drawable::Mesh(m.clone())).with_color(crate::theme::lin(0xc71010)).over_transparent().unpickable().layer(34));
         }
         // Curve joints: a dark ring around a light center; free ends a small red dot.
         let (mut rings, mut centers) = (PointData::default(), PointData::default());
@@ -710,21 +714,25 @@ impl PartStudioView {
                 .enumerate()
                 .map(|(i, r)| {
                     let r2 = r.clone();
+                    // Live (dom/dialog-interference-results.txt): 24 px rows,
+                    // 13.33 px #555, 6 px in, "×" 16.67 px #666 always shown.
                     h_flex()
                         .id(SharedString::from(format!("{id}-{i}")))
-                        .group("atrow")
-                        .h(px(23.))
-                        .px(px(6.))
-                        .text_size(px(12.))
-                        .text_color(pal.text)
+                        .h(px(24.))
+                        .pl(px(6.))
+                        .text_size(px(13.33))
+                        .text_color(gpui_kit::rgb(0x555555))
                         .child(div().flex_1().truncate().child(labeler(r)))
                         .child(
                             div()
                                 .id(SharedString::from(format!("{id}-x-{i}")))
-                                .invisible()
-                                .group_hover("atrow", |d| d.visible())
+                                .w(px(20.))
+                                .flex()
+                                .justify_center()
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
+                                .text_size(px(16.67))
+                                .text_color(gpui_kit::rgb(0x666666))
+                                .child("×")
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     if let Some(t) = &mut this.ui.analysis_tool {
@@ -737,6 +745,8 @@ impl PartStudioView {
                         .into_any_element()
                 })
                 .collect();
+            // An Onshape query list: 1 px #1651b0 on #def1fb while active
+            // (#d7d7d7 otherwise), radius 2; the label 12 px, 6/6/2 px padding.
             let empty = rows.is_empty();
             v_flex()
                 .id(id)
@@ -744,9 +754,9 @@ impl PartStudioView {
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if active { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
-                .bg(if active { gpui_kit::rgb(0xdef1fb) } else { gpui_kit::rgb(0xffffff) })
+                .when(active, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
                 .cursor_pointer()
-                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
+                .child(div().pt(px(6.)).px(px(6.)).pb(px(if empty { 5. } else { 2. })).text_size(px(12.)).line_height(px(13.33)).text_color(gpui_kit::rgb(if active { 0x555555 } else { 0x666666 })).child(caption))
                 .children(rows)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(t) = &mut this.ui.analysis_tool {
@@ -806,7 +816,7 @@ impl PartStudioView {
                 ToolKind::Dihedral => "Edges to analyze",
                 ToolKind::Connection => "Entities",
                 ToolKind::Thickness => "Parts to analyze",
-                ToolKind::Interference => "Parts or bodies",
+                ToolKind::Interference => "Parts to analyze",
                 _ => "Entities to analyze",
             };
             body = body.child(field("at-sel", caption, &t.selection, false, true, cx));
@@ -833,28 +843,31 @@ impl PartStudioView {
             ToolKind::Interference => {
                 // Interferences: one row per overlapping pair; hovering a row
                 // shows its bounding box and size.
+                // Live (analysis/81–84, dom/dialog-interference-results.txt): a
+                // read-only query list "Interferences" (#d7d7d7, #666), one
+                // 24 px row "Part 1 and Part 2" per pair with the overlap's
+                // "L x W x H" as tooltip; hover outlines it, a click makes the
+                // row bold and zooms to it; "No interferences" otherwise.
                 let rows = t.result.as_ref().map(|r| r.interferences.clone()).unwrap_or_default();
-                let hovered = self.ui.interference_hover;
-                let mut list = v_flex().gap(px(2.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Interferences"));
-                if rows.is_empty() && t.selection.len() >= 2 {
-                    list = list.child(div().text_size(px(12.)).text_color(pal.text).child("No interferences"));
+                let picked = self.ui.interference_picked;
+                let row = |id: SharedString, text: String| h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(20.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(div().flex_1().truncate().child(text));
+                let mut list = v_flex()
+                    .rounded(px(2.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xd7d7d7))
+                    .child(div().pt(px(6.)).px(px(6.)).pb(px(2.)).text_size(px(12.)).line_height(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Interferences"));
+                if rows.is_empty() && !t.selection.is_empty() && t.result.is_some() {
+                    list = list.child(row("at-intf-none".into(), "No interferences".into()));
                 }
                 for (k, (i, a, b)) in rows.iter().enumerate() {
                     let size = i.bounds.1 - i.bounds.0;
-                    let dims = format!("{} × {} × {}", fmt_len(size.x), fmt_len(size.y), fmt_len(size.z));
+                    let dims = format!("{} x {} x {}", fmt_len(size.x), fmt_len(size.y), fmt_len(size.z));
+                    let bounds = i.bounds;
                     list = list.child(
-                        v_flex()
-                            .id(SharedString::from(format!("at-intf-{k}")))
-                            .px(px(6.))
-                            .py(px(3.))
-                            .text_size(px(12.))
-                            .text_color(pal.text)
-                            .bg(gpui_kit::rgb(0xffffff))
-                            .border_1()
-                            .border_color(gpui_kit::rgb(0xd7d7d7))
-                            .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                            .child(format!("{a}, {b}"))
-                            .when(hovered == Some(k), |d| d.child(div().text_color(pal.text_muted).child(dims)))
+                        row(SharedString::from(format!("at-intf-{k}")), format!("{a} and {b}"))
+                            .cursor_pointer()
+                            .when(picked == Some(k), |d| d.font_weight(FontWeight::BOLD))
+                            .tooltip(crate::ui::tooltip(dims))
                             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                                 let new = if *h { Some(k) } else { None };
                                 if this.ui.interference_hover != new {
@@ -862,6 +875,17 @@ impl PartStudioView {
                                     this.refresh_scene(false, cx);
                                     cx.notify();
                                 }
+                            }))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.ui.interference_picked = Some(k);
+                                this.push_camera_history(cx);
+                                let inset = this.fit_inset_left();
+                                this.viewport.update(cx, |vp, cx| {
+                                    let mut to = vp.camera;
+                                    crate::viewport::fit_camera_to_box(&mut to, bounds.0, bounds.1, vp.size(), inset);
+                                    vp.animate_to(to, cx);
+                                });
+                                cx.notify();
                             })),
                     );
                 }
@@ -989,15 +1013,25 @@ impl PartStudioView {
                 }
             }
         }
-        if !matches!(kind, ToolKind::Connection | ToolKind::Flatten) && !kind.is_view_mode() {
+        // Live: Interference detection has no Scale slider (dom/dialog-interference-*.txt).
+        if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
             body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
         }
+        // Live analysis/80–84: Interference detection opens at the lower right
+        // (x 1073, y 571 in the 1640 × 973 viewport: 347 px in from its right),
+        // the other analysis dialogs at the top left like feature dialogs.
+        let (left, top) = if kind == ToolKind::Interference {
+            let size = self.viewport.read(cx).size();
+            (((size.x as f32) - 347. - 220.).max(0.), 571f32.min((size.y as f32) - 180.).max(0.))
+        } else {
+            (0., 0.)
+        };
         let dialog = v_flex()
             .id("analysis-tool")
             .occlude()
             .absolute()
-            .top(px(0.))
-            .left(px(0.))
+            .top(px(top))
+            .left(px(left))
             .w(px(220.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -1042,6 +1076,9 @@ impl PartStudioView {
                     ),
             )
             .child(body)
+            // The help row every analysis dialog ends with: 22 px, a 14 px
+            // `?` 4 px in from the right (dialog-help-container).
+            .child(h_flex().h(px(22.)).pr(px(4.)).justify_end().child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xa0a0a0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
             .into_any_element();
         let mut out = vec![dialog];
         // "Min: …" / "Max: …" beside the deviation lines; the scale slider

@@ -39,6 +39,8 @@ pub enum DialogEvent {
     ConfigureParam(String),
     /// The field's "Create selection" side button was clicked.
     CreateSelection(String),
+    /// A reference parameter's "Import…": add the file as a tab and pick it.
+    ImportReference { param: String, file: std::path::PathBuf },
 }
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
@@ -68,6 +70,9 @@ pub struct FeatureDialog {
     pub faulty: Vec<String>,
     labeler: RefLabeler,
     collapsed_groups: std::collections::HashSet<String>,
+    /// Focus handles of the controls Tab reaches besides the text fields
+    /// (checkboxes, tolerance buttons, help), by control key.
+    tab_stops: HashMap<String, FocusHandle>,
     /// Tolerance options shown (`<param>__tolerance` keys); Onshape
     /// collapses them until the row's chevron is clicked.
     tol_open: std::collections::HashSet<String>,
@@ -75,6 +80,12 @@ pub struct FeatureDialog {
     renaming: Option<Entity<InputState>>,
     /// Sources offered by the Derived feature's Part Studio picker.
     pub derived_sources: Vec<DerivedSource>,
+    /// Tabs reference parameters can pick (file tabs, Part Studios).
+    pub ref_sources: Vec<crate::fs_reference::RefSource>,
+    /// The open "Select …" panel of a reference parameter.
+    pub(crate) ref_picker: Option<crate::fs_reference::RefPicker>,
+    /// The document name its "Current document" tab shows.
+    pub ref_document_name: String,
     /// Preview the end of the history instead of rolling to this feature.
     pub show_final: bool,
     /// "Other document…" chooser: the document, the selected version index.
@@ -189,10 +200,14 @@ impl FeatureDialog {
             faulty: Vec::new(),
             labeler,
             collapsed_groups,
+            tab_stops: HashMap::new(),
             tol_open: Default::default(),
             focus: cx.focus_handle(),
             renaming: None,
             derived_sources: Vec::new(),
+            ref_sources: Vec::new(),
+            ref_picker: None,
+            ref_document_name: String::new(),
             show_final: false,
             ext_pick: None,
             ext_info: None,
@@ -1049,12 +1064,16 @@ impl FeatureDialog {
                 .child(crate::assets::icon(icon, 20., cx))
                 .tooltip(crate::ui::tooltip(tip))
         };
-        let mut row = h_flex().ml(px(-2.)).h(px(28.)).items_start().child(
-            button(format!("axisflip-{path}"), if on { "flip-direction-opposite" } else { "flip-direction" }, flip.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
-                this.set_value(&fpath, ParamValue::Bool(!cur), cx);
-            })),
-        );
+        // Live: the flip toggle is a Tab stop (Space / Enter press it).
+        let flip_focus = self.tab_stop(&format!("axisflip:{path}"), cx);
+        let toggle = move |this: &mut Self, _: &mut Window, cx: &mut Context<Self>| {
+            let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
+            this.set_value(&fpath, ParamValue::Bool(!cur), cx);
+        };
+        let toggle = std::rc::Rc::new(toggle);
+        let t1 = toggle.clone();
+        let flip_btn = button(format!("axisflip-{path}"), if on { "flip-direction-opposite" } else { "flip-direction" }, flip.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| t1(this, window, cx)));
+        let mut row = h_flex().ml(px(-2.)).h(px(28.)).items_end().child(Self::tab_stop_element(flip_btn, &flip_focus, Focus::Underline, move |this, window, cx| toggle(this, window, cx), cx));
         if let Some(a) = axis {
             let apath = match prefix {
                 None => a.id.to_string(),
@@ -1065,14 +1084,51 @@ impl FeatureDialog {
                 _ => Vec::new(),
             };
             let cur = values.enum_(a.id).to_string();
-            row = row.child(button(format!("axisturn-{apath}"), "realign-mate-dialog", a.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            let step = move |this: &mut Self, _: &mut Window, cx: &mut Context<Self>| {
                 let at = options.iter().position(|o| *o == cur).unwrap_or(0);
                 if let Some(next) = options.get((at + 1) % options.len().max(1)) {
                     this.set_value(&apath, ParamValue::Enum(next.to_string()), cx);
                 }
-            })));
+            };
+            let step = std::rc::Rc::new(step);
+            let s1 = step.clone();
+            let turn_focus = self.tab_stop(&format!("axisturn:{path}"), cx);
+            let turn = button(format!("axisturn-{path}"), "realign-mate-dialog", a.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| s1(this, window, cx)));
+            row = row.child(Self::tab_stop_element(turn, &turn_focus, Focus::Underline, move |this, window, cx| step(this, window, cx), cx));
         }
         row.into_any_element()
+    }
+
+    /// A Tab stop for a dialog control. Onshape's Tab order (live
+    /// behaviours.md, Extrude "Keyboard"): Depth → tolerance (±) button →
+    /// Direction → Starting offset → Symmetric → Draft → Second end position
+    /// → `?` help; Shift+Tab from Depth reaches the flip button; selects and
+    /// the ✓ / ✕ are skipped. Stops follow the render (DOM) order.
+    fn tab_stop(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
+        self.tab_stops.entry(key.to_string()).or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
+    }
+
+    /// Make `d` a Tab stop; Space (and Enter for buttons) activates it.
+    /// Focus looks (bundle CSS): icon buttons (`.os-param-icon-button:focus`)
+    /// get a 2 px `#1651b0` bottom line (1 px border + 1 px inset shadow);
+    /// checkboxes draw it on their box (`os_checkbox_focused`, so `Focus::Box`
+    /// adds nothing here); the `?` link gets a ring.
+    fn tab_stop_element(d: Stateful<Div>, h: &FocusHandle, look: Focus, activate: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static, cx: &mut Context<Self>) -> Stateful<Div> {
+        let enter = look != Focus::Box;
+        let blue: Hsla = gpui_kit::rgb(0x1651b0).into();
+        let d = d.track_focus(h);
+        let d = match look {
+            Focus::Underline => d.focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(-2.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }])),
+            Focus::Ring => d.focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])),
+            Focus::Box => d,
+        };
+        d.on_key_down(cx.listener(move |this, ev: &KeyDownEvent, window, cx| {
+            let k = ev.keystroke.key.as_str();
+            if k == "space" || (enter && k == "enter") {
+                activate(this, window, cx);
+                cx.stop_propagation();
+            }
+        }))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1211,15 +1267,20 @@ impl FeatureDialog {
                     .child({
                         let view = cx.entity();
                         let p2 = path.to_string();
+                        let toggle = move |this: &mut Self, cx: &mut Context<Self>| {
+                            // Checking a group unfolds it.
+                            if header && !on {
+                                this.collapsed_groups.remove(&path_s);
+                            }
+                            this.set_value(&path_s, ParamValue::Bool(!on), cx)
+                        };
+                        let toggle = std::rc::Rc::new(toggle);
+                        let (t1, t2) = (toggle.clone(), toggle);
+                        let focus = self.tab_stop(&format!("cb:{path}"), cx);
+                        let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), s.label, on, focus.is_focused(window)).rounded(px(2.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| t1(this, cx)));
                         div()
                             .id(SharedString::from(format!("cbw-{path}")))
-                            .child(crate::ui::os_checkbox(SharedString::from(format!("cb-{path}")), s.label, on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                // Checking a group unfolds it.
-                                if header && !on {
-                                    this.collapsed_groups.remove(&path_s);
-                                }
-                                this.set_value(&path_s, ParamValue::Bool(!on), cx)
-                            })))
+                            .child(Self::tab_stop_element(cb, &focus, Focus::Box, move |this, _, cx| t2(this, cx), cx))
                             // Right-click > Convert to expression (e.g. `#Length > 3`).
                             .os_context_menu(move |m, _, _| {
                                 let v = view.clone();
@@ -1330,9 +1391,16 @@ impl FeatureDialog {
                 let tolerant = matches!(s.kind, ParamKind::Num(_)) && s.hints.has(Hints::CAN_BE_TOLERANT) && !path.contains('.');
                 let tol_key = format!("{path}__tolerance");
                 let tol = tolerant.then(|| Tolerance::parse(self.get_value(&tol_key))).flatten();
+                let tol_focus = if tolerant { Some(self.tab_stop(&format!("tol:{path}"), cx)) } else { None };
+                let on = tol.is_some();
+                let press = move |this: &mut Self, key: &str, cx: &mut Context<Self>| {
+                    let next = if on { None } else { Some(Tolerance::default()) };
+                    this.tol_open.remove(key);
+                    this.set_tolerance(key, next, cx);
+                };
+                let key2 = tol_key.clone();
                 let tol_btn = tolerant.then(|| {
                     let key = tol_key.clone();
-                    let on = tol.is_some();
                     // Onshape (live, dom/dialog-hole-tolerance.txt): a 20 px
                     // "Tolerance options" toggle 5 px after the field, pressed
                     // `#eaeaea`; turning it on enables the row's chevron (the
@@ -1341,6 +1409,9 @@ impl FeatureDialog {
                         .id(SharedString::from(format!("tolbtn-{path}")))
                         .mt(px(3.))
                         .ml(px(5.))
+                        // Live (dom/dialog-extrude-new): 5 px after the toggle
+                        // before the 26 px right column.
+                        .mr(px(4.))
                         .size(px(20.))
                         .flex_none()
                         .rounded(px(3.))
@@ -1349,12 +1420,9 @@ impl FeatureDialog {
                         .when(!on, |d| d.hover(|d| d.bg(pal.panel_hover)))
                         .child(crate::assets::icon("tolerance", 20., cx))
                         .tooltip(crate::ui::tooltip("Tolerance options"))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            let next = if on { None } else { Some(Tolerance::default()) };
-                            this.tol_open.remove(&key);
-                            this.set_tolerance(&key, next, cx);
-                        }))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| press(this, &key, cx)))
                 });
+                let tol_btn = tol_btn.zip(tol_focus).map(|(b, f)| Self::tab_stop_element(b, &f, Focus::Underline, move |this, _, cx| press(this, &key2, cx), cx));
                 // Onshape (live DOM): tolerant quantities start with a 20 px
                 // expander: `›` `#d7d7d7` and inert without tolerances, `#666`
                 // and clickable with them, `⌄` while the options show; the
@@ -1383,12 +1451,13 @@ impl FeatureDialog {
                         })
                 });
                 let diameter = s.hints.has(Hints::CAN_BE_TOLERANT_DIAMETER);
-                // Live (dialogs/thicken-01, chamfer-01): the field runs from
-                // the label to 1 px past the column; rows with tolerance
-                // options sit 3 px further left.
+                // Live (dom/dialog-variable, dialog-thicken, dialog-extrude-new):
+                // the row starts at the dialog edge (expander, then the label
+                // with 5 px padding each side) and the field runs from the
+                // label to 1 px past the 194 px column.
                 let row = h_flex()
                     .mr(px(-1.))
-                    .when(tolerant, |d| d.ml(px(-3.)))
+                    .ml(px(-2.))
                     .min_h(px(26.))
                     .items_start()
                     .children(expander)
@@ -1396,7 +1465,7 @@ impl FeatureDialog {
                     // instead of their label.
                     .child(match param_icon(self.ty.id, s.id) {
                         Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
-                        None => div().pl(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
+                        None => div().pl(px(5.)).pr(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
                     })
                     // Live: the value's baseline 1 px under the label's, the
                     // underline on the row's bottom line.
@@ -1816,6 +1885,12 @@ impl FeatureDialog {
                         })),
                 );
                 col.into_any_element()
+            }
+            // Reference parameters (TableData, ImageData, PartStudioData, …):
+            // the labelled field and its "Select …" panel (fs_reference.rs).
+            ParamKind::Reference { kind } => {
+                let chosen = values.text(s.id).to_string();
+                self.render_reference_field(s.label, path, *kind, &chosen, cx)
             }
             ParamKind::Lookup { table } => {
                 let cur = values.lookup(s.id).to_vec();
@@ -2270,6 +2345,7 @@ fn item_slice(item: &Arc<Vec<ParamSpec>>) -> &'static [ParamSpec] {
 impl Render for FeatureDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        let help_focus = self.tab_stop("help", cx);
         let params: &'static [ParamSpec] = self.ty.params.as_slice();
         let mut rows = self.render_params(params, None, window, cx);
         let (extra_rows, footer_extra) = match self.extra.clone() {
@@ -2290,6 +2366,7 @@ impl Render for FeatureDialog {
         let tip_name = if name == self.feature.name { name.clone() } else { format!("{name} [{}]", self.ty.name) };
         // The sketch's red title has no tooltip: the bubble asks for a plane.
         let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
+        let ref_panel = self.render_reference_panel(cx);
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
@@ -2380,6 +2457,8 @@ impl Render for FeatureDialog {
                     })
                     .child(
                         Button::new("dlg-ok")
+                            // Live: the ✓ / ✕ are not Tab stops.
+                            .tab_stop(false)
                             .custom(
                                 gpui_kit::component::button::ButtonCustomVariant::new(cx)
                                     .color(if invalid { gpui_kit::rgb(0xcce9cc).into() } else { pal.accept.into() })
@@ -2404,6 +2483,7 @@ impl Render for FeatureDialog {
                     )
                     .child(
                         Button::new("dlg-cancel")
+                            .tab_stop(false)
                             .custom(dialog_icon_variant(cx, false))
                             .child(crate::assets::icon("dialog-cancel", 18., cx))
                             .w(px(28.))
@@ -2447,8 +2527,16 @@ impl Render for FeatureDialog {
                     .child(div().flex_1())
                     .children(footer_extra)
                     .child(
-                        div()
-                            .id("dlg-help")
+                        Self::tab_stop_element(
+                            div().id("dlg-help"),
+                            &help_focus,
+                            Focus::Ring,
+                            |this, _, cx| {
+                                this.show_help = !this.show_help;
+                                cx.notify();
+                            },
+                            cx,
+                        )
                             // Live: a 12 px `#a0a0a0` disc, its centre 1 px
                             // above the slider track.
                             .size(px(12.))
@@ -2489,8 +2577,20 @@ impl Render for FeatureDialog {
             })
             // Tab / Shift+Tab move between the dialog's fields and stay in the
             // dialog (Onshape), instead of going on to the toolbar or view cube.
+            .children(ref_panel)
             .focus_trap("feature-dialog-fields", &self.focus)
     }
+}
+
+/// How a Tab stop shows its focus ([`FeatureDialog::tab_stop_element`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Focus {
+    /// Icon buttons: a 2 px blue bottom line.
+    Underline,
+    /// Checkboxes: their box draws it.
+    Box,
+    /// The `?` help link.
+    Ring,
 }
 
 /// Where Onshape's preview slider handle rests (live: 69% of the track).
