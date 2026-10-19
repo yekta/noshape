@@ -45,8 +45,8 @@ pub use geom::{BSplineCurveData, BoundingBox, Curve, EdgeInfo, FaceProjection, P
 pub use history::{History, HistoryRecord, OpResult, Relation};
 pub use hlr::{EdgeClass, ProjectedEdge, Visibility, project_hlr, project_hlr_with};
 pub use io::{
-    ExportShape, ImportedShape, LengthUnit, StlFormat, read_brep, read_iges, read_mesh, read_step, write_brep, write_iges,
-    write_obj, write_obj_mesh, write_step, write_step_shapes, write_stl, write_stl_mesh,
+    ExportShape, ImportedShape, LengthUnit, StepOptions, StepSchema, StlFormat, read_brep, read_iges, read_mesh, read_step, write_brep,
+    rhino_brep_count, write_acis, write_iges, write_jt, write_obj, write_obj_mesh, write_parasolid, write_pvz, read_parasolid, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
 };
 pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_with};
 pub use ops::*;

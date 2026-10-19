@@ -630,7 +630,9 @@ fn constrained_surface_from_points_and_mesh() {
     for (k, y) in [-20.0f64, 0.0, 20.0].into_iter().enumerate() {
         let pl = s.add("cPlane", move |p| {
             p.set("entities", q(Reference::Plane(DatumPlane::Front)));
-            p.set("offset", expr(&format!("{} mm", -y)));
+            // Offsets are not negative (Onshape bounds): flip instead.
+            p.set("offset", expr(&format!("{} mm", y.abs())));
+            p.set("oppositeDirection", ParamValue::Bool(y > 0.0));
         });
         planes.push(pl);
         let mut sk = noshape_sketch::Sketch::new();
@@ -1121,20 +1123,18 @@ fn flat_spiral_planes_and_ruled_overrides() {
     let n = r.context.planes.last().unwrap().frame.normal;
     assert!(near(n.z.abs(), 0.5f64.sqrt(), 1e-9) && near(n.x.abs(), 0.5f64.sqrt(), 1e-9), "bisector normal {n:?}");
 
-    // Tangent plane to a cylinder face at a point.
+    // Tangent plane to a cylinder face, parallel to the Right plane.
     let (mut s, _) = cylinder_and_tool();
     let r = s.ok();
     let cyl = cylinder_face(&r, 0);
-    let pl = s.ps.features.iter().find(|f| f.type_id == "cPlane").unwrap().id;
-    let _ = pl;
     s.add("cPlane", move |p| {
         p.set("cplaneType", en("TANGENT_PLANE"));
-        p.set("entities", ParamValue::Query(vec![cyl, Reference::Origin]));
+        p.set("entities", ParamValue::Query(vec![cyl, Reference::Plane(DatumPlane::Right)]));
     });
     let r = s.ok();
     let f = r.context.planes.last().unwrap().frame;
     assert!(near((f.origin.x.powi(2) + f.origin.y.powi(2)).sqrt(), mm(20.0), 1e-6), "on the cylinder {f:?}");
-    assert!(f.normal.z.abs() < 1e-9, "tangent plane is vertical");
+    assert!(near(f.origin.x, mm(20.0), 1e-9) && near(f.normal.x, 1.0, 1e-9), "tangent on the +X side {f:?}");
 
     // Ruled surface along Z with one end overridden to X.
     let mut s = block();

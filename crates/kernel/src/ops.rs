@@ -134,6 +134,11 @@ pub struct SweepOptions {
     pub with_contact: bool,
     /// Rotate the profile to be normal to the path at the start.
     pub with_correction: bool,
+    /// Twist of the profile about the path over its whole length (radians,
+    /// right-handed about the path direction), spread evenly by arc length
+    /// on top of the rotation-minimizing frame (Onshape's sweep Twist).
+    #[serde(default)]
+    pub twist: f64,
 }
 
 impl Default for SweepOptions {
@@ -145,6 +150,7 @@ impl Default for SweepOptions {
             scale_end: 1.0,
             with_contact: false,
             with_correction: false,
+            twist: 0.0,
         }
     }
 }
@@ -180,6 +186,7 @@ pub fn sweep_sections(sections: &[Shape], path: &Shape, opts: &SweepOptions) -> 
         scale_end: opts.scale_end,
         with_contact: opts.with_contact,
         with_correction: opts.with_correction,
+        twist: opts.twist,
     };
     let l = vec_to_list(sections);
     op(ffi::op_pipe_shell(&l, path.raw(), &o, Shape::null().raw()))
@@ -258,19 +265,69 @@ pub fn shell(solid: &Shape, faces: &[Shape], thickness: f64, side: ShellSide, jo
     op(ffi::op_shell(solid.raw(), &l, off, join.code()))
 }
 
+/// How [`shell_solid`] builds the wall (tests compare the methods).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ShellMethod {
+    /// Offset first, the boolean construction when that fails.
+    #[default]
+    Auto,
+    /// Only OCCT's offset of the whole solid.
+    Offset,
+    /// Only the boolean construction (thickened faces + fillers).
+    Slabs,
+}
+
+/// Hollow a solid like Parasolid's shell: offsets of the kept faces are
+/// extended until they meet (faces whose offset vanishes disappear, walls that
+/// overlap merge), removed faces leave an opening. `faces` may be empty (closed
+/// hollow solid with an inner void). History (argument 0 = `solid`): faces on
+/// the original faces are `Modified` from them, offset faces are `Generated` by
+/// their face, faces on a removed face (the rim) are `Modified` from it.
+pub fn shell_solid(solid: &Shape, faces: &[Shape], thickness: f64, side: ShellSide, method: ShellMethod) -> Result<OpResult> {
+    if !(thickness > 0.0) {
+        return Err(KernelError::invalid("shell thickness must be positive"));
+    }
+    let l = vec_to_list(faces);
+    let m = match method {
+        ShellMethod::Auto => 0,
+        ShellMethod::Offset => 1,
+        ShellMethod::Slabs => 2,
+    };
+    op(ffi::op_shell_solid(solid.raw(), &l, thickness, side == ShellSide::Outside, m))
+}
+
+/// Scale applied to lengths around OCCT's blend algorithms (the checked fillet and chamfer),
+/// process-wide. Their approximation tolerances are absolute and tuned for
+/// millimetre-sized parts: the same part modelled in metres fails (a top-loop
+/// R4 fillet over R3 corner fillets on a 40 x 20 x 10 mm block). A model whose
+/// lengths are metres sets 1000; results come back at the model's scale. Default 1.
+pub fn set_working_scale(k: f64) -> Result<()> {
+    Ok(ffi::set_working_scale(k)?)
+}
+
 // ---------------------------------------------------------------- fillet / chamfer
 
 /// Constant-radius fillet of `edges`. History: each filleted edge `Generated`
 /// its blend face(s); adjacent faces are `Modified`.
 pub fn fillet(shape: &Shape, edges: &[Shape], radius: f64) -> Result<OpResult> {
     let l = vec_to_list(edges);
-    op(ffi::op_fillet(shape.raw(), &l, &[radius]))
+    op(ffi::op_fillet(shape.raw(), &l, &[radius], false))
 }
 
 /// Fillet with one radius per edge.
 pub fn fillet_radii(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpResult> {
     let l = vec_to_list(edges);
-    op(ffi::op_fillet(shape.raw(), &l, radii))
+    op(ffi::op_fillet(shape.raw(), &l, radii, false))
+}
+
+/// [`fillet_radii`] that always gives a valid solid (or fails): blends that
+/// consume a face exactly, where OCCT fails or builds an invalid solid, are
+/// retried a hair smaller (1e-7, 1e-6, 1e-5 relative) and the sliver faces left removed.
+/// An input that is invalid already keeps OCCT's result. One radius applies to
+/// every edge.
+pub fn fillet_checked(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpResult> {
+    let l = vec_to_list(edges);
+    op(ffi::op_fillet(shape.raw(), &l, radii, true))
 }
 
 /// Variable-radius fillet of one edge: `(relative parameter in [0, 1],
@@ -278,7 +335,14 @@ pub fn fillet_radii(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<OpR
 pub fn fillet_variable(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) -> Result<OpResult> {
     let params: Vec<f64> = law.iter().map(|p| p.0).collect();
     let radii: Vec<f64> = law.iter().map(|p| p.1).collect();
-    op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii))
+    op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, false))
+}
+
+/// [`fillet_variable`] with [`fillet_checked`]'s guarantees.
+pub fn fillet_variable_checked(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) -> Result<OpResult> {
+    let params: Vec<f64> = law.iter().map(|p| p.0).collect();
+    let radii: Vec<f64> = law.iter().map(|p| p.1).collect();
+    op(ffi::op_fillet_variable(shape.raw(), edge.raw(), &params, &radii, true))
 }
 
 /// Chamfer specification.
@@ -296,6 +360,17 @@ pub enum ChamferSpec {
 /// face that `d1` / the distance is measured on for asymmetric chamfers; by
 /// default the first adjacent face of each edge is used.
 pub fn chamfer(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_faces: &[Shape]) -> Result<OpResult> {
+    chamfer_impl(shape, edges, spec, reference_faces, false)
+}
+
+/// [`chamfer`] with [`fillet_checked`]'s guarantees. A chamfer wider than a
+/// face it runs over (or than the radius of an arc it follows) fails with
+/// `OperationFailed("chamfer distance too large")`.
+pub fn chamfer_checked(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_faces: &[Shape]) -> Result<OpResult> {
+    chamfer_impl(shape, edges, spec, reference_faces, true)
+}
+
+fn chamfer_impl(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_faces: &[Shape], checked: bool) -> Result<OpResult> {
     let (mode, d1, d2) = match spec {
         ChamferSpec::Equal(d) => (0, d, 0.0),
         ChamferSpec::TwoDistances(a, b) => (1, a, b),
@@ -303,7 +378,7 @@ pub fn chamfer(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_face
     };
     let le = vec_to_list(edges);
     let lf = vec_to_list(reference_faces);
-    op(ffi::op_chamfer(shape.raw(), &le, &lf, mode, d1, d2))
+    op(ffi::op_chamfer(shape.raw(), &le, &lf, mode, d1, d2, checked))
 }
 
 // ---------------------------------------------------------------- draft / direct edit
@@ -313,6 +388,17 @@ pub fn chamfer(shape: &Shape, edges: &[Shape], spec: ChamferSpec, reference_face
 pub fn draft(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutral: &Plane, angle: f64) -> Result<OpResult> {
     let l = vec_to_list(faces);
     op(ffi::op_draft(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
+}
+
+/// [`draft`] built by booleans (`cpp/shell.cpp`), for when OCCT's draft fails or
+/// gives an invalid solid: faces parallel to the pull direction move inward by
+/// h·tan(angle) (h = height above `neutral`, along the pull), faces whose
+/// drafted surface vanishes disappear and their neighbours meet (Parasolid's
+/// result, e.g. R3 fillets drafted 30° over 10 mm). Planar faces and cylinder
+/// bands only. History like [`draft`]: drafted faces `Modified`.
+pub fn draft_wedges(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutral: &Plane, angle: f64) -> Result<OpResult> {
+    let l = vec_to_list(faces);
+    op(ffi::op_draft_wedges(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
 }
 
 /// Delete faces and heal the gap by extending neighbors

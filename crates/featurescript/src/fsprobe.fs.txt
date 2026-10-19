@@ -1,0 +1,42 @@
+FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+export enum Corner { annotation { "Name" : "Sharp" } SHARP, annotation { "Name" : "Rounded" } ROUNDED }
+annotation { "Feature Type Name" : "FS probe", "Feature Type Description" : "probe" }
+export const fsProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Size" }
+        isLength(definition.size, { (millimeter) : [1, 20, 100] } as LengthBoundSpec);
+        annotation { "Name" : "Corner" }
+        definition.corner is Corner;
+        if (definition.corner == Corner.ROUNDED)
+        {
+            annotation { "Name" : "Radius" }
+            isLength(definition.radius, BLEND_BOUNDS);
+        }
+        annotation { "Name" : "Count" }
+        isInteger(definition.count, POSITIVE_COUNT_BOUNDS);
+    }
+    {
+        println(2 * inch);
+        println(1 / 3);
+        println(toString(2 * inch));
+        println([1, "a", true]);
+        println({ "k" : 1.5 * meter });
+        println("" ~ (2 * meter));
+        println(evPlane(context, { "face" : qCreatedBy(makeId("Front"), EntityType.FACE) }));
+        fCuboid(context, id + "cube", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(1, 1, 1) * definition.size });
+        println(evPlane(context, { "face" : qNthElement(qGeometry(qCreatedBy(id + "cube", EntityType.FACE), GeometryType.PLANE), 0) }));
+        println(size(evaluateQuery(context, qCreatedBy(id + "cube", EntityType.EDGE))));
+        println(evaluateQuery(context, qCreatedBy(id + "cube", EntityType.BODY)));
+        if (definition.corner == Corner.ROUNDED)
+            opFillet(context, id + "fillet", { "entities" : qCreatedBy(id + "cube", EntityType.EDGE), "radius" : definition.radius });
+        var m = undefined;
+        try { m.x = 1; } catch (e) { println(e); }
+        try { var a = [1]; println(a[3]); } catch (e) { println(e); }
+        try { println(1 * meter + 1); } catch (e) { println(e); }
+        try { println(sqrt(-1)); } catch (e) { println(e); }
+        try { println(undefinedFunctionCall()); } catch (e) { println(e); }
+    });
+

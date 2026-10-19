@@ -80,7 +80,7 @@ fn code2(i: i64, j: i64) -> u32 {
 }
 
 fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
-    let Some(r1) = ev.query("directionOne").first() else { return err("Select a pattern direction") };
+    let Some(r1) = ev.query("directionOne").first() else { return crate::regen::eval::err_at(&["directionOne"], "Select a pattern direction.") };
     let mut d1 = ev.resolve_direction(r1).ok_or_else(|| fe("The pattern direction could not be resolved"))?.normalize();
     if ev.bool("oppositeDirection") {
         d1 = -d1;
@@ -111,7 +111,7 @@ fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
 }
 
 fn circular_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
-    let Some(r) = ev.query("axis").first() else { return err("Select a pattern axis") };
+    let Some(r) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select a pattern axis.") };
     let (origin, mut axis) = ev.resolve_axis(r).ok_or_else(|| fe("The pattern axis could not be resolved"))?;
     if ev.bool("oppositeDirection") {
         axis = -axis;
@@ -300,11 +300,13 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
 // ------------------------------------------------------------------ entry points
 
 pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
+    check_seeds(ev, "pattern")?;
     let inst = linear_instances(ev)?;
     run_pattern(ev, inst)
 }
 
 pub fn circular_pattern(ev: &mut EvalCtx) -> FResult<()> {
+    check_seeds(ev, "pattern")?;
     let inst = circular_instances(ev)?;
     run_pattern(ev, inst)
 }
@@ -315,9 +317,22 @@ pub fn curve_pattern(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 pub fn mirror(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(r) = ev.query("mirrorPlane").first() else { return err("Select a mirror plane") };
+    check_seeds(ev, "mirror")?;
+    let Some(r) = ev.query("mirrorPlane").first() else { return crate::regen::eval::err_at(&["mirrorPlane"], "Select a mirror plane.") };
     let frame = ev.resolve_plane(r).ok_or_else(|| fe("The mirror plane could not be resolved"))?;
     run_pattern(ev, vec![Instance { code: 1, t: k::Transform::Mirror(kernel_plane(&frame)) }])
+}
+
+/// Onshape checks what is patterned before the direction / axis / plane:
+/// an empty dialog says "Select parts to pattern." (or mirror).
+fn check_seeds(ev: &EvalCtx, verb: &str) -> FResult<()> {
+    match ev.enum_("patternType") {
+        "FEATURE" => Ok(()),
+        "FACE" if ev.query("faces").is_empty() => crate::regen::eval::err_at(&["faces"], format!("Select faces to {verb}.")),
+        "FACE" => Ok(()),
+        _ if ev.query("entities").is_empty() => crate::regen::eval::err_at(&["entities"], format!("Select parts to {verb}.")),
+        _ => Ok(()),
+    }
 }
 
 fn run_pattern(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> {
@@ -378,7 +393,7 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     let bodies: Vec<usize> = ev.resolve_bodies(refs);
     let has_conn = refs.iter().any(|r| matches!(r, Reference::MateConnector { .. }));
     if bodies.is_empty() && !has_conn {
-        return err("Select parts to pattern");
+        return crate::regen::eval::err_at(&["entities"], "Select parts to pattern.");
     }
     if instances.is_empty() {
         return Ok(());
@@ -949,7 +964,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     let bodies = ev.resolve_bodies(refs);
     let conn_refs: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::MateConnector { .. })).cloned().collect();
     if bodies.is_empty() && conn_refs.is_empty() {
-        return err("Select parts or mate connectors to transform");
+        return crate::regen::eval::err_at(&["entities"], "Cannot resolve entities.");
     }
     let t = transform_of(ev)?;
     let copy = t.is_none() || ev.bool("makeCopy");

@@ -161,6 +161,25 @@ pub fn external_context(r: &ExternalRef) -> Option<Arc<Context>> {
     ctx
 }
 
+impl DocStudios {
+    /// A Part Studio regenerated in a configuration (not cached).
+    pub fn context_in(&self, tab: &str, config: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
+        let studio = self.studio(tab)?.clone();
+        let opts = RegenOptions {
+            document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
+            derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
+            custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
+            ..Default::default()
+        };
+        let mut values = studio.configuration.defaults();
+        for (k, v) in &config.0 {
+            values.0.insert(k.clone(), v.clone());
+        }
+        let mut reg = noshape_model::regen::Regenerator::new();
+        Some(reg.regenerate(&studio, &values, &self.doc.settings.units, &opts).context)
+    }
+}
+
 impl DerivedProvider for DocStudios {
     fn context(&self, tab: &str) -> Option<Arc<Context>> {
         if let Some(r) = ExternalRef::parse(tab) {

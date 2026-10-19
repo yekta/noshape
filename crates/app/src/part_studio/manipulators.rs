@@ -1,6 +1,6 @@
 //! In-viewport manipulators for feature dialogs (Onshape's drag handles):
 //! the Extrude depth arrow (dragging past zero flips direction) and the
-//! Revolve angle arc.
+//! Revolve angle arc (also Move face: offset/translate arrow, rotate arc).
 
 use super::PartStudioView;
 use crate::viewport::ViewportEvent;
@@ -24,6 +24,10 @@ pub(super) struct Arrow {
     pub flip: Option<&'static str>,
 }
 
+/// The arrow glyph (live, in pixels): shaft length and head length.
+const ARROW_SHAFT_PX: f64 = 25.;
+const ARROW_HEAD_PX: f64 = 22.;
+
 /// An angular manipulator: an arc around an axis bound to an angle parameter.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ArcHandle {
@@ -45,6 +49,8 @@ impl ArcHandle {
 pub(super) enum Manip {
     Arrow(Arrow),
     Arc(ArcHandle),
+    /// Transform ▸ Translate by XYZ (see `triad.rs`).
+    Triad(super::triad::Triad),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,8 +65,10 @@ impl PartStudioView {
         let Some(e) = self.edit.as_ref() else { return self.section_arrow().map(Manip::Arrow) };
         match e.dialog.read(cx).feature.type_id.as_str() {
             "extrude" => self.current_arrow(cx).map(Manip::Arrow),
-            "cPlane" | "shell" | "fillet" | "chamfer" => self.param_arrow(cx).map(Manip::Arrow),
+            "moveFace" if e.dialog.read(cx).feature.params.is("moveFaceType", "ROTATE") => self.current_arc(cx).map(Manip::Arc),
+            "cPlane" | "shell" | "fillet" | "chamfer" | "moveFace" => self.param_arrow(cx).map(Manip::Arrow),
             "revolve" => self.current_arc(cx).map(Manip::Arc),
+            "transform" => self.current_triad(cx).map(Manip::Triad),
             _ => None,
         }
     }
@@ -68,19 +76,27 @@ impl PartStudioView {
     fn current_arc(&self, cx: &App) -> Option<ArcHandle> {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
-        if p.bool("fullRevolve") || !p.is("endBound", "BLIND") {
+        let move_face = d.feature.type_id == "moveFace";
+        if !move_face && (p.bool("fullRevolve") || !p.is("endBound", "BLIND")) {
             return None;
         }
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
-        let anchor = p.query("entities").iter().find_map(|r| match r {
-            Reference::SketchRegion { sketch, key } => {
-                let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
-                let reg = sk.regions.iter().find(|g| &g.key == key)?;
-                region_anchor(&reg.positions, &reg.indices)
-            }
-            _ => None,
-        })?;
+        // moveFace.fs: the rotate manipulator turns the first face about
+        // the axis.
+        let anchor = if move_face {
+            let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
+            p.query("moveFaces").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r)).map(|(b, _)| b)?
+        } else {
+            p.query("entities").iter().find_map(|r| match r {
+                Reference::SketchRegion { sketch, key } => {
+                    let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
+                    let reg = sk.regions.iter().find(|g| &g.key == key)?;
+                    region_anchor(&reg.positions, &reg.indices)
+                }
+                _ => None,
+            })?
+        };
         let (origin, mut axis) = self.axis_of(p.query("axis").first()?)?;
         if p.bool("oppositeDirection") {
             axis = -axis;
@@ -127,14 +143,16 @@ impl PartStudioView {
             let units = self.doc.read(cx).session.doc.settings.units;
             d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok()).map(|q| q.value)
         })?;
-        // Profile center and normal from the first selected region.
+        // Profile center and normal from the first selected region, or a
+        // picked planar face (it only exists before the feature).
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref());
         let (base, normal) = d.feature.params.query("entities").iter().find_map(|r| match r {
             Reference::SketchRegion { sketch, key } => {
                 let sk = self.display.sketches.iter().find(|s| s.feature == *sketch)?;
                 let reg = sk.regions.iter().find(|g| &g.key == key)?;
                 Some((region_anchor(&reg.positions, &reg.indices)?, sk.frame.normal))
             }
-            _ => None,
+            r => noshape_model::select::face_anchor(ctx?, r),
         })?;
         let mut dir = normal;
         if d.feature.params.bool("oppositeDirection") {
@@ -155,7 +173,8 @@ impl PartStudioView {
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
         match d.feature.type_id.as_str() {
             "cPlane" if p.is("cplaneType", "OFFSET") => {
-                let f = p.query("entities").iter().find_map(|r| self.frame_of_ref(r))?;
+                // A plane, or a circular / elliptical edge (offset from its plane).
+                let f = p.query("entities").iter().find_map(|r| noshape_model::regen::features::cplane::circular_edge_frame(ctx, r).or_else(|| self.frame_of_ref(r)))?;
                 let dir = if p.bool("oppositeDirection") { -f.normal } else { f.normal };
                 Some(Arrow { base: f.origin, dir, length: value("offset")?, param: "offset", flip: Some("oppositeDirection") })
             }
@@ -163,6 +182,19 @@ impl PartStudioView {
                 let (base, n) = p.query("entities").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
                 let dir = if p.bool("oppositeDirection") { n } else { -n };
                 Some(Arrow { base, dir, length: value("thickness")?, param: "thickness", flip: Some("oppositeDirection") })
+            }
+            // moveFace.fs: Offset drives offsetDistance along the first
+            // face's normal, Translate drives translationDistance along the
+            // direction (Blind only); the base is the first face.
+            "moveFace" if p.is("limitType", "BLIND") && !p.is("moveFaceType", "ROTATE") => {
+                let (base, n) = p.query("moveFaces").iter().find_map(|r| noshape_model::select::face_anchor(ctx, r))?;
+                let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
+                if p.is("moveFaceType", "OFFSET") {
+                    return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection") });
+                }
+                let r = p.query("direction").first()?;
+                let dir = self.axis_of(r).map(|(_, d)| d).or_else(|| self.frame_of_ref(r).map(|f| f.normal))?;
+                Some(Arrow { base, dir: dir * sign, length: value("translationDistance")?, param: "translationDistance", flip: Some("oppositeDirection") })
             }
             "fillet" | "chamfer" => {
                 let param = if d.feature.type_id == "fillet" { "radius" } else { "width" };
@@ -175,10 +207,15 @@ impl PartStudioView {
 
     /// Publish the current arrow's handle to the viewport hit test.
     pub(super) fn sync_manipulator(&mut self, cx: &mut Context<Self>) {
-        let handles: Vec<(DVec3, DVec3)> = match self.current_manip(cx) {
-            Some(Manip::Arrow(a)) => vec![(a.base, a.base + a.dir * a.length)],
+        let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
+            // The arrow glyph at the end of the length (see manipulator_overlay).
+            Some(Manip::Arrow(a)) => {
+                let tip = a.base + a.dir * a.length;
+                vec![(tip, tip + a.dir * a.length.signum() * 1e-3, ARROW_SHAFT_PX + ARROW_HEAD_PX)]
+            }
             // The handle end of the arc (last few degrees) is grabbable.
-            Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle))],
+            Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
+            Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
             None => Vec::new(),
         };
         self.viewport.update(cx, |v, _| v.manipulators = handles);
@@ -206,25 +243,36 @@ impl PartStudioView {
                     Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(41),
                 ];
             }
+            Some(Manip::Triad(t)) => return self.triad_overlay(&t, cx),
             None => return Vec::new(),
         };
+        let _ = color;
+        // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
+        // the end of the length: a 1.5 px white shaft and a hollow triangular
+        // head, outlined light gray (blue when hovered).
         let tip = a.base + a.dir * a.length;
-        let mut lines = LineData::default();
-        // Hovered: a blue outline around the arrow (Onshape).
-        let (color, width) = if self.ui.manip_hover { (crate::theme::rgb8(0x3e94ff), 3.5) } else { (color, 2.5) };
-        lines.push_polyline(&[f(a.base), f(tip)], color, 0, width, LineSegment::ON_TOP);
-        // Arrowhead: two short barbs in a plane containing the axis.
-        let side = a.dir.any_orthonormal_vector();
-        let side2 = a.dir.cross(side);
-        let head = (a.length.abs() * 0.12).clamp(0.0015, 0.008) * a.length.signum();
-        for s in [side, -side, side2, -side2] {
-            let barb = tip - a.dir * head + s * head.abs() * 0.45;
-            lines.push_polyline(&[f(tip), f(barb)], color, 0, width, LineSegment::ON_TOP);
+        let dir = a.dir * a.length.signum();
+        let vp = self.viewport.read(cx);
+        let right = vp.camera.right();
+        let (Some(p0), Some(p1)) = (vp.project(tip), vp.project(tip + right * 1e-3)) else { return Vec::new() };
+        let wpp = 1e-3 / (p1 - p0).length().max(1e-9);
+        // The head's width runs across the view.
+        let view_dir = (vp.camera.target - vp.camera.eye()).normalize_or_zero();
+        let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
+        let base = tip + dir * ARROW_SHAFT_PX * wpp;
+        let apex = base + dir * ARROW_HEAD_PX * wpp;
+        let (l, r) = (base + side * ARROW_HEAD_PX * 0.45 * wpp, base - side * ARROW_HEAD_PX * 0.45 * wpp);
+        let outline = if self.ui.manip_hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) };
+        let white = crate::theme::rgb8(0xffffff);
+        let mut back = LineData::default();
+        let mut front = LineData::default();
+        for (data, color, width) in [(&mut back, outline, if self.ui.manip_hover { 4.0 } else { 3.0 }), (&mut front, white, 1.5)] {
+            data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
+            data.push_polyline(&[f(l), f(apex), f(r), f(l)], color, 0, width, LineSegment::ON_TOP);
         }
-        let pts = PointData { points: vec![PointSprite { position: f(tip), color, pick_id: 0, size: 10.0, style: LineSegment::ON_TOP, _pad: 0 }] };
         vec![
-            Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(40),
-            Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(41),
+            Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
+            Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
         ]
     }
 
@@ -245,6 +293,7 @@ impl PartStudioView {
         let a = match self.current_manip(cx) {
             Some(Manip::Arrow(a)) => a,
             Some(Manip::Arc(h)) => return self.arc_event(h, ev, window, cx),
+            Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
             None => {
                 self.manip_drag = None;
                 return false;

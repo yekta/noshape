@@ -22,9 +22,16 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
   ONSHAPE_EMAIL / ONSHAPE_PASSWORD (from /root/.config/noshape/onshape.env). Never print, log or commit them.
   Only the live-capture agent drives the Chrome instance on DISPLAY=:107 (CDP port 9333). If you need something
   captured, write the request into /root/onshape-research/live/REQUESTS.md (one line per request, your name).
-- **Build:** `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-<you> nice cargo build -p noshape`. Use only your
-  own target dir and your own Xvfb display (given in your prompt). Delete `<target>/debug/incremental` when it
-  grows past a few GB. Disk is shared (keep more than 15 GB free).
+- **Build (changed 2026-10-19): ONE shared target dir for everyone:**
+  `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-shared nice cargo build -p noshape`.
+  Per-agent target dirs choked the machine (7 parallel full builds, RAM exhausted, hour-long builds). Cargo locks the
+  shared dir, so builds queue one at a time ("Blocking waiting for file lock" is normal), and each reuses everyone's
+  compiled output, so builds stay incremental. Rules: never `cargo clean`; never delete anything in target-shared;
+  build only when you need to; batch edits before building; prefer `cargo check` and single-test runs
+  (`cargo test -p <crate> <name>`) over full suites. **Right after your build, copy the binary** to your own folder
+  (`cp /root/target-shared/debug/noshape /tmp/<you>/noshape`) and run that copy, since the next agent's build overwrites
+  it. Build in the shared tree /root/noshape. A private worktree is allowed only when the shared tree doesn't compile
+  for reasons outside your area, and then it must still use /root/target-shared. Use your own Xvfb display.
 - **Disk:** the disk hit 100% once. After each build, if `<target>/debug/incremental` is over 2 GB, delete it.
   Each test binary is ~130 MB (OCCT is linked in), so old ones pile up. When you're not building, delete the stale
   executables: `find <target>/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +60 -delete`.

@@ -27,6 +27,11 @@ const CANCEL_HOVER: u32 = 0xeeeeee;
 pub const GLYPH_OWNED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7.7" r="3.1" fill="currentColor"/><path d="M4.5 15.5c1.2-2.3 3.2-3.5 5.5-3.5s4.3 1.2 5.5 3.5A7.6 7.6 0 0 1 10 17.8a7.6 7.6 0 0 1-5.5-2.3z" fill="currentColor"/></svg>"#;
 pub const GLYPH_RECENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="8.25"/><path d="M10 5.25V10l3.25 2.25"/></svg>"#;
 pub const GLYPH_FOLDER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"><path d="M2.6 4.6h5l1.6 1.8h8.2v9h-14.8z"/></svg>"#;
+pub const GLYPH_SORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M4.2 3h1.6v10.6l2-2 1.1 1.1L5 16.6l-3.9-3.9 1.1-1.1 2 2z"/><path d="M10.5 4h8v1.6h-8zM10.5 8h6v1.6h-6zM10.5 12h4v1.6h-4z"/></svg>"#;
+pub const GLYPH_GRIP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="7.5" cy="5" r="1.4"/><circle cx="12.5" cy="5" r="1.4"/><circle cx="7.5" cy="10" r="1.4"/><circle cx="12.5" cy="10" r="1.4"/><circle cx="7.5" cy="15" r="1.4"/><circle cx="12.5" cy="15" r="1.4"/></svg>"#;
+pub const GLYPH_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 3.5v13M3.5 10h13"/></svg>"#;
+pub const GLYPH_CREATED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M3.7 2.7h12.6v14.6H3.7z"/></svg>"#;
+pub const GLYPH_TRASH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 2.2h4.8l.6 1.4h3.6v1.6H3.4V3.6H7zM4.6 6.2h10.8l-.9 11.6H5.5zm2.6 1.9v7.7h1.3V8.1zm2.2 0v7.7h1.2V8.1zm2.1 0v7.7h1.3V8.1z" fill-rule="evenodd"/></svg>"#;
 pub const GLYPH_DOCUMENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"><path d="M4.6 2.6h7.6l3.2 3.2v11.6H4.6z"/><path d="M7 10.5h6M7 13h6"/></svg>"#;
 pub const GLYPH_OPEN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9.3 3.4 5.2 7.5l1.1 1.1 2.4-2.4V13h1.6V6.2l2.4 2.4 1.1-1.1-4.1-4.1z"/><path d="M3.5 14.5h13V16h-13z"/></svg>"#;
 pub const GLYPH_HOME: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2.5 1.8 10h2.4v7h4.3v-4.5h3V17h4.3v-7h2.4z"/></svg>"#;
@@ -57,6 +62,18 @@ pub fn glyph(data: &'static [u8], size: f32, color: impl Into<Hsla>) -> Icon {
 /// 14 px white text.
 pub fn primary_button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
     Button::new(id).primary().child(div().text_size(px(14.)).child(label.into())).h(px(34.)).px(px(11.)).rounded(px(3.))
+}
+
+/// Onshape's danger button (Bootstrap `btn-danger`, live documents/70
+/// "Delete forever"): `#bd3039`, white 14 px text.
+pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
+    Button::new(id)
+        .custom(ButtonCustomVariant::new(cx).color(rgb(0xbd3039).into()).foreground(rgb(0xffffff).into()).hover(rgb(0xd27177).into()).active(rgb(0xa3272f).into()).shadow(false))
+        .bg(rgb(0xbd3039))
+        .child(div().text_size(px(14.)).text_color(rgb(0xffffff)).child(label.into()))
+        .h(px(34.))
+        .px(px(11.))
+        .rounded(px(3.))
 }
 
 /// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`.
@@ -123,7 +140,8 @@ pub fn modal(dialog: Dialog, title: impl Into<SharedString>, width: f32) -> Dial
                 .pr(px(12.))
                 .border_b_1()
                 .border_color(rgb(MODAL_DIVIDER))
-                .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).whitespace_nowrap().child(title))
+                // Live (document/80, drawing/90, document/23): 18 px `#666`, regular.
+                .child(div().text_size(px(18.)).text_color(pal.text_muted).whitespace_nowrap().child(title))
                 .child(div().flex_1())
                 .child(div().flex_none().child(DialogClose::new().child(
                     div()
@@ -151,12 +169,12 @@ pub fn modal_footer() -> Div {
 }
 
 /// A footer button that confirms the dialog (runs its `on_ok`).
-pub fn modal_ok(button: Button) -> Div {
+pub fn modal_ok(button: impl IntoElement) -> Div {
     div().flex_none().child(gpui_kit::component::dialog::DialogAction::new().child(button))
 }
 
 /// A footer button that closes the dialog.
-pub fn modal_cancel(button: Button) -> Div {
+pub fn modal_cancel(button: impl IntoElement) -> Div {
     div().flex_none().child(DialogClose::new().child(button))
 }
 
@@ -170,21 +188,6 @@ pub fn field_label(text: impl Into<SharedString>) -> Div {
 pub fn info_box(text: impl Into<SharedString>) -> Div {
     let pal = p();
     div().px(px(14.)).py(px(15.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child(text.into())
-}
-
-/// A documents-page menu row (Create ▾): 30 px, 18 px glyph, 13.33 px
-/// text, like Onshape's "Document…" / "Folder…" items.
-pub fn menu_item(glyph_data: &'static [u8], label: &'static str) -> gpui_kit::component::menu::PopupMenuItem {
-    gpui_kit::component::menu::PopupMenuItem::element(move |_, _| {
-        let pal = p();
-        h_flex()
-            .h(px(30.))
-            .w_full()
-            .gap(px(8.))
-            .pl(px(8.))
-            .child(glyph(glyph_data, 18., pal.text))
-            .child(div().text_size(px(13.33)).text_color(pal.text).child(label))
-    })
 }
 
 /// Onshape's dialog checkbox row: 27 px, a 12 px box (1 px `#888`, radius
@@ -267,25 +270,53 @@ pub fn row_states(d: Stateful<Div>, selected: bool) -> Stateful<Div> {
 }
 
 
-/// Onshape's message bubble (`.osx-message-bubble`, live DOM): 14 px text
-/// in a rounded (5 px) box, padding 4/25/4/10, an 18 px icon 10 px before
-/// the text and a bold 21 px "×" (`#467bb6`) at the right. Info is
-/// `#def1fb` / `#b2ddf6` / `#094174`; warnings and errors use the theme's
-/// warning and error fills. Position it yourself (Onshape: top center).
-/// Icons: msg-info / msg-warning / msg-error.svg (our own artwork).
-pub fn message_bubble(id: impl Into<ElementId>, kind: crate::ui::AlertKind, message: impl Into<SharedString>, on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, cx: &App) -> Stateful<Div> {
+/// The look of a message bubble: the three alert kinds plus Onshape's green
+/// success bubble ("✓ Folder created. ×").
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BubbleKind {
+    Info,
+    Warning,
+    Error,
+    Success,
+}
+
+impl From<crate::ui::AlertKind> for BubbleKind {
+    fn from(k: crate::ui::AlertKind) -> Self {
+        match k {
+            crate::ui::AlertKind::Info => Self::Info,
+            crate::ui::AlertKind::Warning => Self::Warning,
+            crate::ui::AlertKind::Error => Self::Error,
+        }
+    }
+}
+
+/// Onshape's message bubble (`.osx-message-bubble`, live dom/toast-*.txt,
+/// assembly-bom-copy-toast.txt): 14 px text in a rounded (5.25 px) box,
+/// padding 4/25/4/10 plus the 12 px close cell, an 18 px icon 10 px before
+/// the text and a bold 21 px "×" at the right. Info `#def1fb` / `#b2ddf6` /
+/// `#094174` (× `#467bb6`), warning (× `#987107`), error (× `#bd3039`),
+/// success `#ddf6cc` / `#a2db7d` / `#333` (× `#028502`). Position it
+/// yourself (Onshape: top center, 8–9 px down). Icons: toast-*.svg.
+pub fn message_bubble(id: impl Into<ElementId>, kind: impl Into<BubbleKind>, message: impl IntoElement, on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, cx: &App) -> Stateful<Div> {
     use crate::ui::AlertKind;
-    let (fill, outline, text) = crate::ui::alert_colors(kind);
-    let icon = match kind {
-        AlertKind::Info => "msg-info",
-        AlertKind::Warning => "msg-warning",
-        AlertKind::Error => "msg-error",
+    let kind = kind.into();
+    let (fill, outline, text) = match kind {
+        BubbleKind::Info => crate::ui::alert_colors(AlertKind::Info),
+        BubbleKind::Warning => crate::ui::alert_colors(AlertKind::Warning),
+        BubbleKind::Error => crate::ui::alert_colors(AlertKind::Error),
+        BubbleKind::Success => (rgb(0xddf6cc), rgb(0xa2db7d), rgb(0x333333)),
+    };
+    let (icon, close) = match kind {
+        BubbleKind::Info => ("toast-info", 0x467bb6),
+        BubbleKind::Warning => ("toast-warning", 0x987107),
+        BubbleKind::Error => ("toast-error", 0xbd3039),
+        BubbleKind::Success => ("toast-success", 0x028502),
     };
     h_flex()
         .id(id)
         .occlude()
         .relative()
-        .max_w(px(640.))
+        .max_w(px(1000.))
         .min_h(px(29.))
         .pl(px(10.))
         .pr(px(37.))
@@ -298,20 +329,38 @@ pub fn message_bubble(id: impl Into<ElementId>, kind: crate::ui::AlertKind, mess
         .text_size(px(14.))
         .text_color(text)
         .child(crate::assets::icon(icon, 18., cx))
-        .child(div().min_w_0().child(message.into()))
+        .child(div().min_w_0().child(message))
         .child(
             div()
                 .id("bubble-x")
                 .absolute()
-                .right(px(11.))
+                .right(px(5.))
                 .top(px(0.))
+                .bottom(px(0.))
+                .flex()
+                .items_center()
                 .cursor_pointer()
                 .text_size(px(21.))
                 .font_weight(FontWeight::BOLD)
-                .text_color(rgb(0x467bb6))
+                .text_color(rgb(close))
                 .child("×")
                 .on_click(on_close),
         )
+}
+
+/// A message bubble with Onshape's action link after the message
+/// (`.osx-message-bubble-link`: 14 px, weight 600, underlined, the text
+/// color), e.g. "Sketch 2 has been canceled. **Restore**".
+pub fn message_bubble_with_link(
+    id: impl Into<ElementId>,
+    kind: impl Into<BubbleKind>,
+    message: impl IntoElement,
+    link: impl Into<SharedString>,
+    on_link: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> Stateful<Div> {
+    message_bubble(id, kind, message, on_close, cx).child(div().id("bubble-link").ml(px(-6.)).cursor_pointer().font_weight(FontWeight::SEMIBOLD).underline().child(link.into()).on_click(on_link))
 }
 
 /// Onshape's form select (Bootstrap `form-control` select, live DOM): full
@@ -339,7 +388,7 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
         .cursor_pointer()
         .text_size(px(14.))
         .text_color(pal.text)
-        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().size_full())
+        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().child(label))
         .child(glyph(GLYPH_CARET, 8., pal.text))
         .on_click(move |_, window, cx| {
@@ -360,23 +409,6 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
         })
 }
 
-/// Onshape's Export modal (live dom/dialog-export-drawing.txt): 600 px;
-/// "File name" field, then a "Format" select; Export / Cancel. The caller
-/// adds `on_ok`, reading `file` and `chosen` (index into `formats`).
-pub fn export_modal(dialog: Dialog, title: &'static str, file: &Entity<gpui_kit::component::input::InputState>, formats: Vec<String>, chosen: Rc<Cell<usize>>, cx: &App) -> Dialog {
-    let pick = chosen.clone();
-    modal(dialog, title, 600.)
-        .child(
-            modal_body()
-                .gap(px(6.))
-                .child(field_label("File name"))
-                .child(gpui_kit::component::input::Input::new(file).h(px(34.)).text_size(px(14.)))
-                .child(div().pt(px(8.)).child(field_label("Format")))
-                .child(select_field("export-format", formats, chosen.get(), move |i, _, _| pick.set(i))),
-        )
-        .footer(modal_footer().child(modal_ok(primary_button("ok", "Export"))).child(modal_cancel(cancel_button("cancel", "Cancel", cx))))
-}
-
 // Feature Studio toolbar and search pane glyphs (our own drawings).
 pub const GLYPH_ARROW_LEFT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 10h-13M8.5 5 3.5 10l5 5"/></svg>"#;
 pub const GLYPH_ARROW_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h13M11.5 5l5 5-5 5"/></svg>"#;
@@ -387,3 +419,42 @@ pub const GLYPH_IMPORT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg"
 pub const GLYPH_FUNCTION: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M10 5v10"/><ellipse cx="10" cy="10" rx="3.6" ry="3"/></svg>"#;
 pub const GLYPH_EXPAND_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M3 7h14M3 13h14M7 4l3-2.5L13 4M7 16l3 2.5 3-2.5"/></svg>"#;
 pub const GLYPH_COLLAPSE_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M7 2.5l3 3 3-3M7 17.5l3-3 3 3"/></svg>"#;
+pub const GLYPH_LINES: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5h12M4 10h12M4 15h12"/></svg>"#;
+pub const GLYPH_NEW_FEATURE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M3 7.5 9 4.5l6 3v6l-6 3-6-3z"/><path d="M3 7.5l6 3 6-3M9 10.5v6"/><path d="M15.5 2v5M13 4.5h5" stroke-linecap="round"/></svg>"#;
+pub const GLYPH_FS_IMPORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M5 2.6h7l3 3v11.8H5z"/><path d="M10 7v7M7.2 11.2 10 14l2.8-2.8" stroke-linecap="round"/></svg>"#;
+pub const GLYPH_BRUSH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M16.6 2.2c.5.4.5 1.1.1 1.6L10.4 11l-1.9-1.7 6.6-6.9c.4-.5 1.1-.5 1.5-.2z"/><path d="M7.6 10.1l2 1.8c-.3 2.6-2.4 4.8-6.6 5.1.9-1 1.1-2 1.3-3 .3-2.2 1.6-3.6 3.3-3.9z"/></svg>"#;
+pub const GLYPH_PULSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="2.6" y="2.6" width="14.8" height="14.8" rx="1.5"/><path d="M4.5 11h2.5l1.5-4 2.5 7 1.5-3h3" stroke-linecap="round"/></svg>"#;
+
+/// Onshape menus on dropdown buttons (instead of the kit's `dropdown_menu`):
+/// wraps the button, and a click opens `f`'s menu under it, as a Bootstrap
+/// select list as wide as the button (`select`) or a dropdown.
+pub trait OsDropdownExt: IntoElement + Sized {
+    fn os_dropdown_menu(self, id: impl Into<ElementId>, select: bool, f: impl Fn(crate::os_menu::OsMenu, &mut Window, &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu + 'static) -> Stateful<Div> {
+        let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
+        let probe = bounds.clone();
+        let f = Rc::new(f);
+        div()
+            .id(id)
+            .relative()
+            .flex_none()
+            .child(self)
+            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .on_click(move |_, window, cx| {
+                let (f, b) = (f.clone(), bounds.get());
+                let width = f32::from(b.size.width);
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
+                    let m = if select { m.select_list(width) } else { m.dropdown() };
+                    f(m, window, cx)
+                });
+                // Near the window's right edge the menu aligns to the button's right.
+                if b.right() + px(260.) > window.viewport_size().width {
+                    crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
+                } else {
+                    crate::os_menu::open_anchored(point(b.origin.x, b.bottom()), Anchor::TopLeft, menu, window, cx);
+                }
+            })
+    }
+}
+
+impl OsDropdownExt for Button {}
+impl OsDropdownExt for Stateful<Div> {}

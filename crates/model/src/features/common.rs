@@ -42,6 +42,7 @@ pub fn thin_block() -> Vec<ParamSpec> {
             .visible(move |v| thin(v) && !v.bool("midplane")),
         ParamSpec::flip("flipWall", "Flip wall").visible(move |v| thin(v) && !v.bool("midplane")),
         ParamSpec::num("thickness2", "Thickness 2", crate::params::NumSpec::positive_length(0.0, 0.0))
+            .hints(Hints::CAN_BE_TOLERANT)
             .visible(move |v| thin(v) && !v.bool("midplane")),
         ParamSpec::num("thickness", "Thickness", crate::params::NumSpec::positive_length(5.0, 0.25))
             .hints(Hints::CAN_BE_TOLERANT)
@@ -177,6 +178,18 @@ pub fn without_hint(mut specs: Vec<ParamSpec>, h: Hints) -> Vec<ParamSpec> {
         s.hints = Hints(s.hints.0 & !h.0);
     }
     specs
+}
+
+/// A plain group title ("Group Name" in FeatureScript, e.g. "Selections"):
+/// a GROUP_LABEL header whose value is "unfolded", and its params, shown
+/// only while it is unfolded.
+pub fn group(id: &'static str, label: &'static str, open: bool, specs: Vec<ParamSpec>) -> Vec<ParamSpec> {
+    let mut out = vec![ParamSpec::bool(id, label, open).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE)];
+    out.extend(specs.into_iter().map(|mut s| {
+        let prev = s.visible.take();
+        s.visible(move |v| v.bool(id) && prev.as_ref().is_none_or(|f| f(v)))
+    }));
+    out
 }
 
 /// Change the default of a Bool spec.

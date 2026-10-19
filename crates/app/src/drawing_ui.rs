@@ -4,7 +4,7 @@
 use crate::drawing_view::*;
 use crate::theme::{p, with_alpha as theme_with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
+use gpui_kit::component::input::{Input, InputEvent, InputState, TextareaState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -23,7 +23,7 @@ pub fn parse_scale(s: &str) -> Option<f64> {
 }
 
 impl DrawingEditor {
-    fn tool_btn(&self, id: &'static str, icon: &'static str, tip: &'static str, active: bool, tool: impl Fn() -> Tool + 'static, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn tool_btn(&self, id: &'static str, icon: &'static str, tip: &'static str, active: bool, tool: impl Fn() -> Tool + 'static, cx: &mut Context<Self>) -> AnyElement {
         // Onshape toolbar button: 30 px cell, 20 px full-color icon (§3.2).
         crate::ui::tool_button(id, icon, active, cx)
             .tooltip(tip)
@@ -72,8 +72,6 @@ impl DrawingEditor {
             MenuEntry::item("Crop view (circle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: true }, cx)),
             MenuEntry::item("Crop view (polygon)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: false }, cx)),
             MenuEntry::item("Crop view (spline)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: true }, cx)),
-            MenuEntry::item("Break view (vertical lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
-            MenuEntry::item("Break view (horizontal lines)", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: false }, cx)),
             MenuEntry::Separator,
             MenuEntry::item("Datum target", |e, _, cx| e.set_tool(Tool::DatumTarget { anchor: None }, cx)),
         ];
@@ -158,6 +156,8 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-balloon", "callout", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }, cx))
             .child(self.tool_btn("dr-table", "table", "Table", matches!(t, Tool::Table { kind: TableTool::General, .. }), || Tool::Table { kind: TableTool::General, view: None, origin: None }, cx))
             .child(self.tool_btn("dr-bomtable", "drawing-bom", "BOM table", matches!(t, Tool::Table { kind: TableTool::Bom, .. }), || Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx))
+            .child(self.tool_btn("dr-revtable", "revision-table", "Revision table", matches!(t, Tool::Table { kind: TableTool::Revision, .. }), || Tool::Table { kind: TableTool::Revision, view: None, origin: None }, cx))
+            .child(self.tool_btn("dr-cutlist", "cut-list", "Cut list table", matches!(t, Tool::Table { kind: TableTool::CutList, .. }), || Tool::Table { kind: TableTool::CutList, view: None, origin: None }, cx))
             .child(self.tool_btn("dr-holetable", "hole-table", "Hole table", matches!(t, Tool::Table { kind: TableTool::Hole, .. }), || Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx))
             .child(sep())
             .child(self.tool_btn("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }, cx))
@@ -166,7 +166,18 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-ccline2", "centerline-circle2", "2 point circle centerline", matches!(t, Tool::CircleCenterline { three: false, .. }), || Tool::CircleCenterline { three: false, points: vec![] }, cx))
             .child(self.tool_btn("dr-cmark", "centermark", "Centermark", matches!(t, Tool::Centermark), || Tool::Centermark, cx))
             .child(self.tool_btn("dr-vsharp", "virtual-sharp", "Virtual sharp", matches!(t, Tool::VirtualSharp { .. }), || Tool::VirtualSharp { first: None }, cx))
+            .children(self.sketch_toolbar(cx))
             .child(sep())
+            .child(
+                crate::ui::tool_button("dr-dwg-insert", "dwg-insert", false, cx)
+                    .tooltip("Insert DXF or DWG")
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_cad_file(window, cx))),
+            )
+            .child(
+                crate::ui::tool_button("dr-image", "image", matches!(t, Tool::PlaceImage { .. }), cx)
+                    .tooltip("Insert image")
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_image(window, cx))),
+            )
             .child(
                 crate::ui::tool_button("dr-painter", "format-painter", self.painter.is_some(), cx)
                     .tooltip("Format painter")
@@ -204,14 +215,11 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    pub fn render_status(&mut self, _cx: &mut Context<Self>) -> AnyElement {
+    pub fn render_status(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let mut parts: Vec<String> = Vec::new();
         if let Some(pr) = self.prompt() {
             parts.push(format!("{}: {pr}", self.tool.name()));
-        }
-        if let Some(s) = &self.status {
-            parts.push(s.to_string());
         }
         if self.computing {
             parts.push("computing views…".into());
@@ -224,23 +232,34 @@ impl DrawingEditor {
         {
             parts.push(format!("{} dangling annotation(s)", b.dangling.len()));
         }
-        if parts.is_empty() {
-            return div().into_any_element();
-        }
+        // Messages ("Exported …", errors) are Onshape's message bubble at the
+        // top center (os_ui::message_bubble), closed with its ×.
+        let bubble = self.status.clone().map(|msg| {
+            let kind = if msg.contains("failed") || msg.contains("Error") { crate::ui::AlertKind::Error } else { crate::ui::AlertKind::Info };
+            let ed = cx.entity();
+            div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(crate::os_ui::message_bubble("dr-toast", kind, msg, move |_, _, cx| {
+                ed.update(cx, |this, cx| {
+                    this.status = None;
+                    cx.notify();
+                })
+            }, cx))
+        });
         // Onshape has no status bar: the tool prompt and drawing state show as
         // quiet text at the bottom-left of the drawing area.
-        div()
-            .absolute()
-            .bottom(px(6.))
-            .left(px(10.))
-            .px(px(6.))
-            .py(px(2.))
-            .rounded(px(3.))
-            .bg(theme_with_alpha(pal.panel, 0.85))
-            .text_size(px(12.))
-            .text_color(pal.text_muted)
-            .child(parts.join("    "))
-            .into_any_element()
+        let quiet = (!parts.is_empty()).then(|| {
+            div()
+                .absolute()
+                .bottom(px(6.))
+                .left(px(10.))
+                .px(px(6.))
+                .py(px(2.))
+                .rounded(px(3.))
+                .bg(theme_with_alpha(pal.panel, 0.85))
+                .text_size(px(12.))
+                .text_color(pal.text_muted)
+                .child(parts.join("    "))
+        });
+        div().absolute().inset_0().children(bubble).children(quiet).into_any_element()
     }
 
     // ------------------------------------------------------------ panels
@@ -249,15 +268,13 @@ impl DrawingEditor {
         let pal = p();
         let panel = self.panel.as_ref()?;
         let (title, rows): (&str, Vec<AnyElement>) = match panel {
-            Panel::Note { input, edit, .. } => (
-                if edit.is_some() { "Edit note" } else { "Note" },
-                vec![
-                    Textarea::new(input).w(px(340.)).into_any_element(),
-                    div().text_xs().text_color(pal.text_faint).child("Fields: {part.name} {part.number} {part.material} {doc.name} {sheet.scale} {sheet.number} {sheet.count} {date}").into_any_element(),
-                ],
-            ),
+            Panel::Note { edit, .. } => {
+                let title = if edit.is_some() { "Edit note" } else { "Note" };
+                (title, self.note_panel_rows(cx))
+            }
             Panel::Dimension { .. } | Panel::Gdt { .. } | Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } | Panel::NewTable { .. } => self.extra_panel_rows(cx)?,
-            Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
+            Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
+            Panel::BomCell { .. } => ("BOM cell", self.bom_cell_rows(cx)),
             Panel::TitleBlock { inputs } => (
                 "Title block (fields like {part.name}, {sheet.scale} allowed)",
                 inputs
@@ -277,8 +294,8 @@ impl DrawingEditor {
             v_flex()
                 .id("dr-panel")
                 .absolute()
-                .top_2()
-                .left_2()
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
                 .p_3()
                 .gap_2()
                 .bg(pal.panel_raised)
@@ -331,12 +348,20 @@ impl DrawingEditor {
     }
 
     pub fn open_note_panel(&mut self, edit: Option<u64>, pos: [f64; 2], window: &mut Window, cx: &mut Context<Self>) {
-        let text = edit
+        let note = edit
             .and_then(|id| self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id))
-            .and_then(|a| if let AnnotationKind::Note { text, .. } = &a.kind { Some(text.clone()) } else { None })
-            .unwrap_or_default();
+            .and_then(|a| if let AnnotationKind::Note { text, height_mm, style } = &a.kind { Some((text.clone(), *height_mm, style.clone())) } else { None });
+        // New notes: Drawing properties › Annotations › Notes text height, else All annotations'.
+        let default_h = self.drawing.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(self.drawing.props.ann_text_height);
+        let (text, h, mut style) = note.unwrap_or((String::new(), default_h, Default::default()));
+        if edit.is_none()
+            && let Some(l) = self.note_leader.take()
+        {
+            style.leaders.push(l);
+        }
         let input = self.textarea(&text, 5, window, cx);
-        self.panel = Some(Panel::Note { input, edit, pos });
+        let height = self.input(&format!("{} mm", noshape_model::drawing::format::format_number(h, None, 2)), window, cx);
+        self.panel = Some(Panel::Note { input, edit, pos, height, style });
         cx.notify();
     }
 
@@ -365,21 +390,34 @@ impl DrawingEditor {
     pub fn apply_panel(&mut self, cx: &mut Context<Self>) {
         let Some(panel) = self.panel.take() else { return };
         match panel {
-            Panel::Note { input, edit, pos } => {
+            Panel::Note { input, edit, pos, height, style } => {
                 let text = input.read(cx).value().to_string();
+                let h = height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.1);
                 if text.trim().is_empty() {
                     if let Some(id) = edit {
                         self.edit_sheet("Delete note", cx, |s| s.annotations.retain(|a| a.id != id));
                     }
                 } else if let Some(id) = edit {
                     self.edit_sheet("Edit note", cx, |s| {
-                        if let Some(AnnotationKind::Note { text: t, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
+                        if let Some(AnnotationKind::Note { text: t, height_mm, style: st }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
                             *t = text;
+                            *st = style;
+                            if let Some(h) = h {
+                                *height_mm = h;
+                            }
                         }
                     });
                 } else {
                     let id = self.current_sheet().next_annotation_id();
-                    self.edit_sheet("Note", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm: 3.5 }, position: pos, ..Default::default() }));
+                    // New notes take Drawing properties › Annotations › Text height.
+                    // Notes › Text height, else All annotations'.
+                    let default_h = self.drawing.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(self.drawing.props.ann_text_height);
+                    let height_mm = h.unwrap_or(default_h);
+                    // The text height becomes the new Notes default.
+                    if h.is_some_and(|h| (h - default_h).abs() > 1e-9) {
+                        self.drawing.props.ann_type_mut(noshape_model::drawing::sheet::AnnType::Notes).height = Some(height_mm);
+                    }
+                    self.edit_sheet("Note", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm, style }, position: pos, ..Default::default() }));
                     self.tool = Tool::Select;
                 }
             }

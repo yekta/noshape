@@ -13,7 +13,7 @@
 //! others the clearance diameter (Onshape's multi-part tapped hole).
 
 use super::helpers_a::*;
-use crate::display::BodyKind;
+use crate::display::{BodyKind, ComputedValue};
 use crate::features::hole_tables as ht;
 use crate::reference::{BodyId, Reference, Role, Source};
 use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
@@ -211,12 +211,20 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
 pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let locs = locations(ev)?;
     if locs.is_empty() {
-        return err("Select sketch points or mate connectors to place holes");
+        return crate::regen::eval::err_at(&["locations"], "No hole points selected.");
     }
     if locs.len() > 500 {
         return err("A hole feature can have at most 500 locations");
     }
     let dims = hole_dims(ev)?;
+    // Onshape (hole.fs → getFitToleranceLimits): a Fit with tolerance /
+    // Fit (tolerance only) whose class has no limits at this size fails the
+    // feature with the table's message.
+    let diameter_fit = match crate::fits::Tolerance::parse(ev.params.get("holeDiameterV3__tolerance")).map(|t| t.hole_fit(dims.diameter)) {
+        Some(Err(e)) => return err(e.message()),
+        Some(Ok(f)) => f,
+        None => None,
+    };
     let end = ev.enum_("endStyleV2").to_string();
     let start_style = ev.enum_("startStyle").to_string();
     let extent = ev.model_extent();
@@ -247,6 +255,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // Tools grouped by the body ids they cut.
     let mut groups: BTreeMap<Vec<BodyId>, Vec<NamedShape>> = BTreeMap::new();
     let mut any_hit = false;
+    // Depth of an Up to next / Up to entity hole, shown read-only.
+    let mut up_to_depth_found: Option<f64> = None;
     for loc in &locs {
         let dir = if flip { loc.normal } else { -loc.normal }.normalize();
         // Ray from far behind the location so bodies around it are seen.
@@ -299,6 +309,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         if h.is_nan() || h <= 1e-9 {
             return err("The hole has zero depth (check the termination and direction)");
         }
+        up_to_depth_found.get_or_insert(h);
         // Overshoot above the start when that is outside every part.
         let over = {
             let o = r_main * 0.25;
@@ -332,6 +343,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                 cbore: dims.cbore,
                 csink: dims.csink,
                 inch: !iso,
+                diameter_fit: diameter_fit.clone(),
+                exits: end == "THROUGH" || h + 1e-9 >= hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max),
             });
         }
         let frame = k::Plane::new(s, -dir, perp(dir));
@@ -377,6 +390,11 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         ev.boolean_into(&targets, tools, k::BooleanOp::Cut).map_err(|e| fe(format!("Hole cut failed: {}", e.message)))?;
+    }
+    // hole.fs: the computed Depth reads "Multiple" for several locations.
+    if let Some(h) = up_to_depth_found.filter(|_| end == "UP_TO_NEXT" || end == "UP_TO_ENTITY") {
+        let v = if locs.len() > 1 { ComputedValue::Text("Multiple".into()) } else { ComputedValue::Length(h) };
+        ev.computed.push(("holeDepthComputedV3".into(), v));
     }
     Ok(())
 }

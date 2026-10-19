@@ -71,10 +71,14 @@ struct CacheEntry {
     state: FeatureState,
 }
 
+/// Parsed Assembly context snapshots: (id, revision) -> bodies and their display.
+type ContextCache = HashMap<(u32, u32), (Vec<Arc<context::Body>>, Vec<crate::display::BodyDisplay>)>;
+
 #[derive(Default)]
 pub struct Regenerator {
     entries: HashMap<FeatureId, CacheEntry>,
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
+    contexts: ContextCache,
 }
 
 fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
@@ -91,6 +95,8 @@ impl Regenerator {
 
     pub fn regenerate(&mut self, studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions) -> RegenResult {
         let t0 = Instant::now();
+        // Model lengths are metres; OCCT's blends are tuned for millimetre-sized parts.
+        let _ = noshape_kernel::set_working_scale(1000.0);
         let upto = opts.upto.unwrap_or_else(|| studio.rollback_index()).min(studio.features.len());
         // Configuration variables are visible to every feature.
         let mut outer_vars: BTreeMap<String, Quantity> = opts.document_variables.clone();
@@ -107,6 +113,18 @@ impl Regenerator {
         let mut key = hash_bytes(0, serde_json::to_vec(&(config, units, &outer_vars.keys().collect::<Vec<_>>())).unwrap_or_default().as_slice());
         for v in outer_vars.values() {
             key = hash_bytes(key, &v.value.to_le_bytes());
+        }
+        // Assembly contexts: features referencing them regenerate when one is updated.
+        for c in &studio.contexts {
+            key = hash_bytes(key, &[c.id.to_le_bytes(), c.revision.to_le_bytes()].concat());
+        }
+        self.contexts.retain(|k, _| studio.contexts.iter().any(|c| (c.id, c.revision) == *k));
+        for c in &studio.contexts {
+            self.contexts.entry((c.id, c.revision)).or_insert_with(|| {
+                let bodies = c.regen_bodies();
+                let display = crate::in_context::display_bodies(c, &bodies);
+                (bodies, display)
+            });
         }
         let mut ctx: Arc<Context> = Arc::new(Context::default());
         let mut states = Vec::with_capacity(studio.features.len());
@@ -128,8 +146,10 @@ impl Regenerator {
             let scope = noshape_units::LayeredScope { inner: &ctx.variables, outer: &outer_vars };
             let mut expr_error: Option<String> = None;
             if let Some(e) = f.suppression_expr.as_deref().filter(|e| !e.trim().is_empty()) {
+                // Onshape's "Unsuppressed if": active while the expression
+                // is true, suppressed while it is false.
                 match eval_bool(e, &scope) {
-                    Ok(b) => suppressed |= b,
+                    Ok(b) => suppressed = !b,
                     Err(msg) => expr_error = Some(format!("Suppression expression: {msg}")),
                 }
             }
@@ -150,7 +170,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0 });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new() });
                 continue;
             }
             if let Some(e) = self.entries.get(&f.id)
@@ -161,7 +181,7 @@ impl Regenerator {
                 continue;
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0 };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -177,7 +197,16 @@ impl Regenerator {
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);
-                        let mut ev = EvalCtx::new(f.id, &f.name, params, units, (*ctx).clone(), &outer_vars);
+                        // Geometry of Assembly contexts joins the feature's context only
+                        // while it is evaluated (never merged, patterned or listed).
+                        let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
+                        let mut base = (*ctx).clone();
+                        if uses_context {
+                            for (bodies, _) in self.contexts.values() {
+                                base.bodies.extend(bodies.iter().cloned());
+                            }
+                        }
+                        let mut ev = EvalCtx::new(f.id, &f.name, params, units, base, &outer_vars);
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = &effective;
                         ev.derived = opts.derived.clone();
@@ -193,17 +222,25 @@ impl Regenerator {
                                 if !ev.warnings.is_empty() {
                                     state.status = FeatureStatus::Warning;
                                     state.message = Some(ev.warnings.join("\n"));
+                                } else if !ev.infos.is_empty() {
+                                    state.status = FeatureStatus::Info;
+                                    state.message = Some(ev.infos.join("\n"));
                                 }
                                 if f.type_id == "sketch"
                                     && let Some(s) = ev.ctx.sketch(f.id)
                                 {
                                     state.underdefined = s.report.dof.is_some_and(|d| d > 0);
                                 }
+                                state.computed = std::mem::take(&mut ev.computed);
+                                if uses_context {
+                                    ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
+                                }
                                 ctx = Arc::new(ev.ctx);
                             }
                             Ok(Err(e)) => {
                                 state.status = if e.warning { FeatureStatus::Warning } else { FeatureStatus::Error };
                                 state.message = Some(e.message);
+                                state.faulty = e.faulty.iter().map(|s| s.to_string()).collect();
                             }
                             Err(_) => {
                                 state.status = FeatureStatus::Error;
@@ -219,6 +256,13 @@ impl Regenerator {
         }
         self.entries.retain(|id, _| live.contains(id));
         let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
+        // The shown Assembly context: its bodies, translucent and pickable.
+        if let Some(active) = studio.active_context
+            && let Some(c) = studio.contexts.iter().find(|c| c.id == active)
+            && let Some((_, shown)) = self.contexts.get(&(c.id, c.revision))
+        {
+            display.context_bodies = shown.clone();
+        }
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;

@@ -7,7 +7,7 @@ use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::sheet::format_scale;
@@ -77,10 +77,10 @@ impl DrawingEditor {
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0xdddddd))
                 .rounded(px(0.))
-                .dropdown_menu(move |mut menu, _, _| {
+                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                     for (label, checked, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
-                        menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| e.update(cx, |this, cx| f(this, w, cx))));
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| e.update(cx, |this, cx| f(this, w, cx))));
                     }
                     menu
                 })
@@ -106,10 +106,10 @@ impl DrawingEditor {
             })
             .collect();
         let ed2 = ed.clone();
-        let scale_menu = Button::new("sp-scale-list").ghost().small().w(px(20.)).p_0().dropdown_caret(true).dropdown_menu(move |mut menu, _, _| {
+        let scale_menu = Button::new("sp-scale-list").ghost().small().w(px(20.)).p_0().dropdown_caret(true).os_dropdown_menu("sp-scale-list-dd", true, move |mut menu, _, _| {
             for (label, checked, f) in &scale_items {
                 let (e, f) = (ed2.clone(), f.clone());
-                menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| e.update(cx, |this, cx| f(this, w, cx))));
+                menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| e.update(cx, |this, cx| f(this, w, cx))));
             }
             menu
         });
@@ -165,8 +165,8 @@ impl DrawingEditor {
             v_flex()
                 .id("dr-sheet-props")
                 .absolute()
-                .top(px(4.))
-                .left(px(4.))
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
                 .w(px(299.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])

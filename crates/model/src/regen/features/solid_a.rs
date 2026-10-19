@@ -23,17 +23,28 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
     let path_edges = resolve_curves(ev, ev.query("path"))?;
     if path_edges.is_empty() {
-        return err("Select a sweep path");
+        return crate::regen::eval::err_at(&["path"], "Select entities for sweep path.");
     }
     let wires = wires_from(&path_edges)?;
     if wires.len() != 1 {
         return err("The sweep path must be one connected chain of edges");
     }
     let path = wires[0].clone();
-    if ev.bool("hasTwist") && matches!(ev.enum_("profileControl"), "NONE" | "KEEP_ORIENTATION") {
-        return err("Sweep twist is not supported yet");
-    }
-    let mut opts = k::SweepOptions { scale_end: if ev.bool("hasScale") { ev.real("scaleFactor")? } else { 1.0 }, ..Default::default() };
+    // Twist: total rotation about the path (Turns, Angle, or one turn per Pitch length).
+    let twist = if ev.bool("hasTwist") && matches!(ev.enum_("profileControl"), "NONE" | "KEEP_ORIENTATION") {
+        let total = match ev.enum_("twistType") {
+            "ANGLE" => ev.angle("angle")?,
+            "PITCH" => {
+                let len: f64 = path.edges().iter().filter_map(|e| e.length().ok()).sum();
+                std::f64::consts::TAU * len / ev.length("pitch")?
+            }
+            _ => std::f64::consts::TAU * ev.real("turns")?,
+        };
+        if ev.bool("ccw") { total } else { -total }
+    } else {
+        0.0
+    };
+    let mut opts = k::SweepOptions { scale_end: if ev.bool("hasScale") { ev.real("scaleFactor")? } else { 1.0 }, twist, ..Default::default() };
     let lock_dir = match ev.enum_("profileControl") {
         "LOCK_FACES" => return err("Sweep \"Lock profile faces\" is not supported yet"),
         "LOCK_DIRECTION" => {
@@ -84,6 +95,11 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         let res = k::sweep(&p.shape, &path, &opts).map_err(kerr("Sweep failed"))?;
         if res.shape.count(ShapeType::Solid) == 0 {
             return err("Sweep did not produce a solid (check that the profile is closed and the path is valid)");
+        }
+        // OCCT sweeps a profile round a bend tighter than the profile into a
+        // self-intersecting solid; Onshape refuses it.
+        if !res.shape.is_valid() || res.shape.self_intersects() {
+            return err("Could not create valid swept body, check input.");
         }
         let names = sweep_names(ev, p, &res, true, true);
         tools.push(NamedShape::new(res.shape, names));
@@ -213,7 +229,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         loft_sections(ev, ev.params.array("wireProfilesArray"), "wireProfileEntities", true)?
     };
     if sections.len() < 2 {
-        return err("Select at least two profiles to loft");
+        return crate::regen::eval::err_at(&["sheetProfilesArray", "wireProfilesArray"], "Select profiles in order from start to finish.");
     }
     if sections[1..sections.len() - 1].iter().any(|s| s.profile.is_none()) {
         return err("Only the first and last loft profiles can be points");
@@ -296,7 +312,7 @@ struct ThickenInput {
 pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     if refs.is_empty() {
-        return err("Select faces or surfaces to thicken");
+        return crate::regen::eval::err_at(&["entities"], "Select surfaces or faces to thicken.");
     }
     let (mut t1, mut t2) = if ev.bool("midplane") {
         let t = ev.length("thickness")? * 0.5;
@@ -466,7 +482,7 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
 pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("profiles");
     if refs.is_empty() {
-        return err("Select sketch curves for the rib profiles");
+        return crate::regen::eval::err_at(&["profiles"], "Select sketch profiles to create the ribs.");
     }
     if ev.bool("hasDraft") {
         return err("Rib draft is not supported yet");

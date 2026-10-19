@@ -61,75 +61,126 @@ pub fn demo_document() -> Document {
 
 /// Source of the demo Feature Studio: a sketch-free "Flange" and a
 /// "Bolt circle" that cuts holes into a selected planar face.
-pub const DEMO_FEATURE_STUDIO: &str = r#"// Custom features for this document (script API: docs/custom-features.md).
-// Lengths are in meters: write mm(8) or inch(0.5). Angles in radians: deg(30).
+pub const DEMO_FEATURE_STUDIO: &str = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
 
-feature("Flange", #{
-    icon: "revolve",
-    description: "Round flange with a hub, a bore, a bolt circle and rounded edges",
-    params: [
-        length("diameter", "Diameter", mm(80)),
-        length("thickness", "Thickness", mm(8)),
-        length("hub_diameter", "Hub diameter", mm(36)),
-        length("hub_height", "Hub height", mm(14)),
-        length("bore", "Bore diameter", mm(20)),
-        int("bolts", "Bolt holes", 6, 0, 24),
-        length("bolt_diameter", "Bolt hole diameter", mm(8)),
-        bool("round", "Round outer edges", true),
-        length("radius", "Edge radius", mm(1.5)).visible_when("round", true),
-    ],
-});
-
-fn flange(ctx, p) {
-    let r = p.diameter / 2.0;
-    if p.hub_diameter >= p.diameter { throw "The hub must be smaller than the flange"; }
-    if p.bore >= p.hub_diameter { throw "The bore must be smaller than the hub"; }
-    // Operation ids keep face names stable when the number of operations changes.
-    let disk = ctx.cylinder([0, 0, 0], [0, 0, 1], r, p.thickness, #{ id: "disk" });
-    ctx.cylinder([0, 0, p.thickness], [0, 0, 1], p.hub_diameter / 2.0, p.hub_height, #{ id: "hub", op: "add" });
-    ctx.cylinder([0, 0, -mm(1)], [0, 0, 1], p.bore / 2.0, p.thickness + p.hub_height + mm(2), #{ id: "bore", op: "remove" });
-    if p.bolts > 0 {
-        let pcd = (r + p.hub_diameter / 2.0) / 2.0;
-        let hole = ctx.cylinder([pcd, 0, -mm(1)], [0, 0, 1], p.bolt_diameter / 2.0, p.thickness + mm(2), #{ id: "bolt" });
-        let others = ctx.circular_pattern(hole, [0, 0, 0], [0, 0, 1], p.bolts, deg(360), #{ id: "bolts" });
-        ctx.subtract(disk, hole + others);
-    }
-    if p.round {
-        // The two circular edges on the outer rim.
-        let rim = [];
-        for e in ctx.filter(ctx.edges(disk), "CIRCLE") {
-            if abs(ctx.bbox(e).size[0] - p.diameter) < 1e-6 { rim.push(e); }
+annotation { "Feature Type Name" : "Flange", "Feature Type Description" : "Round flange with a hub, a bore, a bolt circle and rounded edges" }
+export const flange = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Diameter" }
+        isLength(definition.diameter, { (millimeter) : [1, 80, 10000], (inch) : 3 } as LengthBoundSpec);
+        annotation { "Name" : "Thickness" }
+        isLength(definition.thickness, { (millimeter) : [0.1, 8, 1000], (inch) : 0.3 } as LengthBoundSpec);
+        annotation { "Name" : "Hub diameter" }
+        isLength(definition.hubDiameter, { (millimeter) : [0.1, 36, 10000], (inch) : 1.4 } as LengthBoundSpec);
+        annotation { "Name" : "Hub height" }
+        isLength(definition.hubHeight, { (millimeter) : [0.1, 14, 1000], (inch) : 0.5 } as LengthBoundSpec);
+        annotation { "Name" : "Bore diameter" }
+        isLength(definition.bore, { (millimeter) : [0.1, 20, 10000], (inch) : 0.75 } as LengthBoundSpec);
+        annotation { "Name" : "Bolt holes" }
+        isInteger(definition.bolts, { (unitless) : [0, 6, 24] } as IntegerBoundSpec);
+        annotation { "Name" : "Bolt hole diameter" }
+        isLength(definition.boltDiameter, { (millimeter) : [0.1, 8, 1000], (inch) : 0.3 } as LengthBoundSpec);
+        annotation { "Name" : "Round outer edges", "Default" : true }
+        definition.round is boolean;
+        if (definition.round)
+        {
+            annotation { "Name" : "Edge radius" }
+            isLength(definition.radius, { (millimeter) : [0.01, 1.5, 100], (inch) : 0.06 } as LengthBoundSpec);
         }
-        ctx.fillet(rim, p.radius);
     }
-}
+    {
+        if (definition.hubDiameter >= definition.diameter)
+            throw regenError("The hub must be smaller than the flange", ["hubDiameter"]);
+        if (definition.bore >= definition.hubDiameter)
+            throw regenError("The bore must be smaller than the hub", ["bore"]);
+        const t = definition.thickness;
+        const top = t + definition.hubHeight;
+        const z = 0 * meter;
+        fCylinder(context, id + "disk", { "bottomCenter" : vector(z, z, z), "topCenter" : vector(z, z, t), "radius" : definition.diameter / 2 });
+        fCylinder(context, id + "hub", { "bottomCenter" : vector(z, z, t), "topCenter" : vector(z, z, top), "radius" : definition.hubDiameter / 2 });
+        const body = qCreatedBy(id + "disk", EntityType.BODY);
+        opBoolean(context, id + "join", { "tools" : qUnion([body, qCreatedBy(id + "hub", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+        var cutters = [id + "bore"];
+        fCylinder(context, id + "bore", { "bottomCenter" : vector(z, z, -1 * millimeter), "topCenter" : vector(z, z, top + 1 * millimeter), "radius" : definition.bore / 2 });
+        if (definition.bolts > 0)
+        {
+            const pcd = (definition.diameter + definition.hubDiameter) / 4;
+            fCylinder(context, id + "bolt", { "bottomCenter" : vector(pcd, z, -1 * millimeter), "topCenter" : vector(pcd, z, t + 1 * millimeter), "radius" : definition.boltDiameter / 2 });
+            var transforms = [];
+            var names = [];
+            for (var i = 1; i < definition.bolts; i += 1)
+            {
+                transforms = append(transforms, rotationAround(line(vector(z, z, z), vector(0, 0, 1)), i * 360 / definition.bolts * degree));
+                names = append(names, "bolt" ~ i);
+            }
+            opPattern(context, id + "bolts", { "entities" : qCreatedBy(id + "bolt", EntityType.BODY), "transforms" : transforms, "instanceNames" : names });
+            cutters = concatenateArrays([cutters, [id + "bolt", id + "bolts"]]);
+        }
+        opBoolean(context, id + "cut", {
+                "tools" : qUnion(mapArray(cutters, function(c) { return qCreatedBy(c, EntityType.BODY); })),
+                "targets" : body,
+                "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        if (definition.round)
+        {
+            // The two circular edges on the outer rim.
+            var rim = [];
+            for (var e in evaluateQuery(context, qGeometry(qOwnedByBody(body, EntityType.EDGE), GeometryType.CIRCLE)))
+            {
+                if (tolerantEquals(evCurveDefinition(context, { "edge" : e }).radius, definition.diameter / 2))
+                    rim = append(rim, e);
+            }
+            opFillet(context, id + "round", { "entities" : qUnion(rim), "radius" : definition.radius });
+        }
+    });
 
-feature("Bolt circle", #{
-    icon: "circular-pattern",
-    description: "Holes on a circle centered on a planar face",
-    params: [
-        query("face", "Face", PLANAR_FACE, 1),
-        int("count", "Holes", 4, 1, 36),
-        length("pcd", "Bolt circle diameter", mm(28)),
-        length("diameter", "Hole diameter", mm(3)),
-        bool("through", "Through all", false),
-        length("depth", "Depth", mm(6)).visible_when("through", false),
-    ],
-});
-
-fn bolt_circle(ctx, p) {
-    if p.face.len() == 0 { throw "Select a planar face"; }
-    let face = p.face[0];
-    let plane = ctx.plane(face);
-    let center = ctx.point(face);
-    let n = ctx.normal(face);
-    let depth = if p.through { vlen(ctx.bbox(ctx.parts()).size) * 2.0 } else { p.depth };
-    // A cylinder starting just above the face, pointing into the material.
-    let start = vadd(vadd(center, vscale(plane.x, p.pcd / 2.0)), vscale(n, mm(0.5)));
-    let hole = ctx.cylinder(start, vscale(n, -1.0), p.diameter / 2.0, depth + mm(0.5));
-    let others = ctx.circular_pattern(hole, center, n, p.count, deg(360));
-    ctx.subtract(ctx.owner(face), hole + others);
-}
+annotation { "Feature Type Name" : "Bolt circle", "Feature Type Description" : "Holes on a circle centered on a planar face" }
+export const boltCircle = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Face", "Filter" : EntityType.FACE && GeometryType.PLANE, "MaxNumberOfPicks" : 1 }
+        definition.face is Query;
+        annotation { "Name" : "Holes" }
+        isInteger(definition.count, { (unitless) : [1, 4, 36] } as IntegerBoundSpec);
+        annotation { "Name" : "Bolt circle diameter" }
+        isLength(definition.pcd, { (millimeter) : [0, 28, 10000], (inch) : 1 } as LengthBoundSpec);
+        annotation { "Name" : "Hole diameter" }
+        isLength(definition.diameter, { (millimeter) : [0.01, 3, 1000], (inch) : 0.125 } as LengthBoundSpec);
+        annotation { "Name" : "Through all", "Default" : false }
+        definition.through is boolean;
+        if (!definition.through)
+        {
+            annotation { "Name" : "Depth" }
+            isLength(definition.depth, { (millimeter) : [0.01, 6, 10000], (inch) : 0.25 } as LengthBoundSpec);
+        }
+    }
+    {
+        if (isQueryEmpty(context, definition.face))
+            throw regenError("Select a planar face", ["face"]);
+        const facePlane = evPlane(context, { "face" : definition.face });
+        const center = evApproximateCentroid(context, { "entities" : definition.face });
+        const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane(center, facePlane.normal, facePlane.x) });
+        for (var i = 0; i < definition.count; i += 1)
+        {
+            const a = i * 360 / definition.count * degree;
+            skCircle(sketch, "hole" ~ i, { "center" : vector(cos(a), sin(a)) * definition.pcd / 2, "radius" : definition.diameter / 2 });
+        }
+        skSolve(sketch);
+        opExtrude(context, id + "extrude", {
+                "entities" : qSketchRegion(id + "sketch"),
+                "direction" : -facePlane.normal,
+                "endBound" : definition.through ? BoundingType.THROUGH_ALL : BoundingType.BLIND,
+                "endDepth" : definition.depth
+        });
+        opBoolean(context, id + "cut", {
+                "tools" : qCreatedBy(id + "extrude", EntityType.BODY),
+                "targets" : qOwnerBody(definition.face),
+                "operationType" : BooleanOperationType.SUBTRACTION
+        });
+        opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+    });
 "#;
 
 /// Add the demo Feature Studio and a "Flange" Part Studio using its
@@ -139,7 +190,7 @@ pub fn add_demo_feature_studio(doc: &mut Document) {
     let scripts = crate::custom::DocumentScripts::from_document(doc);
     let units = UnitPrefs::default();
     let mut ps = PartStudio::new();
-    let Some(flange) = ps.new_feature(&crate::custom::type_id(fs, "Flange"), &units) else { return };
+    let Some(flange) = ps.new_feature(&crate::custom::type_id(fs, "flange"), &units) else { return };
     ps.features.push(flange);
     let opts = RegenOptions { custom_features: Some(scripts), ..Default::default() };
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
@@ -154,7 +205,7 @@ pub fn add_demo_feature_studio(doc: &mut Document) {
             .max_by(|a, c| a.1.total_cmp(&c.1))
             .map(|(i, _)| Reference::Face((*b.faces[i]).clone()))
     });
-    if let (Some(top), Some(mut bc)) = (top, ps.new_feature(&crate::custom::type_id(fs, "Bolt circle"), &units)) {
+    if let (Some(top), Some(mut bc)) = (top, ps.new_feature(&crate::custom::type_id(fs, "boltCircle"), &units)) {
         bc.params.set("face", ParamValue::Query(vec![top]));
         ps.features.push(bc);
     }
@@ -247,6 +298,8 @@ pub fn add_demo_assembly(doc: &mut Document) {
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
         best_tessellation: false,
+        reference_designator: None,
+        unsuppressed_if: None,
     };
     let mate = |id: u64, name: &str, t: MateType, a, b| Mate::new(MateId(id), name.into(), t, a, b);
     let mut fastened = mate(4, "Fastened 1", MateType::Fastened, mc(1, top, Inference::Centroid), mc(2, bottom, Inference::Centroid));
@@ -270,7 +323,7 @@ pub fn add_demo_assembly(doc: &mut Document) {
         }
     }
     if let Some(t) = doc.tabs.iter_mut().find(|t| matches!(t.content, TabContent::Assembly(_))) {
-        t.content = TabContent::Assembly(asm);
+        t.content = TabContent::Assembly(Box::new(asm));
     }
 }
 
@@ -337,7 +390,7 @@ pub fn demo_document_with_drawing() -> Document {
     add(sheet, lin(1, [-0.05, 0.0], [0.05, 0.0], -10.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);
     add(sheet, AnnotationKind::Balloon { view: ViewId(4), anchor: [0.0, 0.0], text: "1".into() }, [385.0, 255.0], vec![(0, v(DVec3::new(0.05, -0.03, 0.0)))]);
-    add(sheet, AnnotationKind::Note { text: "NOTES:\n1. BREAK ALL SHARP EDGES.\n2. DIMENSIONS IN MILLIMETERS.".into(), height_mm: 3.5 }, [25.0, 75.0], vec![]);
+    add(sheet, AnnotationKind::note("NOTES:\n1. BREAK ALL SHARP EDGES.\n2. DIMENSIONS IN MILLIMETERS.", 3.5), [25.0, 75.0], vec![]);
     let _ = d.add_tab("Drawing 1", TabContent::Drawing(drawing));
     d
 }

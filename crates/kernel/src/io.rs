@@ -88,6 +88,30 @@ pub struct ExportShape {
 /// Write shapes (one product each, with names and colors) to a STEP AP214
 /// file. Shapes are in `unit`; the file is written in millimeters.
 pub fn write_step(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Result<()> {
+    write_step_with(path, shapes, unit, &StepOptions::default())
+}
+
+/// STEP application protocol written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StepSchema {
+    /// OCCT's default (AP214 IS).
+    #[default]
+    Default,
+    Ap242,
+    Ap214,
+    Ap203,
+}
+
+/// Options of [`write_step_with`].
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct StepOptions {
+    pub schema: StepSchema,
+    /// Length unit of the file (None: millimetres).
+    pub file_unit: Option<LengthUnit>,
+}
+
+/// [`write_step`] with the schema and the file's length unit.
+pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> Result<()> {
     let f = unit.mm_per_unit();
     let mut v = Vec::with_capacity(shapes.len());
     let mut names = Vec::new();
@@ -101,7 +125,22 @@ pub fn write_step(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Resu
         has.push(s.color.is_some());
     }
     let l = vec_to_list(&v);
-    ck(ffi::write_step(&l, &names, &colors, &has, path_str(path)?))
+    let schema = match opts.schema {
+        StepSchema::Default => 0,
+        StepSchema::Ap242 => 1,
+        StepSchema::Ap214 => 2,
+        StepSchema::Ap203 => 3,
+    };
+    // UnitsMethods_LengthUnit codes.
+    let file_unit = match opts.file_unit {
+        None => 0,
+        Some(LengthUnit::Inch) => 1,
+        Some(LengthUnit::Millimeter) => 2,
+        Some(LengthUnit::Foot) => 4,
+        Some(LengthUnit::Meter) => 6,
+        Some(LengthUnit::Centimeter) => 10,
+    };
+    ck(ffi::write_step(&l, &names, &colors, &has, path_str(path)?, schema, file_unit))
 }
 
 /// Convenience: write plain shapes to STEP.
@@ -135,6 +174,69 @@ pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()>
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
     ck(ffi::write_iges(&l, path_str(path)?))
+}
+
+/// Write shapes to a Parasolid transmit file, one body each: text (.x_t) or
+/// neutral binary (.x_b), schema 12006 (read by every Parasolid since V12).
+/// Shapes are in `unit`; Parasolid files are in meters.
+pub fn write_parasolid(path: &Path, shapes: &[Shape], unit: LengthUnit, binary: bool) -> Result<()> {
+    let f = unit.mm_per_unit() * 1e-3;
+    let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
+    let l = vec_to_list(&v);
+    ck(ffi::write_parasolid(&l, path_str(path)?, binary))
+}
+
+/// Write shapes to an ACIS save file (.sat, version 7.0), one body each, in
+/// millimetres. Shapes are in `unit`.
+pub fn write_acis(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()> {
+    let f = unit.mm_per_unit();
+    let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
+    let l = vec_to_list(&v);
+    ck(ffi::write_acis(&l, path_str(path)?))
+}
+
+/// Write shapes to a Rhino .3dm file (one named Brep each, millimetres).
+/// `version` is the Rhino version (2..8; 0 = the newest openNURBS writes).
+/// Needs a kernel built with openNURBS (OPENNURBS_ROOT): CI and releases are.
+pub fn write_rhino(path: &Path, shapes: &[ExportShape], unit: LengthUnit, version: u32) -> Result<()> {
+    let f = unit.mm_per_unit();
+    let v = shapes.iter().map(|s| scaled(&s.shape, f)).collect::<Result<Vec<_>>>()?;
+    let names: Vec<String> = shapes.iter().map(|s| s.name.clone().unwrap_or_default()).collect();
+    let l = vec_to_list(&v);
+    ck(ffi::write_rhino(&l, &names, path_str(path)?, version))
+}
+
+/// Number of Breps in a .3dm file, each checked with openNURBS' validity test
+/// (an error names the first invalid one).
+pub fn rhino_brep_count(path: &Path) -> Result<u32> {
+    ck(ffi::rhino_valid_breps(path_str(path)?))
+}
+
+/// Write shapes to a JT file (JT 9.5 like Onshape's: per part a triangle mesh in
+/// millimetres and the exact B-rep as an embedded Parasolid body). Shapes are in `unit`.
+pub fn write_jt(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Result<()> {
+    let f = unit.mm_per_unit() * 1e-3;
+    let v = shapes.iter().map(|s| scaled(&s.shape, f)).collect::<Result<Vec<_>>>()?;
+    let names: Vec<String> = shapes.iter().map(|s| s.name.clone().unwrap_or_default()).collect();
+    let l = vec_to_list(&v);
+    ck(ffi::write_jt(&l, &names, path_str(path)?))
+}
+
+/// Write shapes to a PTC Creo View .pvz file, laid out like Onshape's (one part
+/// each: per-face mesh and exact B-rep, in metres). Shapes are in `unit`.
+pub fn write_pvz(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Result<()> {
+    let f = unit.mm_per_unit() * 1e-3;
+    let v = shapes.iter().map(|s| scaled(&s.shape, f)).collect::<Result<Vec<_>>>()?;
+    let names: Vec<String> = shapes.iter().map(|s| s.name.clone().unwrap_or_default()).collect();
+    let l = vec_to_list(&v);
+    ck(ffi::write_pvz(&l, &names, path_str(path)?))
+}
+
+/// Read a Parasolid transmit file written by [`write_parasolid`] (schema
+/// 12006, analytic and B-spline geometry) as a compound of bodies in `unit`.
+pub fn read_parasolid(path: &Path, unit: LengthUnit) -> Result<Shape> {
+    let s = Shape::from_res(ffi::read_parasolid(path_str(path)?))?;
+    scaled(&s, 1e3 / unit.mm_per_unit())
 }
 
 /// Write a shape as BREP text file (without triangulation).

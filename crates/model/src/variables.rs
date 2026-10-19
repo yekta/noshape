@@ -19,6 +19,9 @@ pub struct VariableDef {
     pub kind: Option<VarKind>,
     #[serde(default)]
     pub description: String,
+    /// "From import": the CSV selection (kind `FromImport`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import: Option<CsvImport>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,6 +30,9 @@ pub enum VarKind {
     Angle,
     Number,
     Any,
+    /// A value read from a CSV file tab (help: "Importing a variable from a
+    /// CSV table"): a single value, an array or a map.
+    FromImport,
 }
 
 impl VarKind {
@@ -35,8 +41,156 @@ impl VarKind {
             VarKind::Length => Some(Dim::LENGTH),
             VarKind::Angle => Some(Dim::ANGLE),
             VarKind::Number => Some(Dim::UNITLESS),
-            VarKind::Any => None,
+            VarKind::Any | VarKind::FromImport => None,
         }
+    }
+}
+
+/// How rows (or columns) of the CSV are picked: Access type and options.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsvAxis {
+    pub access: CsvAccess,
+    /// By index (0-based).
+    pub index: usize,
+    /// By index range (inclusive, 0-based).
+    pub min: usize,
+    pub max: usize,
+    /// By label: the label to match ("Value").
+    pub label: String,
+    /// By label: match with a regular expression.
+    pub regex: bool,
+    pub result: CsvResult,
+    /// Map results: the column (for rows) / row (for columns) holding labels.
+    pub label_index: usize,
+}
+
+impl Default for CsvAxis {
+    fn default() -> Self {
+        Self { access: CsvAccess::ByIndex, index: 0, min: 0, max: 0, label: String::new(), regex: false, result: CsvResult::Single, label_index: 0 }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CsvAccess {
+    ByIndex,
+    ByIndexRange,
+    ByLabel,
+    All,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CsvResult {
+    Single,
+    Array,
+    Map,
+}
+
+/// A "From import" variable's CSV selection.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CsvImport {
+    /// The CSV file tab.
+    pub file: Option<TabId>,
+    pub row: CsvAxis,
+    pub column: CsvAxis,
+    /// "Conversion factor" (checked: an expression with units, e.g. `1 in`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<String>,
+}
+
+/// The value of a "From import" variable.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ImportValue {
+    Single(String),
+    Array(Vec<ImportValue>),
+    Map(Vec<(String, ImportValue)>),
+}
+
+impl std::fmt::Display for ImportValue {
+    /// Onshape's display: `[A : [1, 10], B : [2, 20]]`, `[1, 2]`, `10`.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ImportValue::Single(s) => write!(f, "{s}"),
+            ImportValue::Array(a) => write!(f, "[{}]", a.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")),
+            ImportValue::Map(m) => write!(f, "[{}]", m.iter().map(|(k, v)| format!("{k} : {v}")).collect::<Vec<_>>().join(", ")),
+        }
+    }
+}
+
+/// Pick the entries of `items` (rows, or the cells of a row) by `axis`;
+/// `label_of(i)` is an entry's label (By label, Map keys).
+fn select<T: Clone>(items: &[T], axis: &CsvAxis, label_of: impl Fn(usize) -> String, value: impl Fn(&T) -> ImportValue) -> Result<ImportValue, String> {
+    let idx: Vec<usize> = match axis.access {
+        CsvAccess::ByIndex => vec![axis.index],
+        CsvAccess::ByIndexRange => (axis.min..=axis.max.max(axis.min)).collect(),
+        CsvAccess::All => (0..items.len()).collect(),
+        CsvAccess::ByLabel => {
+            let re = if axis.regex { Some(regex_lite_match(&axis.label)?) } else { None };
+            (0..items.len()).filter(|i| {
+                let l = label_of(*i);
+                match &re {
+                    Some(m) => m(&l),
+                    None => l == axis.label,
+                }
+            }).collect()
+        }
+    };
+    let picked: Vec<usize> = idx.into_iter().filter(|i| *i < items.len()).collect();
+    match axis.result {
+        CsvResult::Single => picked.first().map(|i| value(&items[*i])).ok_or_else(|| "No matching value in the CSV file".to_string()),
+        CsvResult::Array => Ok(ImportValue::Array(picked.iter().map(|i| value(&items[*i])).collect())),
+        CsvResult::Map => Ok(ImportValue::Map(picked.iter().map(|i| (label_of(*i), value(&items[*i]))).collect())),
+    }
+}
+
+/// A small regular-expression matcher (`^`, `$`, `.`, `*`, literal text) for
+/// "By label" with "Regular expression": anchored at both ends like Onshape.
+fn regex_lite_match(pat: &str) -> Result<impl Fn(&str) -> bool, String> {
+    fn m(p: &[char], t: &[char]) -> bool {
+        match p {
+            [] => t.is_empty(),
+            [c, '*', rest @ ..] => {
+                let mut i = 0;
+                loop {
+                    if m(rest, &t[i..]) {
+                        return true;
+                    }
+                    if i < t.len() && (*c == '.' || t[i] == *c) {
+                        i += 1;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            [c, rest @ ..] => !t.is_empty() && (*c == '.' || t[0] == *c) && m(rest, &t[1..]),
+        }
+    }
+    let p: Vec<char> = pat.trim_start_matches('^').trim_end_matches('$').chars().collect();
+    Ok(move |t: &str| m(&p, &t.chars().collect::<Vec<_>>()))
+}
+
+/// Evaluate a "From import" selection on the document's CSV file tab.
+pub fn import_value(doc: &crate::Document, imp: &CsvImport) -> Result<ImportValue, String> {
+    let file = imp.file.and_then(|t| doc.tab(t)).ok_or("Select a CSV file")?;
+    let crate::TabContent::File(f) = &file.content else { return Err("Select a CSV file".into()) };
+    let text = f.bytes().map(|b| String::from_utf8_lossy(&b).into_owned()).ok_or("The CSV file can't be read")?;
+    let rows: Vec<Vec<String>> = text.trim_start_matches('\u{feff}').lines().filter(|l| !l.trim().is_empty()).map(crate::material_library::split_csv).collect();
+    let col = &imp.column;
+    let row_label = |i: usize| rows.get(i).and_then(|r| r.get(imp.row.label_index)).cloned().unwrap_or_default();
+    select(&rows, &imp.row, row_label, |r: &Vec<String>| {
+        let cell_label = |j: usize| rows.get(col.label_index).and_then(|h| h.get(j)).cloned().unwrap_or_default();
+        select(r, col, cell_label, |c: &String| ImportValue::Single(c.clone())).unwrap_or(ImportValue::Array(Vec::new()))
+    })
+}
+
+/// The expression a single-value "From import" variable evaluates to (the
+/// cell, times the conversion factor); None for arrays and maps (FeatureScript values).
+pub fn import_expression(doc: &crate::Document, imp: &CsvImport) -> Option<String> {
+    match import_value(doc, imp).ok()? {
+        ImportValue::Single(s) => Some(match &imp.conversion {
+            Some(c) if !c.trim().is_empty() => format!("({s}) * ({c})"),
+            _ => s,
+        }),
+        _ => None,
     }
 }
 
@@ -156,6 +310,22 @@ pub fn variables_defined_later(studio: &crate::partstudio::PartStudio, index: us
     studio.features.iter().skip(index).filter_map(name_of).filter(|n| !before.contains(n)).collect()
 }
 
+/// `vs` with its "From import" variables turned into expressions (single
+/// values; arrays and maps are FeatureScript values and get no scalar).
+fn resolved<'a>(vs: &'a VariableStudio, doc: &crate::Document) -> std::borrow::Cow<'a, VariableStudio> {
+    if !vs.variables.iter().any(|v| v.kind == Some(VarKind::FromImport)) {
+        return std::borrow::Cow::Borrowed(vs);
+    }
+    let mut out = vs.clone();
+    // Rows stay in place (results are index-aligned with the table); an
+    // array / map variable gets no scalar value (empty expression).
+    for v in out.variables.iter_mut().filter(|v| v.kind == Some(VarKind::FromImport)) {
+        v.expr = ExprValue::new(v.import.as_ref().and_then(|i| import_expression(doc, i)).unwrap_or_default());
+        v.kind = Some(VarKind::Any);
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 fn studio_of(doc: &crate::Document, tab: TabId) -> Option<&VariableStudio> {
     match &doc.tab(tab)?.content {
         crate::TabContent::VariableStudio(v) => Some(v),
@@ -218,7 +388,7 @@ fn studio_variables_at(doc: &crate::Document, studio: TabId, visiting: &mut Vec<
     for r in &vs.inserted {
         out.extend(ref_variables(doc, r, visiting));
     }
-    let own = vs.evaluate_in(&out, &doc.settings.units);
+    let own = resolved(vs, doc).evaluate_in(&out, &doc.settings.units);
     out.extend(own.values);
     visiting.pop();
     out
@@ -247,7 +417,7 @@ pub fn studio_evaluation(doc: &crate::Document, studio: TabId) -> noshape_units:
     for r in &vs.inserted {
         outer.extend(ref_variables(doc, r, &mut visiting));
     }
-    vs.evaluate_in(&outer, &doc.settings.units)
+    resolved(vs, doc).evaluate_in(&outer, &doc.settings.units)
 }
 
 /// Variables visible in a Part Studio or Assembly: those of the Variable
@@ -308,7 +478,7 @@ mod studio_scope_tests {
     use crate::document::{Tab, TabContent};
 
     fn vs(vars: &[(&str, &str)], all: bool) -> VariableStudio {
-        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new() }).collect(), insert_into_all: all, inserted: Vec::new() }
+        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), import: None }).collect(), insert_into_all: all, inserted: Vec::new() }
     }
 
     fn doc_with(studios: Vec<VariableStudio>) -> (crate::Document, TabId, Vec<TabId>) {
@@ -354,7 +524,7 @@ mod studio_scope_tests {
         assert_eq!(mm(element_variables(&doc, ps).get("a")), 5.0);
         // Studio 2 inserts studio 1 and uses its variable; its own `a` still wins.
         if let TabContent::VariableStudio(v) = &mut doc.tab_mut(ids[1]).unwrap().content {
-            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new() }];
+            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new(), import: None }];
             v.inserted = vec![StudioRef::whole(ids[0])];
             v.insert_into_all = false;
         }
@@ -410,5 +580,37 @@ mod scope_tests {
         assert!(variables_defined_later(&ps, ps.features.len()).is_empty());
         // Editing the first Variable: nothing is defined yet.
         assert_eq!(variables_defined_later(&ps, 0).len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+    use crate::document::{Document, TabContent};
+
+    fn doc_with_csv(csv: &str) -> (Document, TabId) {
+        let mut d = Document::new();
+        let id = d.add_tab("t.csv", TabContent::File(crate::file_tab::FileTab::new("t.csv", csv.as_bytes(), 0)));
+        (d, id)
+    }
+
+    #[test]
+    fn rows_indexed_by_first_column_and_single_values() {
+        // Help: "Variable: From table - Rows indexed by first column example".
+        let (d, id) = doc_with_csv("A,1,10\nB,2,20\nC,3,30\n");
+        let imp = CsvImport {
+            file: Some(id),
+            row: CsvAxis { access: CsvAccess::All, result: CsvResult::Map, label_index: 0, ..Default::default() },
+            column: CsvAxis { access: CsvAccess::ByIndexRange, min: 1, max: 2, result: CsvResult::Array, ..Default::default() },
+            conversion: None,
+        };
+        assert_eq!(import_value(&d, &imp).unwrap().to_string(), "[A : [1, 10], B : [2, 20], C : [3, 30]]");
+        // One cell with a conversion factor becomes a scalar variable.
+        let one = CsvImport { file: Some(id), row: CsvAxis { index: 1, ..Default::default() }, column: CsvAxis { index: 2, ..Default::default() }, conversion: Some("1 mm".into()) };
+        assert_eq!(import_expression(&d, &one).as_deref(), Some("(20) * (1 mm)"));
+        // By label with a regular expression.
+        let lab = CsvImport { file: Some(id), row: CsvAxis { access: CsvAccess::ByLabel, label: "^[BC]*$".replace("[BC]", "C"), regex: true, result: CsvResult::Array, ..Default::default() }, column: CsvAxis { index: 1, ..Default::default() }, conversion: None };
+        assert_eq!(import_value(&d, &lab).unwrap().to_string(), "[3]");
+        assert!(import_value(&d, &CsvImport::default()).is_err());
     }
 }

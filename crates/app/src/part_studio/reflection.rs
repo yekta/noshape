@@ -128,7 +128,19 @@ impl PartStudioView {
             _ => environment_maps::NAMES[0],
         };
         self.ui.env_picker = Some(EnvPicker { tab: 2, choice, search, preview: None, _sub: sub });
+        // Onshape applies the library's first image at once.
+        if self.ui.analysis_tool.as_ref().is_some_and(|t| t.options.reflection.image.is_none()) {
+            self.apply_environment(EnvImageRef::Library(choice), cx);
+        }
         cx.notify();
+    }
+
+    /// Show an image on the parts (the picker stays open).
+    fn apply_environment(&mut self, image: EnvImageRef, cx: &mut Context<Self>) {
+        if let Some(t) = &mut self.ui.analysis_tool {
+            t.options.reflection.image = Some(image);
+        }
+        self.rebuild_scene(cx);
     }
 
     /// Use an image (Select in the picker, or Upload).
@@ -214,11 +226,12 @@ impl PartStudioView {
                     for n in names.clone() {
                         let v = view.clone();
                         m = m.item(PopupMenuItem::new(n).checked(n == choice).on_click(move |_, _, cx| {
+                            // Picking an image applies it right away (Onshape).
                             v.update(cx, |this, cx| {
                                 if let Some(pk) = &mut this.ui.env_picker {
                                     pk.choice = n;
                                 }
-                                cx.notify();
+                                this.apply_environment(EnvImageRef::Library(n), cx);
                             })
                         }));
                     }

@@ -5,8 +5,13 @@
 //!   [`params`]: generic parameter values; [`reference`]: persistent naming.
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
+pub mod file_tab;
 pub mod analysis;
 pub mod thickness;
+pub mod flatten;
+pub mod interference;
+pub mod fits;
+pub mod release;
 pub mod assembly;
 pub mod compare;
 pub mod configuration;
@@ -17,7 +22,9 @@ pub mod display;
 pub mod document;
 pub mod drawing;
 pub mod features;
+pub mod in_context;
 pub mod interaction;
+pub mod material_library;
 pub mod merge;
 pub mod naming;
 pub mod params;

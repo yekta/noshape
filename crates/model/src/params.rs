@@ -225,6 +225,29 @@ impl Hints {
     pub const GROUP_HEADER: Self = Self(1 << 13);
     pub const CAN_BE_TOLERANT: Self = Self(1 << 14);
     pub const ALWAYS_HIDDEN: Self = Self(1 << 15);
+    /// Array shown as one selection field ("Vertices"): picking adds an item
+    /// for the entity (its first query param), removing a pick removes the
+    /// item; the items' other params follow (Onshape's "Driven query").
+    pub const DRIVEN_QUERY: Self = Self(1 << 16);
+    /// With GROUP_HEADER on a boolean: a plain collapsible group title
+    /// ("› Axis measurements"), no checkbox; the value is "unfolded".
+    pub const GROUP_LABEL: Self = Self(1 << 17);
+    /// A selection field that accepts mate connectors without offering the
+    /// "Select mate connector" side button (Linear pattern's Direction).
+    pub const NO_MATE_CONNECTOR_BUTTON: Self = Self(1 << 18);
+    /// A tolerant diameter (FeatureScript `CAN_BE_TOLERANT_DIAMETER`): its
+    /// tolerance types add Fit, Fit with tolerance and Fit (tolerance only).
+    /// Implies CAN_BE_TOLERANT.
+    pub const CAN_BE_TOLERANT_DIAMETER: Self = Self(1 << 19 | 1 << 14);
+    /// A query field with the "Create selection" side button (FeatureScript
+    /// `SHOW_CREATE_SELECTION`).
+    pub const SHOW_CREATE_SELECTION: Self = Self(1 << 20);
+    /// FeatureScript `UIHint.PRIMARY_AXIS`: a boolean shown as a 26 px flip
+    /// button at the row's start (Mate connector's Flip primary axis).
+    pub const PRIMARY_AXIS: Self = Self(1 << 21);
+    /// FeatureScript `UIHint.MATE_CONNECTOR_AXIS_TYPE`: an enum shown as one
+    /// icon button that steps through the options ("Reorient secondary axis").
+    pub const MATE_CONNECTOR_AXIS_TYPE: Self = Self(1 << 22);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)
@@ -265,11 +288,19 @@ pub struct ParamSpec {
     pub hints: Hints,
     pub visible: Option<VisibleFn>,
     pub description: &'static str,
+    /// An array's item label (FeatureScript "Item label template"):
+    /// `#param` stands for an item parameter's value, `#index` for its
+    /// 1-based position ("[#continuity] #entities").
+    pub item_template: Option<&'static str>,
 }
 
 impl ParamSpec {
     fn new(id: &'static str, label: &'static str, kind: ParamKind) -> Self {
-        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "" }
+        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "", item_template: None }
+    }
+    pub fn item_template(mut self, t: &'static str) -> Self {
+        self.item_template = Some(t);
+        self
     }
     pub fn bool(id: &'static str, label: &'static str, default: bool) -> Self {
         Self::new(id, label, ParamKind::Bool { default })

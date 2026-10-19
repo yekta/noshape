@@ -9,7 +9,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::document::TabContent;
@@ -117,6 +117,19 @@ impl DrawingEditor {
         ];
         let cl = v.show_centerlines;
         show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| v.show_centerlines = !cl)));
+        let al = v.auto_centerlines.unwrap_or(cl);
+        show.push(MenuEntry::item(if al { "Hide auto centerlines" } else { "Show auto centerlines" }, move |t, _, cx| t.edit_view("Centerlines", id, cx, |v| v.auto_centerlines = Some(!al))));
+        if v.sketch.is_none() {
+            show.push(MenuEntry::item("Show/hide parts", move |t, _, cx| t.open_hide_parts(id, cx)));
+            let com = v.show_com;
+            show.push(MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_view("Center of mass", id, cx, |v| v.show_com = !com)));
+        }
+        // Part views (not sketch views): the source's sketches and their points.
+        if v.sketch.is_none() && !self.view_sketch_list(id).is_empty() {
+            show.push(MenuEntry::item("Show/hide sketches", move |t, _, cx| t.open_view_sketches(id, cx)));
+            let hp = v.hide_sketch_points;
+            show.push(MenuEntry::item(if hp { "Show sketch points" } else { "Hide sketch points" }, move |t, _, cx| t.edit_view("Sketch points", id, cx, |v| v.hide_sketch_points = !hp)));
+        }
         out.push(MenuEntry::Submenu("Show/hide".into(), show));
         // View orientation ▸ (base views; the current one is checked).
         if let ViewKind::Base { orientation, .. } = &v.kind {
@@ -445,10 +458,10 @@ impl DrawingEditor {
                 .xsmall()
                 .w_full()
                 .dropdown_caret(true)
-                .dropdown_menu(move |mut menu, _, _| {
+                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                     for (label, checked, f) in &items {
                         let (v, f) = (view.clone(), f.clone());
-                        menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| {
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| {
                             v.update(cx, |this, cx| {
                                 if let Some(p) = &mut this.view_props {
                                     f(p);

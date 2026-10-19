@@ -61,6 +61,9 @@ pub struct SectionDialog {
     saved: (Vec<SectionPlane>, Option<(bool, Vec<BodyId>)>),
 }
 
+/// The section view dialog's prompt (live part-studio/70).
+const SELECT_SECTION_PLANE: &str = "Select a plane, planar face, cylinder, or mate connector.";
+
 impl PartStudioView {
     /// Plane frame of a plane, planar face, sketch entity or mate connector.
     pub(super) fn frame_of_ref(&self, r: &Reference) -> Option<PlaneFrame> {
@@ -105,9 +108,14 @@ impl PartStudioView {
             return;
         }
         let saved = (self.ui.section.clone(), self.ui.section_parts.clone());
-        if self.ui.section.is_empty() {
+        // Live (part-studio/70): from the camera menu with nothing selected
+        // the dialog opens empty and asks for a plane.
+        if self.ui.section.is_empty() && !self.selection.is_empty() {
             let refs = self.selection.clone();
             self.ui.section = self.planes_for(&refs, cx);
+        }
+        if self.ui.section.is_empty() {
+            self.message = Some((noshape_model::display::FeatureStatus::Info, SELECT_SECTION_PLANE.into()));
         }
         let (include, items) = self.ui.section_parts.clone().unwrap_or((false, Vec::new()));
         let active = self.ui.section.len().saturating_sub(1);
@@ -130,8 +138,14 @@ impl PartStudioView {
 
     /// Context menu "Section view…" on an entity.
     pub(super) fn section_through(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
+        self.section_through_all(&[r], window, cx);
+    }
+
+    /// Section view… with several references (planes of the selected
+    /// sketches and planes; the Front plane when none is planar).
+    pub(super) fn section_through_all(&mut self, refs: &[Reference], window: &mut Window, cx: &mut Context<Self>) {
         let saved = (self.ui.section.clone(), self.ui.section_parts.clone());
-        self.ui.section = self.planes_for(&[r], cx);
+        self.ui.section = self.planes_for(refs, cx);
         self.ui.section_dialog = None;
         self.open_section_dialog(window, cx);
         if let Some(d) = &mut self.ui.section_dialog {
@@ -142,6 +156,9 @@ impl PartStudioView {
     /// ✓ keeps the section, ✕ restores the state before the dialog.
     pub(super) fn close_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = self.ui.section_dialog.take() else { return };
+        if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
+            self.message = None;
+        }
         if accept {
             self.ui.section_parts = (!d.items.is_empty()).then_some((d.include, d.items));
         } else {
@@ -170,7 +187,7 @@ impl PartStudioView {
             }
         } else {
             let Some(f) = self.frame_of_ref(r) else {
-                self.flash_info("Select a plane, planar face or mate connector".into(), cx);
+                self.flash_info(SELECT_SECTION_PLANE.into(), cx);
                 return true;
             };
             let label = self.labeler(cx)(r);
@@ -181,6 +198,9 @@ impl PartStudioView {
                 return true;
             } else {
                 self.ui.section.push(plane(&label, f.origin, f.normal));
+                if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
+                    self.message = None;
+                }
             }
             if let Some(d) = &mut self.ui.section_dialog {
                 d.active = self.ui.section.len().saturating_sub(1);

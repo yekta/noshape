@@ -11,7 +11,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::Input;
-use gpui_kit::component::menu::DropdownMenu as _;
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -207,6 +207,10 @@ impl DrawingEditor {
     }
 
     pub fn more_overlay(&self, overlay: &mut Overlay) {
+        // Selected table cells.
+        if let Some((a, b)) = self.cell_sel_rect() {
+            overlay.rect(a, b, false);
+        }
         let c = self.hover_snap.unwrap_or(self.cursor);
         match &self.tool {
             Tool::BrokenOut { parent: Some(pid), points, .. } | Tool::CropPoly { parent: Some(pid), points, .. } if !points.is_empty() => {
@@ -280,13 +284,13 @@ impl DrawingEditor {
             }
             Tool::GdtLeader { id } => {
                 let leader = match self.snap_at(c).or_else(|| self.any_point(c)) {
-                    Some(p) => Leader { view: Some(p.view), point: p.p },
-                    None => Leader { view: None, point: c },
+                    Some(p) => Leader { view: Some(p.view), point: p.p, nodes: Vec::new() },
+                    None => Leader { view: None, point: c, nodes: Vec::new() },
                 };
-                self.edit_sheet("Add leader", cx, |s| {
-                    if let Some(AnnotationKind::Gdt { leaders, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
-                        leaders.push(leader);
-                    }
+                self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
+                    Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
+                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(leader),
+                    _ => {}
                 });
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Annotation(id)];
@@ -443,6 +447,18 @@ impl DrawingEditor {
                     }));
                 }
             }
+            AnnotationKind::Note { style, .. } => {
+                out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                if !style.leaders.is_empty() {
+                    out.push(MenuEntry::item("Remove leader", move |t, _, cx| {
+                        t.edit_sheet("Remove leader", cx, |s| {
+                            if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                                style.leaders.clear();
+                            }
+                        })
+                    }));
+                }
+            }
             &AnnotationKind::RadialDimension { view, center, radius, angle, .. } => {
                 let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
                 let jog = [center[0] + d[0] * radius * 0.55 + w[0] * radius * 0.2, center[1] + d[1] * radius * 0.55 + w[1] * radius * 0.2];
@@ -548,6 +564,27 @@ impl DrawingEditor {
                 t.unmerge(r, c);
             })));
         }
+        // Size › Columns equally / Rows equally; Resize… (column width, row height).
+        let layout = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
+        if let Some(l) = layout {
+            let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+            let tallest = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).fold(0.0, f64::max);
+            let avg = widths.iter().sum::<f64>() / widths.len().max(1) as f64;
+            out.push(MenuEntry::Submenu(
+                "Size".into(),
+                vec![
+                    MenuEntry::item("Columns equally", move |t, _, cx| t.edit_table(id, "Size columns equally", cx, |t| t.col_widths = vec![avg; widths.len()])),
+                    MenuEntry::item("Rows equally", move |t, _, cx| t.edit_table(id, "Size rows equally", cx, |t| t.row_height = tallest)),
+                ],
+            ));
+            let (w, h) = (l.xs.get(c + 1).zip(l.xs.get(c)).map(|(b, a)| b - a).unwrap_or(20.0), t.row_height);
+            out.push(MenuEntry::item("Resize…", move |t, win, cx| {
+                let width = t.input(&format::format_number(w, None, 2), win, cx);
+                let height = t.input(&format::format_number(h, None, 2), win, cx);
+                t.panel = Some(Panel::CellResize { table: id, col: c, width, height });
+                cx.notify();
+            }));
+        }
         out.push(MenuEntry::Separator);
         out
     }
@@ -650,7 +687,7 @@ impl DrawingEditor {
                 (
                     "Format cells",
                     vec![
-                        Self::label_row("Apply to", Button::new("dr-cf-scope").label(SCOPES[scope]).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &scope_entries, &ed, w, cx)).into_any_element()),
+                        Self::label_row("Apply to", Button::new("dr-cf-scope").label(SCOPES[scope]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-cf-scope-dd", true, move |m, w, cx| fill_os_menu(m, &scope_entries, &ed, w, cx)).into_any_element()),
                         Self::label_row("Alignment", h_flex().gap_1().child(align_btn("dr-cf-l", "Left", CellAlign::Left)).child(align_btn("dr-cf-c", "Center", CellAlign::Center)).child(align_btn("dr-cf-r", "Right", CellAlign::Right)).into_any_element()),
                         Self::label_row("Text height", h_flex().gap_2().child(Input::new(height).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child("mm (empty = table)")).into_any_element()),
                         Checkbox::new("dr-cf-bold")
@@ -666,6 +703,13 @@ impl DrawingEditor {
                     ],
                 )
             }
+            Panel::CellResize { width, height, .. } => (
+                "Resize",
+                vec![
+                    Self::label_row("Column width", h_flex().gap_2().child(Input::new(width).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child("mm")).into_any_element()),
+                    Self::label_row("Row height", h_flex().gap_2().child(Input::new(height).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child("mm")).into_any_element()),
+                ],
+            ),
             Panel::DatumTarget { label, area, width, height, .. } => {
                 let area = *area;
                 let entries: Vec<MenuEntry> = AREAS
@@ -682,7 +726,7 @@ impl DrawingEditor {
                     .collect();
                 let mut rows = vec![
                     Self::label_row("Label", Input::new(label).small().w(px(100.)).into_any_element()),
-                    Self::label_row("Target area", Button::new("dr-dt-area").label(AREAS[area]).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &entries, &ed, w, cx)).into_any_element()),
+                    Self::label_row("Target area", Button::new("dr-dt-area").label(AREAS[area]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-dt-area-dd", true, move |m, w, cx| fill_os_menu(m, &entries, &ed, w, cx)).into_any_element()),
                 ];
                 match area {
                     1 => rows.push(Self::label_row("Diameter", h_flex().gap_2().child(Input::new(width).xsmall().w(px(70.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element())),
@@ -741,6 +785,26 @@ impl DrawingEditor {
                         t.set_cell_format(r, c, CellFormat { align, height: h, bold });
                     }
                     t.col_widths.clear();
+                });
+            }
+            Panel::CellResize { table, col, width, height } => {
+                // Can't exceed the sheet.
+                let (sw, sh) = self.current_sheet().size.size_mm();
+                let w = num(val(&width, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5).map(|v| v.min(sw));
+                let h = num(val(&height, cx).trim_end_matches("mm").to_string()).filter(|v| *v > 0.5).map(|v| v.min(sh));
+                let widths: Vec<f64> = self.built.as_ref().and_then(|b| b.table_layout(table)).map(|l| l.xs.windows(2).map(|x| x[1] - x[0]).collect()).unwrap_or_default();
+                self.edit_table(table, "Resize cell", cx, |t| {
+                    if let Some(w) = w {
+                        if t.col_widths.len() != widths.len() {
+                            t.col_widths = widths.clone();
+                        }
+                        if let Some(x) = t.col_widths.get_mut(col) {
+                            *x = w;
+                        }
+                    }
+                    if let Some(h) = h {
+                        t.row_height = h;
+                    }
                 });
             }
             Panel::DatumTarget { id, label, area, width, height } => {

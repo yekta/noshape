@@ -11,6 +11,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::base::FocusTrapElement as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
@@ -36,6 +37,8 @@ pub enum DialogEvent {
     PreviewOpacity(f32),
     /// "Configure features" mode: the user picked this parameter.
     ConfigureParam(String),
+    /// The field's "Create selection" side button was clicked.
+    CreateSelection(String),
 }
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
@@ -54,11 +57,20 @@ pub struct FeatureDialog {
     units: UnitPrefs,
     inputs: HashMap<String, Entity<InputState>>,
     pub active_query: Option<String>,
+    /// The field the open Create selection dialog fills (white with a blue
+    /// border while it is open, live part-studio/395).
+    pub cs_target: Option<String>,
     subs: Vec<Subscription>,
     parse_errors: HashMap<String, String>,
     pub status: Option<(FeatureStatus, String)>,
+    /// Parameters the regeneration error points at (Onshape paints those
+    /// fields pink with the message as their tooltip).
+    pub faulty: Vec<String>,
     labeler: RefLabeler,
     collapsed_groups: std::collections::HashSet<String>,
+    /// Tolerance options shown (`<param>__tolerance` keys); Onshape
+    /// collapses them until the row's chevron is clicked.
+    tol_open: std::collections::HashSet<String>,
     focus: FocusHandle,
     renaming: Option<Entity<InputState>>,
     /// Sources offered by the Derived feature's Part Studio picker.
@@ -108,7 +120,17 @@ pub struct FeatureDialog {
     /// Rows the owner adds under the parameters and a footer element left
     /// of `?` (the Sketch dialog's display options and diagnostics button).
     pub extra: Option<DialogExtra>,
+    /// Onshape selects (End type, Hole type…) by field key, and what picking
+    /// an item does (refreshed on every render).
+    selects: HashMap<String, Entity<crate::os_select::OsSelect>>,
+    select_actions: HashMap<String, SelectAction>,
+    /// Values the model computed for read-only parameters (by path).
+    computed: HashMap<String, String>,
+    /// The initial-focus text field got the keyboard once.
+    initial_focus_done: bool,
 }
+
+type SelectAction = std::rc::Rc<dyn Fn(&mut FeatureDialog, SharedString, &mut Context<FeatureDialog>)>;
 
 /// See [`FeatureDialog::extra`].
 pub type DialogExtra = Arc<dyn Fn(&mut Window, &mut Context<FeatureDialog>) -> (Vec<AnyElement>, Option<AnyElement>)>;
@@ -139,20 +161,35 @@ impl FeatureDialog {
         let ty = feature.feature_type().expect("registered feature type");
         let mut feature = feature;
         fill_defaults(&ty.params, &mut feature.params, &units);
+        // Live (dialogs/fillet-01): a group that is on by default starts folded
+        // ("› ☑ Allow edge overflow"); checking a group unfolds it.
+        let collapsed_groups = ty
+            .params
+            .iter()
+            .filter(|s| s.hints.has(Hints::GROUP_HEADER) && !s.hints.has(Hints::GROUP_LABEL) && matches!(s.kind, ParamKind::Bool { default: true }) && feature.params.bool(s.id))
+            .map(|s| s.id.to_string())
+            .collect();
         let mut d = Self {
             feature,
             ty,
             units,
             inputs: HashMap::new(),
+            selects: HashMap::new(),
+            select_actions: HashMap::new(),
+            computed: HashMap::new(),
+            initial_focus_done: false,
             baselines: HashMap::new(),
             size: None,
             configure_mode: false,
             active_query: None,
+            cs_target: None,
             subs: Vec::new(),
             parse_errors: HashMap::new(),
             status: None,
+            faulty: Vec::new(),
             labeler,
-            collapsed_groups: Default::default(),
+            collapsed_groups,
+            tol_open: Default::default(),
             focus: cx.focus_handle(),
             renaming: None,
             derived_sources: Vec::new(),
@@ -183,7 +220,8 @@ impl FeatureDialog {
             .params
             .iter()
             .filter(|s| s.is_visible(&self.feature.params))
-            .find(|s| matches!(s.kind, ParamKind::Query { .. }))
+            // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
+            .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY))
             .map(|s| s.id.to_string())
     }
 
@@ -203,8 +241,13 @@ impl FeatureDialog {
     pub fn active_filter(&self) -> Option<(String, QueryFilter, Option<usize>)> {
         let path = self.active_query.clone()?;
         let spec = self.spec_for_path(&path)?;
-        match spec.kind {
-            ParamKind::Query { filter, max_picks } => Some((path, filter, max_picks)),
+        match &spec.kind {
+            ParamKind::Query { filter, max_picks } => Some((path, *filter, *max_picks)),
+            // A driven array picks what its items' first query takes.
+            ParamKind::Array { item, .. } if spec.hints.has(Hints::DRIVEN_QUERY) => item.iter().find_map(|i| match i.kind {
+                ParamKind::Query { filter, .. } => Some((path.clone(), filter, None)),
+                _ => None,
+            }),
             _ => None,
         }
     }
@@ -323,6 +366,14 @@ impl FeatureDialog {
     pub fn add_pick(&mut self, r: Reference, cx: &mut Context<Self>) -> bool {
         let Some((path, _filter, max)) = self.active_filter() else { return false };
         self.user_set.insert(path.clone());
+        if let Some(spec) = self.spec_for_path(&path)
+            && let ParamKind::Array { item, .. } = &spec.kind
+        {
+            self.toggle_driven_item(spec.id, item_slice(item), r);
+            cx.emit(DialogEvent::Changed);
+            cx.notify();
+            return true;
+        }
         let Some((vals, id)) = self.values_for_path_mut(&path) else { return false };
         let q = vals.query_mut(&id);
         if let Some(pos) = q.iter().position(|x| *x == r) {
@@ -344,6 +395,31 @@ impl FeatureDialog {
         true
     }
 
+    /// A pick in a driven array ("Vertices"): the item holding `r` goes
+    /// away, otherwise a new item takes it, its "match last item" values
+    /// copied from the previous item (Onshape).
+    fn toggle_driven_item(&mut self, arr: &'static str, item_specs: &'static [ParamSpec], r: Reference) {
+        let Some(q) = item_specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. })) else { return };
+        let mut v = ParamValues::default();
+        fill_defaults(item_specs, &mut v, &self.units);
+        let entry = self.feature.params.0.entry(arr.to_string()).or_insert_with(|| ParamValue::Array(vec![]));
+        let ParamValue::Array(items) = entry else { return };
+        if let Some(k) = items.iter().position(|it| it.query(q.id).contains(&r)) {
+            items.remove(k);
+            self.inputs.retain(|p, _| !p.starts_with(&format!("{arr}.")));
+            return;
+        }
+        if let Some(last) = items.last() {
+            for spec in item_specs.iter().filter(|p| p.hints.has(Hints::MATCH_LAST_ARRAY_ITEM)) {
+                if let Some(val) = last.get(spec.id) {
+                    v.set(spec.id, val.clone());
+                }
+            }
+        }
+        v.set(q.id, ParamValue::Query(vec![r]));
+        items.push(v);
+    }
+
     /// Set or clear the tolerance of a top-level quantity (`key` =
     /// `<param>__tolerance`).
     fn set_tolerance(&mut self, key: &str, t: Option<Tolerance>, cx: &mut Context<Self>) {
@@ -359,34 +435,41 @@ impl FeatureDialog {
         cx.notify();
     }
 
-    /// Tolerance row: type, upper/lower values, precision.
-    fn render_tolerance(&mut self, key: &str, t: Tolerance, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    /// Tolerance options under a tolerant quantity (live,
+    /// dom/dialog-hole-tolerance*.txt, dialogs/hole-31–35): 20 px in, past a
+    /// tree line ending in a short tick, a 148 px column of 28 px rows: the
+    /// precision select ("Workspace precision"), the tolerance type select,
+    /// then the type's values; the Fit types add 22 px Standard / Fit type /
+    /// Hole class / Shaft class rows (labels 11 px, right-aligned in 60 px).
+    fn render_tolerance(&mut self, key: &str, t: Tolerance, diameter: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let view = cx.entity();
-        let k1 = key.to_string();
-        let current = t.clone();
-        let type_menu = Button::new(SharedString::from(format!("toltype-{key}"))).label(t.kind.clone()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-            for kind in Tolerance::KINDS {
-                let (v, k, mut nt) = (view.clone(), k1.clone(), current.clone());
-                nt.kind = kind.to_string();
-                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(*kind).checked(current.kind == *kind).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_tolerance(&k, Some(nt.clone()), cx))));
+        // The stored options (value inputs write straight into the params).
+        fn stored(this: &FeatureDialog, key: &str) -> Tolerance {
+            Tolerance::parse(this.get_value(key)).unwrap_or_default()
+        }
+        let mut col = v_flex().w(px(148.)).flex_none();
+        // Precision, then type: 148 px selects with their name as tooltip.
+        let k = key.to_string();
+        let items = Tolerance::PRECISIONS.iter().map(|(_, l)| (SharedString::from(*l), SharedString::from(*l))).collect();
+        let prec = self.os_select(&format!("{key}#precision"), items, Tolerance::precision_label(t.precision), move |this, id, cx| {
+            let mut nt = stored(this, &k);
+            nt.precision = Tolerance::PRECISIONS.iter().find(|(_, l)| *l == &*id).and_then(|(v, _)| *v);
+            this.set_tolerance(&k, Some(nt), cx);
+        }, cx);
+        let k = key.to_string();
+        let items = Tolerance::kinds(diameter).iter().map(|l| (SharedString::from(*l), SharedString::from(*l))).collect();
+        let kind = self.os_select(&format!("{key}#type"), items, &t.kind, move |this, id, cx| {
+            let mut nt = stored(this, &k);
+            nt.kind = id.to_string();
+            if nt.is_fit() {
+                nt.fit = Some(nt.fit_spec());
             }
-            m
-        });
-        let view = cx.entity();
-        let k2 = key.to_string();
-        let current = t.clone();
-        let prec_label = t.precision.map(|p| format!("{p} places")).unwrap_or_else(|| "Workspace precision".into());
-        let prec_menu = Button::new(SharedString::from(format!("tolprec-{key}"))).label(prec_label).ghost().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-            for p in std::iter::once(None).chain((0..=6u8).map(Some)) {
-                let (v, k, mut nt) = (view.clone(), k2.clone(), current.clone());
-                nt.precision = p;
-                let label = p.map(|p| format!("{p} places")).unwrap_or_else(|| "Workspace precision".into());
-                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(label).checked(current.precision == p).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_tolerance(&k, Some(nt.clone()), cx))));
-            }
-            m
-        });
-        let mut fields: Vec<AnyElement> = Vec::new();
+            this.set_tolerance(&k, Some(nt), cx);
+        }, cx);
+        for (name, sel) in [("Precision", prec), ("Tolerance type", kind)] {
+            col = col.child(div().id(SharedString::from(format!("{key}-{name}"))).h(px(28.)).tooltip(crate::ui::tooltip(name)).child(sel));
+        }
+        // Values of Symmetrical / Deviation / Limits.
         for (slot, label) in t.value_labels() {
             let text = if slot == 0 { t.upper.clone() } else { t.lower.clone() };
             let ik = format!("{key}.{slot}");
@@ -394,10 +477,10 @@ impl FeatureDialog {
                 Some(st) => st.clone(),
                 None => {
                     let st = cx.new(|cx| InputState::new(window, cx).default_value(text));
-                    let (k, tt) = (key.to_string(), t.clone());
+                    let k = key.to_string();
                     let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
                         if matches!(ev, InputEvent::Change) {
-                            let mut nt = Tolerance::parse(this.get_value(&k)).unwrap_or_else(|| tt.clone());
+                            let mut nt = stored(this, &k);
                             let v = st.read(cx).value().to_string();
                             if slot == 0 {
                                 nt.upper = v;
@@ -413,9 +496,65 @@ impl FeatureDialog {
                     st
                 }
             };
-            fields.push(h_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child(label)).child(div().w(px(70.)).child(Input::new(&st).xsmall())).into_any_element());
+            col = col.child(
+                h_flex()
+                    .h(px(28.))
+                    .child(div().px(px(5.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(label))
+                    .child(div().flex_1().min_w_0().child(Input::new(&st).xsmall())),
+            );
         }
-        v_flex().pl(px(10.)).gap_1().child(h_flex().gap_1().child(type_menu).child(prec_menu)).children(fields).into_any_element()
+        // Fit: Standard ▸ Fit type ▸ Hole class ▸ Shaft class.
+        if t.is_fit() {
+            let spec = t.fit_spec();
+            let levels: [(&'static [&'static str], Vec<&'static str>, &str); 4] = [
+                (&["Standard"], noshape_model::fits::STANDARDS.to_vec(), spec.standard.as_str()),
+                (&["Fit type"], noshape_model::fits::FIT_TYPES.to_vec(), spec.fit_type.as_str()),
+                (&["Hole", "class"], noshape_model::fits::hole_classes(&spec.standard, &spec.fit_type), spec.hole.as_str()),
+                (&["Shaft", "class"], noshape_model::fits::shaft_classes(&spec.standard, &spec.fit_type, &spec.hole), spec.shaft.as_str()),
+            ];
+            for (level, (lines, options, current)) in levels.into_iter().enumerate() {
+                let k = key.to_string();
+                let items = options.iter().map(|o| (SharedString::from(*o), SharedString::from(*o))).collect();
+                let sel = self.os_select(&format!("{key}#fit{level}"), items, current, move |this, id, cx| {
+                    let mut nt = stored(this, &k);
+                    let mut f = nt.fit_spec();
+                    match level {
+                        0 => f.standard = id.to_string(),
+                        1 => f.fit_type = id.to_string(),
+                        2 => f.hole = id.to_string(),
+                        _ => f.shaft = id.to_string(),
+                    }
+                    nt.fit = Some(f.normalized());
+                    this.set_tolerance(&k, Some(nt), cx);
+                }, cx);
+                sel.update(cx, |s, _| s.set_height(22.));
+                // Live: the label cell is 11 px #333 at 50 % (line height 9.9 px,
+                // "Hole class" on two lines), the select ≈ 88 px.
+                let label = v_flex()
+                    .w(px(60.))
+                    .flex_none()
+                    .h_full()
+                    .px(px(5.))
+                    .pb(px(2.))
+                    .justify_center()
+                    .items_end()
+                    .text_size(px(11.))
+                    .line_height(px(9.9))
+                    .text_color(pal.text)
+                    .opacity(0.5)
+                    .children(lines.iter().map(|l| div().child(*l)));
+                col = col.child(h_flex().h(px(22.)).child(label).child(div().flex_1().min_w_0().child(sel)));
+            }
+        }
+        // Live: div.quantity-tolerance-indent.node-indent-line-end (20 px): a
+        // 1 px line down the middle ending in a tick toward the options.
+        let indent = div()
+            .w(px(20.))
+            .flex_none()
+            .relative()
+            .child(div().absolute().left(px(10.)).top_0().bottom_0().w(px(1.)).bg(pal.border))
+            .child(div().absolute().left(px(10.)).bottom_0().w(px(5.)).h(px(1.)).bg(pal.border));
+        h_flex().w_full().items_stretch().child(indent).child(col).into_any_element()
     }
 
     /// Move pick `from` to position `to` within a selection field.
@@ -458,6 +597,71 @@ impl FeatureDialog {
                 }
             }
         }
+        // Nothing left to pick: the filled field lets go (live sketch/01:
+        // "Top plane" picked, the Sketch plane field no longer active).
+        self.active_query = None;
+    }
+
+    /// An array item's label from its template (FeatureScript "Item label
+    /// template"): `#param` = the item's value of that parameter (a pick's
+    /// name, an option's label, a value as typed), `#index` = its position.
+    fn item_label(&self, template: &str, item: &ParamValues, specs: &[ParamSpec], index: usize) -> String {
+        let mut out = String::new();
+        let mut rest = template;
+        while let Some(at) = rest.find('#') {
+            out.push_str(&rest[..at]);
+            let tail = &rest[at + 1..];
+            let end = tail.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).unwrap_or(tail.len());
+            let name = &tail[..end];
+            let value = match (name, specs.iter().find(|p| p.id == name)) {
+                ("index", None) => (index + 1).to_string(),
+                (_, Some(spec)) => match (&spec.kind, item.get(name)) {
+                    (ParamKind::Query { .. }, _) => item.query(name).first().map(|r| (self.labeler)(r)).unwrap_or_default(),
+                    (ParamKind::Enum { options, default }, _) => options.iter().find(|(id, _)| item.is(name, id)).or_else(|| options.iter().find(|(id, _)| id == default)).map(|(_, l)| l.to_string()).unwrap_or_default(),
+                    (_, Some(ParamValue::Expr(e))) => e.text.clone(),
+                    (_, Some(ParamValue::Bool(b))) => b.to_string(),
+                    _ => String::new(),
+                },
+                _ => format!("#{name}"),
+            };
+            out.push_str(&value);
+            rest = &tail[end..];
+        }
+        out.push_str(rest);
+        out.trim().to_string()
+    }
+
+    /// Show the model's values of read-only parameters.
+    pub fn set_computed(&mut self, computed: HashMap<String, String>, cx: &mut Context<Self>) {
+        if self.computed != computed {
+            self.computed = computed;
+            cx.notify();
+        }
+    }
+
+    /// The Onshape select for `key` showing `items` with `current` chosen;
+    /// `action` runs when an item is picked.
+    fn os_select(&mut self, key: &str, items: Vec<(SharedString, SharedString)>, current: &str, action: impl Fn(&mut Self, SharedString, &mut Context<Self>) + 'static, cx: &mut Context<Self>) -> Entity<crate::os_select::OsSelect> {
+        self.select_actions.insert(key.to_string(), std::rc::Rc::new(action));
+        let sel = match self.selects.get(key) {
+            Some(s) => s.clone(),
+            None => {
+                let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("sel-{key}"))));
+                let k = key.to_string();
+                let sub = cx.subscribe(&s, move |this, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                    let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                    if let Some(f) = this.select_actions.get(&k).cloned() {
+                        f(this, id.clone(), cx);
+                    }
+                });
+                self.subs.push(sub);
+                self.selects.insert(key.to_string(), s.clone());
+                s
+            }
+        };
+        let current = current.to_string();
+        sel.update(cx, |s, _| s.set_items(items, current));
+        sel
     }
 
     pub fn selected_refs(&self) -> Vec<Reference> {
@@ -524,6 +728,26 @@ impl FeatureDialog {
         }
     }
 
+    pub fn set_faulty(&mut self, faulty: Vec<String>, cx: &mut Context<Self>) {
+        if self.faulty != faulty {
+            self.faulty = faulty;
+            cx.notify();
+        }
+    }
+
+    /// The error a field shows: the feature's error when the regeneration
+    /// names this parameter.
+    fn field_error(&self, id: &str) -> Option<String> {
+        let (FeatureStatus::Error, msg) = self.status.as_ref()? else { return None };
+        if !self.faulty.is_empty() {
+            return self.faulty.iter().any(|f| f == id).then(|| msg.clone());
+        }
+        // Features that don't name the parameter: the first empty
+        // selection field is the one Onshape marks.
+        let first_empty = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && matches!(s.kind, ParamKind::Query { .. }) && self.feature.params.query(s.id).is_empty());
+        first_empty.is_some_and(|s| s.id == id).then(|| msg.clone())
+    }
+
     // ------------------------------------------------------------ inputs
 
     fn ensure_input(&mut self, path: &str, initial: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
@@ -531,6 +755,12 @@ impl FeatureDialog {
             return i.clone();
         }
         let state = cx.new(|cx| InputState::new(window, cx).default_value(initial.to_string()));
+        // A text field marked for initial focus (Variable's Name) takes the
+        // keyboard when the dialog opens (live).
+        if !self.initial_focus_done && self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Text { .. }) && s.hints.has(Hints::INITIAL_FOCUS)) {
+            self.initial_focus_done = true;
+            state.update(cx, |s, cx| s.focus(window, cx));
+        }
         let path_s = path.to_string();
         let sub = cx.subscribe_in(&state, window, move |this: &mut FeatureDialog, state, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
@@ -656,19 +886,34 @@ impl FeatureDialog {
     // ------------------------------------------------------------ render helpers
 
     fn render_params(&mut self, specs: &'static [ParamSpec], prefix: Option<(&'static str, usize)>, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        // Array items see the feature's values too (FeatureScript reads
+        // `definition.isAsymmetric` inside its item loops); theirs win.
         let values: ParamValues = match prefix {
             None => self.feature.params.clone(),
-            Some((arr, i)) => self.feature.params.array(arr).get(i).cloned().unwrap_or_default(),
+            Some((arr, i)) => {
+                let mut v = self.feature.params.clone();
+                v.0.shift_remove(arr);
+                for (k, x) in self.feature.params.array(arr).get(i).map(|it| it.0.clone()).unwrap_or_default() {
+                    v.0.insert(k, x);
+                }
+                v
+            }
         };
+        // Items of a driven array show their query in the array's field.
+        let driven = prefix.is_some_and(|(arr, _)| self.ty.params.iter().any(|p| p.id == arr && p.hints.has(Hints::DRIVEN_QUERY)));
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut i = 0;
-        let mut hidden_by_group: Option<&'static str> = None;
-        // An expanded, checked group header: its params are indented.
-        let mut open_group: Option<&'static str> = None;
+        // Open groups, outermost first: the header, whether it is expanded,
+        // and whether it is a plain group title (Onshape "Group Name").
+        // Groups nest (Sheet metal model's Selections holds Extrude's
+        // Second end position group); a param belongs to a group while
+        // turning the header off would hide it.
+        let mut groups: Vec<(&'static str, bool, bool)> = Vec::new();
+        let mut prev_query = false;
         while i < specs.len() {
             let s = &specs[i];
             i += 1;
-            if !s.is_visible(&values) {
+            if !s.is_visible(&values) || (driven && matches!(s.kind, ParamKind::Query { .. })) {
                 continue;
             }
             let path = match prefix {
@@ -684,20 +929,13 @@ impl FeatureDialog {
                 off.set(header, ParamValue::Bool(false));
                 !s.is_visible(&off)
             };
-            let in_group = !s.hints.has(Hints::GROUP_HEADER) && open_group.is_some_and(depends_on);
-            if !in_group {
-                open_group = None;
+            while groups.last().is_some_and(|g| !depends_on(g.0)) {
+                groups.pop();
             }
-            if s.hints.has(Hints::GROUP_HEADER) {
-                hidden_by_group = None;
-            } else if let Some(header) = hidden_by_group {
-                let mut off = values.clone();
-                off.set(header, ParamValue::Bool(false));
-                if !s.is_visible(&off) {
-                    continue;
-                }
-                hidden_by_group = None;
+            if groups.iter().any(|g| !g.1) {
+                continue;
             }
+            let levels: Vec<bool> = groups.iter().map(|g| g.2).collect();
             // Gather trailing flip toggles that belong on this row.
             let mut trailing: Vec<&'static ParamSpec> = Vec::new();
             let mut companion: Option<&'static ParamSpec> = None;
@@ -716,11 +954,26 @@ impl FeatureDialog {
                         trailing.push(n);
                     }
                     i += 1;
+                } else if !n.is_visible(&values) && specs[i + 1..].iter().find(|x| x.is_visible(&values)).is_some_and(|x| x.hints.has(Hints::OPPOSITE_DIRECTION) || x.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR)) {
+                    // A hidden param between a row and its flip (Plane: Angle
+                    // between Offset distance and Opposite direction).
+                    i += 1;
                 } else {
                     break;
                 }
             }
-            let row = self.render_param(s, &path, &values, companion, &trailing, prefix, window, cx);
+            let row = if s.hints.has(Hints::PRIMARY_AXIS) {
+                // Live (dom/dialog-mate-connector.txt): Flip primary axis and
+                // the next "Reorient secondary axis" are one row of 26 px icon
+                // buttons.
+                let next_axis = specs.get(i).filter(|n| n.hints.has(Hints::MATE_CONNECTOR_AXIS_TYPE) && n.is_visible(&values));
+                if next_axis.is_some() {
+                    i += 1;
+                }
+                Some(self.render_axis_buttons(s, &path, next_axis, &values, prefix, cx))
+            } else {
+                self.render_param(s, &path, &values, companion, &trailing, prefix, window, cx)
+            };
             // Configure features mode: top-level numbers, checkboxes and
             // choices are outlined and pick the parameter on click.
             let configurable = self.configure_mode && prefix.is_none() && matches!(s.kind, ParamKind::Num(_) | ParamKind::Bool { .. } | ParamKind::Enum { .. }) && !s.hints.has(Hints::UNCONFIGURABLE);
@@ -743,19 +996,83 @@ impl FeatureDialog {
                     }))
                     .into_any_element()
             });
-            if s.hints.has(Hints::GROUP_HEADER) && (!values.bool(s.id) || self.collapsed_groups.contains(&path)) {
-                hidden_by_group = Some(s.id);
-            } else if s.hints.has(Hints::GROUP_HEADER) {
-                open_group = Some(s.id);
+            if s.hints.has(Hints::GROUP_HEADER) {
+                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path), s.hints.has(Hints::GROUP_LABEL)));
             }
             // Onshape (dialogs/extrude-24): a group's params are indented 24 px
-            // with a 1 px `#d7d7d7` guide line under the expander.
-            let row = row.map(|r| if in_group { div().relative().pl(px(24.)).child(div().absolute().left(px(15.)).top_0().bottom_0().w(px(1.)).bg(p().border)).child(r).into_any_element() } else { r });
+            // with a 1 px `#d7d7d7` guide line under the expander; under a
+            // plain group title 20 px (dom/dialog-sheet-metal-model.txt,
+            // os-param-group-indent).
+            let row = row.map(|r| {
+                levels.iter().rev().fold(r, |r, label| {
+                    let (w, line) = if *label { (20., 8.) } else { (24., 13.) };
+                    div().relative().pl(px(w)).child(div().absolute().left(px(line)).top_0().bottom_0().w(px(1.)).bg(p().border)).child(r).into_any_element()
+                })
+            });
             if let Some(row) = row {
+                let is_query = matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY);
+                if prev_query && !is_query {
+                    // Live: 5 px down to a checkbox row, 4 px to a select (End type).
+                    let select = matches!(s.kind, ParamKind::Enum { .. }) && !s.hints.has(Hints::HORIZONTAL_ENUM);
+                    rows.push(div().h(px(if select { 4. } else { 5. })).flex_none().into_any_element());
+                }
+                prev_query = is_query;
                 rows.push(row);
             }
         }
+        // Live (dialogs/mirror, delete-part): a query field ending the
+        // dialog keeps its bottom margin.
+        if prev_query && prefix.is_none() {
+            rows.push(div().h(px(4.)).flex_none().into_any_element());
+        }
         rows
+    }
+
+    /// Mate connector's axis row: the primary axis flip (its arrow shows the
+    /// current direction) and the secondary axis button, which steps
+    /// through the options.
+    fn render_axis_buttons(&mut self, flip: &'static ParamSpec, path: &str, axis: Option<&'static ParamSpec>, values: &ParamValues, prefix: Option<(&'static str, usize)>, cx: &mut Context<Self>) -> AnyElement {
+        let on = values.bool(flip.id);
+        let fpath = path.to_string();
+        let button = |id: String, icon: &'static str, tip: &'static str, cx: &mut Context<Self>| {
+            div()
+                .id(SharedString::from(id))
+                .size(px(26.))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .border_b_1()
+                .border_color(hsla(0., 0., 0., 0.))
+                .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                .child(crate::assets::icon(icon, 20., cx))
+                .tooltip(crate::ui::tooltip(tip))
+        };
+        let mut row = h_flex().ml(px(-2.)).h(px(28.)).items_start().child(
+            button(format!("axisflip-{path}"), if on { "flip-direction-opposite" } else { "flip-direction" }, flip.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
+                this.set_value(&fpath, ParamValue::Bool(!cur), cx);
+            })),
+        );
+        if let Some(a) = axis {
+            let apath = match prefix {
+                None => a.id.to_string(),
+                Some((arr, idx)) => item_path(arr, idx, a.id),
+            };
+            let options: Vec<&'static str> = match &a.kind {
+                ParamKind::Enum { options, .. } => options.iter().map(|(id, _)| *id).collect(),
+                _ => Vec::new(),
+            };
+            let cur = values.enum_(a.id).to_string();
+            row = row.child(button(format!("axisturn-{apath}"), "realign-mate-dialog", a.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let at = options.iter().position(|o| *o == cur).unwrap_or(0);
+                if let Some(next) = options.get((at + 1) % options.len().max(1)) {
+                    this.set_value(&apath, ParamValue::Enum(next.to_string()), cx);
+                }
+            })));
+        }
+        row.into_any_element()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -772,7 +1089,6 @@ impl FeatureDialog {
     ) -> Option<AnyElement> {
         let pal = p();
         // Onshape dialog field label: 13.33 px #666 (§3.9).
-        let label_el = |text: &'static str| div().text_size(px(13.33)).text_color(pal.text_muted).truncate().child(text);
         let flips: Vec<AnyElement> = trailing
             .iter()
             .map(|f| {
@@ -782,16 +1098,23 @@ impl FeatureDialog {
                 };
                 let on = values.bool(f.id);
                 let circular = f.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR);
-                let icon = if circular { "flip-circular" } else { "flip-direction" };
+                // Live (dialogs/extrude-01, rib-01, draft-01): the button
+                // shows the current direction (the arrow turns round), with
+                // no pressed background.
+                let icon = match (circular, on) {
+                    (true, false) => "flip-circular",
+                    (true, true) => "flip-circular-opposite",
+                    (false, false) => "flip-direction",
+                    (false, true) => "flip-direction-opposite",
+                };
                 Button::new(SharedString::from(format!("flip-{fpath}")))
-                    .custom(dialog_icon_variant(cx, on))
+                    .custom(dialog_icon_variant(cx, false))
                     .child(crate::assets::icon(icon, 20., cx))
                     .w(px(26.))
                     .h(px(26.))
                     .p_0()
                     .rounded(px(0.))
                     .flex_none()
-                    .when(on, |b| b.bg(pal.panel_active))
                     .tooltip(f.label)
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
@@ -828,6 +1151,32 @@ impl FeatureDialog {
                     })
                     .into_any_element()
             }
+            ParamKind::Bool { .. } if s.hints.has(Hints::GROUP_LABEL) => {
+                // A plain collapsible group title (live variable.fs "Axis
+                // measurements"): chevron + 12 px #666 name; click folds.
+                let on = values.bool(s.id);
+                let path_s = path.to_string();
+                // Live (dom/dialog-sheet-metal-model.txt): the group name is
+                // 13.3 px #666 (padding 5 4); it turns red (#aa252d, error
+                // expander) when a field inside it is in error.
+                let error = self.ty.params.iter().any(|q| {
+                    let (mut open, mut off) = (values.clone(), values.clone());
+                    open.set(s.id, ParamValue::Bool(true));
+                    off.set(s.id, ParamValue::Bool(false));
+                    q.is_visible(&open) && !q.is_visible(&off) && self.field_error(q.id).is_some()
+                });
+                let color = if error { gpui_kit::rgb(0xaa252d) } else { gpui_kit::rgb(0x666666) };
+                h_flex()
+                    .id(SharedString::from(format!("grp-{path}")))
+                    .w_full()
+                    .ml(px(-2.))
+                    .min_h(px(27.))
+                    .cursor_pointer()
+                    .child(div().w(px(20.)).flex_none().flex().justify_center().child(crate::ui::glyph(if on { "expander-down" } else { "expander-right" }, 14., if error { color } else { gpui_kit::rgb(0x555555) })))
+                    .child(div().px(px(4.)).py(px(5.)).text_size(px(13.33)).line_height(px(17.33)).text_color(color).child(s.label))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Bool(!on), cx)))
+                    .into_any_element()
+            }
             ParamKind::Bool { .. } => {
                 let on = values.bool(s.id);
                 let path_s = path.to_string();
@@ -844,7 +1193,7 @@ impl FeatureDialog {
                         .flex()
                         .justify_center()
                         .cursor_pointer()
-                        .child(crate::ui::glyph(if on && !collapsed { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if on { gpui_kit::rgb(0x555555) } else { pal.border }))
+                        .child(crate::ui::glyph(if on && !collapsed { "expander-down" } else { "expander-right" }, 14., if on { gpui_kit::rgb(0x555555) } else { pal.border }))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.collapsed_groups.remove(&path_c) {
                                 this.collapsed_groups.insert(path_c.clone());
@@ -856,6 +1205,7 @@ impl FeatureDialog {
                 // checkbox itself is inset 4 px.
                 let mut row = h_flex()
                     .w_full()
+                    .ml(px(-2.))
                     .min_h(px(27.))
                     .children(chevron)
                     .child({
@@ -863,7 +1213,13 @@ impl FeatureDialog {
                         let p2 = path.to_string();
                         div()
                             .id(SharedString::from(format!("cbw-{path}")))
-                            .child(crate::ui::os_checkbox(SharedString::from(format!("cb-{path}")), s.label, on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Bool(!on), cx))))
+                            .child(crate::ui::os_checkbox(SharedString::from(format!("cb-{path}")), s.label, on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                // Checking a group unfolds it.
+                                if header && !on {
+                                    this.collapsed_groups.remove(&path_s);
+                                }
+                                this.set_value(&path_s, ParamValue::Bool(!on), cx)
+                            })))
                             // Right-click > Convert to expression (e.g. `#Length > 3`).
                             .os_context_menu(move |m, _, _| {
                                 let v = view.clone();
@@ -922,40 +1278,49 @@ impl FeatureDialog {
                             .child(*label)
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
                     }));
-                    h_flex().w_full().mb(px(2.)).child(group).children(flips).into_any_element()
+                    h_flex().mx(px(-2.)).mb(px(2.)).child(group).children(flips).into_any_element()
                 } else {
-                    let label = options.iter().find(|(id, _)| *id == cur).map(|(_, l)| *l).unwrap_or("");
                     let path_s = path.to_string();
-                    let opts = *options;
-                    let view = cx.entity();
+                    let items = options.iter().map(|(id, l)| (SharedString::from(*id), SharedString::from(*l))).collect();
                     // Live: Tab skips the dropdowns (Shift+Tab from Depth lands on the flip button).
-                    let dd = Button::new(SharedString::from(format!("dd-{path}")))
-                        .tab_stop(false)
-                        .custom(dialog_field_variant(cx))
-                        .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(pal.text).truncate().child(label)).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
-                        .w_full()
-                        .h(px(28.))
-                        .pl(px(6.))
-                        .pr(px(4.))
-                        .rounded(px(0.))
-                        .border_b_1()
-                        .border_color(pal.border)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for (id, l) in opts.iter() {
-                                let id_s = id.to_string();
-                                let p2 = path_s.clone();
-                                let v = view.clone();
-                                menu = menu.item(gpui_kit::component::menu::PopupMenuItem::new(*l).on_click(move |_, _, cx| {
-                                    v.update(cx, |this, cx| this.set_value(&p2, ParamValue::Enum(id_s.clone()), cx));
-                                }));
-                            }
-                            menu
-                        });
-                    let mut row = h_flex().gap(px(4.)).w_full().min_h(px(28.));
-                    if s.hints.has(Hints::SHOW_LABEL) {
-                        row = row.child(div().pl(px(5.)).max_w(px(90.)).flex_none().child(label_el(s.label)));
+                    let dd = self.os_select(path, items, &cur, move |this, id, cx| this.set_value(&path_s, ParamValue::Enum(id.to_string()), cx), cx);
+                    // Live (div.select-input tip=…): the select's tooltip is its label.
+                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().tooltip(crate::ui::tooltip(s.label)).child(dd);
+                    // Live (dom/dialog-extrude-new.txt): the select fills the dialog's
+                    // first 194 px column flush with its left edge (the body has 2 px
+                    // padding); flips sit in the 26 px right column.
+                    let mut row = h_flex().mx(px(-2.)).pt(px(1.)).min_h(px(28.)).items_start().when(flips.is_empty(), |d| d.pr(px(26.)));
+                    // Live (dom/dialog-chamfer.txt): label and select wrap like
+                    // inline boxes. When the label (12 px, 5 px padding) and
+                    // the current value (14 px, 6 + 20 px padding) don't fit
+                    // the 194 px column, the label takes its own row and the
+                    // select the full width ("Chamfer type" / "Equal distance").
+                    let cur_label = options.iter().find(|(id, _)| *id == cur.as_str()).map(|(_, l)| *l).unwrap_or("");
+                    // The select is its value plus 22 px (padding, caret) and at
+                    // least ~90 px (live: Loft's "End profile condition / None" and
+                    // "Chamfer type / Equal distance" wrap; Hole's "Start plane /
+                    // Start from part" and Helix's "Start condition / Start angle"
+                    // don't).
+                    let fits = 10.0 + crate::ui::text_width(window, s.label, 12.0) + (22.0 + crate::ui::text_width(window, cur_label, 14.0)).max(90.0) <= 194.0;
+                    if s.hints.has(Hints::SHOW_LABEL) && param_icon(self.ty.id, s.id).is_none() && !fits {
+                        return Some(
+                            v_flex()
+                                .w_full()
+                                .child(div().mx(px(-2.)).px(px(5.)).pt(px(7.)).text_size(px(12.)).line_height(px(16.)).text_color(pal.text_muted).child(s.label))
+                                .child(row.child(dd).children(flips))
+                                .into_any_element(),
+                        );
                     }
-                    row.child(div().flex_1().min_w_0().child(dd)).children(flips).into_any_element()
+                    if s.hints.has(Hints::SHOW_LABEL) {
+                        // Live: "Measurement ▾ Radius": the label 12 px #666 with 5 px
+                        // padding, the select takes the rest of the column.
+                        row = row.child(match param_icon(self.ty.id, s.id) {
+                            Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
+                            // Live: the label's baseline is the value's (label 7 px down).
+                            None => div().px(px(5.)).pt(px(6.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
+                        });
+                    }
+                    row.child(dd).children(flips).into_any_element()
                 }
             }
             ParamKind::Text { .. } if s.id == "partStudio" && self.ty.id == "importDerived" => self.render_derived_picker(cx),
@@ -968,7 +1333,10 @@ impl FeatureDialog {
                 let tol_btn = tolerant.then(|| {
                     let key = tol_key.clone();
                     let on = tol.is_some();
-                    // Onshape: a 20 px tolerance toggle 5 px after the field.
+                    // Onshape (live, dom/dialog-hole-tolerance.txt): a 20 px
+                    // "Tolerance options" toggle 5 px after the field, pressed
+                    // `#eaeaea`; turning it on enables the row's chevron (the
+                    // options stay collapsed until it is clicked).
                     div()
                         .id(SharedString::from(format!("tolbtn-{path}")))
                         .mt(px(3.))
@@ -977,44 +1345,80 @@ impl FeatureDialog {
                         .flex_none()
                         .rounded(px(3.))
                         .cursor_pointer()
-                        .when(on, |d| d.bg(pal.panel_active))
-                        .hover(|d| d.bg(pal.panel_hover))
+                        .when(on, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                        .when(!on, |d| d.hover(|d| d.bg(pal.panel_hover)))
                         .child(crate::assets::icon("tolerance", 20., cx))
-                        .tooltip(crate::ui::tooltip("Tolerance"))
+                        .tooltip(crate::ui::tooltip("Tolerance options"))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             let next = if on { None } else { Some(Tolerance::default()) };
+                            this.tol_open.remove(&key);
                             this.set_tolerance(&key, next, cx);
                         }))
                 });
                 // Onshape (live DOM): tolerant quantities start with a 20 px
-                // expander (gray `›`, red-brown `⌄` with tolerances shown); the
+                // expander: `›` `#d7d7d7` and inert without tolerances, `#666`
+                // and clickable with them, `⌄` while the options show; the
                 // label is 12 px `#666` with 5 px padding, the field fills the
                 // rest of the first column.
+                let tol_shown = tol.is_some() && self.tol_open.contains(&tol_key);
                 let expander = tolerant.then(|| {
-                    let open = tol.is_some();
-                    div().w(px(20.)).h(px(26.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., if open { gpui_kit::rgb(0x555555) } else { pal.border }))
+                    let enabled = tol.is_some();
+                    let key = tol_key.clone();
+                    div()
+                        .id(SharedString::from(format!("tolexp-{path}")))
+                        .w(px(20.))
+                        .h(px(26.))
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(crate::ui::glyph(if tol_shown { "expander-down" } else { "expander-right" }, 14., if enabled { gpui_kit::rgb(0x666666) } else { pal.border }))
+                        .when(enabled, |d| {
+                            d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if !this.tol_open.remove(&key) {
+                                    this.tol_open.insert(key.clone());
+                                }
+                                cx.notify();
+                            }))
+                        })
                 });
+                let diameter = s.hints.has(Hints::CAN_BE_TOLERANT_DIAMETER);
+                // Live (dialogs/thicken-01, chamfer-01): the field runs from
+                // the label to 1 px past the column; rows with tolerance
+                // options sit 3 px further left.
                 let row = h_flex()
-                    .w_full()
+                    .mr(px(-1.))
+                    .when(tolerant, |d| d.ml(px(-3.)))
                     .min_h(px(26.))
                     .items_start()
                     .children(expander)
-                    .child(div().px(px(5.)).pt(px(6.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label))
-                    .child(div().flex_1().min_w_0().child(e))
+                    // Live (dom/dialog-hole.txt): hole sizes show a 26 px icon
+                    // instead of their label.
+                    .child(match param_icon(self.ty.id, s.id) {
+                        Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
+                        None => div().pl(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
+                    })
+                    // Live: the value's baseline 1 px under the label's, the
+                    // underline on the row's bottom line.
+                    .child(div().flex_1().min_w_0().pt(px(5.)).child(e))
                     .children(tol_btn)
                     // The first column is 194 px; flips sit in the 26 px right one.
                     .when(flips.is_empty(), |d| d.pr(px(26.)))
                     .children(flips);
                 match tol {
-                    Some(t) => v_flex().w_full().child(row).child(self.render_tolerance(&tol_key, t, window, cx)).into_any_element(),
-                    None => row.into_any_element(),
+                    Some(t) if tol_shown => v_flex().w_full().child(row).child(self.render_tolerance(&tol_key, t, diameter, window, cx)).into_any_element(),
+                    _ => row.into_any_element(),
                 }
             }
             ParamKind::Query { max_picks, filter } => {
-                let takes_mc = filter.intersects(QueryFilter::MATE_CONNECTOR);
+                // Live (dom/dialog-*-pattern, mirror, transform): fields that
+                // pick parts take existing mate connectors but have no button.
+                let takes_mc = filter.intersects(QueryFilter::MATE_CONNECTOR) && !filter.intersects(QueryFilter::SOLID_BODY) && !s.hints.has(Hints::NO_MATE_CONNECTOR_BUTTON);
                 let refs = values.query(s.id).to_vec();
-                let active = self.active_query.as_deref() == Some(path);
+                let cs_open = self.cs_target.as_deref() == Some(path);
+                let active = self.active_query.as_deref() == Some(path) && !cs_open;
                 let flashing = self.flash.as_deref() == Some(path);
+                let takes_cs = s.hints.has(Hints::SHOW_CREATE_SELECTION);
                 let path_s = path.to_string();
                 let any_missing = refs.iter().any(|r| (self.missing)(r));
                 // Every region of a sketch shows as one "Faces of Sketch 1"
@@ -1049,7 +1453,6 @@ impl FeatureDialog {
                         // 35% overlay on hover, the entity name as tooltip.
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{row}")))
-                            .group("qrow")
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
                             .tooltip(crate::ui::tooltip(tip))
                             .w_full()
@@ -1063,8 +1466,7 @@ impl FeatureDialog {
                             .child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
-                                    .invisible()
-                                    .group_hover("qrow", |d| d.visible())
+                                    // Live (dialogs/extrude-13, fillet-02): the × is always shown.
                                     .text_color(pal.text_muted)
                                     .hover(|d| d.text_color(pal.error))
                                     .cursor_pointer()
@@ -1135,33 +1537,37 @@ impl FeatureDialog {
                     .collect();
                 // Onshape: the field label is the placeholder inside the box; once
                 // entities are picked it shrinks to the top-left corner (§3.9).
-                let _ = max_picks;
                 let empty = refs.is_empty();
+                // Live (dialogs/*-error): a field the error points at is
+                // pink with a red border; hovering it shows the message.
+                let error = if active || cs_open { None } else { self.field_error(s.id) };
                 let caption = div()
                     .px(px(6.))
-                    .when(empty, |d| d.py(px(5.)).text_size(px(12.)))
-                    .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
-                    .text_color(pal.text_muted)
+                    .when(empty, |d| d.pt(px(7.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33)).text_color(gpui_kit::rgb(0x555555)))
+                    .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted))
                     .truncate()
                     .child(s.label);
+                // Live (dom/dialog-fillet.txt): fields are 3 px in from the dialog
+                // edges with 5 px above (`os-param-requires-margin`); the row
+                // after the last field also starts 5 px below it (render_params).
                 h_flex()
                     .w_full()
                     .items_start()
-                    .gap(px(2.))
-                    .px(px(2.))
-                    .py(px(2.))
+                    .px(px(1.))
+                    .pt(px(5.))
                     .child(
                         div()
                             .id(SharedString::from(format!("q-{path}")))
                             .flex_1()
                             .min_w_0()
-                            .min_h(px(26.))
+                            .min_h(px(27.))
                             .max_h(px(160.))
                             .overflow_y_scroll()
                             .rounded(px(2.))
                             .border_1()
-                            .border_color(if flashing { pal.error } else if active { pal.accent } else { pal.border })
-                            .bg(if active { pal.row_hover } else { pal.panel })
+                            .border_color(if flashing || error.is_some() { pal.error } else if active || cs_open { pal.accent } else { pal.border })
+                            .bg(if active { pal.row_hover } else if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
+                            .tooltip(crate::ui::tooltip(error.unwrap_or_else(|| s.label.to_string())))
                             .cursor_pointer()
                             .flex()
                             .flex_col()
@@ -1192,11 +1598,39 @@ impl FeatureDialog {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .child(crate::assets::icon("mc-select", 20., cx))
-                                .tooltip(crate::ui::tooltip("Select mate connector"))
+                                // Live (dom/dialog-draft.txt, dialog-hole.txt).
+                                .tooltip(crate::ui::tooltip(if *max_picks == Some(1) { "Select mate connector (ctrl+m)" } else { "Select mate connectors (ctrl+m)" }))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                     this.active_query = Some(p_mc.clone());
                                     window.focus(&this.focus, cx);
                                     cx.emit(DialogEvent::QueryFocused);
+                                    cx.notify();
+                                })),
+                        )
+                    })
+                    // Live (dom/delete-face-field-with-button.txt): a 26 px
+                    // "Create selection" button (20 px icon, 3 px padding).
+                    .when(takes_cs, |d| {
+                        let p_cs = path.to_string();
+                        d.child(
+                            div()
+                                .id(SharedString::from(format!("cs-{path}")))
+                                .size(px(26.))
+                                .flex_none()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .border_b_1()
+                                .border_color(hsla(0., 0., 0., 0.))
+                                .cursor_pointer()
+                                .when(cs_open, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                                .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)).border_color(pal.accent))
+                                .child(crate::assets::icon("create-selection", 20., cx))
+                                .tooltip(crate::ui::tooltip("Create selection"))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    this.active_query = Some(p_cs.clone());
+                                    window.focus(&this.focus, cx);
+                                    cx.emit(DialogEvent::CreateSelection(p_cs.clone()));
                                     cx.notify();
                                 })),
                         )
@@ -1208,71 +1642,190 @@ impl FeatureDialog {
                 let items = values.array(s.id).len();
                 let arr_id = s.id;
                 let item_specs: &'static [ParamSpec] = item_slice(item);
-                let mut col = v_flex().gap_1().w_full().child(
-                    h_flex()
-                        .justify_between()
-                        .child(label_el(s.label))
-                        .child(
-                            Button::new(SharedString::from(format!("add-{path}")))
-                                .icon(IconName::Plus)
-                                .ghost()
-                                .xsmall()
-                                .tooltip(format!("Add {}", item_label.to_lowercase()))
-                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    let mut v = ParamValues::default();
-                                    fill_defaults(item_specs, &mut v, &this.units);
-                                    let arr = this.feature.params.0.entry(arr_id.to_string()).or_insert_with(|| ParamValue::Array(vec![]));
-                                    if let ParamValue::Array(a) = arr {
-                                        a.push(v);
-                                        // New items take focus on their first selection field.
-                                        if let Some(q) = item_specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. })) {
-                                            this.active_query = Some(item_path(arr_id, a.len() - 1, q.id));
-                                        }
-                                    }
-                                    cx.emit(DialogEvent::Changed);
-                                    cx.notify();
-                                })),
-                        ),
-                );
+                let remove = move |k: usize| {
+                    move |this: &mut Self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>| {
+                        if let Some(ParamValue::Array(a)) = this.feature.params.0.get_mut(arr_id)
+                            && k < a.len()
+                        {
+                            a.remove(k);
+                        }
+                        this.inputs.retain(|p, _| !p.starts_with(&format!("{arr_id}.")));
+                        cx.emit(DialogEvent::Changed);
+                        cx.notify();
+                    }
+                };
+                if s.hints.has(Hints::DRIVEN_QUERY) {
+                    // Live (dialogs/fillet-12): one selection field ("Vertices",
+                    // active blue); each pick is a row "Vertex of Extrude 1 ×"
+                    // and its item's values follow under it, indented.
+                    let q = item_specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
+                    let active = self.active_query.as_deref() == Some(path);
+                    let mut field = v_flex()
+                        .id(SharedString::from(format!("q-{path}")))
+                        .flex_1()
+                        .min_h(px(26.))
+                        .rounded(px(2.))
+                        .border_1()
+                        .border_color(if active { pal.accent } else { pal.border })
+                        .bg(if active { pal.row_hover } else { pal.panel })
+                        .cursor_pointer()
+                        .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(s.label));
+                    let mut details: Vec<AnyElement> = Vec::new();
+                    for k in 0..items {
+                        let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
+                        let label = match (s.item_template, values.array(arr_id).get(k)) {
+                            (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
+                            _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
+                        };
+                        field = field.child(
+                            h_flex()
+                                .h(px(24.))
+                                .pl(px(6.))
+                                .pr(px(4.))
+                                .text_size(px(13.33))
+                                .text_color(if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                                .child(div().flex_1().truncate().child(label.clone()))
+                                .child(
+                                    div()
+                                        .id(SharedString::from(format!("dqx-{path}-{k}")))
+                                        .cursor_pointer()
+                                        .text_color(pal.text_muted)
+                                        .hover(|d| d.text_color(pal.error))
+                                        .child(Icon::new(IconName::Close).with_size(px(12.)))
+                                        .on_click(cx.listener(remove(k))),
+                                ),
+                        );
+                        let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
+                        details.push(
+                            v_flex()
+                                .relative()
+                                .pl(px(24.))
+                                .child(div().absolute().left(px(15.)).top_0().bottom_0().w(px(1.)).bg(pal.border))
+                                .child(div().h(px(24.)).flex().items_center().text_size(px(13.33)).text_color(pal.text_muted).truncate().child(label))
+                                .children(inner)
+                                .into_any_element(),
+                        );
+                    }
+                    let path_s = path.to_string();
+                    let field = field.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.active_query = Some(path_s.clone());
+                        window.focus(&this.focus, cx);
+                        cx.emit(DialogEvent::QueryFocused);
+                        cx.notify();
+                    }));
+                    let cs = s.hints.has(Hints::SHOW_CREATE_SELECTION).then(|| {
+                        let p_cs = path.to_string();
+                        div()
+                            .id(SharedString::from(format!("cs-{path}")))
+                            .size(px(26.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .when(self.cs_target.as_deref() == Some(path), |d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                            .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                            .child(crate::assets::icon("create-selection", 20., cx))
+                            .tooltip(crate::ui::tooltip("Create selection"))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                this.active_query = Some(p_cs.clone());
+                                window.focus(&this.focus, cx);
+                                cx.emit(DialogEvent::CreateSelection(p_cs.clone()));
+                                cx.notify();
+                            }))
+                    });
+                    return Some(v_flex().w_full().child(h_flex().w_full().items_start().gap(px(2.)).px(px(1.)).pt(px(5.)).child(field).children(cs)).children(details).into_any_element());
+                }
+                // Live (dialogs/fillet-12): a bordered box captioned with the
+                // array's name, its items, and a full-width "Add <item>" button.
+                let mut col = v_flex()
+                    .mx(px(1.))
+                    .mt(px(5.))
+                    .mb(px(5.))
+                    .p(px(4.))
+                    .gap(px(4.))
+                    .rounded(px(2.))
+                    .border_1()
+                    .border_color(pal.border)
+                    .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(s.label));
                 for k in 0..items {
                     let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                     col = col.child(
                         v_flex()
-                            .ml(px(4.))
+                            .relative()
                             .pl(px(6.))
                             .border_l_1()
-                            .border_color(gpui_kit::rgb(0xcccccc))
+                            .border_color(pal.border)
                             .child(
                                 h_flex()
                                     .justify_between()
-                                    .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(format!("{item_label} {}", k + 1)))
+                                    .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(match (s.item_template, values.array(arr_id).get(k)) {
+                                        (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
+                                        _ => format!("{} {}", capitalize(item_label), k + 1),
+                                    }))
                                     .child(
-                                        Button::new(SharedString::from(format!("rm-{path}-{k}")))
-                                            .icon(IconName::Close)
-                                            .ghost()
-                                            .xsmall()
-                                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                                if let Some(ParamValue::Array(a)) = this.feature.params.0.get_mut(arr_id)
-                                                    && k < a.len()
-                                                {
-                                                    a.remove(k);
-                                                }
-                                                this.inputs.retain(|p, _| !p.starts_with(&format!("{arr_id}.")));
-                                                cx.emit(DialogEvent::Changed);
-                                                cx.notify();
-                                            })),
+                                        div()
+                                            .id(SharedString::from(format!("rm-{path}-{k}")))
+                                            .cursor_pointer()
+                                            .text_color(pal.text_muted)
+                                            .hover(|d| d.text_color(pal.error))
+                                            .child(Icon::new(IconName::Close).with_size(px(12.)))
+                                            .on_click(cx.listener(remove(k))),
                                     ),
                             )
                             .children(inner),
                     );
                 }
+                col = col.child(
+                    div()
+                        .id(SharedString::from(format!("add-{path}")))
+                        .h(px(30.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xaaaaaa))
+                        .bg(pal.panel)
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .cursor_pointer()
+                        .text_size(px(14.))
+                        .text_color(pal.text)
+                        .child(format!("Add {item_label}"))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            let mut v = ParamValues::default();
+                            fill_defaults(item_specs, &mut v, &this.units);
+                            let arr = this.feature.params.0.entry(arr_id.to_string()).or_insert_with(|| ParamValue::Array(vec![]));
+                            if let ParamValue::Array(a) = arr {
+                                // "Match last item" values follow the previous item.
+                                if let Some(last) = a.last() {
+                                    for spec in item_specs.iter().filter(|p| p.hints.has(Hints::MATCH_LAST_ARRAY_ITEM)) {
+                                        if let Some(val) = last.get(spec.id) {
+                                            v.set(spec.id, val.clone());
+                                        }
+                                    }
+                                }
+                                a.push(v);
+                                // New items take focus on their first selection field.
+                                if let Some(q) = item_specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. })) {
+                                    this.active_query = Some(item_path(arr_id, a.len() - 1, q.id));
+                                }
+                            }
+                            cx.emit(DialogEvent::Changed);
+                            cx.notify();
+                        })),
+                );
                 col.into_any_element()
             }
             ParamKind::Lookup { table } => {
                 let cur = values.lookup(s.id).to_vec();
                 let path_s = path.to_string();
                 let table: &'static str = table;
-                let mut row = v_flex().gap_1().w_full().child(label_el(s.label));
+                // Live (dialogs/hole-01): no header row; each level is a 22 px row
+                // with its name right-aligned (12 px #999) in an 88 px column and an
+                // underline select ("Hole type ▾ Drilled", "Drill size ▾ 1/4"); the
+                // first underline 27 px under the field above.
+                let mut row = v_flex().w_full().pt(px(3.));
                 let mut prefix_path: Vec<String> = Vec::new();
                 let mut level = 0;
                 loop {
@@ -1282,33 +1835,29 @@ impl FeatureDialog {
                     }
                     let name = noshape_model::features::hole_tables::table_level_name(table, &prefix_path).unwrap_or("");
                     let chosen = cur.get(level).cloned().or_else(|| noshape_model::features::hole_tables::table_level_default(table, &prefix_path)).unwrap_or_default();
-                    let label = opts.iter().find(|o| o.0 == chosen).map(|o| o.1.to_string()).unwrap_or(chosen.clone());
                     let lvl = level;
                     let ps2 = path_s.clone();
                     let base_path = prefix_path.clone();
-                    let opts2: Vec<(String, String)> = opts.iter().map(|o| (o.0.to_string(), o.1.to_string())).collect();
-                    let view = cx.entity();
+                    let items = opts.iter().map(|o| (SharedString::from(o.0.to_string()), SharedString::from(o.1.to_string()))).collect();
+                    let sel = self.os_select(
+                        &format!("{path}#{level}"),
+                        items,
+                        &chosen,
+                        move |this, id, cx| {
+                            let mut np = base_path.clone();
+                            np.truncate(lvl);
+                            np.push(id.to_string());
+                            this.set_lookup(&ps2, np, cx);
+                        },
+                        cx,
+                    );
+                    sel.update(cx, |s, _| s.set_height(22.));
                     row = row.child(
-                        h_flex().gap_2().min_h(px(26.)).child(div().pl(px(5.)).w(px(80.)).text_size(px(13.33)).text_color(pal.text_muted).truncate().child(name)).child(
-                            Button::new(SharedString::from(format!("lk-{path}-{level}")))
-                                .label(label)
-                                .outline()
-                                .small()
-                                .dropdown_caret(true)
-                                .dropdown_menu(move |mut menu, _, _| {
-                                    for (id, l) in &opts2 {
-                                        let mut np = base_path.clone();
-                                        np.truncate(lvl);
-                                        np.push(id.clone());
-                                        let p2 = ps2.clone();
-                                        let v = view.clone();
-                                        menu = menu.item(gpui_kit::component::menu::PopupMenuItem::new(l.clone()).on_click(move |_, _, cx| {
-                                            v.update(cx, |this, cx| this.set_lookup(&p2, np.clone(), cx));
-                                        }));
-                                    }
-                                    menu
-                                }),
-                        ),
+                        h_flex()
+                            .w_full()
+                            .pr(px(4.))
+                            .child(div().w(px(88.)).flex_none().pr(px(6.)).flex().justify_end().text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).truncate().child(name))
+                            .child(div().flex_1().min_w_0().child(sel)),
                     );
                     prefix_path.push(chosen);
                     level += 1;
@@ -1524,6 +2073,13 @@ impl FeatureDialog {
 
     /// Input element for a numeric or text value.
     fn render_inline_value(&mut self, s: &ParamSpec, path: &str, values: &ParamValues, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // Read-only outputs (Variable "Distance", "Along X"…): the value the
+        // model computed, gray, not editable.
+        if s.hints.has(Hints::READ_ONLY) {
+            let pal = p();
+            let text = self.computed.get(path).cloned().or_else(|| values.expr(s.id).map(|e| e.text.clone())).unwrap_or_default();
+            return Some(div().w_full().h(px(26.)).flex().items_center().justify_end().pr(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).text_size(px(13.33)).text_color(pal.text_faint).child(text).into_any_element());
+        }
         let text = match (&s.kind, values.get(s.id)) {
             (ParamKind::Num(_) | ParamKind::Bool { .. }, Some(ParamValue::Expr(e))) => e.text.clone(),
             (ParamKind::Text { .. }, Some(ParamValue::Text(t))) => t.clone(),
@@ -1538,7 +2094,10 @@ impl FeatureDialog {
             _ => None,
         };
         // Onshape shows what an expression evaluates to.
-        let hint = num.filter(|_| err.is_none()).and_then(|n| noshape_model::interaction::evaluated_hint(&text, n.kind.dim(), &self.units, &self.variables));
+        // Onshape shows the "= value" hint for expressions only, not for a
+        // plain value with a unit (dialogs/draft-01: "3 deg", no hint).
+        let is_expression = text.trim().trim_start_matches('-').contains(|c: char| "#+-*/^()".contains(c));
+        let hint = num.filter(|_| err.is_none() && is_expression).and_then(|n| noshape_model::interaction::evaluated_hint(&text, n.kind.dim(), &self.units, &self.variables));
         // Onshape: an accepted value displays converted to the document
         // units (and an expression its result); focusing shows the text.
         let focused = state.read(cx).focus_handle(cx).is_focused(window);
@@ -1550,6 +2109,8 @@ impl FeatureDialog {
             .filter(|_| !focused && err.is_none() && self.completion.is_none())
             .and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).ok())
             .map(|q| noshape_units::format_quantity(q, &self.units))
+            // Dialog fields write angles "3 deg" (live dialogs/draft-01, hole).
+            .map(|c| c.replace('°', " deg"))
             .filter(|c| c.replace(' ', "") != text.trim().replace(' ', ""));
         let hint = hint.filter(|_| converted.is_none());
         let path_s = path.to_string();
@@ -1585,10 +2146,12 @@ impl FeatureDialog {
                         .border_color(if err.is_some() { pal.error } else { pal.border })
                         .when(err.is_some(), |d| d.bg(pal.error_fill))
                         .hover(|d| d.border_color(pal.accent))
+                        // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
+                        .when(focused && err.is_none(), |d| d.border_b_2().mb(px(-1.)).border_color(pal.accent))
                         // The input stays in the tree (so clicks and Tab can
                         // focus it); unfocused, the converted value covers it.
                         .relative()
-                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(13.33)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
+                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(14.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
                         .when_some(converted, |d, c| {
                             d.child(
                                 div()
@@ -1600,7 +2163,7 @@ impl FeatureDialog {
                                     .items_center()
                                     // Onshape right-aligns numbers.
                                     .justify_end()
-                                    .text_size(px(13.33))
+                                    .text_size(px(14.))
                                     .text_color(pal.text)
                                     .cursor_text()
                                     .child(c)
@@ -1667,7 +2230,35 @@ impl FeatureDialog {
 }
 
 
+/// A length parameter as its field shows it: converted to the workspace
+/// units ("6.35 mm" for "0.25 in").
+pub fn shown_length(f: &Feature, id: &str, units: &UnitPrefs, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> Option<String> {
+    let e = f.params.expr(id)?;
+    let q = noshape_units::evaluate_as(&e.text, noshape_units::Dim::LENGTH, units, vars).ok()?;
+    Some(noshape_units::format_quantity(q, units))
+}
+
 /// Feature schemas are static (registry), so array item specs live forever.
+/// Parameters shown with an icon instead of their label (live Hole dialog).
+fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
+    match (feature, param) {
+        ("hole", "holeDiameterV3") => Some("hole-diameter"),
+        ("hole", "holeDepthV3" | "holeDepthComputedV3") => Some("hole-depth"),
+        ("hole", "tipAngleStyle" | "tipAngleV3") => Some("hole-drill-angle"),
+        // Live (part-studio/102, dom/dialog-copy-here.txt): Translate by
+        // XYZ rows start with an axis icon instead of a label.
+        ("transform", "dx") => Some("xyz-along-x"),
+        ("transform", "dy") => Some("xyz-along-y"),
+        ("transform", "dz") => Some("xyz-along-z"),
+        _ => None,
+    }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+}
+
 fn item_slice(item: &Arc<Vec<ParamSpec>>) -> &'static [ParamSpec] {
     // SAFETY-free: the registry is a `LazyLock` static that is never dropped,
     // so the Arc it owns lives for the whole program. Leak a clone of the Arc
@@ -1692,8 +2283,13 @@ impl Render for FeatureDialog {
         // Onshape: the title turns red while the feature is invalid.
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
         let title_color = if invalid { pal.text_invalid } else { pal.text };
-        let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error).map(|s| format!("{} did not regenerate properly: {}", self.feature.name, s.1));
-        let name = noshape_model::interaction::display_name(&self.feature);
+        let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));
+        // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
+        // the parameters ("Ø 0.25 in ↧ 0.5 in", "#? = 0 in") is followed
+        // by the feature type in brackets.
+        let tip_name = if name == self.feature.name { name.clone() } else { format!("{name} [{}]", self.ty.name) };
+        // The sketch's red title has no tooltip: the bubble asks for a plane.
+        let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
@@ -1702,13 +2298,14 @@ impl Render for FeatureDialog {
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no
-            // border or radius, shadow 0 5px 10px rgba(0,0,0,.2).
+            // border or radius, shadow 0 5px 10px rgba(0,0,0,.2) (GPUI blurs
+            // twice as far as CSS: half the radius).
             .relative()
             .w(self.size.map(|s| s.width).unwrap_or(px(220.)))
             .when_some(self.size, |d, s| d.h(s.height))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(DialogEvent::Accept { repeat: false })))
             .on_action(cx.listener(|_, _: &crate::actions::AcceptAndRepeat, _, cx| cx.emit(DialogEvent::Accept { repeat: true })))
@@ -1732,8 +2329,9 @@ impl Render for FeatureDialog {
             }))
             .on_action(cx.listener(|_, _: &crate::actions::Cancel, _, cx| cx.emit(DialogEvent::Cancel)))
             .child(
+                // Live: 28 px plus the 1 px bottom border.
                 h_flex()
-                    .h(px(28.))
+                    .h(px(29.))
                     .flex_none()
                     .pl(px(6.))
                     .bg(pal.panel)
@@ -1843,20 +2441,27 @@ impl Render for FeatureDialog {
                             })),
                     ))
                     // Preview slider: before (left) to after (right) the feature.
-                    .when(!sketch, |d| d.child(self.render_preview_slider(cx)))
+                    // Features without a preview (Sketch; FeatureScript
+                    // NO_PREVIEW_PROVIDED: Variable) have no slider (live).
+                    .when(!sketch && self.feature.type_id != "assignVariable", |d| d.child(self.render_preview_slider(cx)))
                     .child(div().flex_1())
                     .children(footer_extra)
                     .child(
                         div()
                             .id("dlg-help")
-                            .size(px(14.))
+                            // Live: a 12 px `#a0a0a0` disc, its centre 1 px
+                            // above the slider track.
+                            .size(px(12.))
+                            .mr(px(1.))
+                            .relative()
+                            .top(px(-2.))
                             .rounded_full()
-                            .bg(gpui_kit::rgb(0x888888))
+                            .bg(gpui_kit::rgb(0xa0a0a0))
                             .hover(|d| d.bg(pal.text_muted))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .text_size(px(11.))
+                            .text_size(px(9.5))
                             .font_weight(FontWeight::BOLD)
                             .text_color(gpui_kit::rgb(0xffffff))
                             .child("?")
@@ -1882,6 +2487,9 @@ impl Render for FeatureDialog {
                 };
                 d.child(div().p(px(4.)).child(crate::ui::alert(kind).text_size(px(12.)).child(div().flex_1().min_w_0().whitespace_normal().child(msg))))
             })
+            // Tab / Shift+Tab move between the dialog's fields and stay in the
+            // dialog (Onshape), instead of going on to the toolbar or view cube.
+            .focus_trap("feature-dialog-fields", &self.focus)
     }
 }
 
@@ -1924,9 +2532,9 @@ impl FeatureDialog {
                     .bg(gpui_kit::rgb(0xffffff))
                     .border_1()
                     .border_color(gpui_kit::rgb(0x888888))
-                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]),
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(1.5), spread_radius: px(0.), inset: false }]),
             )
-            .child(canvas(move |b, _, _| track.set(b), |_, _, _, _| {}).absolute().size_full())
+            .child(canvas(move |b, _, _| track.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| {
                 cx.stop_propagation();
                 set(this, e.position.x, cx);
@@ -1949,12 +2557,6 @@ fn dialog_icon_variant(cx: &App, on: bool) -> gpui_kit::component::button::Butto
         .hover(pal.panel_hover.into())
         .active(pal.panel_active.into())
         .shadow(false)
-}
-
-/// Underline-style dialog dropdown field: `#def1fb` hover (§4.5).
-fn dialog_field_variant(cx: &App) -> gpui_kit::component::button::ButtonCustomVariant {
-    let pal = p();
-    gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false)
 }
 
 /// A selection row being dragged to a new position.
@@ -1994,44 +2596,7 @@ impl Render for DialogMoveGhost {
     }
 }
 
-/// Tolerance options of a tolerant quantity (Onshape: type, deviation or
-/// limit values, precision), stored as `<param>__tolerance` text.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Tolerance {
-    pub kind: String,
-    pub upper: String,
-    pub lower: String,
-    pub precision: Option<u8>,
-}
-
-impl Default for Tolerance {
-    fn default() -> Self {
-        Self { kind: "Symmetrical".into(), upper: "0.1".into(), lower: "0.1".into(), precision: None }
-    }
-}
-
-impl Tolerance {
-    pub const KINDS: &'static [&'static str] = &["Symmetrical", "Deviation", "Limits", "Min", "Max", "Basic"];
-
-    pub fn parse(v: Option<&ParamValue>) -> Option<Self> {
-        match v {
-            Some(ParamValue::Text(t)) => serde_json::from_str(t).ok(),
-            _ => None,
-        }
-    }
-
-    pub fn encode(&self) -> String {
-        serde_json::to_string(self).unwrap_or_default()
-    }
-
-    /// Value fields for the type: (slot, label).
-    pub fn value_labels(&self) -> Vec<(u8, &'static str)> {
-        match self.kind.as_str() {
-            "Symmetrical" => vec![(0, "Deviation")],
-            "Deviation" => vec![(0, "Upper"), (1, "Lower")],
-            "Limits" => vec![(0, "Upper"), (1, "Lower")],
-            _ => Vec::new(),
-        }
-    }
-}
+/// Tolerance options of a tolerant quantity, stored as `<param>__tolerance`
+/// text (the model reads them for hole callouts and fits).
+pub use noshape_model::fits::Tolerance;
 

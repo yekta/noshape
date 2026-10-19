@@ -25,7 +25,7 @@ use glam::{DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -39,7 +39,7 @@ use noshape_model::assembly::{
 use noshape_model::configuration::ConfigValues;
 use noshape_model::display::BodyKind;
 use noshape_model::document::{Document, TabContent, TabId};
-use noshape_model::reference::{BodyId, Inference, Reference};
+use noshape_model::reference::{BodyId, FeatureId, Inference, Reference};
 use noshape_render::StandardView;
 use noshape_units::ExprValue;
 use parking_lot::Mutex;
@@ -71,6 +71,10 @@ struct CatalogStudio {
     tab: TabId,
     name: String,
     parts: Vec<CatalogPart>,
+    /// Sketches with geometry (Insert › Sketches filter).
+    sketches: Vec<(FeatureId, String)>,
+    /// Composite parts among `parts` (Insert › Composite parts filter).
+    composites: Vec<BodyId>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -115,17 +119,35 @@ struct RelationSession {
 mod panels;
 pub(crate) use panels::*;
 
+/// Radius of the selected mate's value circle, in triad sizes.
+const VALUE_ARC_SCALE: f64 = 0.9;
+
 /// Key in `expanded` that marks the "Mate features" folder as collapsed.
 const MATE_FEATURES_COLLAPSED: InstanceId = InstanceId(u64::MAX);
 
 #[path = "assembly_behaviors.rs"]
 mod behaviors;
 pub(crate) use behaviors::*;
+pub(crate) use props::StaleContexts;
 
 #[path = "assembly_standard.rs"]
 mod standard_content;
 #[path = "assembly_thumbs.rs"]
 mod thumbs;
+#[path = "assembly_props.rs"]
+mod props;
+#[path = "assembly_search.rs"]
+mod search;
+#[path = "assembly_positions.rs"]
+mod positions;
+#[path = "assembly_bom.rs"]
+mod bom_panel;
+#[path = "assembly_config.rs"]
+mod config_panel;
+#[path = "assembly_toolbar.rs"]
+mod toolbar;
+use noshape_model::assembly::config::{self as acfg, ConfigTarget};
+use noshape_model::params::ParamValue;
 pub(crate) use standard_content::*;
 
 struct DragState {
@@ -205,6 +227,8 @@ pub(crate) struct StepEdit {
 #[derive(Clone, Copy, PartialEq)]
 enum SidePanel {
     Bom,
+    /// Assembly configurations (live "Configuration panel").
+    Configurations,
     Interference,
     Explode,
     Positions,
@@ -261,7 +285,6 @@ pub struct AssemblyView {
     ui: AsmUi,
     expanded: HashSet<Vec<InstanceId>>,
     message: Option<(bool, String)>,
-    naming_position: Option<Entity<InputState>>,
     /// Assembly mate connector dialog.
     mc: Option<McSession>,
     /// Pattern / mirror / replicate dialog.
@@ -318,6 +341,9 @@ pub struct AssemblyView {
 pub enum AssemblyViewEvent {
     /// Switch to another tab (instance menu > Switch to Part Studio / Assembly).
     ActivateTab(TabId),
+    /// Instance menu › Edit in context: open the Part Studio with the
+    /// assembly as context graphics.
+    EditInContext(TabId, Box<crate::part_studio::AssemblyContext>),
 }
 
 impl EventEmitter<AssemblyViewEvent> for AssemblyView {}
@@ -338,7 +364,7 @@ fn contains_assembly(doc: &Document, tab: TabId, target: TabId, depth: usize) ->
     }
     let Some(TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { return false };
     a.instances.iter().any(|i| match &i.source {
-        InstanceSource::Assembly { assembly } => contains_assembly(doc, *assembly, target, depth + 1),
+        InstanceSource::Assembly { assembly, .. } => contains_assembly(doc, *assembly, target, depth + 1),
         _ => false,
     })
 }
@@ -417,10 +443,9 @@ impl AssemblyView {
             show_mates: false,
             show_connectors: false,
             // Onshape's Insert dialog starts with the Parts filter on.
-            ui: AsmUi { insert_filter: (true, false), ..Default::default() },
+            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), ..Default::default() },
             expanded: HashSet::new(),
             message: None,
-            naming_position: None,
             mc: None,
             pattern: None,
             snap: None,
@@ -458,9 +483,20 @@ impl AssemblyView {
         this
     }
 
+    /// A part instance of a Composite part.
+    fn is_composite_source(&self, source: &InstanceSource, cx: &App) -> bool {
+        match source {
+            InstanceSource::Part { studio, body, .. } => match self.doc.read(cx).session.doc.tab(*studio).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => ps.feature(body.feature).is_some_and(|f| f.type_id == "compositePart"),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     fn assembly<'a>(&self, cx: &'a App) -> Option<&'a Assembly> {
         match &self.doc.read(cx).session.doc.tab(self.tab)?.content {
-            TabContent::Assembly(a) => Some(a),
+            TabContent::Assembly(a) => Some(&**a),
             _ => None,
         }
     }
@@ -474,6 +510,10 @@ impl AssemblyView {
     /// Assembly to evaluate (with the mate being edited applied) and solve options.
     fn effective(&self, cx: &App) -> Option<(Assembly, SolveOptions)> {
         let mut asm = self.assembly(cx)?.clone();
+        // The configuration chosen above the instance list.
+        if asm.has_configured() {
+            asm.apply_configuration(&self.ui.config_values);
+        }
         let mut opts = SolveOptions::default();
         if let Some(s) = &self.mate
             && let Some(m) = s.dialog.read(cx).to_mate(cx)
@@ -483,6 +523,11 @@ impl AssemblyView {
             // (until Solve solves every mate).
             if !s.solve_all && !fixed(m.a.instance) && !fixed(m.b.instance) {
                 opts.hold.push(m.b.instance);
+            }
+            // Until Solve only this mate is solved (help: Mates), so instances
+            // mated to the moving one stay where they are.
+            if !s.solve_all {
+                opts.only_mate = Some(m.id);
             }
             // After a snap drag the dragged instance starts at its snapped placement.
             if let Some((id, p)) = self.snap_start {
@@ -526,14 +571,17 @@ impl AssemblyView {
                     let mut catalog = Catalog::default();
                     for t in doc.ordered_tabs() {
                         match &t.content {
-                            TabContent::PartStudio(_) => {
-                                let parts = ev
-                                    .studio(&doc, t.id, &ConfigValues::default())
+                            TabContent::PartStudio(ps) => {
+                                let r = ev.studio(&doc, t.id, &ConfigValues::default());
+                                let composites: Vec<BodyId> = r.as_ref().map(|r| r.display.bodies.iter().filter(|b| ps.feature(b.id.feature).is_some_and(|f| f.type_id == "compositePart")).map(|b| b.id.clone()).collect()).unwrap_or_default();
+                                let parts = r
+                                    .as_ref()
                                     .map(|r| {
                                         r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).map(|b| (b.id.clone(), b.name.clone(), b.bounds, b.kind == BodyKind::Surface)).collect()
                                     })
                                     .unwrap_or_default();
-                                catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts });
+                                let sketches = r.as_ref().map(|r| r.context.sketches.iter().filter(|s| s.sketch.entities().any(|e| !e.construction)).map(|s| (s.feature, s.name.clone())).collect()).unwrap_or_default();
+                                catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts, sketches, composites });
                             }
                             TabContent::Assembly(_) if !contains_assembly(&doc, t.id, self_tab, 0) => catalog.assemblies.push((t.id, t.name.clone())),
                             _ => {}
@@ -562,6 +610,7 @@ impl AssemblyView {
             self.resync_patterns(cx);
         }
         self.check_external_updates(cx);
+        self.publish_stale_contexts(cx);
         if self.explode.is_some() || self.placing.is_some() {
             // Re-apply display-only state (explode playback, cursor placement).
             self.update_placing(cx);
@@ -572,7 +621,7 @@ impl AssemblyView {
         if !self.fitted_once && self.result.bounds().is_some() {
             self.fitted_once = true;
             self.viewport.update(cx, |vp, cx| {
-                vp.camera.set_view(StandardView::Isometric);
+                vp.camera.set_view(StandardView::Trimetric);
                 vp.zoom_to_fit(false, cx)
             });
         }
@@ -599,6 +648,8 @@ impl AssemblyView {
         }
         if self.isolate.is_some() || self.ui.transparent.is_some() {
             o.dim_alpha = self.ui.transparency;
+            // Select transparent geometry / Alt+click: pick through.
+            o.pick_dimmed = self.ui.select_transparent || self.ui.alt_through;
         }
         if let Some(s) = &self.snap_drag
             && s.started
@@ -661,6 +712,15 @@ impl AssemblyView {
                 h.mate_lines.push((a.origin, b.origin, strong));
             }
         };
+        // A selected mate with a rotation shows its value circle (live 305).
+        if let Some(mid) = self.selected_mate
+            && self.anim.is_none()
+            && let Some(ms) = self.result.mates.iter().find(|m| m.id == mid && m.ok && !m.inactive)
+            && let Some(f) = ms.frame_b
+            && self.assembly(cx).and_then(|a| a.mate(mid)).is_some_and(|m| noshape_model::assembly::eval::mate_dofs(m.mate_type).iter().any(|(ix, _)| *ix == 0))
+        {
+            h.value_arcs.push((f, size * VALUE_ARC_SCALE));
+        }
         // Mate highlight (list hover / selection): instances accent + both connector triads.
         for mid in [self.selected_mate, self.list_hover_mate].into_iter().flatten() {
             h.accent_tops.extend(self.mate_instances(mid, cx));
@@ -927,7 +987,7 @@ impl AssemblyView {
             let same = a.instances.iter().filter(|i| i.source == source).count();
             let placement = Placement { translation: [same as f64 * (width + 0.01), 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
             let name = a.next_instance_name(&base);
-            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
+            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
             id
         })
     }
@@ -940,18 +1000,33 @@ impl AssemblyView {
         if self.insert_open {
             self.ui.insert_inserted.extend(ids.iter().copied());
         }
+        // Live Onshape: the instance following the cursor is selected (amber),
+        // and deselected once it is placed (assembly/04, 06).
+        self.selected = ids.clone();
         self.placing = Some(ids);
         self.placing_point = None;
         self.ui.place_snap = None;
         self.ui.place_src_ix = 0;
-        self.selected.clear();
-        self.message = Some((false, "Click to place the inserted instance (Esc keeps it where it is).".into()));
+        // Live Onshape shows no hint while the instance follows the cursor.
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
         cx.notify();
     }
 
     fn insert_and_place(&mut self, studio: TabId, body: Option<CatalogPart>, cx: &mut Context<Self>) {
         if let Some(id) = self.insert_part(studio, body, cx) {
+            self.start_placing(vec![id], cx);
+        }
+    }
+
+    /// Insert › Sketches: a sketch of a Part Studio as an instance.
+    fn insert_sketch(&mut self, studio: TabId, sketch: FeatureId, name: String, cx: &mut Context<Self>) {
+        let id = self.edit(&format!("Insert : {name}"), cx, |a| {
+            let id = InstanceId(a.next_id());
+            let n = a.next_instance_name(&name);
+            a.instances.push(Instance::new(id, n, InstanceSource::Sketch { studio, sketch, config: ConfigValues::default() }, Placement::default()));
+            id
+        });
+        if let Some(id) = id {
             self.start_placing(vec![id], cx);
         }
     }
@@ -969,10 +1044,11 @@ impl AssemblyView {
     }
 
     fn insert_assembly(&mut self, tab: TabId, name: String, cx: &mut Context<Self>) {
+        let config = self.ui.insert_config.get(&tab).cloned().unwrap_or_default();
         let id = self.edit(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
-            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
+            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab, config: config.clone() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
             id
         });
         if let Some(id) = id {
@@ -1062,8 +1138,9 @@ impl AssemblyView {
                     self.edit(&format!("Place : {name}"), cx, |_| {});
                 }
             }
-            self.selected = ids;
+            self.selected.retain(|s| !ids.contains(s));
         } else {
+            self.selected.retain(|s| !ids.contains(s));
             self.schedule_eval(window, cx);
         }
         self.refresh_scene(false, cx);
@@ -1092,21 +1169,16 @@ impl AssemblyView {
         });
     }
 
-    /// Instance menu "Use best available tessellation" (toggle).
+    /// Instance menu "Use best available tessellation" / "Use automatic
+    /// tessellation setting" (the same slot, live assembly/110).
     pub(super) fn set_best_tessellation(&mut self, ids: Vec<InstanceId>, on: bool, cx: &mut Context<Self>) {
-        self.edit("Use best available tessellation", cx, |a| {
+        self.edit(if on { "Use best available tessellation" } else { "Use automatic tessellation setting" }, cx, |a| {
             for id in &ids {
                 if let Some(i) = a.instance_mut(*id) {
                     i.best_tessellation = on;
                 }
             }
         });
-    }
-
-    fn toggle_fix_selected(&mut self, cx: &mut Context<Self>) {
-        let ids = self.selected.clone();
-        let all_fixed = self.assembly(cx).is_some_and(|a| ids.iter().all(|id| a.instance(*id).is_some_and(|i| i.fixed)));
-        self.set_fixed(ids, !all_fixed, cx);
     }
 
     fn set_hidden(&mut self, ids: Vec<InstanceId>, hidden: bool, cx: &mut Context<Self>) {
@@ -1120,8 +1192,13 @@ impl AssemblyView {
     }
 
     fn set_suppressed(&mut self, ids: Vec<InstanceId>, s: bool, cx: &mut Context<Self>) {
+        let values = self.ui.config_values.clone();
         self.edit(if s { "Suppress" } else { "Unsuppress" }, cx, |a| {
             for id in &ids {
+                // A configured suppression changes the current configuration.
+                if a.set_configured_value(ConfigTarget::Instance(*id), acfg::param::UNSUPPRESSED, &values, ParamValue::Bool(!s)) {
+                    continue;
+                }
                 if let Some(i) = a.instance_mut(*id) {
                     i.suppressed = s;
                 }
@@ -1137,20 +1214,31 @@ impl AssemblyView {
             for id in &ids {
                 a.remove_instance(*id);
             }
+            a.prune_configured();
         });
         self.selected.retain(|i| !ids.contains(i));
     }
 
     fn delete_mate(&mut self, id: MateId, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.mate(id).map(|m| m.name.clone()).or_else(|| a.relations.iter().find(|r| r.id == id).map(|r| r.name.clone())).or_else(|| a.groups.iter().find(|g| g.id == id).map(|g| g.name.clone())));
-        self.edit(&format!("Delete : {}", name.unwrap_or_default()), cx, |a| a.remove_mate(id));
+        self.edit(&format!("Delete : {}", name.unwrap_or_default()), cx, |a| {
+            a.remove_mate(id);
+            a.prune_configured();
+        });
         if self.selected_mate == Some(id) {
             self.selected_mate = None;
         }
     }
 
     fn toggle_mate_suppressed(&mut self, id: MateId, cx: &mut Context<Self>) {
+        let values = self.ui.config_values.clone();
         self.edit("Suppress mate", cx, |a| {
+            let now = a.configured(&values).mate(id).map(|m| m.suppressed);
+            if let Some(now) = now
+                && a.set_configured_value(ConfigTarget::Mate(id), acfg::param::UNSUPPRESSED, &values, ParamValue::Bool(now))
+            {
+                return;
+            }
             if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
                 m.suppressed = !m.suppressed;
             }
@@ -1248,6 +1336,11 @@ impl AssemblyView {
     }
 
     fn edit_mate(&mut self, id: MateId, window: &mut Window, cx: &mut Context<Self>) {
+        // Configure assembly features mode: the mate's parameters are picked.
+        if self.ui.cfg_mode.is_some() {
+            self.configure_pick_mate(id, window, cx);
+            return;
+        }
         self.close_mate(window, cx);
         if let Some(c) = self.assembly(cx).and_then(|a| a.connector(id).cloned()) {
             self.open_mc(Some(c), window, cx);
@@ -1265,7 +1358,7 @@ impl AssemblyView {
             self.open_relation(r.relation_type, Some(r), window, cx);
             return;
         }
-        let Some(m) = self.assembly(cx).and_then(|a| a.mate(id).cloned()) else { return };
+        let Some(m) = self.assembly(cx).map(|a| a.configured(&self.ui.config_values)).and_then(|a| a.mate(id).cloned()) else { return };
         self.open_mate_dialog(m, Some(id), window, cx);
     }
 
@@ -1282,6 +1375,7 @@ impl AssemblyView {
             MateDialogEvent::AcceptAndNew => this.accept_mate_and_new(window, cx),
             MateDialogEvent::Animate => this.toggle_mate_preview(window, cx),
             MateDialogEvent::EditConnector(field) => this.edit_dialog_connector(*field, window, cx),
+            MateDialogEvent::ConfigureParam(param) => this.configure_mate_param(param, cx),
             MateDialogEvent::Solve => {
                 if let Some(s) = &mut this.mate {
                     s.solve_all = true;
@@ -1311,9 +1405,15 @@ impl AssemblyView {
             self.anim = None;
         }
         let desc = if editing.is_some() { format!("Edit : {}", m.name) } else { format!("Insert : {}", m.name) };
+        let values = self.ui.config_values.clone();
+        let mut m = m;
         // Solved placements of the preview (which includes this mate) are folded in.
         self.edit(&desc, cx, |a| match editing.and_then(|id| a.mates.iter().position(|x| x.id == id)) {
-            Some(i) => a.mates[i] = m,
+            Some(i) => {
+                // Configured parameters go to the current configuration's row.
+                a.store_mate_edit(&mut m, &values);
+                a.mates[i] = m;
+            }
             None => a.mates.push(m),
         });
         window.focus(&self.focus, cx);
@@ -1562,62 +1662,6 @@ impl AssemblyView {
                 }
             }
         }));
-    }
-
-    fn save_named_position(&mut self, name: String, cx: &mut Context<Self>) {
-        let placements = self.result.solved.placements.clone();
-        let mate_values = self.assembly(cx).map(|a| self.result.named_position_values(a)).unwrap_or_default();
-        self.edit(&format!("Insert : Named position {name}"), cx, |a| {
-            a.named_positions.retain(|n| n.name != name);
-            a.named_positions.push(NamedPosition { name, placements, mate_values });
-        });
-    }
-
-    fn update_named_position(&mut self, i: usize, cx: &mut Context<Self>) {
-        let placements = self.result.solved.placements.clone();
-        let mate_values = self.assembly(cx).map(|a| self.result.named_position_values(a)).unwrap_or_default();
-        let name = self.assembly(cx).and_then(|a| a.named_positions.get(i).map(|n| n.name.clone())).unwrap_or_default();
-        self.edit(&format!("Update named position : {name}"), cx, |a| {
-            if let Some(np) = a.named_positions.get_mut(i) {
-                np.placements = placements;
-                np.mate_values = mate_values;
-            }
-        });
-        self.message = Some((false, format!("{name} updated to the current positions.")));
-    }
-
-    fn delete_named_position(&mut self, i: usize, cx: &mut Context<Self>) {
-        let name = self.assembly(cx).and_then(|a| a.named_positions.get(i).map(|n| n.name.clone())).unwrap_or_default();
-        self.edit(&format!("Delete named position : {name}"), cx, |a| {
-            if i < a.named_positions.len() {
-                a.named_positions.remove(i);
-            }
-        });
-    }
-
-    fn apply_named_position(&mut self, i: usize, cx: &mut Context<Self>) {
-        let Some(np) = self.assembly(cx).and_then(|a| a.named_positions.get(i).cloned()) else { return };
-        // Stored placements as the start, stored driving mate values imposed.
-        let solved = self.result.prepared.solve_named_position(&np);
-        let mut placements = np.placements.clone();
-        for (id, p) in &solved.placements {
-            match placements.iter_mut().find(|(i, _)| i == id) {
-                Some(x) => x.1 = *p,
-                None => placements.push((*id, *p)),
-            }
-        }
-        let tab = self.tab;
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_tab(tab, &format!("Apply named position : {}", np.name), cx, |c| {
-                if let TabContent::Assembly(a) = c {
-                    for (id, p) in &placements {
-                        if let Some(inst) = a.instance_mut(*id) {
-                            inst.placement = *p;
-                        }
-                    }
-                }
-            });
-        });
     }
 
     // ------------------------------------------------------------ animation
@@ -1871,6 +1915,14 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::PointerMove { position, modifiers } => {
+                // Alt: transparent instances become pickable (Onshape Alt+click).
+                if modifiers.alt != self.ui.alt_through {
+                    self.ui.alt_through = modifiers.alt;
+                    if self.isolate.is_some() || self.ui.transparent.is_some() {
+                        // Pickability changes: the pick buffer must be redrawn.
+                        self.rebuild_scene(true, cx);
+                    }
+                }
                 self.pointer = *position;
                 // Shift (hold) locks mate inference to the entity under the cursor.
                 self.infer_locked = modifiers.shift;
@@ -1945,6 +1997,8 @@ impl AssemblyView {
                     let id = self.ui.overlay_mates.get(i).copied();
                     if let (Some(id), true) = (id, self.relation.is_some()) {
                         self.pick_relation_mate(id, cx);
+                    } else if let (Some(id), true) = (id, self.ui.cfg_mode.is_some()) {
+                        self.configure_pick_mate(id, window, cx);
                     } else {
                         self.selected_mate = id;
                         self.selected.clear();
@@ -2399,58 +2453,103 @@ impl AssemblyView {
     fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let sep = crate::ui::tool_separator;
+        // Tool search's "Highlight tool in toolbar": `#fcda7f`, border `#fab601`.
+        let found = self.search_found_icon();
+        let lit = move |b: Button, icon: &str| b.when(found == Some(icon), |b| b.bg(rgb(0xfcda7f)).border_1().border_color(rgb(0xfab601)));
+        // Tooltips: title (+ shortcut), then the description after a pause.
+        let rich = |id: &'static str, tip: &'static str, icon: &str, b: Button| crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tip, search::tool_description(icon), b);
         let tool = |this: &Self, id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self, &mut Window, &mut Context<Self>)| {
             let _ = this;
-            crate::ui::tool_button(id, icon, on, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx)))
+            rich(id, tip, icon, lit(crate::ui::tool_button(id, icon, on, cx), icon).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx))))
         };
         let mate = |this: &Self, id: &'static str, t: MateType, tip: &'static str, cx: &mut Context<Self>| {
             let on = this.mate.as_ref().is_some_and(|m| m.dialog.read(cx).mate_type() == t);
-            crate::ui::tool_button(id, crate::assembly_mate_dialog::mate_icon_name(t), on, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_mate(t, window, cx)))
+            let icon = crate::assembly_mate_dialog::mate_icon_name(t);
+            rich(id, tip, icon, lit(crate::ui::tool_button(id, icon, on, cx), icon).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_mate(t, window, cx))))
         };
         let relation = |id: &'static str, icon: &'static str, tip: &'static str, kind: RelationType, cx: &mut Context<Self>| {
-            crate::ui::tool_button(id, icon, false, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_relation(kind, None, window, cx)))
+            rich(id, tip, icon, lit(crate::ui::tool_button(id, icon, false, cx), icon).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_relation(kind, None, window, cx))))
         };
+        // Editing a named position: only Undo / Redo, and the yellow
+        // "Editing <name> [Done]" banner at the top centre (live 105).
+        let banner = self.render_np_banner(cx).or_else(|| self.explode_banner(cx));
+        if let Some(banner) = banner {
+            return crate::ui::toolbar()
+                .relative()
+                .child(crate::ui::undo_redo(&self.doc, cx))
+                .child(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner))
+                .into_any_element();
+        }
+        // Configure assembly features: the toolbar greyed out with the yellow
+        // banner over it (live 192).
+        let cfg_banner = self.render_cfg_banner(cx);
         // Onshape's assembly toolbar, in its order (live DOM, 1.222): no
         // dropdowns; exploded views, named positions, interference and the
         // BOM live in the right panel rail.
-        crate::ui::toolbar()
-            .child(crate::ui::undo_redo(&self.doc, cx))
-            .child(sep())
-            .child(crate::ui::text_tool_button("tb-insert", "insert", "Insert", self.insert_open, cx).tooltip("Insert parts and assemblies (i)").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_insert(w, cx))))
-            .child(sep())
-            .child(tool(self, "tb-mc", "mate-connector-assembly", "Mate connector (ctrl+m)", self.mc.is_some(), cx, |this, w, cx| this.open_mc(None, w, cx)))
-            .child(sep())
-            .child(mate(self, "tb-fastened", MateType::Fastened, "Fastened mate (m)", cx))
-            .child(mate(self, "tb-revolute", MateType::Revolute, "Revolute mate (m)", cx))
-            .child(mate(self, "tb-slider", MateType::Slider, "Slider mate (m)", cx))
-            .child(mate(self, "tb-planar", MateType::Planar, "Planar mate (m)", cx))
-            .child(mate(self, "tb-cyl", MateType::Cylindrical, "Cylindrical mate (m)", cx))
-            .child(mate(self, "tb-pinslot", MateType::PinSlot, "Pin slot mate (m)", cx))
-            .child(mate(self, "tb-ball", MateType::Ball, "Ball mate (m)", cx))
-            .child(mate(self, "tb-parallel", MateType::Parallel, "Parallel mate (m)", cx))
-            .child(sep())
-            .child(mate(self, "tb-tangent", MateType::Tangent, "Tangent mate", cx))
-            .child(mate(self, "tb-width", MateType::Width, "Width mate", cx))
-            .child(sep())
-            .child(tool(self, "tb-group", "group", "Group", self.ui.group.is_some(), cx, |this, _, cx| this.create_group(cx)))
-            .child(tool(self, "tb-snap", "snap-mode", "Snap mode (shift+s)", self.snap.is_some(), cx, |this, w, cx| this.toggle_snap(w, cx)))
-            .child(tool(self, "tb-show-mates", "show-mates", "Show mates mode (h)", self.show_mates_mode, cx, |this, _, cx| this.toggle_show_mates_mode(cx)))
-            .child(tool(self, "tb-replicate", "replicate", "Replicate", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Replicate, w, cx)))
-            .child(tool(self, "tb-replace", "replace-part", "Replace instance", self.replace_panel.is_some(), cx, |this, _, cx| this.replace_selected(cx)))
-            .child(tool(self, "tb-linpat", "linear-pattern", "Assembly linear pattern", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Linear, w, cx)))
-            .child(tool(self, "tb-circpat", "circular-pattern", "Assembly circular pattern", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Circular, w, cx)))
-            .child(tool(self, "tb-mirror", "mirror", "Assembly mirror", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Mirror, w, cx)))
-            .child(sep())
-            .child(relation("tb-gear", "gear-relation", "Gear relation", RelationType::Gear, cx))
-            .child(relation("tb-rack", "rack-pinion", "Rack and pinion relation", RelationType::RackAndPinion, cx))
-            .child(relation("tb-screw", "screw-relation", "Screw relation", RelationType::Screw, cx))
-            .child(relation("tb-linear", "linear-relation", "Linear relation", RelationType::Linear, cx))
-            .child(sep())
-            .child(tool(self, "tb-display-states", "display-states", "Display states", self.ui.display_states, cx, |this, w, cx| this.toggle_display_states(w, cx)))
-            .child(tool(self, "tb-fix", "fix-instance", "Fix / unfix selected", false, cx, |this, _, cx| this.toggle_fix_selected(cx)))
+        // Tool sets in the user's order without removed tools (Customize
+        // toolbar), each built by its id.
+        let prefs = self.toolbar_prefs();
+        let mut bar = crate::ui::toolbar().child(crate::ui::undo_redo(&self.doc, cx));
+        for (set, ids) in prefs.sets() {
+            let tools: Vec<AnyElement> = ids
+                .iter()
+                .map(|id| match *id {
+                    "tb-update-refs" => tool(self, "tb-update-refs", "update-all-button", "Update all references to latest versions", self.ui.ref_manager.is_some(), cx, |this, _, cx| this.open_reference_manager(cx)).into_any_element(),
+                    "tb-insert" => rich("tb-insert", "Insert parts and assemblies (i)", "insert", lit(crate::ui::text_tool_button("tb-insert", "insert", "Insert", self.insert_open, cx), "insert").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_insert(w, cx)))).into_any_element(),
+                    "tb-mc" => tool(self, "tb-mc", "mate-connector-assembly", "Mate connector (ctrl+m)", self.mc.is_some(), cx, |this, w, cx| this.open_mc(None, w, cx)).into_any_element(),
+                    "tb-fastened" => mate(self, "tb-fastened", MateType::Fastened, "Fastened mate (m)", cx).into_any_element(),
+                    "tb-revolute" => mate(self, "tb-revolute", MateType::Revolute, "Revolute mate (m)", cx).into_any_element(),
+                    "tb-slider" => mate(self, "tb-slider", MateType::Slider, "Slider mate (m)", cx).into_any_element(),
+                    "tb-planar" => mate(self, "tb-planar", MateType::Planar, "Planar mate (m)", cx).into_any_element(),
+                    "tb-cyl" => mate(self, "tb-cyl", MateType::Cylindrical, "Cylindrical mate (m)", cx).into_any_element(),
+                    "tb-pinslot" => mate(self, "tb-pinslot", MateType::PinSlot, "Pin slot mate (m)", cx).into_any_element(),
+                    "tb-ball" => mate(self, "tb-ball", MateType::Ball, "Ball mate (m)", cx).into_any_element(),
+                    "tb-parallel" => mate(self, "tb-parallel", MateType::Parallel, "Parallel mate (m)", cx).into_any_element(),
+                    "tb-tangent" => mate(self, "tb-tangent", MateType::Tangent, "Tangent mate", cx).into_any_element(),
+                    "tb-width" => mate(self, "tb-width", MateType::Width, "Width mate", cx).into_any_element(),
+                    "tb-group" => tool(self, "tb-group", "group", "Group", self.ui.group.is_some(), cx, |this, _, cx| this.create_group(cx)).into_any_element(),
+                    "tb-snap" => tool(self, "tb-snap", "snap-mode", "Snap mode (shift+s)", self.snap.is_some(), cx, |this, w, cx| this.toggle_snap(w, cx)).into_any_element(),
+                    "tb-show-mates" => tool(self, "tb-show-mates", "show-mates", "Show mates mode (h)", self.show_mates_mode, cx, |this, _, cx| this.toggle_show_mates_mode(cx)).into_any_element(),
+                    "tb-replicate" => tool(self, "tb-replicate", "replicate", "Replicate", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Replicate, w, cx)).into_any_element(),
+                    "tb-replace" => tool(self, "tb-replace", "replace-part", "Replace instance", self.replace_panel.is_some(), cx, |this, _, cx| this.replace_selected(cx)).into_any_element(),
+                    "tb-linpat" => tool(self, "tb-linpat", "linear-pattern", "Assembly linear pattern", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Linear, w, cx)).into_any_element(),
+                    "tb-circpat" => tool(self, "tb-circpat", "circular-pattern", "Assembly circular pattern", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Circular, w, cx)).into_any_element(),
+                    "tb-mirror" => tool(self, "tb-mirror", "mirror", "Assembly mirror", false, cx, |this, w, cx| this.open_pattern(PatternDialogKind::Mirror, w, cx)).into_any_element(),
+                    "tb-gear" => relation("tb-gear", "gear-relation", "Gear relation", RelationType::Gear, cx).into_any_element(),
+                    "tb-rack" => relation("tb-rack", "rack-pinion", "Rack and pinion relation", RelationType::RackAndPinion, cx).into_any_element(),
+                    "tb-screw" => relation("tb-screw", "screw-relation", "Screw relation", RelationType::Screw, cx).into_any_element(),
+                    "tb-linear" => relation("tb-linear", "linear-relation", "Linear relation", RelationType::Linear, cx).into_any_element(),
+                    "tb-display-states" => tool(self, "tb-display-states", "display-states", "Display states", self.ui.display_states, cx, |this, w, cx| this.toggle_display_states(w, cx)).into_any_element(),
+                    _ => tool(self, "tb-ps-in-context", "create-partstudio-incontext", "Create Part Studio in context", self.ui.ps_in_context.is_some(), cx, |this, _, cx| this.open_ps_in_context(cx)).into_any_element(),
+                })
+                .collect();
+            bar = bar.child(sep()).child(self.render_toolset(set, tools, ids, cx));
+        }
+        let bar = bar
+            .child(div().w(px(10.)))
+            .when(!prefs.hide_search, |d| {
+                d.child(crate::ui::search_tools_toggle("asm-search", self.ui.tool_search.is_some()).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    if this.ui.tool_search.is_some() {
+                        this.close_tool_search(window, cx);
+                    } else {
+                        this.open_tool_search(window, cx);
+                    }
+                })))
+            })
             .child(div().flex_1())
-            .when(self.evaluating, |d| d.child(div().pr(px(8.)).text_xs().text_color(pal.text_faint).child("solving…")))
-            .into_any_element()
+            .when(self.evaluating, |d| d.child(div().pr(px(8.)).text_xs().text_color(pal.text_faint).child("solving…")));
+        // Right-click: Customize toolbar… / Hide "Search tools" (live 331z).
+        let menu = self.toolbar_menu(cx.entity());
+        let bar = div().id("asm-toolbar").child(bar).os_context_menu(menu);
+        match cfg_banner {
+            Some(banner) => div()
+                .relative()
+                .child(div().opacity(0.4).child(bar))
+                .child(div().id("tb-cfg-block").occlude().absolute().top_0().left_0().size_full())
+                .child(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner))
+                .into_any_element(),
+            None => bar.into_any_element(),
+        }
     }
 
     /// Onshape's right panel rail (§3.6): 33 x 34 white buttons with `#aaa`
@@ -2489,19 +2588,14 @@ impl AssemblyView {
             .flex()
             .flex_col()
             .justify_center()
-            .child(btn("rail-bom", "bom", "Bill of materials", self.panel == Some(SidePanel::Bom), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Bom, cx))))
+            // Live strip (assembly/181-*): BOM Table, Configuration panel,
+            // Exploded views, Named positions, (Simulation: excluded),
+            // Variable table. Interference is in the top row's menu
+            // (Check interference…), Animate in the mate row's.
+            .child(btn("rail-bom", "bom", "BOM Table", self.panel == Some(SidePanel::Bom), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Bom, cx))))
+            .child(btn("rail-config", "config-show", "Configuration panel", self.panel == Some(SidePanel::Configurations), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Configurations, cx))))
             .child(btn("rail-explode", "explode", "Exploded views", exploded || self.panel == Some(SidePanel::Explode), cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_explode_panel(cx))))
             .child(btn("rail-named", "named-position", "Named positions", self.panel == Some(SidePanel::Positions), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Positions, cx))))
-            .child(btn("rail-interference", "interference", "Interference detection", self.panel == Some(SidePanel::Interference), cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                if this.panel == Some(SidePanel::Interference) {
-                    this.panel = None;
-                    this.rebuild_scene(false, cx);
-                    cx.notify();
-                } else {
-                    this.run_interference(cx);
-                }
-            })))
-            .child(btn("rail-animate", "animate", "Animate mate", self.anim.is_some(), cx).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.start_animation(w, cx))))
             .child(btn("rail-variables", "variable-table", "Variable table", self.panel == Some(SidePanel::Variables), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Variables, cx))))
             .into_any_element()
     }
@@ -2520,8 +2614,15 @@ impl AssemblyView {
         });
         let fixed = inst.map(|i| i.fixed).unwrap_or_else(|| node.is_some_and(|n| n.fixed));
         let hidden = inst.map(|i| i.hidden).unwrap_or_else(|| node.is_some_and(|n| n.hidden));
-        let suppressed = inst.map(|i| i.suppressed).unwrap_or_else(|| node.is_some_and(|n| n.suppressed));
+        // Dynamic suppression shows through the evaluated node.
+        let suppressed = inst.is_some_and(|i| i.suppressed) || node.is_some_and(|n| n.suppressed);
         let error = node.and_then(|n| n.error.clone());
+        // Show instance list properties: the release state pill.
+        let state = inst.filter(|_| self.ui.list_properties).map(|i| self.instance_state(i, cx));
+        // Suppressed by a Dynamic suppression expression: gray italic, struck
+        // through, an ƒx glyph in place of the DOF glyph (live assembly/141).
+        let dyn_suppressed = suppressed && inst.is_some_and(|i| i.unsuppressed_if.is_some());
+        let row_tip: SharedString = if dyn_suppressed { format!("{name} (Suppressed with expression)").into() } else { name.clone().into() };
         // Onshape warns when more than one part is fixed.
         let fixed_tip: SharedString = if is_top && fixed && self.assembly(cx).is_some_and(|a| a.fixed_instances().len() > 1) { format!("{name} has warning: More than one part is fixed").into() } else { "Part is fixed".into() };
         let ext_key = inst.and_then(|i| i.source.external_key().map(|k| k.to_string()));
@@ -2533,6 +2634,10 @@ impl AssemblyView {
         let icon = match kind {
             // Standard content has its own icon in the Instances list (Onshape).
             NodeKind::Part if inst.is_some_and(|i| i.source.standard().is_some()) => "standard-content",
+            // Sketch instances carry the sketch icon (live 123), composite
+            // parts the composite icon (live 326).
+            NodeKind::Part if inst.is_some_and(|i| matches!(i.source, InstanceSource::Sketch { .. })) => "sketch",
+            NodeKind::Part if inst.is_some_and(|i| self.is_composite_source(&i.source, cx)) => "composite-part",
             NodeKind::Part => "part",
             NodeKind::PartStudio => "part-studio",
             NodeKind::Assembly if node.is_some_and(|n| n.rigid) => "sub-assembly-rigid",
@@ -2577,8 +2682,9 @@ impl AssemblyView {
             .child(match self.rename_field(behaviors::RenameRow::Instance(top)).filter(|_| is_top) {
                 Some(field) => field,
                 // The state glyphs follow the name (Onshape), not the row's right edge.
-                None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).child(name.clone()).into_any_element(),
+                None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).when(dyn_suppressed, |d| d.italic()).child(name.clone()).into_any_element(),
             })
+            .when_some(state, |d, s| d.child(Self::state_pill(s)))
             .when(fixed, |d| d.child(div().id(SharedString::from(format!("fixed-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-fixed"), 14., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(fixed_tip.clone()).build(w, cx))))
             .when_some(inst.map(|i| i.lock.clone()).filter(|l| is_top && !l.is_flexible()), |d, lock| {
                 // Lock icon of a locked subassembly (click to unlock).
@@ -2598,9 +2704,12 @@ impl AssemblyView {
                         })),
                 )
             })
-            .when_some(dof.filter(|d| *d > 0 && !fixed), |d, n| {
+            .when(dyn_suppressed && is_top, |d| d.child(svg().path(icon_path("function")).size(px(14.)).flex_none().text_color(pal.text_faint)))
+            .when_some(dof.filter(|d| *d > 0 && !fixed && !dyn_suppressed), |d, n| {
                 d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 14., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has degrees of freedom ({n})")).build(w, cx)))
             })
+            // In-context arrows (Assembly contexts of its Part Studio).
+            .when(is_top, |d| d.children(self.context_icons(top, cx)))
             .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
             .when_some(error.clone(), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .when_some(update.clone(), |d, (v, key)| {
@@ -2638,6 +2747,7 @@ impl AssemblyView {
                     ),
                 )
             })
+            .when(!crate::os_menu::is_open(cx), |d| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a row highlights the instance in the graphics area.
                 let new = if *h { Some(top) } else { None };
@@ -2774,7 +2884,8 @@ impl AssemblyView {
                         }))),
                 )
             })
-            .when_some(tip, |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
+            // No row tooltip while a context menu is open (it would cover the menu).
+            .when_some(tip.filter(|_| !crate::os_menu::is_open(cx)), |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
             // Drag a row onto another of the same kind to reorder (Onshape).
             .on_drag(behaviors::MateDrag { id, label: name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
             .drag_over::<behaviors::MateDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
@@ -2795,6 +2906,11 @@ impl AssemblyView {
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 if ev.click_count() >= 2 {
                     this.edit_mate(id, window, cx);
+                    return;
+                }
+                // Configure assembly features: a click opens the mate's
+                // parameters for picking (live 194).
+                if this.ui.cfg_mode.is_some() && this.configure_pick_mate(id, window, cx) {
                     return;
                 }
                 if this.pick_mode(cx).is_some() {
@@ -2954,7 +3070,7 @@ impl AssemblyView {
                 continue;
             }
             let node = result.node(&[inst.id]);
-            if !self.instance_passes(inst, node) {
+            if !self.instance_passes(inst, node, cx) {
                 continue;
             }
             if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
@@ -2970,6 +3086,11 @@ impl AssemblyView {
         if !filtering {
             // Empty instance folders.
             for folder in asm.folders.iter().filter(|f| f.instances.is_empty() && f.features.is_empty()) {
+                rows.push(self.folder_row(folder, cx));
+            }
+        } else {
+            // Filtered rows are flat; `:folder` lists the folders.
+            for folder in asm.folders.iter().filter(|f| self.folder_passes(f)) {
                 rows.push(self.folder_row(folder, cx));
             }
         }
@@ -3073,11 +3194,14 @@ impl AssemblyView {
         if mates_open || filtering {
             rows.extend(mate_rows.into_iter().map(|r| div().pl(px(if filtering { 0. } else { 17. })).child(r).into_any_element()));
         }
+        // A configured assembly: the Configurations box above the list (live 191).
+        let config_box = self.render_asm_config_box(cx);
         v_flex()
             .size_full()
             .bg(pal.panel)
             .border_r_1()
             .border_color(pal.border)
+            .children(config_box)
             .child(self.render_list_filter(cx))
             .child(
                 h_flex()
@@ -3168,10 +3292,10 @@ impl AssemblyView {
             .border_color(gpui_kit::rgb(0xd7d7d7))
             .tooltip("Mate type")
             .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(t.name())).child(crate::ui::glyph("ui-caret-down", 8., pal.text)))
-            .dropdown_menu(move |mut menu, _, _| {
+            .os_dropdown_menu("mate-hud-type-dd", true, move |mut menu, _, _| {
                 for mt in types {
                     let d = d1.clone();
-                    menu = menu.item(crate::ui::menu_tool_item(mt.name(), crate::assembly_mate_dialog::mate_icon_name(mt), None).on_click(move |_, _, cx| d.update(cx, |d, cx| d.set_type(mt, cx))));
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(mt.name()).icon_name(crate::assembly_mate_dialog::mate_icon_name(mt)).on_click(move |_, _, cx| d.update(cx, |d, cx| d.set_type(mt, cx))));
                 }
                 menu
             });
@@ -3357,7 +3481,10 @@ impl AssemblyView {
                                 .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(doc_name))
                                 .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
                         )
-                        .child(square("ins-create-version", "version", "Create version…", cx).on_click(|_, w, cx| w.dispatch_action(Box::new(crate::actions::CreateVersion), cx)))
+                        .child(square("ins-create-version", "version", "Create version…", cx).on_click({
+                            let doc = self.doc.clone();
+                            move |_, w, cx| crate::history_panel::open_create_version(doc.clone(), w, cx)
+                        }))
                         .child(square("ins-version-graph", "version-graph", "Version graph", cx).on_click(|_, w, cx| w.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
                 )
                 .child(
@@ -3375,6 +3502,9 @@ impl AssemblyView {
                 // Type filters (Parts, and Surfaces when there are any) and
                 // "Insert entire Part Studio as rigid" at the right.
                 let has_surfaces = self.catalog.studios.iter().any(|s| s.parts.iter().any(|p| p.3));
+                let has_sketches = self.catalog.studios.iter().any(|s| !s.sketches.is_empty());
+                let fk = self.ui.insert_sketches;
+                let fc = self.ui.insert_composites;
                 let (fp, fs) = self.ui.insert_filter;
                 let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
                     div()
@@ -3404,6 +3534,17 @@ impl AssemblyView {
                             this.ui.insert_filter.0 = !this.ui.insert_filter.0;
                             cx.notify();
                         })))
+                        // Live 320: Parts, Composite parts (off), Sketches (off).
+                        .child(toggle("ins-f-composite", "composite-part", "Composite parts", fc, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_composites = !this.ui.insert_composites;
+                            cx.notify();
+                        })))
+                        .when(has_sketches, |d| {
+                            d.child(toggle("ins-f-sketch", "sketch", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_sketches = !this.ui.insert_sketches;
+                                cx.notify();
+                            })))
+                        })
                         .when(has_surfaces, |d| {
                             d.child(toggle("ins-f-surf", "surface-body", "Surfaces", fs, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_filter.1 = !this.ui.insert_filter.1;
@@ -3471,10 +3612,19 @@ impl AssemblyView {
             let mut any = false;
             for s in self.catalog.studios.clone() {
                 let studio_hit = hit(&s.name);
+                // Type filters: none on shows everything, else the union of the
+                // selected types (Parts, Sketches, Surfaces).
                 let (only_parts, only_surfaces) = self.ui.insert_filter;
-                let kind_ok = |p: &CatalogPart| (!only_parts && !only_surfaces) || (only_parts && !p.3) || (only_surfaces && p.3);
-                let parts: Vec<CatalogPart> = s.parts.iter().filter(|p| (studio_hit || hit(&p.1)) && kind_ok(p)).cloned().collect();
-                if !studio_hit && parts.is_empty() {
+                let only_sketches = self.ui.insert_sketches;
+                let composites_on = self.ui.insert_composites;
+                let any_filter = only_parts || only_surfaces || only_sketches || composites_on;
+                let is_composite = |p: &CatalogPart| s.composites.contains(&p.0);
+                let kind_ok = |p: &CatalogPart| if is_composite(p) { composites_on } else { !any_filter || (only_parts && !p.3) || (only_surfaces && p.3) };
+                // Composite parts first, then the parts (live 320).
+                let mut parts: Vec<CatalogPart> = s.parts.iter().filter(|p| (studio_hit || hit(&p.1)) && kind_ok(p)).cloned().collect();
+                parts.sort_by_key(|p| !is_composite(p));
+                let sketches: Vec<(FeatureId, String)> = if !any_filter || only_sketches { s.sketches.iter().filter(|k| studio_hit || hit(&k.1)).cloned().collect() } else { Vec::new() };
+                if !studio_hit && parts.is_empty() && sketches.is_empty() {
                     continue;
                 }
                 any = true;
@@ -3508,8 +3658,18 @@ impl AssemblyView {
                         let part2 = part.clone();
                         let tab = s.tab;
                         body = body.child(
-                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
+                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if s.composites.contains(&part.0) { "composite-part" } else if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
+                        );
+                    }
+                    // Sketches are listed under the parts (live assembly/121).
+                    for (feature, name) in sketches {
+                        let tab = s.tab;
+                        let n2 = name.clone();
+                        let thumb = self.insert_thumb(s.tab, Some(&noshape_model::assembly::eval::sketch_body_id(feature)));
+                        body = body.child(
+                            item_row(SharedString::from(format!("ins-sk-{}-{}", s.tab, feature.0)), 22., None, "sketch", thumb, name, cx)
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_sketch(tab, feature, n2.clone(), cx))),
                         );
                     }
                 }
@@ -3525,6 +3685,10 @@ impl AssemblyView {
             for (tab, name) in list {
                 let n2 = name.clone();
                 body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
+                // A configured assembly: its configuration inputs before inserting.
+                if let Some(el) = self.render_insert_config(tab, cx) {
+                    body = body.child(div().pl(px(40.)).pr_2().child(el));
+                }
             }
         }
         // Footer: inserted count, then the gray "Undo to remove instances" info row.
@@ -3599,11 +3763,11 @@ impl AssemblyView {
         let picker = |slot: usize, current: Option<MateId>| {
             let mates = mates.clone();
             let view = view.clone();
-            Button::new(SharedString::from(format!("rel-pick-{slot}"))).label(name_of(current)).outline().small().dropdown_caret(true).dropdown_menu(move |mut menu, _, _| {
+            Button::new(SharedString::from(format!("rel-pick-{slot}"))).label(name_of(current)).outline().small().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("rel-pick-{slot}-dd")), true, move |mut menu, _, _| {
                 for (id, name, t) in &mates {
                     let v = view.clone();
                     let id = *id;
-                    menu = menu.item(PopupMenuItem::new(name.clone()).icon(Icon::empty().path(mate_icon(*t))).on_click(move |_, _, cx| {
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(name.clone()).icon(Icon::empty().path(mate_icon(*t))).on_click(move |_, _, cx| {
                         v.update(cx, |this, cx| {
                             if let Some(r) = &mut this.relation {
                                 if slot == 0 {
@@ -3763,58 +3927,6 @@ impl AssemblyView {
             s
         };
         match self.panel {
-            Some(SidePanel::Bom) => {
-                let rows = analysis::bom(&self.result);
-                let studio_name = |t: TabId| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default();
-                // Configured parts: name the non-default configuration, so rows
-                // of the same part in different configurations can be told apart.
-                let config_text = |r: &analysis::BomRow| -> String {
-                    match self.doc.read(cx).session.doc.tab(r.studio).map(|t| &t.content) {
-                        Some(noshape_model::TabContent::PartStudio(ps)) => ps.configuration.describe(&r.config),
-                        _ => String::new(),
-                    }
-                };
-                let mut body = v_flex().id("bom-body").p_2().gap_px().overflow_y_scroll().max_h(px(460.));
-                body = body.child(
-                    h_flex()
-                        .px_2()
-                        .h(px(22.))
-                        .text_xs()
-                        .text_color(pal.text_muted)
-                        .child(div().w(px(28.)).child("#"))
-                        .child(div().flex_1().child("Name"))
-                        .child(div().w(px(90.)).child("Source"))
-                        .child(div().w(px(32.)).child("Qty")),
-                );
-                for r in &rows {
-                    body = body.child(
-                        h_flex()
-                            .px_2()
-                            .h(px(24.))
-                            .text_sm()
-                            .rounded_sm()
-                            .hover(|d| d.bg(pal.panel_hover))
-                            .child(div().w(px(28.)).text_color(pal.text_faint).child(format!("{}", r.item)))
-                            .child(div().flex_1().truncate().child(match config_text(r) {
-                                c if c.is_empty() => r.name.clone(),
-                                c => format!("{} ({c})", r.name),
-                            }))
-                            .child(div().w(px(90.)).truncate().text_xs().text_color(pal.text_muted).child(match r.external.as_deref().and_then(crate::derived::ExternalRef::parse) {
-                                Some(e) => e.path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Other document".into()),
-                                None => studio_name(r.studio),
-                            }))
-                            .child(div().w(px(32.)).child(format!("{}", r.quantity))),
-                    );
-                }
-                if rows.is_empty() {
-                    body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child("Add parts and assemblies to build a bill of materials."));
-                }
-                Self::panel_frame("Bill of materials", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.panel = None;
-                    cx.notify();
-                }), "bom-close")
-                .into_any_element()
-            }
             Some(SidePanel::Interference) => {
                 let units = self.units(cx);
                 let mut body = v_flex().id("intf-body").p_2().gap_1().overflow_y_scroll().max_h(px(460.));
@@ -3852,8 +3964,7 @@ impl AssemblyView {
                 .into_any_element()
             }
             Some(SidePanel::Explode) => self.render_explode_panel(cx),
-            Some(SidePanel::Positions) => self.render_positions_panel(cx),
-            Some(SidePanel::Variables) | None => div().into_any_element(),
+            Some(SidePanel::Bom) | Some(SidePanel::Configurations) | Some(SidePanel::Positions) | Some(SidePanel::Variables) | None => div().into_any_element(),
         }
     }
 
@@ -3914,7 +4025,27 @@ impl AssemblyView {
             left = left.child(self.render_group_dialog(cx));
             any_left = true;
         }
+        if let Some(el) = self.render_np_driver(cx) {
+            left = left.child(el);
+            any_left = true;
+        }
+        if let Some(el) = self.render_ps_in_context_dialog(cx) {
+            left = left.child(el);
+            any_left = true;
+        }
+        if let Some(el) = self.render_reference_manager(cx) {
+            left = left.child(el);
+            any_left = true;
+        }
+        if let Some(el) = self.render_dynamic_suppression(cx) {
+            left = left.child(el);
+            any_left = true;
+        }
         if let Some(el) = self.render_section(cx) {
+            left = left.child(el);
+            any_left = true;
+        }
+        if let Some(el) = self.render_isolate_panel(cx) {
             left = left.child(el);
             any_left = true;
         }
@@ -3923,6 +4054,14 @@ impl AssemblyView {
         }
         if self.panel == Some(SidePanel::Variables) {
             out.push(self.render_variables_panel(cx));
+        } else if self.panel == Some(SidePanel::Configurations) {
+            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_asm_config_panel(cx)).into_any_element());
+        } else if self.panel == Some(SidePanel::Bom) {
+            // Docked 712 px pane, like the variable table (live 181).
+            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_bom_panel(cx)).into_any_element());
+        } else if self.panel == Some(SidePanel::Positions) {
+            // Docked 712 px pane, like the variable table (live 150).
+            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_np_pane(cx)).into_any_element());
         } else if self.panel.is_some() {
             out.push(div().absolute().top_3().right(px(56.)).child(self.render_side_panel(cx)).into_any_element());
         }
@@ -3931,6 +4070,9 @@ impl AssemblyView {
             out.push(el);
         }
         if let Some(el) = self.render_mode_banner(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_cfg_toast(cx) {
             out.push(el);
         }
         if self.explode.is_some() && !self.explode_edit {
@@ -3960,9 +4102,6 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        if let Some(el) = self.render_isolate_panel(cx) {
-            out.push(el);
-        }
         if let Some(el) = self.render_mini_toolbar(cx) {
             out.push(el);
         }
@@ -3970,6 +4109,12 @@ impl AssemblyView {
             out.push(el);
         }
         if let Some(el) = self.render_select_other(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_tool_search(cx) {
+            out.push(el);
+        }
+        if let Some(el) = self.render_np_toast(cx) {
             out.push(el);
         }
         out.extend(self.render_mate_values(cx));
@@ -4022,7 +4167,11 @@ impl AssemblyView {
             },
         };
         let cube = view_cube(rotation, self.cube_hover, menu, hooks, cx);
-        div().absolute().top(px(15.)).right(px(15.)).child(cube).into_any_element()
+        // A docked 712 px pane narrows the graphics area (live 181): the cube
+        // stays 15 px from the pane's left edge.
+        let docked = matches!(self.panel, Some(SidePanel::Bom | SidePanel::Configurations | SidePanel::Positions | SidePanel::Variables));
+        let right = if docked { 15. + 33. + 712f32.min(self.viewport.read(cx).size().x as f32 * 0.5) } else { 15. };
+        div().absolute().top(px(15.)).right(px(right)).child(cube).into_any_element()
     }
 
     /// The camera menu under the cube (Onshape's "Camera and render options").
@@ -4040,16 +4189,16 @@ impl AssemblyView {
             .p_0()
             .rounded(px(3.))
             .tooltip("Camera and render options")
-            .dropdown_menu(move |mut m, _, _| {
+            .os_dropdown_menu("asm-camera-menu-dd", false, move |mut m, _, _| {
                 for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
                     let v = view.clone();
-                    m = m.item(PopupMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
+                    m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
                 }
                 let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                 m.separator()
-                    .item(PopupMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
+                    .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
                     .separator()
-                    .item(PopupMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
+                    .item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
                         v2.update(cx, |this, cx| {
                             this.viewport.update(cx, |vp, cx| {
                                 let p = if perspective { noshape_render::Projection::Orthographic } else { noshape_render::Projection::Perspective };
@@ -4057,7 +4206,7 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    .item(PopupMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
+                    .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
                         v3.update(cx, |this, cx| {
                             this.show_mates = !this.show_mates;
                             this.refresh_scene(false, cx);
@@ -4077,6 +4226,7 @@ impl Render for AssemblyView {
             self.sync_var_tables(window, cx);
         }
         let toolbar = self.render_toolbar(cx);
+        let tb_panel = self.render_tb_custom_panel(cx);
         let list = self.render_list(cx);
         let overlay = self.render_overlay(cx);
         let rail = self.render_panel_rail(cx);
@@ -4159,8 +4309,11 @@ impl Render for AssemblyView {
                     }
                 }
             }))
+            .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
-                if this.triad_menu.is_some() {
+                if this.cancel_bom_cell(cx) {
+                    window.focus(&this.focus, cx);
+                } else if this.triad_menu.is_some() {
                     this.triad_menu = None;
                     cx.notify();
                 } else if this.step_edit.is_some() {
@@ -4171,6 +4324,8 @@ impl Render for AssemblyView {
                     this.close_insert(window, cx);
                 } else if this.mate.is_some() {
                     this.close_mate(window, cx);
+                } else if this.ui.cfg_mode.is_some() {
+                    this.finish_configure_features(window, cx);
                 } else if this.snap.is_some() {
                     this.toggle_snap(window, cx);
                 } else if this.mc.is_some() {
@@ -4181,6 +4336,16 @@ impl Render for AssemblyView {
                 } else if this.ui.group.is_some() {
                     this.ui.group = None;
                     this.update_capture(cx);
+                    cx.notify();
+                } else if this.ui.np_driver.is_some() {
+                    this.ui.np_driver = None;
+                    cx.notify();
+                } else if this.ui.ps_in_context.is_some() || this.ui.ref_manager.is_some() {
+                    this.ui.ps_in_context = None;
+                    this.ui.ref_manager = None;
+                    cx.notify();
+                } else if this.ui.dynamic_suppression.is_some() {
+                    this.ui.dynamic_suppression = None;
                     cx.notify();
                 } else if this.show_mates_mode {
                     this.show_mates_mode = false;
@@ -4203,10 +4368,9 @@ impl Render for AssemblyView {
                     this.toggle_section(window, cx);
                 } else if this.exit_isolate(cx) {
                 } else {
+                    // Esc keeps the selection (live 312; Space clears it).
                     this.insert_open = false;
                     this.relation = None;
-                    this.selected.clear();
-                    this.selected_mate = None;
                     this.refresh_scene(false, cx);
                     cx.notify();
                 }
@@ -4224,8 +4388,11 @@ impl Render for AssemblyView {
                 h_flex()
                     .flex_1()
                     .min_h_0()
+                    .relative()
                     .child(div().w(px(crate::ui::LEFT_PANEL_W)).h_full().flex_none().child(list))
-                    .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay).child(rail)),
+                    .child(div().flex_1().h_full().relative().bg(pal.app_bg).child(self.viewport.clone()).children(overlay).child(rail))
+                    // Customize toolbar's Tools panel, over the list and graphics.
+                    .children(tb_panel),
             )
     }
 }

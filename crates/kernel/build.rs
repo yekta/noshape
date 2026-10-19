@@ -59,19 +59,39 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/geom.cpp",
     "cpp/build.cpp",
     "cpp/features.cpp",
+    "cpp/shell.cpp",
     "cpp/boolean.cpp",
     "cpp/mesh.cpp",
     "cpp/io.cpp",
     "cpp/mesh_io.cpp",
     "cpp/hlr.cpp",
     "cpp/surfacing.cpp",
+    "cpp/xt.cpp",
+    "cpp/sat.cpp",
+    "cpp/rhino.cpp",
+    "cpp/jt.cpp",
+    "cpp/jt_writer.cpp",
+    "cpp/pvz.cpp",
+    "cpp/pvz_writer.cpp",
 ];
+
+/// openNURBS static libraries (scripts/build-opennurbs.sh), dependents first.
+fn opennurbs_libs(target_os: &str) -> &'static [&'static str] {
+    match target_os {
+        "linux" | "android" => &["opennurbsStatic", "opennurbs_public_freetype", "android_uuid", "zlib"],
+        _ => &["opennurbsStatic", "zlib"],
+    }
+}
 
 fn main() {
     println!("cargo:rerun-if-env-changed=OCCT_ROOT");
+    println!("cargo:rerun-if-env-changed=OPENNURBS_ROOT");
+    println!("cargo:rerun-if-env-changed=NOSHAPE_REQUIRE_OPENNURBS");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/ffi.rs");
     println!("cargo:rerun-if-changed=cpp/noshape_occt.hpp");
+    println!("cargo:rerun-if-changed=cpp/jt_writer.hpp");
+    println!("cargo:rerun-if-changed=cpp/pvz_writer.hpp");
     for s in BRIDGE_SOURCES {
         println!("cargo:rerun-if-changed={s}");
     }
@@ -91,6 +111,16 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let msvc = target_env == "msvc";
+
+    // Rhino export (cpp/rhino.cpp) needs openNURBS; CI and releases always
+    // have it (NOSHAPE_REQUIRE_OPENNURBS), agents' dev builds may go without.
+    let opennurbs = env::var_os("OPENNURBS_ROOT").filter(|v| !v.is_empty()).map(PathBuf::from);
+    if opennurbs.is_none() && env::var_os("NOSHAPE_REQUIRE_OPENNURBS").is_some_and(|v| !v.is_empty() && v != "0") {
+        panic!(
+            "\n\nnoshape-kernel: NOSHAPE_REQUIRE_OPENNURBS is set but OPENNURBS_ROOT is not.\n\
+             Build openNURBS with `scripts/build-opennurbs.sh <prefix>` and set OPENNURBS_ROOT=<prefix>.\n\n"
+        );
+    }
 
     let mut build = cxx_build::bridge("src/ffi.rs");
     build
@@ -119,6 +149,16 @@ fn main() {
             .flag_if_supported("-Wno-deprecated-copy")
             .flag_if_supported("-Wno-cpp");
     }
+    if let Some(on) = &opennurbs {
+        let inc = on.join("include");
+        build.define("NOSHAPE_OPENNURBS", None);
+        if msvc {
+            build.include(&inc);
+        } else {
+            // openNURBS headers use pragmas GCC doesn't know: no warnings from them.
+            build.flag("-isystem").flag(inc.to_str().expect("OPENNURBS_ROOT is not UTF-8"));
+        }
+    }
     // The bridge is hot code (tessellation, history); always optimize it.
     build.opt_level(2);
     build.compile("noshape_occt");
@@ -128,6 +168,29 @@ fn main() {
         // `-bundle`: do not copy the (large) OCCT archives into our rlib; the
         // final link of the downstream binary references them directly.
         println!("cargo:rustc-link-lib=static:-bundle={lib}");
+    }
+
+    if let Some(on) = &opennurbs {
+        println!("cargo:rustc-link-search=native={}", on.join("lib").display());
+        for lib in opennurbs_libs(&target_os) {
+            println!("cargo:rustc-link-lib=static:-bundle={lib}");
+        }
+        // zcalloc/zcfree after zlib: openNURBS' own copies come before it.
+        println!("cargo:rerun-if-changed=cpp/rhino_zmem.cpp");
+        cxx_build::bridges(std::iter::empty::<&str>()).file("cpp/rhino_zmem.cpp").compile("noshape_onzmem");
+        match target_os.as_str() {
+            "macos" | "ios" => {
+                for f in ["CoreGraphics", "CoreText", "Foundation"] {
+                    println!("cargo:rustc-link-lib=framework={f}");
+                }
+            }
+            "windows" => {
+                for l in ["shlwapi", "usp10"] {
+                    println!("cargo:rustc-link-lib=dylib={l}");
+                }
+            }
+            _ => {}
+        }
     }
 
     match target_os.as_str() {

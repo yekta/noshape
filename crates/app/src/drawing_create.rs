@@ -34,6 +34,13 @@ pub fn request_create_drawing(req: CreateRequest, window: &mut Window, cx: &mut 
     window.dispatch_action(Box::new(crate::actions::CreateDrawing), cx);
 }
 
+/// Part Studio › "Create Drawing of Sketch N…": the Create Drawing dialog
+/// for a sketch view of feature `sketch` (named after the sketch).
+pub fn request_create_drawing_of_sketch(tab: noshape_model::document::TabId, sketch: noshape_model::FeatureId, sketch_name: &str, window: &mut Window, cx: &mut App) {
+    let source = noshape_model::drawing::create::DrawingSource { tab, part: None, config: Default::default(), sketch: Some(sketch) };
+    request_create_drawing(CreateRequest { source: Some(source), name: Some(sketch_name.to_string()) }, window, cx);
+}
+
 pub fn take_request() -> Option<CreateRequest> {
     REQUEST.lock().take()
 }
@@ -398,7 +405,7 @@ impl Render for CreateDrawingDialog {
             .flex()
             .items_center()
             .justify_center()
-            .bg(hsla(0., 0., 0., 0.25))
+            .bg(pal.modal_backdrop)
             .occlude()
             .key_context("CreateDrawing")
             .track_focus(&self.focus)
@@ -408,7 +415,7 @@ impl Render for CreateDrawingDialog {
                 v_flex()
                     .w(px(908.))
                     .h(px(597.))
-                    .bg(pal.dialog_bg)
+                    .bg(pal.modal_bg)
                     .rounded(px(4.))
                     .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.25), offset: point(px(0.), px(6.)), blur_radius: px(18.), spread_radius: px(0.), inset: false }])
                     .text_color(pal.text)

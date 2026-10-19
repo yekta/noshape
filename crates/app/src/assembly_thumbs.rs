@@ -67,6 +67,28 @@ impl AssemblyView {
                                 out.push(((*tab, part), img));
                             }
                         }
+                        // Sketches (Sketches filter): each sketch alone, seen
+                        // normal to its plane.
+                        for sk in &display.sketches {
+                            let mut d = display.clone();
+                            for b in &mut d.bodies {
+                                b.hidden = true;
+                            }
+                            d.sketches.retain(|x| x.feature == sk.feature);
+                            if let Some(x) = d.sketches.first_mut() {
+                                x.hidden = false;
+                            }
+                            let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: true, show_origin: false, ..Default::default() };
+                            let mut cache = crate::scene_builder::GpuCache::default();
+                            let built = crate::scene_builder::build(&d, &opts, &mut cache, gpu.uploader());
+                            let Some((lo, hi)) = built.scene.bounds() else { continue };
+                            let (w, h) = crate::gpu::THUMBNAIL_SIZE;
+                            let camera = fit_camera_normal(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64, &sk.frame);
+                            let Ok(png) = gpu.render_thumbnail(Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
+                            if let Some(img) = decode(&png) {
+                                out.push(((*tab, Some(noshape_model::assembly::eval::sketch_body_id(sk.feature))), img));
+                            }
+                        }
                     }
                     (todo, out)
                 })
@@ -84,6 +106,26 @@ impl AssemblyView {
         })
         .detach();
     }
+}
+
+/// A camera looking at the box normal to a sketch plane (its X right).
+fn fit_camera_normal(lo: DVec3, hi: DVec3, aspect: f64, frame: &noshape_model::display::PlaneFrame) -> noshape_render::Camera {
+    let mut camera = noshape_render::Camera { rotation: noshape_render::Camera::look_rotation(-frame.normal, frame.y), ..Default::default() };
+    let (right, up) = (camera.right(), camera.up());
+    let center = (lo + hi) * 0.5;
+    let (mut x0, mut x1, mut y0, mut y1) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+    for i in 0..8 {
+        let c = DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z }) - center;
+        let (x, y) = (c.dot(right), c.dot(up));
+        x0 = x0.min(x);
+        x1 = x1.max(x);
+        y0 = y0.min(y);
+        y1 = y1.max(y);
+    }
+    let target = center + right * ((x0 + x1) * 0.5) + up * ((y0 + y1) * 0.5);
+    let half_h = ((y1 - y0) * 0.5).max((x1 - x0) * 0.5 / aspect).max(1e-5);
+    camera.fit_sphere(target, half_h * 1.1 / 1.15, aspect.max(1.0));
+    camera
 }
 
 /// PNG -> GPUI image (BGRA); the white background becomes transparent so

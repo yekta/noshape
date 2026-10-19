@@ -201,6 +201,9 @@ pub(crate) mod ffi {
         scale_end: f64,
         with_contact: bool,
         with_correction: bool,
+        /// Total twist of the profile about the path (radians, right-handed about
+        /// the path direction), spread evenly along its length; 0 = none.
+        twist: f64,
     }
 
     /// Developable surface for wrap / unwrap (see `crate::surfacing`).
@@ -247,6 +250,7 @@ pub(crate) mod ffi {
         fn list_len(l: &OcShapeList) -> Result<usize>;
         fn list_get(l: &OcShapeList, i: usize) -> Result<UniquePtr<OcShape>>;
         fn is_valid(s: &OcShape) -> Result<bool>;
+        fn self_intersects(s: &OcShape) -> Result<bool>;
         fn fix_shape(s: &OcShape, tolerance: f64) -> Result<UniquePtr<OcShape>>;
         fn dump_shape(s: &OcShape) -> Result<String>;
 
@@ -371,15 +375,18 @@ pub(crate) mod ffi {
             closed: bool,
             start_points: &[f64],
         ) -> Result<OpOut>;
+        fn set_working_scale(k: f64) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
         fn op_shell(solid: &OcShape, faces: &OcShapeList, thickness: f64, join: u8)
         -> Result<OpOut>;
-        fn op_fillet(s: &OcShape, edges: &OcShapeList, radii: &[f64]) -> Result<OpOut>;
+        fn op_shell_solid(solid: &OcShape, faces: &OcShapeList, thickness: f64, outward: bool, method: u8) -> Result<OpOut>;
+        fn op_fillet(s: &OcShape, edges: &OcShapeList, radii: &[f64], checked: bool) -> Result<OpOut>;
         fn op_fillet_variable(
             s: &OcShape,
             edge: &OcShape,
             params: &[f64],
             radii: &[f64],
+            checked: bool,
         ) -> Result<OpOut>;
         fn op_chamfer(
             s: &OcShape,
@@ -388,7 +395,9 @@ pub(crate) mod ffi {
             mode: u8,
             d1: f64,
             d2: f64,
+            checked: bool,
         ) -> Result<OpOut>;
+        fn op_draft_wedges(solid: &OcShape, faces: &OcShapeList, pull: P3, neutral: &PlaneF, angle: f64) -> Result<OpOut>;
         fn op_draft(
             s: &OcShape,
             faces: &OcShapeList,
@@ -468,10 +477,19 @@ pub(crate) mod ffi {
             colors: &[f32],
             has_color: &[bool],
             path: &str,
+            schema: u8,
+            file_unit: u8,
         ) -> Result<()>;
         fn read_iges(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
         fn write_iges(shapes: &OcShapeList, path: &str) -> Result<()>;
+        fn write_parasolid(shapes: &OcShapeList, path: &str, binary: bool) -> Result<()>;
+        fn read_parasolid(path: &str) -> Result<UniquePtr<OcShape>>;
+        fn write_acis(shapes: &OcShapeList, path: &str) -> Result<()>;
+        fn write_rhino(shapes: &OcShapeList, names: &[String], path: &str, version: u32) -> Result<()>;
+        fn rhino_valid_breps(path: &str) -> Result<u32>;
+        fn write_jt(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
+        fn write_pvz(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
 
         // ---- surfacing (wrap, isocline, surface fitting)
         fn op_wrap_faces(faces: &OcShapeList, src: &DevSurf, dst: &DevSurf, xf: &[f64], tol: f64) -> Result<OpOut>;

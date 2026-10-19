@@ -53,7 +53,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
             (center, z.normalize(), x_dir, radius, 0.0, None)
         }
         _ => {
-            let Some(&(bi, fi)) = ev.resolve_faces(ev.query("entities")).first() else { return err("Select a cylindrical or conical face") };
+            let Some(&(bi, fi)) = ev.resolve_faces(ev.query("entities")).first() else { return crate::regen::eval::err_at(&["entities"], "Select a cone or cylinder.") };
             let face = ev.face_shape(bi, fi)?;
             match face.face_surface()? {
                 k::Surface::Cylinder { origin, axis, x_dir, radius } => {
@@ -71,7 +71,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
                         (origin + a * lo, a, x_dir, rad(lo), half_angle, Some(hi - lo))
                     }
                 }
-                _ => return err("Select a cylindrical or conical face"),
+                _ => return crate::regen::eval::err_at(&["entities"], "Select a cone or cylinder."),
             }
         }
     };

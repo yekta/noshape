@@ -2,7 +2,7 @@
 //! list, documents folder, watched folders), reads their metadata and
 //! thumbnails through read-only store handles, and caches decoded images
 //! keyed by file modification stamps. Also the file operations of the
-//! start window (rename, duplicate, trash).
+//! start window (rename, duplicate, move; the Trash is start_trash).
 
 use anyhow::{Context as _, bail};
 use gpui_kit::RenderImage;
@@ -25,11 +25,15 @@ pub struct DocEntry {
     pub modified_by: String,
     /// Author of the first change ("Owned by").
     pub owner: String,
+    /// Document description (the "Description" column).
+    pub description: String,
     pub thumbnail: Option<Arc<RenderImage>>,
     /// Position in the recent list.
     pub recent_rank: Option<usize>,
     /// Could not be read as a noshape document.
     pub broken: bool,
+    /// In the Trash (`path` is the trashed copy).
+    pub trashed: bool,
 }
 
 impl DocEntry {
@@ -45,6 +49,7 @@ struct Cached {
     modified: i64,
     modified_by: String,
     owner: String,
+    description: String,
     thumbnail: Option<Arc<RenderImage>>,
     broken: bool,
 }
@@ -57,6 +62,8 @@ pub struct Library {
 
 pub struct ScanResult {
     pub docs: Vec<DocEntry>,
+    /// Folders under the scanned places (canonical; folder tiles).
+    pub dirs: Vec<PathBuf>,
     /// Thumbnails replaced in the cache (to free from the window's atlas).
     pub dropped: Vec<Arc<RenderImage>>,
 }
@@ -66,6 +73,8 @@ pub struct ScanResult {
 pub struct ScanInput {
     pub recent: Vec<PathBuf>,
     pub folders: Vec<PathBuf>,
+    /// Trashed documents (start_trash).
+    pub trash: Vec<PathBuf>,
 }
 
 impl ScanInput {
@@ -76,7 +85,7 @@ impl ScanInput {
                 folders.push(f);
             }
         }
-        Self { recent: crate::files::recent(), folders }
+        Self { recent: crate::files::recent(), folders, trash: crate::start_trash::Trash::load().documents() }
     }
 }
 
@@ -100,8 +109,9 @@ fn to_ms(t: SystemTime) -> i64 {
     t.duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
-/// `.noshape` files in `dir` and its subfolders (a few levels deep).
-fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+/// `.noshape` files in `dir` and its subfolders (a few levels deep), and
+/// those subfolders.
+fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     for e in rd.flatten() {
         let p = e.path();
@@ -111,8 +121,9 @@ fn list_dir(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
         }
         let Ok(ft) = e.file_type() else { continue };
         if ft.is_dir() {
+            dirs.push(p.canonicalize().unwrap_or_else(|_| p.clone()));
             if depth > 0 {
-                list_dir(&p, depth - 1, out);
+                list_dir(&p, depth - 1, out, dirs);
             }
         } else if p.extension().is_some_and(|x| x == EXT) {
             out.push(p);
@@ -138,13 +149,16 @@ fn decode_thumbnail(png: &[u8]) -> Option<Arc<RenderImage>> {
 impl Library {
     /// Scan the file system (blocking; run on a background thread).
     pub fn scan(&self, input: &ScanInput) -> ScanResult {
-        let mut paths: Vec<PathBuf> = Vec::new();
+        let (mut paths, mut dirs): (Vec<PathBuf>, Vec<PathBuf>) = (Vec::new(), Vec::new());
         for f in &input.folders {
-            list_dir(f, 3, &mut paths);
+            list_dir(f, 3, &mut paths, &mut dirs);
         }
+        dirs.sort();
+        dirs.dedup();
         let mut seen = std::collections::HashSet::new();
         let mut unique = Vec::new();
-        for p in input.recent.iter().cloned().chain(paths) {
+        let trash: Vec<PathBuf> = input.trash.iter().map(|p| p.canonicalize().unwrap_or_else(|_| p.clone())).collect();
+        for p in input.recent.iter().cloned().chain(paths).chain(trash.iter().cloned()) {
             let c = p.canonicalize().unwrap_or(p);
             if seen.insert(c.clone()) {
                 unique.push(c);
@@ -176,9 +190,11 @@ impl Library {
                 modified: cached.modified,
                 modified_by: cached.modified_by.clone(),
                 owner: cached.owner.clone(),
+                description: cached.description.clone(),
                 thumbnail: cached.thumbnail.clone(),
                 recent_rank: recent.iter().position(|r| *r == path),
                 broken: cached.broken,
+                trashed: trash.contains(&path),
                 path: path.clone(),
             });
             fresh.insert(path, cached);
@@ -191,12 +207,13 @@ impl Library {
                 }
         }
         *self.cache.lock() = fresh;
-        ScanResult { docs, dropped }
+        ScanResult { docs, dirs, dropped }
     }
 }
 
 struct MetaRead {
     name: String,
+    description: String,
     modified: i64,
     owner: String,
     modified_by: String,
@@ -211,7 +228,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     if wal_path(path).exists() {
         let doc = noshape_store::Document::open_read_only(path)?;
         let (meta, (owner, modified_by)) = (doc.meta()?, doc.owner_and_last_author()?);
-        return Ok(MetaRead { name: meta.name, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
+        return Ok(MetaRead { name: meta.name, description: meta.description, modified: meta.modified, owner, modified_by, thumbnail: meta.thumbnail });
     }
     use rusqlite::{Connection, OpenFlags, OptionalExtension as _};
     let mut uri = url_escape(&path.to_string_lossy());
@@ -225,7 +242,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     let get = |key: &str| -> anyhow::Result<Option<Vec<u8>>> { Ok(conn.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?) };
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
     let (owner, modified_by) = noshape_store::owner_and_last_author(&conn)?;
-    Ok(MetaRead { name: text(get("name")?), modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
+    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), modified: text(get("modified")?).parse().unwrap_or(0), owner, modified_by, thumbnail: get("thumbnail")? })
 }
 
 /// Percent-encode the characters that are special in SQLite URIs.
@@ -250,12 +267,13 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
             modified: if meta.modified > 0 { meta.modified } else { fallback_ms },
             modified_by: meta.modified_by,
             owner: meta.owner,
+            description: meta.description,
             thumbnail: meta.thumbnail.as_deref().and_then(decode_thumbnail),
             broken: false,
         },
         Err(e) => {
             log::warn!("cannot read {}: {e}", path.display());
-            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), thumbnail: None, broken: true }
+            Cached { stamp, name: stem, modified: fallback_ms, modified_by: String::new(), owner: String::new(), description: String::new(), thumbnail: None, broken: true }
         }
     }
 }
@@ -417,18 +435,6 @@ pub fn copy_document_named(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
     Ok(dest)
 }
 
-/// Move a (closed) document to the system trash.
-pub fn trash_document(path: &Path) -> anyhow::Result<()> {
-    let _ = settle(path);
-    trash::delete(path).map_err(|e| anyhow::anyhow!("{e}"))?;
-    for s in sidecars(path) {
-        if s.exists() {
-            let _ = std::fs::remove_file(s);
-        }
-    }
-    Ok(())
-}
-
 /// Onshape's time stamps (live documents list and versions panel): "1:15 PM
 /// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
 pub fn format_onshape_time(ms: i64) -> String {
@@ -480,10 +486,6 @@ impl Labels {
 
     fn key(path: &Path) -> String {
         path.canonicalize().unwrap_or_else(|_| path.to_path_buf()).to_string_lossy().to_string()
-    }
-
-    pub fn of(&self, path: &Path) -> Vec<String> {
-        self.assign.get(&Self::key(path)).cloned().unwrap_or_default()
     }
 
     pub fn has(&self, path: &Path, label: &str) -> bool {

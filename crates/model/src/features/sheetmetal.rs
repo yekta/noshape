@@ -60,24 +60,33 @@ const SM_BOUNDS: &[(&str, &str)] =
 /// Relief. Shown when `gate` holds.
 pub fn model_parameters(gate: impl Fn(&ParamValues) -> bool + Copy + Send + Sync + 'static) -> Vec<ParamSpec> {
     let rem = Hints::REMEMBER_PREVIOUS_VALUE;
-    let corner = move |v: &ParamValues, s: &str| gate(v) && v.is("defaultCornerStyle", s);
-    let bend_scaled = move |v: &ParamValues| gate(v) && !v.is("defaultBendReliefStyle", "TEAR");
+    // sheetMetalModelParameters: groups "General" (open), "Material" and
+    // "Relief" (collapsed by default).
+    let group = |id: &'static str, label: &'static str, open: bool| ParamSpec::bool(id, label, open).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(gate);
+    let general = move |v: &ParamValues| gate(v) && v.bool("generalGroup");
+    let material = move |v: &ParamValues| gate(v) && v.bool("materialGroup");
+    let relief = move |v: &ParamValues| gate(v) && v.bool("reliefGroup");
+    let corner = move |v: &ParamValues, s: &str| relief(v) && v.is("defaultCornerStyle", s);
+    let bend_scaled = move |v: &ParamValues| relief(v) && !v.is("defaultBendReliefStyle", "TEAR");
     vec![
-        ParamSpec::num("thickness", "Thickness", SM_THICKNESS).hints(rem).visible(gate),
-        ParamSpec::flip("oppositeDirection", "Opposite direction").visible(gate),
-        ParamSpec::num("radius", "Bend radius", SM_BEND_RADIUS).hints(rem).visible(gate),
-        ParamSpec::bool("flipDirectionUp", "Flip direction up", false).hints(rem).visible(gate),
+        group("generalGroup", "General", true),
+        ParamSpec::num("thickness", "Thickness", SM_THICKNESS).hints(rem).visible(general),
+        ParamSpec::flip("oppositeDirection", "Opposite direction").visible(general),
+        ParamSpec::num("radius", "Bend radius", SM_BEND_RADIUS).hints(rem).visible(general),
+        ParamSpec::bool("flipDirectionUp", "Flip direction up", false).hints(rem).visible(general),
+        group("materialGroup", "Material", false),
         ParamSpec::enum_(
             "bendCalculationType",
             "Bend calculation",
             &[("K_FACTOR", "K Factor"), ("BEND_ALLOWANCE", "Bend allowance"), ("BEND_DEDUCTION", "Bend deduction")],
         )
-        .hints(rem)
-        .visible(gate),
-        ParamSpec::num("kFactor", "Default bend K Factor", K_FACTOR).hints(rem).visible(gate),
-        ParamSpec::num("kFactorRolled", "Rolled K Factor", NumSpec::real(0.5, 0.0, 1.0)).hints(rem).visible(gate),
-        ParamSpec::num("minimalClearance", "Minimal gap", SM_MINIMAL_CLEARANCE).hints(rem).visible(gate),
-        ParamSpec::enum_("defaultCornerStyle", "Corner relief type", CORNER_RELIEF).default_enum("SIMPLE").hints(rem).visible(gate),
+        .hints(rem | Hints::SHOW_LABEL)
+        .visible(material),
+        ParamSpec::num("kFactor", "Default bend K Factor", K_FACTOR).hints(rem).visible(material),
+        ParamSpec::num("kFactorRolled", "Rolled K Factor", NumSpec::real(0.5, 0.0, 1.0)).hints(rem).visible(material),
+        group("reliefGroup", "Relief", false),
+        ParamSpec::num("minimalClearance", "Minimal gap", SM_MINIMAL_CLEARANCE).hints(rem).visible(relief),
+        ParamSpec::enum_("defaultCornerStyle", "Corner relief type", CORNER_RELIEF).default_enum("SIMPLE").hints(rem | Hints::SHOW_LABEL).visible(relief),
         ParamSpec::num("defaultCornerReliefScale", "Corner relief scale", NumSpec::real(1.5, 1.0, 2.0))
             .hints(rem)
             .visible(move |v| corner(v, "RECTANGLE") || corner(v, "ROUND")),
@@ -89,8 +98,8 @@ pub fn model_parameters(gate: impl Fn(&ParamValues) -> bool + Copy + Send + Sync
             &[("RECTANGLE", "Rectangle - Scaled"), ("OBROUND", "Obround - Scaled"), ("TEAR", "Tear")],
         )
         .default_enum("OBROUND")
-        .hints(rem)
-        .visible(gate),
+        .hints(rem | Hints::SHOW_LABEL)
+        .visible(relief),
         ParamSpec::num("defaultBendReliefDepthScale", "Bend relief depth scale", NumSpec::real(2.0, 1.0, 5.0)).hints(rem).visible(bend_scaled),
         ParamSpec::num("defaultBendReliefScale", "Bend relief width scale", NumSpec::real(1.0625, 0.0625, 2.0)).hints(rem).visible(bend_scaled),
     ]
@@ -152,20 +161,23 @@ pub fn sheet_metal_start() -> FeatureType {
     let mut p = vec![
         hidden(ParamSpec::query("initEntities", "Initial entities", QueryFilter::BODY | QueryFilter::ANY_FACE | QueryFilter::SKETCH_EDGE)),
         ParamSpec::enum_("process", "Process", &[("CONVERT", "Convert"), ("EXTRUDE", "Extrude"), ("THICKEN", "Thicken")]).hints(Hints::HORIZONTAL_ENUM),
+    ];
+    // sheetMetalStart.fs: the selections sit in the "Selections" group.
+    let mut sel = vec![
         ParamSpec::query("partToConvert", "Parts and surfaces to convert", QueryFilter::BODY).hints(Hints::INITIAL_FOCUS).visible(move |v| pr(v, "CONVERT")),
         ParamSpec::query("facesToExclude", "Faces to exclude", QueryFilter::ANY_FACE).visible(move |v| pr(v, "CONVERT")),
         ParamSpec::query("sketchCurves", "Sketch curves to extrude", QueryFilter::SKETCH_EDGE).visible(extrude),
         ParamSpec::query("bendArcs", "Arcs to extrude as bends", QueryFilter::SKETCH_EDGE).visible(extrude),
     ];
-    p.extend(sm_extrude_direction(false));
-    p.push(ParamSpec::bool("symmetric", "Symmetric", false).visible(move |v| extrude(v) && v.is("endBound", "BLIND")));
-    p.push(
+    sel.extend(sm_extrude_direction(false));
+    sel.push(ParamSpec::bool("symmetric", "Symmetric", false).visible(move |v| extrude(v) && v.is("endBound", "BLIND")));
+    sel.push(
         ParamSpec::bool("hasSecondDirection", "Second end position", false)
             .hints(Hints::GROUP_HEADER)
             .visible(move |v| extrude(v) && !(v.bool("symmetric") && v.is("endBound", "BLIND"))),
     );
-    p.extend(sm_extrude_direction(true));
-    p.extend([
+    sel.extend(sm_extrude_direction(true));
+    sel.extend([
         ParamSpec::query("regions", "Faces or sketch regions to thicken", QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION)
             .visible(move |v| pr(v, "THICKEN")),
         ParamSpec::bool("tangentPropagation", "Tangent propagation", false).visible(move |v| pr(v, "THICKEN")),
@@ -174,6 +186,7 @@ pub fn sheet_metal_start() -> FeatureType {
         ParamSpec::bool("bendsIncluded", "Include bends", false).visible(conv_or_thick),
         ParamSpec::bool("keepInputParts", "Keep input parts", false).visible(move |v| pr(v, "CONVERT")),
     ]);
+    p.extend(group("selectionsGroup", "Selections", true, sel));
     p.extend(model_parameters(always));
     p.push(hidden(ParamSpec::text("parameterLibraryPurposeId", "Parameter library purpose", "")));
     FeatureType::new("sheetMetalStart", "Sheet metal model", Category::SheetMetal, p)

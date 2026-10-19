@@ -2,7 +2,7 @@
 //! Helvetica). All take a [`SheetGeometry`] in millimeters.
 
 use super::font;
-use super::sheet::{Anchor, Fill2, LineStyle, Polyline2, SheetGeometry, Text2};
+use super::sheet::{Anchor, ColorSpan, Fill2, FontSpan, LineStyle, Polyline2, SheetGeometry, Text2, TextFont};
 use std::fmt::Write as _;
 
 /// Texts with characters outside the PDF/DXF base fonts (GD&T and other
@@ -25,45 +25,153 @@ pub struct ExportOptions {
     pub underline_overrides: bool,
     /// "Exclude off-sheet content" (DWG/DXF).
     pub exclude_off_sheet: bool,
+    /// Color: 0 Color, 1 Black and white (white stays white), 2 Grayscale.
+    pub color_mode: u8,
 }
 
 impl Default for ExportOptions {
     fn default() -> Self {
-        Self { explode_all: false, strokes: false, explode: Vec::new(), underline_overrides: true, exclude_off_sheet: false }
+        Self { explode_all: false, strokes: false, explode: Vec::new(), underline_overrides: true, exclude_off_sheet: false, color_mode: 0 }
     }
+}
+
+/// Rebuild color spans from per-element colors (consecutive runs).
+fn spans_of(lines: &[Option<[u8; 3]>], texts: &[Option<[u8; 3]>], fills: &[Option<[u8; 3]>]) -> Vec<ColorSpan> {
+    let mut out = Vec::new();
+    let runs = |v: &[Option<[u8; 3]>]| {
+        let mut r: Vec<(std::ops::Range<usize>, [u8; 3])> = Vec::new();
+        for (i, c) in v.iter().enumerate() {
+            let Some(c) = c else { continue };
+            match r.last_mut() {
+                Some((rg, rc)) if rg.end == i && rc == c => rg.end = i + 1,
+                _ => r.push((i..i + 1, *c)),
+            }
+        }
+        r
+    };
+    for (rg, c) in runs(lines) {
+        out.push(ColorSpan { lines: rg, texts: 0..0, fills: 0..0, rgb: c });
+    }
+    for (rg, c) in runs(texts) {
+        out.push(ColorSpan { lines: 0..0, texts: rg, fills: 0..0, rgb: c });
+    }
+    for (rg, c) in runs(fills) {
+        out.push(ColorSpan { lines: 0..0, texts: 0..0, fills: rg, rgb: c });
+    }
+    out
 }
 
 /// The geometry an export writes, after [`ExportOptions`].
 pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
+    let tone = |c: Option<[u8; 3]>| -> Option<[u8; 3]> {
+        let c = c?;
+        match o.color_mode {
+            1 => (c == [255, 255, 255]).then_some(c),
+            2 => {
+                let y = (0.299 * c[0] as f64 + 0.587 * c[1] as f64 + 0.114 * c[2] as f64).round() as u8;
+                Some([y, y, y])
+            }
+            _ => Some(c),
+        }
+    };
     let mut out = g.clone();
+    out.colors.clear();
+    out.backdrops = g.backdrops.iter().filter_map(|(p, c)| tone(Some(*c)).map(|c| (p.clone(), c))).collect();
+    let mut lc: Vec<Option<[u8; 3]>> = (0..g.lines.len()).map(|i| tone(g.line_color(i))).collect();
+    let mut fc: Vec<Option<[u8; 3]>> = (0..g.fills.len()).map(|i| tone(g.fill_color(i))).collect();
+    let mut tc: Vec<Option<[u8; 3]>> = Vec::new();
+    let mut tf: Vec<Option<TextFont>> = Vec::new();
+    out.fonts.clear();
     if o.underline_overrides {
         for &i in &g.overridden {
             let Some(t) = g.texts.get(i) else { continue };
             let b = font::text_box(t);
             out.lines.push(Polyline2 { points: vec![b[0], b[1]], style: LineStyle::Thin, closed: false, pick: t.pick });
+            lc.push(tone(g.text_color(i)));
         }
     }
     let texts = std::mem::take(&mut out.texts);
     for (i, t) in texts.into_iter().enumerate() {
+        let c = tone(g.text_color(i));
         if !(o.explode_all || o.explode.contains(&i)) {
             out.texts.push(t);
+            tc.push(c);
+            tf.push(g.text_font(i).cloned());
             continue;
         }
         if !o.strokes && font::fill_supported(&t.text) {
-            let (pts, idx) = font::text_fill(&t);
-            out.fills.extend(idx.chunks(3).filter(|c| c.len() == 3).map(|c| Fill2 { points: c.iter().map(|&k| pts[k as usize]).collect() }));
+            let (pts, idx) = font::text_fill_font(&t, g.text_font(i));
+            for tri in idx.chunks(3).filter(|c| c.len() == 3) {
+                out.fills.push(Fill2 { points: tri.iter().map(|&k| pts[k as usize]).collect() });
+                fc.push(c);
+            }
         } else {
-            out.lines.extend(font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2).map(|points| Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick }));
+            for points in font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2) {
+                out.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick });
+                lc.push(c);
+            }
         }
     }
     out.overridden.clear();
     if o.exclude_off_sheet {
         let inside = |p: &[f64; 2]| p[0] >= -1e-6 && p[1] >= -1e-6 && p[0] <= g.width + 1e-6 && p[1] <= g.height + 1e-6;
-        out.lines.retain(|l| l.points.iter().all(inside));
-        out.fills.retain(|f| f.points.iter().all(inside));
-        out.texts.retain(|t| font::text_box(t).iter().all(inside));
+        let keep_l: Vec<bool> = out.lines.iter().map(|l| l.points.iter().all(inside)).collect();
+        let keep_f: Vec<bool> = out.fills.iter().map(|f| f.points.iter().all(inside)).collect();
+        let keep_t: Vec<bool> = out.texts.iter().map(|t| font::text_box(t).iter().all(inside)).collect();
+        let filter = |v: &mut Vec<Option<[u8; 3]>>, keep: &[bool]| {
+            let mut k = keep.iter();
+            v.retain(|_| *k.next().unwrap_or(&true));
+        };
+        filter(&mut lc, &keep_l);
+        filter(&mut fc, &keep_f);
+        filter(&mut tc, &keep_t);
+        let mut k = keep_t.iter();
+        tf.retain(|_| *k.next().unwrap_or(&true));
+        let mut k = keep_l.iter();
+        out.lines.retain(|_| *k.next().unwrap_or(&true));
+        let mut k = keep_f.iter();
+        out.fills.retain(|_| *k.next().unwrap_or(&true));
+        let mut k = keep_t.iter();
+        out.texts.retain(|_| *k.next().unwrap_or(&true));
     }
+    out.colors = spans_of(&lc, &tc, &fc);
+    out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
     out
+}
+
+/// SVG font attributes of a text.
+fn svg_font(f: Option<&TextFont>) -> String {
+    match f {
+        None => "font-family=\"Helvetica, Arial, sans-serif\"".into(),
+        Some(f) => {
+            let generic = if f.family.contains("Serif") { "serif" } else if f.family.contains("Mono") { "monospace" } else { "sans-serif" };
+            format!("font-family=\"{}, {generic}\"{}{}", esc_xml(&f.family), if f.bold { " font-weight=\"bold\"" } else { "" }, if f.italic { " font-style=\"italic\"" } else { "" })
+        }
+    }
+}
+
+/// PDF base-14 font resource (F1–F12) of a text.
+fn pdf_font(f: Option<&TextFont>) -> usize {
+    let Some(f) = f else { return 1 };
+    let base = if f.family.contains("Serif") { 4 } else if f.family.contains("Mono") { 8 } else { 0 };
+    base + 1 + usize::from(f.bold) + 2 * usize::from(f.italic)
+}
+
+const PDF_FONTS: [&str; 12] = ["Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique", "Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic", "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique"];
+
+/// "#rrggbb" of an element color (black ink by default).
+fn hex(c: Option<[u8; 3]>) -> String {
+    let c = c.unwrap_or([0, 0, 0]);
+    format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2])
+}
+
+/// The nearest AutoCAD color index (DXF R12 has no true color): 7 is
+/// black / white.
+fn aci(c: Option<[u8; 3]>) -> u8 {
+    let Some(c) = c else { return 7 };
+    const TABLE: [(u8, [u8; 3]); 9] = [(1, [255, 0, 0]), (2, [255, 255, 0]), (3, [0, 255, 0]), (4, [0, 255, 255]), (5, [0, 0, 255]), (6, [255, 0, 255]), (7, [0, 0, 0]), (8, [128, 128, 128]), (9, [192, 192, 192])];
+    let d = |a: [u8; 3]| (0..3).map(|i| (a[i] as i32 - c[i] as i32).pow(2)).sum::<i32>();
+    TABLE.iter().min_by_key(|(_, rgb)| d(*rgb)).map(|t| t.0).unwrap_or(7)
 }
 
 fn stroke_width(t: &Text2) -> f64 {
@@ -83,35 +191,52 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         h = g.height
     );
     let _ = writeln!(s, r#"<rect width="{}" height="{}" fill="white"/>"#, g.width, g.height);
+    for im in &g.images {
+        let _ = writeln!(
+            s,
+            r#"<image x="{:.4}" y="{:.4}" width="{:.4}" height="{:.4}" preserveAspectRatio="none" href="data:{};base64,{}"/>"#,
+            im.pos[0],
+            g.height - im.pos[1] - im.size[1],
+            im.size[0],
+            im.size[1],
+            im.mime(),
+            im.data_base64
+        );
+    }
     // Flip Y: sheet coordinates are Y-up.
     let _ = writeln!(s, r#"<g transform="translate(0 {}) scale(1 -1)" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round">"#, g.height);
-    for l in &g.lines {
+    for (pts, c) in &g.backdrops {
+        let pts: Vec<String> = pts.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
+        let _ = writeln!(s, r#"<polygon points="{}" fill="{}" stroke="none"/>"#, pts.join(" "), hex(Some(*c)));
+    }
+    for (li, l) in g.lines.iter().enumerate() {
         if l.points.len() < 2 {
             continue;
         }
         let pts: Vec<String> = l.points.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
         let tag = if l.closed { "polygon" } else { "polyline" };
+        let stroke = g.line_color(li).map(|c| format!(r#" stroke="{}""#, hex(Some(c)))).unwrap_or_default();
         let dash = l.style.dashes();
         let dash_attr = if dash.is_empty() {
             String::new()
         } else {
             format!(r#" stroke-dasharray="{}""#, dash.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(" "))
         };
-        let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}/>"#, pts.join(" "), l.style.width_mm());
+        let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}{stroke}/>"#, pts.join(" "), l.style.width_mm());
     }
-    for f in &g.fills {
+    for (fi, f) in g.fills.iter().enumerate() {
         let pts: Vec<String> = f.points.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
-        let _ = writeln!(s, r#"<polygon points="{}" fill="black" stroke="none"/>"#, pts.join(" "));
+        let _ = writeln!(s, r#"<polygon points="{}" fill="{}" stroke="none"/>"#, pts.join(" "), hex(g.fill_color(fi)));
     }
     let _ = writeln!(s, "</g>");
-    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
         let w = stroke_width(t);
         for st in font::text_strokes(t) {
             let pts: Vec<String> = st.iter().map(|p| format!("{:.4},{:.4}", p[0], g.height - p[1])).collect();
-            let _ = writeln!(s, r#"<polyline points="{}" fill="none" stroke="black" stroke-width="{w:.3}" stroke-linecap="round" stroke-linejoin="round"/>"#, pts.join(" "));
+            let _ = writeln!(s, r#"<polyline points="{}" fill="none" stroke="{}" stroke-width="{w:.3}" stroke-linecap="round" stroke-linejoin="round"/>"#, pts.join(" "), hex(g.text_color(ti)));
         }
     }
-    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
         let (x, y) = (t.pos[0], g.height - t.pos[1]);
         let anchor = match t.anchor {
             Anchor::BottomLeft | Anchor::TopLeft => "start",
@@ -124,8 +249,10 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         };
         let _ = writeln!(
             s,
-            r#"<text x="{x:.4}" y="{y:.4}" font-family="Helvetica, Arial, sans-serif" font-size="{:.3}" text-anchor="{anchor}"{baseline} transform="rotate({:.3} {x:.4} {y:.4})">{}</text>"#,
+            r#"<text x="{x:.4}" y="{y:.4}" {} font-size="{:.3}" fill="{}" text-anchor="{anchor}"{baseline} transform="rotate({:.3} {x:.4} {y:.4})">{}</text>"#,
+            svg_font(g.text_font(ti)),
             t.height * 1.4,
+            hex(g.text_color(ti)),
             -t.angle.to_degrees(),
             esc_xml(&t.text)
         );
@@ -229,10 +356,14 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
 
     pair(&mut s, 0, "SECTION");
     pair(&mut s, 2, "ENTITIES");
-    for l in &g.lines {
+    for (li, l) in g.lines.iter().enumerate() {
+        let color = g.line_color(li).map(|c| aci(Some(c)));
         if l.points.len() == 2 && !l.closed {
             pair(&mut s, 0, "LINE");
             pair(&mut s, 8, l.style.layer());
+            if let Some(c) = color {
+                pair(&mut s, 62, &c.to_string());
+            }
             pair(&mut s, 10, &format!("{:.6}", l.points[0][0]));
             pair(&mut s, 20, &format!("{:.6}", l.points[0][1]));
             pair(&mut s, 11, &format!("{:.6}", l.points[1][0]));
@@ -240,6 +371,9 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
         } else if l.points.len() >= 2 {
             pair(&mut s, 0, "POLYLINE");
             pair(&mut s, 8, l.style.layer());
+            if let Some(c) = color {
+                pair(&mut s, 62, &c.to_string());
+            }
             pair(&mut s, 66, "1");
             pair(&mut s, 70, if l.closed { "1" } else { "0" });
             for p in &l.points {
@@ -251,10 +385,13 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 0, "SEQEND");
         }
     }
-    for f in &g.fills {
+    for (fi, f) in g.fills.iter().enumerate() {
         if f.points.len() >= 3 {
             pair(&mut s, 0, "SOLID");
             pair(&mut s, 8, "ANNOTATION");
+            if let Some(c) = g.fill_color(fi) {
+                pair(&mut s, 62, &aci(Some(c)).to_string());
+            }
             let p = &f.points;
             let pts = [p[0], p[1], p[2], p[2]];
             for (i, q) in pts.iter().enumerate() {
@@ -263,13 +400,16 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             }
         }
     }
-    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
         for st in font::text_strokes(t) {
             if st.len() < 2 {
                 continue;
             }
             pair(&mut s, 0, "POLYLINE");
             pair(&mut s, 8, "ANNOTATION");
+            if let Some(c) = g.text_color(ti) {
+                pair(&mut s, 62, &aci(Some(c)).to_string());
+            }
             pair(&mut s, 66, "1");
             pair(&mut s, 70, "0");
             for p in &st {
@@ -281,9 +421,12 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 0, "SEQEND");
         }
     }
-    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
         pair(&mut s, 0, "TEXT");
         pair(&mut s, 8, "ANNOTATION");
+        if let Some(c) = g.text_color(ti) {
+            pair(&mut s, 62, &aci(Some(c)).to_string());
+        }
         pair(&mut s, 10, &format!("{:.6}", t.pos[0]));
         pair(&mut s, 20, &format!("{:.6}", t.pos[1]));
         pair(&mut s, 40, &format!("{:.4}", t.height));
@@ -312,10 +455,22 @@ fn pdf_content(g: &SheetGeometry) -> String {
     let pt = 72.0 / 25.4;
     let mut content = String::new();
     content.push_str("1 J 1 j 0 0 0 RG 0 0 0 rg\n");
-    for l in &g.lines {
+    let rgb = |c: Option<[u8; 3]>| {
+        let c = c.unwrap_or([0, 0, 0]);
+        format!("{:.3} {:.3} {:.3}", c[0] as f64 / 255.0, c[1] as f64 / 255.0, c[2] as f64 / 255.0)
+    };
+    for (pts, c) in &g.backdrops {
+        let _ = writeln!(content, "{} rg", rgb(Some(*c)));
+        for (i, p) in pts.iter().enumerate() {
+            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+        }
+        content.push_str("f\n");
+    }
+    for (li, l) in g.lines.iter().enumerate() {
         if l.points.len() < 2 {
             continue;
         }
+        let _ = writeln!(content, "{} RG", rgb(g.line_color(li)));
         let dash = l.style.dashes();
         if dash.is_empty() {
             content.push_str("[] 0 d\n");
@@ -330,14 +485,15 @@ fn pdf_content(g: &SheetGeometry) -> String {
         content.push_str(if l.closed { "s\n" } else { "S\n" });
     }
     content.push_str("[] 0 d\n");
-    for f in &g.fills {
+    for (fi, f) in g.fills.iter().enumerate() {
+        let _ = writeln!(content, "{} rg", rgb(g.fill_color(fi)));
         for (i, p) in f.points.iter().enumerate() {
             let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
         }
         content.push_str("f\n");
     }
-    for t in g.texts.iter().filter(|t| needs_strokes(t)) {
-        let _ = writeln!(content, "{:.3} w", stroke_width(t) * pt);
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| needs_strokes(t)) {
+        let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
         for st in font::text_strokes(t) {
             for (i, p) in st.iter().enumerate() {
                 let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
@@ -345,8 +501,9 @@ fn pdf_content(g: &SheetGeometry) -> String {
             content.push_str("S\n");
         }
     }
-    for t in g.texts.iter().filter(|t| !needs_strokes(t)) {
+    for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
         let size = t.height * 1.4 * pt;
+        let _ = writeln!(content, "{} rg", rgb(g.text_color(ti)));
         // Approximate Helvetica advance: 0.5 em per char.
         let width = t.text.chars().count() as f64 * size * 0.5;
         let (dx, dy) = match t.anchor {
@@ -372,7 +529,7 @@ fn pdf_content(g: &SheetGeometry) -> String {
                 _ => "?".to_string(),
             })
             .collect();
-        let _ = writeln!(content, "BT /F1 {size:.3} Tf {c:.5} {s:.5} {:.5} {c:.5} {x:.3} {y:.3} Tm ({text}) Tj ET", -s);
+        let _ = writeln!(content, "BT /F{} {size:.3} Tf {c:.5} {s:.5} {:.5} {c:.5} {x:.3} {y:.3} Tm ({text}) Tj ET", pdf_font(g.text_font(ti)), -s);
     }
     content
 }
@@ -390,23 +547,49 @@ pub fn to_pdf_pages(pages: &[SheetGeometry]) -> Vec<u8> {
 /// [`to_pdf_pages`] with the header version (Export Drawing › Version).
 pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
     let pt = 72.0 / 25.4;
-    let mut objects = vec![
-        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        format!("<< /Type /Pages /Kids [{}] /Count {} >>", (0..pages.len()).map(|i| format!("{} 0 R", 4 + 2 * i)).collect::<Vec<_>>().join(" "), pages.len()),
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_string(),
+    let mut objects: Vec<Vec<u8>> = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        format!("<< /Type /Pages /Kids [{}] /Count {} >>", (0..pages.len()).map(|i| format!("{} 0 R", 4 + 2 * i)).collect::<Vec<_>>().join(" "), pages.len()).into_bytes(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_vec(),
     ];
+    // Fonts F2–F12 follow the pages, then the image XObjects (decoded RGB
+    // supplied by the caller).
+    let font0 = 4 + 2 * pages.len();
+    let fonts: String = (2..=12).map(|k| format!(" /F{k} {} 0 R", font0 + k - 2)).collect();
+    let mut next = font0 + 11;
+    let mut images: Vec<Vec<u8>> = Vec::new();
     for (i, g) in pages.iter().enumerate() {
-        let content = pdf_content(g);
+        let mut draw = String::new();
+        let mut xobjects = String::new();
+        for im in &g.images {
+            let Some((w, h, rgb)) = &im.rgb else { continue };
+            let n = next;
+            next += 1;
+            let _ = write!(xobjects, " /Im{n} {n} 0 R");
+            let _ = writeln!(draw, "q {:.3} 0 0 {:.3} {:.3} {:.3} cm /Im{n} Do Q", im.size[0] * pt, im.size[1] * pt, im.pos[0] * pt, im.pos[1] * pt);
+            let mut obj = format!("<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length {} >>\nstream\n", rgb.len()).into_bytes();
+            obj.extend_from_slice(rgb);
+            obj.extend_from_slice(b"\nendstream");
+            images.push(obj);
+        }
+        let content = draw + pdf_content(g).as_str();
         let (w, h) = (g.width * pt, g.height * pt);
-        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>", 5 + 2 * i));
-        objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content));
+        let xo = if xobjects.is_empty() { String::new() } else { format!(" /XObject <<{xobjects} >>") };
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
+        objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content).into_bytes());
     }
+    for name in &PDF_FONTS[1..] {
+        objects.push(format!("<< /Type /Font /Subtype /Type1 /BaseFont /{name} /Encoding /WinAnsiEncoding >>").into_bytes());
+    }
+    objects.extend(images);
     let mut out: Vec<u8> = format!("%PDF-{version}\n").into_bytes();
     out.extend_from_slice(b"%\xE2\xE3\xCF\xD3\n");
     let mut offsets = Vec::new();
     for (i, o) in objects.iter().enumerate() {
         offsets.push(out.len());
-        out.extend_from_slice(format!("{} 0 obj\n{}\nendobj\n", i + 1, o).as_bytes());
+        out.extend_from_slice(format!("{} 0 obj\n", i + 1).as_bytes());
+        out.extend_from_slice(o);
+        out.extend_from_slice(b"\nendobj\n");
     }
     let xref = out.len();
     let mut tail = format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1);
@@ -520,6 +703,41 @@ mod tests {
         assert!(d.contains("$INSUNITS\n 70\n1"));
         let pdf = to_pdf_pages_version(&[g], "1.5");
         assert!(pdf.starts_with(b"%PDF-1.5\n"));
+    }
+
+    #[test]
+    fn colors_survive_prepare_and_reach_writers() {
+        let mut g = sample();
+        let m = g.mark();
+        g.rect(10.0, 10.0, 20.0, 20.0, LineStyle::Thin);
+        g.texts.push(Text2 { pos: [15.0, 15.0], height: 2.5, text: "7".into(), angle: 0.0, anchor: Anchor::Center, pick: 0 });
+        g.color_since(m, [255, 0, 0]);
+        let red = |s: &str| s.contains("#ff0000");
+        assert!(red(&to_svg(&g)));
+        // Exploded text keeps its color (as fills), grayscale turns it gray.
+        let p = prepare(&g, &ExportOptions { explode_all: true, ..Default::default() });
+        assert!(p.fill_color(p.fills.len() - 1) == Some([255, 0, 0]));
+        let gray = prepare(&g, &ExportOptions { color_mode: 2, ..Default::default() });
+        assert_eq!(gray.line_color(gray.lines.len() - 1), Some([76, 76, 76]));
+        let bw = prepare(&g, &ExportOptions { color_mode: 1, ..Default::default() });
+        assert!(bw.colors.is_empty());
+        assert!(to_dxf(&g).contains(" 62\n1\n"));
+        assert!(String::from_utf8_lossy(&to_pdf(&g)).contains("1.000 0.000 0.000 RG"));
+    }
+
+    #[test]
+    fn images_reach_svg_and_pdf() {
+        let mut g = sample();
+        let png = crate::sketch_feature::base64_encode(&[0x89, b'P', b'N', b'G', 13, 10, 26, 10, 0, 0, 0, 0]);
+        g.images.push(super::super::sheet::GeomImage { pos: [10.0, 20.0], size: [30.0, 15.0], data_base64: png.into(), rgb: Some((2, 1, std::sync::Arc::new(vec![255, 0, 0, 0, 0, 255]))) });
+        let svg = to_svg(&g);
+        assert!(svg.contains("data:image/png;base64,") && svg.contains(&format!(r#"y="{:.4}""#, g.height - 35.0)));
+        let pdf = to_pdf(&g);
+        let text = String::from_utf8_lossy(&pdf);
+        assert!(text.contains("/XObject << /Im17 17 0 R >>") && text.contains("/Subtype /Image /Width 2 /Height 1"));
+        let sx = text.rfind("startxref\n").unwrap();
+        let off: usize = text[sx + 10..].lines().next().unwrap().trim().parse().unwrap();
+        assert_eq!(&pdf[off..off + 4], b"xref");
     }
 
     #[test]

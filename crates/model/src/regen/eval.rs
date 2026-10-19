@@ -17,11 +17,14 @@ use std::sync::Arc;
 pub struct FeatureError {
     pub message: String,
     pub warning: bool,
+    /// The parameters at fault (Onshape's faulty parameters: their empty
+    /// selection fields turn pink and show the message).
+    pub faulty: Vec<&'static str>,
 }
 
 impl FeatureError {
     pub fn new(m: impl Into<String>) -> Self {
-        Self { message: m.into(), warning: false }
+        Self { message: m.into(), warning: false, faulty: Vec::new() }
     }
 }
 
@@ -35,6 +38,11 @@ pub type FResult<T> = Result<T, FeatureError>;
 
 pub fn err<T>(m: impl Into<String>) -> FResult<T> {
     Err(FeatureError::new(m))
+}
+
+/// An error caused by the given parameters (see [`FeatureError::faulty`]).
+pub fn err_at<T>(faulty: &[&'static str], m: impl Into<String>) -> FResult<T> {
+    Err(FeatureError { faulty: faulty.to_vec(), ..FeatureError::new(m) })
 }
 
 /// Why `v` (SI) is outside the bounds of `spec`, in user units; `None` if inside.
@@ -97,6 +105,12 @@ pub struct EvalCtx<'a> {
     pub outer_vars: &'a BTreeMap<String, Quantity>,
     /// Warnings to surface without failing.
     pub warnings: Vec<String>,
+    /// Information messages (Onshape's `reportFeatureInfo`: a blue bubble,
+    /// the feature still succeeds).
+    pub infos: Vec<String>,
+    /// Read-only parameter values the feature computed (see
+    /// [`crate::display::FeatureState::computed`]).
+    pub computed: Vec<(String, crate::display::ComputedValue)>,
     /// Sketch being edited (for display of constraint states).
     pub editing_sketch: Option<FeatureId>,
     /// Other Part Studios of the document (for Derived).
@@ -194,7 +208,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None }
     }
 
     // ------------------------------------------------------------ pattern transform
@@ -735,6 +749,16 @@ impl<'a> EvalCtx<'a> {
             args.extend(tools.iter().map(|t| t.names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();
             let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+            // Like Parasolid, merge faces left coplanar (or on one cylinder...) by
+            // the boolean: a block added flush with a face leaves one face.
+            let unified = k::unify_same_domain(&res.shape)?;
+            let (res, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+                let before = names_for(&res.shape, face_names);
+                let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+                (unified, names)
+            } else {
+                (res, face_names)
+            };
             let pieces = split_solids(&res.shape, &face_names);
             let mut bodies = Vec::new();
             for (j, p) in pieces.into_iter().enumerate() {

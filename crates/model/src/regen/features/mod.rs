@@ -3,6 +3,8 @@
 use super::eval::{EvalCtx, FResult};
 
 pub mod basic;
+pub mod blend_section;
+pub mod cplane;
 pub mod detail;
 pub mod extrude;
 pub mod revolve;
@@ -51,7 +53,7 @@ pub fn evaluator(type_id: &str) -> Option<EvalFn> {
         "chamfer" => detail::chamfer,
         "shell" => detail::shell,
         "booleanBodies" => basic::boolean,
-        "cPlane" => basic::plane,
+        "cPlane" => cplane::plane_feature,
         "assignVariable" => basic::variable,
         "deleteBodies" => basic::delete_bodies,
         // --- dispatch: batch A ---

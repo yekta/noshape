@@ -94,6 +94,52 @@ fn signed(s: String) -> String {
     if s.starts_with('-') || s.chars().all(|c| c == '0' || c == '.' || c == ',') { s } else { format!("+{s}") }
 }
 
+/// A fit deviation (meters) with its sign, in the dimension's units and
+/// the drawing's tolerance precision: "+0.015", "−0.000" (a zero lower
+/// deviation keeps the minus sign; live, dialogs/hole-35).
+pub fn format_deviation(drawing: &Drawing, f: &DimFormat, meters: f64, lower: bool) -> String {
+    let u = length_units(drawing, f);
+    let p = &drawing.props;
+    let s = number(drawing, meters / u.meters(), f.precision, p.tolerance_precision.or(p.precision), default_digits(u), true);
+    match s.strip_prefix('-') {
+        Some(abs) => format!("−{abs}"),
+        None if lower && s.chars().all(|c| c == '0' || c == '.' || c == ',') => format!("−{s}"),
+        None => format!("+{s}"),
+    }
+}
+
+/// Markers of stacked text (upper over lower) inside a one-line label such
+/// as a hole callout line: `STACK_OPEN upper STACK_SEP lower STACK_CLOSE`.
+pub const STACK_OPEN: char = '\u{E000}';
+pub const STACK_SEP: char = '\u{E001}';
+pub const STACK_CLOSE: char = '\u{E002}';
+
+/// `upper` stacked over `lower` (see [`STACK_OPEN`]).
+pub fn stacked(upper: &str, lower: &str) -> String {
+    format!("{STACK_OPEN}{upper}{STACK_SEP}{lower}{STACK_CLOSE}")
+}
+
+/// A label split around its stacked part: (before, (upper, lower), after).
+pub fn split_stacked(s: &str) -> (&str, Option<(&str, &str)>, &str) {
+    let parts = s.split_once(STACK_OPEN).and_then(|(a, rest)| {
+        let (pair, b) = rest.split_once(STACK_CLOSE)?;
+        let (u, l) = pair.split_once(STACK_SEP)?;
+        Some((a, (u, l), b))
+    });
+    match parts {
+        Some((a, p, b)) => (a, Some(p), b),
+        None => (s, None, ""),
+    }
+}
+
+/// One-line text of a label with a stacked part ("⌀6.35 H7 +0.015/−0 THRU").
+pub fn flatten_stacked(s: &str) -> String {
+    match split_stacked(s) {
+        (a, Some((u, l)), b) => format!("{a}{u}/{l}{b}"),
+        (a, None, _) => a.to_string(),
+    }
+}
+
 /// Full text of a dimension measuring `value` (meters, or radians when
 /// `angular`); `symbol` precedes the value (e.g. "Ø", "R").
 pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, symbol: &str) -> DimText {
@@ -164,6 +210,12 @@ pub const FIELDS: &[(&str, &str)] = &[
 /// Replace `{key}` occurrences using `lookup`; unknown keys are kept as
 /// typed, known but empty values become "----" (like Onshape).
 pub fn expand_fields(text: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+    expand_fields_with(text, lookup, "----")
+}
+
+/// [`expand_fields`] with the empty-value placeholder (Notes › Hide
+/// property placeholder: "").
+pub fn expand_fields_with(text: &str, lookup: &dyn Fn(&str) -> Option<String>, placeholder: &str) -> String {
     let codes = text_codes(text);
     let text = codes.as_str();
     if !text.contains('{') {
@@ -176,10 +228,14 @@ pub fn expand_fields(text: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Str
         let after = &rest[i + 1..];
         match after.find('}') {
             Some(j) if !after[..j].contains('{') => {
-                let key = after[..j].trim();
+                // `{key|format}`: a text format or a date time format.
+                let (key, fmt) = match after[..j].split_once('|') {
+                    Some((k, f)) => (k.trim(), Some(f.trim())),
+                    None => (after[..j].trim(), None),
+                };
                 match lookup(key) {
-                    Some(v) if v.is_empty() => out.push_str("----"),
-                    Some(v) => out.push_str(&v),
+                    Some(v) if v.is_empty() => out.push_str(placeholder),
+                    Some(v) => out.push_str(&fmt.map(|f| field_format(&v, f)).unwrap_or(v)),
                     None => {
                         out.push('{');
                         out.push_str(&after[..j]);
@@ -195,6 +251,79 @@ pub fn expand_fields(text: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Str
         }
     }
     out.push_str(rest);
+    out
+}
+
+/// Text formats of inserted properties.
+pub const TEXT_FORMATS: [(&str, &str); 5] = [("upper", "All uppercase"), ("lower", "All lowercase"), ("sentence", "Sentence case"), ("title", "Title case"), ("", "Unmodified")];
+
+/// Date time formats of date properties.
+pub const DATE_FORMATS: [&str; 5] = ["yyyy-MM-dd", "M/d/yyyy", "dd.MM.yyyy", "d-MMM-yy", "dddd,MMMM d,yyyy"];
+
+/// Apply a property's text format (`upper`, `lower`, `sentence`, `title`)
+/// or, to YYYY-MM-DD dates, a date time format (`yyyy`, `yy`, `MMMM`,
+/// `MMM`, `MM`, `M`, `dddd`, `dd`, `d`).
+pub fn field_format(v: &str, fmt: &str) -> String {
+    match fmt {
+        "upper" => return v.to_uppercase(),
+        "lower" => return v.to_lowercase(),
+        "sentence" => {
+            let l = v.to_lowercase();
+            let mut c = l.chars();
+            return c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default();
+        }
+        "title" => {
+            return v
+                .split(' ')
+                .map(|w| {
+                    let l = w.to_lowercase();
+                    let mut c = l.chars();
+                    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+        }
+        _ => {}
+    }
+    let parts: Vec<i64> = v.split('-').filter_map(|p| p.parse().ok()).collect();
+    let [y, m, d] = parts[..] else { return v.to_string() };
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return v.to_string();
+    }
+    const MONTHS: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const DAYS: [&str; 7] = ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"];
+    // Days since the epoch (1970-01-01 was a Thursday).
+    let days = {
+        let (yy, mm) = if m <= 2 { (y - 1, m + 9) } else { (y, m - 3) };
+        let era = yy.div_euclid(400);
+        let yoe = yy - era * 400;
+        let doy = (153 * mm + 2) / 5 + d - 1;
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        era * 146097 + doe - 719468
+    };
+    let mut out = String::new();
+    let f: Vec<char> = fmt.chars().collect();
+    let mut i = 0;
+    while i < f.len() {
+        let c = f[i];
+        let mut n = 1;
+        while i + n < f.len() && f[i + n] == c {
+            n += 1;
+        }
+        match (c, n) {
+            ('y', 4) => out.push_str(&format!("{y:04}")),
+            ('y', _) => out.push_str(&format!("{:02}", y % 100)),
+            ('M', 4) => out.push_str(MONTHS[m as usize - 1]),
+            ('M', 3) => out.push_str(&MONTHS[m as usize - 1][..3]),
+            ('M', 2) => out.push_str(&format!("{m:02}")),
+            ('M', _) => out.push_str(&m.to_string()),
+            ('d', 4) => out.push_str(DAYS[days.rem_euclid(7) as usize]),
+            ('d', 2) => out.push_str(&format!("{d:02}")),
+            ('d', _) => out.push_str(&d.to_string()),
+            _ => (0..n).for_each(|_| out.push(c)),
+        }
+        i += n;
+    }
     out
 }
 
@@ -266,6 +395,18 @@ pub fn civil_from_days(z: i64) -> (i64, u32, u32) {
 mod tests {
 
     #[test]
+    fn fit_deviations_stack_in_callouts() {
+        let mut d = Drawing::default();
+        d.props.precision = Some(3);
+        let f = DimFormat::default();
+        let line = format!("⌀6.350 H7 {} THRU", stacked(&format_deviation(&d, &f, 15e-6, false), &format_deviation(&d, &f, 0.0, true)));
+        assert_eq!(flatten_stacked(&line), "⌀6.350 H7 +0.015/−0.000 THRU");
+        assert_eq!(split_stacked(&line), ("⌀6.350 H7 ", Some(("+0.015", "−0.000")), " THRU"));
+        assert_eq!(format_deviation(&d, &f, -5e-6, false), "−0.005");
+        assert_eq!(split_stacked("⌀5 THRU"), ("⌀5 THRU", None, ""));
+    }
+
+    #[test]
     fn drawing_properties_shape_dimension_text() {
         let mut d = Drawing::default();
         let f = DimFormat::default();
@@ -294,6 +435,11 @@ mod tests {
         assert_eq!(text_codes("A\\U+00AEB \\u+2300"), "A®B ⌀");
         assert_eq!(text_codes("100%"), "100%");
         assert_eq!(expand_fields("%%c{x}", &|k| (k == "x").then(|| "5".into())), "⌀5");
+        assert_eq!(expand_fields("{x|upper} {x|title}", &|k| (k == "x").then(|| "steel plate".into())), "STEEL PLATE Steel Plate");
+        assert_eq!(field_format("2026-10-19", "dd.MM.yyyy"), "19.10.2026");
+        assert_eq!(field_format("2026-10-19", "d-MMM-yy"), "19-Oct-26");
+        assert_eq!(field_format("2026-10-19", "dddd,MMMM d,yyyy"), "Monday,October 19,2026");
+        assert_eq!(field_format("2026-10-19", "M/d/yyyy"), "10/19/2026");
     }
 
     use super::*;

@@ -1,8 +1,8 @@
 //! Reference geometry: Mate connector, Point, Composite part, Query variable,
-//! Name entity, and the Tangent-to-cylinder plane construction.
+//! Name entity.
 
 use super::bshared::{add_wire_body, canonical_x, extent_along};
-use crate::display::{BodyKind, PlaneFrame};
+use crate::display::BodyKind;
 use crate::reference::{BodyId, Reference};
 use crate::regen::context::{Body, Connector, PointEntity};
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
@@ -214,7 +214,10 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
 }
 
 pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
-    let origin_ref = ev.query("originQuery").first().cloned().unwrap_or(Reference::Origin);
+    // Live (dom/dialog-mate-connector.txt): an empty Origin entity fails.
+    let Some(origin_ref) = ev.query("originQuery").first().cloned() else {
+        return crate::regen::eval::err_at(&["originQuery"], "Cannot resolve entities.");
+    };
     let inference = ev.enum_("entityInferenceType").to_string();
     let secondary = ev.query("secondaryOriginQuery");
     let mut cs = origin_csys(ev, &origin_ref, &inference, secondary)?;
@@ -373,7 +376,7 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
 pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
     let name = ev.params.text("name").trim().trim_start_matches('#').to_string();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return err("Enter a valid variable name");
+        return err("Variable name must be a letter followed by a string of letters or numbers.");
     }
     let st = ev.enum_("selectionType").to_string();
     let mut refs = query_selection(ev, ev.params, &st, "")?;
@@ -478,52 +481,4 @@ fn resolves(ev: &EvalCtx, r: &Reference) -> bool {
 /// Name entity: names are persistent already; nothing to compute.
 pub fn name_entity(_ev: &mut EvalCtx) -> FResult<()> {
     Ok(())
-}
-
-/// Plane tangent to a cylindrical face, parallel to a plane or through a
-/// point (`cPlane` type TANGENT_CYLINDER). `other_side` picks the second
-/// tangent solution.
-pub fn tangent_cylinder_frame(ev: &EvalCtx, refs: &[Reference], other_side: bool) -> FResult<PlaneFrame> {
-    let mut cyl = None;
-    let mut rest = Vec::new();
-    for r in refs {
-        if cyl.is_none()
-            && let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first()
-            && let Ok(face) = ev.face_shape(bi, fi)
-            && let Ok(k::Surface::Cylinder { origin, axis, radius, .. }) = face.face_surface()
-        {
-            let c = face.centroid().unwrap_or(origin);
-            // Axis point closest to the face centroid.
-            let a = axis.normalize();
-            let foot = origin + a * (c - origin).dot(a);
-            cyl = Some((foot, a, radius));
-            continue;
-        }
-        rest.push(r);
-    }
-    let Some((foot, a, radius)) = cyl else { return err("Select a cylindrical face") };
-    let Some(other) = rest.first() else { return err("Select a plane or point to define the tangent plane") };
-    let side = if other_side { -1.0 } else { 1.0 };
-    let normal = if matches!(other, Reference::Vertex(_) | Reference::SketchEntity { .. } | Reference::Origin)
-        && let Some(p) = ev.resolve_vertex_point(other)
-    {
-        let foot_p = foot + a * (p - foot).dot(a);
-        let d = (p - foot_p).length();
-        if d < radius - 1e-9 {
-            return err("The point is inside the cylinder");
-        }
-        let u = (p - foot_p) / d;
-        let phi = (radius / d).clamp(-1.0, 1.0).acos();
-        DQuat::from_axis_angle(a, side * phi) * u
-    } else if let Some(f) = ev.resolve_plane(other) {
-        let n = f.normal - a * f.normal.dot(a);
-        if n.length() < 1e-9 {
-            return err("The plane must be parallel to the cylinder axis");
-        }
-        n.normalize() * side
-    } else {
-        return err("Select a plane or point to define the tangent plane");
-    };
-    let origin = foot + normal * radius;
-    Ok(PlaneFrame { origin, x: a, y: normal.cross(a), normal })
 }

@@ -261,6 +261,24 @@ pub struct FeatureState {
     pub underdefined: bool,
     /// Milliseconds spent regenerating this feature.
     pub time_ms: f32,
+    /// Parameters at fault when it failed.
+    pub faulty: Vec<String>,
+    /// Values the feature computed for its read-only parameters (Onshape's
+    /// `setFeatureComputedParameter`, e.g. a Hole's Up to next depth).
+    pub computed: Vec<(String, ComputedValue)>,
+}
+
+/// A computed parameter value: a length (meters) or text such as "Multiple".
+#[derive(Clone, Debug, PartialEq)]
+pub enum ComputedValue {
+    Length(f64),
+    Text(String),
+}
+
+impl FeatureState {
+    pub fn computed(&self, id: &str) -> Option<&ComputedValue> {
+        self.computed.iter().find(|(k, _)| k == id).map(|(_, v)| v)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -276,6 +294,9 @@ pub struct StudioDisplay {
     pub regen_ms: f32,
     /// Variables defined by the evaluated features (for expression entry).
     pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
+    /// The shown Assembly context's bodies (translucent, pickable for
+    /// references; not parts of this Part Studio, see `crate::in_context`).
+    pub context_bodies: Vec<BodyDisplay>,
 }
 
 impl StudioDisplay {

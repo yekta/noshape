@@ -19,6 +19,7 @@ noshape-kernel = { path = "crates/kernel" }
 noshape-model = { path = "crates/model" }
 noshape-store = { path = "crates/store" }
 noshape-render = { path = "crates/render" }
+noshape-featurescript = { path = "crates/featurescript" }
 
 gpui-kit = "0.7.3"
 wgpu = "29"
@@ -43,7 +44,6 @@ cxx = "1"
 cxx-build = "1"
 indexmap = { version = "2", features = ["serde"] }
 ahash = "0.8"
-rhai = { version = "1.26.1", features = ["sync"] }
 
 [profile.dev]
 opt-level = 1

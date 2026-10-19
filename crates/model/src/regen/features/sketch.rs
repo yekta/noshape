@@ -13,7 +13,7 @@ pub const CONFIGURED_DIMENSION_PREFIX: &str = "sketchDim:";
 
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(plane_ref) = ev.query("sketchPlane").first() else {
-        return err("Select a sketch plane");
+        return crate::regen::eval::err_at(&["sketchPlane"], "Select a sketch plane");
     };
     let Some(frame) = ev.resolve_plane(plane_ref) else {
         return err("The sketch plane could not be found");

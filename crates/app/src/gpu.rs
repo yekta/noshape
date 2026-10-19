@@ -98,6 +98,11 @@ impl Gpu {
         Ok(Self { worker: cell, routes, next_target: Arc::new(AtomicU64::new(1)) })
     }
 
+    /// The GPU adapter ("name (Backend)") once the renderer is up.
+    pub fn adapter_name(&self) -> Option<String> {
+        self.worker.get().and_then(|w| w.as_ref().ok()).map(|w| w.adapter_name().to_string())
+    }
+
     /// The render worker, waiting for its initialization if needed.
     fn worker(&self) -> &RenderWorker {
         match self.worker.wait() {

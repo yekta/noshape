@@ -99,6 +99,17 @@ const HEAD_BG: u32 = 0xeaeaea;
 
 /// Whether a value is an expression (references a variable or computes),
 /// rather than a plain number with an optional unit ("4 in").
+/// Onshape's type names (live document/16).
+fn kind_label(k: VarKind) -> &'static str {
+    match k {
+        VarKind::Length => "Length",
+        VarKind::Angle => "Angle",
+        VarKind::Number => "Number",
+        VarKind::Any => "Any",
+        VarKind::FromImport => "From import",
+    }
+}
+
 fn is_expression(text: &str) -> bool {
     let t = text.trim();
     t.contains('#') || t.trim_start_matches(['-', '+']).contains(['+', '-', '*', '/', '(', '^'])
@@ -318,7 +329,21 @@ impl Render for VariableStudioView {
                 let unit = expression_unit(&studio, &v.expr.text, 0).unwrap_or(units.length);
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
+            let from_import = v.kind == Some(VarKind::FromImport);
             let value_cell = match shown {
+                // From import: the imported value and the Edit pencil (help:
+                // "In the Value cell, click the Edit pencil icon").
+                _ if from_import => {
+                    let text = v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Select CSV file".into());
+                    let (doc, tab) = (self.doc.clone(), self.tab);
+                    cell_div()
+                        .id(("vs-val", i))
+                        .px(px(7.))
+                        .gap(px(4.))
+                        .child(div().flex_1().min_w_0().truncate().child(text))
+                        .child(div().id(("vs-edit", i)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip("Edit")).child(crate::ui::glyph("edit", 14., pal.text_muted)).on_click(move |_, window, cx| crate::variable_import::open(doc.clone(), tab, i, window, cx)))
+                        .into_any_element()
+                }
                 Some(text) => {
                     let st = expr.clone();
                     cell_div()
@@ -357,7 +382,7 @@ impl Render for VariableStudioView {
                             .child({
                                 // The cell's painted bounds place the select list under it.
                                 let b = cell_bounds.clone();
-                                canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().size_full()
+                                canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
                             })
                             .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
                             .child(
@@ -368,22 +393,27 @@ impl Render for VariableStudioView {
                                 .justify_start()
                                 .pl(px(7.))
                                 .pt(px(2.))
-                                .child(div().text_size(px(14.)).child(format!("{kind:?}")))
+                                .child(div().text_size(px(14.)).child(kind_label(kind)))
                                 .on_click(move |_, window, cx| {
                                     let kinds = kinds.clone();
                                     let b = cell_bounds.get();
                                     // Onshape's select list (live, document/16).
                                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                                         m = m.select_list(COL_W);
-                                        for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any] {
+                                        // Onshape's types (behaviours.md, Variable Studio).
+                                        for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport] {
                                             let v = kinds.clone();
-                                            m = m.item(crate::os_menu::OsMenuItem::new(format!("{k:?}")).checked(k == kind).on_click(move |_, _, cx| {
+                                            m = m.item(crate::os_menu::OsMenuItem::new(kind_label(k)).checked(k == kind).on_click(move |_, window, cx| {
                                                 v.update(cx, |this, cx| {
                                                     this.edit("Change variable type", cx, |s| {
                                                         if let Some(var) = s.variables.get_mut(i) {
                                                             var.kind = Some(k);
                                                         }
-                                                    })
+                                                    });
+                                                    // From import: its settings are in the Variable dialog.
+                                                    if k == VarKind::FromImport {
+                                                        crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
+                                                    }
                                                 })
                                             }));
                                         }
@@ -413,7 +443,7 @@ impl Render for VariableStudioView {
                 return;
             }
             this.inputs.remove("new");
-            this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new() }));
+            this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), import: None }));
         });
         let collapsed = self.collapsed;
         let more_view = view.clone();

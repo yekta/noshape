@@ -7,7 +7,8 @@ use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::DropdownMenu as _;
+use crate::os_menu::OsMenuItem;
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -29,6 +30,8 @@ pub enum MateDialogEvent {
     Animate,
     /// The mate connector icon of a field: edit that mate connector.
     EditConnector(usize),
+    /// "Select parameters to configure" mode: a parameter was clicked.
+    ConfigureParam(&'static str),
     Cancel,
 }
 
@@ -84,8 +87,14 @@ pub struct MateDialog {
     pub rotation_axis: u8,
     /// Mate indicator hidden (kept when editing).
     hidden: bool,
+    /// Dynamic suppression expression (kept when editing).
+    unsuppressed_if: Option<String>,
     /// Animate preview running.
     pub animating: bool,
+    /// Configure assembly features mode (live 194–196): clicking a
+    /// parameter configures it; the configured ones (listed) get a dashed
+    /// amber frame and an "Unsuppressed" checkbox is shown.
+    pub configuring: Option<Vec<String>>,
     use_offset: bool,
     use_limits: bool,
     offsets: [Entity<InputState>; 4],
@@ -109,6 +118,32 @@ fn text_of(e: &Option<ExprValue>) -> String {
 }
 
 impl MateDialog {
+    /// In "Select parameters to configure" mode a parameter row is a pick
+    /// target (click: configure it); configured rows get a dashed amber
+    /// frame (live 195–196).
+    fn cfg_param(&self, param: &'static str, el: impl IntoElement, cx: &mut Context<Self>) -> AnyElement {
+        let Some(list) = &self.configuring else { return el.into_any_element() };
+        let on = list.iter().any(|p| p == param);
+        div()
+            .relative()
+            .border_1()
+            .when(on, |d| d.border_dashed().border_color(gpui_kit::rgb(0xfab601)))
+            .when(!on, |d| d.border_color(gpui_kit::transparent_white()))
+            .child(el)
+            .child(
+                div()
+                    .id(SharedString::from(format!("mate-cfg-{param}")))
+                    .occlude()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .cursor_pointer()
+                    .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::ConfigureParam(param)))),
+            )
+            .into_any_element()
+    }
+
     pub fn new(mate: Mate, is_new: bool, labeler: ConnectorLabeler, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mk = |text: String, ph: &str, window: &mut Window, cx: &mut Context<Self>| {
             let ph = ph.to_string();
@@ -157,7 +192,9 @@ impl MateDialog {
             tangent_propagation: mate.tangent_propagation,
             rotation_axis: mate.rotation_axis,
             hidden: mate.hidden,
+            unsuppressed_if: mate.unsuppressed_if.clone(),
             animating: false,
+            configuring: None,
             use_offset,
             use_limits,
             offsets,
@@ -300,6 +337,7 @@ impl MateDialog {
             extra,
             tangent_propagation: self.tangent_propagation,
             hidden: self.hidden,
+            unsuppressed_if: self.unsuppressed_if.clone(),
         })
     }
 
@@ -430,16 +468,19 @@ impl Render for MateDialog {
             .border_b_1()
             .border_color(pal.border)
             .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(t.name())).child(os::glyph(os::GLYPH_CARET, 9., gpui_kit::rgb(0x000000))))
-            .dropdown_menu(move |mut menu, _, _| {
-                // Onshape's order in the type select; Tangent and Width are separate tools.
+            .os_dropdown_menu("mate-type-dd", true, move |mut menu, _, _| {
+                // Onshape's order in the type select (live behaviours: Slider,
+                // Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened,
+                // Parallel); Tangent and Width are separate tools.
                 let order = [MateType::Slider, MateType::Cylindrical, MateType::Revolute, MateType::PinSlot, MateType::Planar, MateType::Ball, MateType::Fastened, MateType::Parallel];
                 let types: Vec<MateType> = if order.contains(&t) { order.to_vec() } else { vec![t] };
                 for mt in types {
                     let v = view.clone();
-                    menu = menu.item(crate::ui::menu_tool_item(mt.name(), mate_icon_name(mt), None).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_type(mt, cx))));
+                    menu = menu.item(OsMenuItem::new(mt.name()).icon_name(mate_icon_name(mt)).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_type(mt, cx))));
                 }
                 menu
-            });
+            })
+            .w_full();
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -447,13 +488,13 @@ impl Render for MateDialog {
         let mut offset_rows = v_flex();
         if self.use_offset {
             if ox {
-                offset_rows = offset_rows.child(field("X offset", &self.offsets[0]));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, field("X offset", &self.offsets[0]), cx));
             }
             if oy {
-                offset_rows = offset_rows.child(field("Y offset", &self.offsets[1]));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Y, field("Y offset", &self.offsets[1]), cx));
             }
             if oz {
-                offset_rows = offset_rows.child(field("Z offset", &self.offsets[2]));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Z, field("Z offset", &self.offsets[2]), cx));
             }
             if orot {
                 let ax = self.rotation_axis;
@@ -479,7 +520,7 @@ impl Render for MateDialog {
                             })),
                     );
                 }
-                offset_rows = offset_rows.child(h_flex().h(px(30.)).pl(px(5.)).gap(px(6.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child("Rotation axis")).child(axes)).child(field("Rotation", &self.offsets[3]));
+                offset_rows = offset_rows.child(h_flex().h(px(30.)).pl(px(5.)).gap(px(6.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child("Rotation axis")).child(axes)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, field("Rotation", &self.offsets[3]), cx));
             }
         }
         let mut limit_rows = v_flex();
@@ -561,7 +602,8 @@ impl Render for MateDialog {
                     .border_b_1()
                     .border_color(pal.border)
                     .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { pal.text_invalid } else { pal.text }).truncate().child(self.name.clone()))
-                    .child(
+                    // Configure mode: only ✕ (live 194).
+                    .when(self.configuring.is_none(), |d| d.child(
                         div()
                             .id("mate-ok")
                             .size(px(28.))
@@ -574,7 +616,7 @@ impl Render for MateDialog {
                             .tooltip(crate::ui::tooltip("Accept (Enter)"))
                             .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),
-                    )
+                    ))
                     .child(
                         div()
                             .id("mate-cancel")
@@ -605,12 +647,12 @@ impl Render for MateDialog {
                         })))
                     })
                     .when(has_offset, |d| {
-                        d.child(os::checkbox("mate-offset", "Offset", self.use_offset).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        let offset = os::checkbox("mate-offset", "Offset", self.use_offset).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.use_offset = !this.use_offset;
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
-                        })))
-                        .child(offset_rows)
+                        }));
+                        d.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET, offset, cx)).child(offset_rows)
                     })
                     .when(!lkeys.is_empty(), |d| {
                         d.child(os::checkbox("mate-limits", "Limits", self.use_limits).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -681,6 +723,11 @@ impl Render for MateDialog {
                                     .child("?"),
                             ),
                     )
+                    // Configure mode: the mate's suppression as a checkbox (live 195).
+                    .when(self.configuring.is_some(), |d| {
+                        let unsup = os::checkbox("mate-unsuppressed", "Unsuppressed", !self.suppressed);
+                        d.child(self.cfg_param(noshape_model::assembly::config::param::UNSUPPRESSED, unsup, cx))
+                    })
                     .when_some(self.status.clone(), |d, s| d.child(div().p(px(4.)).child(crate::ui::alert(crate::ui::AlertKind::Warning).text_size(px(12.)).child(s)))),
             )
     }

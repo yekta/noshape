@@ -103,7 +103,7 @@ Assembly items not re-checked.
   features after it: all rows stay normal). Onshape greys them (rollback-bar drag does grey them correctly).
 - **Selection stays after editing**: after Sketch 1 edit is accepted, or after clicking Sketch 3 in the list
   for a Hole, the row stays highlighted (selected) indefinitely.
-- **Dimension value box shows "80" without unit** (Onshape: "80 mm", value selected) when re-editing; the new
+- ✅ (skb: sketch 14.47, plain numbers reopen as "80 mm"; the new-dimension box text carries the unit but may be clipped in the narrow box, to check in the GUI) **Dimension value box shows "80" without unit** (Onshape: "80 mm", value selected) when re-editing; the new
   dimension box shows "77.82060542" (unit-less, clipped). (skb owns the box.)
 - **Fillet/chamfer: clicking a short edge often adds nothing and shows "Select faces or edges."** The edge is
   highlighted on hover, but the click resolves to the edge's midpoint (within 8 px, `behaviors.rs::midpoint_pick`)
@@ -141,7 +141,7 @@ Assembly items not re-checked.
 - **View animations are slow**: N (view normal) takes >1.2 s here (Onshape ≈ 0.5 s); measured on llvmpipe.
 
 ### asb (assembly / drawing)
-- **Mate HUD ✓ commits and immediately opens "Revolute 2"** (accept-and-repeat). Onshape's ✓ closes the mate
+- ✅ n/a (live 91–95: Onshape's ✓ does commit and open the next mate) **Mate HUD ✓ commits and immediately opens "Revolute 2"** (accept-and-repeat). Onshape's ✓ closes the mate
   dialog; only Shift+Enter repeats. Please verify live and fix.
 - **Insert dialog**: Part Studio and part rows show generic icons, not 48 px thumbnails; "Inserted: 0" while the
   first instance is following the cursor; a blue toast "Click to place the inserted instance (Esc keeps it where
@@ -149,10 +149,10 @@ Assembly items not re-checked.
 - **Triad** is coloured rings/arrows; Onshape's drag triad is gray-outlined (blue on hover).
 - **Instance context menu** is 342 px wide with 28 px rows (Onshape: 196 px, 22 px rows, 12 px text) and lacks
   Properties…, Instance properties…, Show center of mass, Dynamic suppression ▸.
-- **Stale tooltip over a context menu**: right-click the mate row → the row tooltip "Revolute mate / Offset: off"
+- ✅ (skb: row tooltips gated on `os_menu::is_open`, toolbar rich tooltips hide while a menu is open) **Stale tooltip over a context menu**: right-click the mate row → the row tooltip "Revolute mate / Offset: off"
   stays drawn on top of the menu (covers Rename/Edit…).
-- **Drag readout "Rz -12.232°" stays in the viewport** after the drag ends (still there after Animate…).
-- **Animate dialog**: no "Mate DOF to animate" field, Steps 60 (Onshape 300), Single/Reciprocate/Loop toggles
+- ✅ (skb: live 300–318 show mate values only on the selected mate, never during/after a drag) **Drag readout "Rz -12.232°" stays in the viewport** after the drag ends (still there after Animate…).
+- ✅ (skb: live layout, verified GUI v41) **Animate dialog**: no "Mate DOF to animate" field, Steps 60 (Onshape 300), Single/Reciprocate/Loop toggles
   (Onshape: Playback type ▾ Reciprocate + ↻), title "Animate Revolute 1" (Onshape "Animate mate").
 - **Drawing: Create Drawing from + doesn't open Insert view**; Onshape opens the Insert view panel with the view
   following the cursor. Template table: no default row highlighted.
@@ -165,12 +165,12 @@ Assembly items not re-checked.
   Drawing" modal (File name, Format ▾ PDF/DWG/DXF/DWT/SVG/PNG/JPEG/TIFF…, Version, Text, Color, Options).
 
 ### skb (sketch)
-- **No live values while drawing**: corner rectangle shows no width/height, circle no Ø (Onshape shows them in
+- ✅ (skb: sketch 14.39) **No live values while drawing**: corner rectangle shows no width/height, circle no Ø (Onshape shows them in
   `#449ccd` next to the preview).
-- **Point tool makes filled dots**; Onshape drops hollow points.
-- **Vertical dimension text sits on its dimension line** ("40" overlaps the line); horizontal ones break the
+- ✅ (skb: sketch 14.40) **Point tool makes filled dots**; Onshape drops hollow points.
+- ✅ (skb: sketch 14.41) **Vertical dimension text sits on its dimension line** ("40" overlaps the line); horizontal ones break the
   line around the text.
-- **Just-applied dimension has no tan background** (Onshape highlights it).
+- ✅ (skb: sketch 14.42, it stays selected) **Just-applied dimension has no tan background** (Onshape highlights it).
 
 ### ui (more, sessions 2–5)
 - **Modals are see-through**: the 3D model shows through "Create Drawing" and title-block lines through "Select
@@ -204,6 +204,8 @@ Assembly items not re-checked.
 - Create ▾ menu: "Document…, Folder…, Open file…". Onshape: Document…, Folder…, Import files…, Import from ▸,
   Label….
 - Document list columns: Name | Modified | Location | Size. Onshape: Name | Modified | Modified by | Owned by.
+- ui2 (18 Oct, 21:50): both fixed — Create ▾ = Document…, Folder… | Import files…, Label… ("Import from ▸" lists
+  cloud drives: left out as cloud-only); columns Name | Modified | Modified by | Owned by ("me" for you).
 
 ## Performance (llvmpipe on Xvfb, so GPU-bound numbers are pessimistic)
 - Regeneration is fast: full bracket (15 features) refine 26–64 ms after an edit; first evaluation of Mirror 1

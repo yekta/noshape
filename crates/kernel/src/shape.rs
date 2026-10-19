@@ -282,6 +282,13 @@ impl Shape {
         ffi::is_valid(self.raw()).unwrap_or(false)
     }
 
+    /// Whether faces of the shape intersect each other (BOPAlgo_ArgumentAnalyzer
+    /// self-interference check; BRepCheck doesn't see this, e.g. a sweep whose
+    /// bend is tighter than its profile). ~10 ms on small parts.
+    pub fn self_intersects(&self) -> bool {
+        ffi::self_intersects(self.raw()).unwrap_or(false)
+    }
+
     /// Heal the shape with ShapeFix_Shape (`tolerance <= 0`: default precision).
     pub fn fixed(&self, tolerance: f64) -> Result<Shape> {
         Shape::from_res(ffi::fix_shape(self.raw(), tolerance))

@@ -7,6 +7,9 @@ mod assembly_mate_dialog;
 mod assembly_scene;
 mod assembly_view;
 mod assets;
+mod material_libraries;
+mod release_prefs;
+mod release_thumbs;
 mod derived;
 mod doc_dialogs;
 mod doc_model;
@@ -22,6 +25,20 @@ mod drawing_inspection;
 mod drawing_panels;
 mod drawing_export;
 mod drawing_smart;
+mod drawing_sketch;
+mod drawing_hatch;
+mod drawing_images;
+mod drawing_break;
+mod drawing_aux;
+mod drawing_detail;
+mod drawing_revision;
+mod drawing_view_sketches;
+mod drawing_hide_parts;
+mod drawing_note;
+mod drawing_cells;
+mod drawing_refs;
+mod drawing_color;
+mod file_tab_view;
 mod drawing_props;
 mod drawing_scene;
 mod drawing_section;
@@ -31,26 +48,38 @@ mod drawing_ui;
 mod drawing_view;
 mod feature_dialog;
 mod feature_studio;
+mod fs_notices;
+mod fs_search;
+mod import_dialog;
+mod material_library_view;
 mod files;
 mod gpu;
 mod graphics_prefs;
 mod graphics_prefs_dialog;
 mod history_panel;
+mod doc_panels;
 mod cursor;
 mod os_menu;
+mod os_select;
 mod os_ui;
 mod part_studio;
+mod preferences_window;
+mod properties_dialog;
+mod release_dialog;
 mod scene_builder;
 mod session;
 mod sketch_mode;
 mod start_library;
 mod start_thumbnail;
+mod start_trash;
+mod shortcuts;
 mod start_window;
 mod tab_manager;
 mod theme;
 mod tool_text;
 mod ui;
 mod var_complete;
+mod variable_import;
 mod variable_insert;
 mod variable_studio;
 mod viewport;
@@ -141,6 +170,14 @@ fn apply_theme(cx: &mut App) {
         t.slider_thumb = gpui_kit::rgb(0xffffff).into();
         // Modal backdrop: Bootstrap's 50% black, as Onshape's modals.
         t.overlay = gpui_kit::rgba(0x00000080).into();
+        // Feature Studio code editor (Onshape's Ace editor, help images):
+        // #f0f0f0 gutter, dark line numbers, #ededed current line.
+        let mut code = (*t.highlight_theme).clone();
+        code.style.editor_gutter_background = Some(gpui_kit::rgb(0xf0f0f0).into());
+        code.style.editor_active_line = Some(gpui_kit::rgb(0xededed).into());
+        code.style.editor_line_number = Some(gpui_kit::rgb(0x333333).into());
+        code.style.editor_active_line_number = Some(gpui_kit::rgb(0x333333).into());
+        t.highlight_theme = std::sync::Arc::new(code);
     });
 }
 
@@ -163,9 +200,13 @@ fn main() {
     app.run(move |cx| {
         noshape_render::perf::milestone("GPUI app started");
         gpui_kit::init(cx);
+        // Onshape's text (Chrome) is grayscale anti-aliased, without the
+        // colour fringes of subpixel rendering.
+        cx.set_text_rendering_mode(gpui_kit::TextRenderingMode::Grayscale);
         apply_theme(cx);
         graphics_prefs::init(cx);
         actions::bind_default_keys(cx);
+        feature_studio::bind_keys(cx);
         cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 

@@ -27,7 +27,7 @@ pub fn offset_surface() -> FeatureType {
             "Faces, surfaces, and sketch regions to offset",
             QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY,
         )
-        .hints(Hints::INITIAL_FOCUS),
+        .hints(Hints::INITIAL_FOCUS | Hints::SHOW_CREATE_SELECTION),
         ParamSpec::num("offset", "Offset", ZERO_INCLUSIVE_OFFSET).hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::flip("oppositeDirection", "Opposite offset direction"),
     ];
@@ -49,7 +49,9 @@ pub fn fill() -> FeatureType {
                 ParamSpec::query("adjacentFaces", "Adjacent faces", QueryFilter::ANY_FACE).visible(|v| !v.is("continuity", "G0")),
             ],
         )
-        .hints(Hints::INITIAL_FOCUS),
+        // fillSurface.fs: a driven query with the Create selection button.
+        .hints(Hints::INITIAL_FOCUS | Hints::DRIVEN_QUERY | Hints::SHOW_CREATE_SELECTION)
+        .item_template("[#continuity] #entities"),
         ParamSpec::bool("addGuides", "Guides", false).hints(Hints::GROUP_HEADER),
         ParamSpec::query("guideEntities", "Vertices or curves", QueryFilter::VERTEX | CURVES).visible(|v| v.bool("addGuides")),
         ParamSpec::enum_("constraintMode", "Mode", &[("PRECISE", "Precise"), ("SAMPLED", "Sampled")]).visible(|v| v.bool("addGuides")),

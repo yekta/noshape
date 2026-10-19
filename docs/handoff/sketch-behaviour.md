@@ -96,11 +96,11 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 
 ## How to test
 
-* Sketch crate: `CARGO_TARGET_DIR=/root/target-skb cargo test -p noshape-sketch`
+* Sketch crate: `CARGO_TARGET_DIR=/root/target-shared cargo test -p noshape-sketch`
   (`crates/sketch/tests/onshape_ux.rs` has the behaviour tests; `inference.rs` and `dxf.rs`
   have unit tests).
 * Model: `cargo test -p noshape-model --lib text_expression image_tests`.
-* App editor (headless, no GPU): `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-skb
+* App editor (headless, no GPU): `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-shared
   cargo test -p noshape --bin noshape sketch_mode`. Helpers `click`, `drag`, `editor(tool)`
   drive `SketchEditor::tool_down/tool_drag/tool_up/pointer_move` exactly like the view.
 * GUI: `tools/sketch-ui/` (copies of `/root/skb-scripts`). Start your own Xvfb
@@ -125,7 +125,7 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
   view_tools, analysis, appearance).
 * `cargo clippy --workspace` may fail in other agents' crates; lint your code with
   `cargo clippy -p noshape-sketch -p noshape --no-deps --all-targets -- -D warnings`.
-* A new sketch starts with the Line tool active: pressing `l` then toggles it off.
+* (Superseded 2026-10-19) A new sketch now starts with no tool active, per live sketch/00, 01, 44.
 * `SketchData` fields are compared in its manual `PartialEq`: add new fields there.
 * Ellipse axes are stored as radii but shown/typed as diameters
   (`ConstraintKind::display_scale`); expressions are stored in the shown scale and
@@ -133,7 +133,7 @@ Implemented and compiling, mostly covered by crate tests; GUI not yet re-verifie
 
 ## skb continuation — 2026-10-18
 
-- Working on DISPLAY=:103, CARGO_TARGET_DIR=/root/target-skb. No commits/pushes.
+- Working on DISPLAY=:103, CARGO_TARGET_DIR=/root/target-shared. No commits/pushes.
 - Both requested test commands started; cold dependency compilation in progress.
 - Added circular-pattern solver links (points, circle radii, ellipse axes/sizes),
   shared draggable construction center, and center recovery when editing a pattern.
@@ -386,3 +386,22 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   Pierce, 14.3 Shift, 14.10 fast trim, 14.37 use glyph + unlink. Left: 3.13 (match the
   live "Customize keyboard shortcuts" page once captured), 14.38 (used geometry colour,
   ui2), Select ▸ items with nothing selected (live capture pending).
+
+## skb run 3 (2026-10-19)
+* Verified in GUI :103 against the live answers: "Escape line" menu (14.43), Select ▸ with nothing selected =
+  Create selection… only (14.44), the two-step Esc with the menu open (14.45), L clears the selection (14.46,
+  new unit test `choosing_a_drawing_tool_clears_the_selection`), Customize keyboard shortcuts → Preferences
+  window (3.13). Fixed: the separator before Select ▸ in the nothing-selected sketch menu.
+* QA3 sketch items (live values, hollow points, dimension text placement, applied-dimension highlight) were
+  already done by the previous run (14.39–14.42).
+* Builds now go to the shared `/root/target-shared` (TEAM-RULES); copy the binary to /tmp/skb/noshape.
+* Lead / ui pixel pass: a new sketch starts with no tool active (part_studio/sketch.rs, `start_sketch`
+  path) and the empty sketch frame is 200 x 112.5 mm (`EMPTY_SKETCH_BOX_HALF_HEIGHT`, sketch_mode.rs
+  `sketch_box`); live confirmation requested in REQUESTS.md.
+
+## skb run 4 (2026-10-19 afternoon)
+* QA3 "dimension value box shows 80 without unit": `dimension_edit_text` now formats plain-number
+  expressions with the document unit ("80" → "80 mm"); real expressions ("2 * 15 mm", "#w") keep their text.
+  Row 14.47; the extended test `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value` checks it.
+* The dimension box text now uses 6 decimals for lengths and 7 for angles (live sketch/13, 141, 143), so the
+  unit fits the 100 px input; Enter on an untouched box closes it without re-applying the rounded value.

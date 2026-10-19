@@ -50,7 +50,9 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             let e = ev.edge_shape(bi, ei).ok()?;
             let info = e.edge_info().ok()?;
             match info.curve {
-                k::Curve::Circle { center, axis, .. } => Some(mk(center, axis)),
+                // Arcs and circles: the center, except an arc's midpoint
+                // (Onshape offers center, midpoint and ends on an arc).
+                k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex) => Some(mk(center, axis)),
                 _ => {
                     let mid = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
                     let p = if matches!(inference, Inference::Vertex) { info.start } else { mid };
@@ -58,6 +60,18 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
                     Some(mk(p, t))
                 }
             }
+        }
+        // A sketch curve's midpoint (picked outside the sketch, like an edge's).
+        Reference::SketchEntity { sketch, entity } if ev.ctx.sketch(*sketch).is_some_and(|s| s.sketch.curve(noshape_sketch::EntityId(*entity)).is_some()) => {
+            let s = ev.ctx.sketch(*sketch)?;
+            let c = s.sketch.curve(noshape_sketch::EntityId(*entity))?;
+            let seg = super::features::extrude::curve_to_segment(&c)?;
+            let e = k::make_edge_2d(&super::eval::kernel_plane(&s.frame), &seg).ok()?;
+            let info = e.edge_info().ok()?;
+            let u = (info.first_param + info.last_param) * 0.5;
+            let mid = e.point_at(u).ok()?;
+            let t = e.tangent_at(u).ok().unwrap_or(DVec3::X);
+            Some(mk(mid, t))
         }
         Reference::Vertex(_) | Reference::SketchEntity { .. } => {
             let p = ev.raw_vertex_point(on)?;

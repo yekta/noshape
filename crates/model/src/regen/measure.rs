@@ -204,3 +204,77 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
         inertia,
     })
 }
+
+/// Distance between two entities for a Measured variable (variable.fs):
+/// the length and the vector from the first entity to the second.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EntityDistance {
+    pub distance: f64,
+    pub delta: glam::DVec3,
+}
+
+/// Minimum (or, with `maximum`, the largest) distance between the shapes of
+/// two references. The maximum is taken over points sampled on both (their
+/// vertices, mesh nodes and edge polylines).
+pub fn entity_distance(ctx: &Context, a: &Reference, b: &Reference, maximum: bool) -> Option<EntityDistance> {
+    let (sa, sb) = (resolve_shapes(ctx, a), resolve_shapes(ctx, b));
+    if sa.is_empty() || sb.is_empty() {
+        return None;
+    }
+    if !maximum {
+        let mut best: Option<EntityDistance> = None;
+        for x in &sa {
+            for y in &sb {
+                if let Ok(d) = k::distance(x, y)
+                    && best.is_none_or(|b| d.distance < b.distance)
+                {
+                    best = Some(EntityDistance { distance: d.distance, delta: d.point_b - d.point_a });
+                }
+            }
+        }
+        return best;
+    }
+    let (pa, pb) = (sample_points(&sa), sample_points(&sb));
+    let mut best: Option<EntityDistance> = None;
+    for p in &pa {
+        for q in &pb {
+            let d = q.distance(*p);
+            if best.is_none_or(|b| d > b.distance) {
+                best = Some(EntityDistance { distance: d, delta: *q - *p });
+            }
+        }
+    }
+    best
+}
+
+fn sample_points(shapes: &[Shape]) -> Vec<glam::DVec3> {
+    let mut out = Vec::new();
+    for s in shapes {
+        out.extend(s.sub_shapes(ShapeType::Vertex).iter().filter_map(|v| v.vertex_point().ok()));
+        if let Ok(t) = k::tessellate(s, 1e-4, 0.2, false) {
+            out.extend(t.positions.iter().map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)));
+            out.extend(t.edge_points.iter().map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)));
+        }
+    }
+    out
+}
+
+/// Total length of the edges (and wire bodies) of `refs`.
+pub fn total_length(ctx: &Context, refs: &[Reference]) -> f64 {
+    refs.iter().flat_map(|r| resolve_shapes(ctx, r)).flat_map(|s| if s.shape_type() == ShapeType::Edge { vec![s] } else { s.sub_shapes(ShapeType::Edge) }).filter_map(|e| e.length().ok()).sum()
+}
+
+/// Diameter of a circular edge, cylinder or sphere.
+pub fn entity_diameter(ctx: &Context, r: &Reference) -> Option<f64> {
+    resolve_shapes(ctx, r).iter().find_map(|s| match s.shape_type() {
+        ShapeType::Edge => match s.edge_curve().ok()? {
+            k::Curve::Circle { radius, .. } => Some(2.0 * radius),
+            _ => None,
+        },
+        ShapeType::Face => match s.face_surface().ok()? {
+            k::Surface::Cylinder { radius, .. } | k::Surface::Sphere { radius, .. } => Some(2.0 * radius),
+            _ => None,
+        },
+        _ => None,
+    })
+}

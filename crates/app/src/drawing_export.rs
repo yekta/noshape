@@ -21,7 +21,9 @@ use std::rc::Rc;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DrawingFormat {
     Pdf,
+    Dwg,
     Dxf,
+    Dwt,
     Svg,
     Png,
     Jpeg,
@@ -31,11 +33,13 @@ pub enum DrawingFormat {
 }
 
 impl DrawingFormat {
-    pub const ALL: [DrawingFormat; 8] = [DrawingFormat::Pdf, DrawingFormat::Dxf, DrawingFormat::Svg, DrawingFormat::Png, DrawingFormat::Jpeg, DrawingFormat::Tiff, DrawingFormat::InspectionList, DrawingFormat::DefinitionList];
+    pub const ALL: [DrawingFormat; 10] = [DrawingFormat::Pdf, DrawingFormat::Dwg, DrawingFormat::Dxf, DrawingFormat::Dwt, DrawingFormat::Svg, DrawingFormat::Png, DrawingFormat::Jpeg, DrawingFormat::Tiff, DrawingFormat::InspectionList, DrawingFormat::DefinitionList];
     pub fn label(self) -> &'static str {
         match self {
             DrawingFormat::Pdf => "PDF",
+            DrawingFormat::Dwg => "DWG",
             DrawingFormat::Dxf => "DXF",
+            DrawingFormat::Dwt => "DWT",
             DrawingFormat::Svg => "SVG",
             DrawingFormat::Png => "PNG",
             DrawingFormat::Jpeg => "JPEG",
@@ -47,7 +51,9 @@ impl DrawingFormat {
     pub fn ext(self) -> &'static str {
         match self {
             DrawingFormat::Pdf => "pdf",
+            DrawingFormat::Dwg => "dwg",
             DrawingFormat::Dxf => "dxf",
+            DrawingFormat::Dwt => "dwt",
             DrawingFormat::Svg => "svg",
             DrawingFormat::Png => "png",
             DrawingFormat::Jpeg => "jpg",
@@ -57,6 +63,10 @@ impl DrawingFormat {
     }
     fn raster(self) -> bool {
         matches!(self, DrawingFormat::Png | DrawingFormat::Jpeg | DrawingFormat::Tiff)
+    }
+    /// DWG, DXF and DWT share Text, Units and the CAD checkboxes.
+    fn cad(self) -> bool {
+        matches!(self, DrawingFormat::Dwg | DrawingFormat::Dxf | DrawingFormat::Dwt)
     }
     fn csv(self) -> bool {
         matches!(self, DrawingFormat::InspectionList | DrawingFormat::DefinitionList)
@@ -71,7 +81,7 @@ const DXF_TEXT: [&str; 3] = ["Export as text", "Explode into polylines (notes)",
 const COLOR: [&str; 3] = ["Color", "Black and white", "Grayscale"];
 /// DXF Units: the drawing's, or another (INSUNITS code).
 const UNITS: [(&str, u8); 6] = [("Drawing units", 0), ("Millimeters", 4), ("Centimeters", 5), ("Meters", 6), ("Inches", 1), ("Feet", 2)];
-const OPTIONS: [&str; 1] = ["Download"];
+const OPTIONS: [&str; 3] = ["Download", "Download and store…", "Store file in a new tab"];
 
 /// The modal's settings.
 #[derive(Clone, Debug)]
@@ -88,11 +98,13 @@ pub struct ExportSettings {
     pub z_zero: bool,
     pub hide_inspection: bool,
     pub exclude_off_sheet: bool,
+    /// Options: 0 Download, 1 Download and store, 2 Store file in a new tab.
+    pub options: usize,
 }
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false }
+        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0 }
     }
 }
 
@@ -154,11 +166,18 @@ impl DrawingEditor {
             if f == DrawingFormat::Pdf {
                 body = body.child(select("ex-version", "Version", strs(&PDF_VERSIONS), s.version, |s, i| s.version = i));
             }
-            if f == DrawingFormat::Dxf {
-                // The DXF writer emits AutoCAD R12 (AC1009).
-                body = body.child(select("ex-version", "Version", vec!["R12".into()], 0, |s, i| s.version = i));
+            if f.cad() {
+                // DWT is always written as 2013 (Onshape).
+                let mut versions: Vec<String> = noshape_model::drawing::cad_export::VERSIONS.iter().map(|v| v.0.to_string()).collect();
+                if f == DrawingFormat::Dxf {
+                    versions.push("R12".into());
+                }
+                if f == DrawingFormat::Dwt {
+                    versions = vec!["2013".into()];
+                }
+                body = body.child(select("ex-version", "Version", versions, s.version, |s, i| s.version = i));
             }
-            if !f.csv() && sheet_count > 1 {
+            if !f.csv() && f != DrawingFormat::Dwt && sheet_count > 1 {
                 body = body.child(select("ex-sheets", "Sheets", strs(&SHEETS), s.sheets, |s, i| s.sheets = i));
                 if s.sheets == 2 {
                     body = body.child(div().pt(px(6.)).child(Input::new(&custom).h(px(34.)).text_size(px(14.))));
@@ -169,26 +188,26 @@ impl DrawingEditor {
             }
             match f {
                 DrawingFormat::Pdf => body = body.child(select("ex-text", "Text", strs(&PDF_TEXT), s.text, |s, i| s.text = i)),
-                DrawingFormat::Dxf => body = body.child(select("ex-text", "Text", strs(&DXF_TEXT), s.text, |s, i| s.text = i)),
+                DrawingFormat::Dwg | DrawingFormat::Dxf | DrawingFormat::Dwt => body = body.child(select("ex-text", "Text", strs(&DXF_TEXT), s.text, |s, i| s.text = i)),
                 _ => {}
             }
             if f == DrawingFormat::Pdf || f.raster() {
                 body = body.child(select("ex-color", "Color", strs(&COLOR), s.color, |s, i| s.color = i));
             }
-            if f == DrawingFormat::Dxf {
+            if matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) {
                 body = body.child(select("ex-units", "Units", UNITS.iter().map(|u| u.0.to_string()).collect(), s.units, |s, i| s.units = i));
             }
-            body = body.child(select("ex-options", "Options", strs(&OPTIONS), 0, |_, _| {}));
+            body = body.child(select("ex-options", "Options", strs(&OPTIONS), s.options, |s, i| s.options = i));
             if !f.csv() && f != DrawingFormat::Pdf {
                 body = body.child(div().pt(px(6.)).child(check("ex-splines", "Export splines as polylines", s.splines, |s, v| s.splines = v)));
             }
-            if f == DrawingFormat::Dxf {
+            if f.cad() {
                 body = body.child(check("ex-z", "Set z-height to zero and normals to positive", s.z_zero, |s, v| s.z_zero = v));
             }
             if !f.csv() {
                 body = body.child(div().pt(px(6.)).child(check("ex-hide-insp", "Hide inspection items", s.hide_inspection, |s, v| s.hide_inspection = v)));
             }
-            if f == DrawingFormat::Dxf {
+            if f.cad() {
                 body = body.child(check("ex-offsheet", "Exclude off-sheet content", s.exclude_off_sheet, |s, v| s.exclude_off_sheet = v));
             }
             let (st2, file2, custom2, ed2) = (st.clone(), file.clone(), custom.clone(), ed.clone());
@@ -212,6 +231,8 @@ impl DrawingEditor {
         let count = self.drawing.sheets.len();
         let sheets: Vec<usize> = match s.sheets {
             _ if s.format.csv() => vec![],
+            // DWT: sheets 1 and 2 (the second is the continuation template).
+            _ if s.format == DrawingFormat::Dwt => (0..count.min(2)).collect(),
             1 => vec![self.sheet],
             2 => parse_sheet_range(&s.custom, count),
             _ => (0..count).collect(),
@@ -221,23 +242,49 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        let zip = s.format != DrawingFormat::Pdf && sheets.len() > 1;
+        let zip = !matches!(s.format, DrawingFormat::Pdf | DrawingFormat::Dwt) && sheets.len() > 1;
         let ext = if zip { "zip" } else { s.format.ext() };
+        // Store file in a new tab: no download.
+        if s.options == 2 {
+            self.write_export_with(s, sheets, name, None, cx);
+            return;
+        }
         let this = cx.entity().downgrade();
         crate::files::request_save_path("Export drawing", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
-            this.update(cx, |this, cx| this.write_export_with(s, sheets, name, path, cx)).ok();
+            this.update(cx, |this, cx| this.write_export_with(s, sheets, name, Some(path), cx)).ok();
         });
     }
 
-    fn write_export_with(&mut self, s: ExportSettings, sheets: Vec<usize>, name: String, path: PathBuf, cx: &mut Context<Self>) {
+    /// Download (write to `path`) and / or store the exported file in a new
+    /// file tab after the drawing (Options).
+    fn deliver(&mut self, file_name: String, bytes: Vec<u8>, path: Option<&PathBuf>, store: bool, cx: &mut Context<Self>) -> Result<String, String> {
+        if let Some(p) = path {
+            std::fs::write(p, &bytes).map_err(|e| e.to_string())?;
+        }
+        if store {
+            let tab = self.tab;
+            self.doc.update(cx, |d, cx| {
+                d.edit_document(&format!("Store {file_name}"), cx, |d| {
+                    crate::file_tab_view::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file_name, &bytes, noshape_model::file_tab::now()), None, Some(tab));
+                })
+            });
+        }
+        Ok(match (path, store) {
+            (Some(p), true) => format!("Export completed: {} (also stored in a new tab)", p.display()),
+            (Some(p), false) => format!("Export completed: {}", p.display()),
+            _ => format!("Export completed: {file_name} stored in a new tab"),
+        })
+    }
+
+    fn write_export_with(&mut self, s: ExportSettings, sheets: Vec<usize>, name: String, path: Option<PathBuf>, cx: &mut Context<Self>) {
         let f = s.format;
+        let store = s.options >= 1;
+        let zip = !matches!(f, DrawingFormat::Pdf | DrawingFormat::Dwt) && sheets.len() > 1;
+        let file_name = format!("{name}.{}", if zip { "zip" } else { f.ext() });
         if f.csv() {
             let csv = noshape_model::drawing::inspection::rows_csv(&self.inspection_rows(f == DrawingFormat::DefinitionList));
-            self.status = Some(match std::fs::write(&path, csv) {
-                Ok(()) => format!("Exported {}", path.display()),
-                Err(e) => format!("Export failed: {e}"),
-            }
-            .into());
+            let done = self.deliver(file_name, csv.into_bytes(), path.as_ref(), store, cx);
+            self.status = Some(done.unwrap_or_else(|e| format!("Export failed: {e}")).into());
             cx.notify();
             return;
         }
@@ -245,6 +292,22 @@ impl DrawingEditor {
         if s.hide_inspection {
             drawing.props.hide_inspection = true;
         }
+        if f == DrawingFormat::Dwt {
+            // A template keeps the formats only: no views, no Drawing layer
+            // (annotations and tables).
+            for sh in drawing.sheets.iter_mut() {
+                sh.views.clear();
+                sh.annotations.clear();
+                sh.tables.clear();
+            }
+        }
+        // DWG / DXF versions (DXF's last entry is our R12 writer); DWT is 2013.
+        let versions = noshape_model::drawing::cad_export::VERSIONS;
+        let cad_version = match f {
+            DrawingFormat::Dwt => Some(acadrust_2013()),
+            DrawingFormat::Dwg | DrawingFormat::Dxf => versions.get(s.version).map(|v| v.1),
+            _ => None,
+        };
         let sources = self.sources.clone();
         let cache = self.cache.clone();
         let info = self.info.clone();
@@ -263,7 +326,7 @@ impl DrawingEditor {
                     for &i in &sheets {
                         let built = render_sheet_with(&drawing, i, &sources, &cache, true, &info).ok_or("nothing to export")?;
                         // Explode notes: texts picked as notes.
-                        let explode: Vec<usize> = if f == DrawingFormat::Dxf && s.text == 1 {
+                        let explode: Vec<usize> = if f.cad() && s.text == 1 {
                             let sheet = &drawing.sheets[i];
                             built
                                 .geometry
@@ -277,24 +340,37 @@ impl DrawingEditor {
                             vec![]
                         };
                         let opts = ExportOptions {
-                            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f == DrawingFormat::Dxf && s.text == 2) || f.raster(),
-                            strokes: f == DrawingFormat::Dxf,
+                            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text == 2) || f.raster(),
+                            strokes: f.cad(),
                             explode,
                             underline_overrides: s.overridden == 0,
                             exclude_off_sheet: s.exclude_off_sheet,
+                            color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
                         };
-                        pages.push((drawing.sheets[i].name.clone(), export::prepare(&built.geometry, &opts)));
+                        let mut geo = export::prepare(&built.geometry, &opts);
+                        // PDF embeds decoded image pixels.
+                        if f == DrawingFormat::Pdf {
+                            for im in &mut geo.images {
+                                im.rgb = crate::drawing_images::decode_rgb(&im.data_base64);
+                            }
+                        }
+                        pages.push((drawing.sheets[i].name.clone(), geo));
                     }
                     let files: Vec<(String, Vec<u8>)> = match f {
                         DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS[s.version]))],
-                        DrawingFormat::Dxf => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
+                        DrawingFormat::Dxf => match cad_version {
+                            Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                            None => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
+                        },
+                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg(g, insunits, cad_version.unwrap_or(versions[0].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                        DrawingFormat::Dwt => vec![(String::new(), noshape_model::drawing::cad_export::to_dwg_pages(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), insunits, acadrust_2013())?)],
                         _ => pages.iter().map(|(n, g)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
                     };
                     Ok(files)
                 })
                 .await;
             this.update(cx, |this, cx| {
-                let done = result.and_then(|files| {
+                let done = result.and_then(|files| -> Result<String, String> {
                     let files = if f.raster() { files.into_iter().map(|(n, svg)| Ok((n, rasterize(&svg, f, cx)?))).collect::<Result<Vec<_>, String>>()? } else { files };
                     let bytes = if files.len() == 1 {
                         files.into_iter().next().map(|f| f.1).unwrap_or_default()
@@ -302,12 +378,9 @@ impl DrawingEditor {
                         let named: Vec<(String, Vec<u8>)> = files.into_iter().map(|(sheet, b)| (format!("{name} - {sheet}.{}", f.ext()), b)).collect();
                         export::zip_store(&named)
                     };
-                    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+                    this.deliver(file_name.clone(), bytes, path.as_ref(), store, cx)
                 });
-                this.status = Some(match done {
-                    Ok(()) => format!("Export completed: {}", path.display()).into(),
-                    Err(e) => format!("Export failed: {e}").into(),
-                });
+                this.status = Some(done.unwrap_or_else(|e| format!("Export failed: {e}")).into());
                 cx.notify();
             })
             .ok();
@@ -323,7 +396,7 @@ fn rasterize(svg: &[u8], f: DrawingFormat, cx: &App) -> Result<Vec<u8>, String> 
     let size = img.size(0);
     let bgra = img.as_bytes(0).ok_or("no image")?;
     let mut rgba = bgra.to_vec();
-    for px in rgba.chunks_exact_mut(4) {
+    for px in rgba.as_chunks_mut::<4>().0 {
         px.swap(0, 2);
     }
     let buf = image::RgbaImage::from_raw(size.width.0 as u32, size.height.0 as u32, rgba).ok_or("bad image size")?;
@@ -347,4 +420,9 @@ mod tests {
         assert_eq!(parse_sheet_range("3-1 9", 4), vec![0, 1, 2]);
         assert!(parse_sheet_range("x", 3).is_empty());
     }
+}
+
+/// AutoCAD 2013 (DWT exports always use it).
+fn acadrust_2013() -> noshape_model::drawing::cad_export::CadVersion {
+    noshape_model::drawing::cad_export::VERSIONS[1].1
 }

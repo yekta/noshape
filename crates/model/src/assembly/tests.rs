@@ -116,6 +116,8 @@ fn part_instance(id: u64, name: &str, studio: TabId, body: BodyId, at: DVec3, fi
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
         best_tessellation: false,
+        reference_designator: None,
+        unsuppressed_if: None,
     }
 }
 
@@ -178,6 +180,37 @@ fn two_blocks_fastened_face_to_face() {
     let p = res.solved.placement(InstanceId(2)).unwrap();
     let q = DQuat::from_xyzw(p.rotation[0], p.rotation[1], p.rotation[2], p.rotation[3]);
     assert!((q * DVec3::Z).z < -0.999, "flipped orientation {:?}", q * DVec3::Z);
+}
+
+#[test]
+fn a_mate_being_defined_is_solved_alone_until_solve() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    // Block 3 already sits on block 2 (mate 11); the new mate 10 puts 2 on 1.
+    let at2 = DVec3::new(0.07, 0.03, -0.02);
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), at2, false),
+            part_instance(3, "Block <3>", f.studios[0], body.clone(), at2 + DVec3::new(0.0, 0.0, 0.01), false),
+        ],
+        mates: vec![
+            mate(11, MateType::Fastened, conn(2, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid)),
+            mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid)),
+        ],
+        ..Default::default()
+    };
+    // Before Solve: only mate 10 moves block 2; block 3 stays, mate 11 reports ok.
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions { only_mate: Some(MateId(10)), ..Default::default() }, None);
+    assert!((origin_of(&res, 2) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-6, "{:?}", origin_of(&res, 2));
+    assert!((origin_of(&res, 3) - (at2 + DVec3::new(0.0, 0.0, 0.01))).length() < 1e-9, "{:?}", origin_of(&res, 3));
+    assert!(res.mates.iter().all(|m| m.ok));
+    // Solve (and accepting): every mate, so block 3 follows.
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!((origin_of(&res, 3) - DVec3::new(0.0, 0.0, 0.02)).length() < 1e-6, "{:?}", origin_of(&res, 3));
 }
 
 #[test]
@@ -302,7 +335,7 @@ fn sub_assembly_and_nested_mate() {
         mates: vec![mate(10, MateType::Fastened, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid))],
         ..Default::default()
     };
-    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(sub));
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
     // Top: a fixed block and the sub-assembly fastened onto it by its upper block's top face.
     let top_asm = Assembly {
         instances: vec![
@@ -310,7 +343,7 @@ fn sub_assembly_and_nested_mate() {
             Instance {
                 id: InstanceId(5),
                 name: "Sub <1>".into(),
-                source: InstanceSource::Assembly { assembly: sub_tab },
+                source: InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() },
                 placement: Placement { translation: [0.2, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] },
                 fixed: false,
                 hidden: false,
@@ -318,6 +351,8 @@ fn sub_assembly_and_nested_mate() {
                 lock: SubassemblyLock::Flexible,
                 nested: Vec::new(),
                 best_tessellation: false,
+                reference_designator: None,
+                unsuppressed_if: None,
             },
         ],
         mates: vec![mate(
@@ -1330,7 +1365,7 @@ fn instances_from_other_documents() {
     let mut asm = Assembly {
         instances: vec![
             part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true),
-            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false },
+            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None },
         ],
         mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
         ..Default::default()
@@ -1609,7 +1644,7 @@ fn move_to_new_subassembly_and_dissolve_keep_positions() {
     };
     let before = world(&ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None));
     let mut parent = asm.clone();
-    let sub_tab = f.doc.add_tab("Assembly 2", TabContent::Assembly(Assembly::default()));
+    let sub_tab = f.doc.add_tab("Assembly 2", TabContent::Assembly(Box::default()));
     let (sub, sub_id) = parent.move_to_new_subassembly(&[InstanceId(2), InstanceId(3)], sub_tab, "Assembly 2");
     assert_eq!(parent.instances.len(), 2);
     assert_eq!(parent.instance(sub_id).unwrap().name, "Assembly 2 <1>");
@@ -1618,7 +1653,7 @@ fn move_to_new_subassembly_and_dissolve_keep_positions() {
     let m = parent.mate(MateId(10)).unwrap();
     assert_eq!((m.b.instance, m.b.path.clone()), (sub_id, vec![InstanceId(2)]), "parent mate reaches into the subassembly");
     if let Some(t) = f.doc.tabs.iter_mut().find(|t| t.id == sub_tab) {
-        t.content = TabContent::Assembly(sub.clone());
+        t.content = TabContent::Assembly(Box::new(sub.clone()));
     }
     let res = ev.evaluate(&f.doc, &parent, &SolveOptions::default(), None);
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
@@ -1733,8 +1768,8 @@ fn flexible_subassembly_moves_in_parent_and_locks() {
         named_positions: vec![NamedPosition { name: "Up".into(), placements: vec![], mate_values: vec![(MateId(10), [0.0, 0.0, 0.0, 0.03])] }],
         ..Default::default()
     };
-    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(sub));
-    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab }, Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] });
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] });
     sub_inst.lock = SubassemblyLock::Flexible;
     let mut asm = Assembly {
         instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), sub_inst],
@@ -1811,11 +1846,11 @@ fn drop_instances_into_a_subassembly() {
     let top = face_with(&r, "CapEnd");
     let bottom = face_with(&r, "CapStart");
     let sub_content = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true)], ..Default::default() };
-    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(sub_content.clone()));
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub_content.clone())));
     let mut asm = Assembly {
         instances: vec![
             part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
-            Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab }, Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }),
+            Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }),
             part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.01), false),
             part_instance(3, "Block <3>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.02), false),
         ],
@@ -1837,7 +1872,7 @@ fn drop_instances_into_a_subassembly() {
     let m = asm.mate(MateId(10)).unwrap();
     assert_eq!((m.b.instance, m.b.path.clone()), (InstanceId(5), vec![new[0]]));
     if let Some(t) = f.doc.tabs.iter_mut().find(|t| t.id == sub_tab) {
-        t.content = TabContent::Assembly(sub);
+        t.content = TabContent::Assembly(Box::new(sub));
     }
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
@@ -2053,4 +2088,397 @@ fn best_available_tessellation_refines_only_flagged_instances() {
     assert!(!json.contains("best_tessellation"));
     let back: Instance = serde_json::from_str(&serde_json::to_string(&asm.instances[1]).unwrap()).unwrap();
     assert!(back.best_tessellation);
+}
+
+#[test]
+fn sketch_instances_are_wire_occurrences_with_edges() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let r = ev.studio(&f.doc, f.studios[0], &ConfigValues::default()).unwrap();
+    let sketch = r.context.sketches[0].feature;
+    let asm = Assembly {
+        instances: vec![Instance::new(InstanceId(1), "Sketch 1 <1>".into(), InstanceSource::Sketch { studio: f.studios[0], sketch, config: ConfigValues::default() }, Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] })],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[0].error.is_none(), "{:?}", res.nodes[0].error);
+    let occ = &res.occurrences[0];
+    assert_eq!(occ.kind, crate::display::BodyKind::Wire);
+    assert_eq!(occ.edge_refs.len(), 4, "the rectangle's four lines");
+    assert_eq!(occ.mesh.edges.len(), 4, "drawable edge polylines");
+    // The region fill (live assembly/123): triangles, but no pickable faces.
+    assert!(!occ.mesh.indices.is_empty(), "the sketch region is filled");
+    assert!(occ.mesh.face_ranges.is_empty() && occ.face_refs.is_empty(), "no faces");
+    // Placed with its instance.
+    let p = occ.transform.transform_point3(DVec3::ZERO);
+    assert!((p.x - 0.1).abs() < 1e-9);
+    // A mate connector on one of its edges resolves.
+    let c = conn(1, occ.edge_refs[0].clone(), Inference::Midpoint);
+    let mut asm2 = asm.clone();
+    asm2.instances[0].fixed = true;
+    asm2.connectors.push(crate::assembly::AsmMateConnector::new(MateId(5), "Mate connector 1".into(), c));
+    let res = ev.evaluate(&f.doc, &asm2, &SolveOptions::default(), None);
+    let mc = res.connectors.iter().find(|c| c.id == MateId(5)).expect("connector status");
+    assert!(mc.local.is_some(), "the connector on the sketch edge resolves");
+}
+
+#[test]
+fn dynamic_suppression_suppresses_while_the_expression_is_false() {
+    let f = doc_with(vec![pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (pin, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Pin <1>", f.studios[0], pin.clone(), DVec3::ZERO, true),
+            part_instance(2, "Pin <2>", f.studios[0], pin, DVec3::new(0.05, 0.0, 0.0), false),
+        ],
+        ..Default::default()
+    };
+    let count = |ev: &mut AssemblyEvaluator, asm: &Assembly| ev.evaluate(&f.doc, asm, &SolveOptions::default(), None).occurrences.len();
+    assert_eq!(count(&mut ev, &asm), 2);
+    asm.instances[1].unsuppressed_if = Some("1 > 2".into());
+    assert_eq!(count(&mut ev, &asm), 1, "false expression suppresses the instance");
+    asm.instances[1].unsuppressed_if = Some("3 > 2".into());
+    assert_eq!(count(&mut ev, &asm), 2);
+    // An expression that doesn't evaluate leaves the instance as it is.
+    asm.instances[1].unsuppressed_if = Some("#nope".into());
+    assert_eq!(count(&mut ev, &asm), 2);
+}
+
+#[test]
+fn dynamic_suppression_applies_to_mates() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false),
+        ],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    let inactive = |ev: &mut AssemblyEvaluator, asm: &Assembly| ev.evaluate(&f.doc, asm, &SolveOptions::default(), None).mates[0].inactive;
+    assert!(!inactive(&mut ev, &asm));
+    asm.mates[0].unsuppressed_if = Some("0".into());
+    assert!(inactive(&mut ev, &asm), "a false expression suppresses the mate");
+    asm.mates[0].unsuppressed_if = Some("1".into());
+    assert!(!inactive(&mut ev, &asm));
+}
+
+#[test]
+fn bom_flattened_structured_exclusion_and_cell_edits() {
+    use super::bom::{self, BomColumn, BomSettings, BomType};
+    let mut f = doc_with(vec![block_studio(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (block, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, _) = body_of(&mut ev, &f.doc, f.studios[1]);
+    // Subassembly: two pins.
+    let sub = Assembly {
+        instances: vec![
+            part_instance(1, "Pin <1>", f.studios[1], pin.clone(), DVec3::ZERO, true),
+            part_instance(2, "Pin <2>", f.studios[1], pin.clone(), DVec3::new(0.05, 0.0, 0.0), true),
+        ],
+        ..Default::default()
+    };
+    let sub_tab = f.doc.add_tab("Assembly 2", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = part_instance(5, "Assembly 2 <1>", f.studios[0], block.clone(), DVec3::new(0.2, 0.0, 0.0), true);
+    sub_inst.source = InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() };
+    let top = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], block.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], block.clone(), DVec3::new(0.1, 0.0, 0.0), true),
+            sub_inst,
+        ],
+        ..Default::default()
+    };
+    let top_tab = f.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(top.clone())));
+    let res = ev.evaluate(&f.doc, &top, &SolveOptions::default(), None);
+    let mut s = BomSettings::default();
+    assert_eq!(s.columns, BomColumn::DEFAULT.to_vec(), "Item | Quantity | Part number | Description");
+
+    // Flattened: block x2, pin x2 (the subassembly's parts).
+    let flat = bom::lines(&f.doc, top_tab, &res, &s);
+    let summary: Vec<(Option<String>, usize)> = flat.iter().map(|l| (l.item.clone(), l.quantity)).collect();
+    assert_eq!(summary, vec![(Some("1".into()), 2), (Some("2".into()), 2)]);
+    assert!(matches!(flat[1].source, bom::BomSource::Part { studio, .. } if studio == f.studios[1]));
+
+    // Structured: block x2, Assembly 2 x1 with 2.1 pins x2.
+    s.bom_type = BomType::Structured;
+    let st = bom::lines(&f.doc, top_tab, &res, &s);
+    let summary: Vec<(String, usize, usize)> = st.iter().map(|l| (l.item.clone().unwrap(), l.depth, l.quantity)).collect();
+    assert_eq!(summary, vec![("1".into(), 0, 2), ("2".into(), 0, 1), ("2.1".into(), 1, 2)]);
+    assert_eq!(st[1].name, "Assembly 2");
+    assert!(st[1].has_children);
+
+    // Subassembly BOM behavior "Show Assembly only": one item in both types.
+    if let Some(TabContent::Assembly(a)) = f.doc.tab_mut(sub_tab).map(|t| &mut t.content) {
+        a.properties.bom_behavior = BomBehavior::AssemblyOnly;
+    }
+    assert_eq!(bom::lines(&f.doc, top_tab, &res, &s).len(), 2);
+    s.bom_type = BomType::Flattened;
+    let flat = bom::lines(&f.doc, top_tab, &res, &s);
+    assert!(matches!(flat[1].source, bom::BomSource::Assembly(t) if t == sub_tab));
+    if let Some(TabContent::Assembly(a)) = f.doc.tab_mut(sub_tab).map(|t| &mut t.content) {
+        a.properties.bom_behavior = BomBehavior::AssemblyAndComponents;
+    }
+
+    // Editing a cell writes the part's Properties; the block row shows it.
+    let flat = bom::lines(&f.doc, top_tab, &res, &s);
+    assert!(bom::set_cell(&mut f.doc, &flat[0], BomColumn::PartNumber, "PRT-001"));
+    assert!(!bom::set_cell(&mut f.doc, &flat[0], BomColumn::PartNumber, "PRT-001"), "unchanged");
+    assert!(!bom::set_cell(&mut f.doc, &flat[0], BomColumn::Quantity, "5"), "read-only");
+    assert_eq!(bom::cell(&f.doc, &res, &flat[0], BomColumn::PartNumber), bom::BomCell::Text("PRT-001".into()));
+    assert_eq!(bom::cell(&f.doc, &res, &flat[0], BomColumn::UnitOfMeasure).text(), "Each");
+    assert_eq!(bom::cell(&f.doc, &res, &flat[0], BomColumn::Mass).text(), "No value");
+    assert_eq!(bom::cell(&f.doc, &res, &flat[0], BomColumn::Material).text(), "- None -");
+    assert_eq!(bom::cell(&f.doc, &res, &flat[0], BomColumn::Appearance).text(), "Default");
+
+    // Exclude from all BOMs: gone, listed without an item number with
+    // Show excluded/suppressed.
+    if let Some(TabContent::PartStudio(ps)) = f.doc.tab_mut(f.studios[1]).map(|t| &mut t.content) {
+        ps.part_properties.entry(pin.clone()).or_default().meta.exclude_from_bom = true;
+    }
+    assert_eq!(bom::lines(&f.doc, top_tab, &res, &s).len(), 1);
+    s.show_excluded = true;
+    let with = bom::lines(&f.doc, top_tab, &res, &s);
+    assert_eq!(with.len(), 2);
+    assert!(with[1].excluded && with[1].item.as_deref() == Some("--"), "excluded rows: Item -- at the end");
+    s.show_excluded = false;
+
+    // Top level assembly row at the bottom, its name as the Item.
+    s.show_top_level = true;
+    let with = bom::lines(&f.doc, top_tab, &res, &s);
+    let last = with.last().unwrap();
+    assert!(last.top_level && last.item.as_deref() == Some("Assembly 1"));
+    assert!(bom::table_text(&f.doc, &res, &with, &s, true).lines().last().unwrap().starts_with("Assembly1,,"));
+    s.show_top_level = false;
+
+    // Columns: add, move, remove; Item stays first.
+    s.add_column(BomColumn::Name);
+    assert_eq!(s.columns.last(), Some(&BomColumn::Name));
+    s.move_column(BomColumn::Name, -1);
+    assert_eq!(s.columns[3], BomColumn::Name);
+    s.move_column(BomColumn::Quantity, -1);
+    assert_eq!(s.columns[1], BomColumn::Quantity, "nothing moves before Item");
+    s.remove_column(BomColumn::Item);
+    assert_eq!(s.columns[0], BomColumn::Item);
+    s.remove_column(BomColumn::Name);
+
+    // CSV export: header plus one row per line, quoted when needed.
+    let lines = bom::lines(&f.doc, top_tab, &res, &s);
+    assert!(bom::set_cell(&mut f.doc, &lines[0], BomColumn::Description, "Block, 40 mm"));
+    let csv = bom::table_text(&f.doc, &res, &lines, &s, true);
+    let mut rows = csv.lines();
+    assert_eq!(rows.next(), Some("Item,Quantity,Part number,Description"));
+    assert_eq!(rows.next(), Some("1,2,PRT-001,\"Block, 40 mm\""));
+    let tsv = bom::table_text(&f.doc, &res, &lines, &s, false);
+    assert!(tsv.starts_with("Item\tQuantity\tPart number\tDescription\n1\t2\tPRT-001\tBlock, 40 mm\n"));
+}
+
+#[test]
+fn assembly_configurations_drive_suppression_and_mate_offsets() {
+    use super::config::{param, ConfigTarget};
+    use crate::configuration::{ConfigInputKind, ConfigValues};
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false),
+            part_instance(3, "Block <3>", f.studios[0], body.clone(), DVec3::new(0.2, 0.0, 0.0), true),
+        ],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    // Configure Assembly: one List input "Configuration" with "Default".
+    asm.configuration.inputs.push(super::config::new_list_input("in1".into(), 1));
+    assert_eq!(asm.configuration.inputs[0].name, "Configuration");
+    asm.add_config_row("in1", "Long", "long".into());
+    let ConfigInputKind::List { options, .. } = &asm.configuration.inputs[0].kind else { panic!() };
+    assert_eq!(options.iter().map(|o| o.name.as_str()).collect::<Vec<_>>(), ["Default", "Long"]);
+    // Configure Revolute/Fastened 1 Unsuppressed + Offset, Block <3> suppression.
+    assert!(asm.configure_param("in1", ConfigTarget::Mate(MateId(10)), param::UNSUPPRESSED));
+    assert!(!asm.configure_param("in1", ConfigTarget::Mate(MateId(10)), param::UNSUPPRESSED), "once");
+    assert!(asm.configure_param("in1", ConfigTarget::Mate(MateId(10)), param::OFFSET));
+    assert!(asm.configure_param("in1", ConfigTarget::Mate(MateId(10)), param::OFFSET_Z));
+    assert!(asm.configure_param("in1", ConfigTarget::Instance(InstanceId(3)), param::UNSUPPRESSED));
+    // Every row starts at the current value.
+    assert_eq!(asm.configuration.configured[0].values.get("long"), Some(&ParamValue::Bool(true)));
+    // Long: the mate offset 10 mm, Block <3> suppressed.
+    asm.set_config_cell(1, "long", ParamValue::Bool(true));
+    asm.set_config_cell(2, "long", ParamValue::Expr(ExprValue::new("10 mm")));
+    asm.set_config_cell(3, "long", ParamValue::Bool(false));
+    let default = ConfigValues::default();
+    let mut long = ConfigValues::default();
+    long.0.insert("in1".into(), "long".into());
+    let d = ev.evaluate(&f.doc, &asm.configured(&default), &SolveOptions::default(), None);
+    let l = ev.evaluate(&f.doc, &asm.configured(&long), &SolveOptions::default(), None);
+    assert_eq!(d.occurrences.len(), 3);
+    assert_eq!(l.occurrences.len(), 2, "Block <3> suppressed in Long");
+    let z = |res: &super::eval::AssemblyResult| res.occurrences.iter().find(|o| o.path == vec![InstanceId(2)]).unwrap().transform.w_axis.z;
+    assert!((z(&l) - z(&d) - 0.01).abs() < 1e-6, "Long offsets the mate by 10 mm: {} vs {}", z(&l), z(&d));
+    // Suppressing a configured feature changes only the current configuration.
+    assert!(asm.set_configured_value(ConfigTarget::Mate(MateId(10)), param::UNSUPPRESSED, &long, ParamValue::Bool(false)));
+    assert!(asm.configured(&long).mate(MateId(10)).unwrap().suppressed);
+    assert!(!asm.configured(&default).mate(MateId(10)).unwrap().suppressed);
+    // Editing a configured mate stores into the active row.
+    let mut edited = asm.configured(&long).mate(MateId(10)).unwrap().clone();
+    edited.offset_z = Some(ExprValue::new("12 mm"));
+    asm.store_mate_edit(&mut edited, &long);
+    assert_eq!(asm.configuration.configured[2].values.get("long"), Some(&ParamValue::Expr(ExprValue::new("12 mm"))));
+    assert_eq!(edited.offset_z, None, "the mate itself keeps its own value");
+    // A subassembly instance in a configuration.
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(asm.clone())));
+    let mut inst = part_instance(5, "Sub <1>", f.studios[0], body.clone(), DVec3::ZERO, true);
+    inst.source = InstanceSource::Assembly { assembly: sub_tab, config: long.clone() };
+    let parent = Assembly { instances: vec![inst], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &parent, &SolveOptions::default(), None);
+    assert_eq!(res.occurrences.len(), 2, "the subassembly instance uses its Long configuration");
+    // Delete the input: its columns go too.
+    asm.delete_config_input("in1");
+    assert!(asm.configuration.is_empty() && asm.configuration.configured.is_empty());
+}
+
+#[test]
+fn edit_in_context_snapshot_is_referenced_by_part_studio_features() {
+    use crate::display::FeatureStatus;
+    use crate::in_context;
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.1, 0.0, 0.0), true),
+        ],
+        ..Default::default()
+    };
+    let asm_tab = f.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(asm.clone())));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let name = |p: &super::eval::InstancePath| asm.instance(p[0]).map(|i| i.name.clone()).unwrap_or_default();
+    let c = in_context::snapshot(&res, asm_tab, 1, "Assembly 1 context 1", &vec![InstanceId(1)], &name).expect("snapshot");
+    assert_eq!(c.bodies.len(), 1, "the other instance");
+    assert_eq!(c.bodies[0].instance, "Block <2>");
+    let bodies = c.regen_bodies();
+    assert_eq!(bodies.len(), 1);
+    let bb = bodies[0].shape.bounding_box(false).unwrap();
+    assert!((bb.min.x - 0.1).abs() < 1e-6, "placed relative to the primary instance: {:?}", bb.min);
+    // A plane offset from a face of the context body.
+    let face = Reference::Face((*bodies[0].faces[0]).clone());
+    let units = UnitPrefs::default();
+    let Some(TabContent::PartStudio(ps)) = f.doc.tab_mut(f.studios[0]).map(|t| &mut t.content) else { panic!() };
+    ps.contexts.push(c);
+    ps.active_context = Some(1);
+    let mut plane = ps.new_feature("cPlane", &units).unwrap();
+    plane.params.set("entities", ParamValue::Query(vec![face]));
+    plane.params.set("offset", ParamValue::Expr(ExprValue::new("0 mm")));
+    let pid = plane.id;
+    ps.features.push(plane);
+    assert_eq!(in_context::referenced_contexts(&ps.features), vec![1]);
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let st = r.display.features.iter().find(|s| s.id == pid).unwrap();
+    assert!(matches!(st.status, FeatureStatus::Ok), "{:?}", st.message);
+    assert_eq!(r.context.bodies.len(), 1, "context bodies never stay in the Part Studio");
+    assert!(r.context.bodies.iter().all(|b| !in_context::is_context_feature(b.id.feature)));
+    // The shown context: its body joins the display (pickable, translucent).
+    assert!(r.display.bodies.iter().all(|b| !in_context::is_context_feature(b.id.feature)), "not parts of the Part Studio");
+    let shown = &r.display.context_bodies;
+    assert_eq!(shown.len(), 1);
+    assert!(shown[0].color[3] < 0.5 && !shown[0].face_refs.is_empty());
+    ps.active_context = None;
+    let r = reg.regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    assert!(r.display.context_bodies.is_empty());
+    let st = r.display.features.iter().find(|s| s.id == pid).unwrap();
+    assert!(matches!(st.status, FeatureStatus::Ok), "the reference holds without the context shown");
+}
+
+/// A full revolve (about the sketch's Y axis, Front plane) of the region
+/// built by `profile`, plus the axis line.
+fn revolved_studio(profile: impl FnOnce(&mut noshape_sketch::Sketch)) -> PartStudio {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    profile(&mut sk);
+    let axis = sk.add_line(DVec2::new(0.0, -0.05), DVec2::new(0.0, 0.05));
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let key = r.display.sketches[0].regions.iter().max_by(|a, b| a.area.partial_cmp(&b.area).unwrap()).unwrap().key.clone();
+    let mut f = ps.new_feature("revolve", &units).unwrap();
+    f.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+    f.params.set("axis", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: axis.0 }]));
+    ps.features.push(f);
+    ps
+}
+
+#[test]
+fn inference_points_on_cones_spheres_arcs_and_vertices() {
+    use super::eval::inference_candidates;
+    use noshape_kernel::{Surface, ShapeType};
+    // Truncated cone: radius 10 mm at the bottom, 5 mm at 20 mm up, about
+    // Y; the virtual sharp (apex) is 40 mm up, outside the part.
+    let cone = revolved_studio(|sk| {
+        let p = [DVec2::new(0.0, 0.0), DVec2::new(0.01, 0.0), DVec2::new(0.005, 0.02), DVec2::new(0.0, 0.02)];
+        let ids: Vec<_> = p.iter().map(|q| sk.add_point(*q)).collect();
+        for i in 0..4 {
+            sk.add_line_between(ids[i], ids[(i + 1) % 4]).unwrap();
+        }
+    });
+    // Sphere: half disc of radius 10 mm about Y.
+    let sphere = revolved_studio(|sk| {
+        sk.add_arc(DVec2::ZERO, DVec2::new(0.0, -0.01), DVec2::new(0.0, 0.01));
+    });
+    let f = doc_with(vec![cone, sphere, crate::demo_fab::revolve_studio(), block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let units = UnitPrefs::default();
+    let face_of = |r: &crate::regen::RegenResult, want: fn(&Surface) -> bool| -> (BodyId, Reference) {
+        for b in &r.context.bodies {
+            for (i, n) in b.faces.iter().enumerate() {
+                if b.shape.sub_shape(ShapeType::Face, i).ok().and_then(|s| s.face_surface().ok()).is_some_and(|k| want(&k)) {
+                    return (b.id.clone(), Reference::Face((**n).clone()));
+                }
+            }
+        }
+        panic!("no such face")
+    };
+    // N4: conical face — bottom, middle, top of the axis and the virtual sharp (apex).
+    let (cb, rc) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (_, cone_face) = face_of(&rc, |k| matches!(k, Surface::Cone { .. }));
+    let pts = inference_candidates(&rc.context, Some(&cb), &cone_face, &units);
+    assert_eq!(pts.len(), 4, "{:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    assert!(pts.iter().all(|p| p.frame.z().cross(DVec3::Z).length() < 1e-6), "Z along the cone axis");
+    assert!(pts.iter().any(|p| (p.frame.origin - DVec3::new(0.0, 0.0, 0.04)).length() < 1e-6), "virtual sharp at the apex: {:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    // N5: spherical face — its center.
+    let (sb, rs) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (_, sphere_face) = face_of(&rs, |k| matches!(k, Surface::Sphere { .. }));
+    let pts = inference_candidates(&rs.context, Some(&sb), &sphere_face, &units);
+    assert_eq!(pts.len(), 1);
+    assert!(pts[0].frame.origin.length() < 1e-6, "sphere center at the origin");
+    // N8: an open arc edge — center, midpoint and both ends.
+    let (ab, ra) = body_of(&mut ev, &f.doc, f.studios[2]);
+    let b = ra.context.bodies.iter().find(|b| b.id == ab).unwrap();
+    let arc = (0..b.edges.len())
+        .find(|i| b.shape.sub_shape(ShapeType::Edge, *i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|inf| !inf.closed && matches!(inf.curve, noshape_kernel::Curve::Circle { .. })))
+        .map(|i| Reference::Edge((*b.edges[i]).clone()))
+        .expect("an arc edge");
+    let pts = inference_candidates(&ra.context, Some(&ab), &arc, &units);
+    assert_eq!(pts.len(), 4, "center, midpoint, two ends: {:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    // N9: a block vertex — the point, Z normal to a planar face around it.
+    let (bb, rb) = body_of(&mut ev, &f.doc, f.studios[3]);
+    let blk = rb.context.bodies.iter().find(|b| b.id == bb).unwrap();
+    let v = Reference::Vertex((*blk.vertices[0]).clone());
+    let pts = inference_candidates(&rb.context, Some(&bb), &v, &units);
+    assert_eq!(pts.len(), 1);
+    let z = pts[0].frame.z();
+    assert!([DVec3::X, DVec3::Y, DVec3::Z].iter().any(|a| z.cross(*a).length() < 1e-6), "Z normal to one of the corner's faces: {z:?}");
 }

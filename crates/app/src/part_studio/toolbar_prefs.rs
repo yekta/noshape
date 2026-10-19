@@ -17,6 +17,10 @@ pub struct ToolbarPrefs {
     /// S shortcut toolbar tools (None = defaults).
     #[serde(default)]
     pub shortcut_tools: Option<Vec<String>>,
+    /// S shortcut toolbar tools in a sketch, by tool name (None = defaults;
+    /// Preferences › Shortcut toolbars › Sketch).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch_shortcut_tools: Option<Vec<String>>,
 }
 
 impl ToolbarPrefs {
@@ -64,6 +68,22 @@ impl ToolbarPrefs {
         self.shortcut_tools.clone().unwrap_or_else(|| DEFAULT_SHORTCUT_TOOLS.iter().map(|s| s.to_string()).collect())
     }
 
+    /// Sketch S toolbar tool names (`defaults`: Onshape's ten).
+    pub fn sketch_shortcut_tools(&self, defaults: &[&str]) -> Vec<String> {
+        self.sketch_shortcut_tools.clone().unwrap_or_else(|| defaults.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_sketch_shortcut(&mut self, name: &str, defaults: &[&str]) {
+        let mut tools = self.sketch_shortcut_tools(defaults);
+        match tools.iter().position(|t| t == name) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(name.to_string()),
+        }
+        self.sketch_shortcut_tools = Some(tools);
+    }
+
     pub fn toggle_shortcut(&mut self, id: &str) {
         let mut tools = self.shortcut_tools();
         match tools.iter().position(|t| t == id) {
@@ -93,5 +113,10 @@ mod tests {
         assert!(!p.shortcut_tools().contains(&"extrude".to_string()));
         p.toggle_shortcut("helix");
         assert_eq!(p.shortcut_tools().last().map(|s| s.as_str()), Some("helix"));
+        let defaults = ["Line", "Trim"];
+        assert_eq!(p.sketch_shortcut_tools(&defaults), ["Line", "Trim"]);
+        p.toggle_sketch_shortcut("Line", &defaults);
+        p.toggle_sketch_shortcut("Slot", &defaults);
+        assert_eq!(p.sketch_shortcut_tools(&defaults), ["Trim", "Slot"]);
     }
 }

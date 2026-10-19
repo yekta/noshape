@@ -142,40 +142,43 @@ fn out_of_range_values_fail_with_message() {
     assert!(msg.as_deref().unwrap_or("").contains("must be at most") && msg.as_deref().unwrap_or("").contains("in"), "{msg:?}");
 }
 
-/// QA: a new Hole in a millimetre document defaulted to the Inch standard
-/// with drill size 1/4" while its Diameter field said 5 mm (the evaluator
-/// used the 5 mm). New holes now follow the document units and start with
-/// the table values of their default standard.
+/// QA: a new Hole's Diameter field disagreed with its drill size (the
+/// evaluator used a 5 mm default while the dialog said 1/4"). New holes now
+/// start with the table values of their default standard. Like Onshape
+/// (live, behaviours.md "Hole with several sketch points": a mm document
+/// opens a new Hole on the **Inch** tab, Drilled 1/4 = 6.35 mm, title
+/// "Ø 6.35 mm"), the standard is Inch whatever the document units;
+/// switching the dialog to Metric re-applies the ISO table.
 #[test]
 fn new_hole_follows_document_units_and_table() {
     use noshape_model::features::hole_tables as ht;
     let ps = PartStudio::new();
-    let metric = UnitPrefs::default();
-    let f = ps.new_feature("hole", &metric).unwrap();
-    assert!(f.params.is("unitsSystem", "METRIC"));
-    let (pid, table) = ht::hole_table_param(&f.params);
-    assert!(!f.params.lookup(pid).is_empty());
-    let spec = ht::table_values(table, &ht::complete_path(table, f.params.lookup(pid))).unwrap();
-    let d = f.params.expr("holeDiameterV3").unwrap().text.clone();
-    assert!(d.ends_with("mm"), "{d}");
-    let v: f64 = d.trim_end_matches("mm").trim().parse().unwrap();
-    assert!((v / 1000.0 - spec.hole_diameter).abs() < 1e-9, "{d} vs {}", spec.hole_diameter);
-
     let imperial = UnitPrefs { length: LengthUnit::Inch, ..UnitPrefs::default() };
-    let mut f = ps.new_feature("hole", &imperial).unwrap();
-    assert!(f.params.is("unitsSystem", "INCH"));
-    assert!(f.params.expr("holeDiameterV3").unwrap().text.ends_with("in"));
-    // Switching to Metric in the dialog re-applies the (ISO) table.
-    f.params.set("unitsSystem", en("METRIC"));
-    assert!(ht::sync_hole_standard(&mut f.params));
-    assert!(f.params.expr("holeDiameterV3").unwrap().text.ends_with("mm"));
+    for units in [UnitPrefs::default(), imperial] {
+        let mut f = ps.new_feature("hole", &units).unwrap();
+        assert!(f.params.is("unitsSystem", "INCH"));
+        let (pid, table) = ht::hole_table_param(&f.params);
+        assert!(!f.params.lookup(pid).is_empty());
+        let spec = ht::table_values(table, &ht::complete_path(table, f.params.lookup(pid))).unwrap();
+        // Drilled 1/4: 6.35 mm.
+        assert!((spec.hole_diameter - 6.35e-3).abs() < 1e-9, "{}", spec.hole_diameter);
+        let d = f.params.expr("holeDiameterV3").unwrap().text.clone();
+        let v = noshape_units::evaluate_as(&d, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope).unwrap().value;
+        assert!((v - spec.hole_diameter).abs() < 1e-9, "{d} vs {}", spec.hole_diameter);
+        // Switching to Metric in the dialog re-applies the (ISO) table.
+        f.params.set("unitsSystem", en("METRIC"));
+        assert!(ht::sync_hole_standard(&mut f.params));
+        assert!(f.params.expr("holeDiameterV3").unwrap().text.ends_with("mm"));
+    }
 }
 
 /// QA3: on a block with 3 mm corner fillets, a 5 mm chamfer of a top edge
 /// (tangent propagation runs it around the whole top loop) "succeeded" with
 /// an invalid solid (BRepCheck fails; the app showed holes through missing
-/// faces). Onshape fails the feature: "Failed to chamfer selections.".
-/// Blends now either give a valid solid or fail with Onshape's message.
+/// faces). Blends now either give a valid solid or fail with Onshape's
+/// message; Onshape (live capture F1, behaviours.md "Geometry ground truth"):
+/// chamfers wider than the 3 mm corner fillets fail with "Distance of chamfer
+/// on face too large.", fillets of any of these sizes succeed.
 #[test]
 fn blend_over_smaller_fillets_is_valid_or_fails() {
     let mut t = T::new();
@@ -208,7 +211,7 @@ fn blend_over_smaller_fillets_is_valid_or_fails() {
         })
         .map(|i| Reference::Edge((*body.edges[i]).clone()))
         .expect("top edge");
-    for (ty, size, ok) in [("chamfer", "1 mm", true), ("chamfer", "5 mm", false), ("chamfer", "8 mm", false), ("fillet", "1 mm", true), ("fillet", "5 mm", false)] {
+    for (ty, size, ok) in [("chamfer", "1 mm", true), ("chamfer", "5 mm", false), ("chamfer", "8 mm", false), ("fillet", "1 mm", true), ("fillet", "5 mm", true)] {
         let mut t2 = T { ps: t.ps.clone(), units: t.units, reg: Regenerator::new() };
         let size_param = if ty == "chamfer" { "width" } else { "radius" };
         let f = t2.add(ty, &[("entities", q(vec![top.clone()])), (size_param, e(size)), ("tangentPropagation", ParamValue::Bool(true))]);
@@ -218,7 +221,7 @@ fn blend_over_smaller_fillets_is_valid_or_fails() {
             assert_eq!(st, FeatureStatus::Ok, "{ty} {size}: {msg:?}");
         } else {
             assert_eq!(st, FeatureStatus::Error, "{ty} {size} should fail");
-            let want = if ty == "chamfer" { "Failed to chamfer selections." } else { "Failed to fillet selections." };
+            let want = if ty == "chamfer" { "Distance of chamfer on face too large." } else { "Failed to fillet selections." };
             assert_eq!(msg.as_deref(), Some(want), "{ty} {size}");
         }
         assert!(r.context.bodies[0].shape.is_valid(), "{ty} {size}: invalid solid");

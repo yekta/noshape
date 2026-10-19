@@ -77,8 +77,8 @@ impl Sheet {
             let mut t = t.clone();
             t.id = id;
             match &mut t.kind {
-                TableKind::Bom { view } | TableKind::Hole { view, .. } => *view = remap(*view),
-                TableKind::General { .. } => {}
+                TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => *view = remap(*view),
+                TableKind::General { .. } | TableKind::Revision { .. } => {}
             }
             t.position = [t.position[0] + d[0], t.position[1] + d[1]];
             self.tables.push(t);

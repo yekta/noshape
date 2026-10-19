@@ -14,19 +14,13 @@ use noshape_model::display::BodyDisplay;
 pub enum Analysis {
     /// Mean curvature magnitude, blue (flat) to red (tight).
     Curvature,
-    /// Draft relative to a pull direction: green >= angle, red <= -angle,
-    /// yellow in between (needs draft).
-    Draft { pull: [f64; 3], angle_deg: f64 },
+    /// Draft relative to the mold's pull direction (Onshape): side 1 light
+    /// blue (draft ≥ the minimum toward the pull), side 2 blue (away),
+    /// steep faces yellow, undercut regions red. `parts` limits it to some
+    /// parts (empty: all).
+    Draft { pull: [f64; 3], angle_deg: f64, undercut: bool, parts: Vec<noshape_model::BodyId> },
 }
 
-impl Analysis {
-    pub fn title(&self) -> &'static str {
-        match self {
-            Analysis::Curvature => "Curvature map",
-            Analysis::Draft { .. } => "Draft analysis",
-        }
-    }
-}
 
 /// Blue → cyan → green → yellow → red ramp for t in 0..1.
 pub fn ramp(t: f64) -> [u8; 4] {
@@ -41,29 +35,57 @@ pub fn ramp(t: f64) -> [u8; 4] {
     [c(0), c(1), c(2), 255]
 }
 
-pub const DRAFT_POSITIVE: [u8; 4] = [70, 180, 80, 255];
-pub const DRAFT_NEGATIVE: [u8; 4] = [210, 60, 50, 255];
-pub const DRAFT_NEEDED: [u8; 4] = [235, 200, 40, 255];
+/// Draft analysis colors (Onshape's legend: Steep, Undercut, Side 1, Side 2).
+pub const DRAFT_STEEP: [u8; 4] = [0xf8, 0xe7, 0x1c, 255];
+pub const DRAFT_UNDERCUT: [u8; 4] = [0xd0, 0x02, 0x1b, 255];
+pub const DRAFT_SIDE1: [u8; 4] = [0x83, 0xd1, 0xff, 255];
+pub const DRAFT_SIDE2: [u8; 4] = [0x00, 0x6f, 0xff, 255];
 
 /// Per-vertex colors of a body for an analysis.
 pub fn analysis_colors(b: &BodyDisplay, a: &Analysis) -> Vec<[u8; 4]> {
     let m = &b.mesh;
     let p3 = |v: [f32; 3]| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
     match a {
-        Analysis::Draft { pull, angle_deg } => {
+        Analysis::Draft { pull, angle_deg, undercut, parts } => {
+            if !parts.is_empty() && !parts.contains(&b.id) {
+                // Not checked: the part's own color.
+                return vec![[0, 0, 0, 0]; m.positions.len()];
+            }
             let d = DVec3::from_array(*pull).normalize_or(DVec3::Z);
             let lim = angle_deg.to_radians().sin();
+            // Undercuts: material in the way when pulling the face out.
+            let blocked: Vec<bool> = if *undercut {
+                let tris: Vec<[DVec3; 3]> = m.indices.as_chunks::<3>().0.iter().filter_map(|t| Some([p3(*m.positions.get(t[0] as usize)?), p3(*m.positions.get(t[1] as usize)?), p3(*m.positions.get(t[2] as usize)?)])).collect();
+                let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1).max(1e-9);
+                let rays: Vec<(DVec3, DVec3)> = m
+                    .positions
+                    .iter()
+                    .zip(&m.normals)
+                    .map(|(p, n)| {
+                        let n = p3(*n).normalize_or_zero();
+                        let dir = if n.dot(d) >= 0.0 { d } else { -d };
+                        // Start just off the surface so the face itself isn't hit.
+                        (p3(*p) + n * size * 1e-5, dir)
+                    })
+                    .collect();
+                noshape_model::thickness::cast_rays(tris, &rays, size * 1e-5).into_iter().map(|h| h.is_some()).collect()
+            } else {
+                vec![false; m.positions.len()]
+            };
             m.normals
                 .iter()
-                .map(|n| {
+                .zip(blocked)
+                .map(|(n, blocked)| {
                     // Draft angle = asin(n · pull).
                     let s = p3(*n).normalize_or_zero().dot(d);
-                    if s >= lim - 1e-9 {
-                        DRAFT_POSITIVE
-                    } else if s <= -lim + 1e-9 {
-                        DRAFT_NEGATIVE
+                    if s.abs() < lim - 1e-9 {
+                        DRAFT_STEEP
+                    } else if blocked {
+                        DRAFT_UNDERCUT
+                    } else if s > 0.0 {
+                        DRAFT_SIDE1
                     } else {
-                        DRAFT_NEEDED
+                        DRAFT_SIDE2
                     }
                 })
                 .collect()
@@ -77,6 +99,55 @@ pub fn analysis_colors(b: &BodyDisplay, a: &Analysis) -> Vec<[u8; 4]> {
                 .collect()
         }
     }
+}
+
+/// Curvature color map (Onshape): each part's vertices colored by the
+/// chosen curvature (Gaussian, mean, max or min radius) on one scale for
+/// all parts, the bar's palette and bounds (values beyond user bounds get
+/// the bar's outside colors); vertices where nothing curves keep the part's
+/// color. Returns the colors and the data range (display units).
+/// Per-vertex colors of each body.
+pub type BodyColors = std::collections::HashMap<noshape_model::BodyId, std::sync::Arc<Vec<[u8; 4]>>>;
+
+pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::CurvatureMap>, meters_per_unit: f64) -> (BodyColors, Option<(f64, f64)>) {
+    use super::thickness::{CURVATURE_PALETTES, palette_color_in};
+    let kind = map.map(|m| m.kind).unwrap_or_default();
+    let values: Vec<(&BodyDisplay, Vec<Option<f64>>)> = bodies
+        .iter()
+        .filter(|b| !b.hidden)
+        .map(|b| {
+            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1).max(1e-9);
+            let k = noshape_model::analysis::principal_curvatures(&b.mesh.positions, &b.mesh.normals, &b.mesh.indices);
+            (b, k.into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size)).collect())
+        })
+        .collect();
+    let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+    for v in values.iter().flat_map(|(_, v)| v.iter().flatten()) {
+        lo = lo.min(*v);
+        hi = hi.max(*v);
+    }
+    let range = (lo <= hi).then_some((lo, hi));
+    let bounds = map.map(|m| m.bar.bounds).unwrap_or([None; 2]);
+    let palette = map.map(|m| m.bar.palette).unwrap_or(0);
+    let (blo, bhi) = (bounds[0].unwrap_or(lo), bounds[1].unwrap_or(hi));
+    let rgba = |c: u32| [(c >> 16) as u8, (c >> 8) as u8, c as u8, 255];
+    let colors = values
+        .into_iter()
+        .map(|(b, v)| {
+            let c: Vec<[u8; 4]> = v
+                .into_iter()
+                .map(|v| match v {
+                    // Alpha 0: the part's own color.
+                    None => [0, 0, 0, 0],
+                    Some(v) if bounds[0].is_some() && v < blo => rgba(0xcc5fc0),
+                    Some(v) if bounds[1].is_some() && v > bhi => rgba(0x6b3a14),
+                    Some(v) => rgba(palette_color_in(&CURVATURE_PALETTES, palette, if bhi > blo { (v - blo) / (bhi - blo) } else { 0.5 })),
+                })
+                .collect();
+            (b.id.clone(), std::sync::Arc::new(c))
+        })
+        .collect();
+    (colors, range)
 }
 
 /// Discrete curvature magnitude per vertex from normal variation along
@@ -108,7 +179,15 @@ impl PartStudioView {
     /// Shift+C / Shift+D / Analysis menu: toggle an analysis map.
     pub(super) fn toggle_analysis(&mut self, a: Analysis, window: &mut Window, cx: &mut Context<Self>) {
         let same = std::mem::discriminant(&a) == self.ui.analysis.as_ref().map(std::mem::discriminant).unwrap_or(std::mem::discriminant(&Analysis::Curvature)) && self.ui.analysis.is_some();
+        // Another analysis replaces an open Draft analysis dialog.
+        if self.ui.draft.is_some() {
+            self.close_analysis_tool(cx);
+        }
         self.ui.analysis = if same { None } else { Some(a) };
+        self.ui.curvature_map = match self.ui.analysis {
+            Some(Analysis::Curvature) => self.ui.curvature_map.take().or_else(|| Some(Default::default())),
+            _ => None,
+        };
         // The curvature color map turns zebra stripes off (Onshape).
         if matches!(self.ui.analysis, Some(Analysis::Curvature)) {
             if self.ui.analysis_tool.as_ref().is_some_and(|t| t.kind == super::analysis_tools::ToolKind::Zebra) {
@@ -120,107 +199,41 @@ impl PartStudioView {
         self.apply_display(d, window, cx);
     }
 
-    /// Default draft analysis: pull along the selected plane/face normal,
-    /// else Top (Z), 3°.
-    pub(super) fn draft_analysis(&self) -> Analysis {
-        let pull = self.selection.iter().find_map(|r| self.frame_of_ref(r)).map(|f| f.normal).unwrap_or(DVec3::Z);
-        Analysis::Draft { pull: pull.to_array(), angle_deg: 3.0 }
-    }
-
     /// Shift+R: view in high quality (finer tessellation for every part).
     pub(super) fn toggle_high_quality(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.high_quality = !self.ui.high_quality;
         self.schedule_regen(window, cx);
     }
 
-    /// Legend of the active analysis (and the high-quality notice).
+    /// The "View in high quality" notice (the analyses show their legends
+    /// at the top of the graphics area).
     pub(super) fn render_analysis_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
-        if self.ui.analysis.is_none() && !self.ui.high_quality {
+        if !self.ui.high_quality {
             return None;
         }
-        let mut col = v_flex()
-            .id("analysis-panel")
-            .occlude()
-            .absolute()
-            .bottom(px(46.))
-            .left_3()
-            .w(px(230.))
-            .p_2()
-            .gap_1()
-            .rounded_md()
-            .bg(with_alpha(pal.panel_raised, 0.96))
-            .border_1()
-            .border_color(pal.border_strong);
-        if self.ui.high_quality {
-            col = col.child(
-                h_flex()
-                    .gap_2()
-                    .child(div().flex_1().text_xs().text_color(pal.info).child("Viewing in high quality. Performance can decrease."))
-                    .child(Button::new("hq-off").icon(IconName::Close).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_high_quality(w, cx)))),
-            );
-        }
-        if let Some(a) = self.ui.analysis.clone() {
-            let swatch = |c: [u8; 4], label: String| {
-                h_flex()
-                    .gap_2()
-                    .child(div().size(px(12.)).rounded_sm().bg(gpui_kit::Rgba { r: c[0] as f32 / 255.0, g: c[1] as f32 / 255.0, b: c[2] as f32 / 255.0, a: 1.0 }))
-                    .child(div().text_xs().text_color(pal.text).child(label))
-            };
-            col = col.child(
-                h_flex()
-                    .gap_2()
-                    .child(div().flex_1().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child(a.title().to_uppercase()))
-                    .child(Button::new("analysis-off").icon(IconName::Close).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
-                        this.ui.analysis = None;
-                        let d = this.display.clone();
-                        this.apply_display(d, w, cx);
-                    }))),
-            );
-            match a {
-                Analysis::Curvature => {
-                    col = col
-                        .child(swatch(ramp(1.0), "High curvature (small radius)".into()))
-                        .child(swatch(ramp(0.5), "Medium".into()))
-                        .child(swatch(ramp(0.0), "Flat".into()));
-                }
-                Analysis::Draft { angle_deg, .. } => {
-                    let step = |id: &'static str, label: &'static str, d: f64, cx: &mut Context<Self>| {
-                        Button::new(id).label(label).xsmall().ghost().on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
-                            if let Some(Analysis::Draft { angle_deg, .. }) = &mut this.ui.analysis {
-                                *angle_deg = (*angle_deg + d).clamp(0.0, 89.0);
-                            }
-                            let disp = this.display.clone();
-                            this.apply_display(disp, w, cx);
-                        }))
-                    };
-                    col = col
-                        .child(
-                            h_flex()
-                                .gap_1()
-                                .child(div().text_xs().text_color(pal.text_muted).child("Draft angle"))
-                                .child(step("draft-m", "−", -0.5, cx))
-                                .child(div().text_xs().text_color(pal.text).child(format!("{angle_deg:.1}°")))
-                                .child(step("draft-p", "+", 0.5, cx))
-                                .child(Button::new("draft-dir").label("Pull: selection").xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
-                                    let angle = match &this.ui.analysis {
-                                        Some(Analysis::Draft { angle_deg, .. }) => *angle_deg,
-                                        _ => 3.0,
-                                    };
-                                    if let Analysis::Draft { pull, .. } = this.draft_analysis() {
-                                        this.ui.analysis = Some(Analysis::Draft { pull, angle_deg: angle });
-                                    }
-                                    let d = this.display.clone();
-                                    this.apply_display(d, w, cx);
-                                }))),
-                        )
-                        .child(swatch(DRAFT_POSITIVE, format!("Positive draft ≥ {angle_deg:.1}°")))
-                        .child(swatch(DRAFT_NEEDED, "Requires draft".into()))
-                        .child(swatch(DRAFT_NEGATIVE, format!("Negative draft ≤ −{angle_deg:.1}°")));
-                }
-            }
-        }
-        Some(col.into_any_element())
+        let pal = p();
+        Some(
+            v_flex()
+                .id("analysis-panel")
+                .occlude()
+                .absolute()
+                .bottom(px(46.))
+                .left_3()
+                .w(px(230.))
+                .p_2()
+                .gap_1()
+                .rounded_md()
+                .bg(with_alpha(pal.panel_raised, 0.96))
+                .border_1()
+                .border_color(pal.border_strong)
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(div().flex_1().text_xs().text_color(pal.info).child("Viewing in high quality. Performance can decrease."))
+                        .child(Button::new("hq-off").icon(IconName::Close).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_high_quality(w, cx)))),
+                )
+                .into_any_element(),
+        )
     }
 }
 

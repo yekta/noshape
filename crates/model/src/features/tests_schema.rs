@@ -119,6 +119,20 @@ fn all_lists(ty: &FeatureType) -> Vec<(String, Vec<ParamSpec>)> {
     out
 }
 
+/// Every parameter list with the parameters in scope around it: array items
+/// see their feature's values (the dialog evaluates item visibility on the
+/// feature's values overlaid with the item's, like FeatureScript's
+/// `definition.isAsymmetric` inside a `vertexSettings` loop).
+fn scoped_lists(specs: &[ParamSpec], outer: &[ParamSpec], out: &mut Vec<(String, Vec<ParamSpec>, Vec<ParamSpec>)>, path: &str) {
+    out.push((path.to_string(), specs.to_vec(), outer.to_vec()));
+    let scope: Vec<ParamSpec> = outer.iter().chain(specs).cloned().collect();
+    for s in specs {
+        if let ParamKind::Array { item, .. } = &s.kind {
+            scoped_lists(item, &scope, out, &format!("{path}.{}", s.id));
+        }
+    }
+}
+
 #[test]
 fn required_features_exist() {
     for id in REQUIRED {
@@ -260,14 +274,17 @@ impl Rng {
 /// check that each non-hidden parameter is visible in at least one sample.
 /// Catches visibility predicates that test misspelled ids or impossible
 /// combinations.
-fn check_reachable(path: &str, list: &[ParamSpec], units: &UnitPrefs, rng: &mut Rng) {
+/// Asserts that every parameter of `list` shows for some choice of the
+/// booleans and enums of `list` and of the `outer` parameters in scope.
+fn check_reachable(path: &str, list: &[ParamSpec], outer: &[ParamSpec], units: &UnitPrefs, rng: &mut Rng) {
     let mut base = ParamValues::default();
+    fill_defaults(outer, &mut base, units);
     fill_defaults(list, &mut base, units);
     let mut seen: HashSet<&str> = HashSet::new();
     for sample in 0..4000 {
         let mut v = base.clone();
         if sample > 0 {
-            for s in list {
+            for s in outer.iter().chain(list) {
                 match &s.kind {
                     ParamKind::Bool { .. } => v.set(s.id, ParamValue::Bool(rng.below(2) == 1)),
                     ParamKind::Enum { options, .. } => v.set(s.id, ParamValue::Enum(options[rng.below(options.len())].0.to_string())),
@@ -296,8 +313,10 @@ fn every_parameter_can_become_visible() {
     let units = UnitPrefs::default();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     for ty in all() {
-        for (path, list) in all_lists(ty) {
-            check_reachable(&path, &list, &units, &mut rng);
+        let mut lists = Vec::new();
+        scoped_lists(&ty.params, &[], &mut lists, ty.id);
+        for (path, list, outer) in lists {
+            check_reachable(&path, &list, &outer, &units, &mut rng);
         }
     }
 }
@@ -326,5 +345,5 @@ fn categories_populated() {
 #[should_panic(expected = "never visible")]
 fn reachability_check_detects_dead_params() {
     let list = vec![ParamSpec::bool("flag", "Flag", false), ParamSpec::bool("dead", "Dead", false).visible(|v| v.is("misspelled", "X"))];
-    check_reachable("test", &list, &UnitPrefs::default(), &mut Rng(1));
+    check_reachable("test", &list, &[], &UnitPrefs::default(), &mut Rng(1));
 }

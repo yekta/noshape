@@ -33,10 +33,11 @@ rfd = "0.15"
 dirs = "6"
 # Local times in the documents page and the versions panel ("1:15 PM Today").
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+regex = "1"
+tiny-skia = "0.11"
 serde_json.workspace = true
 serde.workspace = true
 rusqlite.workspace = true
-trash = "5"
 open = "5"
 # The selection-count cursor sets an image cursor through the platform (cursor.rs).
 raw-window-handle = "0.6"

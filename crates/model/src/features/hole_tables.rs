@@ -612,7 +612,40 @@ fn split_std(path: &[String]) -> Option<(&'static Standard, &[String])> {
     Some((standard(first)?, rest))
 }
 
+/// A lookup table registered at run time (a FeatureScript "Lookup Table"
+/// annotation): one level per node.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DynLevel {
+    /// The level's key in a `LookupTablePath` (`"standard"`).
+    pub key: String,
+    /// Shown name (`"Standard"`).
+    pub name: &'static str,
+    pub default: String,
+    /// (option, its sub-level; `None` for a leaf).
+    pub entries: Vec<(String, Option<std::sync::Arc<DynLevel>>)>,
+}
+
+static DYNAMIC_TABLES: std::sync::LazyLock<parking_lot::RwLock<std::collections::HashMap<&'static str, std::sync::Arc<DynLevel>>>> = std::sync::LazyLock::new(Default::default);
+
+/// Register (or replace) a run-time lookup table under `name`.
+pub fn register_dynamic_table(name: &'static str, root: DynLevel) {
+    DYNAMIC_TABLES.write().insert(name, std::sync::Arc::new(root));
+}
+
+/// The level reached by `path` in a run-time table.
+pub fn dynamic_level(table: &str, path: &[String]) -> Option<std::sync::Arc<DynLevel>> {
+    let mut level = DYNAMIC_TABLES.read().get(table)?.clone();
+    for key in path {
+        let next = level.entries.iter().find(|(k, _)| k == key)?.1.clone()?;
+        level = next;
+    }
+    Some(level)
+}
+
 fn level_info(table: &str, path: &[String]) -> Option<LevelInfo> {
+    if let Some(l) = dynamic_level(table, path) {
+        return Some(LevelInfo { name: l.name, options: l.entries.iter().map(|(k, _)| (k.clone(), k.clone())).collect(), default: l.default.clone() });
+    }
     match table {
         TABLE_HOLE => match split_std(path) {
             Some((std, rest)) => hole_level(std, rest),
@@ -670,14 +703,11 @@ pub fn table_values(table: &str, path: &[String]) -> Option<HoleSpec> {
     }
 }
 
-/// Initialise a new Hole like Onshape: the units system follows the
-/// document's length unit (ISO for metric documents, ANSI for imperial ones)
-/// and the default Standard path's values fill the numeric fields, so the
-/// dialog's drill size and diameter agree from the start.
-pub fn init_new_hole(params: &mut ParamValues, units: &noshape_units::UnitPrefs) {
-    use noshape_units::LengthUnit;
-    let imperial = matches!(units.length, LengthUnit::Inch | LengthUnit::Foot | LengthUnit::Yard);
-    params.set("unitsSystem", ParamValue::Enum(if imperial { "INCH" } else { "METRIC" }.into()));
+/// Initialise a new Hole like Onshape: the default Standard path's values
+/// fill the numeric fields, so the dialog's drill size and diameter agree
+/// from the start. Units keep hole.fs's default, Inch, whatever the
+/// workspace units (live: a mm document opens a new Hole on the Inch tab).
+pub fn init_new_hole(params: &mut ParamValues) {
     sync_hole_standard(params);
     // The fields now hold the table values, but the hole is not marked as
     // synced: until the user edits it, a Standard path set later (by code, or

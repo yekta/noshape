@@ -496,6 +496,7 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
                 Some(vars::VarKind::Length) => "Length",
                 Some(vars::VarKind::Angle) => "Angle",
                 Some(vars::VarKind::Number) => "Number",
+                Some(vars::VarKind::FromImport) => "From import",
                 _ => "Any",
             };
             h_flex()

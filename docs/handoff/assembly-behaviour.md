@@ -159,3 +159,140 @@ Checklist section 13 (LA1–LA21) lists every live-capture difference and its st
 - The theme agent restyles render code in the same files (toolbar via `crate::ui`, list header
   "Mates"); re-read before editing and keep edits surgical.
 - `MateConnectorRef.align` is boxed to keep `PatternKind` under clippy's large-variant limit.
+
+## Takeover by skb (2026-10-18 evening) — skb now owns assembly behaviour
+asb moved to drawings. skb builds in /root/target-shared (since 2026-10-19; copy the binary to /tmp/skb/noshape and run the copy), display :103; app start script
+`/root/skb-scripts/astart.sh` (demo document, Assembly 1 tab on :103), screenshots in /tmp/skb/asm/.
+Done so far:
+* "Use best available tessellation" (instance menus, toggle with ✓): `Instance.best_tessellation`,
+  evaluator re-tessellates the instance's parts at `BEST_TESSELLATION` (0.1 × chord tolerance,
+  `regen::tessellate_shape`, cached per shape hash in `AssemblyEvaluator.fine_meshes`). Model test
+  `best_available_tessellation_refines_only_flagged_instances`. Verified in the app.
+* Instance menus re-ordered to the live dumps; "Select instances with same part and same
+  configuration" removed (not in Onshape's menu); Show mates in its own group (list only).
+* Mate menu: Expand ▸ / Collapse ▸ (selected / all).
+* QA3: mate HUD ✓ = "Commit current mate and start a new mate" (live tooltip, help) — kept;
+  Insert footer counts the instance following the cursor (live 04: "Inserted: 1"), the
+  "Click to place…" toast and banner removed, the following instance is selected (amber) and
+  deselected on placing; no row tooltip while a context menu is open (`os_menu::is_open`);
+  mate values hidden while Animate is open; Animate playback is time based (60 steps/s).
+  Animate dialog already had the live layout (QA ran an older build).
+Round 2 (live answers in behaviours.md "Assembly right-click menus"):
+* Properties… (instance row: part metadata; top row / subassembly: assembly metadata with
+  Subassembly BOM behavior) — shared `crates/app/src/properties_dialog.rs` (800 px Bootstrap
+  modal, form undo/redo, Apply/Save/Close); model `PartProperties.meta: ItemMeta`,
+  `Assembly.properties: AssemblyProperties`. Instance properties… → `Instance.reference_designator`.
+* Show / Hide instance list properties: gray state pill after the names (`ui.list_properties`).
+* Dynamic suppression ▸ Add expression… → "Dynamic suppression" dialog; `Instance.unsuppressed_if`,
+  applied in `eval::prepare_inner` via `dynamically_suppressed` (model test). Rows of dynamically
+  suppressed instances show suppressed (node state).
+* Use best available tessellation ↔ "Use automatic tessellation setting" (same slot).
+* Edit in context: `AssemblyViewEvent::EditInContext` → workspace activates the Part Studio and
+  calls `PartStudioView::set_assembly_context` (`part_studio/in_context.rs`: translucent context
+  meshes in the Part Studio's coordinates, banner, Hide/show instances, transparency slider).
+  Transient; NOT yet: persistent Assembly contexts, references to context geometry, Update context.
+* Create Part Studio in context (toolbar + Origin row): dialog "Origin of new Part Studio"
+  (Origin or an assembly mate connector row), new Part Studio tab after the assembly, opened in
+  context; banner "Go to assembly ▾" › Insert and go to assembly (`PartStudioEvent::InsertInAssembly`).
+* Reference manager (Change to version…, toolbar Update all references): `assembly_props.rs`.
+* Tool search Alt+C in assemblies (`assembly_search.rs`); the non-Onshape "Fix / unfix selected"
+  toolbar button removed.
+* Sketch instances: region fill + gray curves/dots (`eval::sketch_wire_result`, assembly_scene),
+  Insert dialog sketch thumbnails (normal view) under the parts.
+Open / waiting for live captures: Named positions panel + "Edit named position driver mate…"
+(REQUESTS), Dynamic suppression menu once set, Unit of measure list, tool descriptions.
+Release… is a paid-plan upsell on Onshape (subscription → excluded).
+
+Requested from live capture (REQUESTS.md "skb (assembly)"): Properties… / Instance properties… /
+Show instance list properties, Dynamic suppression ▸, Edit named position driver mate…,
+Use best available tessellation look, Change to version…, Release…, Edit in context,
+Create Part Studio in context…, Sketches toggle in Insert.
+
+## skb run 3 (2026-10-19, taking over after the quota stop)
+State: shared tree compiles in my files (cargo check -p noshape clean except other agents' in-progress files).
+* Clippy blockers: `TabContent::Assembly(Box<Assembly>)` (all call sites updated, incl. drawing/demo/tests,
+  workspace.rs); eval.rs sketch-instance cache uses type aliases `SketchKey` / `SketchBodyEntry`.
+* `assembly::tests::sketch_instances_are_wire_occurrences_with_edges` passes.
+* Fixed someone's half-done dropdown migration in assembly files (the `DropdownMenu`/`PopupMenuItem`
+  import was removed from assembly_view.rs): assembly_behaviors filter / Animate playback, assembly_standard
+  dropdowns and the mate HUD type list now use `os_dropdown_menu` + `OsMenuItem`.
+* BOM Table panel (live 181–187): model `crates/model/src/assembly/bom.rs` (`BomSettings` stored in
+  `Assembly.bom`: Flattened / Structured, columns (Item frozen) + Add column list, Show excluded/suppressed,
+  Show top level assembly row; `lines()` walks the instance tree honouring Subassembly BOM behavior and
+  Exclude from all BOMs; `cell` / `editable` / `set_cell` write part / subassembly Properties; `table_text`
+  CSV / TSV). App `crates/app/src/assembly_bom.rs` (docked 712 px pane, header row, header and row
+  right-click menus, inline cell editing, Export to CSV, Copy table). Model test
+  `bom_flattened_structured_exclusion_and_cell_edits`. Old `analysis::bom` still used by drawings.
+* Assembly configurations (live 190–200): model `crates/model/src/assembly/config.rs`
+  (`Assembly.configuration: AsmConfiguration` = inputs + `AsmConfiguredParam { input, target:
+  ConfigTarget::Instance|Mate, param, values }`; params unsuppressed / offset / offsetZ/X/Y / rotation /
+  flipPrimary; `configured(values)`, `apply_configuration`, `configure_param`, `store_mate_edit`,
+  `set_configured_value`, `add_config_row`, `delete_config_input`, `prune_configured`).
+  `InstanceSource::Assembly { assembly, config }` (subassembly instances in a configuration; evaluator
+  applies it). App `crates/app/src/assembly_config.rs`: Configuration panel (empty state, tabs, sections,
+  two-level header, Name add row, footer split button), Configurations box above the instance list,
+  yellow "Select instances or mates to configure" / "Select parameters to configure" modes (toolbar greyed),
+  mate dialog `configuring` mode (dashed amber frames, Unsuppressed checkbox, ✕ only,
+  `MateDialogEvent::ConfigureParam`), instance menu "Configure suppression", info toasts. The active
+  configuration is `AsmUi.config_values` (applied in `effective()`). Model test
+  `assembly_configurations_drive_suppression_and_mate_offsets`.
+* Right strip now matches live: BOM Table, Configuration panel, Exploded views, Named positions, Variable
+  table (Simulation excluded; Interference via top row › Check interference…, Animate via mate row).
+* Known failing model tests NOT mine: `standard_content_*` (FeatureScript host changes by agent fs).
+* REQUESTS.md (skb): mate values visibility after a drag, composite parts, Customize toolbar, BOM details.
+Next: build + verify BOM / configurations in the app, then the remaining 🔧/⏳ rows.
+
+### skb run 3, milestone 2 (live answers for mate values, BOM details, composite, customize toolbar, in-context)
+* Build: shared target `/root/target-shared` (TEAM-RULES). My scripts: `/root/skb-scripts/bld.sh` (retrying
+  build, kills my app, copies to /tmp/skb/noshape), `astart.sh` (demo doc, Assembly 1 on :103), `s.sh name`
+  (screenshot to /tmp/skb/asm/). pkill patterns must be anchored (`^/tmp/skb/noshape`), else they kill the shell.
+* Mate values (R11, live 300–318): only the selected mate; blue dashed circle with arrowheads
+  (`Highlights.value_arcs`, assembly_scene.rs) + "275.326°" label (render_mate_values); nothing during/after a
+  drag (fixes QA3 "drag readout stays"); Esc keeps the selection (the Esc fallback no longer clears it).
+* BOM details (live 350–378): excluded rows "--" at the end, suppressed instances gone, top level row at the
+  bottom (Item = assembly name, bold, CSV "Assembly1"), Appearance "Default", Material "- None -", Mass "No
+  value" on pink with the ƒ header marker, Not revision managed checkbox, Tessellation select; click selects a
+  cell (blue frame, header + Item #d7d7d7), double-click edits, Enter commits and moves down, Esc cancels;
+  Structured: "›/⌄ 3" chevron in the Item, double-click a row to expand, ⋯ Collapse all / Expand all; Copy table
+  toast "Flattened BOM table copied to clipboard."; CSV "BOM of Assembly 1.csv". Verified GUI g2.
+* In-context modelling persisted (G13, live 500–525): model `crates/model/src/in_context.rs` +
+  `PartStudio.contexts / active_context`, regen injection (regen/mod.rs: `uses_context`, `ContextCache`,
+  `StudioDisplay.context_bodies`), Part Studio: `part_studio/in_context.rs` (`display_for_scene` wraps the
+  renamed `display_for_scene_inner` in behaviors.rs; "Assembly contexts" section hook in mod.rs; context
+  arrows in feature rows; labeler "Face of Context 1"; missing-reference check skips context features).
+  Assembly: `assembly_props.rs` (`add_assembly_context`, `update_context`, `set_primary_instance`,
+  `instance_contexts`, `context_icons`), menus in assembly_behaviors.rs. Important: Part Studios regenerate
+  only on `DocEvent::TabChanged(tab)`, so context edits emit it explicitly. Verified GUI e2–e16.
+  Run 4: magenta context references (`context_ref_overlay` in part_studio/in_context.rs, hooked in
+  `refresh_scene`; `ui.context_arrow_hover`; model `in_context::context_refs`), greyed section during a
+  feature dialog, and stale dots in the Part Studio (`assembly_view::StaleContexts` global, filled by
+  `publish_stale_contexts` in `apply_result`, cleared by both Update context paths). Verified GUI c11–c31.
+  Note: in a Part Studio, translucent default planes win the pick over context faces behind or in front of
+  them (renderer pick pass, not mine); pick ghost faces away from the planes.
+  To do: "Insert and go to assembly" part chooser dialog (LA33, waiting on REQUESTS line 201).
+* Next: composite parts (I12), Customize toolbar (T12, live captured), remaining 🔧 rows, QA3 Animate check.
+
+### skb run 4 (2026-10-19 afternoon, after the context reset)
+* Clippy clean in my files (`cargo clippy -p noshape --tests`: remaining warnings are in material_libraries,
+  session, material_panel, material_library_view, feature_studio, drawing_section, drawing_export, none mine).
+  `AssemblyViewEvent::EditInContext` now carries `Box<AssemblyContext>` (large_enum_variant); workspace.rs
+  derefs it. Model `assembly::` tests 57/57 green.
+* In-context: magenta references, greyed section while a feature dialog is open, Part Studio stale dots
+  (see milestone 2 above).
+* Verified and marked ✅: I12 (Insert filters + composite row, GUI i1–i7), I14 (snap-insert with a Part Studio
+  mate connector → Fastened 2, k6–k9), I16, K11/S3 (Ctrl cycles the dragged connector, k1–k3), L6 (`:warnings`
+  now uses `instance_warning`, `:folder` lists folders while filtering, w1/w4).
+* Fixed: Insert dialog "Create version…" dispatched `actions::CreateVersion`, which nothing handles; it now
+  calls `history_panel::open_create_version`. (The Ctrl+Alt+V binding of that action is still unhandled; that's for the lead
+  or the workspace owner.) LA34 Reference manager checked against live 111 (v3–v6).
+* Graphics instance menu: "Edit in context" (or its ▸ submenus once contexts exist) now sits before "Find in
+  instance list", as in the live dump. LA12 row rewritten (it had a status spliced into its title).
+* REQUESTS.md: one batched skb line (fixed-instance drag cue, snap drag message, Animate in the mate dialog,
+  MC icon in the mate dialog, Solve scope, configured Part Studio Insert/Generate, sketch region inference,
+  after Update all). Lines 200–202 (Unfix all / Check interference, Insert and go to assembly dialog, sketch
+  start) are still open.
+* D18 (help: Mates): while a mate is being defined only that mate is solved (`SolveOptions::only_mate`, set in
+  `effective()` until Solve); model test `a_mate_being_defined_is_solved_alone_until_solve`.
+* Blocked at the end of the run: the shared tree's crates/render shader change (someone else's, uncommitted)
+  panics at GPU init ("entry point cannot be called", shaders.wgsl:260), so fresh builds don't start. The LA12
+  graphics menu change is compiled but not yet seen in the GUI.

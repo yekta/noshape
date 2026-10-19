@@ -48,7 +48,8 @@ impl Default for Camera {
             projection: Projection::Orthographic,
             fov_y: 30f64.to_radians(),
         };
-        c.set_view(StandardView::Isometric);
+        // Onshape opens every graphics area in its Trimetric view.
+        c.set_view(StandardView::Trimetric);
         c
     }
 }
@@ -86,11 +87,12 @@ impl Camera {
             StandardView::Right => (DVec3::NEG_X, DVec3::Z),
             StandardView::Top => (DVec3::NEG_Z, DVec3::Y),
             StandardView::Bottom => (DVec3::Z, DVec3::NEG_Y),
-            // Onshape's isometric (measured live): the camera sits 30° to the
-            // right of the front view and 30° above the ground plane.
-            StandardView::Isometric => (DVec3::new(-0.4330127, 0.75, -0.5).normalize(), DVec3::Z),
-            StandardView::Dimetric => (DVec3::new(-1.0, 1.0, -0.5).normalize(), DVec3::Z),
-            StandardView::Trimetric => (DVec3::new(-0.8, 1.0, -0.6).normalize(), DVec3::Z),
+            // Onshape's standard view frames: Isometric looks down the
+            // (-1, 1, -1) diagonal; Dimetric is 45° and Trimetric 30° to the
+            // right of the front view, both 30° above the ground plane.
+            StandardView::Isometric => (DVec3::new(-1.0, 1.0, -1.0).normalize(), DVec3::Z),
+            StandardView::Dimetric => (DVec3::new(-0.61237244, 0.61237244, -0.5).normalize(), DVec3::Z),
+            StandardView::Trimetric => (DVec3::new(-0.4330127, 0.75, -0.5).normalize(), DVec3::Z),
         };
         Self::look_rotation(fwd, up)
     }

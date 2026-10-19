@@ -58,7 +58,7 @@ pub fn showcase_document() -> Document {
             s.annotations.push(Annotation { id, kind, position, ..Default::default() });
             id += 1;
         };
-        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2] }] }, [24.0, 262.0]);
+        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2], nodes: Vec::new() }] }, [24.0, 262.0]);
         add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![] }, [24.0, 112.0]);
         add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into() }, [150.0, 126.0]);
         add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into() }, [175.0, 200.0]);
@@ -66,7 +66,7 @@ pub fn showcase_document() -> Document {
         // A grouped ordinate dimension along the bottom of the top view.
         let o = [-0.05, -0.03];
         add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true }, [110.0, 168.0]);
-        s.tables.push(Table { corner: TableCorner::BottomLeft, ..Table::new(1, TableKind::Hole { view: ViewId(2), origin: [-0.05, -0.03], origin_ref: None, precision: Some(1) }, [150.0, 46.0]) });
+        s.tables.push(Table { corner: TableCorner::BottomLeft, ..Table::new(1, TableKind::Hole { view: ViewId(2), origin: [-0.05, -0.03], origin_ref: None, precision: Some(1), flip_x: false, flip_y: false }, [150.0, 46.0]) });
         // Ordinates now carry the bottom-left location: move the front view's notes down.
         if let Some(n) = s.annotations.iter_mut().find(|a| matches!(a.kind, AnnotationKind::Note { .. })) {
             n.position = [25.0, 60.0];
@@ -81,8 +81,8 @@ pub fn showcase_document() -> Document {
         s.views.push(DrawingView { id: ViewId(1), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [110.0, 190.0], label: Some("ASSEMBLED".into()), scale: Some(1.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(2), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Isometric, part: None }, position: [300.0, 150.0], label: Some("EXPLODED".into()), explode: Some(0), scale: Some(0.5), ..Default::default() });
         s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Base { source: asm, config: Default::default(), orientation: ViewOrientation::Front, part: None }, position: [110.0, 80.0], style: RenderStyle::HiddenLinesVisible, ..Default::default() });
-        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1) }, [421.8, 269.4]));
-        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::Note { text: "{model.name}: {part.name}\nSHEET {sheet.number} OF {sheet.count}".into(), height_mm: 3.5 }, position: [25.0, 40.0], ..Default::default() });
+        s.tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new() }, [421.8, 269.4]));
+        s.annotations.push(Annotation { id: 1, kind: AnnotationKind::note("{model.name}: {part.name}\nSHEET {sheet.number} OF {sheet.count}", 3.5), position: [25.0, 40.0], ..Default::default() });
     }
 
 
@@ -154,7 +154,7 @@ pub fn showcase_document() -> Document {
         add(s, AnnotationKind::ForeshortenedRadial { view: ViewId(5), center: [0.038, 0.018], radius: 0.0048, angle: -0.8, jog: [0.028, -0.012] }, [0.0; 2]);
         add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A1".into(), area: DatumTargetArea::Point }, [28.0, 190.0]);
         add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [0.03, -0.02], label: "A2".into(), area: DatumTargetArea::Circle { diameter: 0.008 } }, [150.0, 100.0]);
-        add(s, AnnotationKind::Gdt { anchor: [30.0, 270.0], frame: vec!["⟂".into(), "0.02".into(), "A".into()], leaders: vec![Leader { view: Some(ViewId(1)), point: [-0.05, 0.006] }] }, [30.0, 270.0]);
+        add(s, AnnotationKind::Gdt { anchor: [30.0, 270.0], frame: vec!["⟂".into(), "0.02".into(), "A".into()], leaders: vec![Leader { view: Some(ViewId(1)), point: [-0.05, 0.006], nodes: Vec::new() }] }, [30.0, 270.0]);
         let mut t = Table::new(1, TableKind::General {
             cells: vec![
                 vec!["PROPERTY".into(), "".into(), "VALUE".into()],
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(drawing.sheets.len(), 4);
         let sources = regenerate_sources(&doc, &drawing);
         let cache = views::ViewCache::new();
-        let info = SheetInfo { doc_name: "Showcase".into(), drawing_name: "Drawing 1".into() };
+        let info = SheetInfo { doc_name: "Showcase".into(), drawing_name: "Drawing 1".into(), ..Default::default() };
         let _ = std::fs::create_dir_all("/tmp/drw");
         for si in 0..drawing.sheets.len() {
             let b = render_sheet_with(&drawing, si, &sources, &cache, true, &info).unwrap();

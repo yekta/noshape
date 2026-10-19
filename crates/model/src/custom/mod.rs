@@ -1,32 +1,28 @@
-//! Feature Studios: document-scoped custom features written in a sandboxed
-//! script language ([Rhai](https://rhai.rs)), noshape's FeatureScript
-//! equivalent.
+//! Feature Studios: document-scoped custom features written in
+//! FeatureScript, Onshape's feature language (`noshape-featurescript`).
 //!
-//! * A Feature Studio tab ([`FeatureStudio`]) holds script source. Compiling
-//!   it ([`compile`]) runs its top level once, which declares features with
-//!   `feature(name, #{ params: [...], evaluate: ... })`.
-//! * Every declared feature becomes a feature type with id
-//!   `custom:<tab id>:<feature name>` (see [`type_id`]). Its parameter
-//!   schema is built at run time and registered so `features::get` (and
-//!   therefore the generic feature dialog) knows it.
+//! * A Feature Studio tab ([`FeatureStudio`]) holds FeatureScript source.
+//!   Compiling it ([`compile`], [`studio`]) loads the module (and the
+//!   standard library it imports) and finds its features: exported
+//!   constants made with `defineFeature`, annotated with a
+//!   "Feature Type Name". Their dialogs come from the preconditions.
+//! * Every feature becomes a feature type `custom:<tab id>:<constant>`
+//!   (see [`type_id`]) whose schema is registered so `features::get` and the
+//!   generic feature dialog know it.
 //! * Part Studios evaluate custom features through a
-//!   [`CustomFeatureProvider`] passed in `RegenOptions::custom_features`.
-//!   The script's `evaluate(ctx, params)` function calls kernel operations
-//!   through the `ctx` object; results are named with the regular persistent
-//!   naming machinery, keyed by an operation counter of the script run.
-//!
-//! The script API is documented in `docs/custom-features.md`.
+//!   [`CustomFeatureProvider`] passed in `RegenOptions::custom_features`;
+//!   [`run`] calls the feature with a `Context` over the regeneration
+//!   context, and [`host`] implements the modeling natives.
 
-mod api;
-mod compile;
-mod eval;
+pub mod host;
 mod provider;
-mod schema;
+pub mod run;
+pub mod studio;
 
-pub use compile::{CompiledStudio, CustomFeatureDef, DeclKind, Diagnostic, ParamDecl, Severity, compile};
-pub use eval::evaluate;
 pub use provider::{CustomFeatureProvider, DocumentScripts};
-pub use schema::lookup;
+pub use run::evaluate;
+pub use noshape_featurescript::lexer::symbol_occurrences;
+pub use studio::{CompiledStudio, CustomFeatureDef, Diagnostic, ParamDecl, Severity, compile, lookup};
 
 /// Provider for regenerations without an explicit one: the most recently
 /// compiled Feature Studios (registered by [`DocumentScripts::from_document`]).
@@ -49,7 +45,7 @@ pub struct FeatureStudio {
 }
 
 impl FeatureStudio {
-    /// Source of a new Feature Studio: a small working example.
+    /// Source of a new Feature Studio (Onshape's template).
     pub fn template() -> Self {
         Self::new(TEMPLATE)
     }
@@ -102,30 +98,28 @@ pub fn parse_type_id(type_id: &str) -> Option<(&str, &str)> {
     type_id.strip_prefix(TYPE_PREFIX)?.split_once(':')
 }
 
-const TEMPLATE: &str = r#"// Feature Studio: custom features for this document's Part Studios.
-// See docs/custom-features.md for the script API. Lengths are in meters
-// (use mm(), inch() ...) and angles in radians (use deg()).
+/// Onshape's new Feature Studio: the version header and the common.fs
+/// import, caret on line 4.
+const TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
 
-feature("Rounded block", #{
-    icon: "fillet",
-    description: "A block with rounded vertical edges",
-    params: [
-        length("width", "Width", mm(40)),
-        length("depth", "Depth", mm(25)),
-        length("height", "Height", mm(10)),
-        length("radius", "Corner radius", mm(4)),
-    ],
-    evaluate: "rounded_block",
-});
+#[cfg(test)]
+mod studio_commit_tests {
+    use super::FeatureStudio;
 
-fn rounded_block(ctx, p) {
-    let body = ctx.box([0, 0, 0], [p.width, p.depth, p.height]);
-    // Vertical edges are the lines parallel to Z.
-    let vertical = [];
-    for e in ctx.filter(ctx.edges(body), "LINE") {
-        let a = ctx.axis(e);
-        if abs(a.direction[2]) > 0.99 { vertical.push(e); }
+    #[test]
+    fn edits_are_saved_but_used_only_after_commit() {
+        let mut f = FeatureStudio::new("a");
+        f.save("b".into());
+        assert_eq!((f.source.as_str(), f.text(), f.has_uncommitted()), ("a", "b", true));
+        // Typing back to the committed text leaves nothing to commit.
+        f.save("a".into());
+        assert!(!f.has_uncommitted());
+        f.save("c".into());
+        assert!(f.commit());
+        assert_eq!((f.source.as_str(), f.has_uncommitted()), ("c", false));
+        assert!(!f.commit());
+        // Old documents (no draft field) still load.
+        let old: FeatureStudio = serde_json::from_str(r#"{"source":"x"}"#).unwrap();
+        assert_eq!(old, FeatureStudio::new("x"));
     }
-    if p.radius > 0.0 { ctx.fillet(vertical, p.radius); }
 }
-"#;

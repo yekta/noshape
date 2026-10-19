@@ -33,6 +33,14 @@ pub const LIST_ICON: f32 = 17.;
 pub const LEFT_PANEL_W: f32 = 206.;
 
 /// Onshape's simple tooltip: blue-gray `#d0dbe5`, 12 px / 500, square corners (§4.7).
+/// Width in pixels of `text` in the window's font at `size` px (layout
+/// decisions Onshape's browser makes by measuring, such as wrapping).
+pub fn text_width(window: &Window, text: &str, size: f32) -> f32 {
+    let style = window.text_style();
+    let run = TextRun { len: text.len(), font: style.font(), color: style.color, background_color: None, underline: None, strikethrough: None };
+    f32::from(window.text_system().shape_line(SharedString::from(text.to_string()), px(size), &[run], None).width)
+}
+
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text: SharedString = text.into();
     move |window, cx| {
@@ -151,7 +159,8 @@ impl Render for RichTooltip {
         // The title-only box's width isn't known before layout: center it
         // with a 400 px strip whose content is centered.
         let at = point(a.center().x - px(RICH_TOOLTIP_W * 0.5), a.bottom() + px(3.));
-        div().child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content)))
+        // Never drawn over an open context menu (QA3: a stale tooltip covered its items).
+        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content))))
     }
 }
 
@@ -206,7 +215,8 @@ pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
     let pal = p();
     Button::new(id)
         .custom(tool_variant(cx, false, true))
-        .child(glyph("ui-chevron-down", 10., pal.text))
+        // Live: a 10 x 5 px caret, about 2 px thick.
+        .child(glyph("tool-caret", 12., pal.text))
         .w(px(TOOL_CARET_W))
         .h(px(TOOL_CELL))
         .p_0()
@@ -333,8 +343,10 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
     let undo_tip: SharedString = "Undo (cmd+z/ctrl+z)".into();
     let redo_tip: SharedString = "Redo (ctrl+y/shift+cmd+z)".into();
     let (d1, d2) = (doc.clone(), doc.clone());
+    // Live: Undo @42, Redo @76 (dom/toolbar-partstudio.txt), 2 px apart like every tool.
     h_flex()
         .flex_none()
+        .gap(px(2.))
         .child(with_tooltip(
             "tt-undo",
             undo_tip,
@@ -410,13 +422,16 @@ pub fn tree_icon(name: &str, dim: bool, cx: &App) -> Div {
 
 /// Collapsible caret (▾/▸) in a 16 px column (§4.11).
 pub fn caret(open: bool) -> Div {
+    // Live (Parts / Default geometry headers): a thin 12 x 6 `#666` chevron.
     div()
         .w(px(16.))
+        .ml(px(-3.))
+        .mr(px(3.))
         .flex_none()
         .flex()
         .items_center()
         .justify_center()
-        .child(glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 13., p().text))
+        .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x666666)))
 }
 
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask

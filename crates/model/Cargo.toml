@@ -8,6 +8,7 @@ license.workspace = true
 noshape-units.workspace = true
 noshape-sketch.workspace = true
 noshape-kernel.workspace = true
+noshape-featurescript.workspace = true
 earcutr = "0.5"
 serde.workspace = true
 serde_json.workspace = true
@@ -21,7 +22,8 @@ ahash.workspace = true
 parking_lot.workspace = true
 smallvec.workspace = true
 nalgebra.workspace = true
-rhai.workspace = true
+# DWG / DWT and DXF 2000+ drawing export (MPL-2.0).
+acadrust = "0.6.5"
 
 [dev-dependencies]
 env_logger.workspace = true

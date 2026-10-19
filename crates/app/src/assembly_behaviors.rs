@@ -22,7 +22,7 @@ pub(crate) enum MenuEntry {
     Sep,
 }
 
-fn item(label: impl Into<String>, act: impl Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>) + 'static) -> MenuEntry {
+pub(super) fn item(label: impl Into<String>, act: impl Fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>) + 'static) -> MenuEntry {
     MenuEntry::Item { label: label.into(), icon: None, disabled: false, act: Rc::new(act) }
 }
 
@@ -147,6 +147,35 @@ pub(crate) struct AsmUi {
     pub scroll_to_selection: bool,
     /// Mates expanded in the list (their implicit mate connectors shown).
     pub expanded_mates: HashSet<MateId>,
+    /// Insert dialog: Sketches filter toggle (off by default, live).
+    pub insert_sketches: bool,
+    /// Insert dialog: Composite parts filter toggle (off by default, live 320).
+    pub insert_composites: bool,
+    /// The user's toolbar (Customize toolbar…) and the open customize mode.
+    pub tb_prefs: super::toolbar::AsmToolbarPrefs,
+    pub tb_custom: Option<super::toolbar::TbCustom>,
+    /// The open Dynamic suppression dialog (instance, "Unsuppressed if").
+    pub dynamic_suppression: Option<(super::props::DynTarget, Entity<InputState>, Subscription)>,
+    /// Show instance list properties (state pills after the names).
+    pub list_properties: bool,
+    /// Reference manager dialog (Change to version…, Update all references).
+    pub ref_manager: Option<super::props::RefManager>,
+    /// "Origin of new Part Studio" dialog: the chosen assembly mate
+    /// connector (`None` = the assembly origin).
+    pub ps_in_context: Option<Option<MateId>>,
+    /// Tool search (Alt+C): input, query, selected row.
+    pub tool_search: Option<(Entity<InputState>, Subscription)>,
+    pub tool_query: String,
+    pub tool_sel: usize,
+    pub tool_no_highlight: bool,
+    /// Named positions: the row being edited (yellow banner), the applied
+    /// row (blue), the Driving mate selector, the typed cell, the toast.
+    pub np_editing: Option<usize>,
+    pub np_applied: Option<usize>,
+    pub np_driver: Option<super::positions::NpDriver>,
+    pub np_cell: Option<super::positions::NpCell>,
+    pub np_toast: Option<String>,
+    pub np_count: usize,
     /// Keyboard shortcut list (Shift+/).
     pub show_shortcuts: bool,
     /// Insert dialog: search box, source (0 current document, 1 other
@@ -183,6 +212,25 @@ pub(crate) struct AsmUi {
     pub section: Option<AsmSection>,
     /// Isolate / Make transparent slider: opacity of the transparent instances.
     pub transparency: Option<f32>,
+    /// Isolate dialog › Select transparent geometry; Alt held (pick through
+    /// transparent instances).
+    pub select_transparent: bool,
+    pub alt_through: bool,
+    /// BOM Table: the cell being typed in.
+    pub bom_edit: Option<super::bom_panel::BomEdit>,
+    /// BOM Table: the selected cell (row, column) and expanded Structured items.
+    pub bom_selected: Option<(usize, noshape_model::assembly::bom::BomColumn)>,
+    pub bom_expanded: HashSet<String>,
+    /// Configurations: the current configuration (box above the instance
+    /// list), the Configure assembly features mode, the "… added to
+    /// Configuration" toast, the typed table cell, folded inputs, and the
+    /// "Configured assembly properties" tab.
+    pub config_values: ConfigValues,
+    pub cfg_mode: Option<super::config_panel::CfgMode>,
+    pub cfg_toast: Option<String>,
+    pub cfg_edit: Option<super::config_panel::CfgEdit>,
+    pub cfg_folded: HashSet<String>,
+    pub cfg_props_tab: bool,
     /// Live mate value being typed (double-click a value label): mate, DOF.
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
     /// Insert dialog: configuration chosen per configured Part Studio.
@@ -302,7 +350,7 @@ impl AssemblyView {
         } else {
             self.ui.transparent = None;
         }
-        self.rebuild_scene(false, cx);
+        self.rebuild_scene(true, cx);
         cx.notify();
     }
 
@@ -311,11 +359,16 @@ impl AssemblyView {
         if self.isolate.take().is_none() && self.ui.transparent.take().is_none() {
             return false;
         }
-        self.rebuild_scene(false, cx);
+        self.rebuild_scene(true, cx);
         cx.notify();
         true
     }
 
+    /// Onshape's Isolate / Make transparent dialog (live assembly/61,
+    /// dom/dialog-assembly-isolate.txt): 220 px, title + ✕; "Transparency
+    /// controls" (☐ Select transparent geometry, transparency slider "Show/
+    /// hide internal geometry"), "Component controls" (Expand: connectivity
+    /// / distance select, slider "Expand isolate by mate connectivity").
     pub(super) fn render_isolate_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let pal = p();
         let title = if self.isolate.is_some() {
@@ -325,39 +378,92 @@ impl AssemblyView {
         } else {
             return None;
         };
-        let (connectivity, expand_steps) = self.ui.iso_expand.as_ref().map(|e| (e.0, e.1)).unwrap_or((false, 0));
+        let (connectivity, steps) = self.ui.iso_expand.as_ref().map(|e| (e.0, e.1)).unwrap_or((true, 0));
+        let max_steps = {
+            let seeds: Vec<InstanceId> = match self.ui.iso_expand.as_ref() {
+                Some(e) => e.2.clone(),
+                None => self.isolate.clone().or_else(|| self.ui.transparent.clone()).map(|s| s.into_iter().collect()).unwrap_or_default(),
+            };
+            self.assembly(cx).map(|a| analysis::isolate_expansion(&self.result, a, &seeds, connectivity).len()).unwrap_or(0)
+        };
+        let alpha = self.ui.transparency.unwrap_or(if title == "Isolate" { ISO_ALPHA_MIN } else { 0.35 });
+        let t_alpha = ((alpha - ISO_ALPHA_MIN) / (ISO_ALPHA_MAX - ISO_ALPHA_MIN)).clamp(0.0, 1.0);
+        let t_expand = if max_steps == 0 { 0.0 } else { steps as f32 / max_steps as f32 };
+        let section = |t: &'static str| div().pl(px(3.)).h(px(15.)).mt(px(10.)).mb(px(10.)).text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x666666)).child(t);
+        let select_t = self.ui.select_transparent;
         Some(
-            h_flex()
-                .id("asm-isolate-panel")
+            v_flex()
+                .id("asm-isolate-dialog")
                 .occlude()
-                .absolute()
-                .bottom(px(48.))
-                .left(relative(0.5))
-                .ml(px(-200.))
-                .gap_2()
-                .px_3()
-                .py_1()
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.accent)
-                .text_xs()
-                .child(div().text_color(pal.text).child(title))
-                // Transparency slider (Onshape: show / hide internal geometry).
-                .child(div().text_color(pal.text_muted).child("Transparency"))
-                .child(Button::new("asm-iso-less").label("−").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.step_transparency(0.1, cx))))
-                .child(div().w(px(34.)).text_center().text_color(pal.text).child(format!("{:.0}%", (1.0 - self.ui.transparency.unwrap_or(if title == "Isolate" { 0.12 } else { 0.35 })) * 100.0)))
-                .child(Button::new("asm-iso-more").label("+").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.step_transparency(-0.1, cx))))
-                // Component controls: Expand by distance / connectivity.
-                .child(div().text_color(pal.text_muted).child("Expand"))
-                .child(Button::new("asm-iso-dist").label("Distance").ghost().xsmall().selected(!connectivity).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(Some(false), 0, cx))))
-                .child(Button::new("asm-iso-conn").label("Connectivity").ghost().xsmall().selected(connectivity).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(Some(true), 0, cx))))
-                .child(Button::new("asm-iso-exp-less").label("−").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(None, -1, cx))))
-                .child(div().w(px(18.)).text_center().text_color(pal.text).child(format!("{expand_steps}")))
-                .child(Button::new("asm-iso-exp-more").label("+").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_iso_expand(None, 1, cx))))
-                .child(Button::new("asm-iso-exit").label(if title == "Isolate" { "Exit isolate" } else { "Close" }).xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.exit_isolate(cx);
+                .w(px(220.))
+                .bg(with_alpha(rgb(0xffffff), 0.95))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title))
+                        .child(
+                            div()
+                                .id("asm-iso-close")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .opacity(0.5)
+                                .child(Icon::new(IconName::Close).size(px(14.)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.exit_isolate(cx);
+                                })),
+                        ),
+                )
+                .child(section("Transparency controls"))
+                .child(
+                    crate::os_ui::checkbox("asm-iso-select-transparent", "Select transparent geometry", select_t)
+                        .tooltip(crate::ui::tooltip("Enable selection of parts, faces, and edges from transparent bodies"))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.select_transparent = !this.ui.select_transparent;
+                            // Pickability changes: the pick buffer must be redrawn.
+                            this.rebuild_scene(true, cx);
+                            cx.notify();
+                        })),
+                )
+                .child(div().mt(px(6.)).child(iso_slider("asm-iso-transparency", t_alpha, "Show/hide internal geometry", cx, |this, f, cx| {
+                    this.ui.transparency = Some(ISO_ALPHA_MIN + f * (ISO_ALPHA_MAX - ISO_ALPHA_MIN));
+                    this.rebuild_scene(false, cx);
+                    cx.notify();
                 })))
+                .child(section("Component controls"))
+                .child(
+                    crate::os_ui::select_field("asm-iso-type", vec!["Expand: connectivity".into(), "Expand: distance".into()], if connectivity { 0 } else { 1 }, {
+                        let v = cx.entity();
+                        move |i, _, cx| v.update(cx, |this, cx| this.set_iso_expand(Some(i == 0), 0, cx))
+                    })
+                    .h(px(26.))
+                    .w(px(194.))
+                    .pl(px(6.))
+                    .rounded(px(0.))
+                    .border_0()
+                    .border_b_1()
+                    .border_color(rgb(0xd7d7d7))
+                    .text_size(px(13.33)),
+                )
+                .child(
+                    h_flex()
+                        .mt(px(5.))
+                        .mb(px(5.))
+                        .child(div().flex_1().child(iso_slider("asm-iso-expand", t_expand, if connectivity { "Expand isolate by mate connectivity" } else { "Expand isolate by distance" }, cx, move |this, f, cx| {
+                            let want = (f * max_steps as f32).round() as i32;
+                            let have = this.ui.iso_expand.as_ref().map(|e| e.1).unwrap_or(0) as i32;
+                            if want != have {
+                                this.set_iso_expand(None, want - have, cx);
+                            }
+                        })))
+                        .child(div().mr(px(4.)).size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
+                )
                 .into_any_element(),
         )
     }
@@ -420,7 +526,7 @@ impl AssemblyView {
         if inst.fixed && fixed.len() > 1 {
             return Some("More than one part is fixed");
         }
-        if let InstanceSource::Assembly { assembly } = &inst.source
+        if let InstanceSource::Assembly { assembly, .. } = &inst.source
             && let Some(TabContent::Assembly(sub)) = self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content)
             && sub.fixed_instances().len() > 1
         {
@@ -493,8 +599,8 @@ impl AssemblyView {
         // Sources must exist in this document (Part Studios / assemblies).
         let doc = self.doc.read(cx).session.doc.clone();
         let valid = clip.instances.iter().all(|i| match &i.source {
-            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } => doc.tab(*studio).is_some(),
-            InstanceSource::Assembly { assembly } => doc.tab(*assembly).is_some() && !contains_assembly(&doc, *assembly, self.tab, 0),
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => doc.tab(*studio).is_some(),
+            InstanceSource::Assembly { assembly, .. } => doc.tab(*assembly).is_some() && !contains_assembly(&doc, *assembly, self.tab, 0),
             InstanceSource::External { .. } | InstanceSource::Standard { .. } => true,
         });
         if !valid {
@@ -649,6 +755,14 @@ impl AssemblyView {
             }));
             m.push(MenuEntry::Sep);
         }
+        // Properties (list only): the part's metadata and the instance's own.
+        if !graphics && !multi {
+            if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. }) {
+                m.push(item("Properties…", move |t, w, cx| t.open_instance_metadata(top, w, cx)));
+            }
+            m.push(item("Instance properties…", move |t, w, cx| t.open_instance_properties(top, w, cx)));
+            m.push(MenuEntry::Sep);
+        }
         // Visibility group.
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
@@ -657,7 +771,7 @@ impl AssemblyView {
         m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
         let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
-        m.push(item(if com_on { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
+        m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
         let tg = targets.clone();
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
         let tg = targets.clone();
@@ -666,14 +780,24 @@ impl AssemblyView {
             m.push(icon_item("Section view…", "section-view-3d", |t, w, cx| t.toggle_section(w, cx)));
         }
         let tg = targets.clone();
-        let sup = if suppressed { "Unsuppress" } else { "Suppress" };
-        m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
+        if inst.unsuppressed_if.is_some() && !multi {
+            // Suppressed with an expression (live assembly/142): Unsuppress
+            // (drops the expression) and Edit dynamic suppression.
+            m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), true));
+        } else {
+            let sup = if suppressed { "Unsuppress" } else { "Suppress" };
+            m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| t.set_suppressed(tg.clone(), !suppressed, cx)));
+            // Dynamic suppression ▸ Add expression…
+            if !graphics && !multi {
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), false));
+            }
+        }
         let tg = targets.clone();
         m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
         // Use best available tessellation (finest meshes for these instances).
         let best = inst.best_tessellation;
         let tg = targets.clone();
-        m.push(item(if best { "✓ Use best available tessellation" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
+        m.push(item(if best { "Use automatic tessellation setting" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
         if is_asm || multi {
             let tg = targets.clone();
             m.push(item("Check interference…", move |t, _, cx| {
@@ -701,9 +825,46 @@ impl AssemblyView {
         });
         let drawing = self.instance_drawing_entry(&inst, multi);
         let tg = targets.clone();
-        let export = icon_item("Export…", "export", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx));
+        let export = if graphics { icon_item("Export…", "export", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx)) } else { item("Export…", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx)) };
         // Edit group: mate connector, replace, switch to the source.
         let mut edit: Vec<MenuEntry> = Vec::new();
+        // Graphics (live rmb-asm-two-instances-selected): Edit in context,
+        // Find in instance list, Add mate connector…, Replace…, Switch to….
+        if !multi && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
+            // With contexts already in the Part Studio: pick one or Create
+            // new context; Update context ▸ re-snapshots one (help:
+            // Modeling in context).
+            let studio = inst.source.studio();
+            let contexts = studio.map(|s| self.contexts_in(s, cx)).unwrap_or_default();
+            let mine = self.instance_contexts(top, cx);
+            if contexts.is_empty() {
+                edit.push(item("Edit in context", move |t, _, cx| t.edit_in_context(top, cx)));
+            } else if let Some(studio) = studio {
+                // Live 513–518: Edit in context ▸ [Edit Context 1 | Create new
+                // context]; Update context ▸ [• Context 1] (dot = update
+                // available); on other instances of the part, Set as primary
+                // instance ▸ [Context 1].
+                let mut sub: Vec<MenuEntry> = contexts.iter().map(|(id, name)| {
+                    let id = *id;
+                    item(format!("Edit {name}"), move |t, _, cx| t.edit_in_context_with(top, Some(id), cx))
+                }).collect();
+                sub.push(item("Create new context", move |t, _, cx| t.edit_in_context_with(top, None, cx)));
+                edit.push(MenuEntry::Sub { label: "Edit in context".into(), children: sub });
+                let upd: Vec<MenuEntry> = contexts.iter().map(|(id, name)| {
+                    let id = *id;
+                    let stale = mine.iter().any(|c| c.1 == id && c.4);
+                    item(if stale { format!("• {name}") } else { name.clone() }, move |t, _, cx| t.update_context(top, studio, id, cx))
+                }).collect();
+                edit.push(MenuEntry::Sub { label: "Update context".into(), children: upd });
+                let not_primary: Vec<MenuEntry> = mine.iter().filter(|c| !c.3).map(|c| {
+                    let id = c.1;
+                    item(c.2.clone(), move |t, _, cx| t.set_primary_instance(top, studio, id, cx))
+                }).collect();
+                if !not_primary.is_empty() {
+                    edit.push(MenuEntry::Sub { label: "Set as primary instance".into(), children: not_primary });
+                }
+            }
+        }
         if graphics {
             edit.push(item("Find in instance list", move |t, _, cx| {
                 t.selected = vec![top];
@@ -724,13 +885,17 @@ impl AssemblyView {
             move |t, _, cx| t.open_replace(top, cx),
         ));
         let switch_tab = match &inst.source {
-            InstanceSource::Assembly { assembly } => Some(*assembly),
+            InstanceSource::Assembly { assembly, .. } => Some(*assembly),
             other => other.studio(),
         };
         if let Some(tab) = switch_tab.filter(|_| !multi)
             && let Some(tname) = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())
         {
             edit.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+        }
+        // A configured assembly: "Configure suppression" (live 199).
+        if !multi && self.can_configure_suppression(top, cx) {
+            edit.push(item("Configure suppression", move |t, _, cx| t.configure_instance_suppression(top, cx)));
         }
         edit.extend(self.instance_source_entries(&inst, multi, cx));
         if graphics {
@@ -740,7 +905,7 @@ impl AssemblyView {
             let tab = self.tab;
             let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
             m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
-                let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+                let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
             }));
             m.push(export);
@@ -771,6 +936,9 @@ impl AssemblyView {
             let tg: Vec<InstanceId> = targets.iter().copied().filter(|id| asm.instance(*id).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { .. }))).collect();
             m.push(item("Dissolve subassembly", move |t, _, cx| t.dissolve_subassemblies(tg.clone(), cx)));
         }
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
+            m.push(icon_item("Change to version…", "version", |t, _, cx| t.open_reference_manager(cx)));
+        }
         m.push(export);
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
@@ -779,7 +947,7 @@ impl AssemblyView {
         m.extend(drawing);
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
-        m.push(icon_item("Add selection to folder…", "folder", move |t, w, cx| t.folder_from_instances(tg.clone(), w, cx)));
+        m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_instances(tg.clone(), w, cx)));
         let has_children = self.result.node(&[top]).is_some_and(|n| !n.children.is_empty());
         if has_children {
             m.push(MenuEntry::Sub {
@@ -815,7 +983,7 @@ impl AssemblyView {
         let (tab, part, config) = match &inst.source {
             InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
             InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
-            InstanceSource::Assembly { assembly } => (*assembly, None, ConfigValues::default()),
+            InstanceSource::Assembly { assembly, .. } => (*assembly, None, ConfigValues::default()),
             _ => return None,
         };
         if multi {
@@ -824,7 +992,7 @@ impl AssemblyView {
         // The part's own name (the instance name without " <n>").
         let base = inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or_else(|| inst.name.clone());
         Some(icon_item(format!("Create Drawing of {base}…"), "drawing", move |_, w, cx| {
-            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone() });
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone(), sketch: None });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(base.clone()) }, w, cx);
         }))
     }
@@ -834,7 +1002,7 @@ impl AssemblyView {
     fn instance_source_entries(&self, inst: &Instance, multi: bool, cx: &App) -> Vec<MenuEntry> {
         let mut m = Vec::new();
         let top = inst.id;
-        if let (false, InstanceSource::Assembly { assembly }) = (multi, &inst.source) {
+        if let (false, InstanceSource::Assembly { assembly, .. }) = (multi, &inst.source) {
             // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
             let names: Vec<String> = match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
                 Some(TabContent::Assembly(a)) => a.named_positions.iter().map(|n| n.name.clone()).collect(),
@@ -1165,12 +1333,12 @@ impl AssemblyView {
         let mut new_id = None;
         self.edit_doc("Move to new subassembly", cx, |doc, tab| {
             let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Assembly::default()));
+            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
             let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
             let (sub, sid) = parent.move_to_new_subassembly(&ids, sub_tab, &name);
             new_id = Some(sid);
             if let Some(t) = doc.tab_mut(sub_tab) {
-                t.content = TabContent::Assembly(sub);
+                t.content = TabContent::Assembly(Box::new(sub));
             }
         });
         if let Some(id) = new_id {
@@ -1181,10 +1349,10 @@ impl AssemblyView {
 
     /// Drag and drop onto a subassembly row: the instances move into it.
     pub(super) fn move_into_subassembly(&mut self, ids: Vec<InstanceId>, sub_inst: InstanceId, cx: &mut Context<Self>) {
-        let Some(InstanceSource::Assembly { assembly: sub_tab }) = self.assembly(cx).and_then(|a| a.instance(sub_inst)).map(|i| i.source.clone()) else { return };
+        let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = self.assembly(cx).and_then(|a| a.instance(sub_inst)).map(|i| i.source.clone()) else { return };
         let doc = self.doc.read(cx).session.doc.clone();
         // Never move a subassembly into itself or one that contains it.
-        if ids.iter().any(|id| self.assembly(cx).and_then(|a| a.instance(*id)).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { assembly } if contains_assembly(&doc, assembly, sub_tab, 0)))) {
+        if ids.iter().any(|id| self.assembly(cx).and_then(|a| a.instance(*id)).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if contains_assembly(&doc, assembly, sub_tab, 0)))) {
             self.message = Some((true, "Cannot move the instance into the subassembly because it would create cyclical references".into()));
             cx.notify();
             return;
@@ -1210,11 +1378,11 @@ impl AssemblyView {
         let mut new_id = None;
         self.edit_doc("Create empty subassembly", cx, |doc, tab| {
             let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
-            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Assembly::default()));
+            let sub_tab = doc.add_tab(&name, TabContent::Assembly(Box::default()));
             let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) else { return };
             let id = InstanceId(parent.next_id());
             let n = parent.next_instance_name(&name);
-            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
+            parent.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: sub_tab, config: Default::default() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
             new_id = Some(id);
         });
         if let Some(id) = new_id {
@@ -1232,17 +1400,17 @@ impl AssemblyView {
         self.edit_doc("Dissolve subassembly", cx, |doc, tab| {
             for sid in &ids {
                 let Some(TabContent::Assembly(parent)) = doc.tab(tab).map(|t| &t.content) else { return };
-                let Some(InstanceSource::Assembly { assembly: sub_tab }) = parent.instance(*sid).map(|i| i.source.clone()) else { continue };
+                let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = parent.instance(*sid).map(|i| i.source.clone()) else { continue };
                 let Some(TabContent::Assembly(sub)) = doc.tab(sub_tab).map(|t| t.content.clone()) else { continue };
                 if let Some(TabContent::Assembly(parent)) = doc.tab_mut(tab).map(|t| &mut t.content) {
                     created.extend(parent.dissolve_subassembly(*sid, &sub));
                 }
                 let used_elsewhere = doc.tabs.iter().any(|t| match &t.content {
-                    TabContent::Assembly(a) => a.instances.iter().any(|i| matches!(i.source, InstanceSource::Assembly { assembly } if assembly == sub_tab)),
+                    TabContent::Assembly(a) => a.instances.iter().any(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if assembly == sub_tab)),
                     _ => false,
                 });
                 if !used_elsewhere && let Some(t) = doc.tab_mut(sub_tab) {
-                    t.content = TabContent::Assembly(Assembly::default());
+                    t.content = TabContent::Assembly(Box::default());
                 }
             }
         });
@@ -1254,10 +1422,18 @@ impl AssemblyView {
     /// Expand all, Collapse all).
     pub(super) fn assembly_menu(&self, cx: &App) -> Vec<MenuEntry> {
         let any_fixed = self.assembly(cx).is_some_and(|a| a.instances.iter().any(|i| i.fixed));
+        let tab = self.tab;
+        let list_props = self.ui.list_properties;
         let mut m = vec![
-            icon_item("Rename", "rename", |t, w, cx| t.rename_tab(w, cx)),
-            item(if self.ui.com.as_ref().is_some_and(|(c, _)| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
-            icon_item("Check interference…", "interference", |t, _, cx| {
+            item("Properties…", move |t, w, cx| t.open_assembly_properties(tab, w, cx)),
+            item(if list_props { "Hide instance list properties" } else { "Show instance list properties" }, move |t, _, cx| {
+                t.ui.list_properties = !list_props;
+                cx.notify();
+            }),
+            MenuEntry::Sep,
+            item("Rename", |t, w, cx| t.rename_tab(w, cx)),
+            icon_item(if self.ui.com.as_ref().is_some_and(|(c, _)| c.is_empty()) { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", |t, _, cx| t.toggle_center_of_mass(Vec::new(), cx)),
+            item("Check interference…", |t, _, cx| {
                 t.selected.clear();
                 t.run_interference(cx);
             }),
@@ -1266,18 +1442,17 @@ impl AssemblyView {
             m.push(item("Unfix all", |t, _, cx| t.unfix_all(cx)));
         }
         m.push(MenuEntry::Sep);
-        let tab = self.tab;
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         m.push(icon_item(format!("Create Drawing of {name}…"), "drawing", move |_, w, cx| {
-            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
         }));
-        m.push(icon_item("Add exploded view…", "explode", |t, _, cx| {
+        m.push(item("Add exploded view…", |t, _, cx| {
             t.panel = Some(SidePanel::Explode);
             t.add_exploded_view(false, cx);
         }));
         m.push(MenuEntry::Sep);
-        m.push(icon_item("Export…", "export", |t, w, cx| t.open_asm_export(None, w, cx)));
+        m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));
         m.push(item("Collapse all", |t, _, cx| t.expand_all(false, cx)));
@@ -1300,12 +1475,15 @@ impl AssemblyView {
         // Onshape: Rename, Edit… | Reset | Hide, Hide other mates, Hide all
         // mates (hidden: Show, Show all mates), Isolate…, Make transparent…,
         // Suppress | Animate… | Add selection to folder… | Delete.
-        m.push(icon_item("Rename", "rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
-        m.push(icon_item("Edit…", "edit", move |t, w, cx| t.edit_mate(id, w, cx)));
+        let np_editing = self.ui.np_editing.is_some();
+        if !np_editing {
+            m.push(item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
+            m.push(item("Edit…", move |t, w, cx| t.edit_mate(id, w, cx)));
+        }
         let movable = mate.as_ref().is_some_and(|mt| mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width));
         if let Some(mt) = &mate {
             m.push(MenuEntry::Sep);
-            if movable {
+            if movable && !np_editing {
                 m.push(item("Reset", move |t, _, cx| t.reset_mate(id, cx)));
             }
             let keys: Vec<&'static str> = noshape_model::assembly::eval::limit_keys(mt.mate_type).iter().copied().filter(|k| *k != "cone" && mt.limits.iter().any(|(x, _)| x == k)).collect();
@@ -1344,16 +1522,58 @@ impl AssemblyView {
         let ids2 = ids.clone();
         m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, ids.clone(), cx)));
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
-        m.push(icon_item(if suppressed { "Unsuppress" } else { "Suppress" }, "suppress", move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
-        if movable {
+        // Named-position editing mode: no driver, suppression or Animate
+        // items (live 152).
+        if movable && !np_editing {
+            m.push(item("Edit named position driver mate…", move |t, _, cx| t.open_np_driver(id, cx)));
+        }
+        match &mate {
+            _ if np_editing => {}
+            Some(mt) if mt.unsuppressed_if.is_some() => m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), true)),
+            _ => {
+                m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
+                if mate.is_some() {
+                    m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
+                }
+            }
+        }
+        if movable && !np_editing {
             m.push(MenuEntry::Sep);
-            m.push(icon_item("Animate…", "animate", move |t, w, cx| {
+            m.push(item("Animate…", move |t, w, cx| {
                 t.selected_mate = Some(id);
                 t.start_animation(w, cx);
             }));
         }
         m.push(MenuEntry::Sep);
-        m.push(icon_item("Add selection to folder…", "folder", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
+        m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
+        // Expand ▸ / Collapse ▸: the mate rows' connector children (live mate menu).
+        m.push(MenuEntry::Sub {
+            label: "Expand".into(),
+            children: vec![
+                item("Expand selected", move |t, _, cx| {
+                    t.ui.expanded_mates.insert(id);
+                    cx.notify();
+                }),
+                item("Expand all", |t, _, cx| {
+                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+                    t.ui.expanded_mates.extend(ids);
+                    cx.notify();
+                }),
+            ],
+        });
+        m.push(MenuEntry::Sub {
+            label: "Collapse".into(),
+            children: vec![
+                item("Collapse selected", move |t, _, cx| {
+                    t.ui.expanded_mates.remove(&id);
+                    cx.notify();
+                }),
+                item("Collapse all", |t, _, cx| {
+                    t.ui.expanded_mates.clear();
+                    cx.notify();
+                }),
+            ],
+        });
         m.push(MenuEntry::Sep);
         m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
         m
@@ -1409,7 +1629,7 @@ impl AssemblyView {
                 let tab = self.tab;
                 let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
                 m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
-                    let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default() });
+                    let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
                     crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
                 }));
                 m.push(MenuEntry::Sep);
@@ -1558,10 +1778,11 @@ impl AssemblyView {
 
     /// "Inserted: N" of the Insert dialog: placed instances inserted since
     /// it opened that still exist (Undo removes them).
+    /// The Insert dialog's "Inserted: N": instances inserted since it
+    /// opened, including the one still following the cursor (live 04).
     pub(super) fn inserted_count(&self, cx: &App) -> usize {
         let Some(a) = self.assembly(cx) else { return 0 };
-        let placing = self.placing.as_deref().unwrap_or(&[]);
-        self.ui.insert_inserted.iter().filter(|id| a.instance(**id).is_some() && !placing.contains(id)).count()
+        self.ui.insert_inserted.iter().filter(|id| a.instance(**id).is_some()).count()
     }
 
     /// The Insert dialog's undo icon: undo the last insert (an instance
@@ -1627,11 +1848,11 @@ impl AssemblyView {
             .pr(px(5.))
             .gap(px(2.))
             .child(
-                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon("filter", 20., cx)).w(px(26.)).h(px(26.)).p_0().tooltip("Filter").dropdown_menu(move |mut menu, _, _| {
+                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon("filter", 20., cx)).w(px(26.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
                     for c in FilterCommand::ALL {
                         let v = view.clone();
                         let current = current.clone();
-                        menu = menu.item(PopupMenuItem::new(format!("{}  {}", c.label(), c.token())).checked(current.commands.contains(&c)).on_click(move |_, window, cx| {
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(format!("{}  {}", c.label(), c.token())).checked(current.commands.contains(&c)).on_click(move |_, window, cx| {
                             v.update(cx, |this, cx| {
                                 let text = this.ui.filter_input.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
                                 let mut words: Vec<String> = text.split_whitespace().map(|w| w.to_string()).collect();
@@ -1652,7 +1873,7 @@ impl AssemblyView {
     }
 
     /// Does an instance row pass the list filter?
-    pub(super) fn instance_passes(&self, inst: &Instance, node: Option<&InstanceNode>) -> bool {
+    pub(super) fn instance_passes(&self, inst: &Instance, node: Option<&InstanceNode>, cx: &App) -> bool {
         let f = &self.ui.filter;
         if f.is_empty() {
             return true;
@@ -1664,7 +1885,14 @@ impl AssemblyView {
             InstanceSource::Assembly { .. } => RowKind::Assembly,
             _ => RowKind::Part,
         };
-        f.matches(&RowInfo { kind, name: &inst.name, error: node.is_some_and(|n| n.error.is_some()), warning: false, suppressed: inst.suppressed, hidden: inst.hidden, has_limits: false })
+        let warning = self.instance_warning(inst.id, cx).is_some();
+        f.matches(&RowInfo { kind, name: &inst.name, error: node.is_some_and(|n| n.error.is_some()), warning, suppressed: inst.suppressed, hidden: inst.hidden, has_limits: false })
+    }
+
+    /// Does a folder row pass the list filter (`:folder`, or its name)?
+    pub(super) fn folder_passes(&self, folder: &noshape_model::assembly::ListFolder) -> bool {
+        let f = &self.ui.filter;
+        !f.is_empty() && f.matches(&RowInfo { kind: RowKind::Folder, name: &folder.name, error: false, warning: false, suppressed: false, hidden: false, has_limits: false })
     }
 
     /// Does a mate feature row pass the list filter?
@@ -1972,8 +2200,10 @@ impl AssemblyView {
             a.t = if a.dir > 0.0 { 0.0 } else { 1.0 };
         }
         a.playing = true;
-        // About 60 steps per second; more steps play slower.
+        // 60 steps per second, so more steps play slower; time based, so a
+        // slow frame (solve + redraw) skips steps instead of slowing down.
         let step = 1.0 / (steps - 1) as f64;
+        let mut last = std::time::Instant::now();
         a.task = Some(cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor().timer(Duration::from_millis(16)).await;
@@ -1982,7 +2212,10 @@ impl AssemblyView {
                     if !a.playing || a.busy {
                         return a.playing.then_some(None);
                     }
-                    a.t += a.dir * step;
+                    let now = std::time::Instant::now();
+                    let frames = (now.duration_since(last).as_secs_f64() * 60.0).clamp(1.0, 30.0);
+                    last = now;
+                    a.t += a.dir * step * frames;
                     if a.t > 1.0 + 1e-9 || a.t < -1e-9 {
                         match a.playback {
                             Playback::Single => {
@@ -2086,10 +2319,10 @@ impl AssemblyView {
             .small()
             .w(px(110.))
             .dropdown_caret(true)
-            .dropdown_menu(move |mut menu, _, _| {
+            .os_dropdown_menu("anim-playback-dd", true, move |mut menu, _, _| {
                 for (label, v) in [("Single", Playback::Single), ("Reciprocate", Playback::Reciprocate), ("Loop", Playback::Loop)] {
                     let view = view.clone();
-                    menu = menu.item(PopupMenuItem::new(label).checked(v == pb).on_click(move |_, _, cx| {
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(label).checked(v == pb).on_click(move |_, _, cx| {
                         view.update(cx, |this, cx| {
                             if let Some(a) = &mut this.anim {
                                 a.playback = v;
@@ -2476,8 +2709,10 @@ impl AssemblyView {
     /// dialog (list and checkbox inputs; values apply to the next insert).
     pub(super) fn render_insert_config(&mut self, studio: TabId, cx: &mut Context<Self>) -> Option<AnyElement> {
         use noshape_model::configuration::ConfigInputKind;
+        // Part Studios and configured assemblies (Assemblies tab).
         let inputs = match self.doc.read(cx).session.doc.tab(studio).map(|t| &t.content) {
             Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+            Some(TabContent::Assembly(a)) => a.configuration.inputs.clone(),
             _ => return None,
         };
         if inputs.is_empty() {
@@ -2527,29 +2762,30 @@ impl AssemblyView {
 // ---------------------------------------------------------------- live mate values
 
 impl AssemblyView {
-    /// Mates whose values show in the graphics: those of the instance being
-    /// dragged, else the selected mate (Onshape mate value display).
+    /// Mates whose values show in the graphics: only the selected mate
+    /// (live 300–318: nothing during or after a drag; the values stay while
+    /// the mate is selected, Esc keeps them, a click in empty space clears).
     fn value_mates(&self, cx: &App) -> Vec<MateId> {
         let Some(asm) = self.assembly(cx) else { return vec![] };
         let shown = |m: &&Mate| !noshape_model::assembly::eval::mate_dofs(m.mate_type).is_empty();
-        if let Some(d) = self.drag.as_ref().filter(|d| d.started && !d.explode) {
-            return asm.mates.iter().filter(|m| m.uses_instance(d.top)).filter(shown).map(|m| m.id).collect();
-        }
         if let Some((id, ..)) = &self.ui.value_edit {
             return vec![*id];
         }
         self.selected_mate.and_then(|id| asm.mate(id)).filter(shown).map(|m| vec![m.id]).unwrap_or_default()
     }
 
-    /// Value labels of the shown mates at their connectors (Rz, Tx, Ty, Tz as the
-    /// mate allows); double-click one to type a value that moves the parts.
+    /// Value labels of the selected mate: the rotation as "275.326°" beside
+    /// its dashed circle (live 305z: dark blue, 3 decimals, no box), the
+    /// translations as lengths; double-click one to type a value that moves
+    /// the parts (help: Mate values).
     pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let ids = self.value_mates(cx);
-        if ids.is_empty() || self.mate.is_some() {
+        // Not while a mate dialog or the Animate dialog is open.
+        if ids.is_empty() || self.mate.is_some() || self.anim.is_some() {
             return vec![];
         }
-        let pal = p();
         let units = self.units(cx);
+        let radius = self.triad_size() * super::VALUE_ARC_SCALE;
         let vp = self.viewport.read(cx);
         let size = vp.size();
         let mut out = Vec::new();
@@ -2557,45 +2793,40 @@ impl AssemblyView {
             let Some(ms) = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive) else { continue };
             let Some(t) = self.assembly(cx).and_then(|a| a.mate(id)).map(|m| m.mate_type) else { continue };
             let Some(f) = ms.frame_b else { continue };
-            let Some(at) = vp.project(f.origin) else { continue };
-            if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
-                continue;
-            }
-            let mut col = v_flex().absolute().left(px(at.x as f32 + 10.)).top(px(at.y as f32 - 10.)).gap_px();
-            for (ix, label) in noshape_model::assembly::eval::mate_dofs(t) {
+            for (k, (ix, _)) in noshape_model::assembly::eval::mate_dofs(t).iter().enumerate() {
                 let ix = *ix;
                 let v = ms.values[ix];
-                let q = if ix == 0 { noshape_units::Quantity::radians(v) } else { noshape_units::Quantity::meters(v) };
-                let axis = match ix {
-                    0 => "Rz",
-                    1 => "X",
-                    2 => "Y",
-                    _ => "Z",
+                // The rotation label sits on the circle's far side; lengths
+                // stack beside the connector.
+                let anchor = if ix == 0 { f.origin + f.rotation * DVec3::new(-radius, -radius * 0.3, 0.0) } else { f.origin };
+                let Some(at) = vp.project(anchor) else { continue };
+                if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
+                    continue;
+                }
+                let text = if ix == 0 {
+                    format!("{:.3}°", v.to_degrees())
+                } else {
+                    noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units)
                 };
-                let _ = label;
                 let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == ix).map(|(_, _, st, _)| st.clone());
-                let chip = h_flex()
+                let (x, y) = if ix == 0 { (at.x as f32 - 60., at.y as f32 - 8.) } else { (at.x as f32 + 12., at.y as f32 + 14. * k as f32) };
+                let label = div()
                     .id(SharedString::from(format!("mv-{}-{ix}", id.0)))
-                    .gap_1()
-                    .px_1()
-                    .rounded_sm()
-                    .bg(with_alpha(pal.panel_raised, 0.92))
-                    .border_1()
-                    .border_color(pal.border_strong)
-                    .text_xs()
-                    .text_color(pal.text)
-                    .child(div().text_color(pal.text_muted).child(axis));
-                let chip = match editing {
-                    Some(st) => chip.child(div().w(px(80.)).child(Input::new(&st).xsmall())),
-                    None => chip.child(noshape_units::format_quantity(q, &units)).cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                    .absolute()
+                    .left(px(x))
+                    .top(px(y))
+                    .text_size(px(13.))
+                    .text_color(rgb(0x1a35b8));
+                let label = match editing {
+                    Some(st) => label.child(div().w(px(80.)).bg(rgb(0xffffff)).child(Input::new(&st).xsmall())),
+                    None => label.child(text).cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                         if ev.click_count() >= 2 {
                             this.start_value_edit(id, ix, window, cx);
                         }
                     })),
                 };
-                col = col.child(chip.occlude());
+                out.push(label.occlude().into_any_element());
             }
-            out.push(col.into_any_element());
         }
         out
     }
@@ -2865,7 +3096,8 @@ impl AssemblyView {
         let (mut by_conn, mut steps, seeds) = self.ui.iso_expand.clone().unwrap_or_else(|| {
             let mut seeds: Vec<InstanceId> = current.iter().copied().collect();
             seeds.sort();
-            (false, 0, seeds)
+            // Live default: "Expand: connectivity".
+            (true, 0, seeds)
         });
         if let Some(c) = connectivity {
             by_conn = c;
@@ -2884,59 +3116,46 @@ impl AssemblyView {
             self.isolate = Some(set);
         }
         self.ui.iso_expand = Some((by_conn, steps, seeds));
-        self.rebuild_scene(false, cx);
+        self.rebuild_scene(true, cx);
         cx.notify();
     }
 
-    /// Isolate / Make transparent panel slider steps.
-    pub(super) fn step_transparency(&mut self, delta: f32, cx: &mut Context<Self>) {
-        let default = if self.isolate.is_some() { 0.12 } else { 0.35 };
-        let v = (self.ui.transparency.unwrap_or(default) + delta).clamp(0.0, 0.9);
-        self.ui.transparency = Some(v);
-        self.rebuild_scene(false, cx);
-        cx.notify();
-    }
 }
 
 // ---------------------------------------------------------------- export
 
 impl AssemblyView {
     /// Export… (instance menu: those instances; top-level row: the whole
-    /// assembly): choose a format, then where to save. Parts are written at
-    /// their assembly positions.
+    /// assembly): Onshape's Export modal with the assembly format list
+    /// (part_studio/export.rs); parts are written at their assembly positions.
     pub(super) fn open_asm_export(&mut self, ids: Option<Vec<InstanceId>>, window: &mut Window, cx: &mut Context<Self>) {
-        use crate::part_studio::ExportFormat;
-        use gpui_kit::component::WindowExt as _;
         let view = cx.entity();
         let base = match ids.as_deref() {
             Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
             _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
         };
-        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(base));
-        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
-        window.open_dialog(cx, move |dialog, _, cx| {
-            let formats: Vec<String> = ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
-            let (v, c, ids, file2) = (view.clone(), chosen.clone(), ids.clone(), file.clone());
-            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx).on_ok(move |_, window, cx| {
-                let format = ExportFormat::ALL[c.get()];
-                let base = file2.read(cx).value().trim().to_string();
-                let (v, ids, name) = (v.clone(), ids.clone(), format!("{base}.{}", format.ext()));
-                // After this dialog closes (an in-app save prompt is a dialog too).
-                window.defer(cx, move |window, cx| {
-                    crate::files::request_save_path("Export", name, format.ext(), window, cx, move |path, cx| {
-                        v.update(cx, |this, cx| {
-                            let msg = match this.export_occurrences(format, &path, ids.as_deref()) {
-                                Ok(n) => (false, format!("Exported {n} parts to {}", path.display())),
-                                Err(e) => (true, format!("Export failed: {e:#}")),
-                            };
-                            this.message = Some(msg);
-                            cx.notify();
-                        });
-                    });
+        let run: crate::part_studio::export::RunExport = std::rc::Rc::new(move |s, name, window, cx| {
+            let (v, ids) = (view.clone(), ids.clone());
+            if let Some(msg) = crate::part_studio::export::missing_writer(s.format) {
+                v.update(cx, |this, cx| {
+                    this.message = Some((true, msg));
+                    cx.notify();
                 });
-                true
-            })
+                return;
+            }
+            let file = format!("{name}.{}", s.format.ext());
+            crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
+                v.update(cx, |this, cx| {
+                    let parts = this.export_parts(ids.as_deref(), s.hidden);
+                    this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
+                        Ok(p) => (false, format!("Exported {}", p.display())),
+                        Err(e) => (true, format!("Export failed: {e:#}")),
+                    });
+                    cx.notify();
+                });
+            });
         });
+        crate::part_studio::export::open_export_modal(base, true, run, window, cx);
     }
 
     /// Tab › Export… of an Assembly tab: the whole assembly.
@@ -2944,41 +3163,21 @@ impl AssemblyView {
         self.open_asm_export(None, window, cx);
     }
 
-    /// Write the visible parts of `ids` (None: every instance) at their
-    /// assembly positions. Returns the number of parts written.
-    pub(super) fn export_occurrences(&self, format: crate::part_studio::ExportFormat, path: &std::path::Path, ids: Option<&[InstanceId]>) -> anyhow::Result<usize> {
-        use crate::part_studio::ExportFormat;
+    /// The parts to export: instances `ids` (None: all) at their assembly
+    /// positions, hidden ones only with "Include hidden instances in export".
+    fn export_parts(&self, ids: Option<&[InstanceId]>, include_hidden: bool) -> Vec<(String, noshape_kernel::Shape, [f32; 4])> {
         use noshape_kernel as k;
-        let mut shapes: Vec<k::ExportShape> = Vec::new();
-        for o in &self.result.occurrences {
-            if o.hidden || ids.is_some_and(|ids| !ids.contains(&o.top())) {
-                continue;
-            }
-            let Some(b) = o.context.bodies.iter().find(|b| b.id == o.body) else { continue };
-            let shape = b.shape.transformed(&k::Transform::Matrix(o.transform))?;
-            let c = o.color;
-            shapes.push(k::ExportShape { shape, name: Some(o.instance_name.clone()), color: Some([c[0].powf(1.0 / 2.2), c[1].powf(1.0 / 2.2), c[2].powf(1.0 / 2.2)]) });
-        }
-        anyhow::ensure!(!shapes.is_empty(), "There are no parts to export");
-        let n = shapes.len();
-        match format {
-            ExportFormat::Step => k::write_step(path, &shapes, k::LengthUnit::Meter)?,
-            ExportFormat::Iges => k::write_iges(path, &shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
-            ExportFormat::Brep => k::write_brep(&k::Shape::compound(&shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>()), path)?,
-            ExportFormat::Stl | ExportFormat::Obj => {
-                // Mesh formats are unitless; millimeters (as the Part Studio export).
-                let c = k::Shape::compound(&shapes.into_iter().map(|s| s.shape).collect::<Vec<_>>());
-                let mm = c.transformed(&k::Transform::Scale { center: DVec3::ZERO, factor: 1000.0 })?;
-                let diag = mm.bounding_box(false).map(|b| b.diagonal()).unwrap_or(100.0);
-                let defl = (diag * 2e-4).max(1e-3);
-                if format == ExportFormat::Stl {
-                    k::write_stl(&mm, path, defl, k::StlFormat::Binary)?;
-                } else {
-                    k::write_obj(&mm, path, defl)?;
-                }
-            }
-        }
-        Ok(n)
+        self.result
+            .occurrences
+            .iter()
+            .filter(|o| (include_hidden || !o.hidden) && ids.is_none_or(|ids| ids.contains(&o.top())))
+            .filter_map(|o| {
+                let b = o.context.bodies.iter().find(|b| b.id == o.body)?;
+                let shape = b.shape.transformed(&k::Transform::Matrix(o.transform)).ok()?;
+                let c = o.color;
+                Some((o.instance_name.clone(), shape, [c[0], c[1], c[2], 1.0]))
+            })
+            .collect()
     }
 }
 
@@ -3032,4 +3231,48 @@ impl AssemblyView {
         let p = vp.project(*at)?;
         Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&icon_path("com-indicator"), 18., cx)).into_any_element())
     }
+}
+
+/// Transparency of the dimmed instances at the slider's ends.
+const ISO_ALPHA_MIN: f32 = 0.12;
+const ISO_ALPHA_MAX: f32 = 0.9;
+
+/// Onshape's noUi slider in the Isolate dialog: a 183 px track (2 px inset
+/// `#777` outline, radius 6) with an 11 px round white handle; click or drag
+/// sets the fraction.
+fn iso_slider(id: &'static str, t: f32, tip: &'static str, cx: &mut Context<AssemblyView>, set: impl Fn(&mut AssemblyView, f32, &mut Context<AssemblyView>) + 'static) -> AnyElement {
+    let track: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let (t1, t2, t3) = (track.clone(), track.clone(), track);
+    let set = Rc::new(set);
+    let s2 = set.clone();
+    let frac = |x: Pixels, b: Bounds<Pixels>| (f32::from(x - b.left()) / f32::from(b.size.width).max(1.0)).clamp(0.0, 1.0);
+    div()
+        .id(id)
+        .relative()
+        .h(px(15.))
+        .mx(px(11.))
+        .cursor_pointer()
+        .tooltip(crate::ui::tooltip(tip))
+        .child(div().absolute().left_0().right_0().top(px(4.)).h(px(7.)).rounded(px(6.)).border_2().border_color(rgb(0x777777)))
+        .child(
+            div()
+                .absolute()
+                .top(px(2.))
+                .left(relative(t))
+                .ml(px(-6.))
+                .size(px(11.))
+                .rounded_full()
+                .bg(rgb(0xffffff))
+                .border_1()
+                .border_color(rgb(0x888888))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]),
+        )
+        .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| set(this, frac(e.position.x, t2.get()), cx)))
+        .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
+            if e.pressed_button == Some(MouseButton::Left) {
+                s2(this, frac(e.position.x, t3.get()), cx);
+            }
+        }))
+        .into_any_element()
 }

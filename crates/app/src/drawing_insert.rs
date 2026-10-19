@@ -9,7 +9,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -31,11 +31,16 @@ pub struct InsertViewState {
     /// "Select a part or assembly" chooser: open, and its tab (0 Part
     /// Studios, 1 Assemblies).
     pub chooser: Option<u8>,
+    /// Insert a sketch of the source (a sketch view).
+    pub sketch: Option<noshape_model::FeatureId>,
+    /// The chooser picks a replacement for this source (Sheets panel ›
+    /// BOM › Replace): its views (and so its BOM) switch to the choice.
+    pub replace: Option<TabId>,
 }
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, replace: None }
     }
 }
 
@@ -118,11 +123,26 @@ impl DrawingEditor {
 
     fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
+        if let Some(old) = self.insert.replace.take() {
+            // Replace: every base view of the old source shows the new one.
+            self.edit_sheet("Replace", cx, |s| {
+                for v in s.views.iter_mut() {
+                    if let ViewKind::Base { source: src, .. } = &mut v.kind
+                        && *src == old
+                    {
+                        *src = source;
+                    }
+                }
+            });
+            self.ensure_sources(false, cx);
+            return;
+        }
         let orientation = match &self.tool {
             Tool::InsertView { orientation, .. } => *orientation,
             _ => ViewOrientation::Front,
         };
         self.tool = Tool::Select;
+        self.insert.sketch = None;
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
     }
 
@@ -162,10 +182,10 @@ impl DrawingEditor {
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0xd7d7d7))
                 .rounded(px(0.))
-                .dropdown_menu(move |mut menu, _, _| {
+                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                     for (label, checked, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
-                        menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| f(this, cx))));
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| f(this, cx))));
                     }
                     menu
                 })
@@ -224,8 +244,8 @@ impl DrawingEditor {
             v_flex()
                 .id("dr-insert-view")
                 .absolute()
-                .top(px(4.))
-                .left(px(4.))
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
                 .w(px(247.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -330,6 +350,14 @@ impl DrawingEditor {
                             let bid = b.id.clone();
                             list = list.child(row(SharedString::from(format!("dr-ch-p-{id}-{}", b.id)), 20., "part", b.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, Some(bid.clone()), cx))));
                         }
+                        // Sketches give sketch views.
+                        for s in &src.context.sketches {
+                            let f = s.feature;
+                            list = list.child(row(SharedString::from(format!("dr-ch-s-{id}-{}", f.0)), 20., "sketch", s.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.choose_source(id, None, cx);
+                                this.insert_sketch(Some(f), cx);
+                            })));
+                        }
                     }
                 }
                 (true, 1) => {
@@ -351,7 +379,7 @@ impl DrawingEditor {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(hsla(0., 0., 0., 0.2))
+                .bg(pal.modal_backdrop)
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -359,7 +387,7 @@ impl DrawingEditor {
                     v_flex()
                         .w(px(420.))
                         .h(px(460.))
-                        .bg(pal.dialog_bg)
+                        .bg(pal.modal_bg)
                         .rounded(px(4.))
                         .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.25), offset: point(px(0.), px(6.)), blur_radius: px(18.), spread_radius: px(0.), inset: false }])
                         .text_color(pal.text)
@@ -381,5 +409,20 @@ impl DrawingEditor {
                 )
                 .into_any_element(),
         )
+    }
+}
+
+impl DrawingEditor {
+    /// Insert view of a sketch ("Create Drawing of Sketch N…" with No views).
+    pub fn insert_sketch(&mut self, sketch: Option<noshape_model::FeatureId>, cx: &mut Context<Self>) {
+        self.insert.sketch = sketch;
+        self.update_preview(cx);
+    }
+
+    /// The view frame of the sketch being inserted (looking at its plane).
+    pub fn insert_sketch_frame(&self, source: noshape_model::document::TabId) -> Option<[[f64; 3]; 2]> {
+        let f = self.insert.sketch.as_ref()?;
+        let key = noshape_model::drawing::views::SourceKey { tab: source, config: Default::default(), explode: None, version: None };
+        noshape_model::drawing::views::sketch_frame(&self.sources.get(&key)?.context, f)
     }
 }

@@ -19,7 +19,8 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 1.4 | Double-click a sketch in the Feature list (or Edit) re-opens it | B§1.1 | ✅ |
 | 1.5 | View is **not** reoriented on entry by default; `n` views normal to the sketch plane, `n` again flips | View__orient_normal_to_sketch_on_edit, B§1.4 | ✅ |
 | 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) |
-| 1.7 | A new empty sketch starts with the Line tool | LE (Onshape default) | ✅ |
+| 1.7 | A new sketch starts with no tool active once the plane is picked (live sketch/00, 01, 44; was Line, changed 2026-10-19 per ui's pixel pass; confirmation requested) | Live | ✅ (GUI :103 n1) |
+| 1.7a | The empty sketch's light-blue frame is 200 × 112.5 mm (16:9, twice the default plane's width), growing with the geometry | Live sketch/00, 44, ui final-sketch-start | ✅ (GUI :103 n1: frame/plane width 1.68 vs live 1.70) |
 | 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ |
 | 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) |
 | 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) |
@@ -63,7 +64,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ |
 | 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ |
-| 3.13 | Shortcuts are user-customizable | B§2.1 | 🔧 (assignments work and apply immediately (sketch-shortcuts.json); the sheet's "Customize keyboard shortcuts" link opens a small sketch-only panel, live opens a full preferences page: page requested from live capture, then match it) |
+| 3.13 | Shortcuts are user-customizable | B§2.1 | ✅ (Shift+/ › Customize keyboard shortcuts opens the Preferences window scrolled to Keyboard shortcuts, like live's /user/settings?focusView=customize-keyboard-shortcuts tab (shortcuts/30–47): tabs, Edit / Reset per row, legend, Reset all, Shortcut toolbars; GUI :103 k1–k2) |
 
 ## 4. Geometry tools: clicks, drags and results
 
@@ -316,3 +317,12 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.36 | Typed expressions on ellipse axis (diameter) dimensions are kept and regenerate correctly | H:dimension | ✅ (T:sm + model test `ellipse_diameter_expressions_regenerate_as_radii` pass) |
 | 14.37 | Used (projected) geometry carries the "use" glyph at its middle and both ends; hovering it highlights the entity; selecting it + Delete unlinks the geometry (stays as free sketch geometry) | Live sketch/202 | ✅ (T:sm; GUI :103 m9-hover-c.png: cube use glyph on hover; select + Delete → m9-unlinked-c.png, the circle becomes free blue geometry) |
 | 14.38 | Used geometry is drawn black (fixed) like live, not purple | Live sketch/202 | ✅ (ui2: `sketch_color` draws external geometry in the constrained color; `SKETCH_EXTERNAL` removed) |
+| 14.39 | Live values next to the rubber band while drawing (line length, rectangle width/height, circle Ø outside the circle, arc R, ellipse axes, polygon Ø) in `#449ccd` 13 px, no box | Live sketch/05, 09, 51, 76–80 | ✅ (QA3; `preview_values`, T:sm `rubber_band_shows_live_values`; GUI :103 q1.png / q3-c.png) |
+| 14.40 | Point tool drops hollow points (white center, colored ring); Bezier control points hollow | Live behaviours.md §Point, sketch/103 | ✅ (QA3; point style bit `PointSprite::HOLLOW` (render shader) for standalone points and spline control points; GUI q1.png) |
+| 14.41 | Vertical (steep) linear dimensions: text beside the unbroken dimension line; horizontal ones break the line around the text | Live sketch/17 | ✅ (QA3; `labels_beside_line`; GUI q3-c.png) |
+| 14.42 | A just-applied dimension stays selected (amber box) | Live sketch/148 | ✅ (QA3; value-box commit selects the dimension; GUI q3-c.png) |
+| 14.43 | Right-click with a tool active: "Escape line" first (directly above Confirm Sketch N, no separator), no Curve/surface analysis; clicking it exits the tool | Live sketch/400–406, menus/rmb-sketch-linetool-*.png | ✅ (GUI :103 s2 matches rmb-sketch-linetool-empty incl. the separator before Select ▸) |
+| 14.44 | Select ▸ with nothing selected lists only "Create selection…" | Live menus/rmb-sketch-empty-select-submenu.png | ✅ (GUI :103 s3) |
+| 14.45 | Esc with that menu open: first Esc exits the tool (menu stays), second Esc closes the menu | Live sketch/405–408 | ✅ (GUI :103 s4–s5; `OsMenu::on_first_escape`) |
+| 14.46 | Choosing a drawing tool (L) clears the selection | Live sketch/401–402 | ✅ (T:sm `choosing_a_drawing_tool_clears_the_selection`) |
+| 14.47 | A dimension's value box shows the value with the document unit, selected: lengths with 6 decimals ("3.51041 in", "1.725582 in"), angles with 7 ("35.5376823 deg"), zeros trimmed; a value typed as a plain number reopens with its unit ("80" → "80 mm") | Live sketch/13, 141, 143; QA3 | ⏳ (`dimension_edit_text`; Enter on the untouched box keeps the exact value (`commit_dimension`); T:sm `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value` extended; GUI dm2 showed the old 8-decimal text pushing " mm" out of the box; recheck once the shared tree builds) |

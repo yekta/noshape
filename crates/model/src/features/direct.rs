@@ -14,7 +14,7 @@ pub fn register(out: &mut Vec<FeatureType>) {
 
 pub fn delete_face() -> FeatureType {
     let p = vec![
-        ParamSpec::query("deleteFaces", "Delete faces", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query("deleteFaces", "Delete faces", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS | Hints::SHOW_CREATE_SELECTION),
         ParamSpec::enum_("healType", "Type", &[("HEAL", "Heal"), ("CAP", "Cap"), ("VOID", "Leave open")]).hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::bool("includeFillet", "Delete fillet faces", true),
     ];
@@ -29,12 +29,13 @@ pub fn move_face() -> FeatureType {
     let has_off = move |v: &ParamValues| up_to(v) && v.bool("hasOffset");
     let p = vec![
         hidden(ParamSpec::enum_("outputType", "Creation type", &[("MOVE", "Move"), ("CREATE", "Create")])),
-        ParamSpec::query("moveFaces", "Faces to move", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS).visible(mv),
+        ParamSpec::query("moveFaces", "Faces to move", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS | Hints::SHOW_CREATE_SELECTION).visible(mv),
         ParamSpec::query(
             "surfacesAndFaces",
             "Faces, surfaces, and sketch regions to offset",
             QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY,
         )
+        .hints(Hints::SHOW_CREATE_SELECTION)
         .visible(move |v| !mv(v)),
         ParamSpec::enum_("moveFaceType", "Move face type", &[("OFFSET", "Offset"), ("TRANSLATE", "Translate"), ("ROTATE", "Rotate")]),
         ParamSpec::query1("direction", "Direction", QueryFilter::DIRECTION).visible(move |v| ty(v, "TRANSLATE")),
@@ -60,7 +61,7 @@ pub fn move_face() -> FeatureType {
 
 pub fn replace_face() -> FeatureType {
     let p = vec![
-        ParamSpec::query("replaceFaces", "Faces to replace", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query("replaceFaces", "Faces to replace", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS | Hints::SHOW_CREATE_SELECTION),
         ParamSpec::query("templateFace", "Faces to replace with", QueryFilter::ANY_FACE | QueryFilter::PLANE),
         hidden(ParamSpec::bool("showFlip", "Show flip", true)),
         ParamSpec::bool("oppositeSense", "Flip alignment", false).visible(|v| v.bool("showFlip")),

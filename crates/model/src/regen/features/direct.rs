@@ -36,7 +36,7 @@ fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
 pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
     let groups = by_body(ev.resolve_faces(ev.query("deleteFaces")));
     if groups.is_empty() {
-        return err("Select faces to delete");
+        return crate::regen::eval::err_at(&["deleteFaces"], "Select faces to delete.");
     }
     let heal = ev.enum_("healType").to_string();
     for (bi, faces) in groups.into_iter().rev() {
@@ -157,7 +157,7 @@ fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
 
 /// Move faces by a rigid transform: remove them (healing the gap with the
 /// neighbours), then re-apply the region they bounded at the new place.
-fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FResult<()> {
+pub(crate) fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FResult<()> {
     let body = ev.ctx.bodies[bi].clone();
     let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
     let healed = k::delete_faces(&body.shape, &shapes).map_err(kerr("Move face failed (the faces could not be removed from the part)"))?;
@@ -208,7 +208,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     }
     let groups = by_body(ev.resolve_faces(ev.query("moveFaces")));
     if groups.is_empty() {
-        return err("Select faces to move");
+        return crate::regen::eval::err_at(&["moveFaces"], "Select faces to move.");
     }
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
@@ -253,7 +253,18 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
             ev.length("offsetDistance")? * sign
         };
         let res = match translate_dir {
-            None => k::offset_faces(&body.shape, &shapes, dist).map_err(kerr("Move face failed"))?,
+            None => match k::offset_faces(&body.shape, &shapes, dist) {
+                Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
+                // OCCT can't rebuild the topology (the face passes through a hole,
+                // a hole closes or splits the part): booleans.
+                other => {
+                    if let Err(e) = &other {
+                        log::debug!("move face: offset failed ({e}), trying booleans");
+                    }
+                    offset_by_booleans(ev, bi, &faces, dist).map_err(|e| crate::regen::eval::FeatureError::new(format!("Move face failed: {}", e.message)))?;
+                    continue;
+                }
+            },
             Some(d) => {
                 // Planar faces moved along their normal: offset (neighbours follow).
                 let mut each = Vec::new();
@@ -275,6 +286,81 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
         ev.replace_body(bi, res.shape, names);
     }
+    Ok(())
+}
+
+/// The region a face sweeps when offset by `d` along its outward normal (d < 0:
+/// into the part). A cylinder face offset past its axis (a hole closing)
+/// sweeps the whole cylinder.
+fn face_slab(f: &Shape, d: f64) -> FResult<Shape> {
+    if let k::Surface::Cylinder { origin, axis, radius, .. } = f.face_surface()? {
+        // Offset toward the axis by at least the radius (outward normal pointing in).
+        // A point on the face (a full cylinder's centroid is on its axis).
+        let c = f.project_point(f.centroid()? + axis.any_orthonormal_vector() * radius)?.point;
+        let n = f.normal_at_point(c)?;
+        let toward_axis = n.dot((origin + axis * (c - origin).dot(axis)) - c) > 0.0;
+        if toward_axis && d >= radius * (1.0 - 1e-9) && f.edges().iter().any(|e| e.is_closed().unwrap_or(false)) {
+            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+            for v in f.vertices() {
+                let t = (v.vertex_point()? - origin).dot(axis);
+                lo = lo.min(t);
+                hi = hi.max(t);
+            }
+            return Ok(k::make_cylinder(&k::Plane::from_normal(origin + axis * lo, axis), radius, hi - lo, std::f64::consts::TAU)?);
+        }
+    }
+    // Thicken, then make sure the slab is on the requested side.
+    let p = f.centroid()?;
+    let probe = f.project_point(p)?.point + f.normal_at_point(p)? * (d * 0.5);
+    for (t1, t2) in [(d.max(0.0), (-d).max(0.0)), ((-d).max(0.0), d.max(0.0))] {
+        let Ok(r) = k::thicken(f, t1, t2) else { continue };
+        if !r.shape.is_valid() {
+            continue;
+        }
+        if r.shape.classify_point(probe, d.abs() * 1e-6)? == k::PointClass::Inside {
+            return Ok(r.shape);
+        }
+    }
+    err("The face could not be offset")
+}
+
+/// Move face (offset) by booleans, where OCCT's offset fails: each face's slab
+/// is added (outward) or cut (inward), the faces on the far side of the slabs
+/// are the moved faces. A part that falls apart keeps its largest piece
+/// (Onshape keeps one part: a hole grown to touch both sides leaves one half).
+fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -> FResult<()> {
+    use super::sheetmetal_util::{bool_named, body_named, tool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let feature = ev.feature;
+    let mut tools = Vec::new();
+    for &fi in faces {
+        let f = body.shape.sub_shape(ShapeType::Face, fi)?;
+        let parent = body.faces[fi].clone();
+        tools.push(tool_named(face_slab(&f, dist)?, |_| Arc::new(TopoName::face(feature, Role::Offset(parent.clone())))));
+    }
+    let op = if dist > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+    let (shape, names) = bool_named(ev, op, &body_named(&body), &tools)?;
+    let un = k::unify_same_domain(&shape)?;
+    let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);
+    let mut pieces = crate::regen::eval::split_solids(&un.shape, &names);
+    if pieces.is_empty() {
+        return err("Nothing is left of the part");
+    }
+    let key = |p: &crate::regen::eval::NamedShape| -> (f64, [f64; 3]) {
+        let v = k::volume_properties(&p.shape).map(|m| m.mass).unwrap_or(0.0);
+        let c = p.shape.bounding_box(false).map(|b| b.center()).unwrap_or_default();
+        (v, [c.x, c.y, c.z])
+    };
+    // Largest; equal volumes: the one nearest the origin corner (lowest x, y, z).
+    let best = (0..pieces.len())
+        .max_by(|&a, &b| {
+            let (ka, kb) = (key(&pieces[a]), key(&pieces[b]));
+            let tol = 1e-9 * ka.0.abs().max(kb.0.abs());
+            if (ka.0 - kb.0).abs() > tol { ka.0.total_cmp(&kb.0) } else { kb.1.partial_cmp(&ka.1).unwrap_or(std::cmp::Ordering::Equal) }
+        })
+        .unwrap_or(0);
+    let piece = pieces.swap_remove(best);
+    ev.replace_body(bi, piece.shape, piece.names.faces);
     Ok(())
 }
 

@@ -103,7 +103,7 @@ struct CachedBody {
 pub struct GpuCache {
     bodies: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Arc<CachedBody>)>,
     /// Colored body meshes keyed by (mesh, colors) pointers.
-    colored: HashMap<(usize, usize), (std::sync::Weak<Vec<[u8; 4]>>, MeshHandle)>,
+    colored: HashMap<(usize, usize), ColoredMesh>,
     /// Hidden-edge overlays (dashed, on top) keyed by mesh pointer.
     hidden_edges: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, LinesHandle)>,
     /// Edges without the tangent ones (and the tangent ones dash-dot) for
@@ -118,6 +118,10 @@ pub struct GpuCache {
 
 /// Boundary edges: solid (visible) and dashed on top (hidden) lines.
 type BoundaryLines = (LinesHandle, LinesHandle);
+/// Per-body per-vertex sRGB colors (face appearances).
+pub type VertexColors = Arc<HashMap<noshape_model::BodyId, Arc<Vec<[u8; 4]>>>>;
+/// A per-vertex-colored mesh upload and the colors it was made from.
+type ColoredMesh = (std::sync::Weak<Vec<[u8; 4]>>, MeshHandle);
 
 #[derive(Clone)]
 struct TangentLines {
@@ -161,13 +165,18 @@ pub struct SceneOptions {
     pub section: Vec<(glam::DVec3, f64)>,
     /// Per-vertex colors (sRGB) replacing a body's color: analysis maps
     /// and face appearances. Indexed like the body's mesh positions.
-    pub vertex_colors: Option<Arc<HashMap<noshape_model::BodyId, Arc<Vec<[u8; 4]>>>>>,
+    pub vertex_colors: Option<VertexColors>,
     /// Draw edges hidden behind faces as dashed lines.
     pub hidden_edges_visible: bool,
     /// How tangent (smooth) edges are drawn.
     pub tangent_edges: TangentEdges,
     /// Parts the section view leaves whole.
     pub section_skip: Vec<noshape_model::BodyId>,
+    /// Feature preview bodies: shaded with the preview lighting.
+    pub preview_bodies: Vec<noshape_model::BodyId>,
+    /// Bodies drawn for display only: not pickable and never highlighted
+    /// (a Transform's moved preview, whose original is the selectable ghost).
+    pub display_only: Vec<noshape_model::BodyId>,
     /// Onshape's "Highlight boundary edges": laminar edges in red, solid
     /// where visible and dashed where hidden.
     pub highlight_boundary: bool,
@@ -202,6 +211,9 @@ pub struct BuiltScene {
 
 const EDGE_COLOR: u32 = theme::viewport::EDGE;
 
+/// Pick base of display-only bodies: beyond any scene's pick ids.
+const DISPLAY_ONLY_PICK_BASE: u32 = 1 << 30;
+
 pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache, up: &Uploader) -> BuiltScene {
     let _t = noshape_render::perf::scope("s.build");
     let mut scene = Scene::default();
@@ -223,13 +235,23 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 c
             }
         };
-        let face_base = picks.reserve(b.face_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Face, anchor: None }));
-        let edge_base = picks.reserve(b.edge_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Edge, anchor: None }));
-        let vert_base = picks.reserve(b.vertex_refs.iter().enumerate().map(|(i, r)| PickTarget {
-            reference: r.clone(),
-            kind: PickKind::Vertex,
-            anchor: b.mesh.vertices.get(i).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)),
-        }));
+        let display_only = opts.display_only.contains(&b.id);
+        let first_instance = scene.instances.len();
+        // Display-only bodies get pick ids past the highlight states (so no
+        // state ever applies to them) and draw unpickable.
+        let (face_base, edge_base, vert_base) = if display_only {
+            (DISPLAY_ONLY_PICK_BASE, DISPLAY_ONLY_PICK_BASE, DISPLAY_ONLY_PICK_BASE)
+        } else {
+            (
+                picks.reserve(b.face_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Face, anchor: None })),
+                picks.reserve(b.edge_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Edge, anchor: None })),
+                picks.reserve(b.vertex_refs.iter().enumerate().map(|(i, r)| PickTarget {
+                    reference: r.clone(),
+                    kind: PickKind::Vertex,
+                    anchor: b.mesh.vertices.get(i).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)),
+                })),
+            )
+        };
         let mut color = b.color;
         if opts.transparent_bodies || b.kind == BodyKind::Surface {
             color[3] = color[3].min(if b.kind == BodyKind::Surface { 0.85 } else { 0.35 });
@@ -259,9 +281,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
                 // which is ~0.48 in the renderer's linear blending.
                 DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
-                // Faces drawn in the background color hide what is behind them.
-                DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)),
+                // Faces drawn flat in the background color hide what is behind
+                // them (live part-studio/61: white, unlit, only the edges show).
+                DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
             };
+            let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
             // Parts excluded from the section view are not cut.
             scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
         }
@@ -341,6 +365,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let red = theme::lin(theme::viewport::BOUNDARY_EDGE);
                 scene.instances.push(Instance::new(Drawable::Lines(solid)).with_color(red).unpickable().layer(3));
                 scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
+            }
+        }
+        if display_only {
+            for i in &mut scene.instances[first_instance..] {
+                i.pickable = false;
             }
         }
     }
@@ -577,6 +606,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone() };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
+    let mut overlay_lines = LineData::default();
     let sel_color = theme::lin(theme::viewport::SELECTION);
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
     // Onshape outlines hovered and selected faces (their boundary edges
@@ -602,10 +632,20 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         && let Some(sk) = display.sketches.iter().find(|s| s.feature == *sketch)
                         && let Some(reg) = sk.regions.iter().find(|g| &g.key == key)
                     {
-                        let n: [f32; 3] = sk.frame.normal.as_vec3().into();
-                        let mut c = if flag == state::HOVER { hov_color } else { sel_color };
-                        c[3] = if flag == state::HOVER { 0.25 } else { 0.4 };
-                        overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, c));
+                        // Live (dialogs/extrude-02, 04): a hovered region shows only
+                        // its boundary in light orange; a selected one is filled
+                        // amber with an amber boundary.
+                        let hovered = flag == state::HOVER;
+                        let c = if hovered { hov_color } else { sel_color };
+                        for (a, b) in region_outline(&reg.positions, &reg.indices) {
+                            overlay_lines.segments.push(LineSegment { a, b, color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+                        }
+                        if !hovered {
+                            let n: [f32; 3] = sk.frame.normal.as_vec3().into();
+                            let mut fill = c;
+                            fill[3] = 0.4;
+                            overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill));
+                        }
                     }
                 }
                 _ => {}
@@ -632,8 +672,31 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for (m, c) in overlay_regions {
         scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(8));
     }
+    if !overlay_lines.segments.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&overlay_lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+    }
     scene.instances.extend(extra);
     scene
+}
+
+/// An edge by its quantized end points.
+type EdgeKey = ([i64; 3], [i64; 3]);
+
+/// The boundary of a triangulated region: the triangle edges used once
+/// (vertices matched by position, so split meshes work too).
+fn region_outline(positions: &[[f32; 3]], indices: &[u32]) -> Vec<([f32; 3], [f32; 3])> {
+    let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
+    // Edge (quantized ends) -> (uses, ends).
+    let mut count: HashMap<EdgeKey, (u32, [f32; 3], [f32; 3])> = HashMap::new();
+    for t in indices.as_chunks::<3>().0 {
+        for (i, j) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+            let (Some(a), Some(b)) = (positions.get(i as usize), positions.get(j as usize)) else { continue };
+            let (qa, qb) = (q(a), q(b));
+            let key = if qa <= qb { (qa, qb) } else { (qb, qa) };
+            count.entry(key).or_insert((0, *a, *b)).0 += 1;
+        }
+    }
+    count.into_values().filter(|(n, _, _)| *n == 1).map(|(_, a, b)| (a, b)).collect()
 }
 
 /// `NOSHAPE_PERF`: log a regeneration's per-feature timing breakdown.

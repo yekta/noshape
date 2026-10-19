@@ -37,7 +37,7 @@ fn pattern_type_block(types: &'static [(&'static str, &'static str)], label: &'s
         ParamSpec::enum_("patternType", label, types),
         operation_type(is_part),
         ParamSpec::query("entities", ent, PATTERN_BODIES).hints(Hints::INITIAL_FOCUS).visible(is_part),
-        ParamSpec::query("faces", faces, QueryFilter::ANY_FACE).visible(|v| v.is("patternType", "FACE")),
+        ParamSpec::query("faces", faces, QueryFilter::ANY_FACE).hints(Hints::SHOW_CREATE_SELECTION).visible(|v| v.is("patternType", "FACE")),
         ParamSpec::query("instanceFunction", feats, QueryFilter::FEATURE).visible(|v| v.is("patternType", "FEATURE")),
     ]
 }
@@ -53,13 +53,13 @@ pub fn linear_pattern() -> FeatureType {
     let second = |v: &ParamValues| v.bool("hasSecondDir");
     let mut p = pattern_type_block(PATTERN_TYPE, "Pattern type", false);
     p.extend([
-        ParamSpec::query1("directionOne", "Direction", QueryFilter::DIRECTION),
+        ParamSpec::query1("directionOne", "Direction", QueryFilter::DIRECTION).hints(Hints::NO_MATE_CONNECTOR_BUTTON),
         ParamSpec::num("distance", "Distance", NumSpec::positive_length(25.0, 1.0)),
         ParamSpec::num("instanceCount", "Instance count", NumSpec::integer(2, 1, 2500)),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
         ParamSpec::bool("isCentered", "Centered", false),
         ParamSpec::bool("hasSecondDir", "Second direction", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::query1("directionTwo", "Direction", QueryFilter::DIRECTION).visible(second),
+        ParamSpec::query1("directionTwo", "Direction", QueryFilter::DIRECTION).hints(Hints::NO_MATE_CONNECTOR_BUTTON).visible(second),
         ParamSpec::num("distanceTwo", "Distance", NumSpec::positive_length(25.0, 1.0)).visible(second),
         ParamSpec::num("instanceCountTwo", "Instance count", NumSpec::integer(1, 1, 2500)).visible(second),
         ParamSpec::flip("oppositeDirectionTwo", "Opposite direction").visible(second),

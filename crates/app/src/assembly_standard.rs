@@ -227,11 +227,11 @@ impl AssemblyView {
         }
         button
             .dropdown_caret(true)
-            .dropdown_menu(move |mut menu, _, _| {
+            .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
                 for o in &options {
                     let v = view.clone();
                     let o2 = o.clone();
-                    menu = menu.item(PopupMenuItem::new(o.clone()).checked(*o == current).on_click(move |_, _, cx| v.update(cx, |this, cx| on_pick(this, &o2, cx))));
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(*o == current).on_click(move |_, _, cx| v.update(cx, |this, cx| on_pick(this, &o2, cx))));
                 }
                 menu
             })

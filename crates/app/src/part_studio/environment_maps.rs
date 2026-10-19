@@ -2,7 +2,7 @@
 //! maps), used by Reflection analysis. Equirectangular, Z up, row 0 looks
 //! straight up; generated procedurally after the library's previews.
 
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 
 /// The library's images, in its order.
 pub const NAMES: [&str; 11] = ["Blue sky", "Ceiling hexagonal", "Ceiling square", "Chromatic", "Daylight road", "Horizontal stripe", "Light tunnel", "Metro station", "Nightfall", "Pedestrian bridge", "Wall stripes"];
@@ -61,16 +61,23 @@ fn band(x: f64, width: f64) -> f64 {
     1.0 - smooth(width * 0.5, width, x.abs())
 }
 
-/// Sky gradient above the horizon, sun glow, bright horizon line and a
-/// darker blue ground that mirrors it.
+/// Cheap hash noise in 0..1 (grain for floors and stars).
+fn noise(d: DVec3, scale: f64) -> f64 {
+    let q = (d * scale).floor();
+    let h = (q.x * 127.1 + q.y * 311.7 + q.z * 74.7).sin() * 43758.5453;
+    h - h.floor()
+}
+
+/// Sky gradient with a high sun and a bright horizon, mirrored below as
+/// a calm sea with the sun's reflection.
 fn blue_sky(d: DVec3) -> DVec3 {
+    let sun = DVec3::new(0.64, 0.0, 0.77).normalize();
+    let glow = |d: DVec3| d.dot(sun).max(0.0).powf(600.0) * 1.5 + 0.25 * d.dot(sun).max(0.0).powf(25.0);
     if d.z >= 0.0 {
-        let sky = rgb(0xa9c8e6).lerp(rgb(0x2c5a9a), d.z.powf(0.6));
-        let sun = DVec3::new(0.25, 0.0, 0.97).normalize();
-        let glow = d.dot(sun).max(0.0).powf(400.0) + 0.35 * d.dot(sun).max(0.0).powf(30.0);
-        sky + DVec3::splat(glow) + DVec3::splat(0.6 * band(d.z, 0.04))
+        rgb(0xb7cbe0).lerp(rgb(0x3d6aa6), d.z.powf(0.55)) + DVec3::splat(glow(d) + 0.45 * band(d.z, 0.06))
     } else {
-        rgb(0x7f9cbc).lerp(rgb(0x1f3654), (-d.z).powf(0.5)) + DVec3::splat(0.4 * band(d.z, 0.04))
+        let m = DVec3::new(d.x, d.y, -d.z);
+        rgb(0x8ea6c2).lerp(rgb(0x22385a), (-d.z).powf(0.5)) + DVec3::splat(0.5 * glow(m).min(0.6) + 0.4 * band(d.z, 0.06))
     }
 }
 
@@ -79,107 +86,120 @@ fn ceiling(d: DVec3) -> Option<(f64, f64)> {
     (d.z > 0.02).then(|| (d.x / d.z, d.y / d.z))
 }
 
+/// Walls and floor of a soft grey room.
 fn room_floor(d: DVec3) -> DVec3 {
-    rgb(0x8d8d8d).lerp(rgb(0x3b3b3b), (-d.z).max(0.0).powf(0.5))
+    if d.z > 0.0 { rgb(0x6e6c78).lerp(rgb(0x4a4854), d.z) } else { rgb(0x7a7884).lerp(rgb(0x8c8a96), (-d.z).powf(0.5)) }
 }
 
+/// White hexagonal light panels in a dark frame overhead.
 fn ceiling_hexagonal(d: DVec3) -> DVec3 {
-    let Some((x, y)) = ceiling(d) else { return room_floor(d) };
-    // Distance to the nearest center of a hexagonal lattice.
-    let (sx, sy) = (1.2, 1.2 * 3f64.sqrt());
-    let cell = |ox: f64, oy: f64| {
+    let Some((x, y)) = ceiling(d).filter(|_| d.z > 0.12) else { return room_floor(d) };
+    // Nearest center of a hexagonal lattice (two offset rectangular grids).
+    let (sx, sy) = (0.8 * 3f64.sqrt(), 1.2);
+    let near = |ox: f64, oy: f64| {
         let (px, py) = (x - ox, y - oy);
         let (cx, cy) = ((px / sx).round() * sx, (py / sy).round() * sy);
-        ((px - cx).powi(2) + (py - cy).powi(2)).sqrt()
+        DVec2::new(px - cx, py - cy)
     };
-    let r = cell(0.0, 0.0).min(cell(sx * 0.5, sy * 0.5));
-    let light = 1.0 - smooth(0.32, 0.38, r);
-    rgb(0x303236).lerp(DVec3::ONE, light)
+    let (a, b) = (near(0.0, 0.0), near(sx * 0.5, sy * 0.5));
+    let q = if a.length() < b.length() { a } else { b };
+    // Hexagon "radius" (flat top and bottom).
+    let hex = (q.x.abs() * 3f64.sqrt() * 0.5 + q.y.abs() * 0.5).max(q.y.abs());
+    let panel = 1.0 - smooth(0.5, 0.54, hex);
+    rgb(0x2a2a2e).lerp(DVec3::ONE, panel)
 }
 
+/// A grid of white light strips on a dark ceiling.
 fn ceiling_square(d: DVec3) -> DVec3 {
-    let Some((x, y)) = ceiling(d) else { return room_floor(d) };
-    let f = |v: f64| (v / 1.5 - (v / 1.5).round()).abs();
-    let light = (1.0 - smooth(0.22, 0.26, f(x))) * (1.0 - smooth(0.22, 0.26, f(y)));
-    rgb(0x2e3034).lerp(DVec3::ONE, light)
+    let Some((x, y)) = ceiling(d).filter(|_| d.z > 0.12) else { return room_floor(d) };
+    let line = |v: f64| band(v / 0.6 - (v / 0.6).round(), 0.08);
+    rgb(0x3a3648).lerp(DVec3::ONE, line(x).max(line(y)))
 }
 
 /// Hue around the horizon, white above, black below.
 fn chromatic(d: DVec3) -> DVec3 {
     let h = (d.y.atan2(d.x) / std::f64::consts::TAU + 0.5) * 6.0;
     let hue = DVec3::new((h - 3.0).abs() - 1.0, 2.0 - (h - 2.0).abs(), 2.0 - (h - 4.0).abs()).clamp(DVec3::ZERO, DVec3::ONE);
-    if d.z >= 0.0 { hue.lerp(DVec3::ONE, d.z) } else { hue.lerp(DVec3::ZERO, -d.z) }
+    if d.z >= 0.0 { hue.lerp(DVec3::splat(0.85), d.z * 0.8) } else { hue.lerp(DVec3::splat(0.1), -d.z * 0.8) }
 }
 
+/// Sky, a low sun, fields either side of a straight road.
 fn daylight_road(d: DVec3) -> DVec3 {
-    if d.z > 0.12 {
-        rgb(0xc6dcef).lerp(rgb(0x4f86c6), d.z.powf(0.7))
-    } else if d.z > 0.0 {
-        // Tree line along the road.
-        let az = d.y.atan2(d.x);
-        let top = 0.06 + 0.05 * (az * 7.0).sin().abs() + 0.02 * (az * 23.0).sin();
-        if d.z < top { rgb(0x3e5a32) } else { rgb(0xc6dcef) }
+    let sun = DVec3::new(-0.9, 0.4, 0.06).normalize();
+    if d.z > 0.04 {
+        rgb(0xd9e4ee).lerp(rgb(0x4a7fc0), d.z.powf(0.6)) + DVec3::splat(d.dot(sun).max(0.0).powf(300.0) * 1.5 + 0.3 * d.dot(sun).max(0.0).powf(12.0))
+    } else if d.z > -0.04 {
+        // Crops along the horizon.
+        rgb(0x6f7a3c).lerp(rgb(0x9a9a52), noise(d, 60.0))
     } else {
-        // Asphalt with the road's center line straight ahead and behind.
-        let lane = band(d.y / d.z.abs().max(0.05), 0.15);
-        rgb(0x6d6f72).lerp(rgb(0x3a3b3d), (-d.z).powf(0.5)).lerp(rgb(0xe8e4d8), lane * 0.8)
+        // Asphalt straight ahead and behind, grass to the sides.
+        let road = 1.0 - smooth(0.25, 0.4, (d.y / d.z.abs().max(0.05)).abs());
+        rgb(0x5d6a2c).lerp(rgb(0x3e3c3a), road) * (0.85 + 0.3 * noise(d, 200.0))
     }
 }
 
-/// White bands above and below the horizon on black.
+/// One bright band along the horizon on black.
 fn horizontal_stripe(d: DVec3) -> DVec3 {
-    let e = d.z.asin().to_degrees();
-    let s = [-60.0, -25.0, 10.0, 45.0].iter().map(|c| band(e - c, 9.0)).fold(0.0, f64::max);
-    DVec3::splat(s)
+    DVec3::splat(band(d.z, 0.035) + 0.25 * band(d.z, 0.1))
 }
 
-/// Rings of light around a tunnel running along X.
+/// Light rings over a tunnel running along X, grey road surface below.
 fn light_tunnel(d: DVec3) -> DVec3 {
-    let r = (d.y * d.y + d.z * d.z).sqrt().max(1e-6);
-    let along = d.x / r;
-    let ring = band(along - along.round(), 0.12);
-    rgb(0x15171c).lerp(rgb(0xfff4e0), ring) + rgb(0x202833) * (1.0 - r)
-}
-
-/// Warm light strips along the ceiling, pillars and a dark platform.
-fn metro_station(d: DVec3) -> DVec3 {
-    if let Some((x, y)) = ceiling(d) {
-        let strip = band(y - (y / 1.2).round() * 1.2, 0.12) * (1.0 - smooth(6.0, 12.0, x.abs()));
-        return rgb(0x3a352d).lerp(rgb(0xfff1cf), strip);
+    if d.z < 0.0 {
+        return rgb(0x8a8f9a) * (0.75 + 0.5 * noise(d, 300.0));
     }
-    let az = d.y.atan2(d.x);
-    let pillar = band((az * 8.0 / std::f64::consts::PI).fract() - 0.5, 0.1);
-    if d.z > -0.05 { rgb(0x6a6458).lerp(rgb(0xb8b2a2), pillar) } else { rgb(0x2a2724).lerp(rgb(0x4a4540), (-d.z).powf(0.4)) }
+    let r = (d.y * d.y + d.z * d.z).sqrt().max(1e-6);
+    let along = d.x / r * 1.5;
+    let ring = band(along - along.round(), 0.07) * (1.0 - smooth(0.2, 0.05, d.z));
+    DVec3::splat(ring)
 }
 
+/// A bright station: pale walls and vault, a dark band of platform and
+/// tracks at eye level, columns.
+fn metro_station(d: DVec3) -> DVec3 {
+    let az = d.y.atan2(d.x);
+    let column = band((az * 4.0 / std::f64::consts::PI).fract() - 0.5, 0.04) * (1.0 - smooth(0.3, 0.5, d.z.abs()));
+    let base = if d.z > 0.12 {
+        rgb(0xd8d2c8).lerp(rgb(0xf0ede8), d.z)
+    } else if d.z > -0.05 {
+        rgb(0x2a2a2c)
+    } else {
+        rgb(0xc8c2b8).lerp(rgb(0xe2ddd5), (-d.z).powf(0.5))
+    };
+    base.lerp(rgb(0x707070), column)
+}
+
+/// Dusk: a starry sky, an orange glow low on the horizon, dark ground.
 fn nightfall(d: DVec3) -> DVec3 {
     if d.z >= 0.0 {
-        let glow = band(d.z, 0.35) * (0.5 + 0.5 * d.x.max(0.0));
-        rgb(0x2a2f5c).lerp(rgb(0x0a0c1e), d.z.powf(0.5)) + rgb(0xff8a3c) * glow * 0.8
+        let stars = if noise(d, 400.0) > 0.997 { 0.8 } else { 0.0 };
+        let glow = band(d.z, 0.25) * (0.4 + 0.6 * (-d.x).max(0.0));
+        rgb(0x3a4458).lerp(rgb(0x10141e), d.z.powf(0.4)) + rgb(0xff9a48) * glow * 0.7 + DVec3::splat(stars)
     } else {
-        rgb(0x15172a).lerp(rgb(0x05060c), (-d.z).powf(0.5))
+        rgb(0x3b2a1c).lerp(rgb(0x1e150e), (-d.z).powf(0.5)) * (0.8 + 0.4 * noise(d, 120.0))
     }
 }
 
-/// Sky through the bridge's roof beams, walkway below.
+/// A glazed footbridge: white curved roof, a band of blue glass with black
+/// posts at eye level, a pale floor.
 fn pedestrian_bridge(d: DVec3) -> DVec3 {
-    if let Some((x, y)) = ceiling(d) {
-        let beam = band(x - x.round(), 0.08).max(band(y, 0.06));
-        return rgb(0xd5e4f2).lerp(rgb(0x5b8fc8), d.z).lerp(rgb(0x3c3f44), beam);
+    if d.z > 0.18 {
+        return rgb(0xd8dce2).lerp(rgb(0xf6f7f8), d.z);
     }
     if d.z > -0.02 {
-        rgb(0x9fb8cf)
-    } else {
-        let plank = band(d.x / d.z.abs().max(0.05) * 2.0 - (d.x / d.z.abs().max(0.05) * 2.0).round(), 0.1);
-        rgb(0x8a7a64).lerp(rgb(0x4d4337), plank)
+        let az = d.y.atan2(d.x) / std::f64::consts::TAU * 36.0;
+        let post = band(az - az.round(), 0.08);
+        return rgb(0x6d93b8).lerp(rgb(0x9cc0dc), noise(d, 40.0) * 0.5).lerp(rgb(0x101010), post);
     }
+    rgb(0xb4bcc8).lerp(rgb(0xdfe3e8), (-d.z).powf(0.5))
 }
 
-/// Vertical white stripes on black walls.
+/// Purple room with white horizontal stripes on two facing walls.
 fn wall_stripes(d: DVec3) -> DVec3 {
-    let az = d.y.atan2(d.x) / std::f64::consts::TAU * 16.0;
-    let s = band(az - az.round(), 0.3) * (1.0 - smooth(0.8, 0.95, d.z.abs()));
-    DVec3::splat(s)
+    let facing = smooth(0.55, 0.8, d.x.abs());
+    let h = d.z / d.x.abs().max(0.2) * 3.0;
+    let stripe = band(h - h.round(), 0.15) * facing * (1.0 - smooth(1.0, 1.6, h.abs()));
+    rgb(0x8a5fb8).lerp(rgb(0x6e4596), d.z.abs()).lerp(DVec3::ONE, stripe)
 }
 
 #[cfg(test)]

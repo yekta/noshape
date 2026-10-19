@@ -46,6 +46,10 @@ fn bind_keys(cx: &mut App) {
     });
 }
 
+/// Paint order of open menus: the kit's popup priority (gpui-base
+/// `POPUP_PRIORITY`), so menus opened from a dialog (selects) draw above it.
+const POPUP_PRIORITY: usize = 100;
+
 pub enum MenuIcon {
     /// A full-color app icon (`assets::icon`).
     Named(SharedString),
@@ -129,9 +133,14 @@ pub struct OsMenu {
     _subs: Vec<Subscription>,
     /// The menu this one is a submenu of (Left returns to it).
     parent: Option<WeakEntity<OsMenu>>,
+    /// Where keyboard focus was before the menu opened (root menu only); it
+    /// goes back there when the menu closes, so shortcuts keep working.
+    return_focus: Option<FocusHandle>,
     /// Onshape's icon-less list menus (documents page, Bootstrap
     /// `list-no-icons`): 13 px text 17 px from the edge.
     plain: bool,
+    /// Feature Studio snippet menus: 33 px rows, 14 px `#333` text 14 px in.
+    snippets: bool,
     /// Onshape's select lists (e.g. Variable type): this width, 26 px rows,
     /// 14 px `#666` text 10 px in; the hovered (else the checked) row is
     /// `#1651b0` with white text.
@@ -142,7 +151,13 @@ pub struct OsMenu {
     /// Onshape's Bootstrap dropdowns (the "+" add-element menu): 14 px `#555`
     /// text 43 px in, 27 px rows, 20 px icons 20 px in, radius 5.25, `#d7d7d7`.
     dropdown: bool,
+    /// One-shot Esc handler: the first Esc runs it and the menu stays open
+    /// (a sketch tool's menu: Esc exits the tool), the next one dismisses.
+    on_escape: Option<EscapeHandler>,
 }
+
+/// An `OsMenu`'s one-shot Esc handler.
+type EscapeHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 impl EventEmitter<DismissEvent> for OsMenu {}
 
@@ -155,7 +170,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, plain: false, select: None, toolbar: false, dropdown: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, toolbar: false, dropdown: false, on_escape: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -173,6 +188,19 @@ impl OsMenu {
     /// Bootstrap dropdown style ("+" menu).
     pub fn dropdown(mut self) -> Self {
         self.dropdown = true;
+        self
+    }
+
+    /// Run `f` on the first Esc instead of dismissing (see `on_escape`).
+    pub fn on_first_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_escape = Some(Rc::new(f));
+        self
+    }
+
+    /// Feature Studio snippet menus (live document/71): 33 px rows, 14 px
+    /// `#333` text 14 px in, no icons.
+    pub fn snippet_list(mut self) -> Self {
+        self.snippets = true;
         self
     }
 
@@ -226,10 +254,43 @@ impl OsMenu {
         self.bounds.get().contains(&pos) || self.open_submenu().is_some_and(|m| m.read(cx).contains(pos, cx))
     }
 
+    /// Close the menu (and its parents). Afterwards, unless something else
+    /// took keyboard focus (a dialog the item opened, the clicked element),
+    /// focus returns to where it was before the menu opened.
+    fn dismiss(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<FocusHandle> {
+        let mut root_focus = self.focus.clone();
+        let mut ret = self.return_focus.clone();
+        let mut parent = self.parent.as_ref().and_then(|p| p.upgrade());
+        while let Some(pm) = parent {
+            let pm = pm.read(cx);
+            root_focus = pm.focus.clone();
+            ret = pm.return_focus.clone();
+            parent = pm.parent.as_ref().and_then(|p| p.upgrade());
+        }
+        let own = self.focus.clone();
+        cx.emit(DismissEvent);
+        if let Some(ret) = ret.clone() {
+            window.defer(cx, move |window, cx| {
+                let stale = match window.focused(cx) {
+                    None => true,
+                    Some(f) => f == own || f == root_focus,
+                };
+                if stale {
+                    window.focus(&ret, cx);
+                }
+            });
+        }
+        ret
+    }
+
     fn activate(&mut self, ix: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(OsMenuItem::Item { disabled: false, handler, .. }) = self.items.get(ix) {
             let handler = handler.clone();
-            cx.emit(DismissEvent);
+            // Focus goes back first, so a prompt the item opens returns there too.
+            let ret = self.dismiss(window, cx);
+            if let Some(ret) = ret {
+                window.focus(&ret, cx);
+            }
             if let Some(h) = handler {
                 h(&ClickEvent::default(), window, cx);
             }
@@ -279,26 +340,35 @@ impl Render for OsMenu {
         let select = self.select;
         let no_hover = self.hovered.is_none();
         let any_icon = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { icon: Some(_), .. } | OsMenuItem::Submenu { icon: Some(_), .. }));
-        let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if dropdown {
-            (27., 20., 20., if any_icon { 43. } else { 20. }, 14.)
+        // In dropdowns a ✓ takes the icon place too (documents Folders sort menu).
+        let any_check = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { checked: true, .. }));
+        let snippets = self.snippets;
+        let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if snippets {
+            (33., 4., 18., 14., 14.)
+        } else if dropdown {
+            (27., 20., 20., if any_icon || any_check { 43. } else { 20. }, 14.)
         } else if self.select.is_some() {
-            (26., 4., 18., 10., 14.)
+            // Selects with icons (assembly mate type) put the text after the icon.
+            (26., 6., 18., if any_icon { 30. } else { 10. }, 14.)
         } else if self.toolbar {
             (26., 4., 18., 30., 13.33)
         } else if self.plain {
             (ROW_H, ICON_X, ICON, 17., 13.)
         } else {
-            (ROW_H, ICON_X, ICON, TEXT_X, TEXT)
+            // Live: text 36 px in when an item has an icon, else 17 px.
+            (ROW_H, ICON_X, ICON, if any_icon || any_check { TEXT_X } else { 17. }, TEXT)
         };
+        let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
         let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
         let menu_bounds = bounds.get();
-        // Top of each row inside the menu (1 px border + 1 px padding).
+        // Top of each row inside the menu (1 px border; context menus have
+        // no padding, rows and separators run edge to edge).
         let row_tops: Vec<f32> = self
             .items
             .iter()
-            .scan(2.0f32, |y, i| {
+            .scan(if plain_menu { 1.0f32 } else { 2.0 }, |y, i| {
                 let top = *y;
                 *y += if matches!(i, OsMenuItem::Separator) { if dropdown { 15. } else { 1. } } else { row_h };
                 Some(top)
@@ -324,7 +394,7 @@ impl Render for OsMenu {
                         .h(px(row_h))
                         .w_full()
                         .pl(px(text_x))
-                        .pr(px(12.))
+                        .pr(px(if plain_menu { 10. } else { 12. }))
                         .text_size(px(text_sz))
                         .whitespace_nowrap()
                         .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -338,7 +408,7 @@ impl Render for OsMenu {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
                     OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
-                        .text_color(if *disabled { pal.text_faint } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() { gpui_kit::rgb(0x666666) } else { pal.text })
+                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
@@ -359,19 +429,22 @@ impl Render for OsMenu {
                         .when(hovered, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .child(div().flex_1().child(label.clone()))
-                        // The small ▸ at the right (live: a 4 px black triangle).
-                        .child(div().ml(px(16.)).child(crate::ui::glyph("ui-caret-right", 8., pal.text)))
+                        // The small ▸ at the right (live: a 5 px `#666` triangle 9 px
+                        // from the border).
+                        .pr(px(6.))
+                        .child(div().ml(px(16.)).child(crate::ui::glyph("ui-caret-right", 10., gpui_kit::rgb(0x666666))))
                         .when(hovered, |d| {
                             // Opens beside the row: its top-left at the menu's right edge,
                             // level with the row (window coordinates from the last paint).
                             // Near the window's right edge it opens to the left (live camera menu).
+                            // Live: the submenu's border lies on the parent's.
                             let y = menu_bounds.top() + px(row_tops[ix] - 1.);
-                            let (at, anchor) = if menu_bounds.right() + px(240.) > window_w {
-                                (point(menu_bounds.left() + px(2.), y), Anchor::TopRight)
+                            let (at, anchor) = if menu_bounds.right() + px(200.) > window_w {
+                                (point(menu_bounds.left() + px(1.), y), Anchor::TopRight)
                             } else {
-                                (point(menu_bounds.right() - px(2.), y), Anchor::TopLeft)
+                                (point(menu_bounds.right() - px(1.), y), Anchor::TopLeft)
                             };
-                            d.child(deferred(anchored().anchor(anchor).position(at).snap_to_window_with_margin(px(4.)).child(div().occlude().child(menu.clone()))).with_priority(3))
+                            d.child(deferred(anchored().anchor(anchor).position(at).snap_to_window_with_margin(px(4.)).child(div().occlude().child(menu.clone()))).with_priority(POPUP_PRIORITY + 1))
                         })
                         .into_any_element(),
                 }
@@ -387,7 +460,12 @@ impl Render for OsMenu {
             .on_action(cx.listener(|this, _: &MenuRight, window, cx| this.open_into_submenu(window, cx)))
             .on_action(cx.listener(|this, _: &MenuConfirm, window, cx| this.confirm(window, cx)))
             // Esc closes the menu, like Onshape; Left leaves a submenu.
-            .on_action(cx.listener(|_, _: &MenuDismiss, _, cx| cx.emit(DismissEvent)))
+            .on_action(cx.listener(|this, _: &MenuDismiss, window, cx| match this.on_escape.take() {
+                Some(f) => f(window, cx),
+                None => {
+                    this.dismiss(window, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &MenuLeft, window, cx| {
                 if let Some(parent) = this.parent.as_ref().and_then(|p| p.upgrade()) {
                     this.hovered = None;
@@ -395,9 +473,9 @@ impl Render for OsMenu {
                     cx.notify();
                 }
             }))
-            .on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, _, cx| {
+            .on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, window, cx| {
                 if !this.contains(e.position, cx) {
-                    cx.emit(DismissEvent);
+                    this.dismiss(window, cx);
                 }
             }))
             .on_hover(cx.listener(|this, h: &bool, _, cx| {
@@ -406,17 +484,19 @@ impl Render for OsMenu {
                     cx.notify();
                 }
             }))
-            .p(px(1.))
+            .when(!plain_menu, |d| d.p(px(1.)))
+            .when(plain_menu, |d| d.min_w(px(120.)))
             .bg(gpui_kit::rgb(0xffffff))
             .border_1()
             .border_color(gpui_kit::rgb(if dropdown { 0xd7d7d7 } else { 0xcccccc }))
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            // 0 5px 10px rgba(0,0,0,.2); GPUI blurs twice as far as CSS.
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .children(rows)
-            .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().size_full())
+            .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
     }
 }
 
@@ -438,15 +518,23 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
         cx.default_global::<OsMenuHost>().0 = None;
         cx.refresh_windows();
     });
+    let prev = window.focused(cx);
+    menu.update(cx, |m, _| m.return_focus = prev);
     window.focus(&menu.focus_handle(cx), cx);
     cx.default_global::<OsMenuHost>().0 = Some((position, anchor, menu, sub));
     window.refresh();
 }
 
+/// A right-click menu is open (hover tooltips under it should not show).
+pub fn is_open(cx: &App) -> bool {
+    cx.try_global::<OsMenuHost>().is_some_and(|h| h.0.is_some())
+}
+
 /// The open menu, for the window root to draw on top of everything.
 pub fn render_host(cx: &App) -> Option<AnyElement> {
     let (pos, anchor, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
-    Some(deferred(anchored().anchor(*anchor).position(*pos).snap_to_window_with_margin(px(8.)).child(menu.clone())).with_priority(2).into_any_element())
+    // Live: a menu that doesn't fit below the pointer opens above it.
+    Some(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element())
 }
 
 /// Right-click opens an Onshape menu built by `f` at the pointer.
@@ -458,7 +546,7 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
             let f = f.clone();
             let menu = OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
             if !menu.read(cx).is_empty() {
-                open(e.position, menu, window, cx);
+                open(e.position + point(px(0.), px(2.)), menu, window, cx);
             }
         })
     }

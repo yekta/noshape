@@ -19,6 +19,8 @@ pub struct DrawingSource {
     pub tab: TabId,
     pub part: Option<BodyId>,
     pub config: ConfigValues,
+    /// A sketch of the Part Studio ("Create Drawing of Sketch N…").
+    pub sketch: Option<crate::FeatureId>,
 }
 
 /// Standard drawing scales, largest first (view scale = paper / model).
@@ -26,9 +28,23 @@ const SCALES: [f64; 19] = [10.0, 5.0, 4.0, 2.5, 2.0, 1.5, 1.0, 0.75, 0.5, 0.4, 0
 
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
-    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None };
+    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None };
     let model = regenerate_source(doc, &key, &mut Regenerator::new(), &mut AssemblyEvaluator::new())?;
     let mut acc: Option<(DVec3, DVec3)> = None;
+    // A sketch source: the bounds of its curves.
+    if let Some(f) = &src.sketch {
+        let s = model.context.sketches.iter().find(|s| &s.feature == f)?;
+        for e in s.sketch.entities().filter(|e| !e.construction) {
+            for p in s.sketch.curve(e.id).map(|c| c.tessellate(1e-4)).unwrap_or_default() {
+                let w = s.frame.to_world(p);
+                acc = Some(match acc {
+                    None => (w, w),
+                    Some((lo, hi)) => (lo.min(w), hi.max(w)),
+                });
+            }
+        }
+        return acc;
+    }
     for b in model.context.bodies.iter().filter(|b| src.part.as_ref().is_none_or(|p| &b.id == p)) {
         let Ok(bb) = b.shape.bounding_box(false) else { continue };
         acc = Some(match acc {
@@ -52,12 +68,39 @@ pub fn suggested_scale(extent: DVec3, w: f64, h: f64) -> f64 {
     SCALES.iter().copied().find(|s| need_w * s <= w * 0.6 && need_h * s <= h * 0.6).unwrap_or(*SCALES.last().expect("scales"))
 }
 
+/// The view frame of a sketch source (looking at the sketch plane).
+pub fn source_frame(doc: &Document, src: &DrawingSource) -> Option<[[f64; 3]; 2]> {
+    let f = src.sketch.as_ref()?;
+    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None };
+    let model = regenerate_source(doc, &key, &mut Regenerator::new(), &mut AssemblyEvaluator::new())?;
+    super::views::sketch_frame(&model.context, f)
+}
+
 /// A new drawing from a template; with `suggested` and a source, the
-/// front, top, right and isometric views (labels and scales off).
-pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>, bounds: Option<(DVec3, DVec3)>, suggested: bool) -> Drawing {
+/// front, top, right and isometric views (labels and scales off); a sketch
+/// source gets one view of the sketch, facing its plane (`frame`).
+pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>, bounds: Option<(DVec3, DVec3)>, suggested: bool, frame: Option<[[f64; 3]; 2]>) -> Drawing {
     let mut d = Drawing::default();
+    // Formats › Locked is the default for new drawings.
+    d.props.formats_locked = true;
     apply_template(&mut d, 0, template);
     let (Some(src), true) = (source, suggested) else { return d };
+    if src.sketch.is_some() {
+        let (lo, hi) = bounds.unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));
+        let (w, h) = d.sheets[0].size.size_mm();
+        let e = (hi - lo).max(DVec3::splat(1e-4)) * 1000.0;
+        let ext = e.x.max(e.y).max(e.z);
+        d.sheets[0].scale = SCALES.iter().copied().find(|s| ext * s <= w.min(h) * 0.6).unwrap_or(*SCALES.last().expect("scales"));
+        d.sheets[0].views.push(DrawingView {
+            id: ViewId(1),
+            kind: ViewKind::Base { source: src.tab, config: src.config.clone(), orientation: ViewOrientation::Front, part: None },
+            position: [w * 0.45, 15.0 + (h - 15.0) * 0.55],
+            sketch: src.sketch,
+            custom_frame: frame,
+            ..Default::default()
+        });
+        return d;
+    }
     let (lo, hi) = bounds.unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));
     let e = (hi - lo) * 1000.0;
     let (w, h) = d.sheets[0].size.size_mm();
@@ -106,13 +149,13 @@ mod tests {
         if let TabContent::PartStudio(ps) = &mut doc.tabs[0].content {
             *ps = crate::demo::plate_studio();
         }
-        let src = DrawingSource { tab: doc.tabs[0].id, part: None, config: ConfigValues::default() };
+        let src = DrawingSource { tab: doc.tabs[0].id, part: None, config: ConfigValues::default(), sketch: None };
         let bounds = source_bounds(&doc, &src).expect("bounds");
         // The plate: 100 x 60 x 12 mm.
         assert!(((bounds.1 - bounds.0) * 1000.0 - DVec3::new(100.0, 60.0, 12.0)).length() < 1e-3, "{bounds:?}");
         for name in ["ISO A3", "ANSI B", "ISO A4"] {
             let t = template_by_name(name).unwrap();
-            let d = create_drawing(&t, Some(&src), Some(bounds), true);
+            let d = create_drawing(&t, Some(&src), Some(bounds), true, None);
             let sheet = &d.sheets[0];
             assert_eq!(sheet.views.len(), 4);
             assert_eq!(d.projection, t.projection);
@@ -127,7 +170,7 @@ mod tests {
             let (front, top) = (sheet.views[0].position, sheet.views[1].position);
             assert_eq!(top[1] > front[1], d.projection == Projection::ThirdAngle, "{name}");
         }
-        let empty = create_drawing(&template_by_name("ISO A3").unwrap(), Some(&src), Some(bounds), false);
+        let empty = create_drawing(&template_by_name("ISO A3").unwrap(), Some(&src), Some(bounds), false, None);
         assert!(empty.sheets[0].views.is_empty());
     }
 }

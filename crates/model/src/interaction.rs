@@ -211,7 +211,8 @@ pub fn list_click<T: Clone + PartialEq>(order: &[T], selected: &[T], anchor: Opt
 /// Feature list search (Onshape "Filter by feature name or type name"):
 /// plain text matches names and type names; `:errors`, `:warnings`,
 /// `:suppressed`, `:hidden`, `:shown`, `:type x`, `:name x`, `:folder x`,
-/// `:variable x` and `:part x` narrow further. Returns the matching
+/// `:variable x`, `:part x`, `:partnumber x` and `:revision x` narrow
+/// further (the last two by the parts' properties). Returns the matching
 /// features, or `None` for an empty query (no filtering).
 pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str) -> Option<HashSet<FeatureId>> {
     let q = query.trim();
@@ -229,6 +230,21 @@ pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str
     let status = |id: FeatureId| display.feature_state(id).map(|s| s.status);
     let type_name = |f: &Feature| f.feature_type().map(|t| t.name.to_lowercase()).unwrap_or_else(|| f.type_id.to_lowercase());
     let name_match = |f: &Feature| arg_l.is_empty() || f.name.to_lowercase().contains(&arg_l);
+    fn part_number(p: &crate::partstudio::PartProperties) -> Option<&str> {
+        p.part_number.as_deref()
+    }
+    fn revision(p: &crate::partstudio::PartProperties) -> Option<&str> {
+        p.revision.as_deref()
+    }
+    // A part property contains the argument.
+    let prop = |b: &crate::display::BodyDisplay, get: fn(&crate::partstudio::PartProperties) -> Option<&str>| studio.part_properties.get(&b.id).and_then(get).is_some_and(|v| v.to_lowercase().contains(&arg_l));
+    // Features that create or modify a part the predicate accepts.
+    let part_feature = |i: usize, f: &Feature, matches: &dyn Fn(&crate::display::BodyDisplay) -> bool| {
+        let creators: HashSet<FeatureId> = display.bodies.iter().filter(|b| matches(b)).map(|b| b.id.feature).collect();
+        creators.contains(&f.id)
+            || display.bodies.iter().filter(|b| matches(b)).any(|b| b.face_refs.iter().any(|r| r.depends_on() == Some(f.id)))
+            || feature_dependencies(&studio.features, i).iter().any(|d| creators.contains(d)) && modifies_bodies(f)
+    };
     let mut out = HashSet::new();
     for (i, f) in studio.features.iter().enumerate() {
         let keep = match cmd.as_str() {
@@ -246,13 +262,9 @@ pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str
                 let arg = arg.trim_start_matches('#');
                 used_variables(f).iter().any(|v| v.contains(arg)) || defined_variable(f).is_some_and(|n| n.contains(arg))
             }
-            "part" => {
-                // Features that create or modify a matching part.
-                let creators: HashSet<FeatureId> = display.bodies.iter().filter(|b| b.name.to_lowercase().contains(&arg_l)).map(|b| b.id.feature).collect();
-                creators.contains(&f.id)
-                    || display.bodies.iter().filter(|b| b.name.to_lowercase().contains(&arg_l)).any(|b| b.face_refs.iter().any(|r| r.depends_on() == Some(f.id)))
-                    || feature_dependencies(&studio.features, i).iter().any(|d| creators.contains(d)) && modifies_bodies(f)
-            }
+            "part" => part_feature(i, f, &|b| b.name.to_lowercase().contains(&arg_l)),
+            "partnumber" => part_feature(i, f, &|b| prop(b, part_number)),
+            "revision" => part_feature(i, f, &|b| prop(b, revision)),
             _ => false,
         };
         if keep {
@@ -442,6 +454,19 @@ fn ray_segment(o: DVec3, d: DVec3, a: DVec3, b: DVec3) -> (f64, f64) {
 /// Name a feature shows in the list and its dialog title: Onshape shows a
 /// Variable as "#name = value" ("#?" until it is named) unless renamed.
 pub fn display_name(f: &Feature) -> String {
+    display_name_computed(f, &|_| None)
+}
+
+/// [`display_name`] with the parameters as the dialog shows them:
+/// `shown(id)` = a computed value (a Hole's Up to next depth) or a value
+/// converted to the workspace units ("6.35 mm" for "0.25 in"), as Onshape
+/// fills a templated name ("Ø #holeDiameterV3 ↧ #holeDepthV3").
+pub fn display_name_computed(f: &Feature, shown: &dyn Fn(&str) -> Option<String>) -> String {
+    if f.type_id == "hole" && !f.custom_name
+        && let Some(n) = hole_name(f, shown)
+    {
+        return n;
+    }
     if f.type_id != "assignVariable" || f.custom_name {
         return f.name.clone();
     }
@@ -454,6 +479,109 @@ pub fn display_name(f: &Feature) -> String {
     }
     .unwrap_or_default();
     format!("#{} = {}", if name.trim().is_empty() { "?" } else { name.trim() }, value.trim())
+}
+
+/// hole.fs `getFeatureName`: "Ø 0.25 in ↧ 0.5 in", "M6x1 THRU",
+/// "Ø 6.6 mm ↧ 10 mm | ⌴Ø 11 mm ↧ 6.5 mm", "Ø 6.6 mm THRU | ⌵Ø 12.4 mm X 90°"
+/// (live dom/dialog-hole.txt).
+fn hole_name(f: &Feature, shown: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+    let p = &f.params;
+    let text = |id: &str| shown(id).or_else(|| p.expr(id).map(|e| e.text.trim().to_string())).filter(|t| !t.is_empty());
+    let d = text("holeDiameterV3")?;
+    let (pid, table) = crate::features::hole_tables::hole_table_param(p);
+    let path = crate::features::hole_tables::complete_path(table, p.lookup(pid));
+    // A tapped hole is named after its thread: "M6x1", "#10-24".
+    let tapped = match path.as_slice() {
+        [t, _, size, pitch, ..] if t == "Tapped" => {
+            let mut it = pitch.split_whitespace();
+            match (it.next(), it.next()) {
+                (Some(n), Some("tpi")) => Some(format!("{size}-{n}")),
+                (Some(n), Some("mm")) => Some(format!("{size}x{n}")),
+                _ => Some(format!("{size}{pitch}")),
+            }
+        }
+        _ => None,
+    };
+    let mut name = tapped.unwrap_or_else(|| format!("Ø {d}"));
+    match p.enum_("endStyleV2") {
+        "BLIND" => {
+            if let Some(depth) = text("holeDepthV3") {
+                name += &format!(" ↧ {depth}");
+            }
+        }
+        "UP_TO_NEXT" | "UP_TO_ENTITY" => {
+            if let Some(depth) = shown("holeDepthComputedV3").filter(|t| t != "Multiple") {
+                name += &format!(" ↧ {depth}");
+            }
+        }
+        "THROUGH" => name += " THRU",
+        _ => {}
+    }
+    match p.enum_("styleV2") {
+        "C_BORE" => {
+            name += &format!(" | ⌴Ø {}", text("cBoreDiameterV3").unwrap_or_default());
+            name += &format!(" ↧ {}", text("cBoreDepthV3").unwrap_or_default());
+        }
+        "C_SINK" => {
+            name += &format!(" | ⌵Ø {}", text("cSinkDiameterV3").unwrap_or_default());
+            let deg = p.expr("cSinkAngleV3").and_then(|e| e.cached.map(|q| q.value.to_degrees()).or_else(|| e.text.trim().trim_end_matches("deg").trim().parse().ok())).unwrap_or(90.0);
+            let deg = (deg * 100.0).round() / 100.0;
+            name += &format!(" X {deg}°");
+        }
+        _ => {}
+    }
+    Some(name)
+}
+
+/// The callout Onshape draws beside a hole while its Hole dialog is open
+/// (live dialogs/hole-30, hole-35): "Ø6.35 THRU", with a fit
+/// "Ø6.350 H7 +0.015/−0.000 THRU" (deviations stacked, see
+/// [`crate::drawing::format::stacked`]), then counterbore / countersink
+/// lines. Live (part-studio/431–439): one callout per feature, at its
+/// middle hole, without a count; a blind depth reads "↧5".
+pub fn hole_callout_3d(holes: &[crate::regen::context::HoleRecord], feature: FeatureId, units: &noshape_units::UnitPrefs) -> Option<(crate::regen::context::HoleRecord, Vec<String>)> {
+    use crate::drawing::format::stacked;
+    let mine: Vec<&crate::regen::context::HoleRecord> = holes.iter().filter(|h| h.feature == feature).collect();
+    let hole = *mine.get(mine.len() / 2)?;
+    let factor = units.si_factor(noshape_units::Dim::LENGTH);
+    let len = |m: f64| noshape_units::format_number(m / factor, units.length_precision);
+    // Toleranced values keep the workspace precision's zeros ("6.350").
+    let fixed = |m: f64, p: u8| format!("{:.*}", usize::from(p), m / factor);
+    let depth = |d: Option<f64>| match (hole.through || hole.exits, d) {
+        (true, _) => " THRU".to_string(),
+        (false, Some(d)) => format!(" ↧{}", len(d)),
+        _ => String::new(),
+    };
+    let mut out = Vec::new();
+    match &hole.thread {
+        Some(t) => {
+            let class = hole.thread_class.as_ref().map(|c| format!(" - {c}")).unwrap_or_default();
+            out.push(format!("{t}{class}{}", depth(hole.tapped_depth.or(hole.depth))));
+            if let Some(td) = hole.tap_drill {
+                out.push(format!("Ø{}{}", len(td), depth(hole.depth)));
+            }
+        }
+        None => match &hole.diameter_fit {
+            Some(fit) => {
+                let p = fit.precision.unwrap_or(units.length_precision);
+                let class = fit.class.as_ref().map(|c| format!(" {c}")).unwrap_or_default();
+                let dev = |m: f64, lower: bool| {
+                    let s = fixed(m.abs(), p);
+                    if m < 0.0 || (lower && m == 0.0) { format!("−{s}") } else { format!("+{s}") }
+                };
+                let devs = fit.deviations.map(|(u, l)| format!(" {}", stacked(&dev(u, false), &dev(l, true)))).unwrap_or_default();
+                out.push(format!("Ø{}{class}{devs}{}", fixed(hole.diameter, p), depth(hole.depth)));
+            }
+            None => out.push(format!("Ø{}{}", len(hole.diameter), depth(hole.depth))),
+        },
+    }
+    if let Some((d, dd)) = hole.cbore {
+        out.push(format!("⌴ Ø{} ↧{}", len(d), len(dd)));
+    }
+    if let Some((d, ang)) = hole.csink {
+        out.push(format!("⌵ Ø{} X {}°", len(d), noshape_units::format_number(ang.to_degrees(), 1)));
+    }
+    Some((hole.clone(), out))
 }
 
 /// Features whose selections reference `r` (Show dependencies of a default
@@ -587,9 +715,10 @@ mod tests {
             let mut r = Regenerator::new();
             r.regenerate(ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default()).display
         };
-        ps.features[ext].suppression_expr = Some("2 mm > 1 mm".into());
-        assert_eq!(run(&ps).feature_state(id).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        // "Unsuppressed if": false suppresses, true keeps the feature.
         ps.features[ext].suppression_expr = Some("2 mm < 1 mm".into());
+        assert_eq!(run(&ps).feature_state(id).map(|s| s.status), Some(FeatureStatus::Suppressed));
+        ps.features[ext].suppression_expr = Some("2 mm > 1 mm".into());
         assert_eq!(run(&ps).feature_state(id).map(|s| s.status), Some(FeatureStatus::Ok));
         ps.features[ext].suppression_expr = Some("#nope > 1".into());
         assert_eq!(run(&ps).feature_state(id).map(|s| s.status), Some(FeatureStatus::Error));
@@ -638,6 +767,23 @@ mod tests {
         assert_eq!(filter_features(&ps, &d, ":suppressed").unwrap(), [FeatureId(1004)].into_iter().collect());
         assert_eq!(filter_features(&ps, &d, ":variable d").unwrap(), [FeatureId(1002), FeatureId(1003)].into_iter().collect());
         assert!(filter_features(&ps, &d, ":errors").unwrap().is_empty());
+    }
+
+    #[test]
+    fn part_number_and_revision_filters() {
+        let mut ps = crate::demo::plate_studio();
+        let r = crate::regen::Regenerator::new().regenerate(&ps, &Default::default(), &UnitPrefs::default(), &crate::regen::RegenOptions::default());
+        let d = r.display;
+        let body = d.bodies[0].id.clone();
+        let props = ps.part_properties.entry(body).or_default();
+        props.part_number = Some("PN-100".into());
+        props.revision = Some("B".into());
+        let by_pn = filter_features(&ps, &d, ":partnumber pn-1").unwrap();
+        // The extrude that makes the part and the fillet that changes it.
+        let names: HashSet<&str> = ps.features.iter().filter(|f| by_pn.contains(&f.id)).map(|f| f.type_id.as_str()).collect();
+        assert!(names.contains("extrude") && names.contains("fillet"), "{names:?}");
+        assert_eq!(filter_features(&ps, &d, ":revision b").unwrap(), by_pn);
+        assert!(filter_features(&ps, &d, ":partnumber zz").unwrap().is_empty());
     }
 
     #[test]

@@ -33,11 +33,22 @@ pub struct SourceKey {
     pub tab: TabId,
     pub config: ConfigValues,
     pub explode: Option<usize>,
+    /// Pinned to a version (its id as text): the source comes from the
+    /// document at that version; None: the live workspace.
+    pub version: Option<String>,
 }
 
 impl SourceKey {
     pub fn studio(tab: TabId) -> Self {
-        Self { tab, config: ConfigValues::default(), explode: None }
+        Self { tab, config: ConfigValues::default(), explode: None, version: None }
+    }
+
+    /// The source of a base view (and its part), with its pinned version.
+    pub fn of_view(v: &super::DrawingView) -> Option<(Self, Option<BodyId>)> {
+        match &v.kind {
+            ViewKind::Base { source, config, part, .. } => Some((Self { tab: *source, config: config.clone(), explode: v.explode, version: v.pinned.as_ref().map(|p| p.id.clone()) }, part.clone())),
+            _ => None,
+        }
     }
 }
 
@@ -49,6 +60,8 @@ pub struct PartInfo {
     pub number: String,
     pub material: String,
     pub description: String,
+    /// Density of the part's material (kg/m³), None without a material.
+    pub density: Option<f64>,
 }
 
 /// One bill-of-materials row of an assembly source.
@@ -78,6 +91,42 @@ pub struct SourceModel {
     pub parts: Vec<PartInfo>,
     /// Assemblies only.
     pub bom: Vec<BomEntry>,
+    /// Assemblies only: the Structured BOM (item "3.1", depth, name,
+    /// part number, material, quantity).
+    pub bom_structured: Vec<StructuredBomRow>,
+}
+
+/// One row of a Structured BOM.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StructuredBomRow {
+    pub item: String,
+    pub depth: usize,
+    pub name: String,
+    pub number: String,
+    pub material: String,
+    pub quantity: usize,
+}
+
+/// The Structured BOM rows of an assembly tab.
+fn structured_bom(doc: &Document, tab: crate::document::TabId, result: &AssemblyResult) -> Vec<StructuredBomRow> {
+    use crate::assembly::bom::{BomCell, BomColumn, BomSettings, BomType, cell, lines};
+    let settings = BomSettings { bom_type: BomType::Structured, ..Default::default() };
+    let text = |c: BomCell| match c {
+        BomCell::Text(t) => t,
+        _ => String::new(),
+    };
+    lines(doc, tab, result, &settings)
+        .iter()
+        .filter(|l| !l.excluded && !l.top_level)
+        .map(|l| StructuredBomRow {
+            item: l.item.clone().unwrap_or_default(),
+            depth: l.depth,
+            name: l.name.clone(),
+            number: text(cell(doc, result, l, BomColumn::PartNumber)),
+            material: text(cell(doc, result, l, BomColumn::Material)),
+            quantity: l.quantity,
+        })
+        .collect()
 }
 
 impl SourceModel {
@@ -138,11 +187,10 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
     let mut out: Vec<SourceKey> = Vec::new();
     for sheet in &drawing.sheets {
         for v in &sheet.views {
-            if let ViewKind::Base { source, config, .. } = &v.kind {
-                let k = SourceKey { tab: *source, config: config.clone(), explode: v.explode };
-                if !out.contains(&k) {
-                    out.push(k);
-                }
+            if let Some((k, _)) = SourceKey::of_view(v)
+                && !out.contains(&k)
+            {
+                out.push(k);
             }
         }
     }
@@ -177,6 +225,7 @@ fn part_info(ps: &PartStudio, b: &Body) -> PartInfo {
         number: get(|p| &p.part_number),
         material: get(|p| &p.material),
         description: get(|p| &p.description),
+        density: props.and_then(|p| p.material.as_ref().and(p.density)),
     }
 }
 
@@ -191,11 +240,13 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let opts = RegenOptions { custom_features: has_scripts.then(|| crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>), ..Default::default() };
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
             let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![] })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![] })
         }
         TabContent::Assembly(asm) => {
             let result = assemblies.evaluate(doc, asm, &SolveOptions::default(), key.explode);
-            Some(assembly_source(doc, &result, hash, tab.name.clone()))
+            let mut s = assembly_source(doc, &result, hash, tab.name.clone());
+            s.bom_structured = structured_bom(doc, key.tab, &result);
+            Some(s)
         }
         _ => None,
     }
@@ -256,17 +307,30 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new() }
 }
 
 /// Regenerate every source a drawing references (headless helper for
 /// tests, export and the demo; the app regenerates in the background).
 pub fn regenerate_sources(doc: &Document, drawing: &Drawing) -> Sources {
+    regenerate_sources_with(doc, drawing, &|_| None)
+}
+
+/// [`regenerate_sources`] with pinned sources taken from the document at
+/// their version (`versions(id)`; sources whose version can't be loaded
+/// are left out).
+pub fn regenerate_sources_with(doc: &Document, drawing: &Drawing, versions: &dyn Fn(&str) -> Option<Document>) -> Sources {
     let mut out = Sources::new();
     let mut assemblies = AssemblyEvaluator::new();
     for key in referenced_sources(drawing) {
         let mut reg = Regenerator::new();
-        if let Some(src) = regenerate_source(doc, &key, &mut reg, &mut assemblies) {
+        let at = key.version.as_deref().map(versions);
+        let d = match &at {
+            Some(Some(d)) => d,
+            Some(None) => continue,
+            None => doc,
+        };
+        if let Some(src) = regenerate_source(d, &key, &mut reg, &mut assemblies) {
             out.insert(key, src);
         }
     }
@@ -408,6 +472,17 @@ fn side_of(sheet: &Sheet, child: ViewId, parent: ViewId, n: [f64; 2]) -> f64 {
     }
 }
 
+/// An auxiliary view's side of its edge (parent view coordinates, unit):
+/// the reference indicator sits there and looks back at the edge.
+pub fn auxiliary_toward(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
+    let v = sheet.view(id)?;
+    let ViewKind::Auxiliary { parent, edge_dir } = &v.kind else { return None };
+    let l = (edge_dir[0].powi(2) + edge_dir[1].powi(2)).sqrt().max(1e-12);
+    let n = [-edge_dir[1] / l, edge_dir[0] / l];
+    let s = side_of(sheet, id, *parent, n) * if v.flip { -1.0 } else { 1.0 };
+    Some([n[0] * s, n[1] * s])
+}
+
 /// The direction from parent to child (in the parent's view frame) used
 /// for projected views.
 pub fn projected_direction(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
@@ -437,6 +512,13 @@ pub struct SectionCut {
     pub toward_view: [f64; 2],
     /// Partial section (see [`super::DrawingView::partial`]).
     pub partial: bool,
+    /// "Show cut geometry only" and "Section depth" (Blind, meters, or Up
+    /// to entity: the point, resolved with the model).
+    pub cut_only: bool,
+    pub depth: Option<f64>,
+    pub depth_ref: Option<PointRef>,
+    /// "Exclude from cut": parts left whole.
+    pub exclude: Vec<BodyId>,
 }
 
 pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
@@ -456,8 +538,9 @@ pub fn section_cut(sheet: &Sheet, id: ViewId) -> Option<SectionCut> {
         return None;
     }
     let n = [-e[1] / l, e[0] / l];
-    let s = side_of(sheet, id, parent, n);
-    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && matches!(v.kind, ViewKind::Section { .. }) })
+    let s = side_of(sheet, id, parent, n) * if v.flip { -1.0 } else { 1.0 };
+    let section = matches!(v.kind, ViewKind::Section { .. });
+    Some(SectionCut { points, p0, p1, toward_view: [n[0] * s, n[1] * s], partial: v.partial && section, cut_only: v.cut_only, depth: v.section_depth.filter(|d| *d > 0.0), depth_ref: v.section_depth_ref.clone(), exclude: v.exclude_from_cut.clone() })
 }
 
 /// The frame of any view on a sheet (follows the parent chain).
@@ -493,7 +576,7 @@ fn view_frame_depth(drawing: &Drawing, sheet: &Sheet, id: ViewId, depth: usize) 
             let pf = view_frame_depth(drawing, sheet, *parent, depth + 1)?;
             let l = (edge_dir[0].powi(2) + edge_dir[1].powi(2)).sqrt().max(1e-12);
             let n = [-edge_dir[1] / l, edge_dir[0] / l];
-            let s = side_of(sheet, id, *parent, n);
+            let s = side_of(sheet, id, *parent, n) * if sheet.view(id).is_some_and(|v| v.flip) { -1.0 } else { 1.0 };
             let sign = if drawing.projection == Projection::ThirdAngle { -1.0 } else { 1.0 };
             Some(fold_toward(&pf, pf.lift([n[0] * s, n[1] * s]) * sign))
         }
@@ -521,11 +604,7 @@ pub fn root_view(sheet: &Sheet, id: ViewId) -> Option<ViewId> {
 
 /// Source and part filter of a view.
 pub fn view_source(sheet: &Sheet, id: ViewId) -> Option<(SourceKey, Option<BodyId>)> {
-    let root = sheet.view(root_view(sheet, id)?)?;
-    match &root.kind {
-        ViewKind::Base { source, part, config, .. } => Some((SourceKey { tab: *source, config: config.clone(), explode: root.explode }, part.clone())),
-        _ => None,
-    }
+    SourceKey::of_view(sheet.view(root_view(sheet, id)?)?)
 }
 
 /// Effective scale (paper length / model length) of a view.
@@ -692,6 +771,11 @@ pub struct ViewGeometry {
     pub section_segments: Vec<[[f64; 2]; 2]>,
     /// Detail crop circle (center, radius) in view coordinates.
     pub clip: Option<([f64; 2], f64)>,
+    /// Detail crop polygon (rectangle / polygon / spline profiles), view
+    /// coordinates; replaces the circle when set.
+    pub clip_poly: Option<Vec<[f64; 2]>>,
+    /// Center of mass (view coordinates) when shown.
+    pub com: Option<[f64; 2]>,
     /// Crop boundary of a cropped view (view coordinates).
     pub crop: Option<Crop>,
     /// Axes of cylindrical faces seen from the side (for automatic
@@ -753,6 +837,10 @@ impl ViewGeometry {
         if let Some((c, r)) = self.clip {
             min = [c[0] - r, c[1] - r];
             max = [c[0] + r, c[1] + r];
+        }
+        if let Some(poly) = &self.clip_poly {
+            min = [poly.iter().map(|p| p[0]).fold(f64::MAX, f64::min), poly.iter().map(|p| p[1]).fold(f64::MAX, f64::min)];
+            max = [poly.iter().map(|p| p[0]).fold(f64::MIN, f64::max), poly.iter().map(|p| p[1]).fold(f64::MIN, f64::max)];
         }
         if let Some(crop) = &self.crop
             && min[0].is_finite()
@@ -1235,6 +1323,10 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
     part.hash(&mut h);
     frame.key(&mut h);
     exact.hash(&mut h);
+    v.shown_sketches.hash(&mut h);
+    v.hide_sketch_points.hash(&mut h);
+    v.hidden_parts.hash(&mut h);
+    v.show_com.hash(&mut h);
     let fx = |x: f64, h: &mut std::collections::hash_map::DefaultHasher| ((x * 1e9).round() as i64).hash(h);
     match &v.kind {
         ViewKind::Section { parent, .. } | ViewKind::AlignedSection { parent, .. } => {
@@ -1255,10 +1347,18 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
             for x in [center[0], center[1], *radius] {
                 fx(x, &mut h);
             }
+            for p in v.detail_profile.iter().flatten() {
+                fx(p[0], &mut h);
+                fx(p[1], &mut h);
+            }
         }
         _ => 0u8.hash(&mut h),
     }
     v.partial.hash(&mut h);
+    v.cut_only.hash(&mut h);
+    format!("{:?}", sketch_of(sheet, id)).hash(&mut h);
+    v.section_depth.map(|d| (d * 1e9).round() as i64).hash(&mut h);
+    format!("{:?}{:?}", v.section_depth_ref, v.exclude_from_cut).hash(&mut h);
     format!("{:?}", view_simplification(sheet, id)).hash(&mut h);
     for b in &v.broken_out {
         b.spline.hash(&mut h);
@@ -1301,11 +1401,16 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
     let frame = view_frame(drawing, sheet, id).expect("frame exists (key computed)");
     let (skey, part) = view_source(sheet, id).expect("source exists (key computed)");
     let simplification = view_simplification(sheet, id);
-    let ctx = simplify_context(sources.get(&skey).expect("source exists (key computed)").context.clone(), part.as_ref(), simplification);
+    let mut ctx = simplify_context(sources.get(&skey).expect("source exists (key computed)").context.clone(), part.as_ref(), simplification);
+    if !v.hidden_parts.is_empty() {
+        let mut c = (*ctx).clone();
+        c.bodies.retain(|b| !v.hidden_parts.contains(&b.id));
+        ctx = Arc::new(c);
+    }
     let mut g = match &v.kind {
         ViewKind::Detail { parent, center, radius, .. } => {
             let pg = compute_view(drawing, sheet, *parent, sources, cache, exact);
-            detail_geometry(id, &pg, *center, *radius)
+            detail_geometry(id, &pg, *center, *radius, v.detail_profile.as_deref())
         }
         ViewKind::Section { parent, .. } => {
             let cut = section_cut(sheet, id).expect("cut exists (key computed)");
@@ -1317,11 +1422,45 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             let pf = view_frame(drawing, sheet, *parent).expect("parent frame");
             aligned_section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, exact)
         }
+        // Sketch views (and views projected from them): the sketch's curves.
+        ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } if sketch_of(sheet, id).is_some() => sketch_geometry(id, &ctx, &sketch_of(sheet, id).expect("checked"), &frame),
         _ if !v.broken_out.is_empty() => broken_out_geometry(id, &ctx, part.as_ref(), &frame, &v.broken_out, exact),
         _ => projected_geometry(id, &ctx, part.as_ref(), &frame, exact),
     };
     if !matches!(v.kind, ViewKind::Detail { .. }) {
         simplify_edges(&mut g, &ctx, part.as_ref(), simplification);
+    }
+    // Center of mass of the view's parts (parts with materials), a snap
+    // point for dimensions.
+    if v.show_com {
+        let src = sources.get(&skey).expect("source exists (key computed)");
+        let bodies: Vec<BodyId> = view_bodies(&ctx, part.as_ref()).iter().map(|b| b.id.clone()).collect();
+        let density = |b: &BodyId| src.parts.iter().find(|p| p.body.as_ref() == Some(b)).and_then(|p| p.density);
+        if !bodies.is_empty() && bodies.iter().all(|b| density(b).is_some())
+            && let Some(m) = crate::regen::measure::mass_properties(&ctx, &bodies, &density)
+        {
+            let p = frame.project(m.center_of_mass);
+            g.com = Some(p);
+            g.snaps.push(Snap { p, kind: SnapKind::Vertex, point: None });
+        }
+    }
+    // Shown source sketches, drawn over the model; their free points as
+    // small crosses (0.6 mm on the sheet) unless hidden.
+    if !v.shown_sketches.is_empty() {
+        let arm = 0.6 / (view_scale(sheet, id) * 1000.0).max(1e-9);
+        for f in &v.shown_sketches {
+            let sg = sketch_geometry(id, &ctx, f, &frame);
+            g.edges.extend(sg.edges);
+            g.snaps.extend(sg.snaps.iter().cloned());
+            if !v.hide_sketch_points {
+                for s in &sg.snaps {
+                    let p = s.p;
+                    g.edges.push(ViewEdge { points: vec![[p[0] - arm, p[1]], [p[0] + arm, p[1]]], visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+                    g.edges.push(ViewEdge { points: vec![[p[0], p[1] - arm], [p[0], p[1] + arm]], visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+                }
+            }
+        }
+        g.update_bounds();
     }
     if let Some(crop) = &v.crop {
         // Spline crops are clipped as their sampled outline.
@@ -1795,19 +1934,43 @@ fn section_segments_of(faces: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]>
 
 fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, _exact: bool) -> ViewGeometry {
     let partial = cut.partial;
-    let bodies = view_bodies(ctx, part);
-    let diag = bodies_diagonal(&bodies);
-    let center = bodies_center(&bodies);
+    let all = view_bodies(ctx, part);
+    // Exclude from cut: those parts are projected whole.
+    let (bodies, kept): (Vec<&Arc<Body>>, Vec<&Arc<Body>>) = all.iter().copied().partition(|b| !cut.exclude.contains(&b.id));
+    let diag = bodies_diagonal(&all);
+    let center = bodies_center(&all);
     let sight = frame.dir;
     let big = diag * 4.0 + 1.0;
-    let tool = removal_tool(parent, &cut.points, cut.toward_view, center, big, partial);
-    let (pbs, faces, error) = cut_bodies(&bodies, &tool, sight);
+    let mut tool = removal_tool(parent, &cut.points, cut.toward_view, center, big, partial);
+    // Section depth: Blind, or Up to entity (the depth to that point,
+    // measured along the line of sight from the cutting plane).
+    let along0 = parent.lift([cut.points[1][0] - cut.p0[0], cut.points[1][1] - cut.p0[1]]).normalize();
+    let plane0 = Plane::new(parent.lift(cut.p0) + parent.dir * center.dot(parent.dir), sight, along0);
+    let depth = match &cut.depth_ref {
+        Some(r) => resolve_point3(ctx, r).map(|(p, _)| plane0.signed_distance(p).abs()).filter(|d| *d > 1e-9),
+        None => cut.depth,
+    };
+    if let Some(depth) = depth {
+        let t = cut.toward_view;
+        let far: Vec<[f64; 2]> = cut.points.iter().map(|p| [p[0] - t[0] * depth, p[1] - t[1] * depth]).collect();
+        let back = removal_tool(parent, &far, [-t[0], -t[1]], center, big, false);
+        tool = match (tool, back) {
+            (Ok(a), Ok(b)) => noshape_kernel::fuse(&a, &b).map(|r| r.shape),
+            (Err(e), _) | (_, Err(e)) => Err(e),
+        };
+    }
+    let (mut pbs, mut faces, error) = cut_bodies(&bodies, &tool, sight);
+    pbs.extend(kept.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }));
     // Plane of the first leg (keeps snaps on the remaining side).
     let along = parent.lift([cut.points[1][0] - cut.p0[0], cut.points[1][1] - cut.p0[1]]).normalize();
     let p0 = parent.lift(cut.p0) + parent.dir * center.dot(parent.dir);
     let plane = Plane::new(p0, sight, along);
     let full = cut.points.len() == 2 && !partial;
     let tol = diag * 1e-7;
+    if let Some(depth) = depth {
+        // The faces left at the depth plane are not cut faces (no hatch).
+        faces.retain(|f| !f.face_plane().ok().flatten().is_some_and(|p| (plane.signed_distance(p.origin).abs() - depth).abs() < diag * 1e-6 + 1e-9));
+    }
     // Cut solids always use the exact HLR: OCCT's polygonal HLR
     // (HLRBRep_PolyAlgo::InsertOnOutLine) segfaults on some cuts, e.g.
     // through a cylinder axis. A cut is computed once; dragging only moves it.
@@ -1823,6 +1986,12 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
                 g.section_segments.extend(section_segments_of(&c.faces(), frame));
             }
         }
+    }
+    if cut.cut_only {
+        // Show cut geometry only: the outlines of the cut faces.
+        let segs = &g.section_segments;
+        let near = diag * 1e-5 + 1e-9;
+        g.edges.retain(|e| e.visible && e.points.iter().all(|p| segs.iter().any(|s| dist_to_segment(*p, s[0], s[1]) < near)));
     }
     g.origin = frame.project(center);
     g.update_bounds();
@@ -2023,11 +2192,21 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: 
 }
 
 /// Crop a parent view's geometry to a circle.
-fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: f64) -> ViewGeometry {
+fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: f64, poly: Option<&[[f64; 2]]>) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), aligned: parent.aligned, ..Default::default() };
+    // A polygon profile (rectangle, polygon, spline) replaces the circle.
+    let poly = poly.filter(|p| p.len() >= 3);
+    if let Some(p) = poly {
+        g.clip = None;
+        g.clip_poly = Some(p.to_vec());
+    }
+    let clip = |pts: &[[f64; 2]]| match poly {
+        Some(p) => clip_polyline_polygon(pts, p),
+        None => clip_polyline_circle(pts, center, radius),
+    };
     let mut used: HashMap<u32, u32> = HashMap::new();
     for e in &parent.edges {
-        for piece in clip_polyline_circle(&e.points, center, radius) {
+        for piece in clip(&e.points) {
             let model = e.model.map(|m| {
                 *used.entry(m).or_insert_with(|| {
                     g.model_edges.push(parent.model_edges[m as usize].clone());
@@ -2037,13 +2216,16 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
             g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model });
         }
     }
-    let inside = |p: [f64; 2]| (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9);
+    let inside = |p: [f64; 2]| match poly {
+        Some(poly) => point_in_polygon(p, poly),
+        None => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
+    };
     g.snaps = parent.snaps.iter().filter(|s| inside(s.p)).cloned().collect();
     // Section boundaries stay whole (closed loops) so hatching works; the
     // hatch lines are clipped to the detail circle when the sheet is built.
     g.section_segments = parent.section_segments.clone();
     for a in &parent.axes {
-        for piece in clip_polyline_circle(&[a[0], a[1]], center, radius) {
+        for piece in clip(&[a[0], a[1]]) {
             if piece.len() >= 2 {
                 g.axes.push([piece[0], piece[piece.len() - 1]]);
             }
@@ -2103,6 +2285,63 @@ pub fn clip_polyline_circle(pts: &[[f64; 2]], c: [f64; 2], r: f64) -> Vec<Vec<[f
     }
     out.retain(|p| p.len() >= 2);
     out
+}
+
+
+
+/// The sketch a view shows: its own (base views) or its root view's.
+pub fn sketch_of(sheet: &Sheet, id: ViewId) -> Option<crate::FeatureId> {
+    let root = root_view(sheet, id)?;
+    sheet.view(root)?.sketch
+}
+
+/// View frame looking at a sketch's plane (from its normal side, its y up).
+pub fn sketch_frame(ctx: &Context, feature: &crate::FeatureId) -> Option<[[f64; 3]; 2]> {
+    let s = ctx.sketches.iter().find(|s| &s.feature == feature)?;
+    Some([(-s.frame.normal).to_array(), s.frame.y.to_array()])
+}
+
+/// A sketch view: the sketch's (non-construction) curves projected into the
+/// view; its points are snap points.
+fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame: &ViewFrame) -> ViewGeometry {
+    let mut g = ViewGeometry { id, frame: Some(*frame), exact: true, ..Default::default() };
+    let Some(s) = ctx.sketches.iter().find(|s| &s.feature == feature) else {
+        g.error = Some("The sketch was not found".into());
+        return g;
+    };
+    let sk = &s.sketch;
+    for e in sk.entities() {
+        if e.construction {
+            continue;
+        }
+        if let noshape_sketch::Geometry::Point { pos } = e.geometry {
+            if sk.users_of_point(e.id).is_empty() {
+                g.snaps.push(Snap { p: frame.project(s.frame.to_world(pos)), kind: SnapKind::Vertex, point: None });
+            }
+            continue;
+        }
+        let Some(c) = sk.curve(e.id) else { continue };
+        let pts: Vec<[f64; 2]> = c.tessellate(1e-5).into_iter().map(|p| frame.project(s.frame.to_world(p))).collect();
+        if pts.len() >= 2 {
+            if let Some((a, b)) = e.endpoints().and_then(|(a, b)| Some((sk.point(a)?, sk.point(b)?))) {
+                g.snaps.push(Snap { p: frame.project(s.frame.to_world(a)), kind: SnapKind::Vertex, point: None });
+                g.snaps.push(Snap { p: frame.project(s.frame.to_world(b)), kind: SnapKind::Vertex, point: None });
+            }
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None });
+        }
+    }
+    let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
+    for p in g.edges.iter().flat_map(|e| e.points.iter()) {
+        for k in 0..2 {
+            lo[k] = lo[k].min(p[k]);
+            hi[k] = hi[k].max(p[k]);
+        }
+    }
+    if lo[0] <= hi[0] {
+        g.origin = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+    }
+    g.update_bounds();
+    g
 }
 
 #[cfg(test)]

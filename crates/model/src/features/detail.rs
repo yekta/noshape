@@ -147,7 +147,7 @@ pub fn draft() -> FeatureType {
         ParamSpec::query("draftFaces", "Entities to draft", QueryFilter::ANY_FACE).visible(neutral),
         hidden(ParamSpec::query("hintFaces", "Hint faces", QueryFilter::ANY_FACE)),
         ParamSpec::query1("pullDirectionEntity", "Pull direction", QueryFilter::DIRECTION).visible(parting),
-        ParamSpec::query("partingEdges", "Parting edges", QueryFilter::EDGE).visible(parting),
+        ParamSpec::query("partingEdges", "Parting edges", QueryFilter::EDGE).hints(Hints::SHOW_CREATE_SELECTION).visible(parting),
         ParamSpec::enum_("partingLineSides", "Sides", &[("ONE_SIDED", "One sided"), ("SYMMETRIC", "Symmetric"), ("TWO_SIDED", "Two sided")]).visible(parting),
         default_true(ParamSpec::flip("alongPull", "Switch face")).visible(move |v| parting(v) && v.is("partingLineSides", "ONE_SIDED")),
         ParamSpec::num("angle", "Draft angle", NumSpec::angle(3.0, 0.0, 89.9)).hints(rem),

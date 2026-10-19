@@ -7,14 +7,14 @@ use crate::gpu::Gpu;
 use crate::history_panel::HistoryPanel;
 use crate::part_studio::PartStudioView;
 use crate::variable_studio::VariableStudioView;
+use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Icon, IconName, Sizable as _, TitleBar, WindowExt as _, h_flex, v_flex};
+use crate::os_ui::OsDropdownExt as _;
+use gpui_kit::component::{TitleBar, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
-use noshape_model::assembly::Assembly;
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::drawing::Drawing;
 use noshape_model::partstudio::PartStudio;
@@ -27,6 +27,9 @@ enum TabView {
     Drawing(Entity<crate::drawing_view::DrawingEditor>),
     Assembly(Entity<AssemblyView>),
     FeatureStudio(Entity<crate::feature_studio::FeatureStudioView>),
+    MaterialLibrary(Entity<crate::material_library_view::MaterialLibraryView>),
+    /// Imported / stored files (see `file_tab_view`).
+    File(Entity<crate::file_tab_view::FileTabView>),
 }
 
 pub struct Workspace {
@@ -36,17 +39,30 @@ pub struct Workspace {
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
     history: Option<Entity<HistoryPanel>>,
+    /// The Release drafts panel (left rail).
+    release_drafts: Option<Entity<crate::release_dialog::ReleaseDraftsPanel>>,
     /// Previously active tabs, most recent first (Ctrl+Space).
     recent: Vec<TabId>,
     /// Tab manager (Alt+T), docked left like Onshape's.
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
+    /// Left rail › Document notes or Performance.
+    doc_panel: Option<(DocPanel, Vec<Subscription>)>,
     /// Tab being renamed (tab › Rename, double-click).
     renaming_tab: Option<(TabId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// ☰ › Workspace units… panel.
     units_panel: Option<(Entity<crate::doc_dialogs::WorkspaceUnits>, Subscription)>,
+    /// The tab-bar folder being shown (None: all tabs at the root).
+    open_folder: Option<TabId>,
+    /// Onshape's "FeatureScript notices" panel, under the tab bar.
+    fs_notices: Option<(Entity<crate::fs_notices::FsNoticesPanel>, Subscription)>,
+    /// Onshape's "Search Feature Studios" pane, under the tab bar.
+    fs_search: Option<(Entity<crate::fs_search::FsSearchPane>, Subscription)>,
     /// Create Drawing dialog (see `drawing_create`).
     create_drawing: Option<(Entity<crate::drawing_create::CreateDrawingDialog>, Subscription)>,
     _thumbnailer: Entity<crate::start_thumbnail::Thumbnailer>,
+    /// The last document message, shown for tabs that have no message bubble
+    /// of their own (Variable / Feature Studio, Material Library, file tabs).
+    toast: Option<(crate::ui::AlertKind, String)>,
     _subs: Vec<Subscription>,
 }
 
@@ -65,12 +81,22 @@ impl Workspace {
                 this.sync_tabs(window, cx);
                 cx.notify();
             }
+            // Tabs without their own message display show Onshape's bubble here.
+            DocEvent::Error(msg) | DocEvent::Info(msg) => {
+                let kind = if matches!(ev, DocEvent::Error(_)) { crate::ui::AlertKind::Error } else { crate::ui::AlertKind::Info };
+                this.toast = Some((kind, msg.clone()));
+                cx.notify();
+            }
             _ => cx.notify(),
         })];
+        // When the focused element goes away (a menu, a prompt, a closed
+        // panel), shortcuts keep working: focus returns to the active tab.
+        let focus_lost = cx.on_focus_lost(window, |this: &mut Self, window, cx| this.focus_active(window, cx));
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
-        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, recent: Vec::new(), tab_manager: None, renaming_tab: None, units_panel: None, create_drawing: None, _thumbnailer: thumbnailer, _subs: subs };
+        let mut this = Self { doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
@@ -100,7 +126,19 @@ impl Workspace {
             Some("partstudio") => {
                 let doc = self.doc.clone();
                 let gpu = self.gpu.clone();
-                TabView::PartStudio(cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx)))
+                let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
+                // In-context banner › Go to assembly.
+                self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::part_studio::PartStudioEvent, window, cx| match ev {
+                    crate::part_studio::PartStudioEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                    crate::part_studio::PartStudioEvent::InsertInAssembly { assembly, studio, parts, at } => {
+                        let (assembly, studio, parts, at) = (*assembly, *studio, parts.clone(), *at);
+                        this.activate(assembly, window, cx);
+                        if let Some(TabView::Assembly(v)) = this.views.get(&assembly) {
+                            v.update(cx, |v, cx| v.insert_from_context(studio, parts, at, cx));
+                        }
+                    }
+                }));
+                TabView::PartStudio(v)
             }
             Some("assembly") => {
                 let doc = self.doc.clone();
@@ -109,6 +147,13 @@ impl Workspace {
                 // "Switch to Part Studio / Assembly" from the instance context menu.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::assembly_view::AssemblyViewEvent, window, cx| match ev {
                     crate::assembly_view::AssemblyViewEvent::ActivateTab(t) => this.activate(*t, window, cx),
+                    crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
+                        this.activate(*t, window, cx);
+                        if let Some(TabView::PartStudio(v)) = this.views.get(t) {
+                            let ctx = (**ctx).clone();
+                            v.update(cx, |v, cx| v.set_assembly_context(Some(ctx), cx));
+                        }
+                    }
                 }));
                 TabView::Assembly(v)
             }
@@ -122,7 +167,32 @@ impl Workspace {
             }
             Some("featurestudio") => {
                 let doc = self.doc.clone();
-                TabView::FeatureStudio(cx.new(|cx| crate::feature_studio::FeatureStudioView::new(doc, tab, window, cx)))
+                let v = cx.new(|cx| crate::feature_studio::FeatureStudioView::new(doc, tab, window, cx));
+                self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::feature_studio::FeatureStudioEvent, window, cx| match ev {
+                    crate::feature_studio::FeatureStudioEvent::OpenSearch => this.open_fs_search(window, cx),
+                    crate::feature_studio::FeatureStudioEvent::NoticesChanged => {
+                        if let Some((p, _)) = &this.fs_notices {
+                            p.update(cx, |p, cx| p.refresh(cx));
+                        }
+                        cx.notify();
+                    }
+                    crate::feature_studio::FeatureStudioEvent::FindSymbol { name, at, rename } => {
+                        this.open_fs_search(window, cx);
+                        if let Some((pane, _)) = &this.fs_search {
+                            let (name, at, rename) = (name.clone(), at.clone(), *rename);
+                            pane.update(cx, |p, cx| p.search_symbol(name, at, rename, window, cx));
+                        }
+                    }
+                }));
+                TabView::FeatureStudio(v)
+            }
+            Some("materiallibrary") => {
+                let doc = self.doc.clone();
+                TabView::MaterialLibrary(cx.new(|cx| crate::material_library_view::MaterialLibraryView::new(doc, tab, window, cx)))
+            }
+            Some(k) if k.starts_with("file") => {
+                let doc = self.doc.clone();
+                TabView::File(cx.new(|cx| crate::file_tab_view::FileTabView::new(doc, tab, cx)))
             }
             _ => return,
         };
@@ -136,44 +206,50 @@ impl Workspace {
             self.recent.truncate(16);
         }
         self.active = Some(tab);
+        // The tab bar shows the folder the tab is in.
+        let folder = self.doc.read(cx).session.doc.parent_of(tab);
+        if self.open_folder.is_some() || folder.is_some() {
+            self.open_folder = folder;
+        }
         // Ctrl+Z / Ctrl+Y act on this tab's edits (Onshape).
         self.doc.update(cx, |d, _| d.session.active_tab = Some(tab));
         if let Some((tm, _)) = &self.tab_manager {
             tm.update(cx, |t, cx| t.set_active(Some(tab), cx));
         }
         self.ensure_view(tab, window, cx);
-        if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
-            let fh = v.read(cx).focus_handle(cx);
-            window.focus(&fh, cx);
-        }
-        if let Some(TabView::Drawing(v)) = self.views.get(&tab) {
-            let fh = v.read(cx).focus.clone();
-            window.focus(&fh, cx);
-        }
-        if let Some(TabView::Assembly(v)) = self.views.get(&tab) {
-            let fh = v.read(cx).focus_handle(cx);
-            window.focus(&fh, cx);
-        }
-        if let Some(TabView::FeatureStudio(v)) = self.views.get(&tab) {
-            let fh = v.read(cx).editor_focus(cx);
-            window.focus(&fh, cx);
-        }
+        self.focus_active(window, cx);
         cx.notify();
+    }
+
+    /// Give keyboard focus to the active tab's editor.
+    fn focus_active(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let fh = match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::PartStudio(v)) => v.read(cx).focus_handle(cx),
+            Some(TabView::Drawing(v)) => v.read(cx).focus.clone(),
+            Some(TabView::Assembly(v)) => v.read(cx).focus_handle(cx),
+            Some(TabView::FeatureStudio(v)) => v.read(cx).editor_focus(cx),
+            _ => return,
+        };
+        window.focus(&fh, cx);
     }
 
     fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let mut new_id = None;
+        let after = self.active;
         self.doc.update(cx, |doc, cx| {
             let (base, content) = match kind {
                 "partstudio" => ("Part Studio", TabContent::PartStudio(PartStudio::new())),
-                "assembly" => ("Assembly", TabContent::Assembly(Assembly::default())),
+                "assembly" => ("Assembly", TabContent::Assembly(Box::default())),
                 "drawing" => ("Drawing", TabContent::Drawing(Drawing::default())),
-                "featurestudio" => ("Feature Studio", TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::template())),
+                "featurestudio" => ("Feature Studio", TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(crate::feature_studio::FS_TEMPLATE))),
+                "materiallibrary" => ("Material Library", TabContent::MaterialLibrary(Default::default())),
                 _ => ("Variable Studio", TabContent::VariableStudio(VariableStudio::default())),
             };
             doc.edit_document(&format!("Insert tab : {base}"), cx, |d| {
                 let name = d.next_tab_name(base);
-                new_id = Some(d.add_tab(&name, content));
+                let id = d.add_tab(&name, content);
+                place_after(d, id, after);
+                new_id = Some(id);
             });
         });
         if let Some(id) = new_id {
@@ -241,7 +317,8 @@ impl Workspace {
     /// Tab › Rename: edit the name in the tab; Enter or leaving commits.
     fn start_tab_rename(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         use gpui_kit::component::input::{InputEvent, InputState};
-        let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        let d = &self.doc.read(cx).session.doc;
+        let name = d.tab(tab).map(|t| t.name.clone()).or_else(|| d.folder(tab).map(|f| f.name.clone())).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) && this.renaming_tab.is_some() {
@@ -252,6 +329,8 @@ impl Workspace {
                         d.edit_document(&format!("Rename tab : {name}"), cx, |doc| {
                             if let Some(t) = doc.tab_mut(tab) {
                                 t.name = name.clone();
+                            } else {
+                                doc.rename_folder(tab, &name);
                             }
                         })
                     });
@@ -279,10 +358,13 @@ impl Workspace {
     fn paste_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.clone()) else { return };
         let mut new_id = None;
+        let after = self.active;
         self.doc.update(cx, |doc, cx| {
             doc.edit_document(&format!("Paste tab : {}", t.name), cx, |d| {
                 let name = if d.tabs.iter().any(|x| x.name == t.name) { d.next_tab_name(&t.name) } else { t.name.clone() };
-                new_id = Some(d.add_tab(&name, t.content.clone()));
+                let id = d.add_tab(&name, t.content.clone());
+                place_after(d, id, after);
+                new_id = Some(id);
             });
         });
         if let Some(id) = new_id {
@@ -295,7 +377,8 @@ impl Workspace {
             let Some(t) = doc.session.doc.tab(tab).cloned() else { return };
             doc.edit_document(&format!("Duplicate tab : {}", t.name), cx, |d| {
                 let name = format!("{} (copy)", t.name);
-                d.add_tab(&name, t.content);
+                let id = d.add_tab(&name, t.content);
+                place_after(d, id, Some(tab));
             });
         });
     }
@@ -320,13 +403,13 @@ impl Workspace {
                     .pr_2()
                     .gap(px(4.))
                     .child(
-                        // Onshape: the logo block is 139 px wide with 14 px left padding.
+                        // Onshape: the logo block ends at x 139, the logo 14 px in
+                        // (the title bar already pads 12 px on the left).
                         h_flex()
                             .id("navbar-logo")
                             .flex_none()
-                            .w(px(139.))
-                            .pl(px(14.))
-                            .gap(px(6.))
+                            .w(px(123.))
+                            .gap(px(10.))
                             .cursor_pointer()
                             // Onshape: the logo goes to the documents page.
                             .on_click(|_, _, cx| crate::files::show_start_window(cx))
@@ -334,10 +417,12 @@ impl Workspace {
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().px(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().child(name))
-                    .child(div().flex_none().ml(px(4.)).text_size(px(16.)).text_color(pal.text_faint).child(if read_only { "History".to_string() } else { branch_name }))
+                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().child(name))
+                    // Live: on the name's baseline, 11 px after it.
+                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).child(if read_only { "History".to_string() } else { branch_name }))
                     .when(read_only, |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
+                    .children(self.render_notices_button(cx))
                     .child(self.render_help_menu(cx)),
             )
             .into_any_element()
@@ -348,11 +433,16 @@ impl Workspace {
         let pal = p();
         Button::new("help-menu")
             .custom(navbar_variant(cx))
-            .child(h_flex().gap(px(3.)).child(Icon::new(IconName::Info).with_size(px(18.)).text_color(pal.text)).child(crate::ui::glyph("ui-chevron-down", 9., pal.text)))
+            // Live (part-studio/00): a filled dark "?" disc and a solid caret.
+            .child(h_flex().gap(px(6.)).child(crate::assets::icon("help", 20., cx)).child(crate::ui::glyph("ui-caret-down", 9., pal.text)))
             .h(px(crate::ui::NAVBAR_H))
             .px(px(6.))
             .rounded(px(0.))
-            .dropdown_menu(|menu, _, _| menu.menu("Keyboard shortcuts", Box::new(ToggleShortcutHelp)).separator().item(PopupMenuItem::new("About noshape").disabled(true)))
+            .os_dropdown_menu("help-menu-dd", false, |menu, _, _| {
+                menu.item(crate::os_menu::OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleShortcutHelp), cx)))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new("About noshape").disabled(true))
+            })
             .into_any_element()
     }
 
@@ -423,83 +513,174 @@ impl Workspace {
         }
     }
 
-    fn report(&self, msg: String, cx: &mut Context<Self>) {
-        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
-    }
-
     /// Tab › Export…: Onshape's Export modal (live, drawing/40 layout): File
     /// name, Format select; Export saves the file.
     fn open_export(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
-        use crate::part_studio::ExportFormat;
         self.activate(tab, window, cx);
         match self.views.get(&tab) {
-            Some(TabView::Assembly(v)) => return v.update(cx, |v, cx| v.open_export_all(window, cx)),
+            Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.open_export_all(window, cx)),
             // Onshape's "Export Drawing" modal (drawing_export).
-            Some(TabView::Drawing(v)) => return v.update(cx, |v, cx| v.open_export_dialog(window, cx)),
+            Some(TabView::Drawing(v)) => v.update(cx, |v, cx| v.open_export_dialog(window, cx)),
+            // Onshape's Export modal (part_studio/export.rs).
+            Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.open_part_export(Vec::new(), window, cx)),
             _ => {}
         }
-        let ws = cx.entity();
-        let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(name));
-        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
-        window.open_dialog(cx, move |dialog, _, cx| {
-            let (c, ws, file2) = (chosen.clone(), ws.clone(), file.clone());
-            let formats: Vec<String> = ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
-            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx)
-                .on_ok(move |_, window, cx| {
-                    let (ws, f) = (ws.clone(), ExportFormat::ALL[c.get()]);
-                    let name = file2.read(cx).value().trim().to_string();
-                    window.defer(cx, move |window, cx| ws.update(cx, |t, cx| t.export(f, Some(name), window, cx)));
-                    true
-                })
-        });
     }
 
-    fn export(&mut self, format: crate::part_studio::ExportFormat, file_name: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(view) = self.active_studio() else {
-            self.report("Open a Part Studio tab to export its parts".into(), cx);
-            return;
-        };
-        let name = file_name.filter(|n| !n.is_empty()).unwrap_or_else(|| view.read(cx).studio_name(cx));
-        let ws = cx.entity();
-        crate::files::request_save_path("Export", format!("{name}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
-            let r = view.read(cx).export(format, &path);
-            let msg = match r {
-                Ok(()) => format!("Exported {}", path.display()),
-                Err(e) => format!("Export failed: {e:#}"),
-            };
-            ws.update(cx, |this, cx| this.report(msg, cx));
-        });
-    }
-
-    /// "+" › Import…: Onshape translates the file into a new Part Studio tab
-    /// named after the file and opens it.
+    /// "+" › Import…: the OS picker (several files), then Onshape's "Import
+    /// to Onshape" modal (import_dialog.rs); the new tab opens.
+    /// "+" › Import…: any file. CAD files go through the Import dialog
+    /// (Part Studio plus the file in "CAD Imports"); DXF / DWG become a file
+    /// tab and a Drawing; other files a file tab (Onshape).
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let ws = cx.entity();
         let handle = window.window_handle();
-        let units = self.doc.read(cx).session.doc.settings.units;
-        crate::files::request_open_path("Import files", "CAD and mesh files", IMPORT_EXTS, window, cx, move |path, cx| {
-            let brep = match read_foreign(&path, &units) {
-                Ok(b) => b,
-                Err(e) => return ws.update(cx, |this, cx| this.report(format!("Import failed: {e:#}"), cx)),
-            };
-            let (name, file) = import_names(&path);
-            let mut new_id = None;
-            ws.read(cx).doc.clone().update(cx, |doc, cx| {
-                doc.edit_document(&format!("Import {file}"), cx, |d| {
-                    let mut ps = PartStudio::new();
-                    add_import_feature(&mut ps, &file, brep, &units);
-                    let name = if d.tabs.iter().any(|t| t.name == name) { d.next_tab_name(&name) } else { name };
-                    new_id = Some(d.add_tab(&name, TabContent::PartStudio(ps)));
+        let (doc, after) = (self.doc.clone(), self.active);
+        crate::files::request_open_paths("Import files", "All files", &["*"], window, cx, move |paths, cx| {
+            let is = |p: &std::path::PathBuf, exts: &[&str]| p.extension().is_some_and(|e| exts.contains(&e.to_string_lossy().to_lowercase().as_str()));
+            let (cad, rest): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| is(p, IMPORT_EXTS));
+            let mut last = None;
+            for p in rest {
+                let Ok(bytes) = std::fs::read(&p) else { continue };
+                let (stem, file) = import_names(&p);
+                let drawing = if is(&p, &["dxf", "dwg"]) { crate::file_tab_view::drawing_from_cad(&bytes).ok() } else { None };
+                doc.update(cx, |d, cx| {
+                    d.edit_document(&format!("Import {file}"), cx, |d| {
+                        let f = crate::file_tab_view::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()), None, after);
+                        last = Some(f);
+                        if let Some(dr) = drawing {
+                            let name = if d.tabs.iter().any(|t| t.name == stem) { d.next_tab_name(&stem) } else { stem.clone() };
+                            let id = d.add_tab(&name, TabContent::Drawing(dr));
+                            place_after(d, id, Some(f));
+                            last = Some(id);
+                        }
+                    })
+                });
+            }
+            let ws2 = ws.clone();
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, cx| {
+                    if let Some(id) = last {
+                        ws2.update(cx, |this, cx| this.activate(id, window, cx));
+                    }
+                    if !cad.is_empty() {
+                        crate::import_dialog::open(doc, cad, after, true, move |id, window, cx| ws.update(cx, |this, cx| this.activate(id, window, cx)), window, cx)
+                    }
                 });
             });
-            if let Some(id) = new_id {
-                let _ = handle.update(cx, |_, window, cx| ws.update(cx, |this, cx| this.activate(id, window, cx)));
-            }
         });
     }
 
+    /// File tab › Translate…: a CAD file through the Import dialog (Part
+    /// Studio), a DXF / DWG into a new Drawing.
+    fn translate_file(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(TabContent::File(f)) = self.doc.read(cx).session.doc.tab(id).map(|t| t.content.clone()) else { return };
+        let Some(bytes) = f.bytes() else { return };
+        match f.kind() {
+            noshape_model::file_tab::FileKind::Drawing2d => match crate::file_tab_view::drawing_from_cad(&bytes) {
+                Ok(dr) => {
+                    let stem = std::path::Path::new(&f.file_name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Drawing".into());
+                    let mut new_id = None;
+                    self.doc.update(cx, |d, cx| {
+                        d.edit_document(&format!("Translate {}", f.file_name), cx, |d| {
+                            let name = if d.tabs.iter().any(|t| t.name == stem) { d.next_tab_name(&stem) } else { stem.clone() };
+                            let t = d.add_tab(&name, TabContent::Drawing(dr));
+                            place_after(d, t, Some(id));
+                            new_id = Some(t);
+                        })
+                    });
+                    if let Some(t) = new_id {
+                        self.activate(t, window, cx);
+                    }
+                }
+                Err(e) => self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("Translate failed: {e}")))),
+            },
+            _ => {
+                // The Import dialog reads files from disk: hand it a temporary copy.
+                let dir = std::env::temp_dir().join(format!("noshape-translate-{}", id));
+                let path = dir.join(&f.file_name);
+                if std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, &bytes)).is_err() {
+                    self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error("Translate failed: cannot write a temporary file".into())));
+                    return;
+                }
+                let ws = cx.entity();
+                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, move |t, window, cx| ws.update(cx, |this, cx| this.activate(t, window, cx)), window, cx);
+            }
+        }
+    }
+
+    /// Left rail › Document notes (`notes`) or Performance; one left panel
+    /// at a time, a second click closes it.
+    fn toggle_doc_panel(&mut self, notes: bool, cx: &mut Context<Self>) {
+        let same = match &self.doc_panel {
+            Some((DocPanel::Notes(_), _)) => notes,
+            Some((DocPanel::Performance(_), _)) => !notes,
+            None => false,
+        };
+        self.doc_panel = None;
+        if !same {
+            self.history = None;
+            self.release_drafts = None;
+            self.tab_manager = None;
+            let close = |this: &mut Self, cx: &mut Context<Self>| {
+                this.doc_panel = None;
+                cx.notify();
+            };
+            self.doc_panel = Some(if notes {
+                let doc = self.doc.clone();
+                let panel = cx.new(|cx| crate::doc_panels::NotesPanel::new(doc, cx));
+                let sub = cx.subscribe(&panel, move |this, _, _: &crate::doc_panels::ClosePanel, cx| close(this, cx));
+                (DocPanel::Notes(panel), vec![sub])
+            } else {
+                let snap = self.perf_snapshot(cx);
+                let panel = cx.new(|_| crate::doc_panels::PerformancePanel::new(snap));
+                let subs = vec![
+                    cx.subscribe(&panel, move |this, _, _: &crate::doc_panels::ClosePanel, cx| close(this, cx)),
+                    cx.subscribe(&panel, |this, _, _: &crate::doc_panels::ShowRegenTimes, cx| {
+                        if let Some(s) = this.active_studio() {
+                            s.update(cx, |s, cx| s.show_regen_times(cx));
+                        }
+                    }),
+                ];
+                (DocPanel::Performance(panel), subs)
+            });
+        }
+        cx.notify();
+    }
+
+    /// The Performance panel's numbers: the active Part Studio, the
+    /// document's tabs by kind, the GPU.
+    fn perf_snapshot(&self, cx: &App) -> crate::doc_panels::PerfSnapshot {
+        let mut counts = [("Part Studios", 0usize), ("Other tabs", 0), ("Assemblies", 0), ("Drawings", 0)];
+        for t in self.doc.read(cx).session.doc.ordered_tabs() {
+            let i = match t.content {
+                TabContent::PartStudio(_) => 0,
+                TabContent::Assembly(_) => 2,
+                TabContent::Drawing(_) => 3,
+                _ => 1,
+            };
+            counts[i].1 += 1;
+        }
+        crate::doc_panels::PerfSnapshot {
+            tab: self.active_studio().map(|s| s.read(cx).tab_perf(cx)),
+            tabs: counts.map(|(k, n)| (k.to_string(), n)).to_vec(),
+            adapter: self.gpu.adapter_name(),
+        }
+    }
+
+    fn toggle_release_drafts(&mut self, cx: &mut Context<Self>) {
+        if self.release_drafts.take().is_none() {
+            let doc = self.doc.clone();
+            self.history = None;
+            self.doc_panel = None;
+            self.release_drafts = Some(cx.new(|cx| crate::release_dialog::ReleaseDraftsPanel::new(doc, cx)));
+        }
+        cx.notify();
+    }
+
     fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.release_drafts = None;
+        self.doc_panel = None;
         if self.history.take().is_none() {
             let doc = self.doc.clone();
             self.history = Some(cx.new(|cx| HistoryPanel::new(doc, window, cx)));
@@ -510,9 +691,21 @@ impl Workspace {
     /// Onshape's bottom tab bar (§3.5): 30 px `#d7d7d7`; tab-list cell under
     /// the rail, a + cell, then tabs hanging from the top edge with rounded
     /// bottom corners; the active tab is white with a 2 px blue underline.
-    fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    /// The tab bar: the Tab manager cell (it ends the left rail) and the
+    /// row with "+" and the tabs (under the content, right of any open left
+    /// panel).
+    fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> (AnyElement, AnyElement) {
         let pal = p();
-        let tabs: Vec<(TabId, String, &'static str)> = self.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| (t.id, t.name.clone(), kind_of(&t.content))).collect();
+        let d = &self.doc.read(cx).session.doc;
+        // Onshape: with a folder open, the bar shows only that folder's tabs.
+        let open = self.open_folder.filter(|f| d.is_folder(*f));
+        let items: Vec<(TabId, String, Option<&'static str>)> = d
+            .children(open)
+            .into_iter()
+            .filter_map(|id| d.tab(id).map(|t| (id, t.name.clone(), Some(kind_of(&t.content)))).or_else(|| d.folder(id).map(|f| (id, f.name.clone(), None))))
+            .collect();
+        let crumbs: Vec<(TabId, String)> = open.map(|f| d.ancestors(f).into_iter().rev().filter_map(|a| d.folder(a).map(|x| (a, x.name.clone()))).collect()).unwrap_or_default();
+        let open_name = open.and_then(|f| d.folder(f).map(|x| x.name.clone()));
         let view = cx.entity();
         let cell = |id: &'static str, cx: &App| {
             Button::new(id)
@@ -536,6 +729,7 @@ impl Workspace {
         // Render Studio) are not part of noshape.
         let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(0x555555))).tooltip("Insert new tab").on_click(move |_, window, cx| {
             let (v1, v2, v3, v4, v5, v6, v7) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+            let (v8, v9) = (view.clone(), view.clone());
             let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.as_ref().map(|t| t.name.clone()));
             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                 use crate::os_menu::OsMenuItem as I;
@@ -545,19 +739,64 @@ impl Workspace {
                     None => m,
                 };
                 m
+                    .item(I::new("Create Material Library").icon_name("material-library").on_click(move |_, w, cx| v9.update(cx, |t, cx| t.add_tab("materiallibrary", w, cx))))
                     .item(I::new("Create Feature Studio").icon_name("feature-studio").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
                     .separator()
                     .item(I::new("Create Part Studio").icon_name("part-studio").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_tab("partstudio", w, cx))))
                     .item(I::new("Create Assembly").icon_name("assembly").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.add_tab("assembly", w, cx))))
                     .item(I::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
                     .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
+                    .item(I::new("Create folder").icon_name("folder").on_click(move |_, w, cx| v8.update(cx, |t, cx| t.create_folder(w, cx))))
                     .item(I::new("Import…").icon_name("import").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))))
             });
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
         });
-        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(2.)).overflow_x_scroll();
-        for (id, name, kind) in tabs {
+        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(3.)).overflow_x_scroll();
+        if let Some(name) = open_name {
+            let folder = open.unwrap_or(TabId(0));
+            // "All tabs" (home): back to every tab; dropping here moves to the root.
+            strip = strip.child(
+                tab_chip("tab-home", false)
+                    .px(px(8.))
+                    .child(os::glyph(os::GLYPH_HOME, 18., pal.text_muted))
+                    .tooltip(crate::ui::tooltip("All tabs"))
+                    .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
+                    .on_drop(cx.listener(|this, drag: &TabDrag, _, cx| this.move_into(drag.id, None, cx)))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_folder = None;
+                        cx.notify();
+                    })),
+            );
+            // More than one level deep: an overflow tab lists the parent folders.
+            if !crumbs.is_empty() {
+                let v = cx.entity();
+                strip = strip.child(tab_chip("tab-crumbs", false).px(px(10.)).child("…").on_click(move |e, window, cx| {
+                    let (crumbs, v) = (crumbs.clone(), v.clone());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        m = m.dropdown();
+                        for (id, name) in crumbs {
+                            let v = v.clone();
+                            m = m.item(crate::os_menu::OsMenuItem::new(name).icon(os::glyph(os::GLYPH_FOLDER, 20., p().text)).on_click(move |_, _, cx| {
+                                v.update(cx, |t, cx| {
+                                    t.open_folder = Some(id);
+                                    cx.notify();
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    let h = window.viewport_size().height;
+                    crate::os_menu::open_anchored(point(e.position().x, h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
+                }));
+            }
+            strip = strip.child(self.folder_tab(folder, name, true, cx));
+        }
+        for (id, name, kind) in items {
+            let Some(kind) = kind else {
+                strip = strip.child(self.folder_tab(id, name, false, cx));
+                continue;
+            };
             let active = self.active == Some(id);
             let view = cx.entity();
             let tab_name = name.clone();
@@ -566,8 +805,9 @@ impl Workspace {
                     .id(SharedString::from(format!("tab-{id}")))
                     .relative()
                     .flex_none()
-                    .min_w(px(60.))
-                    .max_w(px(200.))
+                    // Live (part-studio/00, behaviours "Tab bar"): fixed-width
+                    // tabs, 198 px, 3 px apart; long names truncate.
+                    .w(px(198.))
                     .h(px(if active { 28. } else { 27. }))
                     .pl(px(10.))
                     .pr(px(10.))
@@ -585,6 +825,10 @@ impl Workspace {
                         None => div().truncate().child(name).into_any_element(),
                     })
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
+                    // Drag to reorder; drop a tab on a folder to file it.
+                    .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)) }, |d, _, _, cx| cx.new(|_| d.clone()))
+                    .drag_over::<TabDrag>(|st, _, _, _| st.border_l_2().border_color(gpui_kit::rgb(0x1651b0)))
+                    .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_before(drag.id, id, cx)))
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         // The first click activated the tab; a double-click renames it
                         // (activating again would take the field's focus).
@@ -594,7 +838,7 @@ impl Workspace {
                             this.activate(id, window, cx);
                         }
                     }))
-                    .os_context_menu(move |menu, _, _| {
+                    .os_context_menu(move |menu, _, cx| {
                         use crate::doc_dialogs as dd;
                         use crate::os_menu::OsMenuItem as I;
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
@@ -625,40 +869,89 @@ impl Workspace {
                                 let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
                                 cx.set_global(dd::CopiedTab(t));
                             }))
-                            .separator()
-                            .item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v9.update(cx, |t, cx| t.select_thumbnail(id, cx))))
-                            .separator()
+                            .separator();
+                        // Onshape: only tabs with a picture can be the document thumbnail
+                        // (the Feature Studio menu has no such item, menus/rmb-tab-feature-studio).
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") {
+                            menu.item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v9.update(cx, |t, cx| t.select_thumbnail(id, cx)))).separator()
+                        } else {
+                            menu
+                        };
+                        let menu = menu
                             .item(I::new("Move to document…").on_click(move |_, w, cx| {
                                 let doc = v10.read(cx).doc.clone();
-                                dd::move_to_document(doc, id, w, cx)
+                                dd::move_to_document(doc, vec![id], w, cx)
                             }));
                         let menu = if matches!(kind, "partstudio" | "assembly" | "drawing") { menu.item(I::new("Export…").on_click(move |_, w, cx| v11.update(cx, |t, cx| t.open_export(id, w, cx)))) } else { menu };
+                        // Release management (help image Release_highlighted2: the
+                        // last entry, after Export…): Release… for any releasable
+                        // tab; Revision history once an Assembly, Drawing or
+                        // Variable Studio has revisions.
+                        let menu = if matches!(kind, "partstudio" | "assembly" | "drawing" | "variables") || kind.starts_with("file") {
+                            let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
+                            let pn = crate::release_dialog::tab_part_number(d1.read(cx), id);
+                            let has_revisions = !pn.is_empty() && !crate::release_dialog::release_log(d1.read(cx)).revisions(&pn).is_empty();
+                            let menu = menu.item(I::new("Release…").on_click(move |_, w, cx| {
+                                let items = crate::release_dialog::tab_items(d1.read(cx), id);
+                                crate::release_dialog::open_release_candidate(d1.clone(), items, w, cx)
+                            }));
+                            if has_revisions && matches!(kind, "assembly" | "drawing" | "variables") {
+                                menu.item(I::new("Revision history").on_click(move |_, w, cx| crate::release_dialog::open_revision_history(d2.clone(), pn.clone(), w, cx)))
+                            } else {
+                                menu
+                            }
+                        } else {
+                            menu
+                        };
+                        // File tabs: Download, Update…, and Translate… for CAD / DXF / DWG files.
+                        let menu = if kind.starts_with("file") {
+                            let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
+                            let translatable = matches!(view.read(cx).doc.read(cx).session.doc.tab(id).map(|t| &t.content), Some(TabContent::File(f)) if f.translatable());
+                            let v12 = view.clone();
+                            let menu = menu
+                                .separator()
+                                .item(I::new("Download").on_click(move |_, w, cx| crate::file_tab_view::download(&d1, id, w, cx)))
+                                .item(I::new("Update…").on_click(move |_, w, cx| crate::file_tab_view::update(&d2, id, w, cx)));
+                            if translatable { menu.item(I::new("Translate…").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.translate_file(id, w, cx)))) } else { menu }
+                        } else {
+                            menu
+                        };
+                        // Material Library tabs: Export… (CSV) and Update… (help: customizing part materials).
+                        let menu = if kind == "materiallibrary" {
+                            let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
+                            menu.item(I::new("Export…").on_click(move |_, w, cx| crate::material_library_view::export(d1.clone(), id, w, cx)))
+                                .item(I::new("Update…").on_click(move |_, w, cx| crate::material_library_view::update(d2.clone(), id, w, cx)))
+                        } else {
+                            menu
+                        };
                         // Onshape: Part Studio and Assembly tabs offer "Create Drawing of <tab>…".
-                        let menu = if matches!(kind, "partstudio" | "assembly") {
+                        if matches!(kind, "partstudio" | "assembly") {
                             let n = tab_name.clone();
                             menu.item(crate::os_menu::OsMenuItem::new(format!("Create Drawing of {tab_name}…")).on_click(move |_, w, cx| {
-                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default() });
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: id, part: None, config: Default::default(), sketch: None });
                                 let req = crate::drawing_create::CreateRequest { source, name: Some(n.clone()) };
                                 v3.update(cx, |t, cx| t.open_create_drawing(req, w, cx));
                             }))
                         } else {
                             menu
-                        };
-                        menu
+                        }
                     }),
             );
         }
-        h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(tab_list).child(add).child(strip).into_any_element()
+        (tab_list.into_any_element(), h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).into_any_element())
     }
 
     /// Onshape's left document-panel rail (§3.3): 40 px `#fafafa`.
-    fn render_rail(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_rail(&mut self, tab_list: AnyElement, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let history_open = self.history.is_some();
-        v_flex()
+        let notes_open = matches!(self.doc_panel, Some((DocPanel::Notes(_), _)));
+        let perf_open = matches!(self.doc_panel, Some((DocPanel::Performance(_), _)));
+        let perf_error = crate::doc_panels::PerfSnapshot { adapter: self.gpu.adapter_name(), ..Default::default() }.software_renderer();
+        let buttons = v_flex()
             .w(px(crate::ui::RAIL_W))
-            .h_full()
-            .flex_none()
+            .flex_1()
+            .min_h_0()
             .pt(px(1.))
             .gap(px(4.))
             .bg(pal.rail)
@@ -675,16 +968,46 @@ impl Workspace {
                     .tooltip(crate::ui::tooltip("Create version…"))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx))),
             )
-            .into_any_element()
+            // Live order: Versions and history, Create version…, (Comments),
+            // Document notes, (Where used), Performance, (AI Advisor).
+            .child(
+                crate::ui::rail_button("rail-notes", "doc-notes", notes_open, true, cx)
+                    .tooltip(crate::ui::tooltip("Document notes"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(true, cx))),
+            )
+            .child(
+                crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx)
+                    // A software renderer is a performance error (live: a red badge).
+                    .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::white()).child(crate::assets::icon("error", 11., cx))))
+                    .tooltip(crate::ui::tooltip(if perf_error { "Performance errors detected" } else { "Performance" }))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(false, cx))),
+            )
+            // Release management (help releasedraftspanel.png).
+            .child(
+                crate::ui::rail_button("rail-release-drafts", "release-drafts", self.release_drafts.is_some(), true, cx)
+                    .tooltip(crate::ui::tooltip("Release drafts"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_release_drafts(cx))),
+            );
+        // The Tab manager cell ends the rail, beside the tab bar.
+        v_flex().w(px(crate::ui::RAIL_W)).h_full().flex_none().child(buttons).child(tab_list).into_any_element()
     }
 }
 
-fn tab_icon(kind: &str) -> &'static str {
+/// The left rail's document panels.
+enum DocPanel {
+    Notes(Entity<crate::doc_panels::NotesPanel>),
+    Performance(Entity<crate::doc_panels::PerformancePanel>),
+}
+
+fn tab_icon(kind: &'static str) -> &'static str {
     match kind {
         "partstudio" => "part-studio",
         "assembly" => "assembly",
         "drawing" => "drawing",
         "featurestudio" => "feature-studio",
+        "materiallibrary" => "material-library",
+        // File tabs: the kind is the icon ("file-cad", "file-pdf"...).
+        k if k.starts_with("file") => k,
         _ => "variable-studio",
     }
 }
@@ -702,6 +1025,8 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::Drawing(_) => "drawing",
         TabContent::VariableStudio(_) => "variables",
         TabContent::FeatureStudio(_) => "featurestudio",
+        TabContent::MaterialLibrary(_) => "materiallibrary",
+        TabContent::File(f) => crate::file_tab_view::file_icon(f),
     }
 }
 
@@ -710,14 +1035,27 @@ impl Render for Workspace {
         let pal = p();
         crate::assets::set_scale_factor(_window.scale_factor());
         let title = self.render_title_bar(cx);
-        let rail = self.render_rail(cx);
-        let tabs = self.render_tab_bar(cx);
+        let (tab_list, tabs) = self.render_tab_bar(cx);
+        let rail = self.render_rail(tab_list, cx);
+        if let Some((DocPanel::Performance(panel), _)) = &self.doc_panel {
+            let snap = self.perf_snapshot(cx);
+            panel.update(cx, |p, cx| p.set_snapshot(snap, cx));
+        }
+        if let Some((panel, _)) = &self.fs_notices {
+            let results: HashMap<TabId, String> = self.views.iter().filter_map(|(t, v)| match v {
+                TabView::PartStudio(v) => Some((*t, v.read(cx).regen_result())),
+                _ => None,
+            }).collect();
+            panel.update(cx, |p, cx| p.set_results(results, cx));
+        }
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
             Some(TabView::Drawing(v)) => v.clone().into_any_element(),
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
             Some(TabView::Assembly(v)) => v.clone().into_any_element(),
             Some(TabView::FeatureStudio(v)) => v.clone().into_any_element(),
+            Some(TabView::MaterialLibrary(v)) => v.clone().into_any_element(),
+            Some(TabView::File(v)) => v.clone().into_any_element(),
             None => div().into_any_element(),
         };
         v_flex()
@@ -729,6 +1067,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleReleaseDrafts, _, cx| this.toggle_release_drafts(cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
             // Tool search from anywhere in the window (e.g. after clicking the tab bar).
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| {
@@ -746,6 +1085,13 @@ impl Render for Workspace {
             }))
             // Alt+T: Tab manager (search and open tabs).
             .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))
+            // A customized key of an action without its own GPUI action.
+            .on_action(cx.listener(|this, a: &crate::shortcuts::RunShortcut, window, cx| this.run_shortcut(a.id, window, cx)))
+            .on_action(cx.listener(|this, _: &ExportRequestedItem, window, cx| {
+                if let Some((t, parts)) = REQUESTED_EXPORT.lock().take() {
+                    this.export_item(t, parts, window, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ActivateRequestedTab, window, cx| {
                 if let Some(t) = REQUESTED_TAB.lock().take() {
                     this.activate(t, window, cx);
@@ -765,29 +1111,273 @@ impl Render for Workspace {
                     // One left panel at a time: the Tab manager or Versions and history.
                     .children(match &self.tab_manager {
                         Some((tm, _)) => Some(tm.clone().into_any_element()),
-                        None => self.history.clone().map(|h| h.into_any_element()),
+                        None => self.history.clone().map(|h| h.into_any_element()).or_else(|| self.release_drafts.clone().map(|d| d.into_any_element())).or_else(|| {
+                            self.doc_panel.as_ref().map(|(p, _)| match p {
+                                DocPanel::Notes(n) => n.clone().into_any_element(),
+                                DocPanel::Performance(v) => v.clone().into_any_element(),
+                            })
+                        }),
                     }.map(|panel| div().w(px(crate::history_panel::PANEL_W)).h_full().flex_none().border_r_1().border_color(pal.border).child(panel)))
+                    // Onshape: the left panels run the window's full height;
+                    // the tab bar sits under the content only.
                     .child(
-                        div()
-                            .flex_1()
-                            .h_full()
-                            .min_w_0()
-                            .relative()
-                            .child(content)
-                            // Onshape: at the feature dialog's place (below the toolbar, right of the list).
-                            .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::LEFT_PANEL_W)).child(p.clone()))),
+                        v_flex().flex_1().h_full().min_w_0().child(
+                            div()
+                                .flex_1()
+                                .min_h_0()
+                                .relative()
+                                .child(content)
+                                .children(self.render_toast(cx))
+                                // Onshape: at the feature dialog's place (below the toolbar, right of the list).
+                                .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::LEFT_PANEL_W)).child(p.clone()))),
+                        )
+                        .child(tabs),
                     ),
             )
-            .child(tabs)
+            .children(self.fs_notices.as_ref().map(|(p, _)| p.clone()))
+            .children(self.fs_search.as_ref().map(|(p, _)| p.clone()))
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
             // Onshape right-click menus opened with `os_context_menu`.
             .children(crate::os_menu::render_host(cx))
     }
 }
 
+impl Workspace {
+    /// Runs a customized shortcut (Preferences › Keyboard shortcuts) in the
+    /// active tab.
+    fn run_shortcut(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        match self.active.and_then(|a| self.views.get(&a)) {
+            Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.run_shortcut(id, window, cx)),
+            Some(TabView::Drawing(v)) => crate::shortcuts::run_in_drawing(&v.clone(), id, window, cx),
+            _ => {}
+        }
+    }
+
+    /// Onshape's message bubble (top center) for tabs without their own.
+    fn render_toast(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (kind, msg) = self.toast.clone()?;
+        if matches!(self.active.and_then(|a| self.views.get(&a)), Some(TabView::PartStudio(_) | TabView::Assembly(_) | TabView::Drawing(_)) | None) {
+            return None;
+        }
+        let ws = cx.entity();
+        Some(
+            div()
+                .absolute()
+                .top(px(8.))
+                .left_0()
+                .right_0()
+                .flex()
+                .justify_center()
+                .child(crate::os_ui::message_bubble("ws-toast", kind, msg, move |_, _, cx| {
+                    ws.update(cx, |this, cx| {
+                        this.toast = None;
+                        cx.notify();
+                    })
+                }, cx))
+                .into_any_element(),
+        )
+    }
+
+    /// The navbar `{ }` icon (Onshape: "FeatureScript notices"; red `{!}`
+    /// while a Feature Studio's committed source has errors).
+    fn render_notices_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // Live (part-studio/00): shown in every document, `{✓}` when clean.
+        let errors = crate::fs_notices::document_notices(&self.doc, cx).iter().any(|(_, _, n)| n.iter().any(|n| n.error));
+        Some(
+            h_flex()
+                .id("fs-notices-btn")
+                .h(px(32.))
+                .px(px(6.))
+                .rounded(px(3.))
+                .cursor_pointer()
+                .hover(|d| d.bg(p().border))
+                .when(self.fs_notices.is_some(), |d| d.bg(p().border))
+                .tooltip(crate::ui::tooltip("FeatureScript notices"))
+                .items_center()
+                .child(crate::assets::icon(if errors { "fs-notices-error" } else { "fs-notices" }, 20., cx))
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_fs_notices(window, cx)))
+                .into_any_element(),
+        )
+    }
+
+    fn toggle_fs_notices(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.fs_notices.take().is_some() {
+            cx.notify();
+            return;
+        }
+        let doc = self.doc.clone();
+        let panel = cx.new(|cx| crate::fs_notices::FsNoticesPanel::new(doc, window, cx));
+        let sub = cx.subscribe_in(&panel, window, |this: &mut Self, _, ev: &crate::fs_notices::FsNoticesEvent, window, cx| match ev {
+            crate::fs_notices::FsNoticesEvent::Close => {
+                this.fs_notices = None;
+                cx.notify();
+            }
+            crate::fs_notices::FsNoticesEvent::Goto(tab, line, column) => {
+                let (tab, line, column) = (*tab, *line, *column);
+                this.activate(tab, window, cx);
+                if let Some(TabView::FeatureStudio(v)) = this.views.get(&tab) {
+                    v.update(cx, |v, cx| v.goto_line(line, column, window, cx));
+                }
+            }
+        });
+        self.fs_notices = Some((panel, sub));
+        cx.notify();
+    }
+
+    /// "+" › Create folder: a new folder tab, its name field active.
+    fn create_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (after, open) = (self.active, self.open_folder);
+        let mut new_id = None;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document("Create folder", cx, |d| {
+                let name = d.next_folder_name();
+                let id = d.add_folder(&name, None);
+                let parent = open.or_else(|| after.and_then(|a| d.parent_of(a)));
+                if let Some(a) = after.filter(|a| d.parent_of(*a) == parent) {
+                    place_after(d, id, Some(a));
+                } else {
+                    d.set_parent(id, parent);
+                }
+                new_id = Some(id);
+            });
+        });
+        if let Some(id) = new_id {
+            self.start_tab_rename(id, window, cx);
+        }
+    }
+
+    /// Drop on a folder (or on "All tabs": the root).
+    fn move_into(&mut self, id: TabId, folder: Option<TabId>, cx: &mut Context<Self>) {
+        if Some(id) == folder {
+            return;
+        }
+        self.doc.update(cx, |doc, cx| {
+            if doc.session.doc.parent_of(id) != folder {
+                doc.edit_document("Move to folder", cx, |d| {
+                    d.set_parent(id, folder);
+                });
+            }
+        });
+        cx.notify();
+    }
+
+    /// Drop on a tab: in front of it, in its folder.
+    fn move_before(&mut self, id: TabId, before: TabId, cx: &mut Context<Self>) {
+        if id == before {
+            return;
+        }
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document("Reorder tabs", cx, |d| {
+                let parent = d.parent_of(before);
+                if d.set_parent(id, parent) {
+                    d.move_in_order(id, Some(before));
+                }
+            });
+        });
+        cx.notify();
+    }
+
+    /// A folder on the tab bar: click opens it, double-click renames;
+    /// right-click: Rename, Move to parent folder, Unpack folder, Move to
+    /// document (help: Document tabs › Organizing tabs with folders).
+    fn folder_tab(&self, id: TabId, name: String, current: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let has_parent = self.doc.read(cx).session.doc.parent_of(id).is_some();
+        let view = cx.entity();
+        tab_chip(SharedString::from(format!("folder-{id}")), current)
+            .min_w(px(60.))
+            .max_w(px(200.))
+            .px(px(10.))
+            .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
+            .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
+                Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.))).into_any_element(),
+                None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(name.clone()).into_any_element(),
+            })
+            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, |d, _, _, cx| cx.new(|_| d.clone())))
+            .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
+            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                if e.click_count() >= 2 {
+                    this.start_tab_rename(id, window, cx);
+                } else {
+                    this.open_folder = Some(id);
+                    cx.notify();
+                }
+            }))
+            .os_context_menu(move |menu, _, _| {
+                use crate::os_menu::OsMenuItem as I;
+                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
+                    .item(I::new("Move to parent folder").disabled(!has_parent).on_click(move |_, _, cx| {
+                        v2.update(cx, |t, cx| {
+                            let up = t.doc.read(cx).session.doc.ancestors(id).get(1).copied();
+                            t.move_into(id, up, cx)
+                        })
+                    }))
+                    .item(I::new("Unpack folder").on_click(move |_, _, cx| {
+                        v3.update(cx, |t, cx| {
+                            if t.open_folder == Some(id) {
+                                t.open_folder = t.doc.read(cx).session.doc.parent_of(id);
+                            }
+                            t.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(id)));
+                            cx.notify();
+                        })
+                    }))
+                    .separator()
+                    .item(I::new("Move to document…").on_click(move |_, w, cx| {
+                        let doc = v4.read(cx).doc.clone();
+                        crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
+                    }))
+            })
+            .into_any_element()
+    }
+
+    /// Open (or focus) the Search Feature Studios pane.
+    fn open_fs_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(pane) = self.fs_search.as_ref().map(|(p, _)| p.clone()) {
+            let find = pane.read(cx).find_field();
+            find.update(cx, |s, cx| s.focus(window, cx));
+            return;
+        }
+        let doc = self.doc.clone();
+        let pane = cx.new(|cx| crate::fs_search::FsSearchPane::new(doc, window, cx));
+        let sub = cx.subscribe_in(&pane, window, |this: &mut Self, _, ev: &crate::fs_search::FsSearchEvent, window, cx| match ev {
+            crate::fs_search::FsSearchEvent::Close => {
+                this.fs_search = None;
+                cx.notify();
+            }
+            crate::fs_search::FsSearchEvent::Goto(tab, line, column) => {
+                let (tab, line, column) = (*tab, *line, *column);
+                this.activate(tab, window, cx);
+                if let Some(TabView::FeatureStudio(v)) = this.views.get(&tab) {
+                    v.update(cx, |v, cx| v.goto_line(line, column, window, cx));
+                }
+            }
+        });
+        self.fs_search = Some((pane, sub));
+        cx.notify();
+    }
+}
+
 /// Tab to activate, set by views that are not subscribed to by the
 /// workspace (e.g. a drawing view's "Switch to <Part Studio>").
 static REQUESTED_TAB: parking_lot::Mutex<Option<TabId>> = parking_lot::Mutex::new(None);
+static REQUESTED_EXPORT: parking_lot::Mutex<Option<(TabId, Vec<noshape_model::BodyId>)>> = parking_lot::Mutex::new(None);
+
+/// Open the Export modal of a tab's item (parts of a Part Studio, or the
+/// tab), e.g. from a release candidate row.
+pub fn request_export(tab: TabId, parts: Vec<noshape_model::BodyId>, window: &mut Window, cx: &mut App) {
+    // From a modal (release dialog, revision history) an action wouldn't
+    // reach the workspace: call the window's workspace directly.
+    let ws = window.root::<gpui_kit::base::Root>().flatten().and_then(|r| r.read(cx).view().clone().downcast::<Workspace>().ok());
+    match ws {
+        Some(ws) => ws.update(cx, |w, cx| w.export_item(tab, parts, window, cx)),
+        None => {
+            *REQUESTED_EXPORT.lock() = Some((tab, parts));
+            window.dispatch_action(Box::new(ExportRequestedItem), cx);
+        }
+    }
+}
 
 /// Ask the workspace to switch to `tab`.
 pub fn request_activate_tab(tab: TabId, window: &mut Window, cx: &mut App) {
@@ -796,6 +1386,19 @@ pub fn request_activate_tab(tab: TabId, window: &mut Window, cx: &mut App) {
 }
 
 impl Workspace {
+    /// Export one tab's item: its parts (Part Studio) or the tab.
+    fn export_item(&mut self, t: TabId, parts: Vec<noshape_model::BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.activate(t, window, cx);
+        let studio = match self.views.get(&t) {
+            Some(TabView::PartStudio(v)) if !parts.is_empty() => Some(v.clone()),
+            _ => None,
+        };
+        match studio {
+            Some(v) => v.update(cx, |v, cx| v.open_part_export(parts, window, cx)),
+            None => self.open_export(t, window, cx),
+        }
+    }
+
     /// Show the Create Drawing dialog (from "+" › Create Drawing or a
     /// "Create drawing of …" menu entry).
     fn open_create_drawing(&mut self, req: crate::drawing_create::CreateRequest, window: &mut Window, cx: &mut Context<Self>) {
@@ -828,7 +1431,9 @@ impl Workspace {
             let drawing = cx
                 .background_spawn(async move {
                     let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds(&doc, s)) } else { None };
-                    noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested)
+                    // Sketch sources face the sketch plane.
+                    let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
+                    noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame)
                 })
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
@@ -853,7 +1458,11 @@ impl Workspace {
                     match &source {
                         Some(s) => {
                             let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
-                            v.update(cx, |v, cx| v.set_tool(tool, cx));
+                            let sketch = s.sketch;
+                            v.update(cx, |v, cx| {
+                                v.set_tool(tool, cx);
+                                v.insert_sketch(sketch, cx);
+                            });
                         }
                         // From "+" › Create Drawing…: choose what to insert first.
                         None => v.update(cx, |v, cx| v.open_insert_chooser(cx)),
@@ -878,6 +1487,11 @@ impl Workspace {
             let sub = cx.subscribe_in(&tm, window, |this: &mut Self, _, ev: &TabManagerEvent, window, cx| match ev {
                 TabManagerEvent::Open(t) => this.activate(*t, window, cx),
                 TabManagerEvent::Close => this.toggle_tab_manager(window, cx),
+                TabManagerEvent::Delete(tabs) => {
+                    for t in tabs.clone() {
+                        this.delete_tab(t, window, cx);
+                    }
+                }
             });
             self.tab_manager = Some((tm, sub));
         }
@@ -885,6 +1499,64 @@ impl Workspace {
     }
 }
 
+
+/// Onshape inserts a new tab right after the active one (behaviours.md, tab bar).
+pub(crate) fn place_after(d: &mut noshape_model::Document, id: TabId, after: Option<TabId>) {
+    let order = &mut d.settings.tab_order;
+    let Some(at) = after.and_then(|a| order.iter().position(|t| *t == a)) else { return };
+    order.retain(|t| *t != id);
+    order.insert(at + 1, id);
+    // …and in the same folder.
+    let parent = after.and_then(|a| d.parent_of(a));
+    d.set_parent(id, parent);
+}
+
+/// A tab or folder dragged on the tab bar (also its drag preview).
+#[derive(Clone)]
+struct TabDrag {
+    id: TabId,
+    name: String,
+    /// Tab icon; None: a folder.
+    icon: Option<&'static str>,
+}
+
+impl Render for TabDrag {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        h_flex()
+            .h(px(27.))
+            .px(px(10.))
+            .gap(px(3.))
+            .rounded_b(px(5.))
+            .bg(pal.panel)
+            .opacity(0.9)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
+            .text_size(px(14.))
+            .text_color(pal.text)
+            .child(match self.icon {
+                Some(i) => crate::assets::icon(i, 20., cx),
+                None => os::glyph(os::GLYPH_FOLDER, 20., pal.text).into_any_element(),
+            })
+            .child(self.name.clone())
+    }
+}
+
+/// A tab-bar cell hanging from the bar's top edge (Onshape §3.5).
+fn tab_chip(id: impl Into<ElementId>, active: bool) -> Stateful<Div> {
+    let pal = p();
+    h_flex()
+        .id(id)
+        .relative()
+        .flex_none()
+        .h(px(if active { 28. } else { 27. }))
+        .gap(px(3.))
+        .rounded_b(px(5.))
+        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.12), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
+        .text_size(px(14.))
+        .cursor_pointer()
+        .bg(if active { pal.panel } else { pal.tab_inactive })
+        .text_color(if active { pal.text } else { pal.text_muted })
+}
 
 /// File types "Import files…" translates.
 pub(crate) const IMPORT_EXTS: &[&str] = &["step", "stp", "iges", "igs", "brep", "stl", "obj"];
@@ -926,11 +1598,12 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
     Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
 }
 
-/// Append the "Import <file>" feature holding `brep` to `ps`.
+/// Append an Import feature ("Import N") holding `brep` to `ps`.
 pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str, brep: String, units: &noshape_units::UnitPrefs) {
     if let Some(mut f) = ps.new_feature("importForeign", units) {
-        f.name = format!("Import {file}");
-        f.custom_name = true;
+        // Live (documents/64-import-feature-dialog.png): the feature is
+        // numbered like any other ("Import 1") and allows faulty parts.
+        f.params.set("allowFaultyParts", noshape_model::ParamValue::Bool(true));
         f.params.set("blobData", noshape_model::ParamValue::Text(brep));
         f.params.set("foreignId", noshape_model::ParamValue::Text(file.to_string()));
         ps.insert_at_rollback(f);

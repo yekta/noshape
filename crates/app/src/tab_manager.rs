@@ -2,9 +2,15 @@
 //! document with a tab search, type filters, one 54 px row per tab (icon,
 //! name, italic type), a large preview of the selected tab and the
 //! keyboard hint at the bottom. ↑/↓ (or Tab) move the selection, Enter
-//! opens it, Esc closes the panel.
+//! opens it, Esc closes the panel. With no search and no type filter the
+//! tab folders show (help: Document tabs › Searching and grouping tabs):
+//! folder menu Rename, Add selected to a folder, New folder, Unpack folder;
+//! Ctrl+click selects several tabs for Add selection to folder, Move to
+//! document… or Delete.
 
 use crate::doc_model::{DocEvent, DocModel};
+use crate::os_menu::OsContextMenuExt as _;
+use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{h_flex, v_flex};
@@ -17,17 +23,21 @@ use std::collections::HashSet;
 pub enum TabManagerEvent {
     Open(TabId),
     Close,
+    /// Context menu › Delete on the selected tabs.
+    Delete(Vec<TabId>),
 }
 
 impl EventEmitter<TabManagerEvent> for TabManager {}
 
 /// Tab kinds in Onshape's filter order: (key, icon, type label).
-const KINDS: [(&str, &str, &str); 5] = [
+const KINDS: [(&str, &str, &str); 7] = [
     ("partstudio", "part-studio", "Part Studio"),
     ("assembly", "assembly", "Assembly"),
     ("drawing", "drawing", "Drawing"),
     ("variables", "variable-studio", "Variable Studio"),
     ("featurestudio", "feature-studio", "Feature Studio"),
+    ("materiallibrary", "material-library", "Material Library"),
+    ("file", "file", "File"),
 ];
 
 fn kind_of(c: &TabContent) -> &'static str {
@@ -37,6 +47,8 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::Drawing(_) => "drawing",
         TabContent::VariableStudio(_) => "variables",
         TabContent::FeatureStudio(_) => "featurestudio",
+        TabContent::MaterialLibrary(_) => "materiallibrary",
+        TabContent::File(_) => "file",
     }
 }
 
@@ -62,6 +74,11 @@ pub struct TabManager {
     /// Type filters (empty = all).
     kinds: HashSet<&'static str>,
     selected: Option<TabId>,
+    /// Ctrl+click selection (tabs and folders).
+    multi: Vec<TabId>,
+    collapsed: HashSet<TabId>,
+    /// Folder being renamed in place.
+    renaming: Option<(TabId, Entity<InputState>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -88,7 +105,7 @@ impl TabManager {
             cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify()),
         ];
         search.update(cx, |s, cx| s.focus(window, cx));
-        Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, _subs: subs }
+        Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, _subs: subs }
     }
 
     /// The workspace's active tab changed (keep it selected, like Onshape).
@@ -97,17 +114,160 @@ impl TabManager {
         cx.notify();
     }
 
+    /// Folders show only with no search and no type filter.
+    fn tree_mode(&self) -> bool {
+        self.query.trim().is_empty() && self.kinds.is_empty()
+    }
+
+    /// Tabs and folders in folder order with their depth; `all` includes
+    /// the contents of collapsed folders.
+    fn tree(&self, all: bool, cx: &App) -> Vec<(TabId, usize)> {
+        fn walk(d: &noshape_model::Document, f: Option<TabId>, depth: usize, collapsed: Option<&HashSet<TabId>>, out: &mut Vec<(TabId, usize)>) {
+            for c in d.children(f) {
+                out.push((c, depth));
+                if d.is_folder(c) && !collapsed.is_some_and(|s| s.contains(&c)) {
+                    walk(d, Some(c), depth + 1, collapsed, out);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(&self.doc.read(cx).session.doc, None, 0, (!all).then_some(&self.collapsed), &mut out);
+        out
+    }
+
     fn matches(&self, cx: &App) -> Vec<(TabId, String, &'static str)> {
         let q = self.query.trim().to_lowercase();
-        self.doc
-            .read(cx)
-            .session
-            .doc
-            .ordered_tabs()
-            .iter()
+        let d = &self.doc.read(cx).session.doc;
+        let order: Vec<TabId> = if self.tree_mode() { self.tree(true, cx).into_iter().map(|t| t.0).collect() } else { d.ordered_tabs().iter().map(|t| t.id).collect() };
+        order
+            .into_iter()
+            .filter_map(|id| d.tab(id))
             .map(|t| (t.id, t.name.clone(), kind_of(&t.content)))
             .filter(|(_, n, k)| (q.is_empty() || n.to_lowercase().contains(&q)) && (self.kinds.is_empty() || self.kinds.contains(k)))
             .collect()
+    }
+
+    /// The rows a context menu acts on: the Ctrl+click selection if `id` is in it.
+    fn targets(&self, id: TabId) -> Vec<TabId> {
+        if self.multi.contains(&id) { self.multi.clone() } else { vec![id] }
+    }
+
+    /// Add selection to folder: a new folder (in the first item's folder)
+    /// holding `ids`, then its name field.
+    fn add_to_new_folder(&mut self, ids: Vec<TabId>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(first) = ids.first().copied() else { return };
+        let mut made = None;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document("Add selection to folder", cx, |d| {
+                let parent = d.parent_of(first);
+                let f = d.add_folder(&d.next_folder_name(), parent);
+                d.move_in_order(f, Some(first));
+                for id in &ids {
+                    d.set_parent(*id, Some(f));
+                }
+                made = Some(f);
+            });
+        });
+        self.multi.clear();
+        if let Some(f) = made {
+            self.start_rename(f, window, cx);
+        }
+    }
+
+    /// Folder › New folder: a folder inside it.
+    fn new_folder_in(&mut self, folder: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let mut made = None;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document("Create folder", cx, |d| {
+                let name = d.next_folder_name();
+                made = Some(d.add_folder(&name, Some(folder)));
+            });
+        });
+        self.collapsed.remove(&folder);
+        if let Some(f) = made {
+            self.start_rename(f, window, cx);
+        }
+    }
+
+    fn unpack(&mut self, folder: TabId, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(folder)));
+        cx.notify();
+    }
+
+    fn start_rename(&mut self, folder: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let name = self.doc.read(cx).session.doc.folder(folder).map(|f| f.name.clone()).unwrap_or_default();
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) && this.renaming.is_some() {
+                let name = st.read(cx).value().trim().to_string();
+                this.renaming = None;
+                if !name.is_empty() {
+                    this.doc.update(cx, |doc, cx| doc.edit_document(&format!("Rename tab : {name}"), cx, |d| d.rename_folder(folder, &name)));
+                }
+                cx.notify();
+            }
+        });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.renaming = Some((folder, st, sub));
+        cx.notify();
+    }
+
+    /// A folder row: chevron, folder glyph, name (or its rename field).
+    fn folder_row(&self, id: TabId, depth: usize, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let name = self.doc.read(cx).session.doc.folder(id).map(|f| f.name.clone()).unwrap_or_default();
+        let open = !self.collapsed.contains(&id);
+        let picked = self.multi.contains(&id);
+        let view = cx.entity();
+        h_flex()
+            .id(SharedString::from(format!("tm-f-{id}")))
+            .h(px(40.))
+            .flex_none()
+            .pl(px(8. + depth as f32 * 20.))
+            .gap(px(6.))
+            .cursor_pointer()
+            .when(picked, |d| d.bg(pal.accent_soft))
+            .when(!picked, |d| d.hover(|d| d.bg(pal.panel_hover)))
+            .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text))
+            .child(os::glyph(os::GLYPH_FOLDER, 24., pal.text))
+            .child(match self.renaming.as_ref().filter(|r| r.0 == id) {
+                Some((_, st, _)) => div().w(px(200.)).child(Input::new(st).h(px(26.)).text_size(px(14.))).into_any_element(),
+                None => div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(name).into_any_element(),
+            })
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                if e.modifiers().secondary() {
+                    if let Some(i) = this.multi.iter().position(|t| *t == id) {
+                        this.multi.remove(i);
+                    } else {
+                        this.multi.push(id);
+                    }
+                } else if e.click_count() >= 2 {
+                    this.start_rename(id, window, cx);
+                } else {
+                    this.multi.clear();
+                    if !this.collapsed.remove(&id) {
+                        this.collapsed.insert(id);
+                    }
+                }
+                cx.notify();
+            }))
+            .os_context_menu(move |menu, _, _| {
+                use crate::os_menu::OsMenuItem as I;
+                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_rename(id, w, cx))))
+                    .item(I::new("Add selected to a folder").on_click(move |_, w, cx| {
+                        v2.update(cx, |t, cx| {
+                            let ids = t.targets(id);
+                            t.add_to_new_folder(ids, w, cx)
+                        })
+                    }))
+                    .item(I::new("New folder").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.new_folder_in(id, w, cx))))
+                    .item(I::new("Unpack folder").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.unpack(id, cx))))
+            })
+            .into_any_element()
     }
 
     /// Render pictures of Part Studios and Assemblies whose content changed.
@@ -128,7 +288,7 @@ impl TabManager {
             .into_iter()
             .filter_map(|t| match &t.content {
                 TabContent::PartStudio(_) => noshape_model::drawing::views::source_hash(&doc, &noshape_model::drawing::views::SourceKey::studio(t.id)).map(|h| (t.id, h, false)),
-                TabContent::Assembly(_) => Some((t.id, whole, true)),
+                TabContent::Assembly(_) | TabContent::Drawing(_) => Some((t.id, whole, true)),
                 _ => None,
             })
             .filter(|(t, h, _)| self.thumbs.made_for.get(t) != Some(h))
@@ -144,6 +304,13 @@ impl TabManager {
                 .background_spawn(async move {
                     let mut out = Vec::new();
                     for (tab, _, assembly) in &todo {
+                        if let Some(TabContent::Drawing(d)) = doc.tab(*tab).map(|t| &t.content) {
+                            let name = doc.tab(*tab).map(|t| t.name.clone()).unwrap_or_default();
+                            if let Some(img) = drawing_thumbnail(&doc, d, name) {
+                                out.push((*tab, img));
+                            }
+                            continue;
+                        }
                         let scene = if *assembly {
                             let Some(TabContent::Assembly(a)) = doc.tab(*tab).map(|t| &t.content) else { continue };
                             let result = evaluator.lock().evaluate(&doc, a, &Default::default(), None);
@@ -198,18 +365,24 @@ impl Render for TabManager {
             let tabs = self.doc.read(cx).session.doc.ordered_tabs();
             KINDS.iter().map(|k| k.0).filter(|k| tabs.iter().any(|t| kind_of(&t.content) == *k)).collect()
         };
-        let rows: Vec<AnyElement> = matches
-            .iter()
-            .map(|(id, name, kind)| {
+        // Tree mode: folders and their tabs (indented); otherwise the matches.
+        let entries: Vec<(TabId, usize)> = if self.tree_mode() { self.tree(false, cx) } else { matches.iter().map(|t| (t.0, 0)).collect() };
+        let rows: Vec<AnyElement> = entries
+            .into_iter()
+            .filter_map(|(id, depth)| {
+                if self.doc.read(cx).session.doc.is_folder(id) {
+                    return Some(self.folder_row(id, depth, cx));
+                }
+                let (_, name, kind) = matches.iter().find(|t| t.0 == id)?;
                 let (icon, label) = kind_info(kind);
-                let sel = self.selected == Some(*id);
-                let id = *id;
-                h_flex()
+                let sel = self.selected == Some(id) || self.multi.contains(&id);
+                let view = cx.entity();
+                Some(h_flex()
                     .id(SharedString::from(format!("tm-{id}")))
                     .relative()
                     .h(px(54.))
                     .flex_none()
-                    .pl(px(22.))
+                    .pl(px(22. + depth as f32 * 20.))
                     .cursor_pointer()
                     .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().top_0().bottom_0().w(px(6.)).bg(pal.accent)))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.panel_hover)))
@@ -226,12 +399,43 @@ impl Render for TabManager {
                             .child(div().text_size(px(12.6)).italic().text_color(pal.text_muted).child(label)),
                     )
                     .tooltip(crate::ui::tooltip(format!("Click to navigate to {name}")))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.selected = Some(id);
-                        cx.emit(TabManagerEvent::Open(id));
+                    .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
+                        // Ctrl+click: select several (Onshape); a click opens the tab.
+                        if e.modifiers().secondary() {
+                            if this.multi.is_empty()
+                                && let Some(s) = this.selected.filter(|s| *s != id)
+                            {
+                                this.multi.push(s);
+                            }
+                            if let Some(i) = this.multi.iter().position(|t| *t == id) {
+                                this.multi.remove(i);
+                            } else {
+                                this.multi.push(id);
+                            }
+                        } else {
+                            this.multi.clear();
+                            this.selected = Some(id);
+                            cx.emit(TabManagerEvent::Open(id));
+                        }
                         cx.notify();
                     }))
-                    .into_any_element()
+                    .os_context_menu(move |menu, _, cx| {
+                        use crate::os_menu::OsMenuItem as I;
+                        let ids = view.read(cx).targets(id);
+                        let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                        let (i1, i2, i3) = (ids.clone(), ids.clone(), ids);
+                        menu.item(I::new("Add selection to folder").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_to_new_folder(i1.clone(), w, cx))))
+                            .separator()
+                            .item(I::new("Move to document…").on_click(move |_, w, cx| {
+                                let doc = v2.read(cx).doc.clone();
+                                crate::doc_dialogs::move_to_document(doc, i2.clone(), w, cx)
+                            }))
+                            .item(I::new("Delete").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
+                                t.multi.clear();
+                                cx.emit(TabManagerEvent::Delete(i3.clone()))
+                            })))
+                    })
+                    .into_any_element())
             })
             .collect();
         let filters = present.iter().map(|k| {
@@ -340,7 +544,7 @@ impl Render for TabManager {
 
 /// PNG -> GPUI image (BGRA); the white background becomes transparent so the
 /// pictures sit on selected rows and the gray preview.
-fn decode(png: &[u8]) -> Option<std::sync::Arc<RenderImage>> {
+pub(crate) fn decode(png: &[u8]) -> Option<std::sync::Arc<RenderImage>> {
     let img = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
     let mut rgba = img.to_rgba8();
     for px in rgba.as_chunks_mut::<4>().0 {
@@ -348,6 +552,73 @@ fn decode(png: &[u8]) -> Option<std::sync::Arc<RenderImage>> {
         if px[0] >= 250 && px[1] >= 250 && px[2] >= 250 {
             *px = [0; 4];
         }
+    }
+    Some(std::sync::Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
+}
+
+/// A drawing's first sheet, rasterized (paper white, ink black) to the
+/// thumbnail size: Onshape shows drawings as their sheet in the Tab manager.
+pub(crate) fn drawing_thumbnail(doc: &noshape_model::Document, drawing: &noshape_model::drawing::Drawing, name: String) -> Option<std::sync::Arc<RenderImage>> {
+    use noshape_model::drawing::{build, font, sheet::LineStyle, views};
+    use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+    let sources = views::regenerate_sources(doc, drawing);
+    let info = build::SheetInfo { doc_name: String::new(), drawing_name: name, ..Default::default() };
+    let g = build::render_sheet_with(drawing, 0, &sources, &views::ViewCache::new(), false, &info)?.geometry;
+    let (w, h) = crate::gpu::THUMBNAIL_SIZE;
+    let mut pm = Pixmap::new(w, h)?;
+    // Fit the sheet with a small margin; sheet y points up.
+    let k = ((w as f64 - 8.) / g.width).min((h as f64 - 8.) / g.height);
+    let (ox, oy) = ((w as f64 - g.width * k) * 0.5, (h as f64 + g.height * k) * 0.5);
+    let to = |p: [f64; 2]| ((ox + p[0] * k) as f32, (oy - p[1] * k) as f32);
+    let mut paper = PathBuilder::new();
+    let (x0, y0) = to([0., g.height]);
+    paper.push_rect(tiny_skia::Rect::from_xywh(x0, y0, (g.width * k) as f32, (g.height * k) as f32)?);
+    let paper = paper.finish()?;
+    let mut white = Paint::default();
+    white.set_color(Color::WHITE);
+    pm.fill_path(&paper, &white, FillRule::Winding, Transform::identity(), None);
+    let mut ink = Paint::default();
+    ink.set_color(Color::BLACK);
+    ink.anti_alias = true;
+    let fill = |pts: &[[f64; 2]], pm: &mut Pixmap| {
+        let mut pb = PathBuilder::new();
+        for (i, p) in pts.iter().enumerate() {
+            let (x, y) = to(*p);
+            if i == 0 { pb.move_to(x, y) } else { pb.line_to(x, y) }
+        }
+        pb.close();
+        if let Some(path) = pb.finish() {
+            pm.fill_path(&path, &ink, FillRule::Winding, Transform::identity(), None);
+        }
+    };
+    for f in &g.fills {
+        fill(&f.points, &mut pm);
+    }
+    for t in &g.texts {
+        if font::fill_supported(&t.text) {
+            let (pts, idx) = font::text_fill(t);
+            for tri in idx.chunks(3).filter(|c| c.len() == 3) {
+                fill(&[pts[tri[0] as usize], pts[tri[1] as usize], pts[tri[2] as usize]], &mut pm);
+            }
+        }
+    }
+    for l in g.lines.iter().filter(|l| l.style != LineStyle::Hidden && l.points.len() >= 2) {
+        let mut pb = PathBuilder::new();
+        for (i, p) in l.points.iter().enumerate() {
+            let (x, y) = to(*p);
+            if i == 0 { pb.move_to(x, y) } else { pb.line_to(x, y) }
+        }
+        if l.closed {
+            pb.close();
+        }
+        let Some(path) = pb.finish() else { continue };
+        let stroke = Stroke { width: ((l.style.width_mm() * k) as f32).max(0.6), ..Default::default() };
+        pm.stroke_path(&path, &ink, &stroke, Transform::identity(), None);
+    }
+    // Premultiplied RGBA → the BGRA frame GPUI draws.
+    let mut rgba = image::RgbaImage::from_raw(w, h, pm.take())?;
+    for px in rgba.as_chunks_mut::<4>().0 {
+        px.swap(0, 2);
     }
     Some(std::sync::Arc::new(RenderImage::new(vec![image::Frame::new(rgba)])))
 }

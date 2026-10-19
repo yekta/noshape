@@ -152,8 +152,8 @@ pub const LOFT_END_CONDITION: &[(&str, &str)] = &[
     ("TANGENT_TO_PROFILE", "Tangent to profile"),
     ("MATCH_TANGENT", "Match tangent"),
     ("MATCH_CURVATURE", "Match curvature"),
-    ("NORMAL_TO_DIRECTION", "Normal direction"),
-    ("TANGENT_TO_DIRECTION", "Tangent direction"),
+    ("NORMAL_DIRECTION", "Normal direction"),
+    ("TANGENT_DIRECTION", "Tangent direction"),
 ];
 
 pub fn is_match_condition(c: &str) -> bool {
@@ -161,7 +161,8 @@ pub fn is_match_condition(c: &str) -> bool {
 }
 
 pub fn is_direction_condition(c: &str) -> bool {
-    matches!(c, "NORMAL_TO_DIRECTION" | "TANGENT_TO_DIRECTION")
+    // Older documents saved NORMAL_TO_DIRECTION / TANGENT_TO_DIRECTION.
+    matches!(c, "NORMAL_DIRECTION" | "TANGENT_DIRECTION" | "NORMAL_TO_DIRECTION" | "TANGENT_TO_DIRECTION")
 }
 
 pub fn loft() -> FeatureType {
@@ -184,7 +185,9 @@ pub fn loft() -> FeatureType {
                 QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS)
+        // loft.fs: "Driven query" arrays, one selection box adding a
+        // profile per pick (live dom/dialog-loft.txt).
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::DRIVEN_QUERY)
         .visible(|v| v.is("bodyType", "SOLID")),
     );
     p.push(
@@ -198,21 +201,24 @@ pub fn loft() -> FeatureType {
                 QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| !v.is("bodyType", "SOLID")),
     );
     p.extend(without_hint(thin_block(), Hints::CAN_BE_TOLERANT));
+    // loft.fs: Group "End conditions", not collapsed by default.
+    p.push(ParamSpec::bool("endConditions", "End conditions", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE));
+    let ends = |v: &ParamValues| v.bool("endConditions");
     for (cond, faces, mag, dir, label) in [
         ("startCondition", "adjacentFacesStart", "startMagnitude", "startDirection", ["Start profile condition", "Start magnitude", "Start direction"]),
         ("endCondition", "adjacentFacesEnd", "endMagnitude", "endDirection", ["End profile condition", "End magnitude", "End direction"]),
     ] {
-        p.push(ParamSpec::enum_(cond, label[0], LOFT_END_CONDITION).hints(Hints::SHOW_LABEL));
-        p.push(ParamSpec::query(faces, "Adjacent faces", QueryFilter::ANY_FACE).visible(move |v| is_match_condition(v.enum_(cond))));
-        p.push(ParamSpec::num(mag, label[1], CLAMP_MAGNITUDE).visible(move |v| !v.is(cond, "DEFAULT")));
-        p.push(ParamSpec::query1(dir, label[2], QueryFilter::DIRECTION).visible(move |v| is_direction_condition(v.enum_(cond))));
+        p.push(ParamSpec::enum_(cond, label[0], LOFT_END_CONDITION).hints(Hints::SHOW_LABEL).visible(ends));
+        p.push(ParamSpec::query(faces, "Adjacent faces", QueryFilter::ANY_FACE).visible(move |v| ends(v) && is_match_condition(v.enum_(cond))));
+        p.push(ParamSpec::num(mag, label[1], CLAMP_MAGNITUDE).visible(move |v| ends(v) && !v.is(cond, "DEFAULT")));
+        p.push(ParamSpec::query1(dir, label[2], QueryFilter::DIRECTION).visible(move |v| ends(v) && is_direction_condition(v.enum_(cond))));
     }
     p.push(ParamSpec::bool("trimProfiles", "Trim profiles", false).visible(|v| !v.is("bodyType", "SOLID")));
-    p.push(ParamSpec::bool("addGuides", "Guides and continuity", false).hints(Hints::GROUP_HEADER));
+    p.push(ParamSpec::bool("addGuides", "Guides and continuity", false));
     p.push(
         ParamSpec::array(
             "guidesArray",
@@ -223,11 +229,11 @@ pub fn loft() -> FeatureType {
                 ParamSpec::enum_("guideDerivativeType", "Continuity", GUIDE_CONTINUITY).hints(Hints::SHOW_LABEL | Hints::MATCH_LAST_ARRAY_ITEM),
             ],
         )
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("addGuides")),
     );
     p.push(ParamSpec::bool("trimGuidesByProfiles", "Trim guides", true).visible(|v| v.bool("addGuides") && !v.is("bodyType", "SOLID")));
-    p.push(ParamSpec::bool("addSections", "Path", false).hints(Hints::GROUP_HEADER));
+    p.push(ParamSpec::bool("addSections", "Path", false));
     p.push(ParamSpec::query("spine", "Edges, curves and sketches", QueryFilter::ANY_EDGE | QueryFilter::WIRE_BODY).visible(|v| v.bool("addSections")));
     p.push(ParamSpec::num("sectionCount", "Section count", NumSpec::integer(5, 1, 50)).visible(|v| v.bool("addSections")));
     p.push(ParamSpec::bool("matchConnections", "Connections", false).hints(Hints::GROUP_HEADER));
@@ -238,6 +244,7 @@ pub fn loft() -> FeatureType {
             "Connection",
             vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX)],
         )
+        .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("matchConnections")),
     );
     p.push(ParamSpec::bool("showIsocurves", "Show isocurves", false));
@@ -357,7 +364,7 @@ pub fn hole() -> FeatureType {
         ParamSpec::lookup("isoThreadClassV2", "Thread class", hole_tables::TABLE_ISO_THREAD_CLASS)
             .hints(rem | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showThreadClassV2") && v.is("threadStandard", "ISO")),
-        ParamSpec::num("holeDiameterV3", "Diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0)).hints(rem | Hints::CAN_BE_TOLERANT),
+        ParamSpec::num("holeDiameterV3", "Diameter", NumSpec::positive_length(5.0, 0.25).bounded(1e-5, 500.0)).hints(rem | Hints::CAN_BE_TOLERANT_DIAMETER),
         ParamSpec::num("tapDrillDiameterV3", "Tap drill diameter", NumSpec::positive_length(4.2, 0.201).bounded(1e-5, 500.0))
             .hints(rem | Hints::CAN_BE_TOLERANT)
             .visible(|v| v.bool("hasClearance")),
@@ -403,7 +410,7 @@ pub fn hole() -> FeatureType {
         ParamSpec::num("holeDepthComputedV3", "Depth", NumSpec::positive_length(12.0, 0.5))
             .hints(Hints::READ_ONLY | Hints::CAN_BE_TOLERANT | Hints::UNCONFIGURABLE)
             .visible(up_to),
-        ParamSpec::enum_("tipAngleStyle", "Tip angle style", &[("DEGREE118", "118°"), ("DEGREE135", "135°"), ("FLAT", "Flat"), ("CUSTOM", "Custom")])
+        ParamSpec::enum_("tipAngleStyle", "Tip angle style", &[("DEGREE118", "118 deg"), ("DEGREE135", "135 deg"), ("FLAT", "Flat"), ("CUSTOM", "Custom")])
             .hints(Hints::SHOW_LABEL)
             .visible(move |v| !through(v)),
         ParamSpec::num("tipAngleV3", "Tip angle", NumSpec::angle(118.0, 0.1, 180.0))

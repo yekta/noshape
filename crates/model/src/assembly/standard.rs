@@ -64,14 +64,14 @@ pub enum Shape {
 impl Shape {
     fn feature(self) -> &'static str {
         match self {
-            Shape::HexBolt => "Hex bolt",
-            Shape::SocketHead => "Socket head screw",
-            Shape::ButtonHead => "Button head screw",
-            Shape::Countersunk => "Countersunk screw",
-            Shape::SetScrew => "Set screw",
-            Shape::HexNut => "Hex nut",
-            Shape::Washer => "Washer",
-            Shape::Pin => "Pin",
+            Shape::HexBolt => "hexBolt",
+            Shape::SocketHead => "socketHeadScrew",
+            Shape::ButtonHead => "buttonHeadScrew",
+            Shape::Countersunk => "countersunkScrew",
+            Shape::SetScrew => "setScrew",
+            Shape::HexNut => "hexNut",
+            Shape::Washer => "washer",
+            Shape::Pin => "pin",
         }
     }
     /// Whether the component has a length (bolts, screws, pins).
@@ -556,6 +556,7 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     for (i, z) in tops.into_iter().enumerate() {
         let mut m = ps.new_feature("mateConnector", &units)?;
         m.id = FeatureId(PART_FEATURE.0 + 1 + i as u64);
+        m.params.set("originQuery", ParamValue::Query(vec![crate::reference::Reference::Origin]));
         if i == 0 {
             m.params.set("flipPrimary", ParamValue::Bool(true));
         }
@@ -596,113 +597,200 @@ pub fn regenerate(spec: &StandardSpec) -> Result<RegenResult, String> {
     if part_body(&r).is_none() {
         let why: Vec<String> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
         let bodies: Vec<String> = r.context.bodies.iter().map(|b| format!("{:?}", b.id)).collect();
-        return Err(format!("{} was not generated: {} (bodies: {})", spec.part_name(), why.join("; "), bodies.join(", ")));
+        let notices: Vec<String> = crate::custom::run::outputs().values().flat_map(|o| o.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message))).collect();
+        return Err(format!("{} was not generated: {} (bodies: {}; notices: {})", spec.part_name(), why.join("; "), bodies.join(", "), notices.join(" | ")));
     }
     Ok(r)
 }
 
 /// Script generating the standard parts. Every part has its mate connector
 /// origin at the Part Studio origin with the head (or the part) above it.
-pub const SOURCE: &str = r#"// Built-in standard content (fasteners).
-// Parameters: d nominal diameter; a, b, c per shape; l length. Booleans
-// and transforms keep the target body's handle.
+pub const SOURCE: &str = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
 
-fn hex_prism(ctx, z0, h, s, id) {
-    let w = s * 1.25;
-    let a = ctx.box([-w / 2.0, -s / 2.0, z0], [w, s, h], #{ id: id + "0" });
-    let b = ctx.box([-w / 2.0, -s / 2.0, z0], [w, s, h], #{ id: id + "1" });
-    ctx.rotate(b, [0, 0, 0], [0, 0, 1], deg(60));
-    ctx.intersect(a, b);
-    let c = ctx.box([-w / 2.0, -s / 2.0, z0], [w, s, h], #{ id: id + "2" });
-    ctx.rotate(c, [0, 0, 0], [0, 0, 1], deg(120));
-    ctx.intersect(a, c);
-    a
+// Built-in standard content (fasteners). Parameters: d nominal diameter;
+// a, b, c per shape; l length. Parts are built along Z, the head on z = 0.
+
+const ORIGIN_2D = vector(0, 0) * meter;
+const Z = 0 * meter;
+
+function cylinderZ(context is Context, id is Id, z0 is ValueWithUnits, z1 is ValueWithUnits, r is ValueWithUnits) returns Query
+{
+    fCylinder(context, id, { "bottomCenter" : vector(Z, Z, z0), "topCenter" : vector(Z, Z, z1), "radius" : r });
+    return qCreatedBy(id, EntityType.BODY);
 }
 
-// 30 degree chamfer on the corners of a hex prism (z0 .. z0 + h), on its
-// top (and bottom when `both`).
-fn hex_chamfer(ctx, body, z0, h, s, both, id) {
-    let r = s * 0.5 * 0.95;
-    let t = h * 1.732;
-    let cone = ctx.cone([0, 0, z0 + h], [0, 0, -1], r, r + t, h, #{ id: id + "t" });
-    ctx.intersect(body, cone);
-    if both {
-        let cone2 = ctx.cone([0, 0, z0], [0, 0, 1], r, r + t, h, #{ id: id + "b" });
-        ctx.intersect(body, cone2);
+/** A hexagonal prism, across flats `s`, from z0 to z0 + h. */
+function hexPrism(context is Context, id is Id, z0 is ValueWithUnits, h is ValueWithUnits, s is ValueWithUnits) returns Query
+{
+    var p = XY_PLANE;
+    p.origin[2] = z0;
+    const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : p });
+    skRegularPolygon(sketch, "hex", { "center" : ORIGIN_2D, "firstVertex" : vector(s / sqrt(3), Z), "sides" : 6 });
+    skSolve(sketch);
+    opExtrude(context, id + "extrude", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : h });
+    opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+    return qCreatedBy(id + "extrude", EntityType.BODY);
+}
+
+/** A closed polygon of (radius, z) points revolved about Z. */
+function revolveZ(context is Context, id is Id, points is array) returns Query
+{
+    const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane(vector(Z, Z, Z), vector(0, -1, 0), vector(1, 0, 0)) });
+    skPolyline(sketch, "profile", { "points" : append(points, points[0]) });
+    skSolve(sketch);
+    opRevolve(context, id + "revolve", { "entities" : qSketchRegion(id + "sketch"), "axis" : line(vector(Z, Z, Z), vector(0, 0, 1)), "angleForward" : 2 * PI * radian });
+    opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+    return qCreatedBy(id + "revolve", EntityType.BODY);
+}
+
+function intersect(context is Context, id is Id, target is Query, tool is Query)
+{
+    opBoolean(context, id, { "tools" : tool, "targets" : target, "operationType" : BooleanOperationType.INTERSECTION });
+}
+
+function subtract(context is Context, id is Id, target is Query, tool is Query)
+{
+    opBoolean(context, id, { "tools" : tool, "targets" : target, "operationType" : BooleanOperationType.SUBTRACTION });
+}
+
+/** 30 degree chamfer on the corners of a hex prism (z0 .. z0 + h), on its top (and bottom when `both`). */
+function hexChamfer(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, s is ValueWithUnits, both is boolean)
+{
+    const r = s * 0.5 * 0.95;
+    const t = h * 1.732;
+    const top = z0 + h;
+    intersect(context, id + "top", body, revolveZ(context, id + "topCone", [vector(Z, top), vector(r, top), vector(r + t, z0), vector(Z, z0)]));
+    if (both)
+        intersect(context, id + "bottom", body, revolveZ(context, id + "bottomCone", [vector(Z, z0), vector(r, z0), vector(r + t, top), vector(Z, top)]));
+}
+
+function withShank(context is Context, id is Id, head is Query, z0 is ValueWithUnits, d is ValueWithUnits, l is ValueWithUnits)
+{
+    const shank = cylinderZ(context, id + "shank", z0 - l, z0, d / 2);
+    opBoolean(context, id + "join", { "tools" : qUnion([head, shank]), "operationType" : BooleanOperationType.UNION });
+}
+
+predicate fastenerParameters(definition is map)
+{
+    annotation { "Name" : "Diameter" }
+    isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
+    annotation { "Name" : "A" }
+    isLength(definition.a, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    annotation { "Name" : "B" }
+    isLength(definition.b, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    annotation { "Name" : "C" }
+    isLength(definition.c, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+    annotation { "Name" : "Length" }
+    isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
+}
+
+annotation { "Feature Type Name" : "Hex bolt" }
+export const hexBolt = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Diameter" }
+        isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "A" }
+        isLength(definition.a, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "B" }
+        isLength(definition.b, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "C" }
+        isLength(definition.c, NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Length" }
+        isLength(definition.l, NONNEGATIVE_LENGTH_BOUNDS);
     }
-}
+    {
+        const head = hexPrism(context, id + "head", Z, definition.b, definition.a);
+        hexChamfer(context, id + "chamfer", head, Z, definition.b, definition.a, false);
+        withShank(context, id, head, Z, definition.d, definition.l);
+    });
 
-fn with_shank(ctx, head, z0, d, l) {
-    let shank = ctx.cylinder([0, 0, z0], [0, 0, -1], d / 2.0, l, #{ id: "shank" });
-    ctx.union(head, shank);
-}
+annotation { "Feature Type Name" : "Socket head screw" }
+export const socketHeadScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const head = cylinderZ(context, id + "head", Z, definition.b, definition.a / 2);
+        subtract(context, id + "socketCut", head, hexPrism(context, id + "socket", definition.b * 0.45, definition.b, definition.c));
+        withShank(context, id, head, Z, definition.d, definition.l);
+    });
 
-fn params_common() {
-    [length("d", "Diameter", mm(6)), length("a", "A", mm(10)), length("b", "B", mm(4)), length("c", "C", mm(0)), length("l", "Length", mm(20))]
-}
+annotation { "Feature Type Name" : "Button head screw" }
+export const buttonHeadScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const r = definition.a / 2;
+        const b = definition.b;
+        const big = (r * r + b * b) / (2 * b);
+        const head = cylinderZ(context, id + "head", Z, b, r);
+        opSphere(context, id + "dome", { "center" : vector(Z, Z, b - big), "radius" : big });
+        intersect(context, id + "domeCut", head, qCreatedBy(id + "dome", EntityType.BODY));
+        subtract(context, id + "socketCut", head, hexPrism(context, id + "socket", b * 0.35, b, definition.c));
+        withShank(context, id, head, Z, definition.d, definition.l);
+    });
 
-feature("Hex bolt", #{ icon: "part", params: params_common() });
-fn hex_bolt(ctx, p) {
-    let head = hex_prism(ctx, 0.0, p.b, p.a, "head");
-    hex_chamfer(ctx, head, 0.0, p.b, p.a, false, "ch");
-    with_shank(ctx, head, 0.0, p.d, p.l);
-}
+annotation { "Feature Type Name" : "Countersunk screw" }
+export const countersunkScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const k = (definition.a - definition.d) / 2;
+        const head = revolveZ(context, id + "head", [vector(Z, Z), vector(definition.a / 2, Z), vector(definition.d / 2, -k), vector(Z, -k)]);
+        subtract(context, id + "socketCut", head, hexPrism(context, id + "socket", -k * 0.8, k, definition.c));
+        withShank(context, id, head, -k, definition.d, definition.l - k);
+    });
 
-feature("Socket head screw", #{ icon: "part", params: params_common() });
-fn socket_head_screw(ctx, p) {
-    let head = ctx.cylinder([0, 0, 0], [0, 0, 1], p.a / 2.0, p.b, #{ id: "head" });
-    let sock = hex_prism(ctx, p.b * 0.45, p.b, p.c, "socket");
-    ctx.subtract(head, sock);
-    with_shank(ctx, head, 0.0, p.d, p.l);
-}
+annotation { "Feature Type Name" : "Set screw" }
+export const setScrew = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const body = cylinderZ(context, id + "body", -definition.l, Z, definition.d / 2);
+        subtract(context, id + "socketCut", body, hexPrism(context, id + "socket", -definition.d * 0.6, definition.d, definition.c));
+    });
 
-feature("Button head screw", #{ icon: "part", params: params_common() });
-fn button_head_screw(ctx, p) {
-    let r = p.a / 2.0;
-    let big = (r * r + p.b * p.b) / (2.0 * p.b);
-    let head = ctx.cylinder([0, 0, 0], [0, 0, 1], r, p.b, #{ id: "head" });
-    let dome = ctx.sphere([0, 0, p.b - big], big, #{ id: "dome" });
-    ctx.intersect(head, dome);
-    let sock = hex_prism(ctx, p.b * 0.35, p.b, p.c, "socket");
-    ctx.subtract(head, sock);
-    with_shank(ctx, head, 0.0, p.d, p.l);
-}
+annotation { "Feature Type Name" : "Hex nut" }
+export const hexNut = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const nut = hexPrism(context, id + "nut", Z, definition.b, definition.a);
+        hexChamfer(context, id + "chamfer", nut, Z, definition.b, definition.a, true);
+        subtract(context, id + "holeCut", nut, cylinderZ(context, id + "hole", -definition.b, definition.b * 2, definition.d / 2));
+    });
 
-feature("Countersunk screw", #{ icon: "part", params: params_common() });
-fn countersunk_screw(ctx, p) {
-    let k = (p.a - p.d) / 2.0;
-    let head = ctx.cone([0, 0, 0], [0, 0, -1], p.a / 2.0, p.d / 2.0, k, #{ id: "head" });
-    let sock = hex_prism(ctx, -k * 0.8, k, p.c, "socket");
-    ctx.subtract(head, sock);
-    with_shank(ctx, head, -k, p.d, p.l - k);
-}
+annotation { "Feature Type Name" : "Washer" }
+export const washer = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const w = cylinderZ(context, id + "washer", Z, definition.b, definition.a / 2);
+        subtract(context, id + "holeCut", w, cylinderZ(context, id + "hole", -definition.b, definition.b * 2, definition.d / 2));
+    });
 
-feature("Set screw", #{ icon: "part", params: params_common() });
-fn set_screw(ctx, p) {
-    let body = ctx.cylinder([0, 0, 0], [0, 0, -1], p.d / 2.0, p.l, #{ id: "body" });
-    let sock = hex_prism(ctx, -p.d * 0.6, p.d, p.c, "socket");
-    ctx.subtract(body, sock);
-}
-
-feature("Hex nut", #{ icon: "part", params: params_common() });
-fn hex_nut(ctx, p) {
-    let nut = hex_prism(ctx, 0.0, p.b, p.a, "nut");
-    hex_chamfer(ctx, nut, 0.0, p.b, p.a, true, "ch");
-    let hole = ctx.cylinder([0, 0, -p.b], [0, 0, 1], p.d / 2.0, p.b * 3.0, #{ id: "hole" });
-    ctx.subtract(nut, hole);
-}
-
-feature("Washer", #{ icon: "part", params: params_common() });
-fn washer(ctx, p) {
-    let w = ctx.cylinder([0, 0, 0], [0, 0, 1], p.a / 2.0, p.b, #{ id: "washer" });
-    let hole = ctx.cylinder([0, 0, -p.b], [0, 0, 1], p.d / 2.0, p.b * 3.0, #{ id: "hole" });
-    ctx.subtract(w, hole);
-}
-
-feature("Pin", #{ icon: "part", params: params_common() });
-fn pin(ctx, p) {
-    ctx.cylinder([0, 0, 0], [0, 0, -1], p.d / 2.0, p.l, #{ id: "pin" });
-}
+annotation { "Feature Type Name" : "Pin" }
+export const pin = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        cylinderZ(context, id + "pin", -definition.l, Z, definition.d / 2);
+    });
 "#;
 
 /// Mate connector of a standard part (index 0: under the head / bottom face;

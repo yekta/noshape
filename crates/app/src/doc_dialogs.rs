@@ -12,8 +12,6 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
-use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 /// A modal with one name field (and an optional description), OK runs `then`.
@@ -192,10 +190,8 @@ pub fn workspace_properties(doc: Entity<DocModel>, window: &mut Window, cx: &mut
 /// ☰ › Move to…: the folder browser; the document closes, moves and reopens.
 pub fn move_to(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let path = doc.read(cx).session.path.clone();
-    let root = crate::files::documents_dir();
-    let others: Vec<PathBuf> = crate::files::watched_folders().into_iter().filter(|f| *f != root).collect();
-    let start = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| root.clone());
-    let location = Rc::new(crate::start_window::Location { root, others, chosen: Rc::new(RefCell::new(start)) });
+    let start = path.parent().map(|p| p.to_path_buf()).unwrap_or_else(crate::files::documents_dir);
+    let location = Rc::new(crate::start_window::Location::new(start));
     window.open_dialog(cx, move |dialog, _, cx| {
         let (loc, path) = (location.clone(), path.clone());
         os::modal(dialog, "Move to", 460.)
@@ -211,7 +207,7 @@ pub fn move_to(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
                 window.remove_window();
                 cx.spawn(async move |cx| {
                     cx.background_executor().timer(std::time::Duration::from_millis(300)).await;
-                    let _ = cx.update(|cx| {
+                    cx.update(|cx| {
                         if let Ok(dest) = crate::start_library::move_document(&path, &dir) {
                             crate::files::replace_recent(&path, &dest);
                             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
@@ -386,12 +382,13 @@ impl WorkspaceUnits {
     /// and what picking option `i` does to the draft.
     fn select(&self, id: SharedString, w: f32, options: Vec<String>, current: usize, set: impl Fn(&mut noshape_units::UnitPrefs, usize) + 'static, cx: &mut Context<Self>) -> AnyElement {
         use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-        use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+        use crate::os_ui::OsDropdownExt as _;
         let pal = p();
         let view = cx.entity();
         let set = Rc::new(set);
         let plain = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         let label = options.get(current).cloned().unwrap_or_default();
+        let id2 = id.clone();
         div()
             .w(px(w))
             .border_b_1()
@@ -405,10 +402,10 @@ impl WorkspaceUnits {
                     .justify_start()
                     .pl(px(6.))
                     .child(h_flex().w(px(w - 12.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(label)).child(os::glyph(os::GLYPH_CARET, 7., pal.text)))
-                    .dropdown_menu(move |mut m, _, _| {
+                    .os_dropdown_menu(SharedString::from(format!("{id2}-dd")), true, move |mut m, _, _| {
                         for (i, o) in options.iter().enumerate() {
                             let (view, set) = (view.clone(), set.clone());
-                            m = m.item(PopupMenuItem::new(o.clone()).checked(i == current).on_click(move |_, _, cx| {
+                            m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).on_click(move |_, _, cx| {
                                 view.update(cx, |this, cx| {
                                     set(&mut this.draft, i);
                                     cx.notify();
@@ -487,7 +484,7 @@ impl Render for WorkspaceUnits {
             .id("workspace-units")
             .occlude()
             .w(px(338.))
-            .bg(gpui_kit::rgba(0xffffffF2))
+            .bg(gpui_kit::rgba(0xfffffff2))
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .child(
                 h_flex()
@@ -589,7 +586,7 @@ fn element_code(name: &str, content: &TabContent) -> String {
 
 /// Tab › Move to document…: another document receives the element (as a new
 /// tab) and it is deleted here.
-pub fn move_to_document(doc: Entity<DocModel>, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut App) {
+pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document::TabId>, window: &mut Window, cx: &mut App) {
     let path = doc.read(cx).session.path.clone();
     let docs = crate::variable_insert::other_documents(&path);
     window.open_dialog(cx, move |dialog, _, cx| {
@@ -601,7 +598,7 @@ pub fn move_to_document(doc: Entity<DocModel>, tab: noshape_model::document::Tab
                 .enumerate()
                 .map(|(k, target)| {
                     let name = crate::derived::external_doc_info(target).map(|i| i.name).unwrap_or_default();
-                    let (doc, target) = (doc.clone(), target.clone());
+                    let (doc, target, tabs) = (doc.clone(), target.clone(), tabs.clone());
                     h_flex()
                         .id(("mtd", k))
                         .h(px(32.))
@@ -613,7 +610,7 @@ pub fn move_to_document(doc: Entity<DocModel>, tab: noshape_model::document::Tab
                         .child(os::glyph(os::GLYPH_DOCUMENT, 18., pal.text_muted))
                         .child(div().flex_1().truncate().child(name))
                         .on_click(move |_, window, cx| {
-                            let r = move_tab_into(&doc, tab, &target, cx);
+                            let r = tabs.iter().try_for_each(|t| move_tab_into(&doc, *t, &target, cx));
                             if report(&doc, r, cx) {
                                 window.close_dialog(cx);
                             }
@@ -628,21 +625,49 @@ pub fn move_to_document(doc: Entity<DocModel>, tab: noshape_model::document::Tab
     });
 }
 
+/// Move a tab, or a folder with its contents (Onshape: "tabs and folders
+/// within the folder remain within it"), into the other document's main
+/// workspace.
 fn move_tab_into(doc: &Entity<DocModel>, tab: noshape_model::document::TabId, target: &std::path::Path, cx: &mut App) -> anyhow::Result<()> {
+    use noshape_model::document::TabId;
     anyhow::ensure!(!crate::files::is_document_open(target, cx), "Close the other document's window first");
-    let Some(t) = doc.read(cx).session.doc.tab(tab).cloned() else { return Ok(()) };
+    let src = doc.read(cx).session.doc.clone();
+    let label = match (src.tab(tab), src.folder(tab)) {
+        (Some(t), _) => t.name.clone(),
+        (None, Some(f)) => f.name.clone(),
+        _ => return Ok(()),
+    };
     let mut store = noshape_store::Document::open(target)?;
     let branch = store.default_branch()?;
     let head = store.head(branch)?;
     let mut other = noshape_model::Document::from_blobs(&store.read_all(head)?)?;
-    let name = if other.tabs.iter().any(|x| x.name == t.name) { other.next_tab_name(&t.name) } else { t.name.clone() };
-    let id = other.add_tab(&name, t.content.clone());
-    let changes = [(noshape_model::Document::blob_name(id), other.tab_blob(id)), (noshape_model::document::META_BLOB.to_string(), Some(other.settings_blob()))];
-    store.commit(branch, &changes, &format!("Insert tab : {name}"))?;
+    let mut added = Vec::new();
+    // Copy `id` (tab or folder) into `parent` of the other document.
+    fn copy(src: &noshape_model::Document, other: &mut noshape_model::Document, id: TabId, parent: Option<TabId>, added: &mut Vec<TabId>) {
+        if let Some(t) = src.tab(id) {
+            let name = if other.tabs.iter().any(|x| x.name == t.name) { other.next_tab_name(&t.name) } else { t.name.clone() };
+            let new = other.add_tab(&name, t.content.clone());
+            other.set_parent(new, parent);
+            added.push(new);
+        } else if let Some(f) = src.folder(id) {
+            let new = other.add_folder(&f.name, parent);
+            for c in src.children(Some(id)) {
+                copy(src, other, c, Some(new), added);
+            }
+        }
+    }
+    copy(&src, &mut other, tab, None, &mut added);
+    let mut changes: Vec<(String, Option<Vec<u8>>)> = added.iter().map(|id| (noshape_model::Document::blob_name(*id), other.tab_blob(*id))).collect();
+    changes.push((noshape_model::document::META_BLOB.to_string(), Some(other.settings_blob())));
+    store.commit(branch, &changes, &format!("Insert tab : {label}"))?;
     let _ = store.checkpoint();
     doc.update(cx, |d, cx| {
-        d.edit_document_not_undoable(&format!("Move tab to document : {}", t.name), cx, |document| {
-            document.remove_tab(tab);
+        d.edit_document_not_undoable(&format!("Move tab to document : {label}"), cx, |document| {
+            if document.is_folder(tab) {
+                document.delete_folder_tree(tab);
+            } else {
+                document.remove_tab(tab);
+            }
         })
     });
     Ok(())

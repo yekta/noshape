@@ -36,14 +36,17 @@ pub fn mate_connector() -> FeatureType {
     let p = vec![
         ParamSpec::enum_("originType", "Origin type", &[("ON_ENTITY", "On entity"), ("BETWEEN_ENTITIES", "Between entities")]),
         ParamSpec::query1("originQuery", "Origin entity", QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE)
-            .hints(Hints::INITIAL_FOCUS | Hints::UNCONFIGURABLE),
+            // Live (dom/dialog-mate-connector.txt): a full-width field, no
+            // mate connector button.
+            .hints(Hints::INITIAL_FOCUS | Hints::UNCONFIGURABLE | Hints::NO_MATE_CONNECTOR_BUTTON),
         hidden(ParamSpec::enum_("entityInferenceType", "Inference type", INFERENCE)),
         hidden(ParamSpec::query("secondaryOriginQuery", "Secondary origin", QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::ANY_FACE)),
         ParamSpec::query1("originAdditionalQuery", "Between entity", QueryFilter::ANY_FACE).visible(|v| v.is("originType", "BETWEEN_ENTITIES")),
         ParamSpec::bool("realign", "Realign", false),
         ParamSpec::query1("primaryAxisQuery", "Primary axis entity", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE).visible(|v| v.bool("realign")),
         ParamSpec::query1("secondaryAxisQuery", "Secondary axis entity", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE).visible(|v| v.bool("realign")),
-        ParamSpec::bool("transform", "Move", false).hints(Hints::GROUP_HEADER),
+        // Live (dom/dialog-mate-connector.txt): a plain checkbox like Realign.
+        ParamSpec::bool("transform", "Move", false),
         ParamSpec::num("translationX", "X translation", ZERO_DEFAULT_LENGTH).visible(mv),
         ParamSpec::num("translationY", "Y translation", ZERO_DEFAULT_LENGTH).visible(mv),
         ParamSpec::num("translationZ", "Z translation", ZERO_DEFAULT_LENGTH).visible(mv),
@@ -63,8 +66,9 @@ pub fn mate_connector() -> FeatureType {
         hidden(ParamSpec::num("nx", "Normal x", NumSpec::real(0.0, -1.0, 1.0))),
         hidden(ParamSpec::num("ny", "Normal y", NumSpec::real(0.0, -1.0, 1.0))),
         hidden(ParamSpec::num("nz", "Normal z", NumSpec::real(0.0, -1.0, 1.0))),
-        ParamSpec::flip("flipPrimary", "Flip primary axis").hints(Hints::FIRST_IN_ROW),
-        ParamSpec::enum_("secondaryAxisType", "Reorient secondary axis", MATE_CONNECTOR_AXIS),
+        // mateConnector.fs: one row of two icon buttons (live).
+        ParamSpec::bool("flipPrimary", "Flip primary axis", false).hints(Hints::PRIMARY_AXIS),
+        ParamSpec::enum_("secondaryAxisType", "Reorient secondary axis", MATE_CONNECTOR_AXIS).hints(Hints::MATE_CONNECTOR_AXIS_TYPE),
         hidden(ParamSpec::bool("isForSubFeature", "Is for sub-feature", false)),
     ];
     FeatureType::new("mateConnector", "Mate connector", Category::Reference, p)

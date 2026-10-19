@@ -4,24 +4,24 @@ Goal: the Part Studio must look exactly like Onshape (live reference in
 /root/onshape-research/live/, spec in docs/ONSHAPE_UI_SPEC.md). Build dir
 /root/target-ui, display :101. Side-by-side shots go to /tmp/ui-shots/.
 
-## State (2026-10-18 20:10 UTC)
+## State (2026-10-19 03:30 UTC)
 
-**For the lead:** the new disk rule `find …/debug/deps -maxdepth 1 -type f -executable -mmin +60
--delete` also deletes proc-macro `.so` files (they are executable), which forces a rebuild of
-every dependency (gpui, rhai, nalgebra…) in that target dir. Use `… -executable ! -name '*.so'
--mmin +60 -delete` instead.
+Round 4 (lead's list after the Wayland decision) is done: Wayland count cursor, Appearance and
+Configurations bodies, Graphics preferences (dialog + live settings), Highlight boundary edges,
+tool search name matching + Onshape ranking, full tool descriptions for Part Studio **and sketch**
+tools, toolbar tooltips placed and styled like live (see "Round 4" and "Round 5"). Still open from
+it: section interference color and mesh line width are in the dialog but not rendered (no section
+interference / mesh bodies yet); Measure unit lists and the configured Configurations table wait
+for live captures (REQUESTS.md 18:21, 18:31). The documents-page menus were switched by ui2.
 
-Round 4 (lead's list after the Wayland decision): Wayland count cursor done and tested; Appearance
-and Configurations bodies, Graphics preferences (dialog + live settings), Highlight boundary
-edges, tool search name matching + Onshape ranking, full tool descriptions: done (see "Round 4").
-Open: section interference color, underconstrained-occluded sketch color and mesh line width are
-in the dialog but not rendered yet; Measure unit lists wait for a live capture (REQUESTS.md).
-The documents-page menus were already switched by ui2 (with `list_no_icons()`).
+Now on the QA round 3 list (docs/handoff/qa-round-3.md, "ui" sections), queue under "Next";
+items 1-6 and 8 are done and part of 9 ("Round 6"); 7 (toolbar overflow) waits for a capture.
 
-The shared tree didn't compile for most of this round (other agents' half-done session.rs,
-workspace.rs export dialog, reflection.rs, analysis_tools.rs); I built and tested in a private
-copy (/root/noshape-ui, rsync of the tree + local fixes of those errors only). All my edits are
-in the shared tree.
+The shared tree keeps breaking in other agents' files (model best_tessellation, BodyId no longer
+Copy in analysis_tools/thickness, menus.rs v9, workspace.rs focus_find / export dialog,
+start_window open_dialog); I build and test in a private copy (/root/noshape-ui) synced by
+/tmp/ui-tools/sync-private.sh, which patches only those errors locally. All my edits are in the
+shared tree.
 
 ## Done this round (uncommitted)
 
@@ -265,6 +265,278 @@ in the shared tree.
 - Removed the Wireframe display mode (Onshape has none) and the unused `DisplayMode`
   ALL/label/icon, `theme::SKETCH_UNDER`.
 
+## Round 5 (20:10-21:30)
+
+- **Underconstrained occluded sketch color**: while a sketch is edited, its underconstrained
+  entities also draw where geometry hides them, in the Graphics preferences color (`#4040ff`):
+  new `Instance::hidden_only` (renderer `line_hidden`/`point_hidden` pipelines, depth test Less,
+  no depth write). Render test `hidden_only_lines_show_only_behind_geometry`.
+- **Sketch toolbar tooltips**: `ui::with_tool_tooltip` (used by `render_sketch_toolbar`) shows
+  Onshape's title, `ui::onshape_title` (lowercase shortcuts, "Center point rectangle", "Use
+  (Project/Convert) (u)", Undo "(cmd+z/ctrl+z)", Redo "(ctrl+y/shift+cmd+z)" as in
+  dom/toolbar-sketch.txt), and expands with `tool_text::sketch_description` (every sketch tool and
+  constraint, our own words). final-sketch-tooltip.png.
+- **Toolbar tooltip fixes** (`ui::RichTooltip`): it was 32 px too low (the bounds probe canvas was
+  `absolute()` without insets, so in a block parent it sat *below* the tool) and in the system
+  font (tooltips are drawn outside the window's element tree, so they don't inherit the UI font).
+  Now placed with `anchored()` in window coordinates 3 px under the tool, centered, both states
+  (live: y=77, title 26 px, 12 px/500, 4 px padding; description 12 px on 18 px lines, 4 px
+  padding), UI font set explicitly. Same inset fix in os_menu.rs, feature_dialog.rs,
+  graphics_prefs_dialog.rs. Moving straight from one tool to the next shows the next tooltip
+  (QA3 item not reproduced). final-tooltips.png.
+- Undo/Redo are 2 px apart like live (Undo @42, Redo @76), which moved every Part Studio tool 2 px
+  right onto live's x positions.
+- Removed `Session::undo_description`/`redo_description` (only the old tooltip text used them).
+
+## Round 6 (21:30-22:45, QA round 3)
+
+- **Onshape select** (`os_select.rs`, new): feature dialog dropdowns (every non-tab enum) and the
+  Hole lookup rows. Closed: 14 px text over a 1 px `#d7d7d7` underline, 26 px (Hole rows 22 px),
+  `#def1fb` hover. Open: a search input with a 2 px `#1651b0` underline in its place (text 4 px
+  in, blue 9 px × to clear) and the list under it (field width, 1 px border, 5/4 px padding,
+  26 px rows of 14 px `#666`, highlight `#1651b0`/white starting on the current item); ↑/↓ and
+  the pointer move it, typing filters (substring, matched letters bold), Enter/click picks, Esc
+  closes only the list (bound in the select's key context and on `OsSelect > Input`, which wins
+  over the dialog's `FeatureDialog > Input` Esc = Cancel), Tab/click elsewhere close; focus goes
+  back where it was. Pixel-identical to dialogs/extrude-13/15. final-dialog-dropdown.png.
+- Dialog rows: the select fills the first 194 px column flush with the dialog edge (flip in the
+  26 px column); select labels ("Measurement", "Start plane") 12 px `#666` with 5 px padding.
+  Hole: no "Standard" header row; levels are "Hole type ▾", "Drill size ▾" rows (88 px
+  right-aligned 12 px `#999` labels). final-hole-dialog.png (title spec and the
+  diameter/depth/tip icon rows are still to do).
+- Dialog frame: header 29 px (28 + border), selection fields 3 px from the edges with 5 px above
+  and below (4 px above a select), empty field 26 px (label padding 6/5, 13.33 px line), picked
+  field caption 10 px at the top; chip × always shown. Header/tabs/field rows now land on live's
+  pixels.
+- **Fillet dialog** (model `features/core.rs`, surgical, ids follow Onshape's FeatureScript):
+  Edge | Full round; Entities to fillet; Tangent propagation; Measurement ▾ (Radius, Width);
+  Control ▾ (Distance, Conic, Curvature); Radius ± / Width / Rho / Magnitude; Asymmetric (Second
+  radius + flip); › Partial fillet (End type ▾ Position, Start position + flip, Second bound, End
+  position); › Variable fillet (Vertices, Points on edges array "Add point on edge", Smooth
+  transition); › Allow edge overflow (Edges to keep); › Smooth fillet corners (Corners to
+  exclude); Full round: First side face, Second side face, Faces to round, Tangent propagation.
+  Groups that are on by default start folded (live "› ☑ Allow edge overflow"); checking a group
+  unfolds it. **Regen still ignores** asymmetric, conic/curvature, partial, variable, edge
+  overflow and smooth corners (kernel work for psb). Partial fillet End type options and the
+  Second bound fields are guesses until the requested capture (REQUESTS.md 22:40).
+  final-fillet-dialog.png.
+
+- **Modals** (QA3 item 3): theme `modal_bg` (opaque white) and `modal_backdrop` (black 50%,
+  measured on drawing/01 and assembly/100); Create Drawing and "Select a part or assembly" use
+  them (drawing_create.rs / drawing_insert.rs, colour swap only). Sketch name labels and the list
+  toggle now draw under feature dialogs (mod.rs overlay order).
+- The +, tab right-click and ☰ menus were already Onshape's (QA tested an older commit).
+- **Keyboard focus** (item 6): os_menu remembers the focus it took and gives it back when it
+  closes (before running the item, so a prompt the item opens returns there too; deferred for
+  outside clicks unless the click focused something); the workspace refocuses the active tab
+  whenever focus is lost (`on_focus_lost`); Enter in a Configurations/Variable cell hands focus
+  back to the Part Studio. Verified: right-click Fillet 1 › Suppress, then Alt+C "shell" Enter
+  opens Shell.
+- **Configurations panel** (item 8, live part-studio/182-186, dom/panel-configuration-*.txt):
+  configured Part Studios get tabs Configurations | Configured properties, a filter row
+  (funnel, "Filter inputs", List/Checkbox/Variable "show only" toggles, ⋯), and per input a
+  `#eaeaea` header bar (⌄, 16 px name (double-click/⋯ Rename), "Default: …" 14.67 px `#999`,
+  "+ Configure features", ⋯ Rename/Delete) over a `#aaa`-grid table: frozen 140 px Name column
+  (current configuration blue/500 with a 3 px blue bar; click a row to switch; double-click to
+  rename; right-click Delete), one 140 px column per configured parameter (feature name over
+  the parameter; checkboxes for Suppressed), the italic "Name" row adds a configuration, and the
+  blue "No features are configured" box. Footer "[▦ Add configuration input][▲]". A new List has
+  only "Default" (live). The feature list gets the "Configurations [▦👁][▾]" box with one row per
+  input (List = Onshape select). The old "Configure a parameter" menu is gone (Onshape uses
+  "+ Configure features" and right-click › Configure in dialogs). Configured properties tab:
+  a Part | Name table (no capture yet). final-configurations-table.png,
+  final-configurations-box.png.
+- **Right strip**: 5 buttons like live (Appearance, Configuration, Custom tables, Inspection
+  table, Variable table); Custom tables and Model definitions panels show Onshape's empty states
+  (own illustrations); the actual custom tables (FeatureScript) and inspection tools are not
+  implemented.
+- Item 9: region hover is a light-orange boundary only (selected: amber fill + amber boundary;
+  `scene_builder::region_outline`); "regenerating…" removed from the Features header.
+
+- **Fillet ids = Onshape's fillet.fs** (docs-raw/fs-std/fillet.fs, lead/kern request): radius |
+  nonCircularRadius (conic/curvature) | width, rho, magnitude, isAsymmetric/otherRadius/
+  flipAsymmetric (Measurement = Radius only), isPartial group (startPartialType Position/Entity/
+  Offset with partialFirstEdgeTotalParameter / startPartialEntity / startPartialOffset,
+  partialOppositeParameter (default on, flip), useTrimmedFirstBound, secondBound + end*),
+  isVariable group: `vertexSettings` array {vertex, vertexRadius, vertexOtherRadius,
+  vertexFlipAsymmetric, variableRho, variableMagnitude} shown as Onshape's driven "Vertices"
+  selection field (new `Hints::DRIVEN_QUERY` in model params.rs: a pick adds/removes an item,
+  match-last-item values copied), `pointOnEdgeSettings` array {edge, edgeParameter "Location",
+  pointOnEdgeRadius, ...OtherRadius/FlipAsymmetric/VariableRho/VariableMagnitude} in Onshape's
+  bordered box with "Add point on edge", smoothTransition; allowEdgeOverflow (+ keepEdges) and
+  smoothCorners (+ smoothCornerExceptions) hidden for Curvature. Array items now see the
+  feature's values when their visibility is evaluated (render_params overlay), like FS loops.
+  Arrays in every dialog use the bordered "Add <item>" box (live fillet-12).
+- **Part Studio Export modal** (`part_studio/export.rs`, item 5; tab › Export… and part ›
+  Export…): live layout to ±1 px (document/80-81): File name + "View export rules" + ?, Format
+  (Onshape's 12 formats, PARASOLID default), Y axis up, per-format rows (Parasolid/Rhino Version
+  grayed while "Use latest version"; STEP Preprocessing, Version AP242/AP214/AP203, custom units,
+  derived tolerances, MBD text height; IGES compatibility; PVZ grouping; GLTF/GLB Resolution +
+  Compress; OBJ/3MF Resolution; STL Format/Units/Resolution), Options, unique parts as
+  individual files, hidden instances; Bootstrap checkboxes (14 px box, 14 px `#333`). Writers:
+  STEP/IGES (kernel), STL (text/binary, units), OBJ (meters), GLTF/GLB and 3MF (our own, in
+  export.rs, CRC32/base64/stored-zip helpers with tests), Y-up rotation, per-part files, hidden
+  parts only when asked. Not available yet (message shown): PARASOLID, ACIS, PVZ, JT, RHINO; STEP
+  is always AP214 and in mm (kernel `write_step` has no schema/unit option); GLTF "Compress"
+  (Draco) and "Custom" resolution fields, Options other than Download are not implemented.
+  `os_ui::modal` titles are now 18 px `#666` regular like live (all Onshape modals sampled).
+  final-export-dialog.png.
+
+## Round 7 (lead's list after QA3; 02:00-03:30)
+
+- **Toolbar collapse** (live part-studio/220, sketch/420, dom/toolbar-narrow-900*.txt): no
+  overflow button; when the tools don't fit, every group after Sketch becomes one split tool
+  (live faces: Extrude, Hole, Linear pattern, Boolean, Modify fillet, Plane, Frame, Sheet metal
+  model) listing all of its tools; the sketch toolbar collapses to Line ▾ (drawing tools, Use,
+  Intersection, Construction), Sketch fillet ▾, Dimension, Coincident ▾. TOOLBAR now follows the
+  live dump (dom/toolbar-partstudio.txt + dropdowns-partstudio.json). "Search tools…" follows the
+  last tool; ⊞ "Add custom features" ends the toolbar (own icon).
+- **Feature preview**: bodies a feature creates show see-through slate (`FEATURE_PREVIEW`
+  `#4f6577` at 55%) while its dialog is open (live part-studio/230); the "before" model is now
+  computed for every dialog. **Depth arrow**: live's screen-sized white arrow with a hollow head
+  (gray outline, blue when hovered) at the end of the length; hit area follows it
+  (`Viewport::manipulators` carry a glyph length).
+- **Hole**: title/list name "Ø 5 mm ↧ 12 mm" (`interaction::display_name`), 26 px icons
+  instead of the Diameter / Depth / Tip angle labels (own artwork hole-diameter, hole-depth,
+  hole-drill-angle), tip angle options "118 deg", "135 deg". final-hole-dialog.png.
+- **Variable** (fs-std variable.fs ids): Assigned | Measured | From import; Measured Distance
+  (min/max, axis components in a "› Axis measurements" group, custom direction), Length, Diameter
+  (radius option) are evaluated (`regen::measure::entity_distance/total_length/entity_diameter`)
+  and the read-only Distance/Along X/Y/Z values are shown (`FeatureDialog::set_computed`);
+  default value 0; Name has focus on open; no preview slider (live variable-01). From import
+  (CSV tables) is laid out but its regen reports "not available yet" (needs file-tab access).
+  New hints: `GROUP_LABEL` (collapsible title without a checkbox), INITIAL_FOCUS on text.
+- **View animations** 500 ms (live ≈0.5 s; QA's 1.2 s was llvmpipe frame latency).
+- **Section caps rebuilt** (renderer): per-part stencil counting (front faces −1, back faces +1 of
+  the kept surfaces), caps only where the count is odd, at the plane depth; faces lying on the
+  plane count as cut; hatch = 1 px lines at 45° in the plane's own axes, 11 px apart, half the cap
+  color (live part-studio/74). Fixes caps painted over uncut side faces and caps of parts lying
+  wholly behind the cut. Depth format is now depth+stencil (Depth32FloatStencil8, else
+  Depth24PlusStencil8; AO samples a depth-only view). New test
+  `section_leaves_uncut_faces_unhatched`; `section_caps_cover_the_cut` now catches any red tint.
+- **Rollback drop line**: hollow blue circle at its left end while dragging.
+- **Pixel pass vs part-studio/00 at 1919x1079** (Xvfb :101 now 1920x1080): parts list takes the
+  lower 35% of the panel (live), filter box 30 px with italic placeholder and thin funnel, bottom
+  tabs fixed 198 px / 3 px apart, help button = filled "?" + solid caret, view cube redrawn
+  bevelled (rounded white faces in 72% of each side, corner caps, live-size roll arcs that only
+  take clicks on their band), camera menu caret solid.
+
+## Round 8 (05:00-, pixel pass continued)
+
+- **View cube rebuilt from Onshape's own geometry** (webgl bundle, view manipulator; constants
+  VIEW_CUBE_*): widget 150 px, cube half edge 29.5 px centred in it; each near face a white
+  rounded square of 0.75 of the edge, each far face a 0.97 square in `#cedbe5` at 60% seen
+  through the gaps (back-face culling makes that frame and the white lines at the far edges); a
+  white disk (radius 0.24 of the half edge) under each near corner; corner radius 0.2 of the edge.
+  Only faces and corners are clickable (no edge cells); a far face's frame selects that face. A
+  corner goes to its trimetric view (30° steps about Z, 30° above/below). Arrows are drawn shapes:
+  triangles 15 x 9.75 px with tips on the widget edge, roll arcs centred on the cube at radius
+  67.5 px, 6 px thick (45°-72° and 108°-135°) with heads at the outer ends; hover `#90cef1` at 60%;
+  no tooltips (they're GL meshes in Onshape). Triad from 1 px outside the back-bottom-left corner,
+  2 half-edges long, hidden parts at 30%; labels past the tip, fading out end-on (8° to 2°), 30%
+  when behind the cube. Arrows act through the same hit test; while hovered they live in the hover
+  slot as pseudo cells (`Arrow::cell`), so `CubeHooks` didn't change.
+- **Standard views fixed** (render/camera.rs): Onshape opens every graphics area in **Trimetric**
+  (30° right of front, 30° up; `getDefaultStandardView`), which is what part-studio/00 shows.
+  Isometric is the true (-1, 1, -1) diagonal, Dimetric 45° right and 30° up. `Camera::default()`
+  and the assembly's first fit now use Trimetric (assembly_view.rs line ~598, one line).
+
+- **Left rail panels** (doc_panels.rs; live document/rail-panel-*.png + dom/rail-panel-*.txt):
+  rail order Versions and history, Create version…, Document notes, Performance (Comments, AI
+  Advisor are cloud-only; Release drafts stays last). **Document notes**: header ↻ Refresh notes,
+  ✎ Edit notes, ✕; empty state = 140 px pale notepad + "Instructions, description, or notes for
+  this document"; edit mode Apply · Cancel · Show preview with a borderless textarea (Onshape's
+  placeholder); notes are Markdown (headings, lists, **bold**, *italic*) stored in the store meta
+  key `notes`; gray footer with the help link. **Performance**: Tab performance (Total
+  regeneration time + stopwatch = "Show regeneration times", › Features (n) table by feature type),
+  Tab graphics (› Primitives: faces, edges, vertices, sketch entities, planes), Document
+  performance (Tabs table), System (› Browser and platform: noshape, version, platform, GL vendor =
+  wgpu backend, GL renderer = adapter, red ⓘ for software renderers; › WebGL and extensions ✓).
+  Tables: 250 px, sortable by either column (Count ▾ by default). A software renderer also puts
+  the red badge on the rail icon ("Performance errors detected"). Connection is cloud-only.
+  Open left panels (all of them) now run the window's full height with the gray footer level
+  with the tab bar; the tab bar starts right of the panel and the Tab manager cell ends the rail
+  (live). Panel background `#f5f5f5`.
+  **Where used** is not done: Onshape's is the paid, version-based cross-document search
+  (free plan only shows a lock); a local version (assemblies/drawings using this tab's parts)
+  needs its own design.
+
+- **Pixel pass vs part-studio/00** (1919x1079): text is grayscale anti-aliased like Chrome
+  (`cx.set_text_rendering_mode(Grayscale)` in main.rs; subpixel left colour fringes). Navbar: ☰
+  16 px wide, 3 px bars 6 px apart, centred at x 155; name 6 px after it; "Main" on the name's
+  baseline 11 px after it. The `{✓}` FeatureScript notices button is in every document (own icons
+  fs-notices / fs-notices-error). No Appearance button in an empty Part Studio (parts or sketches
+  bring it). Toolbar dropdown carets are a 10x5 px, ~2 px caret (tool-caret.svg). The Default
+  geometry guide line ends in a 9 px tick.
+- **Remove / Intersect previews** (live 234-237, final-remove-preview.png): a tool that reaches no
+  part (every part unchanged) shows translucent dark red (90%) with the blue info toast "Selected
+  tools and targets do not intersect." (cleared when it cuts or the dialog closes); when it cuts,
+  the cut is live and the tool shows gray at 60%; the tool has no edges. The Extrude depth arrow
+  now also appears for a picked part face (not only sketch regions).
+- Sketch start (live sketch/01, final-sketch-start.png): a filled single-pick field with no
+  empty selection field after it lets go (the Sketch plane field is no longer active once "Top
+  plane" is picked); the evaluation tools (Measure, Analysis, Mass properties) stay at the bottom
+  right while a sketch or feature dialog is open (live 01, 230, 234).
+- For the sketch agent (sketch_mode.rs, not changed): live 01 shows **no tool active** after the
+  plane is picked (sketch-behaviour.md says Line starts active), and the empty sketch's frame is
+  about 2.3x ours at the default zoom (ours: half height = 150 px; "Sketch 1" at its top-left).
+- Open: the New preview's shading differs (live top face darker than the lit side, ours the
+  other way); needs a preview-specific lighting in the renderer, not just a colour.
+
+- **Feature preview lighting** (renderer): `Instance::preview()` (params.y bit 4, value 16) shades flat
+  with ambient 0.5 + 0.74 x a light from the viewer's right and slightly below, no highlight, so a
+  box's top and front read alike and the right side lighter (live 230). Preview bodies (what the
+  open dialog creates; not Remove/Intersect tools) come from `PartStudioView::preview_body_ids` via
+  `SceneOptions::preview_bodies`; color `FEATURE_PREVIEW` #92aec5 at 70%. Offscreen test
+  `feature_preview_shading_matches_onshape` (top/front (129,145,158) vs live (132,148,158), right
+  (160,183,203) vs (160,186,202)). final-feature-preview.png.
+- **Feature dialogs vs live/dialogs (27 dialogs; final-dialog-*.png)**: rows sit flush with the
+  dialog edge like live (tabs, checkboxes, group titles, guide lines -2 px); number fields: 14 px
+  value, field 5 px lower (underline on the row's bottom line), label without right padding,
+  tolerance rows 3 px left; labelled selects: label on the value's baseline; closed selects: text
+  and caret 2 px lower, underline 1 px lower; query fields 27 px, placeholder `#555`, no gap before
+  their icon, a 4 px margin when a query field ends the dialog; expander chevrons 12x6 thin
+  (expander-down/right.svg); help disc 12 px `#a0a0a0`; dialog shadow blur halved (GPUI blurs twice
+  as far as CSS); "= value" hints only for expressions; dialog angles show "3 deg"; a hidden param
+  between a row and its flip no longer orphans the flip (Plane's Opposite direction is the arrow on
+  Offset distance again); flip buttons swap their icon (flip-direction(-opposite),
+  flip-circular(-opposite)) instead of a pressed background; a filled single-pick field lets go
+  when nothing is left to pick; driven arrays (Loft's Profiles) take the initial focus; mate
+  connector button redrawn as a double ring.
+- For other owners: **Mate connector** dialog (spec): live has no mate-connector button on Origin
+  entity and shows Flip primary axis / Reorient secondary axis as one row of two icon buttons
+  instead of our "☐ Flip primary axis" and "+X" rows. **Assign material** dialog is 179 px tall vs
+  live 368 (empty body + help icon missing), and isn't in tool search.
+
+- **Display modes** (final-display-modes.png vs live 60-63): Unshaded draws the faces unlit white
+  (they were lit gray). **Section view** (final-section-view.png vs live 70): opened from the camera
+  menu with nothing selected it starts empty with the info toast "Select a plane, planar face,
+  cylinder, or mate connector." (cleared by the first plane / closing); clicking a default plane in
+  the feature list adds it as a section plane. **Mass properties** with a part selected matches
+  live 80 (final-mass.png). Labelled selects wrap like live: a select is its value + 22 px and at
+  least ~90 px wide (Loft's end conditions wrap, Hole's Start plane and Helix's Start condition
+  don't).
+
+- **Right-click menus vs live menus/rmb-ps-*** (final-context-menu.png, final-parts-menu.png):
+  context menus have no inner padding (rows/separators edge to edge), text 36 px in with icons and
+  17 px without, 10 px right padding, 120 px minimum width, shadow blur halved; submenu ▸ 5 px `#666`
+  9 px from the edge, submenus sit on the parent's border and open left only without 200 px of room;
+  menus open 2 px under the pointer and flip above when they don't fit (GPUI's SwitchAnchor instead
+  of snapping). Content: edge menu without Section view… and with icon-less Fillet…/Chamfer…; planes
+  get Size to Part Studio and the eye-off Hide icon; sketch region: no icon on Edit Sketch, Hide
+  other/all sketches only with other sketches shown, Create Drawing icon; no Export as DXF/DWG… with
+  several faces; no Export as SVG… on sketch rows; parts menu icons (Copy, Create Drawing,
+  Hide/Show, Delete); Section view icon redrawn; Add appearance to face uses add-appearance.
+  "Add comment" (comments are cloud) and the Release "Upgrade" pill (subscriptions) stay out.
+- **Parts list**: rows span the list (content 18 px in), 24 px tall, 5 px short of the edge, eye
+  9 px in; double-click renames; while renaming no hover tint or eye, the input fills the row.
+  Tree carets (Parts / Default geometry headers) are the thin 12x6 `#666` chevron. **Rollback bar**:
+  x 45-234, `#c8d9e2` on hover, tooltip "Rollback bar".
+
+- **renderer.rs `draw_lists`** takes `DrawMode { pick, section, outline }` instead of three bools
+  (clippy too_many_arguments; the outline flag is psb's part-outline pass, noted in
+  part-studio-behaviour.md). New render flags go into `DrawMode`.
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting
@@ -292,13 +564,19 @@ in the shared tree.
 - /tmp/ui-shots/final-measure.png, final-mass.png.
 - /tmp/ui-shots/final-appearance.png, final-configurations.png, final-graphics-prefs.png,
   final-graphics-prefs-sketch.png, final-tool-search.png (updated: "fil").
+- /tmp/ui-shots/final-tooltips.png (expanded Extrude tooltip), final-sketch-tooltip.png (ours only).
+- /tmp/ui-shots/final-dialog-dropdown.png (End type open | Onshape, typed "thr" | Onshape),
+  final-fillet-dialog.png, final-hole-dialog.png, final-export-dialog.png,
+  final-configurations-table.png, final-configurations-box.png.
+- /tmp/ui-shots/final-viewcube.png (4x), final-doc-notes.png, final-performance.png,
+  final-remove-preview.png (round 8).
 - (older, by the previous agent) /tmp/ui-shots/new-doc-side-by-side.png: new document.
 
 ## Measured facts (live 1920x1080 screenshot, viewport 1673x973)
 
 - Default view: **orthographic**, camera 30° right of the front view and 30° above the
   ground (X projects to (0.866, 0.25), Y to (0.5, -0.433), Z to (0, -0.866) in screen
-  units, y down). `StandardView::Isometric` now encodes this.
+  units, y down). That is Onshape's Trimetric view (`StandardView::Trimetric`).
 - Default planes are **squares** centered on the origin, side 0.615 of the viewport
   height (598 px), fill `#cedbe5` at 20% unlit (one plane `#f5f8fa`, three `#e7edf2`),
   outline 2 px reading `#aac3de` on white, label 20 px blue at the top-left corner, drawn
@@ -307,16 +585,31 @@ in the shared tree.
 
 ## Next
 
-- Appearance and Configurations panel bodies (the frame is done; the bodies still use the older
-  layout): Appearances = tabs "Parts and surfaces | Sketches and curves" + rows with swatch
-  bars (dom/panel-appearance.txt); Configurations = "Configure Part Studio ▾" + illustration.
-- Camera menu: "Graphics preferences…" (gear icon) and "Highlight boundary edges" items (psb
-  behaviour first). Section view hatch colors (part-studio/70-74), translucent/hidden-edge
-  display mode checks against part-studio/60-68 in the app.
-- Rollback drop line: Onshape draws a small circle at its left end.
-- Left rail and right strip icon sets vs live (Onshape has 6 rail and 5 strip buttons).
+Done (rounds 6-8): QA3 1-9 (dropdowns, Fillet, modals, menus, Export modal, focus, toolbar
+collapse = Onshape's narrow-window behaviour, Configurations), Hole title/icons, Extrude preview
+colours, Variable dialog, 500 ms view animations, section caps + hatch, rollback drop-line circle,
+left rail (Document notes, Performance, rail icons), view cube from Onshape's geometry, standard
+views. Export writers PARASOLID/ACIS/PVZ/JT/RHINO are kern's.
+Open, in order:
+1. (done) Remove/Intersect tool preview. New preview shading (see round 8).
+2. Full-screen pixel pass at 1919x1079 against part-studio/00 and the other live shots
+   (toolbar icons after the TOOLBAR change, navbar spacing, feature list, parts list).
+3. Where used (local design: assemblies/drawings of this document using the part).
+The canvas bounds probes in other areas (feature_studio.rs, os_ui.rs, variable_studio.rs,
+fs_search.rs) have the same missing-inset pattern; harmless only when the parent is a flex
+container.
 
 ## Gotchas
+
+- xdotool under load (load average ~30): double-clicks on feature rows get lost; click once,
+  wait, then double-click, and check a pixel before trusting a capture.
+- Key bindings matched deeper in the context path run first; a binding on `Parent > Input` beats
+  one on an element between them, so add your own `YourCtx > Input` binding (later wins at equal
+  depth).
+
+- An `absolute()` child without `top_0().left_0()` sits at its static position: in a block `div()`
+  that is *after* the previous children (e.g. below them), not over the parent.
+- Tooltip views are laid out as their own root: set font family/size on them explicitly.
 
 - Private build copies: `rsync -a` keeps file times, so cargo can miss changed files (it compares
   them with the last build); `touch` the copied sources before building.
@@ -332,3 +625,20 @@ in the shared tree.
 - Full-color icons go through `assets::icon` (img), not `svg()`; `ui::glyph` tints.
 - Popup menu rows are 26 px by default; `PopupMenuItem::element` rows use min-height,
   so a 32 px element gives Onshape's 32 px rows.
+
+## From ui2 (19 Oct)
+- Export: your part_studio/export.rs is the Part Studio export (I dropped my duplicate). The Assembly
+  tab / instance Export… still opens my simpler modal (`AssemblyView::open_asm_export`, os_ui::export_modal).
+  Onshape's assembly list is the same minus RHINO plus URDF before STL (dom/dialog-export-partstudio-
+  assembly.txt). If you extend your module to assemblies (parts from `self.result.occurrences`, placed with
+  `o.transform`, hidden via `o.hidden`), my URDF writer (robot XML, one link per part, fixed joints, meshes in
+  a stored zip) is at /tmp/ui2/export-urdf-reference.rs to copy. Tell me if you'd rather I do the assembly side.
+- STEP version/units/preprocessing and IGES compatibility mode are requested from kern
+  (kernel-robustness.md, "Request from ui2").
+- The bounds probes you listed (feature_studio, os_ui, variable_studio, fs_search) now have
+  `.top_0().left_0()`. os_menu.rs: popup priority 100 (menus above dialogs) and `OsMenuItem::keys`.
+- (19 Oct, later) Lead gave Export to ui2 for assemblies/URDF: I refactored your part_studio/export.rs
+  without changing its look: the dialog is now `open_export_modal(base, assembly, run, …)` and the writer
+  `write_export(settings, path, parts)` (module fns); `open_part_export` / `write_part_export` call them.
+  Added `PartFormat::Urdf`, `PartFormat::list(assembly)`, `missing_writer`, URDF rows/writer, individual
+  files zipped (Onshape). `mod export` is `pub(crate)`; the old `ExportFormat` enum (BREP) is gone.

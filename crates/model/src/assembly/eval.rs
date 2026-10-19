@@ -204,6 +204,11 @@ pub struct SolveOptions {
     /// Drags of flexible subassembly children: ((subassembly, child), point in
     /// child coordinates, world target).
     pub nested_drags: Vec<((InstanceId, InstanceId), DVec3, DVec3)>,
+    /// Solve only this mate (a mate being defined, before Solve): Onshape
+    /// "does not continually calculate all mates and their positions until
+    /// the Mate feature is accepted" (help: Mates). Other mates and
+    /// relations are not enforced and report ok.
+    pub only_mate: Option<MateId>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -487,11 +492,13 @@ impl Prepared {
             mates[i].hold.push((*ix, *v));
             mates[i].limits.clear();
         }
+        // A mate being defined: only it is enforced (`SolveOptions::only_mate`).
+        let enforced: Vec<bool> = self.mates.iter().map(|(id, _, _)| opts.only_mate.is_none_or(|only| only == *id)).collect();
         let mate_index: HashMap<MateId, usize> = self.mates.iter().enumerate().map(|(i, (id, _, _))| (*id, i)).collect();
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();
         let mut rel_ids = Vec::new();
-        for r in &self.relations {
+        for r in self.relations.iter().filter(|_| opts.only_mate.is_none()) {
             let (Some(&ia), Some(&ib)) = (mate_index.get(&r.a), mate_index.get(&r.b)) else { continue };
             let (base_a, base_b) = match r.base {
                 Some([x, y]) => (x, y),
@@ -501,7 +508,11 @@ impl Prepared {
             rel_ids.push(r.id);
         }
         // Unconstrained bodies follow a drag by pure translation (no solve).
-        let constrained = |b: usize| mates.iter().any(|m| m.a == b || m.b == b || m.extra.iter().any(|(e, _)| *e == b) || m.follow.is_some_and(|f| f.axis_body == b && m.b != b));
+        // The mates handed to the solver (all of them unless `only_mate`; the
+        // relations index into the full list, which is then the same).
+        let active: Vec<SolverMate> = mates.iter().zip(&enforced).filter(|(_, on)| **on).map(|(m, _)| m.clone()).collect();
+        let active_ix: Vec<Option<usize>> = enforced.iter().scan(0usize, |n, on| Some(on.then(|| { *n += 1; *n - 1 }))).collect();
+        let constrained = |b: usize| active.iter().any(|m| m.a == b || m.b == b || m.extra.iter().any(|(e, _)| *e == b) || m.follow.is_some_and(|f| f.axis_body == b && m.b != b));
         let mut drags: Vec<DragTarget> = Vec::new();
         for (id, local, target) in &opts.drags {
             let Some((b, off)) = self.body_of.get(id) else { continue };
@@ -543,7 +554,7 @@ impl Prepared {
                 drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
             }
         }
-        let r = solver::solve(&mut bodies, &mates, &rels, &drags);
+        let r = solver::solve(&mut bodies, &active, &rels, &drags);
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut out = Solved { converged: r.converged, dof: r.dof, ..Default::default() };
         for (id, _) in &self.instances {
@@ -563,7 +574,11 @@ impl Prepared {
             }
         }
         for (i, (id, _, m)) in self.mates.iter().enumerate() {
-            out.mate_ok.insert(*id, r.mate_ok.get(i).copied().unwrap_or(false));
+            let ok = match active_ix.get(i).copied().flatten() {
+                Some(k) => r.mate_ok.get(k).copied().unwrap_or(false),
+                None => true,
+            };
+            out.mate_ok.insert(*id, ok);
             let fa = poses[m.a].mul(&m.a_local);
             let fb = poses[m.b].mul(&m.b_local);
             out.mate_frames.insert(*id, (fa, fb));
@@ -840,7 +855,83 @@ pub struct AssemblyEvaluator {
     /// Finest meshes of bodies drawn with "Use best available tessellation",
     /// by shape hash.
     fine_meshes: HashMap<u64, Arc<MeshBuffers>>,
+    /// Inserted sketches as wire bodies, by (studio, sketch, configuration),
+    /// with the studio regeneration they were built from.
+    sketch_bodies: HashMap<SketchKey, SketchBodyEntry>,
 }
+
+/// Body id of an inserted sketch's wire body (one per sketch feature).
+pub fn sketch_body_id(sketch: FeatureId) -> BodyId {
+    BodyId { feature: sketch, index: u32::MAX }
+}
+
+/// A sketch's (non-construction) curves and standalone points as one wire
+/// body, for Insert › Sketches. `None` when the sketch has no geometry.
+pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<RegenResult> {
+    use noshape_kernel as k;
+    let s = studio.context.sketch(sketch)?;
+    let plane = crate::regen::eval::kernel_plane(&s.frame);
+    let mut shapes = Vec::new();
+    for e in s.sketch.entities() {
+        if e.construction {
+            continue;
+        }
+        if let Some(c) = s.sketch.curve(e.id) {
+            if let Some(seg) = crate::regen::features::extrude::curve_to_segment(&c)
+                && let Ok(edge) = k::make_edge_2d(&plane, &seg)
+            {
+                shapes.push(edge);
+            }
+        } else if let Some(p) = s.sketch.point(e.id)
+            && s.sketch.users_of_point(e.id).is_empty()
+            && let Ok(v) = k::make_vertex(s.frame.to_world(p))
+        {
+            shapes.push(v);
+        }
+    }
+    if shapes.is_empty() {
+        return None;
+    }
+    let shape = k::Shape::compound(&shapes);
+    let id = sketch_body_id(sketch);
+    let body = crate::regen::context::Body::new(id.clone(), s.name.clone(), BodyKind::Wire, shape.clone(), Vec::new(), 0, sketch);
+    let mut mesh = crate::regen::tessellate_shape(&shape, 1.0).unwrap_or_default();
+    // The sketch's regions fill it (live assembly/123: a translucent light
+    // gray region under thin gray curves); not pickable faces.
+    if let Some(sd) = studio.display.sketches.iter().find(|d| d.feature == sketch) {
+        let n = sd.frame.normal.as_vec3().to_array();
+        for r in &sd.regions {
+            let base = mesh.positions.len() as u32;
+            mesh.positions.extend_from_slice(&r.positions);
+            mesh.normals.extend(std::iter::repeat_n(n, r.positions.len()));
+            mesh.indices.extend(r.indices.iter().map(|i| i + base));
+        }
+    }
+    let bounds = shape.bounding_box(false).ok().map(|b| (b.min, b.max));
+    let mut ctx: Context = (*studio.context).clone();
+    let display_body = crate::display::BodyDisplay {
+        id,
+        name: s.name.clone(),
+        kind: BodyKind::Wire,
+        // Sketch region gray #dde2e6 (linear), translucent.
+        color: [0.7230, 0.7605, 0.7913, 0.8],
+        hidden: false,
+        mesh: Arc::new(mesh),
+        face_refs: Vec::new(),
+        edge_refs: body.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
+        vertex_refs: body.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
+        bounds,
+    };
+    ctx.bodies = vec![Arc::new(body)];
+    let mut display = studio.display.clone();
+    display.bodies = vec![display_body];
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx) })
+}
+
+/// Sketch instance cache key: (Part Studio, sketch feature, configuration).
+type SketchKey = (TabId, FeatureId, String);
+/// The studio result a sketch body was built from, and the built body.
+type SketchBodyEntry = (Arc<RegenResult>, Option<Arc<RegenResult>>);
 
 /// Chord-tolerance factor of "Use best available tessellation".
 pub const BEST_TESSELLATION: f64 = 0.1;
@@ -930,6 +1021,26 @@ impl Drop for AsmVarsGuard {
             v.borrow_mut().pop();
         });
     }
+}
+
+/// `asm` with Dynamic suppression applied: an instance or mate whose
+/// "Unsuppressed if" expression evaluates to false (zero) is suppressed. An expression
+/// that doesn't evaluate leaves the instance as it is.
+pub fn dynamically_suppressed(doc: &Document, asm: &Assembly) -> Assembly {
+    let vars = crate::variables::refs_variables(doc, &asm.variable_studios);
+    let mut out = asm.clone();
+    let is_false = |e: Option<&str>| e.and_then(|e| noshape_units::evaluate(e, &vars).ok()).is_some_and(|q| q.value == 0.0);
+    for i in &mut out.instances {
+        if is_false(i.unsuppressed_if.as_deref()) {
+            i.suppressed = true;
+        }
+    }
+    for m in &mut out.mates {
+        if is_false(m.unsuppressed_if.as_deref()) {
+            m.suppressed = true;
+        }
+    }
+    out
 }
 
 fn eval_in(text: &str, dim: Dim, units: &UnitPrefs) -> Option<noshape_units::Quantity> {
@@ -1339,6 +1450,21 @@ impl AssemblyEvaluator {
         Self::default()
     }
 
+    /// An inserted sketch's wire body (cached; rebuilt when its Part Studio
+    /// regenerates).
+    pub fn sketch_studio(&mut self, doc: &Document, tab: TabId, sketch: FeatureId, config: &ConfigValues) -> Option<Arc<RegenResult>> {
+        let r = self.studio(doc, tab, config)?;
+        let key = (tab, sketch, serde_json::to_string(config).unwrap_or_default());
+        if let Some((src, built)) = self.sketch_bodies.get(&key)
+            && Arc::ptr_eq(src, &r)
+        {
+            return built.clone();
+        }
+        let built = sketch_wire_result(&r, sketch).map(Arc::new);
+        self.sketch_bodies.insert(key, (r, built.clone()));
+        built
+    }
+
     /// Regenerate a Part Studio for a configuration (cached).
     pub fn studio(&mut self, doc: &Document, tab: TabId, config: &ConfigValues) -> Option<Arc<RegenResult>> {
         let ps = match &doc.tab(tab)?.content {
@@ -1524,6 +1650,14 @@ impl AssemblyEvaluator {
     /// Flatten an assembly into leaves (relative to their top-level
     /// instance), list nodes and the prepared solver problem.
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
+        // Dynamic suppression: instances whose "Unsuppressed if" is false.
+        let dynamic;
+        let asm = if asm.instances.iter().any(|i| i.unsuppressed_if.is_some()) || asm.mates.iter().any(|m| m.unsuppressed_if.is_some()) {
+            dynamic = dynamically_suppressed(doc, asm);
+            &dynamic
+        } else {
+            asm
+        };
         // `#name` in mate values: this assembly's inserted Variable Studios.
         let _vars = AsmVarsGuard::push(doc, asm);
         let units = doc.settings.units;
@@ -1657,6 +1791,29 @@ impl AssemblyEvaluator {
                         Err(e) => node.error = Some(e),
                     }
                 }
+                InstanceSource::Sketch { studio, sketch, config } => {
+                    node.kind = NodeKind::Part;
+                    match self.sketch_studio(doc, *studio, *sketch, config) {
+                        Some(r) => {
+                            if !suppressed {
+                                leaves.push(LeafInstance {
+                                    path: vec![inst.id],
+                                    inner: DMat4::IDENTITY,
+                                    studio: *studio,
+                                    body: Some(sketch_body_id(*sketch)),
+                                    config: config.clone(),
+                                    regen: r,
+                                    name: inst.name.clone(),
+                                    hidden: inst.hidden,
+                                    mirrored: false,
+                                    external: None,
+                                    flex: None,
+                                });
+                            }
+                        }
+                        None => node.error = Some("Sketch no longer exists in its Part Studio (or has no geometry)".into()),
+                    }
+                }
                 InstanceSource::PartStudio { studio, config } => {
                     node.kind = NodeKind::PartStudio;
                     match self.studio(doc, *studio, config) {
@@ -1680,10 +1837,16 @@ impl AssemblyEvaluator {
                         None => node.error = Some("Part Studio was deleted".into()),
                     }
                 }
-                InstanceSource::Assembly { assembly } => {
+                InstanceSource::Assembly { assembly, config } => {
                     node.kind = NodeKind::Assembly;
+                    // The subassembly in the instance's configuration.
+                    let configured;
                     let sub = match doc.tab(*assembly).map(|t| &t.content) {
-                        Some(TabContent::Assembly(a)) => Some(a),
+                        Some(TabContent::Assembly(a)) if a.has_configured() => {
+                            configured = a.configured(config);
+                            Some(&configured)
+                        }
+                        Some(TabContent::Assembly(a)) => Some(&**a),
                         _ => None,
                     };
                     match sub {

@@ -264,6 +264,15 @@ fn automatic_centerlines_on_hole_axes() {
     let vp = built.picks.iter().position(|p| *p == PickTarget::View(ViewId(1))).unwrap() as u32;
     let cl: Vec<_> = built.geometry.lines.iter().filter(|l| l.pick == vp && l.style == sheet::LineStyle::Centerline).collect();
     assert_eq!(cl.len(), 3, "{cl:#?}");
+    // Auto centerlines off (Drawing properties › Insert view defaults):
+    // the centermark of face-on circles stays, the axis lines go.
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().auto_centerlines = Some(false);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!built.geometry.lines.iter().any(|l| l.pick == vp && l.style == sheet::LineStyle::Centerline));
+    // ViewDefaults on a new view.
+    let mut v = DrawingView::default();
+    ViewDefaults { hidden_lines: true, tangent: 2, auto_centermarks: true, ..Default::default() }.apply(&mut v);
+    assert!(v.style == RenderStyle::HiddenLinesVisible && v.tangent_phantom && v.show_centerlines && v.auto_centerlines == Some(false));
 }
 
 #[test]
@@ -273,10 +282,10 @@ fn bom_hole_table_and_linked_balloons() {
     // Sheet 2: the assembly with a BOM and a callout on the pin.
     let si = drawing.add_sheet(0);
     drawing.sheets[si].views.push(base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]));
-    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1) }, [410.0, 287.0]));
+    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new() }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
-    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None }, [410.0, 120.0]));
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false }, [410.0, 120.0]));
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     assert!(src.assembly);
@@ -364,8 +373,8 @@ fn property_fields_in_notes_and_title_block() {
     if let Some(f) = sheet.title_block.fields.iter_mut().find(|(k, _)| k == "Title") {
         f.1 = "{part.name} ({doc.name})".into();
     }
-    sheet.annotations.push(Annotation { id: 99, kind: AnnotationKind::Note { text: "SHEET {sheet.number} OF {sheet.count}\nSCALE {sheet.scale}\n{nope}".into(), height_mm: 3.5 }, position: [30.0, 120.0], ..Default::default() });
-    let info = SheetInfo { doc_name: "Demo".into(), drawing_name: "Drawing 1".into() };
+    sheet.annotations.push(Annotation { id: 99, kind: AnnotationKind::note("SHEET {sheet.number} OF {sheet.count}\nSCALE {sheet.scale}\n{nope}", 3.5), position: [30.0, 120.0], ..Default::default() });
+    let info = SheetInfo { doc_name: "Demo".into(), drawing_name: "Drawing 1".into(), ..Default::default() };
     let built = render_sheet_with(&drawing, 0, &sources, &cache, false, &info).unwrap();
     let t = texts(&built);
     for want in ["Part 1 (Demo)", "SHEET 1 OF 2", "SCALE 1:1", "{nope}"] {
@@ -497,6 +506,31 @@ fn broken_out_section_exposes_interior() {
     let frame = g.frame.unwrap();
     let bo = BrokenOut { profile, spline: true, depth: 0.0, depth_ref: Some(back) };
     assert!((views::broken_out_depth(&ctx, None, &frame, &bo) - 0.06).abs() < 1e-9);
+}
+
+#[test]
+fn section_cut_only_and_depth() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.04], [-0.025, 0.04]]);
+    let full = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    // Show cut geometry only: just the 60 x 12 mm cut face outline.
+    drawing.sheets[0].view_mut(ViewId(5)).unwrap().cut_only = true;
+    let cut = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    assert!(cut.error.is_none(), "{:?}", cut.error);
+    assert!(!cut.edges.is_empty() && cut.edges.len() < full.edges.len(), "{} vs {}", cut.edges.len(), full.edges.len());
+    assert!(cut.edges.iter().all(|e| e.visible));
+    assert!((seg_range(&cut.section_segments, 1) - 0.06).abs() < 1e-3);
+    // Section depth 5 mm: the holes 13+ mm behind the cut are left out,
+    // the cut face stays (and is still hatched).
+    let v = drawing.sheets[0].view_mut(ViewId(5)).unwrap();
+    v.cut_only = false;
+    v.section_depth = Some(0.005);
+    let shallow = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, false);
+    assert!(shallow.error.is_none(), "{:?}", shallow.error);
+    assert!(shallow.edges.len() < full.edges.len(), "{} vs {}", shallow.edges.len(), full.edges.len());
+    assert!((seg_range(&shallow.section_segments, 1) - 0.06).abs() < 1e-3, "{}", seg_range(&shallow.section_segments, 1));
 }
 
 #[test]
@@ -747,7 +781,7 @@ fn table_cell_formats_and_merged_cells() {
     assert_eq!(t.cell_format(1, 0).height, Some(4.0));
     t.set_cell_format(2, 1, CellFormat::default());
     assert_eq!(t.cell_formats.len(), 2, "default formats are not stored");
-    let d = tables::table_data(&Drawing::default(), &t, None, None, None, &|s| s.to_string());
+    let d = tables::table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
     let l = tables::layout(&t, &d);
     let mut g = sheet::SheetGeometry::new(420.0, 297.0);
     tables::render(&mut g, &t, &d, &l, 1);
@@ -783,7 +817,7 @@ fn gdt_leaders_and_datum_targets() {
     let s = &mut drawing.sheets[0];
     let id = s.next_annotation_id();
     let target = [0.05, 0.0];
-    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target }] }, position: [200.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new() }] }, position: [200.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [60.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A2".into(), area: DatumTargetArea::Point }, position: [50.0, 262.0], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -921,4 +955,156 @@ fn view_simplification_drops_small_detail_and_parts() {
         drawing.sheets[0].view_mut(ViewId(1)).unwrap().simplification = Some(Simplification::RatioToStudio(0.5));
         assert_eq!(views::view_simplification(&drawing.sheets[0], c), Simplification::RatioToStudio(0.5));
     }
+}
+
+#[test]
+fn formats_gaps_and_revision_tables_across_sheets() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    drawing.add_sheet(0);
+    drawing.props.formats_locked = true;
+    drawing.props.title_block_color = Some([220, 40, 40]);
+    drawing.props.dim_extension = 5.0;
+    drawing.sheets[0].tables.push(Table::new(1, TableKind::revision(), [400.0, 280.0]));
+    let rows = vec![tables::RevisionRow { revision: "A".into(), description: "First".into(), date: "2026-10-19".into(), ..Default::default() }];
+    let info = SheetInfo { revisions: rows, ..Default::default() };
+    let built = render_sheet_with(&drawing, 0, &sources, &cache, false, &info).unwrap();
+    // Locked: no title block pick; its texts are red.
+    assert!(!built.picks.contains(&PickTarget::TitleBlock));
+    let g = &built.geometry;
+    assert!((0..g.texts.len()).any(|i| g.text_color(i) == Some([220, 40, 40])));
+    assert!(texts(&built).iter().any(|t| t == "REVISION HISTORY") && texts(&built).iter().any(|t| t == "First"));
+    // Linked: the full table on sheet 2; See sheet 1: the pointer table.
+    let built2 = render_sheet_with(&drawing, 1, &sources, &cache, false, &info).unwrap();
+    assert!(texts(&built2).iter().any(|t| t == "First"));
+    if let TableKind::Revision { see_sheet1, .. } = &mut drawing.sheets[0].tables[0].kind {
+        *see_sheet1 = true;
+    }
+    let built2 = render_sheet_with(&drawing, 1, &sources, &cache, false, &info).unwrap();
+    assert!(texts(&built2).iter().any(|t| t == "SEE SHEET 1") && !texts(&built2).iter().any(|t| t == "First"));
+    // Extension past the dimension line.
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.style.extension = 5.0;
+    g.linear_dimension([0.0, 0.0], [50.0, 0.0], 10.0, DimOrientation::Horizontal, "50", 1);
+    let top = g.lines.iter().flat_map(|l| l.points.iter()).map(|p| p[1]).fold(f64::MIN, f64::max);
+    assert!((top - 15.0).abs() < 1e-9, "{top}");
+}
+
+#[test]
+fn grouped_revision_callout_follows_its_annotation() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut s = Sheet::default();
+    let note = |p: [f64; 2]| Annotation { id: 1, kind: AnnotationKind::note("NOTE", 3.5), position: p, ..Default::default() };
+    let callout = Annotation { id: 2, kind: AnnotationKind::RevisionCallout { anchor: [5.0, 0.0], revision: "B".into(), group: Some(1) }, ..Default::default() };
+    let at = |s: &Sheet| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(s, &env);
+        let text = |t: &str| g.texts.iter().find(|x| x.text == t).map(|x| x.pos).unwrap();
+        (text("NOTE"), text("B"))
+    };
+    s.annotations = vec![note([50.0, 100.0]), callout.clone()];
+    let (n1, b1) = at(&s);
+    s.annotations = vec![note([80.0, 60.0]), callout];
+    let (n2, b2) = at(&s);
+    // The callout moves with the note.
+    assert!(((b2[0] - b1[0]) - (n2[0] - n1[0])).abs() < 1e-9 && ((b2[1] - b1[1]) - (n2[1] - n1[1])).abs() < 1e-9);
+    assert!(b1[0] > n1[0], "beside the text");
+}
+
+#[test]
+fn shown_sketches_overlay_part_views() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let vid = drawing.sheets[0].views[0].id;
+    let (key, _) = views::view_source(&drawing.sheets[0], vid).unwrap();
+    let sketch = sources.get(&key).unwrap().context.sketches.first().map(|s| s.feature).expect("demo studio has a sketch");
+    let before = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
+    drawing.sheets[0].views[0].shown_sketches = vec![sketch];
+    let with_points = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
+    drawing.sheets[0].views[0].hide_sketch_points = true;
+    let without_points = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &cache, false).edges.len();
+    assert!(without_points > before, "sketch curves added: {before} -> {without_points}");
+    assert!(with_points > without_points, "sketch point crosses: {with_points} vs {without_points}");
+}
+
+#[test]
+fn bom_split_order_and_structured_rows() {
+    let (doc, mut drawing) = demo();
+    let asm = assembly_tab(&doc);
+    let si = drawing.add_sheet(0);
+    drawing.sheets[si].views.push(base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let src = &sources[&SourceKey::studio(asm)];
+    assert!(!src.bom_structured.is_empty(), "structured rows from the assembly BOM");
+    let data = |kind: TableKind, rows: Option<[usize; 2]>| {
+        let mut t = Table::new(1, kind, [410.0, 287.0]);
+        t.rows = rows;
+        tables::table_data(&drawing, &t, None, Some(src), None, &[], &|s| s.to_string())
+    };
+    let bom = |structured, bottom_to_top| TableKind::Bom { view: ViewId(1), structured, bottom_to_top, overrides: Vec::new() };
+    let all = data(bom(false, false), None);
+    assert!(all.rows.len() >= 2);
+    // A split part shows its rows only.
+    let tail = data(bom(false, false), Some([1, all.rows.len()]));
+    assert_eq!(tail.rows, all.rows[1..].to_vec());
+    // Bottom to top: rows reversed, header last.
+    let rev = data(bom(false, true), None);
+    assert!(rev.header_bottom && rev.rows.first() == all.rows.last());
+    assert_eq!(rev.all_rows().last().map(|r| r[0].as_str()), Some("ITEM"));
+    assert!(!data(bom(true, false), None).rows.is_empty());
+    // An override replaces the cell's value and is marked.
+    let item = all.rows[0][0].clone();
+    let over = data(TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: vec![(item, 2, "BRACKET".into())] }, None);
+    assert_eq!(over.rows[0][2], "BRACKET");
+    assert_eq!(over.overridden, vec![(0, 2)]);
+}
+
+#[test]
+fn grouped_callout_follows_its_annotation() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut s = Sheet::default();
+    let note = |p: [f64; 2]| Annotation { id: 1, kind: AnnotationKind::note("NOTE", 3.5), position: p, ..Default::default() };
+    let callout = Annotation { id: 2, kind: AnnotationKind::Balloon { view: ViewId(1), anchor: [0.0, 0.0], text: "7".into() }, position: [6.0, 4.0], group: Some(1), ..Default::default() };
+    let at = |s: &Sheet| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(s, &env);
+        let text = |t: &str| g.texts.iter().find(|x| x.text == t).map(|x| x.pos).unwrap();
+        (text("NOTE"), text("7"))
+    };
+    s.annotations = vec![note([50.0, 100.0]), callout.clone()];
+    let (n1, c1) = at(&s);
+    s.annotations = vec![note([90.0, 40.0]), callout];
+    let (n2, c2) = at(&s);
+    assert!(((c2[0] - c1[0]) - (n2[0] - n1[0])).abs() < 1e-9 && ((c2[1] - c1[1]) - (n2[1] - n1[1])).abs() < 1e-9);
+}
+
+#[test]
+fn center_of_mass_needs_a_material() {
+    let (mut doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    drawing.sheets[0].views[0].show_com = true;
+    let none = {
+        let sources = regenerate_sources(&doc, &drawing);
+        compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false).com
+    };
+    assert!(none.is_none(), "no material: no center of mass");
+    // Give the plate a material.
+    let sources = regenerate_sources(&doc, &drawing);
+    let (key, _) = views::view_source(&drawing.sheets[0], vid).unwrap();
+    let body = sources[&key].context.bodies[0].id.clone();
+    if let Some(TabContent::PartStudio(ps)) = doc.tabs.iter_mut().find(|t| t.id == key.tab).map(|t| &mut t.content) {
+        let p = ps.part_properties.entry(body).or_default();
+        p.material = Some("Aluminum 6061".into());
+        p.density = Some(2700.0);
+    }
+    let sources = regenerate_sources(&doc, &drawing);
+    let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
+    let c = g.com.expect("center of mass shown");
+    // A snap point at it, inside the view's extent.
+    assert!(g.snaps.iter().any(|s| s.p == c));
+    assert!(c[0] >= g.min[0] && c[0] <= g.max[0] && c[1] >= g.min[1] && c[1] <= g.max[1]);
 }

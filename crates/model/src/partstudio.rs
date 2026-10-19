@@ -77,6 +77,50 @@ pub struct PartProperties {
     /// Tessellation quality (Appearance dialog).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tessellation: Option<TessQuality>,
+    /// The other Properties fields (State, Vendor, Title 1…).
+    #[serde(default, skip_serializing_if = "ItemMeta::is_empty")]
+    pub meta: ItemMeta,
+}
+
+/// Onshape's release states (Properties › State; "In progress" by default).
+pub const RELEASE_STATES: [&str; 6] = ["In progress", "Pending", "Released", "Obsolete", "Rejected", "Discarded"];
+
+/// Metadata fields of Onshape's Properties dialog that parts and
+/// assemblies share (besides name, description, part number, revision).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ItemMeta {
+    /// Release state, `None` = "In progress".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_line: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title1: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title2: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title3: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not_revision_managed: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub exclude_from_bom: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit_of_measure: Option<String>,
+}
+
+impl ItemMeta {
+    pub fn is_empty(&self) -> bool {
+        *self == ItemMeta::default()
+    }
+
+    /// The release state shown in the instance list ("In progress").
+    pub fn state(&self) -> &str {
+        self.state.as_deref().unwrap_or(RELEASE_STATES[0])
+    }
 }
 
 /// Onshape's tessellation quality setting of a part.
@@ -162,6 +206,12 @@ pub struct PartStudio {
     /// Plane display sizes from "Size to Part Studio": (plane, half width, half height).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plane_sizes: Vec<(Reference, f64, f64)>,
+    /// Assembly contexts (Edit in context snapshots, see
+    /// [`crate::in_context`]) and the one shown (`None`: no context).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contexts: Vec<crate::in_context::AssemblyContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_context: Option<u32>,
 }
 
 /// A saved camera (renderer-independent).
@@ -195,6 +245,13 @@ impl PartStudio {
         self.features.iter_mut().find(|f| f.id == id)
     }
 
+    /// Upgrade feature parameters saved by older versions (run on load).
+    pub fn upgrade_saved_params(&mut self) {
+        for f in self.features.iter_mut().filter(|f| f.type_id == "cPlane") {
+            crate::features::core::upgrade_plane_params(&mut f.params);
+        }
+    }
+
     /// Effective number of evaluated features (rollback bar position).
     pub fn rollback_index(&self) -> usize {
         self.rollback.unwrap_or(self.features.len()).min(self.features.len())
@@ -218,7 +275,7 @@ impl PartStudio {
         let mut params = ParamValues::default();
         fill_defaults(&ty.params, &mut params, units);
         if type_id == "hole" {
-            features::hole_tables::init_new_hole(&mut params, units);
+            features::hole_tables::init_new_hole(&mut params);
         }
         Some(Feature {
             id: FeatureId::new_random(),
@@ -284,6 +341,9 @@ impl PartStudio {
             remap_ids(&mut v, &map);
             let Ok(mut copy) = serde_json::from_value::<Feature>(v) else { continue };
             copy.folder = None;
+            if copy.type_id == "cPlane" {
+                crate::features::core::upgrade_plane_params(&mut copy.params);
+            }
             if let Some(ty) = copy.feature_type()
                 && !copy.custom_name
             {

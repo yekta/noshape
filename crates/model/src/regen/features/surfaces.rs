@@ -17,7 +17,7 @@ use std::sync::Arc;
 pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("surfacesAndFaces");
     if refs.is_empty() {
-        return err("Select faces, surfaces or sketch regions to offset");
+        return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
     // (face, source name) pairs.
     let mut faces: Vec<(Shape, Name)> = Vec::new();

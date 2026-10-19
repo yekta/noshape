@@ -484,7 +484,23 @@ impl Render for HistoryPanel {
                 }
             }
         }
-        let nodes: Vec<(usize, f32, RowKind)> = placed.iter().map(|p| (p.row.lane, p.y + 13., p.row.kind)).collect();
+        // Releases: versions with a release package get a triangle (solid;
+        // with a dot when it contains an obsoletion).
+        let releases = crate::release_dialog::release_log(self.doc.read(cx));
+        let mut packages_at: HashMap<MicroversionId, Vec<noshape_model::release::Package>> = HashMap::new();
+        for v in &graph.versions {
+            for pkg in releases.at_version(&v.id.to_string()) {
+                packages_at.entry(v.microversion).or_default().push(pkg.clone());
+            }
+        }
+        let mark = |mv: &MicroversionId| -> u8 {
+            match packages_at.get(mv) {
+                Some(p) if p.iter().any(|p| p.kind == noshape_model::release::PackageKind::Obsoletion) => 2,
+                Some(_) => 1,
+                None => 0,
+            }
+        };
+        let nodes: Vec<(usize, f32, RowKind, u8)> = placed.iter().map(|p| (p.row.lane, p.y + 13., p.row.kind, if p.row.kind == RowKind::Version { mark(&p.row.mv) } else { 0 })).collect();
         let graph_canvas = canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
@@ -515,8 +531,24 @@ impl Render for HistoryPanel {
                     let t = i as f32 / 24. * std::f32::consts::TAU;
                     point(c.x + px(r * t.cos()), c.y + px(r * t.sin()))
                 }).collect::<Vec<_>>();
-                for &(l, y, kind) in &nodes {
+                for &(l, y, kind, release) in &nodes {
                     let c = pt(lane_x(l), y);
+                    if release > 0 {
+                        // Release ▲ (with a white dot: contains obsoletion).
+                        let mut f = PathBuilder::fill();
+                        f.add_polygon(&[point(c.x, c.y - px(6.)), point(c.x + px(6.), c.y + px(4.5)), point(c.x - px(6.), c.y + px(4.5))], true);
+                        if let Ok(path) = f.build() {
+                            window.paint_path(path, color(l));
+                        }
+                        if release == 2 {
+                            let mut f = PathBuilder::fill();
+                            f.add_polygon(&circle(point(c.x, c.y + px(1.)), 1.6), true);
+                            if let Ok(path) = f.build() {
+                                window.paint_path(path, rgb(0xffffff));
+                            }
+                        }
+                        continue;
+                    }
                     match kind {
                         RowKind::Workspace(_) => {
                             let mut f = PathBuilder::fill();
@@ -575,6 +607,7 @@ impl Render for HistoryPanel {
                 _ => this.view_mv(Some(mv), cx),
             });
             let (v, d, cur) = (view.clone(), doc.clone(), current_name.clone());
+            let row_packages = if r.kind == RowKind::Version { packages_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
             let row = if pl.change {
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
@@ -636,7 +669,21 @@ impl Render for HistoryPanel {
                     )
                     .child(v_flex().pl(px(3.)).flex_1().min_w_0().child(div().truncate().child(r.author.clone())).child(div().truncate().child(history_time(r.time))))
             };
-            let row = row.on_click(open).os_context_menu(move |m, _, _| {
+            let row = row.on_click(open).os_context_menu(move |m, window, cx| {
+                // Releases ▸ <name> [Released] (opens Review Release).
+                let m = if row_packages.is_empty() {
+                    m
+                } else {
+                    let (pk, dr) = (row_packages.clone(), d.clone());
+                    m.submenu("Releases", window, cx, move |mut sm, _, _| {
+                        for p in pk.clone() {
+                            let dr = dr.clone();
+                            let state = if p.kind == noshape_model::release::PackageKind::Obsoletion { "Obsolete" } else { "Released" };
+                            sm = sm.item(crate::os_menu::OsMenuItem::new(format!("{} [{state}]", p.name)).on_click(move |_, window, cx| crate::release_dialog::open_review(dr.clone(), &p, window, cx)));
+                        }
+                        sm
+                    })
+                };
                 let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v.clone());
                 let (name1, name2, cur1) = (name.clone(), name.clone(), cur.clone());
                 let d1 = d.clone();
@@ -674,6 +721,16 @@ impl Render for HistoryPanel {
                     .gap(px(4.))
                     .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Versions and history"))
                     .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
+                    // Release management: a candidate with the active tab's objects
+                    // (Release__typical_release_workflow).
+                    .child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").on_click({
+                        let doc = self.doc.clone();
+                        move |_, window, cx| {
+                            let tab = doc.read(cx).session.active_tab;
+                            let items = tab.map(|t| crate::release_dialog::tab_items(doc.read(cx), t)).unwrap_or_default();
+                            crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
+                        }
+                    }))
                     .child(crate::ui::icon_button("hist-compare", "compare", 30., false, cx).tooltip("Compare with the workspace").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(r) = this.graph(cx).versions.last().map(|v| (v.microversion, v.name.clone())) {
                             this.compare_with_current(r.0, r.1, cx);
@@ -740,7 +797,10 @@ impl Render for HistoryPanel {
                             .gap(px(18.))
                             .child(legend_item(div().size(px(11.)).rounded_full().border_2().border_color(pal.accent).into_any_element(), "Workspace", false))
                             .child(legend_item(dot(4.5), "Version", false))
-                            .child(legend_item(dot(2.5), "Change", true)),
+                            .child(legend_item(dot(2.5), "Change", true))
+                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("△").into_any_element(), "Release candidate", false))
+                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("▲").into_any_element(), "Release", false))
+                            .child(legend_item(div().text_size(px(13.)).text_color(pal.accent).child("◭").into_any_element(), "Contains obsoletion", false)),
                     )
                     .child(legend_item(crate::assets::icon("auto-version", 18., cx), "Automatic version", false)),
             )

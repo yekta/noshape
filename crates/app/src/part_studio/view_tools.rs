@@ -12,156 +12,20 @@ use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::features;
 use noshape_model::reference::FeatureId;
-
-/// Shortcut sheet content (Onshape-compatible defaults).
-/// Keys, action, locked.
-type ShortcutRow = (&'static str, &'static str, bool);
-
-/// Onshape's keyboard shortcut sheet (live capture, dom/keyboard-shortcuts.txt):
-/// tab, then (keys, action, locked = not customizable in Onshape).
-pub(super) const SHORTCUT_TABS: &[(&str, &[ShortcutRow])] = &[
-    ("General", &[
-        ("shift enter", "Accept & repeat command", true),
-        ("enter", "Accept command", true),
-        ("escape", "Cancel", true),
-        ("space", "Clear selection", true),
-        ("ctrl/cmd c", "Copy", true),
-        ("shift c", "Curve/surface analysis", false),
-        ("delete / backspace", "Delete selection", true),
-        ("shift d", "Dihedral analysis", false),
-        ("ctrl/cmd shift f", "FeatureScript search", true),
-        ("ctrl u", "Feedback/Report a bug", true),
-        ("a", "Flip primary axis", false),
-        ("k", "Hide/show mate connectors", false),
-        ("shift /", "Keyboard shortcuts", false),
-        ("shift", "Lock mate inference", true),
-        ("ctrl m", "Mate connector", false),
-        ("[", "Measure", false),
-        ("ctrl/cmd click", "Open in new tab", true),
-        ("shift click", "Open in new window", true),
-        ("ctrl/cmd v", "Paste", true),
-        ("ctrl space", "Quick tab switching", true),
-        ("ctrl y / shift cmd z", "Redo", true),
-        ("shift n", "Rename selection", false),
-        ("q", "Reorient secondary axis", false),
-        ("alt/⌥ c", "Search tools", false),
-        ("`", "Select other", false),
-        ("s", "Shortcut toolbars", true),
-        ("alt/⌥ t", "Tab manager", false),
-        ("ctrl/cmd z", "Undo", true),
-    ]),
-    ("Part Studio", &[
-        ("shift e", "Extrude", false),
-        ("shift f", "Fillet", false),
-        ("shift h", "Hide/show sketches", false),
-        ("select rollback bar ↑ ↓", "Move rollback bar", true),
-        ("shift w", "Revolve", false),
-        ("shift s", "Sketch", false),
-    ]),
-    ("Assembly", &[
-        ("j", "Hide/show mates", false),
-        ("i", "Insert dialog", false),
-        ("m", "Mate", false),
-        ("h", "Show mates mode", false),
-        ("shift s", "Snap mode", false),
-    ]),
-    ("3D view", &[
-        ("shift 2", "Back view", false),
-        ("shift 6", "Bottom view", false),
-        ("shift ← → ↑ ↓", "Coarse rotate", true),
-        ("shift 1", "Front view", false),
-        ("shift p", "Hide all construction", false),
-        ("y", "Hide selected parts", false),
-        ("p", "Hide/show planes", false),
-        ("shift 7", "Isometric view", false),
-        ("shift 3", "Left view", false),
-        ("shift i", "Make isolate", false),
-        ("shift t", "Make transparent", false),
-        ("shift v", "Named view", false),
-        ("ctrl shift ← → ↑ ↓", "Pan", true),
-        ("ctrl ← → ↑ ↓", "Precision rotate", true),
-        ("shift 4", "Right view", false),
-        ("← → ↑ ↓", "Rotate", true),
-        ("shift x", "Section view", false),
-        ("alt/⌥ click", "Select through transparent", true),
-        ("shift y", "Show selected parts", false),
-        ("shift 5", "Top view", false),
-        ("shift r", "View in high quality", false),
-        ("n", "View normal to", false),
-        ("shift z", "Zoom in", false),
-        ("z", "Zoom out", false),
-        ("f", "Zoom to fit", false),
-        ("w", "Zoom to window", false),
-    ]),
-    ("Sketch", &[
-        ("a", "3 point arc", false),
-        ("c", "Center point circle*", false),
-        ("r", "Center point rectangle*", false),
-        ("i", "Coincident*", false),
-        ("shift o", "Concentric", false),
-        ("g", "Corner rectangle*", false),
-        ("shift u", "Curvature", false),
-        ("d", "Dimension*", false),
-        ("e", "Equal", false),
-        ("x", "Extend", false),
-        ("shift j", "Fix", false),
-        ("h", "Horizontal*", false),
-        ("l", "Line*", false),
-        ("shift a", "Line/tangent arc switch", false),
-        ("shift m", "Midpoint", false),
-        ("shift k", "Normal", false),
-        ("o", "Offset", false),
-        ("b", "Parallel*", false),
-        ("shift l", "Perpendicular*", false),
-        ("shift g", "Pierce", false),
-        ("shift s", "Point", false),
-        ("shift f", "Sketch fillet", false),
-        ("shift", "Suppress inferencing", true),
-        ("shift q", "Symmetric", false),
-        ("t", "Tangent*", false),
-        ("q", "Toggle construction", false),
-        ("m", "Trim*", false),
-        ("u", "Use", false),
-        ("v", "Vertical*", false),
-    ]),
-    ("Feature Studio", &[
-        ("ctrl/cmd [", "Back reference", true),
-        ("ctrl/cmd s", "Commit", true),
-        ("ctrl/cmd shift s", "Commit all", true),
-        ("escape", "Dismiss autocomplete", true),
-        ("ctrl/cmd ]", "Forward reference", true),
-        ("ctrl/cmd shift o", "Top level symbols dropdown", true),
-    ]),
-    ("Drawing", &[
-        ("alt/⌥ lmb drag", "Copy annotation", true),
-        ("shift d", "Diameter dimension", false),
-        ("ctrl s", "Display sheet menu", false),
-        ("home", "First sheet", false),
-        ("shift h", "Foreshorten dimension", false),
-        ("end", "Last sheet", false),
-        ("ctrl m", "Max/min dimension", false),
-        ("page down", "Next sheet", false),
-        ("n", "Note", false),
-        ("page up", "Previous sheet", false),
-        ("p", "Projected view", false),
-        ("shift q", "Quad & mid snap point", false),
-        ("shift r", "Radial dimension", false),
-        ("ctrl q", "Update drawing", false),
-    ]),
-];
-
-/// Shortcut rows matching a search (key or description, case-insensitive).
-pub(super) fn shortcut_matches(key: &str, what: &str, query: &str) -> bool {
-    let q = query.trim().to_lowercase();
-    q.is_empty() || key.to_lowercase().contains(&q) || what.to_lowercase().contains(&q)
-}
+use crate::shortcuts::{self, KeyStyle, SheetRow, Tab};
 
 #[derive(Clone)]
 pub(super) enum PaletteItem {
     Feature(&'static str),
     /// A sketch tool (only while a sketch is open).
     SketchTool(crate::sketch_mode::Tool),
+    /// A Part Studio command that is not a feature ([`COMMANDS`]).
+    Command(usize),
 }
+
+/// Part Studio commands in tool search besides the features: (name, icon,
+/// description). Analysis tools are not searchable (live behaviours.md).
+const COMMANDS: [(&str, &str, &str); 1] = [("Assign material", "material", "Assign a material from a material library, or a custom material, to the selected parts.")];
 
 impl PartStudioView {
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -272,6 +136,14 @@ impl PartStudioView {
                 found.push(((f, span, order), PaletteItem::Feature(t.id)));
             }
         }
+        if self.sketch.is_none() {
+            for (i, (name, ..)) in COMMANDS.iter().enumerate() {
+                order += 1;
+                if let Some((f, span)) = score(name) {
+                    found.push(((f, span, order), PaletteItem::Command(i)));
+                }
+            }
+        }
         found.sort_by_key(|(k, _)| *k);
         found.into_iter().map(|(_, i)| i).collect()
     }
@@ -281,6 +153,20 @@ impl PartStudioView {
         match item {
             PaletteItem::Feature(id) => self.start_feature(id, window, cx),
             PaletteItem::SketchTool(t) => self.activate_tool(t, window, cx),
+            PaletteItem::Command(_) => {
+                // Assign material: the parts of the selection.
+                let mut bodies: Vec<noshape_model::BodyId> = Vec::new();
+                for r in &self.selection {
+                    if let Some(b) = self.body_of(r).filter(|b| !bodies.contains(b)) {
+                        bodies.push(b);
+                    }
+                }
+                if bodies.is_empty() {
+                    self.flash_info("Select parts to assign a material to.".into(), cx);
+                } else {
+                    self.open_material_panel(bodies, window, cx);
+                }
+            }
         }
         cx.notify();
     }
@@ -303,6 +189,10 @@ impl PartStudioView {
                     (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), crate::tool_text::description(id).or(t.map(|t| t.description)).unwrap_or_default().to_string())
                 }
                 PaletteItem::SketchTool(t) => (t.icon().into(), sketch_tool_name(*t).to_string(), None, String::new()),
+                PaletteItem::Command(i) => {
+                    let (name, icon, desc) = COMMANDS[*i];
+                    (icon.into(), name.to_string(), None, desc.to_string())
+                }
             }
         };
         let chip = |t: &str| div().px(px(3.)).h(px(18.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).text_size(px(11.)).text_color(pal.text).child(t.to_string());
@@ -434,42 +324,44 @@ impl PartStudioView {
         let pal = p();
         let query = self.ui.shortcut_query.clone();
         let search = self.ui.shortcut_filter.as_ref().map(|(st, _)| st.clone());
-        let tab = self.ui.shortcut_tab.min(SHORTCUT_TABS.len() - 1);
-        let chip = |k: &str| div().h(px(24.)).px(px(5.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0x999999)).rounded(px(2.)).text_size(px(13.)).text_color(pal.text).child(k.to_string());
-        let keys_el = |keys: &str| {
+        let tab = self.ui.shortcut_tab.min(Tab::SHEET.len() - 1);
+        // Keys as chips (`span.key`); customized blue, disabled struck through.
+        let keys_el = |r: &SheetRow| {
             let mut row = h_flex().gap(px(4.)).justify_end();
-            let rest = match keys.strip_prefix("select rollback bar ") {
-                Some(r) => {
-                    row = row.child(div().text_size(px(13.)).text_color(pal.text).child("select rollback bar"));
-                    r
+            if let Some(prefix) = r.prefix {
+                row = row.child(div().text_size(px(14.)).text_color(pal.text).child(prefix));
+            }
+            for (i, group) in r.keys.iter().enumerate() {
+                if i > 0 {
+                    row = row.child(div().px(px(2.)).text_size(px(16.)).text_color(pal.text).child("/"));
                 }
-                None => keys,
-            };
-            let tokens: Vec<&str> = rest.split(' ').filter(|k| !k.is_empty()).collect();
-            for (i, k) in tokens.iter().enumerate() {
-                // "/" between two key groups separates alternatives; at the end it is the key.
-                let separator = *k == "/" && i > 0 && i + 1 < tokens.len();
-                row = if separator { row.child(div().px(px(2.)).text_size(px(16.)).text_color(pal.text).child("/")) } else { row.child(chip(k)) };
+                for k in group {
+                    row = row.child(crate::preferences_window::key_chip(k.clone(), r.style));
+                }
             }
             row
         };
-        let rows: Vec<ShortcutRow> = if query.trim().is_empty() {
-            let mut r: Vec<_> = SHORTCUT_TABS[tab].1.to_vec();
-            r.sort_by_key(|(_, a, _)| a.to_lowercase());
-            r
-        } else {
-            SHORTCUT_TABS.iter().flat_map(|(_, r)| r.iter().copied()).filter(|(k, a, _)| shortcut_matches(k, a, &query)).collect()
-        };
-        let body = rows.into_iter().map(|(k, a, locked)| {
+        let custom = shortcuts::current();
+        let rows: Vec<SheetRow> = if query.trim().is_empty() { shortcuts::sheet_rows(&custom, Tab::SHEET[tab]) } else { shortcuts::sheet_search(&custom, &query) };
+        let body = rows.into_iter().map(|r| {
             h_flex()
                 .w(px(560.))
                 .h(px(39.))
                 .flex_none()
                 .gap(px(14.))
-                .child(div().w(px(273.)).flex_none().child(keys_el(k)))
-                .child(h_flex().flex_1().gap_1().text_size(px(14.)).text_color(pal.text).child(a.to_string()).when(locked, |d| d.child(crate::assets::icon("lock", 14., cx))))
+                .child(div().w(px(273.)).flex_none().child(keys_el(&r)))
+                .child(
+                    h_flex()
+                        .flex_1()
+                        .gap_1()
+                        .text_size(px(14.))
+                        .text_color(pal.text)
+                        .child(r.name)
+                        .when(r.locked, |d| d.child(crate::assets::icon("lock", 14., cx)))
+                        .when(r.conflict, |d| d.child(crate::assets::icon("shortcut-conflict", 16., cx))),
+                )
         });
-        let tabs = SHORTCUT_TABS.iter().enumerate().map(|(i, (name, _))| {
+        let tabs = Tab::SHEET.iter().enumerate().map(|(i, t)| {
             let on = i == tab && query.trim().is_empty();
             div()
                 .id(SharedString::from(format!("sc-tab-{i}")))
@@ -479,29 +371,37 @@ impl PartStudioView {
                 .text_size(px(14.))
                 .text_color(if on { pal.accent } else { pal.text })
                 .when(on, |d| d.border_b_2().border_color(pal.accent))
-                .child(*name)
+                .child(t.label())
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.ui.shortcut_tab = i;
                     cx.notify();
                 }))
         });
-        let legend_chip = |t: &str, color: Rgba, strike: bool| div().px(px(4.)).border_1().border_color(color).text_size(px(13.)).text_color(pal.text).when(strike, |d| d.line_through().text_color(pal.text_faint)).child(t.to_string());
+        let chip = |style| crate::preferences_window::key_chip("example", style);
         let legend = h_flex()
-            .gap(px(8.))
+            .gap(px(5.))
             .px(px(8.))
             .py(px(6.))
             .border_1()
-            .border_color(pal.border_strong)
-            .text_size(px(13.))
+            .border_color(pal.text)
+            .rounded(px(3.))
+            .text_size(px(14.))
             .text_color(pal.text)
-            .child(legend_chip("example", pal.accent, false))
+            .child(chip(KeyStyle::Customized))
             .child("Customized")
-            .child(legend_chip("example", gpui_kit::rgb(0x999999), false))
+            .child(div().w(px(12.)))
+            .child(chip(KeyStyle::Default))
             .child("Onshape default")
-            .child(legend_chip("example", gpui_kit::rgb(0x999999), true))
+            .child(div().w(px(12.)))
+            .child(chip(KeyStyle::Disabled))
             .child("Disabled")
-            .child(crate::assets::icon("lock", 14., cx))
+            .child(div().w(px(12.)))
+            .child(crate::assets::icon("lock", 16., cx))
             .child("Onshape controlled")
+            .child(div().w(px(12.)))
+            .child(crate::assets::icon("shortcut-conflict", 18., cx))
+            .child("Has conflict")
+            .child(div().w(px(12.)))
             .child("* applies in drawing sketches");
         Some(
             div()
@@ -551,10 +451,9 @@ impl PartStudioView {
                                         .text_color(pal.accent)
                                         .cursor_pointer()
                                         .child("Customize keyboard shortcuts")
-                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                            this.toggle_shortcut_sheet(window, cx);
-                                            this.open_sketch_shortcuts(window, cx);
-                                        })),
+                                        // Onshape opens the account Preferences page (a new tab)
+                                        // at Keyboard shortcuts; the sheet stays open here.
+                                        .on_click(|_: &ClickEvent, _, cx| crate::preferences_window::show(crate::preferences_window::Page::KeyboardShortcuts, cx)),
                                 )
                                 .child(div().flex_1())
                                 .children(search.map(|st| div().w(px(198.)).child(Input::new(&st).small())))
@@ -782,15 +681,14 @@ mod tests {
     use std::prelude::v1::test;
 
     #[test]
-    fn shortcut_search_matches_keys_and_descriptions() {
-        assert!(shortcut_matches("Shift+I", "Isolate", "isol"));
-        assert!(shortcut_matches("Shift+I", "Isolate", "shift+i"));
-        assert!(shortcut_matches("W", "Zoom to window", ""));
-        assert!(!shortcut_matches("W", "Zoom to window", "fillet"));
-        // Every shortcut the Part Studio binds is listed.
-        let all: Vec<&str> = SHORTCUT_TABS.iter().flat_map(|(_, r)| r.iter().map(|(k, _, _)| *k)).collect();
+    fn shortcut_sheet_lists_every_part_studio_key() {
+        let s = shortcuts::Shortcuts::default();
+        let keys: Vec<String> = Tab::SHEET.iter().flat_map(|t| shortcuts::sheet_rows(&s, *t)).flat_map(|r| r.keys.into_iter().map(|g| g.join(" "))).collect();
         for k in ["y", "shift y", "shift i", "shift t", "w", "s", "`", "[", "shift p"] {
-            assert!(all.contains(&k), "{k} missing from the shortcut sheet");
+            assert!(keys.iter().any(|x| x == k), "{k} missing from the shortcut sheet");
         }
+        assert!(shortcuts::sheet_search(&s, "isol").iter().any(|r| r.name == "Make isolate"));
+        assert!(shortcuts::sheet_search(&s, "shift+i").iter().any(|r| r.name == "Make isolate"));
+        assert!(!shortcuts::sheet_search(&s, "fillet").iter().any(|r| r.name == "Zoom to window"));
     }
 }

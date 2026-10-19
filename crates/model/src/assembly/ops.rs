@@ -408,7 +408,7 @@ impl Assembly {
         let pos = self.instances.iter().position(|i| moved.contains(&i.id)).unwrap_or(self.instances.len());
         self.instances.retain(|i| !moved.contains(&i.id));
         let name = self.next_instance_name(sub_name);
-        let inst = Instance { id: sub_id, name, source: super::InstanceSource::Assembly { assembly: sub_tab }, placement: Placement::default(), fixed: any_fixed, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false };
+        let inst = Instance { id: sub_id, name, source: super::InstanceSource::Assembly { assembly: sub_tab, config: Default::default() }, placement: Placement::default(), fixed: any_fixed, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None };
         self.instances.insert(pos.min(self.instances.len()), inst);
         (sub, sub_id)
     }

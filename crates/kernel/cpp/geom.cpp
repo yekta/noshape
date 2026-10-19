@@ -456,10 +456,7 @@ static PropsF to_props(const GProp_GProps& g)
 PropsF props_volume(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  GProp_GProps g;
-  // Adaptive integration (relative error 1e-7): accurate on B-spline geometry.
-  BRepGProp::VolumeProperties(s.shape, g, 1e-7, true);
-  return to_props(g);
+  return to_props(volume_props(s.shape));
 }
 
 PropsF props_surface(const OcShape& s)

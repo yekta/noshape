@@ -5,38 +5,16 @@ use super::PartStudioView;
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
-use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::dialog::{DialogAction, DialogClose, DialogFooter};
-use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
-use noshape_model::partstudio::{Appearance, PartProperties};
+use noshape_model::partstudio::PartProperties;
 use noshape_model::reference::{BodyId, FeatureId, Reference};
 use noshape_model::regen::measure::{self, Measurement};
 use noshape_render::StandardView;
 use noshape_units::{Dim, Quantity};
-
-/// Common materials with densities (kg/m³).
-pub const MATERIALS: &[(&str, f64)] = &[
-    ("Steel", 7850.0),
-    ("Stainless steel", 8000.0),
-    ("Aluminum 6061", 2700.0),
-    ("Titanium Ti-6Al-4V", 4430.0),
-    ("Brass", 8500.0),
-    ("Copper", 8960.0),
-    ("ABS", 1040.0),
-    ("PLA", 1240.0),
-    ("PETG", 1270.0),
-    ("Nylon", 1150.0),
-    ("Acrylic", 1180.0),
-    ("Oak", 750.0),
-    ("Plywood", 600.0),
-];
-
-const SWATCHES: &[u32] = &[0xb8bec9, 0x9fb7d6, 0xd6b89f, 0xa7cfae, 0xcfa7c7, 0xd6d29f, 0x9fd3d6, 0xc9a9a9, 0x5d6470, 0x2f3540, 0xe0e3e8, 0xd9534f];
 
 /// A context menu entry's action on the view.
 type MenuAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
@@ -88,6 +66,8 @@ impl PartStudioView {
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let paste_sketch = Self::clipboard_has_sketch(cx);
+        // Shown sketches besides the clicked one's (sketch region menus).
+        let other_sketches_shown = self.display.sketches.iter().filter(|s| !s.hidden && Some(s.feature) != creator).count() > 0;
         // Faces the appearance entry applies to: the selected faces plus this one.
         let mut faces = self.selected_faces();
         if let Some(r @ Reference::Face(_)) = &target_ref
@@ -113,11 +93,21 @@ impl PartStudioView {
                     this.start_feature(tool_id, w, cx);
                 }))
             };
+            let plain_tool = |label: &str, tool_id: &'static str, r: &Reference| {
+                let r = r.clone();
+                item(label, Box::new(move |this, w, cx| {
+                    this.selection = vec![r.clone()];
+                    this.start_feature(tool_id, w, cx);
+                }))
+            };
             let select_menu = |m: OsMenu, r: &Reference, k: PickKind, window: &mut Window, cx: &mut Context<OsMenu>| -> OsMenu {
                 // Select ▸ grows the entity into related ones; Select other… lists what is under the cursor.
                 let criteria: &[noshape_model::select::Criterion] = match k {
                     PickKind::Face => &noshape_model::select::Criterion::FACE,
-                    PickKind::Edge => &noshape_model::select::Criterion::EDGE,
+                    PickKind::Edge => &noshape_model::select::Criterion::SKETCH_EDGE,
+                    // Live: a region gets the face set, a line or circle the sketch edge set.
+                    PickKind::SketchRegion => &noshape_model::select::Criterion::FACE,
+                    PickKind::SketchCurve => &noshape_model::select::Criterion::SKETCH_EDGE,
                     _ => &[],
                 };
                 let mut m = m;
@@ -131,15 +121,11 @@ impl PartStudioView {
                                 this.select_related(&r, c, cx);
                             })));
                         }
-                        let (v, r9) = (vs.clone(), rs.clone());
-                        sm.separator().item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                        let v = vs.clone();
+                        sm.item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            // Live: the right-clicked entity is not pre-filled.
                             this.close_context_menu(cx);
-                            if !this.selection.contains(&r9) {
-                                this.selection.push(r9.clone());
-                            }
-                            this.ui.create_selection = true;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
+                            this.open_create_selection_at(this.ui.menu_pos, cx);
                         })))
                     });
                 }
@@ -178,6 +164,10 @@ impl PartStudioView {
                         m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx)))).separator();
                     }
                     m = m.item(tool("New sketch…", "sketch", "sketch", &r)).item(tool("Offset plane…", "plane", "cPlane", &r));
+                    if matches!(r, Reference::Plane(_)) {
+                        let rz = r.clone();
+                        m = m.item(item("Size to Part Studio", Box::new(move |this, _, cx| this.size_plane_to_studio(rz.clone(), cx))));
+                    }
                     if paste_sketch {
                         let rp = r.clone();
                         m = m.item(item("Paste sketch", Box::new(move |this, _, cx| this.paste_sketch_onto(rp.clone(), cx))));
@@ -185,7 +175,7 @@ impl PartStudioView {
                     let (rh, ro, rs) = (r.clone(), r.clone(), r.clone());
                     m = m
                         .separator()
-                        .item(item(&format!("Hide {plane_name}"), Box::new(move |this, _, cx| {
+                        .item(icon_item(&format!("Hide {plane_name}"), "eye-off", Box::new(move |this, _, cx| {
                             this.set_visibility(std::slice::from_ref(&rh), true, cx);
                             this.hover = None;
                         })))
@@ -198,8 +188,13 @@ impl PartStudioView {
                 // Sketch regions, curves and points (live: region and curve menus).
                 (Some(r), Some(k @ (PickKind::SketchRegion | PickKind::SketchCurve | PickKind::SketchPoint))) => {
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+                        // Curves: Copy sketch entities (live order).
+                        if let (PickKind::SketchCurve, Reference::SketchEntity { entity, .. }) = (k, &r) {
+                            let entity = *entity;
+                            m = m.item(item("Copy sketch entities", Box::new(move |this, _, cx| this.copy_sketch_entities(id, entity, cx))));
+                        }
                         m = m
-                            .item(icon_item(&format!("Edit {name}…"), "sketch", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))))
                             .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(id, w, cx))))
                             .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
                                 this.ui.dependencies = Some(id);
@@ -208,13 +203,25 @@ impl PartStudioView {
                             .separator();
                     }
                     if k == PickKind::SketchRegion {
-                        m = m.item(tool("Extrude…", "extrude", "extrude", &r)).item(tool("Revolve…", "revolve", "revolve", &r)).separator();
+                        m = m
+                            .item(tool("New sketch…", "sketch", "sketch", &r))
+                            .item(tool("Offset plane…", "plane", "cPlane", &r))
+                            .item(tool("Extrude…", "extrude", "extrude", &r))
+                            .item(tool("Revolve…", "revolve", "revolve", &r))
+                            .separator();
                     }
                     let rh = r.clone();
                     m = m.item(icon_item("Hide", "eye-off", Box::new(move |this, _, cx| {
                         this.set_visibility(std::slice::from_ref(&rh), true, cx);
                         this.hover = None;
                     })));
+                    // Live: Hide other sketches, Hide all sketches, when other
+                    // sketches are shown (a lone sketch only has Hide).
+                    if other_sketches_shown {
+                        m = m
+                            .item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(creator, cx))))
+                            .item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
+                    }
                     if k == PickKind::SketchCurve {
                         let rc = r.clone();
                         m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
@@ -227,12 +234,19 @@ impl PartStudioView {
                         let rs = r.clone();
                         m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))));
                         if let Some(id) = creator {
-                            m = m.separator().item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
+                            // Live: Create Drawing of Sketch N…, Export as DXF/DWG… (a sketch view; asb).
+                            let sk_name = creator_name.clone().unwrap_or_else(|| "Sketch".into());
+                            m = m.separator().item(icon_item(&format!("Create Drawing of {sk_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))));
+                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
                         }
                     }
                     m = select_menu(m.separator(), &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
                     if k == PickKind::SketchRegion {
                         m = m.item(normal_to(&r));
+                    } else if k == PickKind::SketchCurve && linear_edge {
+                        // Straight sketch lines (live curve menu).
+                        let ra = r.clone();
+                        m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
                     }
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m
@@ -271,7 +285,8 @@ impl PartStudioView {
                         }
                         m = m.separator();
                     } else if k == PickKind::Edge {
-                        m = m.item(tool("Fillet…", "fillet", "fillet", &r)).item(tool("Chamfer…", "chamfer", "chamfer", &r)).separator();
+                        // Live (menus/rmb-ps-edge): no icons on these two.
+                        m = m.item(plain_tool("Fillet…", "fillet", &r)).item(plain_tool("Chamfer…", "chamfer", &r)).separator();
                     }
                     if let Some(b) = body.clone() {
                         let (b1, b2, b3, b4) = (b.clone(), b.clone(), b.clone(), b.clone());
@@ -299,14 +314,16 @@ impl PartStudioView {
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
                             })));
-                        let rs = r.clone();
-                        m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
-                            if this.frame_of_ref(&rs).is_some() {
-                                this.section_through(rs.clone(), w, cx);
-                            } else {
-                                this.section_part(&b4, w, cx);
-                            }
-                        })));
+                        if k != PickKind::Edge {
+                            let rs = r.clone();
+                            m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
+                                if this.frame_of_ref(&rs).is_some() {
+                                    this.section_through(rs.clone(), w, cx);
+                                } else {
+                                    this.section_part(&b4, w, cx);
+                                }
+                            })));
+                        }
                         // Copy the part (paste derives it in another Part Studio).
                         let bc = b.clone();
                         m = m.separator().item(icon_item(&format!("Copy {body_name}"), "menu-copy", Box::new(move |this, _, cx| this.copy_part(bc.clone(), cx))));
@@ -315,10 +332,10 @@ impl PartStudioView {
                         m = m
                             .separator()
                             .item(icon_item(&format!("Create Drawing of {body_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| {
-                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default() });
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default(), sketch: None });
                                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
                             })));
-                        if k == PickKind::Face && planar {
+                        if k == PickKind::Face && planar && faces.len() <= 1 {
                             let rf = r.clone();
                             m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_face(rf.clone(), w, cx))));
                         }
@@ -358,29 +375,27 @@ impl PartStudioView {
                         let (b1, b2) = (b.clone(), b.clone());
                         m = m
                             .separator()
-                            .item(item(&format!("Assign material for {body_name}…"), Box::new(move |this, w, cx| this.open_part_properties(b1.clone(), w, cx))))
+                            .item(item(&format!("Assign material for {body_name}…"), Box::new(move |this, w, cx| this.open_material_panel(vec![b1.clone()], w, cx))))
                             .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
                         if k == PickKind::Face {
                             let fs = faces.clone();
                             let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
-                            m = m.item(icon_item(&label, "appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
+                            m = m.item(icon_item(&label, "add-appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
                         }
                     }
                 }
                 // Empty space.
                 _ => {
                     m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx)))).separator();
-                    // Select ▸ everything of a kind (the live capture didn't open this submenu).
+                    // Select ▸ with nothing selected: only Create selection…
+                    // (live menus/rmb-sketch-empty-select-submenu.png).
                     let vs = v.clone();
-                    m = m.submenu("Select", window, cx, move |mut sm, _, _| {
-                        for (label, kind) in [("All parts", 0u8), ("All surfaces", 1), ("All sketches", 2), ("All planes", 3), ("All mate connectors", 4)] {
-                            let v = vs.clone();
-                            sm = sm.item(OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| {
-                                this.close_context_menu(cx);
-                                this.select_all_of(kind, cx);
-                            })));
-                        }
-                        sm
+                    m = m.submenu("Select", window, cx, move |sm, _, _| {
+                        let v = vs.clone();
+                        sm.item(OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            this.open_create_selection_at(this.ui.menu_pos, cx);
+                        })))
                     });
                     if has_selection {
                         m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
@@ -431,7 +446,8 @@ impl PartStudioView {
     }
 
     pub(super) fn close_context_menu(&mut self, cx: &mut Context<Self>) {
-        if self.context_menu.take().is_some() {
+        if let Some((pos, _, _)) = self.context_menu.take() {
+            self.ui.menu_pos = pos;
             if self.ui.menu_target.take().is_some() {
                 self.refresh_scene(false, cx);
             }
@@ -469,128 +485,70 @@ impl PartStudioView {
         });
     }
 
-    pub(super) fn open_part_properties(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {
-        let current = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
-        let name = cx.new(|cx| InputState::new(window, cx).default_value(current));
-        let view = cx.entity();
+    /// Parts list › Properties…: Onshape's metadata Properties modal
+    /// (live dom/dialog-assembly-part-properties.txt, "Onshape Part").
+    pub(super) fn open_part_meta(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::properties_dialog::{MetaSpec, MetaValues};
         let props = self.studio(cx).and_then(|s| s.part_properties.get(&body).cloned()).unwrap_or_default();
-        // Part number / revision (parts list properties) and mass override.
-        let part_no = cx.new(|cx| InputState::new(window, cx).default_value(props.part_number.clone().unwrap_or_default()));
-        let revision = cx.new(|cx| InputState::new(window, cx).default_value(props.revision.clone().unwrap_or_default()));
-        let mass = cx.new(|cx| InputState::new(window, cx).placeholder("computed from material").default_value(props.mass_override.map(|m| format!("{m}")).unwrap_or_default()));
-        let pal = p();
-        window.open_dialog(cx, move |dialog, _, _| {
-            let v = view.clone();
-            let b = body.clone();
-            let name2 = name.clone();
-            let (pn2, rv2, ms2) = (part_no.clone(), revision.clone(), mass.clone());
-            let swatches = SWATCHES.iter().map(|hex| {
-                let v = view.clone();
-                let b = body.clone();
-                let hex = *hex;
-                div()
-                    .id(SharedString::from(format!("sw-{hex:x}")))
-                    .size(px(22.))
-                    .rounded_md()
-                    .bg(rgb(hex))
-                    .border_1()
-                    .border_color(pal.border_strong)
-                    .cursor_pointer()
-                    .on_click(move |_, _, cx| {
-                        v.update(cx, |this, cx| this.edit_part_props(&b, "Change appearance", cx, |p| p.appearance = Some(Appearance { color: crate::theme::lin(hex) })));
-                    })
-            });
-            let materials = MATERIALS.iter().map(|(m, rho)| {
-                let v = view.clone();
-                let b = body.clone();
-                let selected = props.material.as_deref() == Some(*m);
-                let m2 = m.to_string();
-                let rho = *rho;
-                Button::new(SharedString::from(format!("mat-{m}")))
-                    .label(*m)
-                    .xsmall()
-                    .when_selected(selected)
-                    .on_click(move |_, _, cx| {
-                        let m3 = m2.clone();
-                        v.update(cx, |this, cx| this.edit_part_props(&b, "Assign material", cx, |p| {
-                            p.material = Some(m3);
-                            p.density = Some(rho);
-                        }));
-                    })
-            });
-            dialog
-                .title("Part properties")
-                .w(px(460.))
-                .child(
-                    v_flex()
-                        .gap_3()
-                        .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Name")).child(Input::new(&name)))
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(v_flex().flex_1().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Part number")).child(Input::new(&part_no)))
-                                .child(v_flex().flex_1().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Revision")).child(Input::new(&revision)))
-                                .child(v_flex().flex_1().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Mass override (kg)")).child(Input::new(&mass))),
-                        )
-                        .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Appearance")).child(h_flex().gap_1p5().flex_wrap().children(swatches)))
-                        .child(v_flex().gap_1().child(div().text_xs().text_color(pal.text_muted).child("Material")).child(h_flex().gap_1().flex_wrap().children(materials))),
-                )
-                .footer(
-                    DialogFooter::new()
-                        .gap_2()
-                        .child(DialogClose::new().child(Button::new("cancel").label("Close").outline()))
-                        .child(DialogAction::new().child(Button::new("ok").label("Apply").primary())),
-                )
-                .on_ok(move |_, _, cx| {
-                    let n = name2.read(cx).value().to_string();
-                    let b2 = b.clone();
-                    let pn = pn2.read(cx).value().trim().to_string();
-                    let rv = rv2.read(cx).value().trim().to_string();
-                    let ms = ms2.read(cx).value().trim().parse::<f64>().ok().filter(|m| *m > 0.0);
-                    v.update(cx, |this, cx| {
-                        this.edit_part_props(&b2, "Part properties", cx, |p| {
-                            p.name = Some(n.clone()).filter(|s| !s.trim().is_empty());
-                            p.part_number = Some(pn.clone()).filter(|s| !s.is_empty());
-                            p.revision = Some(rv.clone()).filter(|s| !s.is_empty());
-                            p.mass_override = ms;
-                        })
-                    });
-                    true
-                })
+        let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
+        let computed = self.context.as_ref().filter(|_| props.material.is_some()).and_then(|ctx| {
+            let density = |_: &BodyId| props.density;
+            noshape_model::regen::measure::mass_properties(ctx, std::slice::from_ref(&body), &density)?.mass
         });
-    }
-
-    /// Onshape "Export…" on parts: choose a format, then where to save.
-    pub(super) fn open_export_dialog(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
-        let view = cx.entity();
-        let base = match bodies.as_slice() {
-            [b] => self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into()),
-            _ => self.studio_name(cx),
+        let spec = MetaSpec {
+            category: "Onshape Part",
+            material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
+            computed_mass: computed.map(|m| format!("{m:.4} kg")),
+            bom_options: None,
+            values: MetaValues {
+                name,
+                description: props.description.clone().unwrap_or_default(),
+                part_number: props.part_number.clone().unwrap_or_default(),
+                // Workspace parts have no revision unless one was typed
+                // (Release__typical_release_workflow).
+                revision: props.revision.clone().unwrap_or_default(),
+                meta: props.meta.clone(),
+                mass_override: props.mass_override.map(|m| format!("{m} kg")),
+                bom: 0,
+            },
         };
-        let file = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(base));
-        let chosen = std::rc::Rc::new(std::cell::Cell::new(0usize));
-        // Onshape's Export modal (shared with the tab menu's Export…).
-        window.open_dialog(cx, move |dialog, _, cx| {
-            let formats: Vec<String> = super::ExportFormat::ALL.iter().map(|f| f.label().to_string()).collect();
-            let (v, c, bodies, file2) = (view.clone(), chosen.clone(), bodies.clone(), file.clone());
-            crate::os_ui::export_modal(dialog, "Export", &file, formats, chosen.clone(), cx).on_ok(move |_, window, cx| {
-                let format = super::ExportFormat::ALL[c.get()];
-                let base = file2.read(cx).value().trim().to_string();
-                let (v, bodies) = (v.clone(), bodies.clone());
-                window.defer(cx, move |window, cx| {
-                    crate::files::request_save_path("Export", format!("{base}.{}", format.ext()), format.ext(), window, cx, move |path, cx| {
-                        v.update(cx, |this, cx| {
-                            let msg = match this.export_bodies(format, &path, &bodies) {
-                                Ok(()) => format!("Exported {}", path.display()),
-                                Err(e) => format!("Export failed: {e:#}"),
-                            };
-                            this.flash_info(msg, cx);
-                        });
+        let (doc, view, tab) = (self.doc.clone(), cx.entity(), self.tab);
+        let (doc_r, body_r, name_r) = (self.doc.clone(), body.clone(), spec.values.name.clone());
+        // Releases the configured part shown (Help: Releasing a configuration).
+        let config_r = self.config_values.clone();
+        // Reset all: the regenerated name, no metadata.
+        let default_name = self.context.as_ref().and_then(|c| c.bodies.iter().find(|x| x.id == body).map(|x| x.name.clone())).unwrap_or_else(|| spec.values.name.clone());
+        let reset_to = MetaValues { name: default_name, ..MetaValues::default() };
+        crate::properties_dialog::open_properties_with_release(
+            spec,
+            Some(reset_to),
+            move |v, _, cx| {
+                let body = body.clone();
+                doc.update(cx, |d, cx| {
+                    d.edit_studio(tab, &format!("Properties : {}", v.name), cx, |ps| {
+                        let p = ps.part_properties.entry(body).or_default();
+                        p.name = Some(v.name.clone());
+                        p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+                        p.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
+                        p.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+                        p.meta = v.meta.clone();
+                        p.mass_override = v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass);
                     });
                 });
-                true
-            })
-        });
+                view.update(cx, |this, cx| this.refresh_scene(true, cx));
+            },
+            move |window, cx| {
+                let items = crate::release_dialog::part_items(doc_r.read(cx), tab, std::slice::from_ref(&body_r), std::slice::from_ref(&name_r), &config_r);
+                crate::release_dialog::open_release_candidate(doc_r.clone(), items, window, cx)
+            },
+            window,
+            cx,
+        );
+    }
+
+    /// Onshape "Export…" on parts: the Export modal (see `export.rs`).
+    pub(super) fn open_export_dialog(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_part_export(bodies, window, cx);
     }
 
     pub(super) fn export_flat(&mut self, body: BodyId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
@@ -625,6 +583,51 @@ impl PartStudioView {
         noshape_units::format_quantity(q, &units)
     }
 
+    /// The live measurement of the selection left of the evaluation tools
+    /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
+    /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
+    fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let ctx = self.context.clone()?;
+        let sel = self.selection.clone();
+        let results = match &self.measure_cache {
+            Some((s, r)) if *s == sel => r.clone(),
+            _ => {
+                let r = measure::measure(&ctx, &sel);
+                self.measure_cache = Some((sel, r.clone()));
+                r
+            }
+        };
+        let (label, m) = results.into_iter().next()?;
+        let pal = p();
+        // "12.5 mm" -> number (monospace, underlined) and unit.
+        let value = |text: String| {
+            let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
+            h_flex()
+                .gap(px(2.))
+                .child(div().font_family("monospace").text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(num))
+                .child(div().child(unit))
+        };
+        let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
+        let row = h_flex().gap(px(4.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
+        Some(match m {
+            Measurement::Point(pt) => {
+                let axis = |name: &'static str, color: u32, v: f64| h_flex().gap(px(2.)).child(div().text_color(gpui_kit::rgb(color)).child(name)).child(value(l(v)));
+                row.child(format!("{label}:")).child(axis("X↘", 0xd52b1e, pt.x)).child(axis("Y↗", 0x2e9b2e, pt.y)).child(axis("Z↑", 0x2a5bd7, pt.z)).into_any_element()
+            }
+            m => {
+                let text = match m {
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
+                    Measurement::Area(x) => self.fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
+                    Measurement::Volume(x) => self.fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
+                    Measurement::Angle(x) => self.fmt(Quantity::new(x, Dim::ANGLE), cx),
+                    Measurement::Distance { distance, .. } => l(distance),
+                    Measurement::Point(_) => String::new(),
+                };
+                row.child(format!("{label}:")).child(value(text)).into_any_element()
+            }
+        })
+    }
+
     /// Model evaluation tools at the bottom right (Onshape): Measure and
     /// Mass properties.
     pub(super) fn render_evaluation_tools(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -637,6 +640,7 @@ impl PartStudioView {
         let btn = |id: &'static str, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
         let view = cx.entity();
         let thickness_on = self.ui.thickness.is_some();
+        let readout = (!measure_on && !mass_on && self.edit.is_none() && !self.selection.is_empty()).then(|| self.selection_readout(cx)).flatten();
         h_flex()
             .id("eval-tools")
             .occlude()
@@ -648,6 +652,7 @@ impl PartStudioView {
             .pr(px(5.))
             .gap(px(5.))
             .bg(with_alpha(pal.panel, 0.75))
+            .children(readout)
             .child(
                 btn("eval-measure", "measure", measure_on, cx).tooltip("Show measure details ([)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.measure_pinned = !this.ui.measure_pinned;
@@ -659,25 +664,24 @@ impl PartStudioView {
             .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).tooltip("Show analysis tools").dropdown_menu(move |m, _, _| {
                 let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
                 let v11 = view.clone();
-                m.item(PopupMenuItem::new("Curve/surface analysis").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx))))
-                    .item(PopupMenuItem::new("Deviation analysis").on_click(move |_, w, cx| v5.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Deviation, w, cx))))
-                    .item(PopupMenuItem::new("Connection analysis").on_click(move |_, w, cx| v6.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Connection, w, cx))))
-                    .item(PopupMenuItem::new("Dihedral analysis").on_click(move |_, w, cx| v2.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Dihedral, w, cx))))
-                    .item(PopupMenuItem::new("Zebra stripes").on_click(move |_, w, cx| v7.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Zebra, w, cx))))
-                    .item(PopupMenuItem::new("Reflection analysis").on_click(move |_, w, cx| v8.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Reflection, w, cx))))
+                let v12 = view.clone();
+                let v13 = view.clone();
+                m.item(PopupMenuItem::new("Curve/surface analysis…").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx))))
+                    .item(PopupMenuItem::new("Deviation analysis…").on_click(move |_, w, cx| v5.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Deviation, w, cx))))
+                    .item(PopupMenuItem::new("Connection analysis…").on_click(move |_, w, cx| v6.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Connection, w, cx))))
+                    .item(PopupMenuItem::new("Dihedral analysis…").on_click(move |_, w, cx| v2.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Dihedral, w, cx))))
+                    .item(PopupMenuItem::new("Interference detection…").on_click(move |_, w, cx| v13.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Interference, w, cx))))
+                    .item(PopupMenuItem::new("Zebra stripes…").on_click(move |_, w, cx| v7.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Zebra, w, cx))))
+                    .item(PopupMenuItem::new("Reflection analysis…").on_click(move |_, w, cx| v8.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Reflection, w, cx))))
                     .item(PopupMenuItem::new("Curvature color map").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
-                    .item(PopupMenuItem::new("Draft analysis").on_click(move |_, w, cx| {
-                        v4.update(cx, |this, cx| {
-                            let a = this.draft_analysis();
-                            this.toggle_analysis(a, w, cx)
-                        })
-                    }))
+                    .item(PopupMenuItem::new("Draft analysis…").on_click(move |_, w, cx| v4.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Draft, w, cx))))
                     // Thickness analysis: once on, the menu edits or turns it off.
-                    .when(!thickness_on, |m| m.item(PopupMenuItem::new("Thickness analysis").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx)))))
+                    .when(!thickness_on, |m| m.item(PopupMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx)))))
                     .when(thickness_on, |m| {
                         m.item(PopupMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx))))
                             .item(PopupMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
                     })
+                    .item(PopupMenuItem::new("Flatten surfaces…").on_click(move |_, w, cx| v12.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Flatten, w, cx))))
             }))
             .child(
                 btn("eval-mass", "mass-properties", mass_on, cx).tooltip("Mass properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -779,7 +783,10 @@ impl PartStudioView {
                 });
             }
         } else {
-            if self.selection.is_empty() && !self.ui.measure_pinned {
+            // Live (part-studio/81-82): a selection only gets the one-line
+            // readout at the bottom right; the panel opens with `[` / the
+            // Measure button.
+            if !self.ui.measure_pinned {
                 return Vec::new();
             }
             let sel = self.selection.clone();
@@ -1039,17 +1046,6 @@ struct MassView {
     inertia: Option<[[String; 3]; 3]>,
     parts: Vec<String>,
     reference: Option<String>,
-}
-
-trait WhenSelected {
-    fn when_selected(self, on: bool) -> Self;
-}
-
-impl WhenSelected for Button {
-    fn when_selected(self, on: bool) -> Self {
-        use gpui_kit::component::Selectable as _;
-        self.selected(on)
-    }
 }
 
 /// Kind of a measurement for the measure type selector.

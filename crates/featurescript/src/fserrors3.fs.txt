@@ -1,0 +1,74 @@
+FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+export enum Shade { RED, GREEN }
+function typed(s is string) { return s; }
+function two(a, b) { return a; }
+function guarded(x) precondition { x > 0; } { return x; }
+function retNum() returns number { return "s"; }
+predicate notBool(x) { 1; }
+function recurse(n) { return recurse(n + 1); }
+
+annotation { "Feature Type Name" : "FS errors" }
+export const fsErrors = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        var a = [1, 2];
+        try { println(a[-1]); } catch (e) { println(e); }
+        try { println(a[1.5]); } catch (e) { println(e); }
+        try { println(a["k"]); } catch (e) { println(e); }
+        try { println([1] + 1); } catch (e) { println(e); }
+        try { println(1 - "a"); } catch (e) { println(e); }
+        try { println(2 * "x"); } catch (e) { println(e); }
+        try { println(1 / [1]); } catch (e) { println(e); }
+        try { println("a" < 1); } catch (e) { println(e); }
+        try { println(-"a"); } catch (e) { println(e); }
+        try { println(!1); } catch (e) { println(e); }
+        try { if (1) { println("x"); } } catch (e) { println(e); }
+        try { var t is number = "s"; println(t); } catch (e) { println(e); }
+        try { println(typed(1)); } catch (e) { println(e); }
+        try { println(two(1)); } catch (e) { println(e); }
+        try { const u = undefined; println(u()); } catch (e) { println(e); }
+        try { for (var x in 5) { println(x); } } catch (e) { println(e); }
+        try { println("abc"[0]); } catch (e) { println(e); }
+        try { const n = 5; println(n.x); } catch (e) { println(e); }
+        try { throw "custom"; } catch (e) { println(e); }
+        try { throw regenError("my message"); } catch (e) { println(e); }
+        try { throw { "a" : 1 }; } catch (e) { println(e); }
+        try { println("FOO" as Shade); } catch (e) { println(e); }
+        try { println(1 as Shade); } catch (e) { println(e); }
+        try { println(guarded(-1)); } catch (e) { println(e); }
+        try { println(retNum()); } catch (e) { println(e); }
+        try { println(notBool(1)); } catch (e) { println(e); }
+        try { println(recurse(0)); } catch (e) { println(e); }
+        try { const nb = 5; println(nb[]); } catch (e) { println(e); }
+        try { println(1 / 0); } catch (e) { println(e); }
+        try { println(0 / 0); } catch (e) { println(e); }
+        try { println(acos(2)); } catch (e) { println(e); }
+        try { println(1 * meter + 1 * radian); } catch (e) { println(e); }
+        try { println(1 * meter < 1); } catch (e) { println(e); }
+        try { println({ "a" : 1 } < { "b" : 2 }); } catch (e) { println(e); }
+        try { var m = {}; m[undefined] = 1; println(m); } catch (e) { println(e); }
+        try { println(evPlane(context, { "face" : qNothing() })); } catch (e) { println(e); }
+        startTimer("t1");
+        printTimer("t1");
+        try { printTimer("nope"); } catch (e) { println(e); }
+        println(1e21);
+        println(1e-7);
+        println(123456789.123);
+        println(-0);
+        println(1 / 3 * meter);
+        println(2 * meter * meter);
+        println(3 * degree);
+        println(vector(1, 2, 3) * inch);
+        println(Shade.RED);
+        println(undefined);
+        println(new box(3));
+        println(function(x) { return x; });
+        println(id);
+        println(context);
+        println(["a", ["b"], { "c" : "d" }]);
+        println("" ~ [1, "a"] ~ " " ~ { "k" : "v" } ~ " " ~ Shade.GREEN ~ " " ~ (1 as Shade == 1));
+    });

@@ -38,9 +38,30 @@ const BELOW: u32 = 0xcc5fc0;
 const ABOVE: u32 = 0x6b3a14;
 const DIMMED: u32 = 0xe3e3e3;
 
+/// The curvature color map's Colors menu (Onshape help).
+pub const CURVATURE_PALETTES: [(&str, &[u32]); 4] = [
+    ("Viridis", &[0x440154, 0x482878, 0x3e4989, 0x31688e, 0x26828e, 0x1f9e89, 0x35b779, 0x6ece58, 0xb5de2b, 0xfde725]),
+    ("Blue - > Red", &[0x0000ff, 0x8000ff, 0xff00ff, 0xff0080, 0xff0000]),
+    ("Plasma", &[0x0d0887, 0x46039f, 0x7201a8, 0x9c179e, 0xbd3786, 0xd8576b, 0xed7953, 0xfb9f3a, 0xfdca26, 0xf0f921]),
+    ("Rainbow", &[0x0000ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff0000]),
+];
+
+/// The palettes of a bar.
+pub fn palettes(bar: Bar) -> &'static [(&'static str, &'static [u32])] {
+    match bar {
+        Bar::Thickness => &PALETTES,
+        Bar::Curvature => &CURVATURE_PALETTES,
+    }
+}
+
 /// Palette color at `t` in 0..=1.
 pub fn palette_color(palette: usize, t: f64) -> u32 {
-    let stops = PALETTES[palette.min(PALETTES.len() - 1)].1;
+    palette_color_in(&PALETTES, palette, t)
+}
+
+/// Color at `t` in 0..=1 of palette `palette` of `table`.
+pub fn palette_color_in(table: &[(&str, &[u32])], palette: usize, t: f64) -> u32 {
+    let stops = table[palette.min(table.len() - 1)].1;
     let x = t.clamp(0.0, 1.0) * (stops.len() - 1) as f64;
     let i = (x.floor() as usize).min(stops.len() - 2);
     let f = x - i as f64;
@@ -64,28 +85,42 @@ enum LegendDrag {
     Move { from: Point<Pixels>, start: Point<Pixels> },
 }
 
-pub struct ThicknessState {
-    pub parts: Vec<BodyId>,
-    pub method: ThicknessMethod,
+/// Which color bar: Thickness analysis or the curvature color map (the
+/// same Onshape legend: Colors, a second menu, bounds you can type or drag).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Bar {
+    Thickness,
+    Curvature,
+}
+
+/// A color bar's palette, user bounds and on-screen state.
+#[derive(Default)]
+pub struct BarUi {
     pub palette: usize,
-    pub dim: bool,
     /// User bounds (display units); `None` follows the data.
     pub bounds: [Option<f64>; 2],
-    pub results: HashMap<BodyId, PartThickness>,
-    /// Progress message while computing.
-    pub progress: Option<&'static str>,
-    generation: u64,
-    task: Option<Task<()>>,
-    /// Legend offset from its default spot, and an active drag.
+    /// Offset from its default spot, and an active drag.
     offset: Point<Pixels>,
     drag: Option<LegendDrag>,
     /// The bound being typed (0 / 1) and its field.
     editing: Option<(usize, Entity<InputState>, Subscription)>,
 }
 
+pub struct ThicknessState {
+    pub parts: Vec<BodyId>,
+    pub method: ThicknessMethod,
+    pub dim: bool,
+    pub bar: BarUi,
+    pub results: HashMap<BodyId, PartThickness>,
+    /// Progress message while computing.
+    pub progress: Option<&'static str>,
+    generation: u64,
+    task: Option<Task<()>>,
+}
+
 impl ThicknessState {
     pub fn new() -> Self {
-        Self { parts: Vec::new(), method: ThicknessMethod::RollingBall, palette: 0, dim: false, bounds: [None; 2], results: HashMap::new(), progress: None, generation: 0, task: None, offset: Point::default(), drag: None, editing: None }
+        Self { parts: Vec::new(), method: ThicknessMethod::RollingBall, dim: false, bar: BarUi::default(), results: HashMap::new(), progress: None, generation: 0, task: None }
     }
 }
 
@@ -119,7 +154,7 @@ impl PartStudioView {
     fn thickness_bounds(&self, cx: &App) -> Option<(f64, f64)> {
         let t = self.ui.thickness.as_ref()?;
         let (lo, hi) = self.thickness_range(cx)?;
-        Some((t.bounds[0].unwrap_or(lo), t.bounds[1].unwrap_or(hi)))
+        Some((t.bar.bounds[0].unwrap_or(lo), t.bar.bounds[1].unwrap_or(hi)))
     }
 
     /// Recompute after a change of parts, method or geometry.
@@ -147,7 +182,7 @@ impl PartStudioView {
             };
             for (i, &(m, next)) in phases.iter().enumerate() {
                 let _ = this.update(cx, |this: &mut Self, cx| {
-                    if let Some(t) = this.ui.thickness.as_mut().filter(|t| t.generation == generation) {
+                    if let Some(t) = this.ui.thickness.as_mut().filter(|t| t.generation == generation && i == 0) {
                         t.progress = Some("Calculating thickness");
                         cx.notify();
                     }
@@ -158,7 +193,7 @@ impl PartStudioView {
                         input
                             .iter()
                             .map(|(id, mesh)| {
-                                let (samples, values) = noshape_model::thickness::analyze(mesh, m, 40_000);
+                                let (samples, values) = noshape_model::thickness::analyze(mesh, m, 25_000);
                                 (id.clone(), PartThickness { mesh: Arc::new(samples), values: Arc::new(values) })
                             })
                             .collect()
@@ -191,7 +226,7 @@ impl PartStudioView {
         }
         let (lo, hi) = self.thickness_bounds(cx)?;
         let k = if t.method.is_gradient() { 1.0 } else { 1.0 / self.length_factor(cx).0 };
-        let user = [t.bounds[0].is_some(), t.bounds[1].is_some()];
+        let user = [t.bar.bounds[0].is_some(), t.bar.bounds[1].is_some()];
         let color = |v: Option<f64>| -> [u8; 4] {
             let c = match v {
                 None => 0x9a9a9a,
@@ -204,7 +239,7 @@ impl PartStudioView {
                     } else if t.dim {
                         DIMMED
                     } else {
-                        palette_color(t.palette, if hi > lo { (v - lo) / (hi - lo) } else { 0.5 })
+                        palette_color(t.bar.palette, if hi > lo { (v - lo) / (hi - lo) } else { 0.5 })
                     }
                 }
             };
@@ -238,8 +273,45 @@ impl PartStudioView {
         self.rebuild_scene(cx);
     }
 
-    fn edit_bound(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((lo, hi)) = self.thickness_bounds(cx) else { return };
+    fn bar_ui(&self, bar: Bar) -> Option<&BarUi> {
+        match bar {
+            Bar::Thickness => self.ui.thickness.as_ref().map(|t| &t.bar),
+            Bar::Curvature => self.ui.curvature_map.as_ref().map(|c| &c.bar),
+        }
+    }
+
+    fn bar_ui_mut(&mut self, bar: Bar) -> Option<&mut BarUi> {
+        match bar {
+            Bar::Thickness => self.ui.thickness.as_mut().map(|t| &mut t.bar),
+            Bar::Curvature => self.ui.curvature_map.as_mut().map(|c| &mut c.bar),
+        }
+    }
+
+    /// Data range shown by a bar.
+    fn bar_range(&self, bar: Bar, cx: &App) -> Option<(f64, f64)> {
+        match bar {
+            Bar::Thickness => self.thickness_range(cx),
+            Bar::Curvature => self.ui.curvature_map.as_ref()?.range,
+        }
+    }
+
+    /// Bounds in use: the user's, else the data's.
+    fn bar_bounds(&self, bar: Bar, cx: &App) -> Option<(f64, f64)> {
+        let (lo, hi) = self.bar_range(bar, cx)?;
+        let b = self.bar_ui(bar)?;
+        Some((b.bounds[0].unwrap_or(lo), b.bounds[1].unwrap_or(hi)))
+    }
+
+    /// Change a bar's settings and recolor.
+    fn set_bar(&mut self, bar: Bar, cx: &mut Context<Self>, f: impl FnOnce(&mut BarUi)) {
+        if let Some(b) = self.bar_ui_mut(bar) {
+            f(b);
+        }
+        self.rebuild_scene(cx);
+    }
+
+    fn edit_bound(&mut self, bar: Bar, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((lo, hi)) = self.bar_bounds(bar, cx) else { return };
         let st = cx.new(|cx| InputState::new(window, cx).default_value(fmt_value([lo, hi][i])));
         st.update(cx, |s, cx| s.focus(window, cx));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
@@ -247,16 +319,15 @@ impl PartStudioView {
                 return;
             }
             let v = st.read(cx).value().trim().parse::<f64>().ok();
-            if let Some(t) = &mut this.ui.thickness {
-                t.editing = None;
+            this.set_bar(bar, cx, |b| {
+                b.editing = None;
                 if let Some(v) = v {
-                    t.bounds[i] = Some(v);
+                    b.bounds[i] = Some(v);
                 }
-            }
-            this.rebuild_scene(cx);
+            });
         });
-        if let Some(t) = &mut self.ui.thickness {
-            t.editing = Some((i, st, sub));
+        if let Some(b) = self.bar_ui_mut(bar) {
+            b.editing = Some((i, st, sub));
         }
         cx.notify();
     }
@@ -283,70 +354,100 @@ impl PartStudioView {
         )
     }
 
-    /// The color bar at the top of the graphics area.
-    pub(super) fn render_thickness_legend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (lo, hi) = self.thickness_bounds(cx)?;
-        let (data_lo, data_hi) = self.thickness_range(cx)?;
+    /// The color bar at the top of the graphics area (Thickness analysis,
+    /// Curvature color map).
+    pub(super) fn render_color_bar(&mut self, bar: Bar, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (lo, hi) = self.bar_bounds(bar, cx)?;
+        let (data_lo, data_hi) = self.bar_range(bar, cx)?;
         let unit = self.length_factor(cx).1;
-        let t = self.ui.thickness.as_ref()?;
+        let b = self.bar_ui(bar)?;
         let pal = p();
-        let (method, palette, dim, user, offset) = (t.method, t.palette, t.dim, [t.bounds[0].is_some(), t.bounds[1].is_some()], t.offset);
-        let editing = t.editing.as_ref().map(|(i, st, _)| (*i, st.clone()));
+        let (palette, user, offset) = (b.palette, [b.bounds[0].is_some(), b.bounds[1].is_some()], b.offset);
+        let editing = b.editing.as_ref().map(|(i, st, _)| (*i, st.clone()));
+        let dim = bar == Bar::Thickness && self.ui.thickness.as_ref().is_some_and(|t| t.dim);
+        let table = palettes(bar);
         const BAR: f32 = 600.;
         let view = cx.entity();
-        let colors_menu = {
+        type Items = Vec<(String, bool, Box<dyn Fn(&mut PartStudioView, &mut Context<PartStudioView>)>)>;
+        let menu = |id: &'static str, label: String, items: Items| {
             let view = view.clone();
-            Button::new("th-colors").ghost().xsmall().child(h_flex().gap_2().child(PALETTES[palette].0).child(Icon::new(IconName::ChevronDown).with_size(px(10.)))).dropdown_menu(move |mut m, _, _| {
-                for (i, (name, _)) in PALETTES.iter().enumerate() {
-                    let v = view.clone();
-                    m = m.item(PopupMenuItem::new(*name).checked(i == palette).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_thickness(cx, |t| t.palette = i))));
+            let items: std::rc::Rc<Items> = std::rc::Rc::new(items);
+            Button::new(id).ghost().xsmall().child(h_flex().gap_2().child(label).child(Icon::new(IconName::ChevronDown).with_size(px(10.)))).dropdown_menu(move |mut m, _, _| {
+                for k in 0..items.len() {
+                    let (v, items2) = (view.clone(), items.clone());
+                    m = m.item(PopupMenuItem::new(items[k].0.clone()).checked(items[k].1).on_click(move |_, _, cx| v.update(cx, |this, cx| (items2[k].2)(this, cx))));
                 }
                 m
             })
         };
-        let method_menu = {
-            let view = view.clone();
-            let label = method.label(unit);
-            Button::new("th-method").ghost().xsmall().child(h_flex().gap_2().child(label).child(Icon::new(IconName::ChevronDown).with_size(px(10.)))).dropdown_menu(move |mut m, _, _| {
-                for mm in ThicknessMethod::ALL {
-                    let v = view.clone();
-                    m = m.item(PopupMenuItem::new(mm.label(unit)).checked(mm == method).on_click(move |_, _, cx| {
-                        v.update(cx, |this, cx| {
-                            if let Some(t) = &mut this.ui.thickness {
-                                t.method = mm;
-                                t.bounds = [None; 2];
-                            }
-                            this.recompute_thickness(cx);
+        let colors_menu = menu(
+            "cb-colors",
+            table[palette.min(table.len() - 1)].0.to_string(),
+            table.iter().enumerate().map(|(i, (name, _))| (name.to_string(), i == palette, Box::new(move |this: &mut Self, cx: &mut Context<Self>| this.set_bar(bar, cx, |b| b.palette = i)) as Box<dyn Fn(&mut Self, &mut Context<Self>)>)).collect(),
+        );
+        let mut controls = h_flex().gap(px(14.)).text_size(px(12.)).child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Colors")).child(colors_menu));
+        match bar {
+            Bar::Thickness => {
+                let method = self.ui.thickness.as_ref().map_or(ThicknessMethod::RollingBall, |t| t.method);
+                let method_menu = menu(
+                    "cb-method",
+                    method.label(unit),
+                    ThicknessMethod::ALL
+                        .into_iter()
+                        .map(|mm| {
+                            (mm.label(unit), mm == method, Box::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                                if let Some(t) = &mut this.ui.thickness {
+                                    t.method = mm;
+                                    t.bar.bounds = [None; 2];
+                                }
+                                this.recompute_thickness(cx);
+                            }) as Box<dyn Fn(&mut Self, &mut Context<Self>)>)
                         })
-                    }));
-                }
-                m
-            })
-        };
-        let controls = h_flex()
-            .gap(px(14.))
-            .text_size(px(12.))
-            .child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Colors")).child(colors_menu))
-            .child(Checkbox::new("th-dim").label("Dim color scale").checked(dim).on_click(cx.listener(|this, v: &bool, _, cx| {
-                let v = *v;
-                this.set_thickness(cx, |t| t.dim = v);
-            })))
-            .child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Method")).child(method_menu));
+                        .collect(),
+                );
+                controls = controls
+                    .child(Checkbox::new("cb-dim").label("Dim color scale").checked(dim).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        let v = *v;
+                        this.set_thickness(cx, |t| t.dim = v);
+                    })))
+                    .child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Method")).child(method_menu));
+            }
+            Bar::Curvature => {
+                let kind = self.ui.curvature_map.as_ref().map_or(CurvatureKind::Gaussian, |c| c.kind);
+                let kind_menu = menu(
+                    "cb-kind",
+                    kind.label(unit),
+                    CurvatureKind::ALL
+                        .into_iter()
+                        .map(|k| {
+                            (k.label(unit), k == kind, Box::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                                if let Some(c) = &mut this.ui.curvature_map {
+                                    c.kind = k;
+                                    c.bar.bounds = [None; 2];
+                                }
+                                this.rebuild_scene(cx);
+                            }) as Box<dyn Fn(&mut Self, &mut Context<Self>)>)
+                        })
+                        .collect(),
+                );
+                controls = controls.child(h_flex().gap_1().child(div().text_color(pal.text_muted).child("Curvature")).child(kind_menu));
+            }
+        }
         let rgb_of = |c: u32| gpui_kit::rgb(c);
         // The gradient (or the dimmed bar) between the bounds.
-        let segments: Vec<AnyElement> = (0..120).map(|i| div().flex_1().h_full().bg(rgb_of(if dim { DIMMED } else { palette_color(palette, (i as f64 + 0.5) / 120.0) })).into_any_element()).collect();
+        let segments: Vec<AnyElement> = (0..120).map(|i| div().flex_1().h_full().bg(rgb_of(if dim { DIMMED } else { palette_color_in(table, palette, (i as f64 + 0.5) / 120.0) })).into_any_element()).collect();
         let per_px = (hi - lo) / BAR as f64;
         let tick = |i: usize, cx: &mut Context<Self>| {
             div()
-                .id(SharedString::from(format!("th-tick-{i}")))
+                .id(SharedString::from(format!("cb-tick-{i}")))
                 .w(px(3.))
                 .h(px(30.))
                 .bg(gpui_kit::rgb(0x333333))
                 .cursor(CursorStyle::ResizeLeftRight)
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, cx| {
                     cx.stop_propagation();
-                    if let Some(t) = &mut this.ui.thickness {
-                        t.drag = Some(LegendDrag::Bound { i, from: ev.position.x, start: [lo, hi][i], per_px });
+                    if let Some(b) = this.bar_ui_mut(bar) {
+                        b.drag = Some(LegendDrag::Bound { i, from: ev.position.x, start: [lo, hi][i], per_px });
                     }
                 }))
         };
@@ -354,7 +455,7 @@ impl PartStudioView {
         let outside = |show: bool, color: u32, value: f64| {
             div().when(show, |d| d.child(h_flex().gap_1().child(div().text_size(px(11.)).font_family("monospace").child(fmt_value(value))).child(div().w(px(8.)).h(px(22.)).bg(rgb_of(color)))))
         };
-        let bar = h_flex()
+        let strip = h_flex()
             .items_end()
             .child(outside(user[0], BELOW, data_lo))
             .child(tick(0, cx))
@@ -370,21 +471,21 @@ impl PartStudioView {
                 .gap_1()
                 .child(
                     div()
-                        .id(SharedString::from(format!("th-bound-{i}")))
+                        .id(SharedString::from(format!("cb-bound-{i}")))
                         .text_color(gpui_kit::rgb(0x2b6cd4))
                         .underline()
                         .cursor_pointer()
                         .child(format!("{}{}", fmt_value(value), if user[i] { "*" } else { "" }))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_bound(i, window, cx))),
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_bound(bar, i, window, cx))),
                 )
                 .when(user[i], |d| {
                     d.child(
                         div()
-                            .id(SharedString::from(format!("th-reset-{i}")))
+                            .id(SharedString::from(format!("cb-reset-{i}")))
                             .cursor_pointer()
                             .text_color(pal.text_muted)
                             .child("↻")
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_thickness(cx, |t| t.bounds[i] = None))),
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_bar(bar, cx, |b| b.bounds[i] = None))),
                     )
                 })
                 .into_any_element()
@@ -405,7 +506,7 @@ impl PartStudioView {
                 .justify_center()
                 .child(
                     v_flex()
-                        .id("thickness-legend")
+                        .id(SharedString::from(format!("color-bar-{bar:?}")))
                         .occlude()
                         .ml(offset.x * 2.)
                         .items_center()
@@ -415,45 +516,90 @@ impl PartStudioView {
                         .rounded(px(2.))
                         .hover(|d| d.bg(hsla(0., 0., 1., 0.85)))
                         .child(controls)
-                        .child(bar)
+                        .child(strip)
                         .child(labels)
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
-                            if let Some(t) = &mut this.ui.thickness
-                                && t.drag.is_none()
+                            if let Some(b) = this.bar_ui_mut(bar)
+                                && b.drag.is_none()
                             {
-                                t.drag = Some(LegendDrag::Move { from: ev.position, start: t.offset });
+                                b.drag = Some(LegendDrag::Move { from: ev.position, start: b.offset });
                             }
                         }))
                         .on_mouse_move(cx.listener(move |this, ev: &MouseMoveEvent, _, cx| {
-                            let Some(t) = &mut this.ui.thickness else { return };
+                            let Some(b) = this.bar_ui_mut(bar) else { return };
                             let mut moved_bound = false;
-                            match t.drag {
+                            match b.drag {
                                 Some(LegendDrag::Move { from, start }) if ev.dragging() => {
-                                    t.offset = point(start.x + (ev.position.x - from.x) * 0.5, start.y + ev.position.y - from.y);
+                                    b.offset = point(start.x + (ev.position.x - from.x) * 0.5, start.y + ev.position.y - from.y);
                                     cx.notify();
                                 }
                                 Some(LegendDrag::Bound { i, from, start, per_px }) if ev.dragging() => {
                                     // The bound follows the tick along the bar.
                                     let v = start + f32::from(ev.position.x - from) as f64 * per_px;
-                                    t.bounds[i] = Some(if i == 0 { v.min(range.1) } else { v.max(range.0) });
+                                    b.bounds[i] = Some(if i == 0 { v.min(range.1) } else { v.max(range.0) });
                                     moved_bound = true;
                                 }
-                                Some(_) => t.drag = None,
+                                Some(_) => b.drag = None,
                                 None => {}
                             }
                             if moved_bound {
                                 this.rebuild_scene(cx);
                             }
                         }))
-                        .on_mouse_up(MouseButton::Left, cx.listener(|this, _: &MouseUpEvent, _, _| {
-                            if let Some(t) = &mut this.ui.thickness {
-                                t.drag = None;
+                        .on_mouse_up(MouseButton::Left, cx.listener(move |this, _: &MouseUpEvent, _, _| {
+                            if let Some(b) = this.bar_ui_mut(bar) {
+                                b.drag = None;
                             }
                         })),
                 )
                 .into_any_element(),
         )
     }
+}
+
+/// What the curvature color map shows (its Curvature menu).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CurvatureKind {
+    #[default]
+    Gaussian,
+    Mean,
+    MaxRadius,
+    MinRadius,
+}
+
+impl CurvatureKind {
+    pub const ALL: [CurvatureKind; 4] = [CurvatureKind::Gaussian, CurvatureKind::Mean, CurvatureKind::MaxRadius, CurvatureKind::MinRadius];
+
+    pub fn label(self, unit: &str) -> String {
+        match self {
+            CurvatureKind::Gaussian => format!("Gaussian (1/{unit}^2)"),
+            CurvatureKind::Mean => format!("Mean (1/{unit})"),
+            CurvatureKind::MaxRadius => format!("Max radius ({unit})"),
+            CurvatureKind::MinRadius => format!("Min radius ({unit})"),
+        }
+    }
+
+    /// The value at a point with principal curvatures k1, k2 (1/m), in
+    /// display units (`m`: meters per unit); `None` where nothing curves.
+    pub fn value(self, (k1, k2): (f64, f64), m: f64, flat: f64) -> Option<f64> {
+        if k1.abs() < flat && k2.abs() < flat {
+            return None;
+        }
+        Some(match self {
+            CurvatureKind::Gaussian => k1 * k2 * m * m,
+            CurvatureKind::Mean => (k1 + k2) * 0.5 * m,
+            CurvatureKind::MaxRadius => 1.0 / k1.abs().min(k2.abs()).max(flat) / m,
+            CurvatureKind::MinRadius => 1.0 / k1.abs().max(k2.abs()) / m,
+        })
+    }
+}
+
+/// The curvature color map's settings and its data range.
+#[derive(Default)]
+pub struct CurvatureMap {
+    pub kind: CurvatureKind,
+    pub bar: BarUi,
+    pub range: Option<(f64, f64)>,
 }
 
 /// A legend number: three significant decimals at most.
@@ -473,7 +619,7 @@ mod tests {
         assert_eq!(palette_color(0, 0.0), 0x440154);
         assert_eq!(palette_color(0, 1.0), 0xfde725);
         assert_eq!(palette_color(7, 0.5), 0x808080);
-        assert_eq!(fmt_value(0.70710678), "0.707");
+        assert_eq!(fmt_value(std::f64::consts::FRAC_1_SQRT_2), "0.707");
         assert_eq!(fmt_value(3.0), "3");
     }
 }

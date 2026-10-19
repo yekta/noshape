@@ -10,7 +10,7 @@ use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -29,7 +29,17 @@ pub enum RightPanel {
 #[derive(Default)]
 pub struct InspectionTableUi {
     pub current_sheet_only: bool,
-    pub editing: Option<(u64, Entity<InputState>, Subscription)>,
+    /// The number being edited: (sheet index, annotation id).
+    pub editing: Option<((usize, u64), Entity<InputState>, Subscription)>,
+    /// The hovered row (sheet index, annotation id).
+    pub hover: Option<(usize, u64)>,
+}
+
+/// Set the inspection number of annotation `id` on sheet `si`.
+fn set_number(d: &mut noshape_model::drawing::Drawing, (si, id): (usize, u64), n: Option<u32>) {
+    if let Some(a) = d.sheets.get_mut(si).and_then(|s| s.annotations.iter_mut().find(|a| a.id == id)) {
+        a.inspection = n;
+    }
 }
 
 /// Panel widths (Drawing properties: 369 px live).
@@ -49,6 +59,7 @@ impl DrawingEditor {
             }
         }
         self.panel_highlight = None;
+        self.insp_table.hover = None;
         cx.notify();
     }
 
@@ -91,7 +102,7 @@ impl DrawingEditor {
     }
 
     /// Double-click a number in the Inspection table: edit it in place.
-    fn edit_table_number(&mut self, id: u64, n: String, window: &mut Window, cx: &mut Context<Self>) {
+    fn edit_table_number(&mut self, key: (usize, u64), n: String, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(n));
         st.update(cx, |s, cx| s.focus(window, cx));
         let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
@@ -101,15 +112,11 @@ impl DrawingEditor {
             let v = st.read(cx).value().trim().parse::<u32>().ok();
             this.insp_table.editing = None;
             if let Some(v) = v {
-                this.edit("Edit inspection item", cx, |d| {
-                    if let Some(a) = d.sheets.iter_mut().flat_map(|s| s.annotations.iter_mut()).find(|a| a.id == id) {
-                        a.inspection = Some(v);
-                    }
-                });
+                this.edit("Edit inspection item", cx, |d| set_number(d, key, Some(v)));
             }
             cx.notify();
         });
-        self.insp_table.editing = Some((id, st, sub));
+        self.insp_table.editing = Some((key, st, sub));
         cx.notify();
     }
 
@@ -129,15 +136,15 @@ impl DrawingEditor {
         rows.retain(|r| !only || r.sheet == sheet);
         let ed = cx.entity();
         let ed2 = ed.clone();
-        let view = Button::new("it-view").label(if only { "Current sheet" } else { "All sheets" }).ghost().small().dropdown_caret(true).dropdown_menu(move |m, _, _| {
+        let view = Button::new("it-view").label(if only { "Current sheet" } else { "All sheets" }).ghost().small().dropdown_caret(true).os_dropdown_menu("it-view-dd", true, move |m, _, _| {
             let (a, b) = (ed2.clone(), ed2.clone());
-            m.item(PopupMenuItem::new("All sheets").checked(!only).on_click(move |_, _, cx| {
+            m.item(crate::os_menu::OsMenuItem::new("All sheets").checked(!only).on_click(move |_, _, cx| {
                 a.update(cx, |t, cx| {
                     t.insp_table.current_sheet_only = false;
                     cx.notify();
                 })
             }))
-            .item(PopupMenuItem::new("Current sheet").checked(only).on_click(move |_, _, cx| {
+            .item(crate::os_menu::OsMenuItem::new("Current sheet").checked(only).on_click(move |_, _, cx| {
                 b.update(cx, |t, cx| {
                     t.insp_table.current_sheet_only = true;
                     cx.notify();
@@ -145,9 +152,9 @@ impl DrawingEditor {
             }))
         });
         let ed3 = ed.clone();
-        let more = Button::new("it-more").ghost().small().child(crate::ui::glyph("more", 14., pal.text_muted)).dropdown_menu(move |m, _, _| {
+        let more = Button::new("it-more").ghost().small().child(crate::ui::glyph("more", 14., pal.text_muted)).os_dropdown_menu("it-more-dd", false, move |m, _, _| {
             let e = ed3.clone();
-            m.item(PopupMenuItem::new("Export to CSV").on_click(move |_, w, cx| e.update(cx, |t, cx| t.export_inspection_list(false, w, cx))))
+            m.item(crate::os_menu::OsMenuItem::new("Export to CSV").on_click(move |_, w, cx| e.update(cx, |t, cx| t.export_inspection_list(false, w, cx))))
         });
         const COLS: [(&str, f32); 7] = [("Item", 46.), ("Sheet", 44.), ("Type", 110.), ("Nominal", 60.), ("Tolerance", 66.), ("Upper", 50.), ("Lower", 50.)];
         let cell = |text: SharedString, w: f32| div().w(px(w)).flex_none().px(px(4.)).overflow_hidden().whitespace_nowrap().text_ellipsis().child(text);
@@ -157,13 +164,15 @@ impl DrawingEditor {
         }
         let mut list = v_flex().id("it-rows").flex_1().min_h_0().overflow_y_scroll().text_size(px(12.));
         let editing = self.insp_table.editing.as_ref().map(|e| (e.0, e.1.clone()));
-        let hl = self.panel_highlight;
+        let hl = self.insp_table.hover;
+        let cur = self.sheet;
         for (i, r) in rows.iter().enumerate() {
             let id = r.id;
-            let on = hl == Some(Sel::Annotation(id));
+            let key = (r.sheet - 1, id);
+            let on = hl == Some(key);
             let number = r.number.clone();
             let item: AnyElement = match &editing {
-                Some((eid, st)) if *eid == id => div().w(px(COLS[0].1)).flex_none().child(Input::new(st).xsmall()).into_any_element(),
+                Some((eid, st)) if *eid == key => div().w(px(COLS[0].1)).flex_none().child(Input::new(st).xsmall()).into_any_element(),
                 _ => {
                     let empty = number.is_empty();
                     let n2 = number.clone();
@@ -178,7 +187,7 @@ impl DrawingEditor {
                         .child(number.clone())
                         .on_click(cx.listener(move |this, e: &ClickEvent, w, cx| {
                             if e.click_count() >= 2 && !n2.is_empty() && !n2.contains('.') {
-                                this.edit_table_number(id, n2.clone(), w, cx);
+                                this.edit_table_number(key, n2.clone(), w, cx);
                             }
                         }))
                         .when(empty, |d| {
@@ -188,11 +197,7 @@ impl DrawingEditor {
                                     cx.stop_propagation();
                                     let entries = vec![MenuEntry::item("Assign number", move |t, _, cx| {
                                         let n = t.drawing.next_inspection_number();
-                                        t.edit("Assign number", cx, |d| {
-                                            if let Some(a) = d.sheets.iter_mut().flat_map(|s| s.annotations.iter_mut()).find(|a| a.id == id) {
-                                                a.inspection = Some(n);
-                                            }
-                                        });
+                                        t.edit("Assign number", cx, |d| set_number(d, key, Some(n)));
                                     })];
                                     let ed = cx.entity();
                                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
@@ -210,10 +215,11 @@ impl DrawingEditor {
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xe6e6e6))
                     .when(on, |d| d.bg(gpui_kit::rgb(0xdbe9fb)).text_color(pal.accent))
+                    // Cross-highlight: the row and its item on the sheet.
                     .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
-                        let want = hovered.then_some(Sel::Annotation(id));
-                        if *hovered || this.panel_highlight == Some(Sel::Annotation(id)) {
-                            this.panel_highlight = want;
+                        if *hovered || this.insp_table.hover == Some(key) {
+                            this.insp_table.hover = hovered.then_some(key);
+                            this.panel_highlight = (*hovered && key.0 == cur).then_some(Sel::Annotation(id));
                             this.redraw(cx);
                         }
                     }))

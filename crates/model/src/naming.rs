@@ -136,9 +136,17 @@ pub fn name_faces(input: &FaceNamingInput) -> Vec<Name> {
             continue;
         }
         let ps = &parents[j];
-        // Prefer face continuations, choose the smallest name for merged faces.
+        // Prefer face continuations. A merged face keeps the name of its
+        // first parent by (argument, face index): a boolean's target comes
+        // first, and its faces come first in the result, so the existing part
+        // keeps its identity (Onshape: the merged face is still created by the
+        // part's feature). Ties: the smallest name. Picking by name alone
+        // depended on (random) feature ids.
         let mut face_parents: Vec<&Name> = ps.iter().filter(|(r, _)| *r != Relation::Generated).map(|(_, n)| n).collect();
-        face_parents.sort();
+        face_parents.sort_by(|a, b| {
+            let at = |n: &Name| parent_key.get(&Arc::as_ptr(n)).copied().unwrap_or((u32::MAX, u32::MAX));
+            at(a).cmp(&at(b)).then_with(|| a.cmp(b))
+        });
         if let Some(p) = face_parents.first() {
             let p = (*p).clone();
             let key = parent_key.get(&Arc::as_ptr(&p)).copied();

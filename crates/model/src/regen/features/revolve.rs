@@ -31,11 +31,11 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let thin = match ev.enum_("bodyType") {
         "SOLID" => false,
         "THIN" => true,
-        _ => return err("Surface revolve is not supported yet"),
+        _ => return surface(ev),
     };
     let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return err(if thin { "Select edges or faces to define the path of the thin wall" } else { "Select sketch regions or planar faces to revolve" });
+        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall" } else { "Select face or sketch region to revolve." });
     }
     let Some(axis_ref) = ev.query("axis").first() else { return err("Select a revolve axis") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
@@ -55,6 +55,46 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let op = ev.enum_("operationType").to_string();
     let scope = super::extrude::scope(ev);
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+}
+
+/// Surface revolve: edges and sketch curves revolved into surfaces (each
+/// connected chain one surface body), with the same end types as solids.
+fn surface(ev: &mut EvalCtx) -> FResult<()> {
+    use super::helpers_a::{resolve_curves, wires_from};
+    let refs = ev.query("surfaceEntities").to_vec();
+    if refs.is_empty() {
+        return err("Select edges or sketch curves to revolve");
+    }
+    let Some(axis_ref) = ev.query("axis").first() else { return err("Select a revolve axis") };
+    let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
+    let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
+    let edges = resolve_curves(ev, &refs)?;
+    if edges.is_empty() {
+        return err("Select edges or sketch curves to revolve");
+    }
+    let x = axis.any_orthonormal_vector();
+    let frame = crate::display::PlaneFrame { origin, x, y: axis.cross(x), normal: axis };
+    let mut tools = Vec::new();
+    for (i, w) in wires_from(&edges)?.into_iter().enumerate() {
+        let edge_sources: Vec<crate::reference::Source> = w
+            .edges()
+            .iter()
+            .map(|e| {
+                let mid = |s: &Shape| s.edge_info().ok().map(|inf| s.point_at((inf.first_param + inf.last_param) / 2.0).unwrap_or(inf.start));
+                edges.iter().find(|x| x.shape.is_same(e) || matches!((mid(&x.shape), mid(e)), (Some(a), Some(b)) if a.distance(b) < 1e-9)).map(|x| x.source.clone()).unwrap_or(crate::reference::Source::Index(i as u32))
+            })
+            .collect();
+        let key = edge_sources.first().cloned().unwrap_or(crate::reference::Source::Index(i as u32));
+        let p = Profile { shape: w, frame, edge_sources, key, from_face: false };
+        if ev.bool("fullRevolve") {
+            let res = k::revolve(&p.shape, origin, axis, TAU)?;
+            let names = sweep_names(ev, &p, &res, false, false);
+            tools.push(NamedShape::new(res.shape, names));
+        } else {
+            tools.push(partial(ev, &p, origin, axis)?);
+        }
+    }
+    ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
 }
 
 /// End of one revolve side.

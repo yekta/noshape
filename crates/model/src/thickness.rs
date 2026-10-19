@@ -200,6 +200,13 @@ pub fn ray_thickness(mesh: &SampleMesh, tris: Vec<[DVec3; 3]>) -> Vec<Option<f64
     mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| if *n == DVec3::ZERO { None } else { bvh.cast(*p, -*n, scale * 1e-7) }).collect()
 }
 
+/// Nearest hit of each ray (origin, unit direction) on `tris`, farther
+/// than `t_min`.
+pub fn cast_rays(tris: Vec<[DVec3; 3]>, rays: &[(DVec3, DVec3)], t_min: f64) -> Vec<Option<f64>> {
+    let bvh = Bvh::new(tris);
+    rays.iter().map(|(o, d)| bvh.cast(*o, *d, t_min)).collect()
+}
+
 fn bounds_size(pts: &[DVec3]) -> f64 {
     let (mut lo, mut hi) = (DVec3::splat(f64::MAX), DVec3::splat(f64::MIN));
     for p in pts {
@@ -243,11 +250,14 @@ pub fn rolling_ball_thickness(mesh: &SampleMesh, ray: &[Option<f64>]) -> Vec<Opt
                 return None;
             }
             let mut r = ray.get(i).copied().flatten().map_or(size, |t| t * 0.5);
-            for (lo, hi, ids) in &cells {
-                if p.clamp(*lo, *hi).distance(*p) > 2.0 * r {
-                    continue;
+            // Nearest cells first: the ball shrinks early and the rest are skipped.
+            let mut near: Vec<(f64, usize)> = cells.iter().enumerate().map(|(k, (lo, hi, _))| (p.clamp(*lo, *hi).distance(*p), k)).filter(|(d, _)| *d <= 2.0 * r).collect();
+            near.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+            for (dist, k) in near {
+                if dist > 2.0 * r {
+                    break;
                 }
-                for &j in ids {
+                for &j in &cells[k].2 {
                     let d = mesh.positions[j as usize] - *p;
                     let dn = d.dot(*n);
                     if dn < -eps {

@@ -40,6 +40,7 @@ const ACCENT: u32 = 8u;
 const ERROR: u32 = 16u;
 const DIM: u32 = 32u;
 const QUERY: u32 = 64u;
+const OUTLINE: u32 = 128u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -62,11 +63,15 @@ fn state_of(id: u32) -> u32 {
     return states[id];
 }
 
+// Geometry lying on a section plane counts as cut (live part-studio/74: a
+// face picked as the section plane shows the hatched cap): 0.1 µm.
+const CLIP_EPS: f32 = 1e-7;
+
 fn clipped(world: vec3<f32>) -> bool {
     if (g.flags.x == 0u || (inst.params.y & 1u) != 0u) { return false; }
-    var c = dot(world, g.clip.xyz) > g.clip.w;
-    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w; }
-    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w; }
+    var c = dot(world, g.clip.xyz) > g.clip.w - CLIP_EPS;
+    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w - CLIP_EPS; }
+    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w - CLIP_EPS; }
     return c;
 }
 
@@ -138,6 +143,10 @@ struct MeshOut {
 
 @vertex
 fn vs_mesh(v: MeshIn) -> MeshOut {
+    return mesh_vertex(v);
+}
+
+fn mesh_vertex(v: MeshIn) -> MeshOut {
     var o: MeshOut;
     let w = inst.model * vec4(v.pos, 1.0);
     o.world = w.xyz;
@@ -174,6 +183,20 @@ fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -
     return base * (diff + ambient) + spec;
 }
 
+// Feature previews (instance params.y bit 4): no part lighting. Onshape's
+// preview of a box in the default view has the top and front faces alike and
+// the right side lighter (live part-studio/230): flat ambient plus one light
+// from the viewer's right and slightly below, no highlight.
+fn shade_preview(normal_in: vec3<f32>, front: bool, base: vec3<f32>) -> vec3<f32> {
+    var n = normalize(normal_in);
+    if (!front) { n = -n; }
+    let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
+    let light = normalize(right * 0.866 - g.camera_up.xyz * 0.5);
+    return base * (PREVIEW_AMBIENT + PREVIEW_DIFFUSE * max(dot(n, light), 0.0));
+}
+const PREVIEW_AMBIENT: f32 = 0.5;
+const PREVIEW_DIFFUSE: f32 = 0.74;
+
 // Zebra stripes (Onshape's analysis tool): the reflection of a room with
 // black and white stripes around the viewer, horizontal unless flipped
 // (instance params.y bit 3); the count is in bits 8 and up.
@@ -183,15 +206,14 @@ fn zebra(world: vec3<f32>, normal: vec3<f32>, front: bool) -> vec3<f32> {
     var v: vec3<f32>;
     if (g.camera_pos.w > 0.5) { v = normalize(g.camera_pos.xyz - world); } else { v = -g.camera_fwd.xyz; }
     let r = reflect(-v, n);
-    // Where the reflected ray meets the room (a sphere around the scene).
-    let o = world - g.room.xyz;
-    let b = dot(o, r);
-    let t = -b + sqrt(max(b * b - dot(o, o) + g.room.w * g.room.w, 0.0));
-    let dir = normalize(o + r * t);
+    // The striped room is sampled a fixed distance along the reflected ray,
+    // seen from the model's center: on a flat face the stripes ring a point
+    // and radiate from it (Onshape). Stripes are latitudes about the view's
+    // up axis; flipped, longitudes.
+    let dir = normalize(world - g.room.xyz + r * g.room.w);
     let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
-    var a = dot(dir, g.camera_up.xyz);
-    if ((inst.params.y & 8u) != 0u) { a = dot(dir, right); }
-    let s = asin(clamp(a, -1.0, 1.0)) / 3.14159265 + 0.5;
+    var s = acos(clamp(dot(dir, g.camera_up.xyz), -1.0, 1.0)) / 3.14159265;
+    if ((inst.params.y & 8u) != 0u) { s = atan2(dot(dir, right), dot(dir, -g.camera_fwd.xyz)) / 6.2831853 + 0.5; }
     let count = f32(max(inst.params.y >> 8u, 1u));
     if ((u32(floor(s * count)) & 1u) == 0u) { return vec3(0.0); }
     return vec3(1.0);
@@ -215,6 +237,8 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     } else if (!unlit) {
         if ((st & SELECTED) != 0u && (st & ERROR) == 0u) {
             c = mix(FACE_SELECTED * 0.97, shade(i.world, i.normal, front, FACE_SELECTED), 0.45);
+        } else if ((inst.params.y & 16u) != 0u) {
+            c = shade_preview(i.normal, front, c);
         } else {
             c = shade(i.world, i.normal, front, c);
         }
@@ -231,6 +255,36 @@ fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<
     return mesh_color(i, front);
 }
 
+// Part outline (state OUTLINE): the faces turned away from the viewer,
+// pushed out along their normals by the outline width in screen space.
+// Where they stick out past the part's own front faces they show as the
+// silhouette; everywhere else the front faces hide them.
+@vertex
+fn vs_outline(v: MeshIn) -> MeshOut {
+    var o = mesh_vertex(v);
+    let n = (g.view_proj * vec4(o.normal, 0.0)).xy;
+    let len = length(n);
+    if (len > 1e-6) {
+        let width = 3.0 * g.viewport.z;
+        o.pos = vec4(o.pos.xy + n / len * width * 2.0 / g.viewport.xy * o.pos.w, o.pos.zw);
+    }
+    return o;
+}
+
+@fragment
+fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
+    let st = state_of(i.pick);
+    if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    var v: vec3<f32>;
+    if (g.camera_pos.w > 0.5) {
+        v = normalize(g.camera_pos.xyz - i.world);
+    } else {
+        v = -g.camera_fwd.xyz;
+    }
+    if (dot(normalize(i.normal), v) > 0.0) { discard; }
+    return vec4(g.select.rgb, 1.0);
+}
+
 struct SectionOut {
     @location(0) color: vec4<f32>,
     @builtin(frag_depth) depth: f32,
@@ -243,9 +297,9 @@ struct SectionOut {
 @fragment
 fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut {
     var o: SectionOut;
-    o.color = mesh_color(i, front);
-    o.depth = i.pos.z;
-    if (front || g.flags.x == 0u || (inst.params.y & 3u) != 0u) { return o; }
+    // Back faces only (front faces are culled); anything but a cap is
+    // already drawn by the opaque pass.
+    if (front || g.flags.x == 0u || (inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u) { discard; }
     var dir = g.camera_fwd.xyz;
     if (g.camera_pos.w > 0.5) { dir = normalize(i.world - g.camera_pos.xyz); }
     // Walk back toward the eye: p(s) = world - dir * s. Enter the removed
@@ -258,26 +312,43 @@ fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut
         let f = dot(i.world, pl.xyz) - pl.w;
         if (f > 0.0) { continue; }
         let nd = dot(pl.xyz, dir);
-        if (nd >= 0.0) { return o; }
+        if (nd >= 0.0) { discard; }
         let s = f / nd;
         if (s >= s_in) { s_in = s; normal = pl.xyz; }
     }
-    if (dot(normal, normal) == 0.0) { return o; }
+    if (dot(normal, normal) == 0.0) { discard; }
     let c = i.world - dir * s_in;
     for (var k = 0u; k < g.flags.x; k = k + 1u) {
         let pl = planes[k];
-        if (dot(c, pl.xyz) - pl.w < -1e-5 * max(1.0, abs(pl.w))) { return o; }
+        if (dot(c, pl.xyz) - pl.w < -1e-5 * max(1.0, abs(pl.w))) { discard; }
     }
     let clip = g.view_proj * vec4(c, 1.0);
     o.depth = clamp(clip.z / clip.w, 0.0, 1.0);
     var own = inst.color.rgb;
     if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
     var col = shade(c, normal, true, own);
-    // Hatching: thin diagonal lines (Onshape draws the cut in the part color, hatched).
-    let k = (i.pos.x + i.pos.y) / (12.0 * g.viewport.z);
-    if (fract(k) < 0.13) { col = col * 0.45; }
+    // Hatching (live part-studio/74): 1 px lines at 45° in the cut plane's
+    // own axes (X+Y on Top), 11 px apart vertically on screen (live), half the cap's color.
+    var u = vec3<f32>(1.0, 0.0, 0.0);
+    if (abs(normal.z) < 0.9) { u = vec3<f32>(0.0, 0.0, 1.0); }
+    u = normalize(u - normal * dot(u, normal));
+    let v = cross(normal, u);
+    let across = normalize(u - v);
+    let p0 = g.view_proj * vec4(c, 1.0);
+    let p1 = g.view_proj * vec4(c + across * 0.001, 1.0);
+    let px_per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5) * 1000.0;
+    let spacing = 11.6 * g.viewport.z / max(px_per_unit, 1e-6);
+    let line_w = 1.0 * g.viewport.z / max(px_per_unit, 1e-6);
+    if (fract(dot(c, across) / spacing) < line_w / spacing) { col = col * 0.5; }
     o.color = vec4(col, 1.0);
     return o;
+}
+
+// Section caps, first pass: kept surfaces only (the stencil counts them).
+@fragment
+fn fs_section_count(i: MeshOut) -> @location(0) vec4<f32> {
+    if ((inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(0.0);
 }
 
 @fragment
@@ -527,8 +598,8 @@ fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
 
 // Reflection analysis: a mirror of an equirectangular environment map
 // (bound like an image). inst.extra: y = rotation (rad) about the up axis,
-// z = blur (mip level), w = 1 when locked to the camera (else the world,
-// Z up).
+// z = blur (mip level), w = 1 when locked to the model (world, Z up; else
+// it follows the camera).
 @fragment
 fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     let base = mesh_color(i, front);
@@ -537,7 +608,8 @@ fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(
     var v: vec3<f32>;
     if (g.camera_pos.w > 0.5) { v = normalize(g.camera_pos.xyz - i.world); } else { v = -g.camera_fwd.xyz; }
     var r = reflect(-v, n);
-    if (inst.extra.w > 0.5) {
+    if (inst.extra.w < 0.5) {
+        // Not locked: the environment turns with the camera (Onshape).
         // Camera frame: x right, y toward the viewer, z up.
         let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
         r = vec3(dot(r, right), -dot(r, g.camera_fwd.xyz), dot(r, g.camera_up.xyz));

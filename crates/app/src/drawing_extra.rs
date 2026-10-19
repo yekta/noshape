@@ -11,7 +11,7 @@ use crate::theme::p;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, Textarea};
-use gpui_kit::component::menu::DropdownMenu as _;
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -188,6 +188,55 @@ impl DrawingEditor {
         }
     }
 
+    /// A BOM / cut list table row of the Sheets panel, with Onshape's menu:
+    /// Properties, Switch to BOM, Delete, Replace.
+    fn sheet_table_row(&self, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
+        let id = t.id;
+        let (label, icon) = match t.kind {
+            TableKind::CutList { .. } => ("Cut list", "cut-list"),
+            _ => ("Bill of materials", "drawing-bom"),
+        };
+        // The assembly the BOM lists (its view's root source).
+        let source = t.view().and_then(|v| views::root_view(self.current_sheet(), v)).and_then(|r| match &self.current_sheet().view(r)?.kind {
+            ViewKind::Base { source, .. } => Some(*source),
+            _ => None,
+        });
+        crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
+            .pl(px(indent))
+            .text_color(rgb(0x666666))
+            .child(crate::ui::tree_icon(icon, false, cx))
+            .child(div().flex_1().truncate().child(label))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.selection = vec![Sel::Table(id)];
+                this.redraw(cx);
+            }))
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |this, e: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    let mut entries = vec![MenuEntry::Submenu("Properties".into(), this.table_entries(id).into_iter().filter(|x| !matches!(x, MenuEntry::Separator)).collect())];
+                    if let Some(tab) = source {
+                        entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
+                    }
+                    entries.push(MenuEntry::item("Delete", move |t, _, cx| {
+                        t.selection.clear();
+                        t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
+                    }));
+                    if let Some(tab) = source {
+                        entries.push(MenuEntry::item("Replace", move |t, _, cx| {
+                            t.insert.replace = Some(tab);
+                            t.insert.chooser = Some(1);
+                            cx.notify();
+                        }));
+                    }
+                    let ed = cx.entity();
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    crate::os_menu::open(e.position, menu, window, cx);
+                }),
+            )
+            .into_any_element()
+    }
+
     fn sheet_view_row(&self, sheet: &Sheet, v: &DrawingView, indent: f32, cx: &mut Context<Self>) -> AnyElement {
         // Derived views nest under their parent (20 px per level).
         let mut depth = 0;
@@ -242,7 +291,7 @@ impl DrawingEditor {
         let mut tabs = h_flex().absolute().top(px(5.)).left(px(4.)).gap(px(2.));
         // A dialog panel at the top left (Insert view, View properties)
         // covers the sheet tabs, as in Onshape.
-        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some() || self.sheet_props.is_some() || self.section_dlg.is_some() || self.centermark_dlg.is_some() || self.painter.is_some() || self.inspection.is_some();
+        let covered = matches!(self.tool, Tool::InsertView { .. }) || self.view_props.is_some() || self.sheet_props.is_some() || self.section_dlg.is_some() || self.centermark_dlg.is_some() || self.painter.is_some() || self.inspection.is_some() || self.hatch_dlg.is_some() || self.break_dlg.is_some() || self.aux_dlg.is_some() || self.detail_dlg.is_some();
         for (i, s) in self.drawing.sheets.iter().enumerate().filter(|_| !covered) {
             let active = i == self.sheet;
             tabs = tabs.child(
@@ -318,6 +367,11 @@ impl DrawingEditor {
     /// a 2 px blue rule, "Sort by sheet | Sort by reference" tabs, then the
     /// tree (sheet › reference › views; the active sheet `#e9eef2` with a
     /// 4 px blue bar). Closed, only the sheet chips and the toggle show.
+    /// Left of the drawing tool dialogs: beside the Sheets panel when open.
+    pub fn dialog_left(&self) -> f32 {
+        if self.sheets_open { 262. } else { 4. }
+    }
+
     pub fn render_sheet_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if !self.sheets_open {
             return self.render_sheet_tabs(cx);
@@ -354,6 +408,9 @@ impl DrawingEditor {
         };
         let ref_row = |key: String, name: &str, indent: f32, cx: &mut Context<Self>| {
             crate::ui::tree_row(SharedString::from(key), false)
+                .cursor_pointer()
+                .tooltip(crate::ui::tooltip("Reference manager"))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_ref_manager(cx)))
                 .pl(px(indent))
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
@@ -391,7 +448,20 @@ impl DrawingEditor {
             }
             for (k, (r, vs)) in refs.iter().enumerate() {
                 list = list.child(ref_row(format!("dr-ref-{k}"), r, 6., cx));
+                // Its sheets, with their views underneath.
+                let mut last = None;
                 for (sheet_i, v) in vs {
+                    if last != Some(*sheet_i) {
+                        last = Some(*sheet_i);
+                        let s = &self.drawing.sheets[*sheet_i];
+                        list = list.child(
+                            crate::ui::tree_row(SharedString::from(format!("dr-ref-{k}-sheet-{sheet_i}")), false)
+                                .pl(px(24.))
+                                .text_color(rgb(0x666666))
+                                .child(crate::ui::tree_icon("sheet-page", false, cx))
+                                .child(div().flex_1().truncate().child(s.name.clone())),
+                        );
+                    }
                     list = list.child(self.sheet_view_row(&self.drawing.sheets[*sheet_i], v, 44., cx));
                 }
             }
@@ -405,6 +475,10 @@ impl DrawingEditor {
                         for v in vs {
                             list = list.child(self.sheet_view_row(s, v, 62., cx));
                         }
+                    }
+                    // BOM and cut list tables.
+                    for t in s.tables.iter().filter(|t| matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. })) {
+                        list = list.child(self.sheet_table_row(t, 44., cx));
                     }
                 }
             }
@@ -690,11 +764,16 @@ impl DrawingEditor {
                     overlay.points.push(s);
                 }
             }
-            Tool::Table { kind, view, .. } if *kind == TableTool::General || view.is_some() => {
+            Tool::Table { kind, view, .. } if matches!(kind, TableTool::General | TableTool::Revision) || view.is_some() => {
                 let w = if *kind == TableTool::General { 60.0 } else { 90.0 };
                 overlay.rect([self.cursor[0] - w, self.cursor[1] - 20.0], self.cursor, true);
             }
             Tool::Datum { anchor: Some(a) } => overlay.lines.push((vec![*a, self.cursor], true)),
+            Tool::RevisionCallout { .. } => {
+                let (p, s) = (self.cursor, 8.0);
+                let y0 = p[1] - s * 0.866 / 3.0;
+                overlay.lines.push((vec![[p[0] - s / 2.0, y0], [p[0] + s / 2.0, y0], [p[0], y0 + s * 0.866], [p[0] - s / 2.0, y0]], true));
+            }
             _ => self.more_overlay(overlay),
         }
     }
@@ -771,6 +850,11 @@ impl DrawingEditor {
             }
             Tool::Break { parent, first: None, vertical } => {
                 let v = parent.or_else(|| self.view_at(c));
+                // Onshape: no breaks on detail views.
+                if v.and_then(|v| self.current_sheet().view(v)).is_some_and(|dv| matches!(dv.kind, ViewKind::Detail { .. })) {
+                    self.status = Some("Break views can't be created from detail views".into());
+                    return true;
+                }
                 if v.is_some() {
                     self.tool = Tool::Break { parent: v, first: Some(c), vertical };
                 }
@@ -781,7 +865,8 @@ impl DrawingEditor {
                 let k = if vertical { 0 } else { 1 };
                 let (lo, hi) = (a[k].min(b[k]), a[k].max(b[k]));
                 if hi - lo > 1e-6 {
-                    self.edit_view("Break view", v, cx, |dv| dv.breaks.push(ViewBreak { vertical, a: lo, b: hi, gap_mm: 6.0, style: BreakStyle::ZigZag }));
+                    let (style, gap_mm) = self.break_dlg.as_ref().map(|d| (d.style, d.gap)).unwrap_or((BreakStyle::ZigZag, 6.0));
+                    self.edit_view("Break view", v, cx, |dv| dv.breaks.push(ViewBreak { vertical, a: lo, b: hi, gap_mm, style }));
                 }
                 self.tool = Tool::Select;
             }
@@ -806,6 +891,8 @@ impl DrawingEditor {
                 }
             }
             Tool::Table { kind: TableTool::General, .. } => self.open_new_table_panel(c, window, cx),
+            Tool::Table { kind: TableTool::Revision, .. } => self.place_revision_table(c, cx),
+            Tool::RevisionCallout { revision } => self.place_revision_callout(revision, c, cx),
             Tool::Table { kind, view: None, origin } => {
                 if let Some(v) = self.view_at(c) {
                     self.tool = Tool::Table { kind, view: Some(v), origin };
@@ -819,13 +906,18 @@ impl DrawingEditor {
             Tool::Table { kind, view: Some(v), origin } => {
                 let id = self.current_sheet().next_table_id();
                 let tk = match kind {
-                    TableTool::Bom => TableKind::Bom { view: v },
+                    TableTool::Bom => TableKind::Bom { view: v, structured: false, bottom_to_top: false, overrides: Vec::new() },
+                    TableTool::CutList => TableKind::CutList { view: v, bottom_to_top: false },
                     _ => {
                         let o = origin.clone();
-                        TableKind::Hole { view: v, origin: o.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: o.and_then(|o| o.r), precision: None }
+                        TableKind::Hole { view: v, origin: o.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: o.and_then(|o| o.r), precision: None, flip_x: false, flip_y: false }
                     }
                 };
-                let name = if kind == TableTool::Bom { "BOM table" } else { "Hole table" };
+                let name = match kind {
+                    TableTool::Bom => "BOM table",
+                    TableTool::CutList => "Cut list table",
+                    _ => "Hole table",
+                };
                 self.edit_sheet(name, cx, |s| s.tables.push(Table::new(id, tk, c)));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Table(id)];
@@ -858,6 +950,16 @@ impl DrawingEditor {
             PickTarget::Table(id) => {
                 let t = sheet.table(id)?.clone();
                 let l = self.built.as_ref()?.table_layout(id)?.clone();
+                // A selected table: dragging a divider resizes its cells.
+                let near_grip = len(sub(start, l.free_corner(t.corner))) < self.tol_mm(9.0);
+                if self.selection.contains(&Sel::Table(id))
+                    && !near_grip
+                    && let Some((col, row)) = self.table_divider_at(&l, start)
+                {
+                    let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+                    let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
+                    return Some(Drag::TableDivider { id, col, row, start, widths, heights });
+                }
                 self.selection = vec![Sel::Table(id)];
                 let grip = l.free_corner(t.corner);
                 if len(sub(start, grip)) < self.tol_mm(9.0) {
@@ -887,6 +989,50 @@ impl DrawingEditor {
         }
     }
 
+    /// The divider of a table layout under `p`: (column boundary, row
+    /// boundary) indices (0 and the last are the outer edges; the left and
+    /// top edges move the table instead).
+    pub fn table_divider_at(&self, l: &noshape_model::drawing::tables::TableLayout, p: [f64; 2]) -> Option<(Option<usize>, Option<usize>)> {
+        let tol = self.tol_mm(4.0);
+        let (lo, hi) = (l.min(), l.max());
+        let inside_y = p[1] >= lo[1] - tol && p[1] <= hi[1] + tol;
+        let inside_x = p[0] >= lo[0] - tol && p[0] <= hi[0] + tol;
+        let col = l.xs.iter().enumerate().skip(1).find(|(_, x)| (p[0] - **x).abs() < tol && inside_y).map(|(i, _)| i);
+        let t0 = l.title as usize;
+        // Row boundaries below the title row.
+        let row = l.ys.iter().enumerate().skip(t0 + 1).find(|(_, y)| (p[1] - **y).abs() < tol && inside_x).map(|(i, _)| i - t0);
+        (col.is_some() || row.is_some()).then_some((col, row))
+    }
+
+    /// Double-click on a table divider: fit that column (or row) to its text.
+    pub fn fit_table_divider(&mut self, id: u64, cx: &mut Context<Self>) -> bool {
+        let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return false };
+        let Some((col, row)) = self.table_divider_at(&l, self.cursor) else { return false };
+        let Some(t) = self.current_sheet().table(id).cloned() else { return false };
+        let data = noshape_model::drawing::tables::table_data(&self.drawing, &t, None, None, None, &self.info.revisions, &|s| s.to_string());
+        let auto = noshape_model::drawing::tables::auto_widths(&t, &data);
+        let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+        let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
+        let rows = data.all_rows().iter().map(|r| r.to_vec()).collect::<Vec<_>>();
+        self.edit_table(id, "Fit to content", cx, |t| {
+            if let Some(i) = col.filter(|i| *i > 0) {
+                let mut w = widths.clone();
+                if let (Some(x), Some(a)) = (w.get_mut(i - 1), auto.get(i - 1)) {
+                    *x = *a;
+                }
+                t.col_widths = w;
+            }
+            if let Some(j) = row.filter(|j| *j > 0) {
+                let mut h = heights.clone();
+                if let (Some(x), Some(r)) = (h.get_mut(j - 1), rows.get(j - 1)) {
+                    *x = noshape_model::drawing::tables::row_need(t, j - 1, r, data.padding[1]);
+                }
+                t.row_heights = h;
+            }
+        });
+        true
+    }
+
     pub fn extra_drag_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
         let c = self.cursor;
         let mut dr = self.drawing.clone();
@@ -896,6 +1042,38 @@ impl DrawingEditor {
             Drag::MoveTable { id, start, orig } => {
                 if let Some(t) = sheet.table_mut(*id) {
                     t.position = add(*orig, sub(c, *start));
+                }
+            }
+            Drag::TableDivider { id, col, row, start, widths, heights } => {
+                let d = sub(c, *start);
+                let min = 3.0;
+                if let Some(t) = sheet.table_mut(*id) {
+                    if let Some(i) = *col {
+                        let mut w = widths.clone();
+                        if i == w.len() {
+                            // The right edge: the last column grows, the table too.
+                            w[i - 1] = (w[i - 1] + d[0]).max(min);
+                        } else if i > 0 {
+                            // An inner divider: its neighbours change, the table doesn't.
+                            let dx = d[0].clamp(min - w[i - 1], w[i] - min);
+                            w[i - 1] += dx;
+                            w[i] -= dx;
+                        }
+                        t.col_widths = w;
+                    }
+                    if let Some(j) = *row {
+                        let mut h = heights.clone();
+                        let dy = -d[1];
+                        if j == h.len() {
+                            // The bottom edge: the last row grows.
+                            h[j - 1] = (h[j - 1] + dy).max(min);
+                        } else if j > 0 {
+                            let dy = dy.clamp(min - h[j - 1], h[j] - min);
+                            h[j - 1] += dy;
+                            h[j] -= dy;
+                        }
+                        t.row_heights = h;
+                    }
                 }
             }
             Drag::ResizeTable { id, start, orig, size, widths } => {
@@ -1056,20 +1234,31 @@ impl DrawingEditor {
     }
 
     /// Move a section view to the other side of its cutting line.
+    /// Section line › Flip direction: the arrows and labels swap sides and
+    /// the view regenerates in place (Onshape).
     pub(crate) fn flip_section(&mut self, id: ViewId, cx: &mut Context<Self>) {
-        let sheet = &self.drawing.sheets[self.sheet];
-        let (Some(parent), Some(cut)) = (sheet.parent_of(id), views::section_cut(sheet, id)) else { return };
-        let (Some(pv), Some(v)) = (sheet.view(parent), sheet.view(id)) else { return };
-        let prot = views::view_rotation(sheet, parent);
-        let n = views::rotate2(cut.toward_view, prot);
-        let d = sub(v.position, pv.position);
-        let t = dot(d, n);
-        let pos = sub(v.position, mul(n, 2.0 * t));
-        self.edit_view("Flip section", id, cx, |v| v.position = pos);
+        self.edit_view("Flip direction", id, cx, |v| v.flip = !v.flip);
     }
 
     pub fn annotation_extra_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
         let mut out = Vec::new();
+        // Several callouts selected: align them to the clicked one.
+        let sheet = &self.drawing.sheets[self.sheet];
+        let callouts: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(id) = s { Some(*id) } else { None }).filter(|id| sheet.annotations.iter().any(|x| x.id == *id && matches!(x.kind, AnnotationKind::Balloon { .. }))).collect();
+        if callouts.len() >= 2 && matches!(a.kind, AnnotationKind::Balloon { .. }) {
+            let at = a.position;
+            for (label, axis) in [("Align horizontally", 1usize), ("Align vertically", 0usize)] {
+                let ids = callouts.clone();
+                out.push(MenuEntry::item(label, move |t, _, cx| {
+                    t.edit_sheet(label, cx, |s| {
+                        for x in s.annotations.iter_mut().filter(|x| ids.contains(&x.id)) {
+                            x.position[axis] = at[axis];
+                        }
+                    })
+                }));
+            }
+            out.push(MenuEntry::Separator);
+        }
         let a2 = a.clone();
         if a.kind.is_dimension() {
             out.push(MenuEntry::item("Dimension properties…", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
@@ -1099,6 +1288,9 @@ impl DrawingEditor {
             })));
             out.push(MenuEntry::Separator);
         }
+        if let TableKind::Revision { .. } = t.kind {
+            out.extend(self.revision_table_entries(id, cell));
+        }
         out.extend(self.table_more_entries(&t, cell));
         if let TableKind::Hole { precision, .. } = t.kind {
             let mut prec = vec![MenuEntry::check("Drawing default", precision.is_none(), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = None }))];
@@ -1106,6 +1298,37 @@ impl DrawingEditor {
                 prec.push(MenuEntry::check(format!("{p} decimals"), precision == Some(p), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = Some(p) })));
             }
             out.push(MenuEntry::Submenu("Precision".into(), prec));
+            // Tag axis directions.
+            out.push(MenuEntry::item("Flip X direction", move |t, _, cx| t.edit_table(id, "Flip X direction", cx, |t| if let TableKind::Hole { flip_x, .. } = &mut t.kind { *flip_x = !*flip_x })));
+            out.push(MenuEntry::item("Flip Y direction", move |t, _, cx| t.edit_table(id, "Flip Y direction", cx, |t| if let TableKind::Hole { flip_y, .. } = &mut t.kind { *flip_y = !*flip_y })));
+        }
+        if let TableKind::CutList { bottom_to_top, .. } = t.kind {
+            out.push(MenuEntry::Submenu(
+                "Order".into(),
+                vec![
+                    MenuEntry::check("Top to bottom", !bottom_to_top, move |t, _, cx| t.edit_table(id, "Cut list order", cx, |t| if let TableKind::CutList { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = false })),
+                    MenuEntry::check("Bottom to top", bottom_to_top, move |t, _, cx| t.edit_table(id, "Cut list order", cx, |t| if let TableKind::CutList { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = true })),
+                ],
+            ));
+        }
+        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. }) {
+            out.extend(self.split_entries(&t, cell));
+        }
+        if let TableKind::Bom { structured, bottom_to_top, .. } = t.kind {
+            out.push(MenuEntry::Submenu(
+                "BOM type".into(),
+                vec![
+                    MenuEntry::check("Flattened", !structured, move |t, _, cx| t.edit_table(id, "BOM type", cx, |t| if let TableKind::Bom { structured, .. } = &mut t.kind { *structured = false })),
+                    MenuEntry::check("Structured", structured, move |t, _, cx| t.edit_table(id, "BOM type", cx, |t| if let TableKind::Bom { structured, .. } = &mut t.kind { *structured = true })),
+                ],
+            ));
+            out.push(MenuEntry::Submenu(
+                "Order".into(),
+                vec![
+                    MenuEntry::check("Top to bottom", !bottom_to_top, move |t, _, cx| t.edit_table(id, "BOM order", cx, |t| if let TableKind::Bom { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = false })),
+                    MenuEntry::check("Bottom to top", bottom_to_top, move |t, _, cx| t.edit_table(id, "BOM order", cx, |t| if let TableKind::Bom { bottom_to_top, .. } = &mut t.kind { *bottom_to_top = true })),
+                ],
+            ));
         }
         let corner = t.corner;
         let corners = [("Top right", TableCorner::TopRight), ("Top left", TableCorner::TopLeft), ("Bottom right", TableCorner::BottomRight), ("Bottom left", TableCorner::BottomLeft)]
@@ -1162,7 +1385,7 @@ impl DrawingEditor {
     pub fn break_entries(&self, view: ViewId, index: usize) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         let Some(b) = self.drawing.sheets[self.sheet].view(view).and_then(|v| v.breaks.get(index)).cloned() else { return out };
-        let styles = [("Zig zag", BreakStyle::ZigZag), ("Straight", BreakStyle::Straight), ("Curve", BreakStyle::Curve)]
+        let styles = [("Zig zag", BreakStyle::ZigZag), ("Small zig zag", BreakStyle::SmallZigZag), ("Curve", BreakStyle::Curve), ("Straight", BreakStyle::Straight)]
             .into_iter()
             .map(|(n, st)| MenuEntry::check(n, b.style == st, move |t, _, cx| t.edit_view("Break style", view, cx, |v| if let Some(b) = v.breaks.get_mut(index) { b.style = st })))
             .collect();
@@ -1214,6 +1437,14 @@ impl DrawingEditor {
     /// Double-click / "Edit cell…" on a general table: edit the cell under the cursor.
     pub fn open_cell_panel(&mut self, table: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(table).cloned() else { return };
+        if let TableKind::Revision { .. } = t.kind {
+            self.open_revision_cell(&t, window, cx);
+            return;
+        }
+        if let TableKind::Bom { .. } = t.kind {
+            self.open_bom_cell(&t, window, cx);
+            return;
+        }
         let TableKind::General { cells, .. } = &t.kind else {
             self.status = Some(format!("{} content comes from the model", t.type_name()).into());
             cx.notify();
@@ -1337,7 +1568,7 @@ impl DrawingEditor {
             Panel::Cell { input, row, col, .. } => (
                 "Edit cell",
                 vec![
-                    div().text_xs().text_color(pal.text_faint).child(format!("Row {}, column {} — fields like {{part.name}} allowed", row + 1, col + 1)).into_any_element(),
+                    div().text_xs().text_color(pal.text_faint).child(if *row == usize::MAX { "Title".to_string() } else { format!("Row {}, column {} — fields like {{part.name}} allowed", row + 1, col + 1) }).into_any_element(),
                     Textarea::new(input).w(px(300.)).into_any_element(),
                 ],
             ),
@@ -1375,7 +1606,7 @@ impl DrawingEditor {
                     vec![
                         Self::label_row(
                             "Characteristic",
-                            Button::new("dr-gdt-sym").label(format!("{}  {}", GDT_SYMBOLS[symbol].0, GDT_SYMBOLS[symbol].1)).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &sym_entries, &e1, w, cx)).into_any_element(),
+                            Button::new("dr-gdt-sym").label(format!("{}  {}", GDT_SYMBOLS[symbol].0, GDT_SYMBOLS[symbol].1)).small().outline().dropdown_caret(true).os_dropdown_menu("dr-gdt-sym-dd", true, move |m, w, cx| fill_os_menu(m, &sym_entries, &e1, w, cx)).into_any_element(),
                         ),
                         Self::label_row(
                             "Tolerance",
@@ -1392,7 +1623,7 @@ impl DrawingEditor {
                         ),
                         Self::label_row(
                             "Modifier",
-                            Button::new("dr-gdt-mod").label(if modifier == 0 { "None".to_string() } else { format!("{}  {}", GDT_MODIFIERS[modifier].0, GDT_MODIFIERS[modifier].1) }).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &mod_entries, &e2, w, cx)).into_any_element(),
+                            Button::new("dr-gdt-mod").label(if modifier == 0 { "None".to_string() } else { format!("{}  {}", GDT_MODIFIERS[modifier].0, GDT_MODIFIERS[modifier].1) }).small().outline().dropdown_caret(true).os_dropdown_menu("dr-gdt-mod-dd", true, move |m, w, cx| fill_os_menu(m, &mod_entries, &e2, w, cx)).into_any_element(),
                         ),
                         Self::label_row(
                             "Datums",
@@ -1439,7 +1670,7 @@ impl DrawingEditor {
                         "Units",
                         h_flex()
                             .gap_2()
-                            .child(Button::new("dr-dim-units").label(units.map(|u| u.name()).unwrap_or("Drawing units")).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &unit_entries, &e1, w, cx)))
+                            .child(Button::new("dr-dim-units").label(units.map(|u| u.name()).unwrap_or("Drawing units")).small().outline().dropdown_caret(true).os_dropdown_menu("dr-dim-units-dd", true, move |m, w, cx| fill_os_menu(m, &unit_entries, &e1, w, cx)))
                             .child(Checkbox::new("dr-dim-showunits").label("Show units").checked(show_units).on_change(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(Panel::Dimension { show_units, .. }) = &mut this.panel {
                                     *show_units = *v;
@@ -1449,7 +1680,7 @@ impl DrawingEditor {
                             .into_any_element(),
                     ));
                 }
-                rows.push(Self::label_row("Tolerance", Button::new("dr-dim-tol").label(TOLERANCES[tol]).small().outline().dropdown_caret(true).dropdown_menu(move |m, w, cx| fill_menu(m, &tol_entries, &e2, w, cx)).into_any_element()));
+                rows.push(Self::label_row("Tolerance", Button::new("dr-dim-tol").label(TOLERANCES[tol]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-dim-tol-dd", true, move |m, w, cx| fill_os_menu(m, &tol_entries, &e2, w, cx)).into_any_element()));
                 let unit_hint = if angular { "°" } else { "in dimension units" };
                 match tol {
                     1 => rows.push(Self::label_row("±", h_flex().gap_2().child(Input::new(upper).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child(unit_hint)).into_any_element())),
@@ -1498,6 +1729,10 @@ impl DrawingEditor {
                 self.edit_sheet("Table", cx, |s| s.tables.push(t));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Table(id)];
+            }
+            Panel::Cell { table, row, col, input } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Revision { .. })) => {
+                let text = input.read(cx).value().to_string();
+                self.apply_revision_cell(table, row, col, text, cx);
             }
             Panel::Cell { table, row, col, input } => {
                 let text = input.read(cx).value().to_string();
@@ -1550,7 +1785,11 @@ impl DrawingEditor {
                 });
             }
             Panel::Datum { edit: None, .. } => {}
-            p @ (Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
+            p @ (Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
+            Panel::BomCell { table, item, col, input, over, .. } => {
+                let value = input.read(cx).value().to_string();
+                self.apply_bom_cell(table, item, col, value, over, cx);
+            }
             Panel::Gdt { edit, pos, symbol, diameter, modifier, tolerance, datums } => {
                 let tol = val(&tolerance, cx);
                 let mut frame = vec![GDT_SYMBOLS[symbol].0.to_string(), format!("{}{}{}", if diameter { "Ø" } else { "" }, tol.trim(), GDT_MODIFIERS[modifier].0)];

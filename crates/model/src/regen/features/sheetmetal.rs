@@ -491,7 +491,7 @@ fn bend_edges(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
 fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     let idx = ev.resolve_bodies(ev.query("partToConvert"));
     if idx.is_empty() {
-        return err("Select parts or surfaces to convert");
+        return crate::regen::eval::err_at(&["partToConvert"], "Cannot resolve entities.");
     }
     if ev.length("clearance").unwrap_or(0.0) > 0.0 {
         ev.warnings.push("Clearance from input is not applied yet".into());

@@ -27,8 +27,12 @@ pub enum InstanceSource {
     Part { studio: TabId, body: BodyId, config: ConfigValues },
     /// All parts of a Part Studio as one rigid instance.
     PartStudio { studio: TabId, config: ConfigValues },
-    /// A sub-assembly tab.
-    Assembly { assembly: TabId },
+    /// A sub-assembly tab, in one of its configurations.
+    Assembly {
+        assembly: TabId,
+        #[serde(default, skip_serializing_if = "ConfigValues::is_empty")]
+        config: ConfigValues,
+    },
     /// Mirrored (opposite-handed) version of one part: the part's geometry
     /// reflected across the plane through `point` with normal `normal`
     /// (Part Studio coordinates). Created by mirrors of handed parts.
@@ -46,6 +50,9 @@ pub enum InstanceSource {
     },
     /// A standard content part (fastener) of the built-in library.
     Standard { spec: standard::StandardSpec },
+    /// A sketch of a Part Studio (Insert › Sketches): its curves as a wire
+    /// body that can be positioned and mated like a part.
+    Sketch { studio: TabId, sketch: crate::reference::FeatureId, config: ConfigValues },
 }
 
 impl InstanceSource {
@@ -61,7 +68,7 @@ impl InstanceSource {
     /// Part Studio the source comes from (parts and rigid Part Studios).
     pub fn studio(&self) -> Option<TabId> {
         match self {
-            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } => Some(*studio),
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => Some(*studio),
             InstanceSource::Assembly { .. } | InstanceSource::External { .. } | InstanceSource::Standard { .. } => None,
         }
     }
@@ -130,11 +137,18 @@ pub struct Instance {
     /// with the finest tessellation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub best_tessellation: bool,
+    /// Instance properties… › Reference designator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_designator: Option<String>,
+    /// Dynamic suppression › "Unsuppressed if" expression: the instance is
+    /// suppressed while it evaluates to false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsuppressed_if: Option<String>,
 }
 
 impl Instance {
     pub fn new(id: InstanceId, name: String, source: InstanceSource, placement: Placement) -> Self {
-        Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false }
+        Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None }
     }
 }
 
@@ -351,6 +365,9 @@ pub struct Mate {
     /// Mate indicator hidden in the graphics area (eye icon / Hide).
     #[serde(default)]
     pub hidden: bool,
+    /// Dynamic suppression: suppressed while this expression is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsuppressed_if: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -377,6 +394,7 @@ impl Mate {
             extra: vec![],
             tangent_propagation: true,
             hidden: false,
+            unsuppressed_if: None,
         }
     }
     /// All connectors of the mate.
@@ -593,6 +611,10 @@ pub struct Assembly {
     pub groups: Vec<Group>,
     #[serde(default)]
     pub named_positions: Vec<NamedPosition>,
+    /// Named positions' driving mate degrees of freedom (the table's value
+    /// columns): (mate, value index 0 = Rz, 1..3 = Tx/Ty/Tz).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub position_drivers: Vec<(MateId, u8)>,
     #[serde(default)]
     pub exploded_views: Vec<ExplodedView>,
     /// Assembly mate connector features.
@@ -607,6 +629,65 @@ pub struct Assembly {
     /// Display states: named visibility of instances, mates and mate connectors.
     #[serde(default)]
     pub display_states: Vec<DisplayState>,
+    /// Top row › Properties… (the assembly's metadata; boxed to keep
+    /// `TabContent` small).
+    #[serde(default, skip_serializing_if = "properties_empty")]
+    pub properties: Box<AssemblyProperties>,
+    /// BOM Table panel settings (type, columns, ⋯ options).
+    #[serde(default, skip_serializing_if = "bom::BomSettings::is_default")]
+    pub bom: bom::BomSettings,
+    /// Configuration inputs and configured instances / mates.
+    #[serde(default, skip_serializing_if = "config::AsmConfiguration::is_empty")]
+    pub configuration: config::AsmConfiguration,
+}
+
+fn properties_empty(p: &AssemblyProperties) -> bool {
+    p.is_empty()
+}
+
+/// Onshape's assembly Properties (besides the name, which is the tab name).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AssemblyProperties {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default, skip_serializing_if = "crate::partstudio::ItemMeta::is_empty")]
+    pub meta: crate::partstudio::ItemMeta,
+    /// Subassembly BOM behavior.
+    #[serde(default, skip_serializing_if = "BomBehavior::is_default")]
+    pub bom_behavior: BomBehavior,
+}
+
+impl AssemblyProperties {
+    pub fn is_empty(&self) -> bool {
+        *self == AssemblyProperties::default()
+    }
+}
+
+/// Properties › "Subassembly BOM behavior".
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BomBehavior {
+    #[default]
+    AssemblyAndComponents,
+    AssemblyOnly,
+    ComponentsOnly,
+}
+
+impl BomBehavior {
+    pub const ALL: [BomBehavior; 3] = [BomBehavior::AssemblyAndComponents, BomBehavior::AssemblyOnly, BomBehavior::ComponentsOnly];
+    pub fn label(self) -> &'static str {
+        match self {
+            BomBehavior::AssemblyAndComponents => "Show Assembly and components",
+            BomBehavior::AssemblyOnly => "Show Assembly only",
+            BomBehavior::ComponentsOnly => "Show components only",
+        }
+    }
+    pub fn is_default(&self) -> bool {
+        *self == BomBehavior::AssemblyAndComponents
+    }
 }
 
 /// A folder in the instance list (`instances`) or in the Mate features
@@ -644,6 +725,8 @@ pub struct DisplayState {
     pub known: Vec<u64>,
 }
 pub mod analysis;
+pub mod bom;
+pub mod config;
 pub mod eval;
 pub mod ops;
 pub mod solver;
@@ -901,7 +984,7 @@ impl Assembly {
             let Some(src) = self.instance(seed).cloned() else { continue };
             let nid = InstanceId(self.next_id());
             let name = self.next_instance_name(Self::base_name(&src.name));
-            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: src.best_tessellation });
+            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: src.best_tessellation, reference_designator: None, unsuppressed_if: src.unsuppressed_if.clone() });
             let mut mate_id = None;
             if let (Some(sm), Some(t)) = (&seed_mate, &target) {
                 let mid = MateId(self.next_id());
@@ -964,7 +1047,7 @@ impl Assembly {
     /// Change the configuration of a Part / Part Studio instance.
     pub fn set_instance_config(&mut self, id: InstanceId, cfg: ConfigValues) -> bool {
         match self.instance_mut(id).map(|i| &mut i.source) {
-            Some(InstanceSource::Part { config, .. }) | Some(InstanceSource::PartStudio { config, .. }) | Some(InstanceSource::MirroredPart { config, .. }) | Some(InstanceSource::External { config, .. }) => {
+            Some(InstanceSource::Part { config, .. }) | Some(InstanceSource::PartStudio { config, .. }) | Some(InstanceSource::MirroredPart { config, .. }) | Some(InstanceSource::External { config, .. }) | Some(InstanceSource::Assembly { config, .. }) => {
                 *config = cfg;
                 true
             }

@@ -55,6 +55,13 @@ static SERIF: [&[u8]; 4] = [
     include_bytes!("../fonts/LiberationSerif-Italic.ttf"),
     include_bytes!("../fonts/LiberationSerif-BoldItalic.ttf"),
 ];
+/// Noto Sans (SIL OFL 1.1): Onshape's default drawing font.
+static NOTO_SANS: [&[u8]; 4] = [
+    include_bytes!("../fonts/NotoSans-Regular.ttf"),
+    include_bytes!("../fonts/NotoSans-Bold.ttf"),
+    include_bytes!("../fonts/NotoSans-Italic.ttf"),
+    include_bytes!("../fonts/NotoSans-BoldItalic.ttf"),
+];
 static MONO: [&[u8]; 4] = [
     include_bytes!("../fonts/LiberationMono-Regular.ttf"),
     include_bytes!("../fonts/LiberationMono-Bold.ttf"),
@@ -64,7 +71,9 @@ static MONO: [&[u8]; 4] = [
 
 fn font_data(font: &str, bold: bool, italic: bool) -> &'static [u8] {
     let f = font.to_ascii_lowercase();
-    let family = if f.contains("serif") && !f.contains("sans") {
+    let family = if f.contains("noto") {
+        &NOTO_SANS
+    } else if f.contains("serif") && !f.contains("sans") {
         &SERIF
     } else if f.contains("mono") {
         &MONO

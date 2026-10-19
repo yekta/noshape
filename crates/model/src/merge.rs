@@ -81,7 +81,13 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
 
 /// Merge serialized tabs; returns merged bytes (None = deleted).
 pub fn merge_tab_blobs(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>) -> Option<Vec<u8>> {
-    let parse = |b: Option<&[u8]>| b.and_then(|b| serde_json::from_slice::<Tab>(b).ok());
+    let parse = |b: Option<&[u8]>| {
+        let mut tab = b.and_then(|b| serde_json::from_slice::<Tab>(b).ok())?;
+        if let TabContent::PartStudio(ps) = &mut tab.content {
+            ps.upgrade_saved_params();
+        }
+        Some(tab)
+    };
     match (parse(base), parse(ours), parse(theirs)) {
         (Some(b), Some(mut o), Some(t)) => {
             if let (TabContent::PartStudio(bp), TabContent::PartStudio(op), TabContent::PartStudio(tp)) = (&b.content, &o.content, &t.content) {

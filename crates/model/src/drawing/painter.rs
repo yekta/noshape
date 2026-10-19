@@ -75,10 +75,10 @@ mod tests {
         paint(&src, &mut dst, PaintOptions { style: false, tolerance_precision: false, content: true });
         assert_eq!(dst.format.prefix, "2X ");
         // A note gets the note height from another note, nothing from a dimension.
-        let note = |h: f64, t: &str| Annotation { kind: AnnotationKind::Note { text: t.into(), height_mm: h }, ..Default::default() };
+        let note = |h: f64, t: &str| Annotation { kind: AnnotationKind::note(t, h), ..Default::default() };
         let mut n = note(3.5, "A");
         paint(&note(5.0, "B"), &mut n, PaintOptions { style: true, tolerance_precision: true, content: true });
-        assert_eq!(n.kind, AnnotationKind::Note { text: "B".into(), height_mm: 5.0 });
+        assert_eq!(n.kind, AnnotationKind::note("B", 5.0));
         let before = n.clone();
         paint(&src, &mut n, PaintOptions { style: true, tolerance_precision: true, content: true });
         assert_eq!(n, before);

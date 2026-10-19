@@ -8,7 +8,7 @@ use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -52,7 +52,7 @@ impl DrawingEditor {
     /// Edit an item (double-click it, or Edit in its context menu): the
     /// dialog with its Number; the checkmark applies.
     pub fn edit_inspection(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(n) = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| a.inspection) else { return };
+        let Some(n) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).and_then(|a| a.inspection) else { return };
         let st = cx.new(|cx| InputState::new(window, cx).default_value(n.to_string()));
         self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None });
         self.selection = vec![Sel::Annotation(id)];
@@ -93,7 +93,7 @@ impl DrawingEditor {
         let reorder = d.reorder.as_ref().map(|st| st.read(cx).value().trim().parse::<u32>().unwrap_or(1));
         let prev = d.hover;
         let id = match self.sel_at(self.hover, self.cursor) {
-            Some(Sel::Annotation(id)) if reorder.is_some() || self.current_sheet().annotations.iter().any(|a| a.id == id && a.inspection.is_none()) => Some(id),
+            Some(Sel::Annotation(id)) if reorder.is_some() || self.drawing.sheets[self.sheet].annotations.iter().any(|a| a.id == id && a.inspection.is_none()) => Some(id),
             _ => None,
         };
         if id == prev {
@@ -267,10 +267,10 @@ impl DrawingEditor {
         let ed = cx.entity();
         let shape = self.drawing.props.inspection_shape;
         let ed2 = ed.clone();
-        let shapes = Button::new("insp-shape").label(shape.name()).ghost().small().w(px(120.)).dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+        let shapes = Button::new("insp-shape").label(shape.name()).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
             for s in InspectionShape::ALL {
                 let e = ed2.clone();
-                m = m.item(PopupMenuItem::new(s.name()).checked(s == shape).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit("Inspection border shape", cx, |d| d.props.inspection_shape = s))));
+                m = m.item(crate::os_menu::OsMenuItem::new(s.name()).checked(s == shape).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit("Inspection border shape", cx, |d| d.props.inspection_shape = s))));
             }
             m
         });
@@ -284,10 +284,10 @@ impl DrawingEditor {
             if automatic {
                 let labels = ["Drawing", "Current sheet", "Selected view"];
                 let ed3 = ed.clone();
-                let scope_btn = Button::new("insp-scope").label(labels[scope as usize]).ghost().small().w(px(120.)).dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+                let scope_btn = Button::new("insp-scope").label(labels[scope as usize]).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-scope-dd", true, move |mut m, _, _| {
                     for (i, l) in labels.iter().enumerate() {
                         let e = ed3.clone();
-                        m = m.item(PopupMenuItem::new(*l).checked(i as u8 == scope).on_click(move |_, _, cx| {
+                        m = m.item(crate::os_menu::OsMenuItem::new(*l).checked(i as u8 == scope).on_click(move |_, _, cx| {
                             e.update(cx, |t, cx| {
                                 if let Some(d) = &mut t.inspection {
                                     d.scope = i as u8;
@@ -309,8 +309,8 @@ impl DrawingEditor {
             v_flex()
                 .id("dr-inspection-dlg")
                 .absolute()
-                .top(px(4.))
-                .left(px(4.))
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
                 .w(px(240.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])

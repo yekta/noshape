@@ -16,6 +16,14 @@ You coordinate agents that build noshape (Onshape clone). The user's rules are i
 - Send the user side-by-side screenshots (ours | Onshape) as areas land. Agents save them as
   /tmp/*-shots/final-*.png.
 
+## Build load (user, 2026-10-19: "careful with agents that build the app")
+- Agents that build the app all use ONE shared target dir, /root/target-shared. Cargo's lock serialises the builds,
+  and artifacts are shared. Never give an agent its own target dir again; 7 parallel full builds choked the machine.
+- At most ~5 app-building agents at once. Research/capture agents (no builds) don't count. kern and fs are paused for
+  load; resume them (message_agent) when a building agent finishes.
+- Integration (its own worktree + target-lead) is an extra full build. Run it only at quiet moments, not as an
+  endless loop.
+
 ## Machinery (all of it keeps running without you)
 - **Integration** (`/root/.config/noshape/lead/integrate.sh "<msg>" <tries>`; copy in /tmp/lead/):
   snapshots the shared tree into the worktree /root/noshape-lead, builds, runs `cargo test --workspace

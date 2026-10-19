@@ -5,6 +5,7 @@
 #include "noshape-kernel/src/ffi.rs.h"
 
 #include <BRepTools_History.hxx>
+#include <GProp_GProps.hxx>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
@@ -114,6 +115,25 @@ std::string algo_errors(const Algo& a)
     s.pop_back();
   return s;
 }
+
+// Factor applied to model lengths before fragile OCCT algorithms (blends):
+// they are tuned for millimetre-sized parts. 1 = none (set_working_scale).
+double working_scale();
+
+// Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
+GProp_GProps volume_props(const TopoDS_Shape& s);
+
+// B-rep exchange writers (xt.cpp): a shape with elementary surfaces where it
+// can, B-splines for swept/revolved/offset ones and closed B-spline faces
+// split; whether a face lies on a cylinder/cone/sphere/torus; a face's
+// boundary as oriented edge cycles without seams of such surfaces and
+// without degenerate edges.
+TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s);
+bool                                  exchange_periodic_analytic(const TopoDS_Face& f);
+std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f);
+// One prepared shape as a Parasolid neutral-binary transmit body (from "PS\0\0",
+// no text header: what JT embeds), and its faces in XT order (node ids).
+std::string parasolid_binary_body(const TopoDS_Shape& prepared, std::vector<TopoDS_Face>& faces);
 
 // Convenience: build OpOut from args + output + optional history.
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,

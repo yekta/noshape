@@ -364,7 +364,8 @@ fn section_caps_cover_the_cut() {
     for y in (h / 2 - 15)..(h / 2 + 15) {
         for x in (w / 2 - 15)..(w / 2 + 15) {
             let (r8, g8, b8) = px(x, y);
-            if r8 > 150 && g8 < 80 && b8 < 80 {
+            // Red in any shade (a cap of the buried block would be red too).
+            if r8 > g8 + 60 && r8 > b8 + 60 {
                 red += 1;
             }
             lums.push(r8 + g8 + b8);
@@ -374,6 +375,50 @@ fn section_caps_cover_the_cut() {
     lums.sort();
     let (dark, light) = (lums[lums.len() / 50], lums[lums.len() / 2]);
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
+}
+
+/// Regression: a box cut at mid-height seen from above-front. The front face
+/// below the plane is not cut and must keep its plain shading (the cap only
+/// covers the cut, not faces the view ray reaches before the material).
+#[test]
+fn section_leaves_uncut_faces_unhatched() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color([0.45, 0.6, 0.75, 1.0]));
+    // Remove z > 0.
+    scene.clip = Some(ClipPlane { normal: glam::Vec3::Z, d: 0.0 });
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(0.3, 1.0, -0.8).normalize(), glam::DVec3::Z), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), w as f64 / h as f64);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let lum = |x: u32, y: u32| {
+        let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+        p[0] as i32 + p[1] as i32 + p[2] as i32
+    };
+    let at = |p: glam::DVec3| cam.project(p, glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
+    // The middle of the front face's uncut lower half, and of the cap.
+    let side = at(glam::DVec3::new(0.0, -0.05, -0.025));
+    let cap = at(glam::DVec3::new(0.0, 0.0, 0.0));
+    let spread = |c: glam::DVec2| {
+        let mut v: Vec<i32> = Vec::new();
+        for dy in -8..=8 {
+            for dx in -8..=8 {
+                v.push(lum((c.x as i32 + dx) as u32, (c.y as i32 + dy) as u32));
+            }
+        }
+        v.sort();
+        (v[2], v[v.len() / 2])
+    };
+    let (side_dark, side_mid) = spread(side);
+    assert!(side_dark * 10 > side_mid * 9, "hatch lines on the uncut front face (darkest {side_dark}, median {side_mid})");
+    let (cap_dark, cap_mid) = spread(cap);
+    assert!(cap_dark * 4 < cap_mid * 3, "no hatched cap on the cut (darkest {cap_dark}, median {cap_mid})");
 }
 
 /// Zebra stripes: a shaded box face turns into black and white stripes
@@ -623,4 +668,45 @@ fn hidden_only_lines_show_only_behind_geometry() {
     let visible = px(glam::DVec3::new(0.025, 0.02, 0.0));
     assert!(hidden[0] > 200 && hidden[1] < 80, "the hidden part is drawn: {hidden:?}");
     assert!(visible[0] > 200 && visible[1] > 200, "the visible part is not: {visible:?}");
+}
+
+/// Feature previews shade like Onshape's (live part-studio/230, default
+/// view, white background): the top and front faces alike, the right side
+/// lighter, flat (no highlight), and see-through.
+#[test]
+fn feature_preview_shading_matches_onshape() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (400u32, 300u32);
+    // The app's preview color and opacity (theme FEATURE_PREVIEW, part_studio FEATURE_PREVIEW_ALPHA).
+    let color = [srgb_lin(0x92), srgb_lin(0xae), srgb_lin(0xc5), 0.7];
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color(color).preview());
+    let mut cam = Camera::default();
+    cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), w as f64 / h as f64);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+    let rgb = |p: glam::DVec3| {
+        let q = cam.project(p, glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
+        let px = &f.bgra[((q.y as u32 * w + q.x as u32) * 4) as usize..][..3];
+        [px[2] as i32, px[1] as i32, px[0] as i32]
+    };
+    let top = rgb(glam::DVec3::new(0.0, 0.0, 0.05));
+    let front = rgb(glam::DVec3::new(0.0, -0.05, 0.0));
+    let right = rgb(glam::DVec3::new(0.05, 0.0, 0.0));
+    eprintln!("preview top {top:?} front {front:?} right {right:?}");
+    let near = |a: [i32; 3], b: [i32; 3], tol: i32| a.iter().zip(b).all(|(x, y)| (x - y).abs() <= tol);
+    // Live: top and front (132, 148, 158), right (160, 186, 202).
+    assert!(near(top, front, 6), "top {top:?} and front {front:?} should read alike");
+    assert!(near(top, [132, 148, 158], 6), "top {top:?}");
+    assert!(near(right, [160, 186, 202], 6), "right {right:?}");
+}
+
+fn srgb_lin(c: u8) -> f32 {
+    let c = c as f32 / 255.0;
+    if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
 }

@@ -45,3 +45,19 @@ What `crates/kernel/build.rs` does:
   X11-using objects of TKService are never referenced);
 * re-runs only when the bridge sources, `build.rs` or `OCCT_ROOT` change, so
   Rust-only edits do not recompile the C++.
+
+## openNURBS (Rhino .3dm export)
+
+Rhino export uses openNURBS (McNeel's MIT-style licensed toolkit), built once
+like OCCT and found through `OPENNURBS_ROOT`:
+
+```sh
+scripts/build-opennurbs.sh ~/.cache/noshape/opennurbs   # cmake, C++17; ~5 min
+export OPENNURBS_ROOT=~/.cache/noshape/opennurbs
+```
+
+CI and release builds always include it (`.github/actions/setup-opennurbs`
+caches the build and sets `NOSHAPE_REQUIRE_OPENNURBS=1`, which makes the kernel
+build fail without it). Local builds may leave it out: Rhino export then reports
+that it needs openNURBS. The script builds with all cores (`JOBS=2` limits it).
+

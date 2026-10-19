@@ -37,19 +37,19 @@ pub fn helix() -> FeatureType {
     let p = vec![
         hidden(ParamSpec::query("initEntities", "Initial entities", QueryFilter::AXIS | QueryFilter::CIRCULAR_EDGE)),
         ParamSpec::enum_("axisType", "Helix axis type", &[("SURFACE", "Cylinder/Cone"), ("AXIS", "Axis"), ("CIRCLE", "Circle")]).hints(Hints::HORIZONTAL_ENUM),
-        ParamSpec::query1("entities", "Conical or cylindrical face", QueryFilter::CYLINDRICAL_FACE | QueryFilter::FACE)
+        ParamSpec::query1("entities", "Conical or cylindrical face", QueryFilter::CYLINDRICAL_FACE)
             .hints(Hints::INITIAL_FOCUS)
             .visible(move |v| axis_ty(v, "SURFACE")),
-        ParamSpec::query1("axis", "Helix axis", QueryFilter::AXIS).visible(move |v| axis_ty(v, "AXIS")),
+        ParamSpec::query1("axis", "Helix axis", QueryFilter::AXIS | QueryFilter::CIRCULAR_EDGE).visible(move |v| axis_ty(v, "AXIS")),
         ParamSpec::query1("edge", "Circular edge", QueryFilter::CIRCULAR_EDGE).visible(move |v| axis_ty(v, "CIRCLE")),
-        ParamSpec::enum_("pathType", "Input type", &[("TURNS", "Turns"), ("PITCH", "Pitch"), ("TURNS_PITCH", "Turns and pitch")]),
+        ParamSpec::enum_("pathType", "Input type", &[("TURNS", "Turns"), ("PITCH", "Pitch"), ("TURNS_PITCH", "Turns and pitch")]).hints(Hints::SHOW_LABEL),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
-        ParamSpec::enum_("startType", "Start condition", &[("START_ANGLE", "Start angle"), ("START_POINT", "Start point")]),
+        ParamSpec::enum_("startType", "Start condition", &[("START_ANGLE", "Start angle"), ("START_POINT", "Start point")]).hints(Hints::SHOW_LABEL),
         ParamSpec::flip("oppositeOrigin", "Opposite origin").visible(move |v| axis_ty(v, "AXIS")),
         ParamSpec::num("startAngle", "Start angle", angle_360(0.0)).visible(start_angle),
         ParamSpec::num("startRadius", "Start radius", NumSpec::positive_length(25.0, 1.0)).visible(move |v| start_angle(v) && axis_ty(v, "AXIS")),
         ParamSpec::query1("startPoint", "Start point", QueryFilter::VERTEX | QueryFilter::SKETCH_POINT).visible(move |v| !start_angle(v)),
-        ParamSpec::enum_("endType", "End condition", &[("HEIGHT", "Height"), ("END_POINT", "End point")]).visible(has_end),
+        ParamSpec::enum_("endType", "End condition", &[("HEIGHT", "Height"), ("END_POINT", "End point")]).hints(Hints::SHOW_LABEL).visible(has_end),
         // Zero height is a flat spiral.
         ParamSpec::num("height", "Height", NumSpec::positive_length(25.0, 1.0)).visible(move |v| height_end(v) && !axis_ty(v, "SURFACE")),
         ParamSpec::bool("endRadToggle", "End radius", false)

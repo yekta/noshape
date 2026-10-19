@@ -35,11 +35,11 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("draftFeatureType", "PARTING_LINE") {
         return parting_line_draft(ev);
     }
-    let Some(np) = ev.query("neutralPlane").first() else { return err("Select a neutral plane") };
+    let Some(np) = ev.query("neutralPlane").first() else { return crate::regen::eval::err_at(&["neutralPlane"], "Select a neutral plane.") };
     let frame = ev.resolve_plane(np).ok_or_else(|| fe("The neutral plane could not be resolved"))?;
     let refs = ev.query("draftFaces");
     if refs.is_empty() {
-        return err("Select faces to draft");
+        return crate::regen::eval::err_at(&["draftFaces"], "Select faces to draft.");
     }
     let angle = ev.angle("angle")?;
     let pull = if ev.bool("pullDirection") { -frame.normal } else { frame.normal };
@@ -48,15 +48,171 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return err("The faces to draft no longer exist");
     }
+    let refillet = ev.bool("reFillet");
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let faces = if ev.bool("tangentPropagation") { propagate_tangent_faces(&body.shape, &faces, pull, angle) } else { faces };
+        // Fillets touching the drafted faces are rolled again afterwards, like
+        // Parasolid: with Reapply fillet, also the drafted fillets themselves
+        // (removed, their neighbours drafted, then re-filleted); without, the
+        // drafted fillets become cones and only the fillets beside them are
+        // rebuilt (Onshape D3: 7335.59 / 7353.62 mm³).
+        let blends = blends_to_reapply(&body.shape, &body.faces, &faces, refillet)?;
+        if !blends.is_empty() {
+            draft_reblend(ev, bi, &faces, &blends, pull, &neutral, angle)?;
+            continue;
+        }
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        let res = k::draft(&body.shape, &shapes, pull, &neutral, angle).map_err(kerr("Draft failed"))?;
+        let res = draft_robust(&body.shape, &shapes, pull, &neutral, angle).map_err(kerr("Draft failed"))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         ev.replace_body(bi, res.shape, face_names);
     }
+    Ok(())
+}
+
+/// OCCT's draft, or the boolean construction where it fails or builds an
+/// invalid solid (drafted fillets that vanish, e.g. R3 at 30° over 10 mm).
+fn draft_robust(shape: &Shape, faces: &[Shape], pull: DVec3, neutral: &k::Plane, angle: f64) -> k::Result<k::OpResult> {
+    match k::draft(shape, faces, pull, neutral, angle) {
+        Ok(r) if r.shape.is_valid() => Ok(r),
+        first => k::draft_wedges(shape, faces, pull, neutral, angle).map_err(|e| match first {
+            Ok(_) => e,
+            Err(f) => f,
+        }),
+    }
+}
+
+/// A fillet face of `shape`: a blend (by name) on a cylinder, torus or sphere
+/// that is tangent to a neighbour. Returns its radius.
+fn fillet_radius(shape: &Shape, faces: &[Shape], names: &[Name], ef: &[Vec<u32>], f: usize) -> Option<f64> {
+    if !matches!(&*names[f], TopoName::Face { role: Role::Blend(_), .. }) {
+        return None;
+    }
+    let r = match faces[f].face_surface().ok()? {
+        k::Surface::Cylinder { radius, .. } => radius,
+        k::Surface::Torus { minor_radius, .. } => minor_radius,
+        k::Surface::Sphere { radius, .. } => radius,
+        _ => return None,
+    };
+    let tangent = ef.iter().enumerate().any(|(ei, fs)| fs.len() == 2 && fs.contains(&(f as u32)) && edge_normals(shape, faces, ef, ei).is_some_and(|(a, b)| a.dot(b) > 0.999));
+    tangent.then_some(r)
+}
+
+/// Fillets to remove and roll again around a draft (see `draft`): blends
+/// beside the drafted faces (and, with Reapply fillet, those among them),
+/// plus blends touching those (corner patches).
+fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet: bool) -> FResult<Vec<usize>> {
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let is_blend: Vec<bool> = (0..faces.len()).map(|f| fillet_radius(shape, &faces, names, &ef, f).is_some()).collect();
+    let drafted: BTreeSet<usize> = drafted.iter().copied().collect();
+    let eligible = |f: usize| is_blend[f] && (refillet || !drafted.contains(&f));
+    let mut set: BTreeSet<usize> = BTreeSet::new();
+    for fs in &ef {
+        if fs.len() != 2 {
+            continue;
+        }
+        let (a, b) = (fs[0] as usize, fs[1] as usize);
+        for (x, y) in [(a, b), (b, a)] {
+            if drafted.contains(&x) && !(refillet && is_blend[x]) && eligible(y) {
+                set.insert(y);
+            }
+            if refillet && drafted.contains(&x) && is_blend[x] {
+                set.insert(x);
+            }
+        }
+    }
+    // Blends touching removed blends (corner patches between two fillets).
+    loop {
+        let before = set.len();
+        for fs in &ef {
+            if fs.len() == 2 {
+                let (a, b) = (fs[0] as usize, fs[1] as usize);
+                if set.contains(&a) && eligible(b) {
+                    set.insert(b);
+                }
+                if set.contains(&b) && eligible(a) {
+                    set.insert(a);
+                }
+            }
+        }
+        if set.len() == before {
+            break;
+        }
+    }
+    Ok(set.into_iter().collect())
+}
+
+/// Draft with fillets rolled again: remove `blends`, draft the remaining
+/// drafted faces, fillet the edges between each removed fillet's two support
+/// faces again (one operation, original radii), the new fillet faces keep
+/// the old names.
+fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize], pull: DVec3, neutral: &k::Plane, angle: f64) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    let faces = body.shape.faces();
+    let ef = body.shape.edge_faces()?;
+    let removed: BTreeSet<usize> = blends.iter().copied().collect();
+    // Support pairs (non-removed tangent neighbours) and radius of each removed fillet.
+    let mut supports: Vec<(usize, usize, f64, Name)> = Vec::new();
+    for &bf in blends {
+        let Some(r) = fillet_radius(&body.shape, &faces, &body.faces, &ef, bf) else { continue };
+        let mut tangent: Vec<usize> = Vec::new();
+        for (ei, fs) in ef.iter().enumerate() {
+            if fs.len() != 2 || !fs.contains(&(bf as u32)) {
+                continue;
+            }
+            let other = if fs[0] as usize == bf { fs[1] as usize } else { fs[0] as usize };
+            if removed.contains(&other) || tangent.contains(&other) {
+                continue;
+            }
+            if edge_normals(&body.shape, &faces, &ef, ei).is_some_and(|(a, b)| a.dot(b) > 0.999) {
+                tangent.push(other);
+            }
+        }
+        if let [a, b] = tangent[..] {
+            supports.push((a, b, r, body.faces[bf].clone()));
+        }
+    }
+    let del: Vec<Shape> = blends.iter().map(|f| faces[*f].clone()).collect();
+    let res = k::delete_faces(&body.shape, &del).map_err(kerr("Draft failed (the fillets could not be removed to reapply them)"))?;
+    let n1 = crate::regen::eval::names_for(&res.shape, ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None));
+    let img1 = |f: usize| -> Vec<u32> { res.history.modified(0, ShapeType::Face, f as u32) };
+    let to_draft: Vec<u32> = drafted.iter().filter(|f| !removed.contains(f)).flat_map(|&f| img1(f)).collect();
+    let shapes: Vec<Shape> = to_draft.iter().filter_map(|&f| res.shape.sub_shape(ShapeType::Face, f as usize).ok()).collect();
+    let res2 = draft_robust(&res.shape, &shapes, pull, neutral, angle).map_err(kerr("Draft failed"))?;
+    let n2 = crate::regen::eval::names_for(&res2.shape, ev.name_result(&[&n1], &res2.history, &res2.shape, &BTreeMap::new(), None));
+    let img = |f: usize| -> Vec<u32> { img1(f).into_iter().flat_map(|g| res2.history.modified(0, ShapeType::Face, g)).collect() };
+    let ef2 = res2.shape.edge_faces()?;
+    let mut edges: Vec<usize> = Vec::new();
+    let mut radii: Vec<f64> = Vec::new();
+    let mut keep_name: Vec<(usize, Name)> = Vec::new();
+    for (a, b, r, old) in &supports {
+        let (ia, ib) = (img(*a), img(*b));
+        for (ei, fs) in ef2.iter().enumerate() {
+            if fs.len() == 2 && ((ia.contains(&fs[0]) && ib.contains(&fs[1])) || (ia.contains(&fs[1]) && ib.contains(&fs[0]))) && !edges.contains(&ei) {
+                edges.push(ei);
+                radii.push(*r);
+                keep_name.push((ei, old.clone()));
+            }
+        }
+    }
+    if edges.is_empty() {
+        let names = ev.name_result(&[&n1], &res2.history, &res2.shape, &BTreeMap::new(), None);
+        ev.replace_body(bi, res2.shape, names);
+        return Ok(());
+    }
+    let shapes: Vec<Shape> = edges.iter().filter_map(|e| res2.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+    let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(kerr("Draft failed (the fillets could not be reapplied)"))?;
+    let mut names3 = ev.name_result(&[&n2], &res3.history, &res3.shape, &BTreeMap::new(), Some(&blend_role));
+    let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| n2.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();
+    for n in names3.iter_mut() {
+        if let Some(old) = map.get(n) {
+            *n = old.clone();
+        }
+    }
+    let names3 = dedup_names(ev, names3);
+    ev.replace_body(bi, res3.shape, names3);
     Ok(())
 }
 

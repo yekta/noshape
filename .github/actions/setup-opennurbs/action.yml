@@ -1,0 +1,50 @@
+name: Set up openNURBS
+description: >
+  Restores a cached static openNURBS (Rhino .3dm toolkit) install, or builds it
+  with scripts/build-opennurbs.sh and saves it to the cache right away, then
+  exports OPENNURBS_ROOT. Rhino export is part of every CI and release build
+  (NOSHAPE_REQUIRE_OPENNURBS makes the kernel build fail without it). On
+  Windows the MSVC developer environment must already be active.
+inputs:
+  rev:
+    description: openNURBS commit to build
+    default: eb92af3ba1806b0a34a99aba0d3bda83e3d46083
+runs:
+  using: composite
+  steps:
+    - name: openNURBS paths
+      id: paths
+      shell: bash
+      run: |
+        tmp="$RUNNER_TEMP"
+        if [ "$RUNNER_OS" = "Windows" ]; then tmp="$(cygpath -m "$tmp")"; fi
+        echo "prefix=$tmp/opennurbs-${{ inputs.rev }}" >> "$GITHUB_OUTPUT"
+        echo "work=$tmp/onb" >> "$GITHUB_OUTPUT"
+
+    - name: Restore openNURBS cache
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.paths.outputs.prefix }}
+        key: opennurbs-${{ runner.os }}-${{ runner.arch }}-${{ inputs.rev }}-${{ hashFiles('scripts/build-opennurbs.sh') }}
+
+    - name: Build openNURBS
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        OPENNURBS_REV: ${{ inputs.rev }}
+        OPENNURBS_WORK: ${{ steps.paths.outputs.work }}
+      run: scripts/build-opennurbs.sh "${{ steps.paths.outputs.prefix }}"
+
+    - name: Save openNURBS cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.paths.outputs.prefix }}
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    - name: Export OPENNURBS_ROOT
+      shell: bash
+      run: |
+        echo "OPENNURBS_ROOT=${{ steps.paths.outputs.prefix }}" >> "$GITHUB_ENV"
+        echo "NOSHAPE_REQUIRE_OPENNURBS=1" >> "$GITHUB_ENV"

@@ -1,5 +1,6 @@
 //! Drawing tables: general tables, bills of materials (from an assembly
-//! view) and hole tables (from a view). Content is resolved when the sheet
+//! view), hole tables (from a view) and revision tables (from the release
+//! log). Content is resolved when the sheet
 //! is built; layout and rendering produce plain sheet geometry so tables
 //! appear in every export.
 
@@ -15,6 +16,16 @@ pub struct TableData {
     pub title: Option<String>,
     pub header: Option<Vec<String>>,
     pub rows: Vec<Vec<String>>,
+    /// Pending rows (indices into `rows`), highlighted blue.
+    pub pending: Vec<usize>,
+    /// Cell padding (mm, each side): horizontal, vertical (Drawing
+    /// properties › Tables).
+    pub padding: [f64; 2],
+    /// The header row is the last row (BOM Order "Bottom to top").
+    pub header_bottom: bool,
+    /// Overridden cells (row in `rows`, column): a black triangle at the
+    /// cell's bottom left.
+    pub overridden: Vec<(usize, usize)>,
 }
 
 impl TableData {
@@ -23,8 +34,110 @@ impl TableData {
     }
     /// Every row in display order (header first, no title).
     pub fn all_rows(&self) -> Vec<&Vec<String>> {
-        self.header.iter().chain(self.rows.iter()).collect()
+        if self.header_bottom {
+            self.rows.iter().chain(self.header.iter()).collect()
+        } else {
+            self.header.iter().chain(self.rows.iter()).collect()
+        }
     }
+}
+
+/// One revision of a drawing (a revision table row).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RevisionRow {
+    pub revision: String,
+    pub description: String,
+    /// YYYY-MM-DD (UTC).
+    pub date: String,
+    pub approved: String,
+    /// In a release candidate, not yet released ("B*", highlighted).
+    pub pending: bool,
+    /// Obsoleted.
+    pub obsolete: bool,
+}
+
+/// The revisions of drawing tab `tab` in the release log, oldest first:
+/// one row per release, then a pending row per saved candidate (draft)
+/// that contains the drawing. Descriptions are the package notes.
+pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::TabId) -> Vec<RevisionRow> {
+    use crate::release::{ItemKind, PackageKind};
+    let date = |ms: i64| {
+        let (y, m, d) = super::format::civil_from_days(ms.div_euclid(86_400_000));
+        format!("{y:04}-{m:02}-{d:02}")
+    };
+    let mut out: Vec<RevisionRow> = Vec::new();
+    for p in &log.packages {
+        for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
+            match p.kind {
+                PackageKind::Release => out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: date(p.created), approved: String::new(), pending: false, obsolete: false }),
+                PackageKind::Obsoletion => {
+                    if let Some(r) = out.iter_mut().rev().find(|r| r.revision == it.revision) {
+                        r.obsolete = true;
+                    }
+                }
+            }
+        }
+    }
+    for p in log.drafts.iter().filter(|p| p.kind == PackageKind::Release) {
+        for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
+            out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: String::new(), approved: String::new(), pending: true, obsolete: false });
+        }
+    }
+    out
+}
+
+/// Highlight of pending revision rows.
+pub const PENDING_BLUE: [u8; 3] = [0xd2, 0xe8, 0xfc];
+
+/// Revision table column headers (defaults).
+pub const REVISION_HEADERS: [&str; 4] = ["REV", "DESCRIPTION", "DATE", "APPROVED"];
+
+/// Content of a revision table: the last `visible_rows` revisions in the
+/// table's order, pending revisions marked "*".
+fn revision_data(kind: &TableKind, revisions: &[RevisionRow]) -> TableData {
+    let TableKind::Revision { visible_rows, newest_top, title, headers, descriptions, .. } = kind else { return TableData::default() };
+    let n = (*visible_rows as usize).max(1);
+    let mut shown: Vec<&RevisionRow> = revisions.iter().skip(revisions.len().saturating_sub(n)).collect();
+    if *newest_top {
+        shown.reverse();
+    }
+    let header = REVISION_HEADERS.iter().enumerate().map(|(i, d)| headers.get(i).cloned().flatten().unwrap_or_else(|| d.to_string())).collect();
+    let rows = shown
+        .iter()
+        .map(|r| {
+            let desc = descriptions.iter().find(|(rev, _)| *rev == r.revision).map(|(_, d)| d.clone()).unwrap_or_else(|| r.description.clone());
+            let rev = if r.pending { format!("{}*", r.revision) } else { r.revision.clone() };
+            vec![rev, desc, r.date.clone(), r.approved.clone()]
+        })
+        .collect();
+    let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
+    TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
+}
+
+/// Label of a revision callout: the revision, "*" while pending; None
+/// when the drawing has no revision table, the row's callouts are hidden,
+/// or "Hide revision callouts no longer shown in the table" applies.
+pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev: &str) -> Option<String> {
+    let t = drawing.sheets.iter().flat_map(|s| &s.tables).find(|t| matches!(t.kind, TableKind::Revision { .. }))?;
+    let TableKind::Revision { visible_rows, hide_callouts, hidden, .. } = &t.kind else { return None };
+    if hidden.iter().any(|h| h == rev) {
+        return None;
+    }
+    let shown = &revisions[revisions.len().saturating_sub((*visible_rows as usize).max(1))..];
+    if *hide_callouts && !shown.iter().any(|r| r.revision == rev) {
+        return None;
+    }
+    let pending = revisions.iter().rev().find(|r| r.revision == rev).is_some_and(|r| r.pending);
+    Some(if pending { format!("{rev}*") } else { rev.to_string() })
+}
+
+/// The pointer table "See sheet 1" shows on the other sheets.
+pub fn see_sheet_data(drawing: &Drawing, home: usize) -> TableData {
+    TableData { title: Some("REVISION HISTORY".into()), header: None, rows: vec![vec![format!("SEE SHEET {}", home + 1)]], pending: Vec::new(), padding: padding(drawing), header_bottom: false, overridden: Vec::new() }
+}
+
+fn padding(drawing: &Drawing) -> [f64; 2] {
+    [drawing.props.table_h_padding, drawing.props.table_v_padding]
 }
 
 /// One hole of a hole table.
@@ -86,17 +199,20 @@ fn tag_letters(i: usize) -> String {
 }
 
 /// Resolve a table's content. `view_geo`: geometry of the table's view;
-/// `source`: the view's source; `origin`: resolved hole table origin.
-pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, expand: &dyn Fn(&str) -> String) -> TableData {
-    match &table.kind {
+/// `source`: the view's source; `origin`: resolved hole table origin;
+/// `revisions`: the drawing's revisions (revision tables).
+pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, revisions: &[RevisionRow], expand: &dyn Fn(&str) -> String) -> TableData {
+    let mut data = match &table.kind {
         TableKind::General { cells, title, header } => {
             let mut rows: Vec<Vec<String>> = cells.iter().map(|r| r.iter().map(|c| expand(c)).collect()).collect();
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows }
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
         }
-        TableKind::Bom { .. } => {
+        TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
             let header = Some(vec!["ITEM".into(), "QTY".into(), "PART NAME".into(), "PART NUMBER".into(), "MATERIAL".into()]);
-            let rows = match source {
+            let mut rows: Vec<Vec<String>> = match source {
+                // Structured: nested rows ("3.1"), names indented by level.
+                Some(s) if s.assembly && *structured => s.bom_structured.iter().map(|r| vec![r.item.clone(), r.quantity.to_string(), format!("{}{}", "  ".repeat(r.depth), r.name), r.number.clone(), r.material.clone()]).collect(),
                 Some(s) if s.assembly => s.bom.iter().map(|r| vec![r.item.to_string(), r.quantity.to_string(), r.name.clone(), r.number.clone(), r.material.clone()]).collect(),
                 Some(s) => {
                     // A Part Studio view: one row per part.
@@ -104,9 +220,25 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                 }
                 None => vec![],
             };
-            TableData { title: Some("BILL OF MATERIALS".into()), header, rows }
+            if *bottom_to_top {
+                rows.reverse();
+            }
+            // Overrides replace the model's value in their cells.
+            let mut overridden = Vec::new();
+            for (ri, row) in rows.iter_mut().enumerate() {
+                for (item, col, value) in overrides {
+                    if row.first() == Some(item)
+                        && let Some(c) = row.get_mut(*col)
+                    {
+                        *c = value.clone();
+                        overridden.push((ri, *col));
+                    }
+                }
+            }
+            TableData { title: Some("BILL OF MATERIALS".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden }
         }
-        TableKind::Hole { precision, origin: stored, .. } => {
+        TableKind::Hole { precision, origin: stored, flip_x, flip_y, .. } => {
+            let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
             let header = Some(vec!["TAG".into(), "X LOC".into(), "Y LOC".into(), "SIZE".into()]);
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
@@ -115,11 +247,37 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                 .map(|g| hole_rows(g, origin.unwrap_or(*stored)))
                 .unwrap_or_default()
                 .into_iter()
-                .map(|h| vec![h.tag, num(h.x), num(h.y), format!("Ø{}", num(h.diameter))])
+                .map(|h| vec![h.tag, num(h.x * sx), num(h.y * sy), format!("Ø{}", num(h.diameter))])
                 .collect();
-            TableData { title: Some("HOLE TABLE".into()), header, rows }
+            TableData { title: Some("HOLE TABLE".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
         }
+        TableKind::Revision { .. } => revision_data(&table.kind, revisions),
+        TableKind::CutList { bottom_to_top, .. } => {
+            let header = Some(["ITEM", "QTY", "STANDARD", "DESCRIPTION", "LENGTH", "ANGLE 1", "ANGLE 2"].map(String::from).to_vec());
+            let f = DimFormat::default();
+            let u = length_units(drawing, &f);
+            let len = |m: Option<f64>| m.map(|m| format_number(m / u.meters(), None, default_digits(u))).unwrap_or_default();
+            let ang = |a: Option<f64>| a.map(|a| format!("{}°", format_number(a.to_degrees(), None, 1))).unwrap_or_default();
+            let mut rows: Vec<Vec<String>> = source
+                .map(|s| crate::regen::features::frames::cut_list(&s.context, None))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|r| vec![r.item.to_string(), r.qty.to_string(), r.standard, r.description, len(r.length), ang(r.angle1), ang(r.angle2)])
+                .collect();
+            if *bottom_to_top {
+                rows.reverse();
+            }
+            TableData { title: Some("CUT LIST".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new() }
+        }
+    };
+    // A split table shows its part of the rows.
+    if let Some([a, b]) = table.rows {
+        let n = data.rows.len();
+        data.rows = data.rows[a.min(n)..b.min(n)].to_vec();
+        data.overridden = data.overridden.iter().filter(|(r, _)| *r >= a && *r < b).map(|(r, c)| (r - a, *c)).collect();
     }
+    data.padding = padding(drawing);
+    data
 }
 
 /// Table cell grid on the sheet.
@@ -174,7 +332,7 @@ fn cell_height(table: &Table, r: usize, c: usize) -> f64 {
 /// not widen single columns.
 pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     let n = data.columns();
-    let pad = table.text_height * 2.2;
+    let pad = data.padding[0] * 2.0;
     let mut w = vec![table.text_height * 3.0; n];
     for (ri, row) in data.all_rows().iter().enumerate() {
         for (i, c) in row.iter().enumerate() {
@@ -197,16 +355,16 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     w
 }
 
-/// Height (mm) a row's content needs.
-fn row_need(table: &Table, ri: usize, row: &[String]) -> f64 {
-    let mut need = table.row_height;
+/// Height (mm) a row's content needs (`vpad`: vertical padding).
+pub fn row_need(table: &Table, ri: usize, row: &[String], vpad: f64) -> f64 {
+    let mut need = table.row_height.max(table.text_height + 2.0 * vpad);
     for (ci, c) in row.iter().enumerate() {
         if table.merge_at(ri, ci).is_some_and(|m| m.rows > 1 || (m.row, m.col) != (ri, ci)) {
             continue;
         }
         let h = cell_height(table, ri, ci);
         let lines = c.lines().count().max(1) as f64;
-        need = need.max(table.row_height - table.text_height + h + (lines - 1.0) * h * 1.5).max(h * 2.0);
+        need = need.max(table.row_height - table.text_height + h + (lines - 1.0) * h * 1.5).max(h + 2.0 * vpad + (lines - 1.0) * h * 1.5);
     }
     need
 }
@@ -215,10 +373,14 @@ pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     let widths = if table.col_widths.len() == data.columns() { table.col_widths.clone() } else { auto_widths(table, data) };
     let mut heights: Vec<f64> = Vec::new();
     if data.title.is_some() {
-        heights.push(table.row_height.max(table.text_height * 2.0));
+        heights.push(table.row_height.max(table.text_height * 1.2 + 2.0 * data.padding[1]));
     }
-    for (ri, r) in data.all_rows().iter().enumerate() {
-        heights.push(row_need(table, ri, r));
+    let all = data.all_rows();
+    let set = table.row_heights.len() == all.len();
+    for (ri, r) in all.iter().enumerate() {
+        let need = row_need(table, ri, r, data.padding[1]);
+        // A dragged height holds unless the text needs more.
+        heights.push(if set { table.row_heights[ri].max(table.text_height * 1.4) } else { need });
     }
     if heights.is_empty() {
         heights.push(table.row_height);
@@ -275,13 +437,32 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
     }
     let rows = data.all_rows();
     let nrows = rows.len();
+    let header_n = data.header.is_some() as usize;
+    for &(ri, ci) in &data.overridden {
+        // Overridden BOM cell: a small black triangle at the bottom left.
+        let row = ri + if data.header_bottom { 0 } else { header_n };
+        let (Some(&x), Some(&y)) = (l.xs.get(ci), l.ys.get(row0 + row + 1)) else { continue };
+        let s = th * 0.6;
+        g.fills.push(super::sheet::Fill2 { points: vec![[x + 0.2, y + 0.2], [x + 0.2 + s, y + 0.2], [x + 0.2, y + 0.2 + s]] });
+    }
+    for &pi in &data.pending {
+        // Pending revisions: a blue row and an unfilled triangle by the label.
+        let (Some(&ya), Some(&yb)) = (l.ys.get(row0 + header_n + pi), l.ys.get(row0 + header_n + pi + 1)) else { continue };
+        let (xa, xb) = (lo[0] + 0.15, hi[0] - 0.15);
+        g.backdrops.push((vec![[xa, yb + 0.15], [xb, yb + 0.15], [xb, ya - 0.15], [xa, ya - 0.15]], PENDING_BLUE));
+        let s = th * 0.7;
+        let (x, y) = (l.xs[0] + th * 0.5, (ya + yb) / 2.0 - s / 2.0);
+        g.lines.push(Polyline2 { points: vec![[x, y], [x + s, y], [x + s / 2.0, y + s * 0.87]], style: LineStyle::Thin, closed: true, pick });
+    }
     let ncols = l.xs.len().saturating_sub(1);
     let header_rows = data.header.is_some() as usize;
+    // The heavier rule sits below the header (above it when at the bottom).
+    let rule_after = if data.header_bottom { nrows.saturating_sub(1) } else { header_rows };
     let merged_across = |r0: usize, c0: usize, r1: usize, c1: usize| table.merges.iter().any(|m| m.contains(r0, c0) && m.contains(r1, c1));
     // Row dividers (interrupted by merged ranges).
     for ri in 0..nrows.saturating_sub(1) {
         let y = l.ys[row0 + ri + 1];
-        let style = if ri + 1 == header_rows { LineStyle::Visible } else { LineStyle::Thin };
+        let style = if header_rows > 0 && ri + 1 == rule_after { LineStyle::Visible } else { LineStyle::Thin };
         grid_runs(g, ncols, |c| !merged_across(ri, c, ri + 1, c), |c| ([l.xs[c], y], [l.xs[c + 1], y]), style, pick);
     }
     // Column dividers below the title.
@@ -307,7 +488,7 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
             let lines: Vec<&str> = c.lines().collect();
             let n = lines.len().max(1) as f64;
             let line_h = h * 1.5;
-            let pad = th * 0.8;
+            let pad = data.padding[0];
             for (k, text) in lines.iter().enumerate() {
                 let y = (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0 - k as f64 * line_h;
                 let tw = font::text_width(text, h);
@@ -335,7 +516,7 @@ mod tests {
     #[test]
     fn general_table_layout() {
         let t = Table::new(1, TableKind::General { cells: vec![vec!["A".into(), "Long header".into()], vec!["1".into(), "x\ny".into()]], title: Some("T".into()), header: true }, [400.0, 280.0]);
-        let d = table_data(&Drawing::default(), &t, None, None, None, &|s| s.to_string());
+        let d = table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
         assert_eq!(d.header.as_ref().unwrap().len(), 2);
         assert_eq!(d.rows.len(), 1);
         let l = layout(&t, &d);
@@ -356,5 +537,39 @@ mod tests {
         assert_eq!(tag_letters(0), "A");
         assert_eq!(tag_letters(25), "Z");
         assert_eq!(tag_letters(26), "AA");
+    }
+
+    #[test]
+    fn revision_table_rows() {
+        use crate::release::{ItemKind, Package, PackageKind, ReleaseItem, ReleaseLog};
+        let tab = crate::document::TabId(7);
+        let item = |rev: &str| ReleaseItem { tab, part: None, name: "Drawing 1".into(), kind: ItemKind::Drawing, part_number: "DRW-1".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default() };
+        let pkg = |id: u64, kind: PackageKind, rev: &str, notes: &str, day: i64| Package { id, kind, name: format!("R{id}"), notes: notes.into(), created: day * 86_400_000, version: None, items: vec![item(rev)], re_releasable: false };
+        let mut log = ReleaseLog::default();
+        log.packages.push(pkg(1, PackageKind::Release, "A", "Initial release", 20744));
+        log.packages.push(pkg(2, PackageKind::Release, "B", "Hole moved", 20745));
+        log.drafts.push(pkg(3, PackageKind::Release, "C", "Pending", 0));
+        let rows = revision_rows(&log, tab);
+        assert_eq!(rows.iter().map(|r| (r.revision.as_str(), r.pending)).collect::<Vec<_>>(), vec![("A", false), ("B", false), ("C", true)]);
+        assert_eq!(rows[0].date, "2026-10-18");
+        assert!(revision_rows(&log, crate::document::TabId(8)).is_empty());
+        let mut t = Table::new(1, TableKind::revision(), [400.0, 280.0]);
+        let d = table_data(&Drawing::default(), &t, None, None, None, &rows, &|s| s.to_string());
+        assert_eq!(d.title.as_deref(), Some("REVISION HISTORY"));
+        assert_eq!(d.header.as_ref().unwrap()[0], "REV");
+        assert_eq!(d.rows.iter().map(|r| r[0].as_str()).collect::<Vec<_>>(), vec!["A", "B", "C*"]);
+        assert_eq!((d.rows[1][1].as_str(), d.pending.as_slice()), ("Hole moved", &[2][..]));
+        // Two visible rows, newest at the top.
+        if let TableKind::Revision { visible_rows, newest_top, .. } = &mut t.kind {
+            (*visible_rows, *newest_top) = (2, true);
+        }
+        let d = table_data(&Drawing::default(), &t, None, None, None, &rows, &|s| s.to_string());
+        assert_eq!(d.rows.iter().map(|r| r[0].as_str()).collect::<Vec<_>>(), vec!["C*", "B"]);
+        assert_eq!(d.pending, vec![0]);
+        // The pending row gets a blue backdrop.
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        render(&mut g, &t, &d, &layout(&t, &d), 1);
+        assert_eq!(g.backdrops.len(), 1);
+        assert_eq!(g.backdrops[0].1, PENDING_BLUE);
     }
 }

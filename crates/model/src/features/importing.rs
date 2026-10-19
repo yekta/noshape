@@ -61,6 +61,8 @@ pub fn import_foreign() -> FeatureType {
         hidden(ParamSpec::num("maxAssembliesToCreate", "Maximum number of assemblies created", NumSpec::integer(10, 1, 100_000))),
         hidden(ParamSpec::bool("isInContext", "Is in context", false)),
         ParamSpec::bool("createComposite", "Create composite", false),
+        // Import modal › "Join adjacent surfaces": sew surfaces sharing edges.
+        hidden(ParamSpec::bool("joinAdjacentSurfaces", "Join adjacent surfaces", false)),
         hidden(ParamSpec::text("compositeName", "Composite name", "")),
         hidden(ParamSpec::bool("fixSingleCompositeEmptyName", "Fix single composite empty name", false)),
     ];

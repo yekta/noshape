@@ -34,6 +34,10 @@ pub struct Palette {
     pub text_invalid: Rgba,
     /// Feature dialog body (`--os-feature-dialog-background`, white at 95%).
     pub dialog_bg: Rgba,
+    /// Modal dialogs (Create Drawing, Select a part…): opaque white over a
+    /// 50% black backdrop (live drawing/01, assembly/100).
+    pub modal_bg: Rgba,
+    pub modal_backdrop: Rgba,
     /// Tool search box (`--os-tool-search-button-fill--idle`).
     pub search_fill: Rgba,
     /// Info alerts: fill, outline, text (`--os-info-*`).
@@ -102,6 +106,8 @@ pub const PALETTE: Palette = Palette {
     text_rolled_back: rgb_const(0x999999),
     text_invalid: rgb_const(0xaa252d),
     dialog_bg: rgba_const(0xfffffff2),
+    modal_bg: rgb_const(0xffffff),
+    modal_backdrop: rgba_const(0x00000080),
     search_fill: rgb_const(0xeeeeee),
     info_fill: rgb_const(0xdef1fb),
     info_outline: rgb_const(0xb2ddf6),
@@ -146,6 +152,13 @@ pub mod viewport {
     pub const PREHIGHLIGHT: u32 = 0xffc685;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).
     pub const SELECTION: u32 = 0xffa90a;
+    /// Bodies a feature creates, while its dialog is open (shaded, seen
+    /// through; live part-studio/230 reads `#8494a0` on the lit faces).
+    pub const FEATURE_PREVIEW: u32 = 0x92aec5;
+    /// A Remove / Intersect tool body: cutting (dark gray) or missing the
+    /// parts (dark red; live `#803f43` shaded).
+    pub const TOOL_PREVIEW: u32 = 0x3a3d40;
+    pub const TOOL_PREVIEW_FAIL: u32 = 0x8a3a3f;
     /// "Highlight boundary edges" (help: open edges in red).
     pub const BOUNDARY_EDGE: u32 = 0xe00000;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).

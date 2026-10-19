@@ -21,7 +21,14 @@ use wgpu::util::DeviceExt;
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 const PICK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Uint;
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+/// Depth (and stencil, for section caps) format: float depth with an 8-bit
+/// stencil where the adapter has it, else 24-bit depth + stencil. Chosen
+/// once, when the first device is created.
+static DEPTH_FORMAT_CHOICE: std::sync::OnceLock<wgpu::TextureFormat> = std::sync::OnceLock::new();
+
+fn depth_format() -> wgpu::TextureFormat {
+    *DEPTH_FORMAT_CHOICE.get().unwrap_or(&wgpu::TextureFormat::Depth32FloatStencil8)
+}
 const INST_STRIDE: u64 = 256;
 
 /// Polygon offset of shaded faces (reverse-Z: negative pushes away from the
@@ -299,6 +306,8 @@ struct Textures {
     resolve: wgpu::Texture,
     resolve_view: wgpu::TextureView,
     depth: wgpu::TextureView,
+    /// The depth aspect alone (sampled by the ambient occlusion pass).
+    depth_sample: wgpu::TextureView,
     pick: wgpu::Texture,
     pick_view: wgpu::TextureView,
     pick_depth: wgpu::TextureView,
@@ -489,7 +498,17 @@ fn outside_frustum((lo, hi): (Vec3, Vec3), mvp: &Mat4, (mx, my): (f32, f32)) -> 
     l || r || b || t
 }
 
-fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, pick: bool, section: bool) {
+/// What a [`draw_lists`] pass draws: the pick ids, the section caps, the
+/// part outlines.
+#[derive(Clone, Copy, Default)]
+struct DrawMode {
+    pick: bool,
+    section: bool,
+    outline: bool,
+}
+
+fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
+    let DrawMode { pick, section, outline } = mode;
     let draw = |pass: &mut wgpu::RenderPass, list: &[usize], pipeline: &wgpu::RenderPipeline| {
         if list.is_empty() {
             return;
@@ -536,7 +555,23 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines, &pipelines.line_pick);
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
-        draw(pass, &lists.opaque, if section { &pipelines.mesh_section } else { &pipelines.mesh_opaque });
+        draw(pass, &lists.opaque, &pipelines.mesh_opaque);
+        if outline {
+            draw(pass, &lists.opaque, &pipelines.mesh_outline);
+        }
+        if section {
+            // Per part: reset the stencil, count the part's kept surfaces
+            // behind each pixel, then draw its caps where the count says the
+            // plane point is inside it (so a part lying wholly behind the
+            // cut, buried in another, gets no cap).
+            pass.set_stencil_reference(0);
+            for &i in &lists.opaque {
+                pass.set_pipeline(&pipelines.stencil_reset);
+                pass.draw(0..3, 0..1);
+                draw(pass, &[i], &pipelines.section_count);
+                draw(pass, &[i], &pipelines.mesh_section);
+            }
+        }
         draw(pass, &lists.reflective, &pipelines.mesh_reflect);
         // Images before transparent meshes: their opaque texels write depth,
         // so datum planes / region fills behind them are hidden and those
@@ -627,8 +662,14 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
 struct Pipelines {
     background: wgpu::RenderPipeline,
     mesh_opaque: wgpu::RenderPipeline,
-    /// Opaque meshes while a section view cuts: draws the caps.
+    /// Silhouettes of outlined parts (state OUTLINE), after the opaque faces.
+    mesh_outline: wgpu::RenderPipeline,
+    /// Section view: counts the surfaces behind each pixel in the stencil,
+    /// then draws the caps where the plane is inside the material.
+    section_count: wgpu::RenderPipeline,
     mesh_section: wgpu::RenderPipeline,
+    /// Full-screen stencil reset to 0 (no color, no depth).
+    stencil_reset: wgpu::RenderPipeline,
     mesh_transparent: wgpu::RenderPipeline,
     /// Opaque meshes mirroring an environment map (image bind group 2).
     mesh_reflect: wgpu::RenderPipeline,
@@ -718,10 +759,12 @@ impl Renderer {
         let adapter_info = adapter.get_info();
         let frames_in_flight = frames_in_flight_for(&adapter_info);
         log::info!("noshape renderer using {:?} ({:?})", adapter_info.name, adapter_info.backend);
+        let float_stencil = adapter.features().contains(wgpu::Features::DEPTH32FLOAT_STENCIL8);
+        DEPTH_FORMAT_CHOICE.get_or_init(|| if float_stencil { wgpu::TextureFormat::Depth32FloatStencil8 } else { wgpu::TextureFormat::Depth24PlusStencil8 });
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
-                required_features: wgpu::Features::empty(),
+                required_features: if depth_format() == wgpu::TextureFormat::Depth32FloatStencil8 { wgpu::Features::DEPTH32FLOAT_STENCIL8 } else { wgpu::Features::empty() },
                 required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
@@ -941,7 +984,14 @@ impl Renderer {
             bias: wgpu::DepthBiasState,
             samples: u32,
         }
-        let make_in = |layout: &wgpu::PipelineLayout, p: P| {
+        // Section caps: the counting pass and the caps (see draw_lists).
+        struct Extra {
+            stencil: wgpu::StencilState,
+            writes: wgpu::ColorWrites,
+            cull: Option<wgpu::Face>,
+        }
+        let plain = || Extra { stencil: Default::default(), writes: wgpu::ColorWrites::ALL, cull: None };
+        let make_full = |layout: &wgpu::PipelineLayout, p: P, x: Extra| {
             d.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(p.label),
                 layout: Some(layout),
@@ -957,7 +1007,7 @@ impl Renderer {
                     targets: &[Some(wgpu::ColorTargetState {
                         format: p.format,
                         blend: p.blend,
-                        write_mask: wgpu::ColorWrites::ALL,
+                        write_mask: x.writes,
                     })],
                     compilation_options: Default::default(),
                 }),
@@ -965,16 +1015,16 @@ impl Renderer {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,
+                    cull_mode: x.cull,
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
                     conservative: false,
                 },
                 depth_stencil: p.depth.map(|(write, cmp)| wgpu::DepthStencilState {
-                    format: DEPTH_FORMAT,
+                    format: depth_format(),
                     depth_write_enabled: Some(write),
                     depth_compare: Some(cmp),
-                    stencil: Default::default(),
+                    stencil: x.stencil.clone(),
                     bias: p.bias,
                 }),
                 multisample: wgpu::MultisampleState { count: p.samples, mask: !0, alpha_to_coverage_enabled: false },
@@ -982,6 +1032,7 @@ impl Renderer {
                 cache: None,
             })
         };
+        let make_in = |layout: &wgpu::PipelineLayout, p: P| make_full(layout, p, plain());
         let make = |p: P| make_in(layout, p);
         let ge = wgpu::CompareFunction::GreaterEqual;
         let alpha = Some(wgpu::BlendState::ALPHA_BLENDING);
@@ -992,7 +1043,53 @@ impl Renderer {
         let pipelines = Pipelines {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
-            mesh_section: make(P { label: "mesh-section", vs: "vs_mesh", fs: "fs_mesh_section", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            mesh_outline: make(P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }),
+            // Counting: every kept surface along the ray, front faces -1 and
+            // back faces +1; no color or depth.
+            section_count: make_full(
+                layout,
+                P { label: "section-count", vs: "vs_mesh", fs: "fs_section_count", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa },
+                Extra {
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState { compare: wgpu::CompareFunction::Always, fail_op: wgpu::StencilOperation::Keep, depth_fail_op: wgpu::StencilOperation::Keep, pass_op: wgpu::StencilOperation::DecrementWrap },
+                        back: wgpu::StencilFaceState { compare: wgpu::CompareFunction::Always, fail_op: wgpu::StencilOperation::Keep, depth_fail_op: wgpu::StencilOperation::Keep, pass_op: wgpu::StencilOperation::IncrementWrap },
+                        read_mask: 0xff,
+                        write_mask: 0xff,
+                    },
+                    writes: wgpu::ColorWrites::empty(),
+                    cull: None,
+                },
+            ),
+            stencil_reset: make_full(
+                layout,
+                P { label: "stencil-reset", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa },
+                Extra {
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState { compare: wgpu::CompareFunction::Always, fail_op: wgpu::StencilOperation::Zero, depth_fail_op: wgpu::StencilOperation::Zero, pass_op: wgpu::StencilOperation::Zero },
+                        back: wgpu::StencilFaceState { compare: wgpu::CompareFunction::Always, fail_op: wgpu::StencilOperation::Zero, depth_fail_op: wgpu::StencilOperation::Zero, pass_op: wgpu::StencilOperation::Zero },
+                        read_mask: 0xff,
+                        write_mask: 0xff,
+                    },
+                    writes: wgpu::ColorWrites::empty(),
+                    cull: None,
+                },
+            ),
+            // Caps: back faces where the count is not zero (the plane point is
+            // inside the material), drawn at the plane.
+            mesh_section: make_full(
+                layout,
+                P { label: "mesh-section", vs: "vs_mesh", fs: "fs_mesh_section", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa },
+                Extra {
+                    stencil: wgpu::StencilState {
+                        front: wgpu::StencilFaceState { compare: wgpu::CompareFunction::NotEqual, fail_op: wgpu::StencilOperation::Keep, depth_fail_op: wgpu::StencilOperation::Keep, pass_op: wgpu::StencilOperation::Keep },
+                        back: wgpu::StencilFaceState { compare: wgpu::CompareFunction::NotEqual, fail_op: wgpu::StencilOperation::Keep, depth_fail_op: wgpu::StencilOperation::Keep, pass_op: wgpu::StencilOperation::Keep },
+                        read_mask: 0xff,
+                        write_mask: 0,
+                    },
+                    writes: wgpu::ColorWrites::ALL,
+                    cull: Some(wgpu::Face::Front),
+                },
+            ),
             mesh_reflect: make_in(image_layout, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
@@ -1096,7 +1193,7 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
                     None => [inst.line_scale, 0.0, 0.0, 0.0],
@@ -1228,7 +1325,8 @@ impl Renderer {
                     view: &tex.depth,
                     // Kept for the ambient occlusion pass.
                     depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
-                    stencil_ops: None,
+                    // Section caps count surfaces in the stencil.
+                    stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
@@ -1239,13 +1337,14 @@ impl Renderer {
             pass.set_bind_group(1, bind_inst, &[0]);
             pass.set_pipeline(&pipelines.background);
             pass.draw(0..3, 0..1);
-            draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, bind_inst, false, req.scene.clip.is_some());
+            let outline = req.scene.states.iter().any(|s| s & crate::scene::state::OUTLINE != 0);
+            draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, bind_inst, DrawMode { section: req.scene.clip.is_some(), outline, ..Default::default() });
         }
         if ao_strength > 0.001
             && let Some(ao) = ao.as_ref()
         {
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength };
-            ao.encode(device, queue, &mut encoder, &tex.depth, &tex.resolve_view, frame);
+            ao.encode(device, queue, &mut encoder, &tex.depth_sample, &tex.resolve_view, frame);
         }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: &tex.resolve, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
@@ -1315,7 +1414,7 @@ impl Renderer {
                     multiview_mask: None,
                 });
                 pass.set_bind_group(0, self.bind_pick.as_ref().expect("bind groups"), &[]);
-                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), true, false);
+                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), DrawMode { pick: true, ..Default::default() });
             }
             self.lists = lists;
             self.targets.get_mut(&target).expect("target").pick_valid = true;
@@ -1510,12 +1609,14 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     let resolve = tex("color", COLOR_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
     let resolve_view = resolve.create_view(&Default::default());
     // Also sampled by the ambient occlusion pass.
-    let depth = tex("depth", DEPTH_FORMAT, msaa, att | wgpu::TextureUsages::TEXTURE_BINDING).create_view(&Default::default());
+    let depth_tex = tex("depth", depth_format(), msaa, att | wgpu::TextureUsages::TEXTURE_BINDING);
+    let depth = depth_tex.create_view(&Default::default());
+    let depth_sample = depth_tex.create_view(&wgpu::TextureViewDescriptor { aspect: wgpu::TextureAspect::DepthOnly, ..Default::default() });
     let pick = tex("pick", PICK_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
     let pick_view = pick.create_view(&Default::default());
-    let pick_depth = tex("pick-depth", DEPTH_FORMAT, 1, att).create_view(&Default::default());
+    let pick_depth = tex("pick-depth", depth_format(), 1, att).create_view(&Default::default());
     let padded_row = (width * 4).div_ceil(256) * 256;
-    Textures { width, height, msaa, color_msaa, resolve, resolve_view, depth, pick, pick_view, pick_depth, padded_row }
+    Textures { width, height, msaa, color_msaa, resolve, resolve_view, depth, depth_sample, pick, pick_view, pick_depth, padded_row }
 }
 
 const SRGB_STEPS: usize = 4096;
@@ -1764,13 +1865,13 @@ fn zebra_bits(z: Option<crate::scene::Zebra>) -> u32 {
     z.map_or(0, |z| 4 | ((z.flip as u32) << 3) | (z.stripes.min(0xff_ffff) << 8))
 }
 
-/// The striped room zebra stripes reflect: a sphere around the scene, big
-/// enough that flat faces show a few broad stripes.
+/// The striped room zebra stripes reflect: centered on the scene, sampled
+/// a third of its size along each reflected ray.
 fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
     match bounds {
         Some((lo, hi)) => {
             let c = (lo + hi) * 0.5;
-            [c.x, c.y, c.z, ((hi - lo).length() * 1.5).max(1e-6)]
+            [c.x, c.y, c.z, ((hi - lo).length() * 0.35).max(1e-6)]
         }
         None => [0.0, 0.0, 0.0, 1.0],
     }

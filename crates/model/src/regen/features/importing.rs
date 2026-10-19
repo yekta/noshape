@@ -148,6 +148,18 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     if tools.is_empty() {
         return err("The imported file contains no parts or surfaces");
     }
+    // "Join adjacent surfaces": sew the surface bodies along shared edges
+    // (closed results become solids).
+    if ev.bool("joinAdjacentSurfaces") {
+        let (solids, surfaces): (Vec<k::Shape>, Vec<k::Shape>) = tools.into_iter().partition(|t| t.count(ShapeType::Solid) > 0);
+        tools = solids;
+        if surfaces.len() > 1 {
+            let sewn = k::sew(&surfaces, 1e-6, true)?.shape;
+            tools.extend(if sewn.count(ShapeType::Solid) > 0 { sewn.solids() } else if sewn.count(ShapeType::Shell) > 0 { sewn.shells() } else { vec![sewn] });
+        } else {
+            tools.extend(surfaces);
+        }
+    }
     for p in tools {
         let kind = if p.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
         let names = new_face_names(ev, &p);

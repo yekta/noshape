@@ -1,7 +1,19 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include "internal.hpp"
 
+#include <atomic>
+#include <cmath>
+
+#include <BOPAlgo_ArgumentAnalyzer.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <GProp_GProps.hxx>
+#include <BRep_Tool.hxx>
+#include <Poly_Triangulation.hxx>
+#include <Bnd_Box.hxx>
+#include <BRepGProp.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
 #include <ShapeFix_Shape.hxx>
@@ -18,6 +30,19 @@ namespace noshape {
 
 void fail_invalid(const std::string& msg) { throw std::runtime_error("invalid: " + msg); }
 void fail_op(const std::string& msg) { throw std::runtime_error("failed: " + msg); }
+
+namespace {
+std::atomic<double> g_working_scale{1.0};
+}
+
+double working_scale() { return g_working_scale.load(std::memory_order_relaxed); }
+
+void set_working_scale(double k)
+{
+  if (!(k > 0) || !std::isfinite(k))
+    fail_invalid("working scale must be positive");
+  g_working_scale.store(k, std::memory_order_relaxed);
+}
 void fail_unsupported(const std::string& msg) { throw std::runtime_error("unsupported: " + msg); }
 void fail_io(const std::string& msg) { throw std::runtime_error("io: " + msg); }
 
@@ -513,6 +538,70 @@ bool is_valid(const OcShape& s)
     return false;
   BRepCheck_Analyzer a(s.shape);
   return a.IsValid();
+}
+
+double mesh_volume(const TopoDS_Shape& shape)
+{
+  TopoDS_Shape s = BRepBuilderAPI_Copy(shape).Shape();
+  Bnd_Box      b;
+  BRepBndLib::Add(s, b);
+  const double size = b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
+  BRepMesh_IncrementalMesh mesh(s, size * 2e-5, false, 0.05);
+  double v = 0;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    TopLoc_Location    loc;
+    const occ::handle<Poly_Triangulation>& t = BRep_Tool::Triangulation(f, loc);
+    if (t.IsNull())
+      continue;
+    for (int i = 1; i <= t->NbTriangles(); ++i)
+    {
+      int a, bb, c;
+      t->Triangle(i).Get(a, bb, c);
+      if (f.Orientation() == TopAbs_REVERSED)
+        std::swap(bb, c);
+      const gp_XYZ p = t->Node(a).Transformed(loc).XYZ(), q = t->Node(bb).Transformed(loc).XYZ(),
+                   r = t->Node(c).Transformed(loc).XYZ();
+      v += p.Dot(q.Crossed(r)) / 6.0;
+    }
+  }
+  return v;
+}
+
+GProp_GProps volume_props(const TopoDS_Shape& s)
+{
+  // OCCT's two integrators fail on different surfaces: plain Gauss on rational
+  // B-splines (a NURBS cylinder: +0.9 %), the adaptive one on strongly
+  // rational extrusions (a conic fillet with weight 4: +4.5 % on the tool).
+  // When they disagree, a fine mesh decides.
+  GProp_GProps gauss, adaptive;
+  BRepGProp::VolumeProperties(s, gauss);
+  BRepGProp::VolumeProperties(s, adaptive, 1e-7, true);
+  const double a = gauss.Mass(), b = adaptive.Mass();
+  if (std::abs(a - b) <= 1e-7 * std::max({std::abs(a), std::abs(b), 1e-300}))
+    return adaptive;
+  const double m = mesh_volume(s);
+  return std::abs(a - m) < std::abs(b - m) ? gauss : adaptive;
+}
+
+bool self_intersects(const OcShape& s)
+{
+  if (s.shape.IsNull())
+    return false;
+  BOPAlgo_ArgumentAnalyzer a;
+  a.SetShape1(s.shape);
+  a.ArgumentTypeMode()   = false;
+  a.SelfInterMode()      = true;
+  a.SmallEdgeMode()      = false;
+  a.RebuildFaceMode()    = false;
+  a.TangentMode()        = false;
+  a.MergeVertexMode()    = false;
+  a.MergeEdgeMode()      = false;
+  a.ContinuityMode()     = false;
+  a.CurveOnSurfaceMode() = false;
+  a.Perform();
+  return a.HasFaulty();
 }
 
 std::unique_ptr<OcShape> fix_shape(const OcShape& s, double tolerance)

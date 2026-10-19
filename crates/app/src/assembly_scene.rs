@@ -91,6 +91,9 @@ pub struct AsmSceneOptions {
     pub section: Vec<(DVec3, f64)>,
     /// Opacity of transparent instances (Isolate / Make transparent slider).
     pub dim_alpha: Option<f32>,
+    /// Dimmed (transparent) instances stay pickable (Isolate › Select
+    /// transparent geometry, Alt held).
+    pub pick_dimmed: bool,
 }
 
 fn to_mat4(m: &DMat4) -> Mat4 {
@@ -142,17 +145,25 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             let e = theme::lin(theme::viewport::ERROR);
             color = [color[0] * 0.4 + e[0] * 0.6, color[1] * 0.4 + e[1] * 0.6, color[2] * 0.4 + e[2] * 0.6, color[3]];
         }
-        if o.kind != BodyKind::Wire {
+        // Sketch instances (wire bodies) are drawn as their translucent
+        // region fill under thin gray curves (live assembly/123).
+        let sketch = o.kind == BodyKind::Wire;
+        if !sketch || !o.mesh.indices.is_empty() {
             let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base);
-            if dimmed {
+            if (dimmed && !opts.pick_dimmed) || sketch {
                 inst = inst.unpickable();
             }
             scene.instances.push(inst);
         }
         if !dimmed {
-            let edge_color = theme::lin(theme::viewport::EDGE);
+            let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
             scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
             scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).with_transform(t).pick_base(vert_base).pick_only().layer(2));
+            if sketch {
+                // The sketch's points as small gray dots.
+                let dots = PointData { points: o.mesh.vertices.iter().map(|p| PointSprite { position: *p, color: [0x99, 0x99, 0x99, 255], pick_id: 0, size: 4.0, style: 0, _pad: 0 }).collect() };
+                scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&dots))).per_primitive_color().with_transform(t).unpickable().layer(2));
+            }
         }
     }
     let static_instances = scene.instances.len();
@@ -218,6 +229,9 @@ pub struct Highlights {
     pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
     pub trails: Vec<(DVec3, DVec3)>,
+    /// Selected mate's rotation value (live 305): a blue dashed circle
+    /// with two arrowheads in the connector's XY plane (frame, radius).
+    pub value_arcs: Vec<(Frame, f64)>,
 }
 
 /// Manipulator handle: translate along axis k, rotate about axis k,
@@ -347,6 +361,26 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     for (a, b, strong) in &h.mate_lines {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: theme::rgb8(theme::viewport::SELECTION), pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP });
+    }
+    for (f, r) in &h.value_arcs {
+        const N: usize = 64;
+        let blue = [26, 53, 184, 255];
+        let at = |a: f64| f.origin + f.rotation * DVec3::new(a.cos() * r, a.sin() * r, 0.0);
+        for i in 0..N {
+            let (a0, a1) = (i as f64 / N as f64 * std::f64::consts::TAU, (i + 1) as f64 / N as f64 * std::f64::consts::TAU);
+            lines.segments.push(LineSegment { a: at(a0).as_vec3().into(), b: at(a1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+        }
+        // Arrowheads pointing along the circle (counter-clockwise).
+        for a in [0.35f64, std::f64::consts::PI + 0.35] {
+            let tip = at(a);
+            let tangent = f.rotation * DVec3::new(-a.sin(), a.cos(), 0.0);
+            let radial = f.rotation * DVec3::new(a.cos(), a.sin(), 0.0);
+            let len = r * 0.18;
+            for side in [1.0, -1.0] {
+                let base = tip - tangent * len + radial * (side * len * 0.4);
+                lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+            }
+        }
     }
     for (a, b) in &h.trails {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });

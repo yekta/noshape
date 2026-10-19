@@ -192,6 +192,8 @@ pub struct Instance {
     pub ignore_clip: bool,
     /// Drawn with its flat color, without lighting (construction planes).
     pub unlit: bool,
+    /// Lit like Onshape's feature previews (see [`Instance::preview`]).
+    pub preview: bool,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
     /// Line width multiplier for line instances (Graphics preferences line widths).
@@ -213,7 +215,7 @@ pub struct Instance {
 /// Reflection analysis: an equirectangular environment image (uploaded
 /// with [`crate::Uploader::upload_image`]; its corners don't matter) turned
 /// by `rotation` radians about the up axis, optionally blurred, and either
-/// fixed in the world (Z up) or locked to the camera.
+/// following the camera or, `lock`ed, fixed to the model (Z up).
 #[derive(Clone)]
 pub struct Reflection {
     pub environment: ImageHandle,
@@ -243,6 +245,7 @@ impl Instance {
             pickable: !image,
             ignore_clip: false,
             unlit: false,
+            preview: false,
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
@@ -302,6 +305,14 @@ impl Instance {
         self
     }
 
+    /// Shade as a feature preview (Onshape: flat faces lit only from the
+    /// viewer's lower right, so the top and front read alike and darker than
+    /// the right side), instead of the part lighting.
+    pub fn preview(mut self) -> Self {
+        self.preview = true;
+        self
+    }
+
     /// Shade as a mirror of an environment map.
     pub fn reflection(mut self, reflection: Option<Reflection>) -> Self {
         self.reflection = reflection;
@@ -328,6 +339,10 @@ pub mod state {
     pub const DIM: u32 = 32;
     /// Entity of a hovered dialog selection row (yellow-green).
     pub const QUERY: u32 = 64;
+    /// Faces of a part picked in a dialog field: the part's silhouette is
+    /// outlined in the selection color, its faces keep their shading
+    /// (Onshape, live part-studio/440).
+    pub const OUTLINE: u32 = 128;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -445,6 +460,7 @@ impl Scene {
                     && a.pickable == b.pickable
                     && a.ignore_clip == b.ignore_clip
                     && a.unlit == b.unlit
+                    && a.preview == b.preview
                     && a.line_scale == b.line_scale
                     && a.hidden_only == b.hidden_only
                     && a.layer == b.layer

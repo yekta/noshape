@@ -218,7 +218,7 @@ impl GraphicsPrefsDialog {
                     .border_color(rgb(0x888888))
                     .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]),
             )
-            .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().size_full())
+            .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| set(this, e.position.x, t2.get(), cx)))
             .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
                 if e.pressed_button == Some(MouseButton::Left) {

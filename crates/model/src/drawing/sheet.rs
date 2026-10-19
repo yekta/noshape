@@ -102,7 +102,198 @@ pub struct SheetGeometry {
     /// Indices into `texts` of overridden dimension values (exports can
     /// underline them).
     pub overridden: Vec<usize>,
+    /// Colored ranges (everything else is black ink); the last span that
+    /// covers an element wins.
+    pub colors: Vec<ColorSpan>,
+    /// Dimension / annotation style (Drawing properties › Dimensions and
+    /// Annotations), set by [`SheetGeometry::add_annotations`].
+    pub style: SheetStyle,
+    /// The annotation being drawn is a dimension (its arrowheads use the
+    /// dimension style).
+    in_dim: bool,
+    /// The annotation being drawn has its arrows flipped (outside).
+    flip_arrows: bool,
+    /// Inserted images (drawn under the geometry; exports embed them).
+    pub images: Vec<GeomImage>,
+    /// Texts in a font other than the default (last span wins).
+    pub fonts: Vec<FontSpan>,
+    /// Colored areas drawn under all the ink (pending revision rows).
+    pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
 }
+
+/// Annotation types with their own style (Drawing properties ›
+/// Annotations › Notes, Callouts, Datums, ...).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum AnnType {
+    Notes,
+    Callouts,
+    Datums,
+    GeometricTolerances,
+    SurfaceFinish,
+    HoleCallouts,
+}
+
+impl AnnType {
+    pub const ALL: [AnnType; 6] = [AnnType::Notes, AnnType::Callouts, AnnType::Datums, AnnType::GeometricTolerances, AnnType::SurfaceFinish, AnnType::HoleCallouts];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            AnnType::Notes => "Notes",
+            AnnType::Callouts => "Callouts",
+            AnnType::Datums => "Datums",
+            AnnType::GeometricTolerances => "Geometric tolerances",
+            AnnType::SurfaceFinish => "Surface finish symbols",
+            AnnType::HoleCallouts => "Hole callouts",
+        }
+    }
+
+    pub fn of(kind: &super::AnnotationKind) -> Option<Self> {
+        use super::AnnotationKind as K;
+        Some(match kind {
+            K::Note { .. } => AnnType::Notes,
+            K::Balloon { .. } => AnnType::Callouts,
+            K::Datum { .. } | K::DatumTarget { .. } => AnnType::Datums,
+            K::Gdt { .. } => AnnType::GeometricTolerances,
+            K::SurfaceFinish { .. } => AnnType::SurfaceFinish,
+            K::HoleCallout { .. } => AnnType::HoleCallouts,
+            _ => return None,
+        })
+    }
+}
+
+/// One annotation type's font, text height and color (None: the "All
+/// annotations" value).
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AnnTypeStyle {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font: Option<TextFont>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<[u8; 3]>,
+}
+
+/// A text font (Drawing properties › Font): family, bold, italic.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct TextFont {
+    pub family: String,
+    #[serde(default)]
+    pub bold: bool,
+    #[serde(default)]
+    pub italic: bool,
+}
+
+/// Families the drawing fonts offer (bundled; Noto Sans is Onshape's default).
+pub const FONT_FAMILIES: [&str; 4] = ["Noto Sans", "Liberation Sans", "Liberation Serif", "Liberation Mono"];
+
+/// Texts drawn in a font.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FontSpan {
+    pub texts: std::ops::Range<usize>,
+    pub font: TextFont,
+}
+
+/// An image on the sheet: lower-left corner and size (mm), the encoded
+/// file, and (filled in by the app for PDF export) its decoded RGB pixels.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeomImage {
+    pub pos: [f64; 2],
+    pub size: [f64; 2],
+    pub data_base64: std::sync::Arc<str>,
+    pub rgb: Option<(u32, u32, std::sync::Arc<Vec<u8>>)>,
+}
+
+impl GeomImage {
+    /// MIME type from the file's magic bytes.
+    pub fn mime(&self) -> &'static str {
+        let b = crate::sketch_feature::base64_decode(&self.data_base64.chars().take(16).collect::<String>()).unwrap_or_default();
+        if b.starts_with(&[0xFF, 0xD8]) {
+            "image/jpeg"
+        } else if b.starts_with(b"GIF") {
+            "image/gif"
+        } else {
+            "image/png"
+        }
+    }
+}
+
+/// Arrowhead types (Drawing properties › Dimensions / Annotations).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ArrowType {
+    None,
+    #[default]
+    Filled,
+    Unfilled,
+    Open,
+    Oblique,
+    FilledDot,
+}
+
+impl ArrowType {
+    pub const ALL: [ArrowType; 6] = [ArrowType::None, ArrowType::Filled, ArrowType::Unfilled, ArrowType::Open, ArrowType::Oblique, ArrowType::FilledDot];
+    pub fn name(self) -> &'static str {
+        match self {
+            ArrowType::None => "None",
+            ArrowType::Filled => "Filled",
+            ArrowType::Unfilled => "Unfilled",
+            ArrowType::Open => "Open",
+            ArrowType::Oblique => "Oblique",
+            ArrowType::FilledDot => "Filled dot",
+        }
+    }
+}
+
+/// Text height (mm), arrowhead length (mm) and type, and color of
+/// dimensions and of other annotations.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SheetStyle {
+    pub dim_text: f64,
+    pub dim_arrow: f64,
+    pub dim_arrow_type: ArrowType,
+    pub dim_color: Option<[u8; 3]>,
+    pub ann_text: f64,
+    pub ann_arrow: f64,
+    pub ann_arrow_type: ArrowType,
+    pub ann_color: Option<[u8; 3]>,
+    /// Fonts (None: the default sans).
+    pub dim_font: Option<TextFont>,
+    pub ann_font: Option<TextFont>,
+    /// Gaps and extensions (mm): text to dimension line, geometry to
+    /// extension line, extension past the dimension line; horizontal text.
+    pub text_gap: f64,
+    pub geometry_gap: f64,
+    pub extension: f64,
+    pub text_horizontal: bool,
+    /// Per annotation type overrides, and the datum triangle size (mm).
+    pub ann_types: Vec<(AnnType, AnnTypeStyle)>,
+    pub datum_size: f64,
+}
+
+impl SheetStyle {
+    /// An annotation type's own style (defaults when not set).
+    pub fn type_style(&self, kind: &super::AnnotationKind) -> AnnTypeStyle {
+        AnnType::of(kind).and_then(|t| self.ann_types.iter().find(|(k, _)| *k == t)).map(|(_, s)| s.clone()).unwrap_or_default()
+    }
+}
+
+impl Default for SheetStyle {
+    fn default() -> Self {
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0 }
+    }
+}
+
+/// Lines, texts and fills drawn in a color (index ranges into the
+/// geometry's vectors).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ColorSpan {
+    pub lines: std::ops::Range<usize>,
+    pub texts: std::ops::Range<usize>,
+    pub fills: std::ops::Range<usize>,
+    pub rgb: [u8; 3],
+}
+
+/// Where the geometry ends (lines, texts, fills), for [`SheetGeometry::color_since`].
+pub type GeomMark = (usize, usize, usize);
 
 /// A grip of an annotation (sheet mm).
 #[derive(Clone, Debug, PartialEq)]
@@ -127,6 +318,32 @@ impl SheetGeometry {
         Self { width, height, ..Default::default() }
     }
 
+    pub fn mark(&self) -> GeomMark {
+        (self.lines.len(), self.texts.len(), self.fills.len())
+    }
+
+    /// Color everything added since `m`.
+    pub fn color_since(&mut self, m: GeomMark, rgb: [u8; 3]) {
+        let span = ColorSpan { lines: m.0..self.lines.len(), texts: m.1..self.texts.len(), fills: m.2..self.fills.len(), rgb };
+        if !(span.lines.is_empty() && span.texts.is_empty() && span.fills.is_empty()) {
+            self.colors.push(span);
+        }
+    }
+
+    pub fn text_font(&self, i: usize) -> Option<&TextFont> {
+        self.fonts.iter().rev().find(|s| s.texts.contains(&i)).map(|s| &s.font)
+    }
+
+    pub fn line_color(&self, i: usize) -> Option<[u8; 3]> {
+        self.colors.iter().rev().find(|s| s.lines.contains(&i)).map(|s| s.rgb)
+    }
+    pub fn text_color(&self, i: usize) -> Option<[u8; 3]> {
+        self.colors.iter().rev().find(|s| s.texts.contains(&i)).map(|s| s.rgb)
+    }
+    pub fn fill_color(&self, i: usize) -> Option<[u8; 3]> {
+        self.colors.iter().rev().find(|s| s.fills.contains(&i)).map(|s| s.rgb)
+    }
+
     pub fn line(&mut self, a: [f64; 2], b: [f64; 2], style: LineStyle) {
         self.lines.push(Polyline2 { points: vec![a, b], style, closed: false, pick: 0 });
     }
@@ -139,12 +356,38 @@ impl SheetGeometry {
         self.texts.push(Text2 { pos, height, text: text.into(), angle: 0.0, anchor, pick: 0 });
     }
 
+    /// An arrowhead at `tip` pointing along `dir`; `len` is relative to
+    /// the default 3 mm (scaled by the dimension / annotation style).
     pub fn arrow(&mut self, tip: [f64; 2], dir: [f64; 2], len: f64) {
+        let (size, kind) = if self.in_dim { (self.style.dim_arrow, self.style.dim_arrow_type) } else { (self.style.ann_arrow, self.style.ann_arrow_type) };
+        let len = len * size / 3.0;
         let l = (dir[0] * dir[0] + dir[1] * dir[1]).sqrt().max(1e-12);
         let (dx, dy) = (dir[0] / l, dir[1] / l);
         let w = len * 0.3;
         let base = [tip[0] - dx * len, tip[1] - dy * len];
-        self.fills.push(Fill2 { points: vec![tip, [base[0] - dy * w, base[1] + dx * w], [base[0] + dy * w, base[1] - dx * w]] });
+        let (left, right) = ([base[0] - dy * w, base[1] + dx * w], [base[0] + dy * w, base[1] - dx * w]);
+        match kind {
+            ArrowType::None => {}
+            ArrowType::Filled => self.fills.push(Fill2 { points: vec![tip, left, right] }),
+            ArrowType::Unfilled => self.lines.push(Polyline2 { points: vec![tip, left, right], style: LineStyle::Thin, closed: true, pick: 0 }),
+            ArrowType::Open => self.lines.push(Polyline2 { points: vec![left, tip, right], style: LineStyle::Thin, closed: false, pick: 0 }),
+            ArrowType::Oblique => {
+                // A 45° tick through the tip.
+                let h = len * 0.5;
+                let (ox, oy) = ((dx - dy) * std::f64::consts::FRAC_1_SQRT_2 * h, (dy + dx) * std::f64::consts::FRAC_1_SQRT_2 * h);
+                self.lines.push(Polyline2 { points: vec![[tip[0] - ox, tip[1] - oy], [tip[0] + ox, tip[1] + oy]], style: LineStyle::Thin, closed: false, pick: 0 });
+            }
+            ArrowType::FilledDot => {
+                let r = len * 0.25;
+                let pts: Vec<[f64; 2]> = (0..12).map(|i| {
+                    let t = i as f64 / 12.0 * std::f64::consts::TAU;
+                    [tip[0] + r * t.cos(), tip[1] + r * t.sin()]
+                }).collect();
+                for i in 1..pts.len() - 1 {
+                    self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
+                }
+            }
+        }
     }
 
     /// Border frame with zone markers and an ISO-style title block.
@@ -285,14 +528,16 @@ impl SheetGeometry {
         self.line([circ_x - big - 1.0, y], [trap_x + len + 1.0, y], LineStyle::Centerline);
     }
 
-    /// An inspection item: the number in its border shape, up and left of
-    /// the annotation's text position.
-    fn inspection_bubble(&mut self, at: [f64; 2], n: u32, (shape, h, border): (super::InspectionShape, f64, f64), pick: u32) {
+    /// An inspection item: the number in its border shape, left of `at`
+    /// (the upper left corner of the annotation's text).
+    fn inspection_bubble(&mut self, at: [f64; 2], n: u32, style: &InspectionStyle, pick: u32) {
         use super::InspectionShape as S;
+        let (shape, h, border) = (style.shape, style.text_height, style.border);
+        let m = self.mark();
         let text = n.to_string();
         let w = (text.chars().count() as f64 * h * 0.7).max(h);
         let (rx, ry) = (w * 0.5 + border, h * 0.5 + border);
-        let c = [at[0] - rx - 4.8, at[1] + ry + 2.5];
+        let c = [at[0] - rx - 0.8, at[1]];
         let ring = |rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..32).map(|i| {
             let t = i as f64 / 32.0 * std::f64::consts::TAU;
             [c[0] + rx * t.cos(), c[1] + ry * t.sin()]
@@ -304,23 +549,79 @@ impl SheetGeometry {
             S::Triangle => vec![[c[0] - rx - 1.5, c[1] - ry], [c[0] + rx + 1.5, c[1] - ry], [c[0], c[1] + ry + 2.0]],
             S::Flag => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx + 1.5, c[1]], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
         };
+        let ink = style.color.unwrap_or([0, 0, 0]);
+        if style.solid {
+            // Solid fill: the shape filled in the border color, the number white.
+            for i in 1..pts.len().saturating_sub(1) {
+                self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
+            }
+        }
         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
+        if style.color.is_some() || style.solid {
+            self.color_since(m, ink);
+        }
+        let mt = self.mark();
         self.texts.push(Text2 { pos: c, height: h, text, angle: 0.0, anchor: Anchor::Center, pick });
+        if let Some(f) = &style.font {
+            self.fonts.push(FontSpan { texts: mt.1..self.texts.len(), font: f.clone() });
+        }
+        if style.solid {
+            self.color_since(mt, [255, 255, 255]);
+        } else if style.color.is_some() {
+            self.color_since(mt, ink);
+        }
     }
 
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
     /// View-relative coordinates are mapped through `env`.
     pub fn add_annotations(&mut self, sheet: &Sheet, env: &dyn AnnotationEnv) {
+        // Where each annotation's geometry starts (inspection bubbles go
+        // at the upper left of its text, after the loop).
+        let mut starts: Vec<(&Annotation, usize, usize, usize)> = Vec::new();
+        self.style = env.sheet_style();
+        let (dh, ah0) = (self.style.dim_text, self.style.ann_text);
         for a in &sheet.annotations {
             let pick = (a.id & 0xFFFF_FFFF) as u32;
-            if let (Some(n), Some(style)) = (a.inspection, env.inspection_style()) {
-                self.inspection_bubble(a.position, n, style, inspection_pick(a.id));
-            }
+            let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
+            starts.push((a, self.texts.len(), self.lines.len(), self.fills.len()));
+            self.in_dim = a.kind.is_dimension();
+            self.flip_arrows = a.flip_arrows;
             match &a.kind {
-                AnnotationKind::Note { text, height_mm } => {
-                    let text = env.expand(text);
-                    for (i, line) in text.lines().enumerate() {
-                        self.texts.push(Text2 { pos: [a.position[0], a.position[1] - i as f64 * height_mm * 1.5], height: *height_mm, text: line.to_string(), angle: 0.0, anchor: Anchor::TopLeft, pick });
+                AnnotationKind::Note { text, height_mm, style } => {
+                    let h = *height_mm;
+                    let text = super::note::fractions(&env.expand(text));
+                    let l = super::note::layout(&text, h, style, a.position);
+                    for p in &l.pieces {
+                        self.note_text(p.pos, h, &p.text, pick);
+                        if let Some(i) = p.item.filter(|i| p.designator && style.flags.contains(i)) {
+                            self.flag(p.pos, h, &p.text, style, i, pick);
+                        }
+                    }
+                    for (at, w) in &l.runs {
+                        if style.underline {
+                            self.lines.push(Polyline2 { points: vec![[at[0], at[1] - h * 0.2], [at[0] + w, at[1] - h * 0.2]], style: LineStyle::Thin, closed: false, pick });
+                        }
+                        if style.strikethrough {
+                            self.lines.push(Polyline2 { points: vec![[at[0], at[1] + h * 0.5], [at[0] + w, at[1] + h * 0.5]], style: LineStyle::Thin, closed: false, pick });
+                        }
+                    }
+                    // Leaders leave the nearer side of the box through a shoulder.
+                    let [x0, y0, x1, y1] = l.bbox;
+                    for ld in &style.leaders {
+                        let t = match ld.view {
+                            Some(v) => env.to_sheet(v, ld.point),
+                            None => ld.point,
+                        };
+                        let right = t[0] > (x0 + x1) / 2.0;
+                        let ym = (y0 + y1) / 2.0;
+                        let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
+                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
+                        let mut pts = vec![start, sh];
+                        pts.extend(ld.nodes.iter().copied());
+                        pts.push(t);
+                        let last = pts[pts.len() - 2];
+                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
                 }
                 AnnotationKind::LinearDimension { view, a: pa, b: pb, offset, orientation, override_text } => {
@@ -355,20 +656,34 @@ impl SheetGeometry {
                     let dir = [angle.cos(), angle.sin()];
                     let tip = [c[0] + dir[0] * r, c[1] + dir[1] * r];
                     let out = [c[0] + dir[0] * (r + 12.0), c[1] + dir[1] * (r + 12.0)];
-                    let start = if *diameter { [c[0] - dir[0] * r, c[1] - dir[1] * r] } else { c };
-                    self.lines.push(Polyline2 { points: vec![start, out], style: LineStyle::Thin, closed: false, pick });
-                    self.arrow(tip, dir, 3.0);
-                    if *diameter {
-                        self.arrow([c[0] - dir[0] * r, c[1] - dir[1] * r], [-dir[0], -dir[1]], 3.0);
+                    let far = [c[0] - dir[0] * r, c[1] - dir[1] * r];
+                    if self.flip_arrows {
+                        // Flipped: arrows outside pointing in, no line inside.
+                        self.lines.push(Polyline2 { points: vec![tip, out], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(tip, [-dir[0], -dir[1]], 3.0);
+                        if *diameter {
+                            let ext = self.style.dim_arrow + 3.0;
+                            self.lines.push(Polyline2 { points: vec![far, [far[0] - dir[0] * ext, far[1] - dir[1] * ext]], style: LineStyle::Thin, closed: false, pick });
+                            self.arrow(far, dir, 3.0);
+                        }
+                    } else {
+                        let start = if *diameter { far } else { c };
+                        self.lines.push(Polyline2 { points: vec![start, out], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(tip, dir, 3.0);
+                        if *diameter {
+                            self.arrow(far, [-dir[0], -dir[1]], 3.0);
+                        }
                     }
+                    // The flip node near the arrow.
+                    self.grips.push(Grip { pick, pos: [tip[0] - dir[0] * 4.0, tip[1] - dir[1] * 4.0], kind: GripKind::Handle });
                     let t = if *diameter { env.text(a, radius * 2.0, false, "Ø") } else { env.text(a, *radius, false, "R") };
                     // Text on a short horizontal shoulder.
                     let left = dir[0] < 0.0;
-                    let w = self.dim_label_width(&t, 3.5);
+                    let w = self.dim_label_width(&t, dh);
                     let sh = [out[0] + if left { -w - 2.0 } else { w + 2.0 }, out[1]];
                     self.lines.push(Polyline2 { points: vec![out, sh], style: LineStyle::Thin, closed: false, pick });
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
-                    self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, 3.5, pick);
+                    self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
                 AnnotationKind::AngularDimension { view, vertex, a: pa, b: pb, radius } => {
                     let v = env.to_sheet(*view, *vertex);
@@ -387,15 +702,32 @@ impl SheetGeometry {
                         })
                         .collect();
                     self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
-                    if (a1 - a0) * radius > 7.0 {
-                        let e0 = [v[0] + radius * a0.cos(), v[1] + radius * a0.sin()];
-                        let e1 = [v[0] + radius * a1.cos(), v[1] + radius * a1.sin()];
+                    let e0 = [v[0] + radius * a0.cos(), v[1] + radius * a0.sin()];
+                    let e1 = [v[0] + radius * a1.cos(), v[1] + radius * a1.sin()];
+                    if self.flip_arrows {
+                        // Flipped: arrows outside the arc ends pointing in, the arc runs on.
+                        let ext = (self.style.dim_arrow + 3.0) / radius.max(1e-9);
+                        for (from, to) in [(a0 - ext, a0), (a1, a1 + ext)] {
+                            let seg: Vec<[f64; 2]> = (0..=6).map(|i| {
+                                let t = from + (to - from) * i as f64 / 6.0;
+                                [v[0] + radius * t.cos(), v[1] + radius * t.sin()]
+                            }).collect();
+                            self.lines.push(Polyline2 { points: seg, style: LineStyle::Thin, closed: false, pick });
+                        }
+                        self.arrow(e0, [-a0.sin(), a0.cos()], 3.0);
+                        self.arrow(e1, [a1.sin(), -a1.cos()], 3.0);
+                    } else if (a1 - a0) * radius > 7.0 {
                         self.arrow(e0, [a0.sin(), -a0.cos()], 3.0);
                         self.arrow(e1, [-a1.sin(), a1.cos()], 3.0);
                     }
+                    // Flip nodes just inside the arc ends.
+                    let k = 4.0 / radius.max(1e-9);
+                    for t in [a0 + k, a1 - k] {
+                        self.grips.push(Grip { pick, pos: [v[0] + radius * t.cos(), v[1] + radius * t.sin()], kind: GripKind::Handle });
+                    }
                     let mid = (a0 + a1) / 2.0;
                     let t = env.text(a, a1 - a0, true, "");
-                    self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, 3.5, pick);
+                    self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::Centermark { view, center, size, angle } => {
                     let c = env.to_sheet(*view, *center);
@@ -426,7 +758,7 @@ impl SheetGeometry {
                     let c = env.to_sheet(*view, *center);
                     let r = radius * env.scale(*view);
                     let lines = env.hole_callout(a);
-                    let h = 3.5;
+                    let h = ah;
                     let t = a.position;
                     let d = [t[0] - c[0], t[1] - c[1]];
                     let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
@@ -437,13 +769,27 @@ impl SheetGeometry {
                     let shoulder = [t[0] + if right { -4.0 } else { 4.0 }, t[1]];
                     self.lines.push(Polyline2 { points: vec![on, shoulder, t], style: LineStyle::Thin, closed: false, pick });
                     self.arrow(on, [-u[0], -u[1]], 3.0);
-                    let w = lines.iter().map(|s| s.chars().count()).max().unwrap_or(0) as f64 * h * 0.62;
+                    let w = lines.iter().map(|s| super::format::flatten_stacked(s).chars().count()).max().unwrap_or(0) as f64 * h * 0.62;
                     let x0 = if right { t[0] + 1.0 } else { t[0] - 1.0 - w };
                     let n = lines.len() as f64;
                     for (i, line) in lines.iter().enumerate() {
                         // Lines stacked around the shoulder (bottom-left anchored).
                         let y = t[1] + (n - 1.0) * h * 0.75 - i as f64 * h * 1.5 - h * 0.5;
-                        self.texts.push(Text2 { pos: [x0, y], height: h, text: line.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                        match super::format::split_stacked(line) {
+                            // Fit deviations stacked after the size, like a
+                            // dimension's deviation tolerance.
+                            (before, Some((up, lo)), after) => {
+                                let hs = h * 0.65;
+                                let xs = x0 + font::text_width(before, h);
+                                let xa = xs + font::text_width(up, hs).max(font::text_width(lo, hs));
+                                for (x, yy, hh, s) in [(x0, y, h, before), (xs, y + h * 0.5, hs, up), (xs, y - h * 0.25, hs, lo), (xa, y, h, after)] {
+                                    if !s.is_empty() {
+                                        self.texts.push(Text2 { pos: [x, yy], height: hh, text: s.to_string(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                                    }
+                                }
+                            }
+                            _ => self.texts.push(Text2 { pos: [x0, y], height: h, text: line.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick }),
+                        }
                     }
                 }
                 AnnotationKind::VirtualSharp { view, a1, b1, a2, b2 } => {
@@ -455,28 +801,15 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: vec![[c[0] - s, c[1] + s], [c[0] + s, c[1] - s]], style: LineStyle::Thin, closed: false, pick });
                     }
                 }
-                AnnotationKind::Balloon { view, anchor, text } => {
-                    let p = env.to_sheet(*view, *anchor);
-                    let c = a.position;
-                    let r = 5.0;
-                    let n = 32;
-                    let circle: Vec<[f64; 2]> = (0..n)
-                        .map(|i| {
-                            let t = i as f64 / n as f64 * std::f64::consts::TAU;
-                            [c[0] + r * t.cos(), c[1] + r * t.sin()]
-                        })
-                        .collect();
-                    self.lines.push(Polyline2 { points: circle, style: LineStyle::Thin, closed: true, pick });
-                    let d = [p[0] - c[0], p[1] - c[1]];
-                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                    self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
-                    // Dot on the part.
-                    self.fills.push(Fill2 { points: (0..8).map(|i| {
-                        let t = i as f64 / 8.0 * std::f64::consts::TAU;
-                        [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
-                    }).collect() });
-                    self.texts.push(Text2 { pos: c, height: 3.5, text: env.balloon_text(a, text), angle: 0.0, anchor: Anchor::Center, pick });
+                // Grouped callouts are drawn after the loop, at their dimension.
+                AnnotationKind::Balloon { .. } if a.group.is_some() => {}
+                AnnotationKind::Balloon { .. } => self.balloon(a, a.position, env, ah, pick),
+                AnnotationKind::RevisionCallout { anchor, revision, group: None } => {
+                    if let Some(label) = env.revision_label(revision) {
+                        self.revision_callout(*anchor, label, ah, pick);
+                    }
                 }
+                AnnotationKind::RevisionCallout { .. } => {}
                 AnnotationKind::SurfaceFinish { anchor, value } => {
                     let p = *anchor;
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], p, [p[0] + 6.0, p[1] + 10.0], [p[0] + 14.0, p[1] + 10.0]], style: LineStyle::Thin, closed: false, pick });
@@ -486,15 +819,17 @@ impl SheetGeometry {
                 AnnotationKind::Gdt { anchor, frame, leaders } => {
                     let mut x = anchor[0];
                     let y = anchor[1];
-                    let h = 3.0;
+                    // The frame scales with the annotation text height.
+                    let k = ah / 3.5;
+                    let h = 3.0 * k;
                     for cell in frame {
-                        let w = (font::text_width(cell, h) + 3.0).max(7.0);
-                        self.lines.push(Polyline2 { points: vec![[x, y], [x + w, y], [x + w, y + 7.0], [x, y + 7.0]], style: LineStyle::Thin, closed: true, pick });
-                        self.texts.push(Text2 { pos: [x + w / 2.0, y + 3.5], height: h, text: cell.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                        let w = (font::text_width(cell, h) + 3.0 * k).max(7.0 * k);
+                        self.lines.push(Polyline2 { points: vec![[x, y], [x + w, y], [x + w, y + 7.0 * k], [x, y + 7.0 * k]], style: LineStyle::Thin, closed: true, pick });
+                        self.texts.push(Text2 { pos: [x + w / 2.0, y + 3.5 * k], height: h, text: cell.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                         x += w;
                     }
                     // Leaders leave the nearer short side through a shoulder.
-                    let (x0, x1, ym) = (anchor[0], x, y + 3.5);
+                    let (x0, x1, ym) = (anchor[0], x, y + 3.5 * k);
                     for l in leaders {
                         let t = match l.view {
                             Some(v) => env.to_sheet(v, l.point),
@@ -509,16 +844,18 @@ impl SheetGeometry {
                 }
                 AnnotationKind::Datum { anchor, label } => {
                     let c = a.position;
-                    let (bw, bh) = ((font::text_width(label, 3.5) + 3.0).max(7.0), 7.0);
+                    let (bw, bh) = ((font::text_width(label, ah) + 3.0).max(7.0), 7.0);
                     self.lines.push(Polyline2 { points: vec![[c[0] - bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] + bh / 2.0], [c[0] - bw / 2.0, c[1] + bh / 2.0]], style: LineStyle::Thin, closed: true, pick });
-                    self.texts.push(Text2 { pos: c, height: 3.5, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    self.texts.push(Text2 { pos: c, height: ah, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     let d = [c[0] - anchor[0], c[1] - anchor[1]];
                     let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
                     if l > 1e-6 {
                         let u = [d[0] / l, d[1] / l];
                         let w = [-u[1], u[0]];
-                        let apex = [anchor[0] + u[0] * 3.0, anchor[1] + u[1] * 3.0];
-                        self.fills.push(Fill2 { points: vec![[anchor[0] + w[0] * 1.8, anchor[1] + w[1] * 1.8], apex, [anchor[0] - w[0] * 1.8, anchor[1] - w[1] * 1.8]] });
+                        // Datum size: the triangle's height (base 1.2 x).
+                        let ds = self.style.datum_size;
+                        let apex = [anchor[0] + u[0] * ds, anchor[1] + u[1] * ds];
+                        self.fills.push(Fill2 { points: vec![[anchor[0] + w[0] * ds * 0.6, anchor[1] + w[1] * ds * 0.6], apex, [anchor[0] - w[0] * ds * 0.6, anchor[1] - w[1] * ds * 0.6]] });
                         // Leader from the triangle to the box edge.
                         let hit = box_exit(c, bw / 2.0, bh / 2.0, [-u[0], -u[1]]);
                         self.lines.push(Polyline2 { points: vec![apex, hit], style: LineStyle::Thin, closed: false, pick });
@@ -547,7 +884,7 @@ impl SheetGeometry {
                         halign = 1.0 - halign;
                     }
                     let at = [end[0] + n[0] * sg * 1.0, end[1] + n[1] * sg * 1.0];
-                    self.dim_label(at, ang, halign, true, &t, 3.5, pick);
+                    self.dim_label(at, ang, halign, true, &t, dh, pick);
                 }
                 AnnotationKind::ChamferDimension { view, a: ca, b: cb, c: cc, d: cd } => {
                     let pa = env.to_sheet(*view, *ca);
@@ -563,12 +900,12 @@ impl SheetGeometry {
                     t.main = format!("{} × {}°", t.main, super::format::format_number(ang.to_degrees(), a.format.precision, 1));
                     let e = a.position;
                     let left = e[0] < m[0];
-                    let wtxt = self.dim_label_width(&t, 3.5);
+                    let wtxt = self.dim_label_width(&t, dh);
                     let sh = [e[0] + if left { -wtxt - 2.0 } else { wtxt + 2.0 }, e[1]];
                     self.lines.push(Polyline2 { points: vec![m, e, sh], style: LineStyle::Thin, closed: false, pick });
                     let d = [m[0] - e[0], m[1] - e[1]];
                     self.arrow(m, d, 3.0);
-                    self.dim_label([e[0] + if left { -1.0 } else { 1.0 }, e[1] + 0.8], 0.0, if left { 1.0 } else { 0.0 }, false, &t, 3.5, pick);
+                    self.dim_label([e[0] + if left { -1.0 } else { 1.0 }, e[1] + 0.8], 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
                 AnnotationKind::ArcLengthDimension { view, center, radius, a: pa, b: pb, mid, offset } => {
                     let c = env.to_sheet(*view, *center);
@@ -593,14 +930,15 @@ impl SheetGeometry {
                     self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                     for (k, t) in [a0, a0 + sweep].into_iter().enumerate() {
                         let (ct, st) = (t.cos(), t.sin());
-                        self.lines.push(Polyline2 { points: vec![[c[0] + (r0 + 1.0) * ct, c[1] + (r0 + 1.0) * st], [c[0] + (rr + 2.0) * ct, c[1] + (rr + 2.0) * st]], style: LineStyle::Thin, closed: false, pick });
+                        let (gap, ext) = (self.style.geometry_gap, self.style.extension);
+                        self.lines.push(Polyline2 { points: vec![[c[0] + (r0 + gap) * ct, c[1] + (r0 + gap) * st], [c[0] + (rr + ext) * ct, c[1] + (rr + ext) * st]], style: LineStyle::Thin, closed: false, pick });
                         let tip = [c[0] + rr * ct, c[1] + rr * st];
                         let s = if (k == 0) == (sweep > 0.0) { -1.0 } else { 1.0 };
                         self.arrow(tip, [-st * s, ct * s], 3.0);
                     }
                     let tm = a0 + sweep / 2.0;
                     let t = env.text(a, radius * sweep.abs(), false, "⌒");
-                    self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, 3.5, pick);
+                    self.dim_label([c[0] + (rr + 4.0) * tm.cos(), c[1] + (rr + 4.0) * tm.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::OrdinateGroup { view, origin, points, horizontal } => {
                     let rot = env.rotation(*view);
@@ -617,7 +955,7 @@ impl SheetGeometry {
                     let mean = sheet_pts.iter().map(|p| dot(*p, n)).sum::<f64>() / sheet_pts.len() as f64;
                     let sg = if level >= mean { 1.0 } else { -1.0 };
                     let along: Vec<f64> = sheet_pts.iter().map(|p| dot(*p, u)).collect();
-                    let text_pos = ordinate_text_positions(&along, 3.5 + 1.5);
+                    let text_pos = ordinate_text_positions(&along, dh + 1.5);
                     let mut ang = n[1].atan2(n[0]);
                     let mut halign = if sg > 0.0 { 0.0 } else { 1.0 };
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
@@ -639,7 +977,7 @@ impl SheetGeometry {
                             vec![at(s0, l0), at(s0, k1), at(s1, k2), at(s1, level)]
                         };
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
-                        self.dim_label(at(s1, level + sg * 1.0), ang, halign, true, &t, 3.5, pick);
+                        self.dim_label(at(s1, level + sg * 1.0), ang, halign, true, &t, dh, pick);
                     }
                 }
                 AnnotationKind::MaxMinDimension { view, a: pa, ra, ca, b: pb, rb, cb, offset, orientation } => {
@@ -701,7 +1039,7 @@ impl SheetGeometry {
                     }
                     let mid = [(f[0] + b[0]) / 2.0, (f[1] + b[1]) / 2.0];
                     let up = [-ang.sin(), ang.cos()];
-                    self.dim_label([mid[0] + up[0] * 1.2, mid[1] + up[1] * 1.2], ang, 0.5, false, &t, 3.5, pick);
+                    self.dim_label([mid[0] + up[0] * 1.2, mid[1] + up[1] * 1.2], ang, 0.5, false, &t, dh, pick);
                 }
                 AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                     let (a0, a1) = (env.to_sheet(*view, axis[0]), env.to_sheet(*view, axis[1]));
@@ -745,7 +1083,7 @@ impl SheetGeometry {
                     }
                     let up = [-ang.sin(), ang.cos()];
                     let mid = [(pe[0] + on_axis[0]) / 2.0 + up[0] * 1.2, (pe[1] + on_axis[1]) / 2.0 + up[1] * 1.2];
-                    self.dim_label(mid, ang, 0.5, false, &txt, 3.5, pick);
+                    self.dim_label(mid, ang, 0.5, false, &txt, dh, pick);
                 }
                 AnnotationKind::DatumTarget { view, anchor, label, area } => {
                     let p = env.to_sheet(*view, *anchor);
@@ -796,6 +1134,159 @@ impl SheetGeometry {
                 }
             }
         }
+        self.in_dim = false;
+        self.flip_arrows = false;
+        // Dimension and annotation colors (construction geometry keeps ink).
+        let end = self.mark();
+        for (k, &(a, t0, l0, f0)) in starts.iter().enumerate() {
+            let construction = matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. } | AnnotationKind::VirtualSharp { .. });
+            let mut ts = self.style.type_style(&a.kind);
+            if let AnnotationKind::Note { style, .. } = &a.kind {
+                // The note's own color and font come first.
+                ts.color = style.color.or(ts.color);
+                ts.font = style.font.clone().or(ts.font);
+            }
+            let c = if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) };
+            let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
+            let font = if a.kind.is_dimension() { self.style.dim_font.clone() } else if construction { None } else { ts.font.or_else(|| self.style.ann_font.clone()) };
+            if let Some(font) = font {
+                self.fonts.push(FontSpan { texts: t0..t1, font });
+            }
+            let Some(c) = c else { continue };
+            self.colors.push(ColorSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, rgb: c });
+        }
+        // Callouts grouped with a dimension: at the upper right of its text.
+        let (tn, ln) = (self.texts.len(), self.lines.len());
+        let corner = |g: &Self, id: u64| {
+            let k = starts.iter().position(|s| s.0.id == id)?;
+            let (t0, t1) = (starts[k].1, starts.get(k + 1).map(|s| s.1).unwrap_or(tn));
+            let pts: Vec<[f64; 2]> = g.texts[t0..t1].iter().flat_map(super::font::text_box).collect();
+            (!pts.is_empty()).then(|| [pts.iter().map(|p| p[0]).fold(f64::MIN, f64::max), pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max)])
+        };
+        let grouped: Vec<([f64; 2], String, u32)> = sheet
+            .annotations
+            .iter()
+            .filter_map(|a| match &a.kind {
+                AnnotationKind::RevisionCallout { anchor, revision, group: Some(g) } => {
+                    let c = corner(self, *g).unwrap_or([0.0, 0.0]);
+                    Some(([c[0] + anchor[0], c[1] + anchor[1]], env.revision_label(revision)?, (a.id & 0xFFFF_FFFF) as u32))
+                }
+                _ => None,
+            })
+            .collect();
+        let grouped_balloons: Vec<(&Annotation, [f64; 2])> = sheet
+            .annotations
+            .iter()
+            .filter(|a| matches!(a.kind, AnnotationKind::Balloon { .. }))
+            .filter_map(|a| {
+                let c = corner(self, a.group?).unwrap_or([0.0, 0.0]);
+                Some((a, [c[0] + a.position[0], c[1] + a.position[1]]))
+            })
+            .collect();
+        let m = self.mark();
+        for (p, label, pick) in grouped {
+            self.revision_callout(p, label, ah0, pick);
+        }
+        for (a, c) in grouped_balloons {
+            let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
+            self.balloon(a, c, env, ah, (a.id & 0xFFFF_FFFF) as u32);
+        }
+        if let Some(c) = self.style.ann_color {
+            self.color_since(m, c);
+        }
+        // (Inspection bubbles measure the annotations' own geometry only.)
+        if let Some(style) = env.inspection_style() {
+            for (k, &(a, t0, l0, _)) in starts.iter().enumerate() {
+                let Some(n) = a.inspection else { continue };
+                let (t1, l1) = starts.get(k + 1).map(|s| (s.1, s.2)).unwrap_or((tn, ln));
+                let mut pts: Vec<[f64; 2]> = self.texts[t0..t1].iter().flat_map(super::font::text_box).collect();
+                if pts.is_empty() {
+                    pts = self.lines[l0..l1].iter().flat_map(|l| l.points.iter().copied()).collect();
+                }
+                let at = if pts.is_empty() { a.position } else { [pts.iter().map(|p| p[0]).fold(f64::MAX, f64::min), pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max)] };
+                self.inspection_bubble(at, n, &style, inspection_pick(a.id));
+            }
+        }
+    }
+
+    /// Note text at its top-left corner: plain runs and stacked fractions
+    /// (numerator over denominator, with or without a bar).
+    fn note_text(&mut self, pos: [f64; 2], h: f64, text: &str, pick: u32) {
+        use super::note::{FRACTION_SCALE, Seg};
+        let mut x = pos[0];
+        for seg in super::note::segments(text) {
+            match seg {
+                Seg::Text(t) => {
+                    let w = font::text_width(&t, h);
+                    self.texts.push(Text2 { pos: [x, pos[1]], height: h, text: t, angle: 0.0, anchor: Anchor::TopLeft, pick });
+                    x += w;
+                }
+                Seg::Fraction { num, den, bar } => {
+                    let fh = h * FRACTION_SCALE;
+                    let w = font::text_width(&num, fh).max(font::text_width(&den, fh));
+                    let cx = x + h * 0.1 + w / 2.0;
+                    self.texts.push(Text2 { pos: [cx, pos[1] + h * 0.15 - fh], height: fh, text: num, angle: 0.0, anchor: Anchor::BottomCenter, pick });
+                    self.texts.push(Text2 { pos: [cx, pos[1] - h * 0.55 - fh], height: fh, text: den, angle: 0.0, anchor: Anchor::BottomCenter, pick });
+                    if bar {
+                        self.lines.push(Polyline2 { points: vec![[x + h * 0.05, pos[1] - h * 0.5], [x + h * 0.15 + w, pos[1] - h * 0.5]], style: LineStyle::Thin, closed: false, pick });
+                    }
+                    x += w + h * 0.2;
+                }
+            }
+        }
+    }
+
+    /// A flag-note flag around a list designator (text top-left at `pos`):
+    /// its size fits `flag_chars` characters.
+    fn flag(&mut self, pos: [f64; 2], h: f64, designator: &str, style: &super::note::NoteStyle, _item: usize, pick: u32) {
+        use super::note::FlagShape;
+        let w = font::text_width(designator, h).max(font::text_width(&"0".repeat(style.flag_chars.max(1) as usize), h));
+        let c = [pos[0] + font::text_width(designator, h) / 2.0, pos[1] - h / 2.0];
+        let r = w / 2.0 + h * 0.5;
+        let pts: Vec<[f64; 2]> = match style.flag_shape {
+            FlagShape::Triangle => vec![[c[0] - r * 1.2, c[1] - r * 0.7], [c[0] + r * 1.2, c[1] - r * 0.7], [c[0], c[1] + r * 1.3]],
+            FlagShape::Square => vec![[c[0] - r, c[1] - r], [c[0] + r, c[1] - r], [c[0] + r, c[1] + r], [c[0] - r, c[1] + r]],
+            FlagShape::Circle => (0..32).map(|i| {
+                let t = i as f64 / 32.0 * std::f64::consts::TAU;
+                [c[0] + r * t.cos(), c[1] + r * t.sin()]
+            }).collect(),
+        };
+        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
+    }
+
+    /// A callout (balloon) centered at `c`: the circle, its leader to the
+    /// anchor with a dot on the part, and its text.
+    fn balloon(&mut self, a: &Annotation, c: [f64; 2], env: &dyn AnnotationEnv, ah: f64, pick: u32) {
+        let AnnotationKind::Balloon { view, anchor, text } = &a.kind else { return };
+        let p = env.to_sheet(*view, *anchor);
+        let r = 5.0;
+        let n = 32;
+        let circle: Vec<[f64; 2]> = (0..n)
+            .map(|i| {
+                let t = i as f64 / n as f64 * std::f64::consts::TAU;
+                [c[0] + r * t.cos(), c[1] + r * t.sin()]
+            })
+            .collect();
+        self.lines.push(Polyline2 { points: circle, style: LineStyle::Thin, closed: true, pick });
+        let d = [p[0] - c[0], p[1] - c[1]];
+        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+        self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
+        // Dot on the part.
+        self.fills.push(Fill2 { points: (0..8).map(|i| {
+            let t = i as f64 / 8.0 * std::f64::consts::TAU;
+            [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
+        }).collect() });
+        self.texts.push(Text2 { pos: c, height: ah, text: env.balloon_text(a, text), angle: 0.0, anchor: Anchor::Center, pick });
+    }
+
+    /// A revision callout: an equilateral triangle around the label, base
+    /// below it, centered on `p`.
+    fn revision_callout(&mut self, p: [f64; 2], label: String, ah: f64, pick: u32) {
+        let s = (font::text_width(&label, ah) + ah * 2.4).max(ah * 3.2);
+        let h = s * 0.866;
+        let y0 = p[1] - h / 3.0;
+        self.lines.push(Polyline2 { points: vec![[p[0] - s / 2.0, y0], [p[0] + s / 2.0, y0], [p[0], y0 + h]], style: LineStyle::Thin, closed: true, pick });
+        self.texts.push(Text2 { pos: p, height: ah, text: label, angle: 0.0, anchor: Anchor::Center, pick });
     }
 
     /// Width (mm) of a dimension label.
@@ -862,8 +1353,7 @@ impl SheetGeometry {
             [dir[0] * s + nrm[0] * level, dir[1] * s + nrm[1] * level]
         };
         let (dp, dq) = (at(p), at(q));
-        let gap = 1.0;
-        let ext = 2.0;
+        let (gap, ext) = (self.style.geometry_gap, self.style.extension);
         for (src, dst) in [(p, dp), (q, dq)] {
             let v = [dst[0] - src[0], dst[1] - src[1]];
             let l = (v[0] * v[0] + v[1] * v[1]).sqrt();
@@ -877,12 +1367,20 @@ impl SheetGeometry {
                 });
             }
         }
-        self.lines.push(Polyline2 { points: vec![dp, dq], style: LineStyle::Thin, closed: false, pick });
         let d = [dq[0] - dp[0], dq[1] - dp[1]];
-        self.arrow(dp, [-d[0], -d[1]], 3.0);
-        self.arrow(dq, d, 3.0);
         let dl = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
         let du = [d[0] / dl, d[1] / dl];
+        if self.flip_arrows {
+            // Flipped: arrows outside pointing in, the line runs past them.
+            let ext = self.style.dim_arrow + 3.0;
+            self.lines.push(Polyline2 { points: vec![[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]], style: LineStyle::Thin, closed: false, pick });
+            self.arrow(dp, d, 3.0);
+            self.arrow(dq, [-d[0], -d[1]], 3.0);
+        } else {
+            self.lines.push(Polyline2 { points: vec![dp, dq], style: LineStyle::Thin, closed: false, pick });
+            self.arrow(dp, [-d[0], -d[1]], 3.0);
+            self.arrow(dq, d, 3.0);
+        }
         for (pos, kind) in [
             (p, GripKind::Origin),
             (q, GripKind::Origin),
@@ -899,12 +1397,21 @@ impl SheetGeometry {
         }
         // Place the text on its own "up" side of the dimension line.
         let up = [-angle.sin(), angle.cos()];
-        let mid = [(dp[0] + dq[0]) / 2.0 + up[0] * 1.2, (dp[1] + dq[1]) / 2.0 + up[1] * 1.2];
+        let tg = self.style.text_gap;
+        let mut mid = [(dp[0] + dq[0]) / 2.0 + up[0] * tg, (dp[1] + dq[1]) / 2.0 + up[1] * tg];
+        if self.style.text_horizontal && angle.abs() > 1e-9 {
+            // Horizontal text beside a non-horizontal dimension line: clear
+            // the line by the text's half width along `up`.
+            let w = self.dim_label_width(text, self.style.dim_text);
+            let k = (w / 2.0 * angle.sin().abs() + self.style.dim_text / 2.0 * (1.0 - angle.cos().abs())).max(0.0);
+            mid = [mid[0] + up[0] * k, mid[1] + up[1] * k];
+            angle = 0.0;
+        }
         if text.upper.is_none() && !text.boxed {
-            self.texts.push(Text2 { pos: mid, height: 3.5, text: text.main.clone(), angle, anchor: Anchor::BottomCenter, pick });
+            self.texts.push(Text2 { pos: mid, height: self.style.dim_text, text: text.main.clone(), angle, anchor: Anchor::BottomCenter, pick });
         } else {
             let mid = if text.boxed { [mid[0] + up[0] * 0.8, mid[1] + up[1] * 0.8] } else { mid };
-            self.dim_label(mid, angle, 0.5, false, text, 3.5, pick);
+            self.dim_label(mid, angle, 0.5, false, text, self.style.dim_text, pick);
         }
     }
 }
@@ -1029,10 +1536,17 @@ pub trait AnnotationEnv {
     fn expand(&self, s: &str) -> String;
     /// Displayed text of a callout (BOM item when linked).
     fn balloon_text(&self, a: &Annotation, text: &str) -> String;
-    /// Inspection item bubbles: shape, text height and border size (mm),
-    /// None while hidden.
-    fn inspection_style(&self) -> Option<(super::InspectionShape, f64, f64)> {
-        Some((super::InspectionShape::Circle, 2.5, 1.2))
+    /// Drawing-wide dimension / annotation style.
+    fn sheet_style(&self) -> SheetStyle {
+        SheetStyle::default()
+    }
+    /// Inspection item bubbles' look, None while hidden.
+    fn inspection_style(&self) -> Option<InspectionStyle> {
+        Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, color: None, solid: false, font: None })
+    }
+    /// Label of a revision callout ("B*" while pending), None when hidden.
+    fn revision_label(&self, revision: &str) -> Option<String> {
+        Some(revision.to_string())
     }
     /// Lines of a hole / thread callout (from the Hole feature).
     fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
@@ -1090,4 +1604,16 @@ fn trim(x: f64) -> String {
 /// pick table remaps it): the annotation's id with the top bit set.
 pub fn inspection_pick(id: u64) -> u32 {
     ((id & 0x7FFF_FFFF) as u32) | 0x8000_0000
+}
+
+/// Drawing properties › Inspection: the bubbles' look (text height and
+/// border size in mm; color None = black; solid = filled, white number).
+#[derive(Clone, Debug, PartialEq)]
+pub struct InspectionStyle {
+    pub shape: super::InspectionShape,
+    pub text_height: f64,
+    pub border: f64,
+    pub color: Option<[u8; 3]>,
+    pub solid: bool,
+    pub font: Option<TextFont>,
 }

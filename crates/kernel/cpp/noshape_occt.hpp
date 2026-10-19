@@ -175,6 +175,7 @@ void                         list_push(OcShapeList& l, const OcShape& s);
 size_t                       list_len(const OcShapeList& l);
 std::unique_ptr<OcShape>     list_get(const OcShapeList& l, size_t i);
 bool                         is_valid(const OcShape& s);
+bool                         self_intersects(const OcShape& s);
 std::unique_ptr<OcShape>     fix_shape(const OcShape& s, double tolerance);
 rust::String                 dump_shape(const OcShape& s);
 
@@ -248,13 +249,19 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
                     const OcShape& aux);
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points);
+void  set_working_scale(double k);
 OpOut op_thicken(const OcShape& s, double t1, double t2);
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join);
-OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii);
+OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
+                     uint8_t method);
+OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
+                bool checked);
 OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
-                         rust::Slice<const double> radii);
+                         rust::Slice<const double> radii, bool checked);
 OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
-                 uint8_t mode, double d1, double d2);
+                 uint8_t mode, double d1, double d2, bool checked);
+OpOut op_draft_wedges(const OcShape& solid, const OcShapeList& faces, P3 pull, const PlaneF& neutral,
+                      double angle);
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir,
                const PlaneF& neutral, double angle);
 OpOut op_defeature(const OcShape& s, const OcShapeList& faces);
@@ -301,10 +308,17 @@ std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes);
 StepImport               read_step(rust::Str path);
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                rust::Str path);
+                rust::Str path, uint8_t schema, uint8_t file_unit);
 std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
 void                     write_iges(const OcShapeList& shapes, rust::Str path);
+void                     write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary);
+std::unique_ptr<OcShape> read_parasolid(rust::Str path);
+void                     write_acis(const OcShapeList& shapes, rust::Str path);
+void     write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path, uint32_t version);
+uint32_t rhino_valid_breps(rust::Str path);
+void     write_jt(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
+void     write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
 
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,

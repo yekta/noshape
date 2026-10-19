@@ -291,6 +291,11 @@ pub struct HoleRecord {
     pub csink: Option<(f64, f64)>,
     /// Inch hole standard (callout values in inches).
     pub inch: bool,
+    /// Fit tolerance of the diameter (callout "⌀6.350 H7 +0.015/−0.000").
+    pub diameter_fit: Option<crate::fits::HoleFit>,
+    /// The hole runs out of the last part it cuts (the Part Studio callout
+    /// then reads THRU, live dialogs/hole-30).
+    pub exits: bool,
 }
 
 impl HoleRecord {

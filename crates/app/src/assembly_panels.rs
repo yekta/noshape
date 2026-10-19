@@ -45,7 +45,6 @@ impl PatternDialogKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RenameTarget {
-    Position(usize),
     Explode(usize),
 }
 
@@ -454,18 +453,29 @@ impl AssemblyView {
             .child(svg().path(icon_path("datum")).size_3p5().text_color(pal.text_muted))
             .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child("Origin"))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                if this.ui.ps_in_context.is_some() {
+                    this.ui.ps_in_context = Some(None);
+                    cx.notify();
+                    return;
+                }
                 if this.pick_mode(cx).is_some() {
                     this.deliver_connector(MateConnectorRef::origin(), window, cx);
                     this.refresh_scene(false, cx);
                     cx.notify();
                 }
             }))
-            // Onshape's origin row menu: (Create Part Studio in context… n/a) | Hide | Create empty subassembly.
+            // Onshape's origin row menu: Create Part Studio in context…, Hide | Create empty subassembly.
             .os_context_menu({
                 let view = cx.entity();
                 let hidden = self.ui.origin_hidden;
                 move |menu, window, cx| {
                     let entries = vec![
+                        behaviors::MenuEntry::Item {
+                            label: "Create Part Studio in context…".into(),
+                            icon: Some("create-partstudio-incontext"),
+                            disabled: false,
+                            act: std::rc::Rc::new(|t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.open_ps_in_context(cx)),
+                        },
                         behaviors::MenuEntry::Item {
                             label: if hidden { "Show".into() } else { "Hide".into() },
                             icon: Some(if hidden { "eye" } else { "eye-off" }),
@@ -532,6 +542,12 @@ impl AssemblyView {
                 }
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                if this.ui.ps_in_context.is_some() {
+                    // Origin of new Part Studio: this connector.
+                    this.ui.ps_in_context = Some(Some(id));
+                    cx.notify();
+                    return;
+                }
                 if this.pick_mode(cx).is_some() {
                     this.deliver_connector(MateConnectorRef::assembly_connector(id, owner), window, cx);
                 } else if ev.click_count() >= 2 {
@@ -1094,17 +1110,33 @@ impl AssemblyView {
     }
 
     /// Top banner for modes (snap, show mates, explode editing, placing).
+    /// Editing an exploded view: the yellow "Editing Explode 1 [Done]"
+    /// banner over a toolbar reduced to Undo / Redo (live 62).
+    pub(super) fn explode_banner(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.explode_edit {
+            return None;
+        }
+        let name = self.explode.and_then(|i| self.assembly(cx).and_then(|a| a.exploded_views.get(i).map(|v| v.name.clone()))).unwrap_or_default();
+        Some(super::positions::yellow_banner(
+            format!("Editing {name}"),
+            cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.explode_edit = false;
+                this.message = None;
+                this.refresh_scene(false, cx);
+                cx.notify();
+            }),
+        ))
+    }
+
     pub(super) fn render_mode_banner(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let pal = p();
         let (text, done): (String, Option<u8>) = if self.explode_edit {
-            let name = self.explode.and_then(|i| self.assembly(cx).and_then(|a| a.exploded_views.get(i).map(|v| v.name.clone()))).unwrap_or_default();
-            (format!("Editing {name}: select instances, then drag or rotate them with the triad to add steps"), Some(0))
+            // The yellow "Editing Explode 1 [Done]" banner sits in the toolbar row.
+            return None;
         } else if let Some(s) = &self.snap {
             (if s.is_some() { "Snap mode: click the target face or mate connector".into() } else { "Snap mode: click a face or mate connector on the instance to move".into() }, Some(1))
         } else if self.show_mates_mode {
             ("Show mates mode: hover an instance to see its mates, click to pin (H to exit)".into(), Some(2))
-        } else if self.placing.is_some() {
-            ("Click to place the inserted instance".into(), None)
         } else {
             return None;
         };
@@ -1176,13 +1208,6 @@ impl AssemblyView {
             return;
         }
         match target {
-            RenameTarget::Position(i) => {
-                self.edit(&format!("Rename named position : {name}"), cx, |a| {
-                    if let Some(np) = a.named_positions.get_mut(i) {
-                        np.name = name;
-                    }
-                });
-            }
             RenameTarget::Explode(i) => {
                 self.edit(&format!("Rename : {name}"), cx, |a| {
                     if let Some(v) = a.exploded_views.get_mut(i) {
@@ -1338,78 +1363,6 @@ impl AssemblyView {
         .into_any_element()
     }
 
-    // ------------------------------------------------------------ named positions panel
-
-    pub(super) fn render_positions_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let positions: Vec<String> = self.assembly(cx).map(|a| a.named_positions.iter().map(|n| n.name.clone()).collect()).unwrap_or_default();
-        let mut body = v_flex().id("np-body").p_2().gap_1().overflow_y_scroll().max_h(px(480.));
-        match self.naming_position.clone() {
-            Some(st) => {
-                body = body.child(
-                    h_flex()
-                        .gap_1()
-                        .child(div().flex_1().child(Input::new(&st).xsmall()))
-                        .child(Button::new("np-save").label("Save").primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            if let Some(st) = this.naming_position.take() {
-                                let name = st.read(cx).value().to_string();
-                                if !name.trim().is_empty() {
-                                    this.save_named_position(name, cx);
-                                }
-                            }
-                            cx.notify();
-                        }))),
-                );
-            }
-            None => {
-                body = body.child(Button::new("np-add").icon(IconName::Plus).label("Add named position").small().ghost().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    let n = this.assembly(cx).map(|a| a.named_positions.len() + 1).unwrap_or(1);
-                    let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("Named position {n}")));
-                    st.update(cx, |s, cx| s.focus(window, cx));
-                    this.transient_sub = Some(cx.subscribe_in(&st, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
-                        if let InputEvent::PressEnter { .. } = ev
-                            && let Some(st) = this.naming_position.take()
-                        {
-                            let name = st.read(cx).value().to_string();
-                            if !name.trim().is_empty() {
-                                this.save_named_position(name, cx);
-                            }
-                            window.focus(&this.focus, cx);
-                            cx.notify();
-                        }
-                    }));
-                    this.naming_position = Some(st);
-                    cx.notify();
-                })));
-            }
-        }
-        if positions.is_empty() {
-            body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child("Save the current instance positions to return to them later."));
-        }
-        for (i, name) in positions.iter().enumerate() {
-            let mut row = h_flex().id(SharedString::from(format!("np-row-{i}"))).h(px(26.)).px_2().gap_1().rounded_sm().text_sm().hover(|d| d.bg(pal.panel_hover)).child(svg().path(icon_path("named-position")).size_3p5().text_color(pal.text_muted));
-            match self.rename_input(RenameTarget::Position(i), cx) {
-                Some(inp) => row = row.child(inp),
-                None => {
-                    let n2 = name.clone();
-                    row = row
-                        .child(div().flex_1().truncate().child(name.clone()))
-                        .child(Button::new(SharedString::from(format!("np-apply-{i}"))).label("Apply").ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.apply_named_position(i, cx))))
-                        .child(Button::new(SharedString::from(format!("np-upd-{i}"))).icon(Icon::empty().path(icon_path("check-repeat"))).ghost().xsmall().tooltip("Update to the current positions").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.update_named_position(i, cx))))
-                        .child(Button::new(SharedString::from(format!("np-ren-{i}"))).icon(Icon::empty().path(icon_path("rename"))).ghost().xsmall().tooltip("Rename").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_rename(RenameTarget::Position(i), n2.clone(), window, cx))))
-                        .child(Button::new(SharedString::from(format!("np-del-{i}"))).icon(Icon::empty().path(icon_path("delete"))).ghost().xsmall().tooltip("Delete").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.delete_named_position(i, cx))));
-                }
-            }
-            body = body.child(row);
-        }
-        Self::panel_frame("Named positions", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.panel = None;
-            this.naming_position = None;
-            cx.notify();
-        }), "np-close")
-        .into_any_element()
-    }
-
     // ------------------------------------------------------------ configuration / replace
 
     pub(super) fn open_config(&mut self, top: InstanceId, window: &mut Window, cx: &mut Context<Self>) {
@@ -1419,23 +1372,22 @@ impl AssemblyView {
             _ => vec![],
         };
         let (inputs, values) = match &inst.source {
-            InstanceSource::Part { studio, config, .. } | InstanceSource::PartStudio { studio, config } | InstanceSource::MirroredPart { studio, config, .. } => (studio_inputs(&self.doc.read(cx).session.doc, *studio), config.clone()),
+            InstanceSource::Part { studio, config, .. } | InstanceSource::PartStudio { studio, config } | InstanceSource::MirroredPart { studio, config, .. } | InstanceSource::Sketch { studio, config, .. } => (studio_inputs(&self.doc.read(cx).session.doc, *studio), config.clone()),
             InstanceSource::External { key, config, .. } => {
                 use noshape_model::assembly::eval::ExternalStudios as _;
                 (AppExternal.studio(key).map(|(d, t)| studio_inputs(&d, t)).unwrap_or_default(), config.clone())
             }
-            InstanceSource::Assembly { .. } => {
-                self.message = Some((false, "Subassembly instances have no configuration.".into()));
-                cx.notify();
-                return;
-            }
+            InstanceSource::Assembly { assembly, config } => match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
+                Some(TabContent::Assembly(a)) => (a.configuration.inputs.clone(), config.clone()),
+                _ => (vec![], config.clone()),
+            },
             InstanceSource::Standard { .. } => {
                 self.edit_standard_instance(top, cx);
                 return;
             }
         };
         if inputs.is_empty() {
-            self.message = Some((false, format!("{} is not configured (its Part Studio has no configuration inputs).", inst.name)));
+            self.message = Some((false, format!("{} is not configured.", inst.name)));
             cx.notify();
             return;
         }
@@ -2194,10 +2146,10 @@ impl AssemblyView {
         let studios: Vec<(String, String)> = crate::derived::external_snapshot(&info.path, version.microversion).map(|d| crate::derived::DocStudios::sources(&d)).unwrap_or_default();
         let view = cx.entity();
         let versions = info.versions.clone();
-        let version_menu = Button::new("ins-ext-version").label(version.label.clone()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
+        let version_menu = Button::new("ins-ext-version").label(version.label.clone()).outline().xsmall().dropdown_caret(true).os_dropdown_menu("ins-ext-version-dd", true, move |mut m, _, _| {
             for (i, v) in versions.iter().enumerate() {
                 let view = view.clone();
-                m = m.item(PopupMenuItem::new(v.label.clone()).checked(i == vi).on_click(move |_, _, cx| {
+                m = m.item(crate::os_menu::OsMenuItem::new(v.label.clone()).checked(i == vi).on_click(move |_, _, cx| {
                     view.update(cx, |this, cx| {
                         if let Some(p) = &mut this.ext_pick {
                             p.1 = i;
@@ -2277,7 +2229,7 @@ impl AssemblyView {
                         let id = InstanceId(a.next_id());
                         let n = a.next_instance_name(&name);
                         let placement = Placement { translation: [k as f64 * 0.03, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
-                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false });
+                        a.instances.push(Instance { id, name: n, source: InstanceSource::External { key: key.clone(), body, config: ConfigValues::default() }, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
                         ids.push(id);
                     }
                     ids

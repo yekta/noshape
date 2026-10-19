@@ -269,11 +269,42 @@ pub fn fill_supported(text: &str) -> bool {
 /// than [`text_width`], so layouts computed from it (dimension gaps, table
 /// cells, title block) still fit.
 pub fn text_fill(t: &Text2) -> (Vec<[f64; 2]>, Vec<u32>) {
-    let layout = noshape_sketch::text::layout_text(&t.text, "Sans", false, false);
+    text_fill_font(t, None)
+}
+
+/// Cap height of a font in [`noshape_sketch::text::layout_text`] units
+/// (the top of its "H"), cached.
+fn fill_cap(family: &str, bold: bool, italic: bool) -> f64 {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    /// (family, bold, italic) -> cap height.
+    type CapCache = Mutex<HashMap<(String, bool, bool), f64>>;
+    static CACHE: OnceLock<CapCache> = OnceLock::new();
+    let key = (family.to_string(), bold, italic);
+    if let Some(v) = CACHE.get_or_init(Default::default).lock().ok().and_then(|c| c.get(&key).copied()) {
+        return v;
+    }
+    let l = noshape_sketch::text::layout_text("H", family, bold, italic);
+    let top = l.polylines(2).iter().flatten().map(|p| p.y).fold(0.0f64, f64::max);
+    let v = if top > 0.1 { top } else { FILL_CAP };
+    if let Ok(mut c) = CACHE.get_or_init(Default::default).lock() {
+        c.insert(key, v);
+    }
+    v
+}
+
+/// [`text_fill`] in a font (None: the drawing's default sans).
+pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<[f64; 2]>, Vec<u32>) {
+    let (family, bold, italic) = match font {
+        Some(f) => (f.family.as_str(), f.bold, f.italic),
+        None => ("Sans", false, false),
+    };
+    let layout = noshape_sketch::text::layout_text(&t.text, family, bold, italic);
     if layout.contours.is_empty() || layout.width <= 0.0 {
         return (Vec::new(), Vec::new());
     }
-    let s = t.height / FILL_CAP;
+    let cap = if font.is_some() { fill_cap(family, bold, italic) } else { FILL_CAP };
+    let s = t.height / cap;
     let natural = layout.width * s;
     let target = text_width(&t.text, t.height);
     let sx = if natural > target && target > 0.0 { target / natural } else { 1.0 };

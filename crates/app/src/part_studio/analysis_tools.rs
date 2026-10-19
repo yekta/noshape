@@ -26,13 +26,16 @@ pub enum ToolKind {
     Zebra,
     Reflection,
     Thickness,
+    Flatten,
+    Interference,
+    Draft,
 }
 
 impl ToolKind {
     /// Tools that change how the parts are drawn: ✓ keeps them on, ✗ (or
     /// Esc) turns them off.
     pub fn is_view_mode(self) -> bool {
-        matches!(self, ToolKind::Zebra | ToolKind::Reflection | ToolKind::Thickness)
+        matches!(self, ToolKind::Zebra | ToolKind::Reflection | ToolKind::Thickness | ToolKind::Draft)
     }
 }
 
@@ -60,6 +63,9 @@ impl ToolKind {
             ToolKind::Zebra => "Zebra stripes",
             ToolKind::Reflection => "Reflection analysis",
             ToolKind::Thickness => "Thickness analysis",
+            ToolKind::Flatten => "Flatten surfaces",
+            ToolKind::Interference => "Interference detection",
+            ToolKind::Draft => "Draft analysis",
         }
     }
 }
@@ -99,7 +105,7 @@ impl Default for ToolOptions {
 }
 
 /// Computed geometry of the open tool.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct ToolResult {
     /// Combs with their tooth color (sRGB).
     pub combs: Vec<(Comb, [u8; 4])>,
@@ -113,6 +119,9 @@ pub struct ToolResult {
     pub dihedral: Option<(f64, f64)>,
     /// Deviation minimum and maximum (distance, point on 1, point on 2).
     pub deviation: Option<(noshape_model::analysis::Extremum, noshape_model::analysis::Extremum)>,
+    /// Interference detection: the overlaps (with the two parts' names) and their red meshes.
+    pub interferences: Vec<(noshape_model::interference::Interference, String, String)>,
+    pub interference_meshes: Vec<noshape_render::MeshHandle>,
     /// Connection: curve endpoints, face edge segments and the boundaries
     /// of faces that connect to nothing.
     pub joints: Vec<(DVec3, Continuity)>,
@@ -176,6 +185,8 @@ impl PartStudioView {
         let key = kind.title();
         // A preselection replaces the remembered selection.
         let pre: Vec<Reference> = self.selection.iter().filter(|r| self.analysis_accepts(kind, r)).filter_map(|r| self.tool_entity(kind, r)).collect();
+        // The tool takes the preselection (it doesn't stay selected).
+        let had_pre = !pre.is_empty();
         let mut selection = if pre.is_empty() { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() } else { pre };
         if kind == ToolKind::Thickness {
             // Edit thickness analysis: the analyzed parts.
@@ -289,6 +300,15 @@ impl PartStudioView {
                 tolerance_inputs.push(st);
             }
         }
+        if kind == ToolKind::Flatten {
+            self.open_flatten(window, cx);
+        }
+        if kind == ToolKind::Draft {
+            self.open_draft(window, cx);
+        }
+        if had_pre || matches!(kind, ToolKind::Draft | ToolKind::Flatten) {
+            self.selection.clear();
+        }
         self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs });
         self.recompute_analysis_tool(cx);
         if kind.is_view_mode() {
@@ -301,13 +321,18 @@ impl PartStudioView {
     pub(super) fn close_analysis_tool(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(t) = self.ui.analysis_tool.take() else { return false };
         self.ui.env_picker = None;
+        self.ui.flatten = None;
         match t.kind {
             ToolKind::Zebra => self.ui.zebra = None,
             ToolKind::Reflection => self.ui.reflection = None,
             ToolKind::Thickness => self.ui.thickness = None,
+            ToolKind::Draft => {
+                self.ui.draft = None;
+                self.ui.analysis = None;
+            }
             _ => {}
         }
-        if t.kind.is_view_mode() {
+        if t.kind.is_view_mode() || t.kind == ToolKind::Interference {
             self.rebuild_scene(cx);
         }
         let key = t.kind.title();
@@ -331,6 +356,7 @@ impl PartStudioView {
             _ => {}
         }
         self.ui.env_picker = None;
+        self.ui.draft = None;
         self.ui.tool_memory.options.insert(t.kind.title(), t.options);
         self.rebuild_scene(cx);
         true
@@ -353,14 +379,15 @@ impl PartStudioView {
             ToolKind::Connection => matches!(r, Reference::Edge(_) | Reference::Face(_) | Reference::SketchEntity { .. }),
             ToolKind::Dihedral => matches!(r, Reference::Edge(_)),
             ToolKind::Zebra | ToolKind::Reflection => false,
-            ToolKind::Thickness => matches!(r, Reference::Body(_) | Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)),
+            ToolKind::Thickness | ToolKind::Interference => matches!(r, Reference::Body(_) | Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)),
+            ToolKind::Flatten | ToolKind::Draft => true,
         }
     }
 
     /// What a pick puts in the tool's field: Thickness analysis takes the
     /// whole part.
     fn tool_entity(&self, kind: ToolKind, r: &Reference) -> Option<Reference> {
-        if kind != ToolKind::Thickness || matches!(r, Reference::Body(_)) {
+        if !matches!(kind, ToolKind::Thickness | ToolKind::Interference) || matches!(r, Reference::Body(_)) {
             return Some(r.clone());
         }
         self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| Reference::Body(b.id.clone()))
@@ -369,6 +396,14 @@ impl PartStudioView {
     /// A viewport pick while a tool is open toggles the entity in its field.
     pub(super) fn analysis_pick(&mut self, r: &Reference, cx: &mut Context<Self>) -> bool {
         let Some(kind) = self.ui.analysis_tool.as_ref().map(|t| t.kind) else { return false };
+        if kind == ToolKind::Flatten {
+            self.flatten_pick(r, cx);
+            return true;
+        }
+        if kind == ToolKind::Draft {
+            self.draft_pick(r, cx);
+            return true;
+        }
         if !self.analysis_accepts(kind, r) {
             let msg = match kind {
                 ToolKind::Dihedral => "Select edges",
@@ -376,8 +411,8 @@ impl PartStudioView {
                 ToolKind::Deviation => "Select curves",
                 ToolKind::CurveSurface => "Select edges, faces or sketch curves",
                 ToolKind::Connection => "Select curves or faces",
-                ToolKind::Thickness => "Select parts",
-                ToolKind::Zebra | ToolKind::Reflection => return false,
+                ToolKind::Thickness | ToolKind::Interference => "Select parts",
+                ToolKind::Zebra | ToolKind::Reflection | ToolKind::Flatten | ToolKind::Draft => return false,
             };
             self.flash_info(msg.into(), cx);
             return true;
@@ -482,7 +517,19 @@ impl PartStudioView {
                     let faces: Vec<Reference> = sel.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
                     res.faces = noshape_model::analysis::face_connections(&ctx, &faces, samples, &o.tolerances);
                 }
-                ToolKind::Zebra | ToolKind::Reflection => {}
+                ToolKind::Zebra | ToolKind::Reflection | ToolKind::Flatten | ToolKind::Draft => {}
+                ToolKind::Interference => {
+                    let ids: Vec<noshape_model::reference::BodyId> = sel.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
+                    let bodies: Vec<&noshape_model::regen::context::Body> = ids.iter().filter_map(|id| ctx.bodies.iter().find(|b| b.id == *id).map(|b| &**b)).collect();
+                    let shapes: Vec<noshape_kernel::Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
+                    let up = self.gpu.uploader();
+                    for i in noshape_model::interference::interferences(&shapes) {
+                        let pick = vec![0u32; i.positions.len()];
+                        res.interference_meshes.push(up.upload_mesh_parts(&i.positions, &i.normals, &pick, &i.indices));
+                        let (a, b) = (bodies[i.a].name.clone(), bodies[i.b].name.clone());
+                        res.interferences.push((i, a, b));
+                    }
+                }
                 ToolKind::Thickness => {
                     let parts: Vec<noshape_model::reference::BodyId> = sel.iter().filter_map(|r| if let Reference::Body(b) = r { Some(b.clone()) } else { None }).collect();
                     let t = self.ui.thickness.get_or_insert_with(Default::default);
@@ -507,12 +554,22 @@ impl PartStudioView {
         if let Some(t) = &mut self.ui.analysis_tool {
             t.result = Some(res);
         }
+        if kind == ToolKind::Interference {
+            self.ui.interference_hover = None;
+            self.rebuild_scene(cx);
+        }
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
     /// Combs, envelopes, control polygons and markers over the model.
     pub(super) fn analysis_tool_overlay(&self) -> Vec<Instance> {
+        if let Some(s) = &self.ui.flatten {
+            return s.drawn.clone();
+        }
+        if self.ui.draft.is_some() {
+            return self.draft_arrow();
+        }
         let Some(t) = &self.ui.analysis_tool else { return Vec::new() };
         let Some(res) = &t.result else { return Vec::new() };
         let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
@@ -563,8 +620,20 @@ impl PartStudioView {
                 lines.push_polyline(&pts, CONTINUITY[0].0, 0, 3.0, LineSegment::ON_TOP);
             }
         }
+        // Interference detection: the hovered overlap's bounding box.
+        if let Some((i, _, _)) = self.ui.interference_hover.and_then(|k| res.interferences.get(k)) {
+            let (lo, hi) = i.bounds;
+            let c = |k: usize| DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z });
+            for (a, b) in [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)] {
+                lines.push_polyline(&[f(c(a)), f(c(b))], [200, 30, 30, 255], 0, 1.5, LineSegment::ON_TOP);
+            }
+        }
         let up = self.gpu.uploader();
         let mut out = vec![Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(35)];
+        // The interfering material, red (seen through the translucent parts).
+        for m in &res.interference_meshes {
+            out.push(Instance::new(Drawable::Mesh(m.clone())).with_color([0.8, 0.02, 0.02, 1.0]).unpickable().layer(34));
+        }
         // Curve joints: a dark ring around a light center; free ends a small red dot.
         let (mut rings, mut centers) = (PointData::default(), PointData::default());
         for (p, c) in res.joints.iter().filter(|j| shown(j.1)) {
@@ -724,11 +793,20 @@ impl PartStudioView {
                     .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Min: {}", fmt_len(min.0))))
                     .child(div().text_size(px(12.)).text_color(pal.text).child(format!("Max: {}", fmt_len(max.0))));
             }
+        } else if kind == ToolKind::Flatten {
+            if let Some(b) = self.render_flatten_body(cx) {
+                body = body.child(b);
+            }
+        } else if kind == ToolKind::Draft {
+            if let Some(b) = self.render_draft_body(cx) {
+                body = body.child(b);
+            }
         } else if !matches!(kind, ToolKind::Zebra | ToolKind::Reflection) {
             let caption = match kind {
                 ToolKind::Dihedral => "Edges to analyze",
                 ToolKind::Connection => "Entities",
                 ToolKind::Thickness => "Parts to analyze",
+                ToolKind::Interference => "Parts or bodies",
                 _ => "Entities to analyze",
             };
             body = body.child(field("at-sel", caption, &t.selection, false, true, cx));
@@ -751,7 +829,44 @@ impl PartStudioView {
                     body = body.child(div().text_size(px(12.)).text_color(pal.text).child(format!("Minimum radius: {}", fmt_len(r))));
                 }
             }
-            ToolKind::Deviation | ToolKind::Thickness => {}
+            ToolKind::Deviation | ToolKind::Thickness | ToolKind::Flatten | ToolKind::Draft => {}
+            ToolKind::Interference => {
+                // Interferences: one row per overlapping pair; hovering a row
+                // shows its bounding box and size.
+                let rows = t.result.as_ref().map(|r| r.interferences.clone()).unwrap_or_default();
+                let hovered = self.ui.interference_hover;
+                let mut list = v_flex().gap(px(2.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Interferences"));
+                if rows.is_empty() && t.selection.len() >= 2 {
+                    list = list.child(div().text_size(px(12.)).text_color(pal.text).child("No interferences"));
+                }
+                for (k, (i, a, b)) in rows.iter().enumerate() {
+                    let size = i.bounds.1 - i.bounds.0;
+                    let dims = format!("{} × {} × {}", fmt_len(size.x), fmt_len(size.y), fmt_len(size.z));
+                    list = list.child(
+                        v_flex()
+                            .id(SharedString::from(format!("at-intf-{k}")))
+                            .px(px(6.))
+                            .py(px(3.))
+                            .text_size(px(12.))
+                            .text_color(pal.text)
+                            .bg(gpui_kit::rgb(0xffffff))
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xd7d7d7))
+                            .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                            .child(format!("{a}, {b}"))
+                            .when(hovered == Some(k), |d| d.child(div().text_color(pal.text_muted).child(dims)))
+                            .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                                let new = if *h { Some(k) } else { None };
+                                if this.ui.interference_hover != new {
+                                    this.ui.interference_hover = new;
+                                    this.refresh_scene(false, cx);
+                                    cx.notify();
+                                }
+                            })),
+                    );
+                }
+                body = body.child(list);
+            }
             ToolKind::Connection => {
                 // A row per class: checkbox, swatch, name and (G1–G3) tolerance.
                 let names = ["No connection", "G0", "G1", "G2", "G3"];
@@ -874,7 +989,7 @@ impl PartStudioView {
                 }
             }
         }
-        if kind != ToolKind::Connection && !kind.is_view_mode() {
+        if !matches!(kind, ToolKind::Connection | ToolKind::Flatten) && !kind.is_view_mode() {
             body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
         }
         let dialog = v_flex()

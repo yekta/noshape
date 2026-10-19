@@ -17,6 +17,9 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Point under the cursor for a ray (origin, direction), if any.
+pub type OrbitPivotFn = Arc<dyn Fn(DVec3, DVec3) -> Option<DVec3> + Send + Sync>;
+
 #[derive(Clone, Debug)]
 pub enum ViewportEvent {
     Hover(Option<u32>),
@@ -129,7 +132,7 @@ pub struct Viewport {
     pub zoom_window: bool,
     /// Point under the cursor for a ray (origin, direction): right-drag
     /// rotates about it (Onshape rotates about the geometry under the cursor).
-    pub orbit_pivot_fn: Option<Arc<dyn Fn(DVec3, DVec3) -> Option<DVec3> + Send + Sync>>,
+    pub orbit_pivot_fn: Option<OrbitPivotFn>,
     orbit_pivot: Option<DVec3>,
     /// Last orbit step and when (for rotation inertia), and the inertia step.
     last_orbit: Option<(DVec2, Instant)>,
@@ -137,7 +140,9 @@ pub struct Viewport {
     /// World-space manipulator handles (segments): pressing the left button
     /// near one routes it to the tool events even when `tool_captures_left`
     /// is false.
-    pub manipulators: Vec<(DVec3, DVec3)>,
+    /// Manipulator hit areas: world segments, or (with a length in pixels)
+    /// a screen-sized glyph from the first point towards the second.
+    pub manipulators: Vec<(DVec3, DVec3, f64)>,
     /// Pick ids that win ties in the pick radius (edges/points over faces).
     pub pick_priority: Arc<dyn Fn(u32) -> i32 + Send + Sync>,
     /// What zoom to fit frames (set by the owner, e.g. the visible parts);
@@ -188,6 +193,11 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
 impl EventEmitter<ViewportEvent> for Viewport {}
 
 impl Viewport {
+    /// Top-left of the viewport in window coordinates.
+    pub fn origin(&self) -> Point<Pixels> {
+        self.bounds.origin
+    }
+
     pub fn new(gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let (target_id, rx, pick_rx) = gpu.register_target_with_picks();
         let frames = cx.spawn_in(window, async move |this, cx| {
@@ -307,8 +317,12 @@ impl Viewport {
 
     /// Whether a viewport-local position is on a manipulator handle.
     pub fn manipulator_at(&self, p: DVec2) -> bool {
-        self.manipulators.iter().any(|&(a, b)| {
-            let (Some(a), Some(b)) = (self.project(a), self.project(b)) else { return false };
+        self.manipulators.iter().any(|&(a, b, glyph_px)| {
+            let (Some(a), Some(mut b)) = (self.project(a), self.project(b)) else { return false };
+            // A screen-sized glyph: `glyph_px` long from `a` towards `b`.
+            if glyph_px > 0.0 {
+                b = a + (b - a).normalize_or_zero() * glyph_px;
+            }
             let d = b - a;
             let u = ((p - a).dot(d) / d.length_squared().max(1e-9)).clamp(0.0, 1.0);
             (a + d * u - p).length() < 8.0 || (b - p).length() < 14.0
@@ -408,7 +422,8 @@ impl Viewport {
     }
 
     pub fn animate_to(&mut self, to: Camera, cx: &mut Context<Self>) {
-        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration: Duration::from_millis(300) });
+        // Live (behaviours.md "N"): Onshape's view changes take about half a second.
+        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration: Duration::from_millis(500) });
         self.dirty = true;
         cx.notify();
     }

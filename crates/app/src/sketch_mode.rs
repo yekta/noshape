@@ -672,13 +672,17 @@ pub fn dim_display_scale(k: &ConstraintKind) -> f64 {
 
 /// Value used by in-place editing, in the same units and scale as its label.
 pub fn dimension_edit_text(data: &SketchData, cid: ConstraintId, units: &UnitPrefs) -> Option<String> {
-    if let Some(expr) = data.dimension_exprs.get(&cid.0) {
+    // A typed plain number reopens with the document unit ("80" → "80 mm",
+    // QA3; live sketch/13: the box shows the value with its unit).
+    if let Some(expr) = data.dimension_exprs.get(&cid.0).filter(|e| e.text.trim().parse::<f64>().is_err()) {
         return Some(expr.text.clone());
     }
     let kind = &data.sketch.constraint(cid)?.kind;
     let value = kind.value()? * dim_display_scale(kind);
     let dim = dim_unit(kind);
-    let precision = if dim == Dim::ANGLE { units.angle_precision } else { units.length_precision }.max(9);
+    // Live sketch/13, 141, 143: lengths with 6 decimals ("3.51041 in",
+    // "1.725582 in"), angles with 7 ("35.5376823 deg"), zeros trimmed.
+    let precision = if dim == Dim::ANGLE { units.angle_precision.max(7) } else { units.length_precision.max(6) };
     Some(noshape_units::format_quantity_with(Quantity::new(value, dim), units, precision))
 }
 
@@ -815,6 +819,12 @@ impl SketchEditor {
     pub fn set_tool(&mut self, tool: Tool) {
         // Pressing the active tool's key again toggles back to select.
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
+        // Choosing a drawing tool clears the selection (live: L with a line
+        // selected deselects it).
+        if self.tool.draws() {
+            self.selection.clear();
+            self.selected_constraints.clear();
+        }
         self.clicks.clear();
         self.chain_end = None;
         self.picks.clear();
@@ -3394,6 +3404,33 @@ impl SketchEditor {
         out
     }
 
+    /// Linear dimensions whose dimension line runs steeper than 60°: live
+    /// Onshape writes their (horizontal) text beside the line, which stays
+    /// unbroken (sketch/17 "2.5"); flatter ones break the line around it.
+    pub fn labels_beside_line(&self, data: &SketchData) -> std::collections::HashSet<ConstraintId> {
+        let labels: std::collections::HashMap<ConstraintId, DVec2> = data.sketch.constraints().filter_map(|c| Some((c.id, self.label_pos(data, c.id, &c.kind)?))).collect();
+        let mut out = std::collections::HashSet::new();
+        for g in self.dimension_graphics(data) {
+            let Some(c) = data.sketch.constraint(g.constraint) else { continue };
+            if !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. } | ConstraintKind::Length { .. }) {
+                continue;
+            }
+            let Some(at) = labels.get(&g.constraint) else { continue };
+            // The dimension line: the segment passing closest to the label.
+            let line = g.segments.iter().filter(|sg| (sg[1] - sg[0]).length() > self.world_per_px * 2.0).min_by(|a, b| {
+                let d = |sg: &[DVec2; 2]| Curve2::Line { a: sg[0], b: sg[1] }.distance(*at);
+                d(a).total_cmp(&d(b))
+            });
+            if let Some(sg) = line {
+                let d = sg[1] - sg[0];
+                if d.y.abs() > d.x.abs() * 3f64.sqrt() {
+                    out.insert(g.constraint);
+                }
+            }
+        }
+        out
+    }
+
     /// Dimension graphics (extension/dimension lines, arrows, arcs) in local coords.
     pub fn dimension_graphics(&self, data: &SketchData) -> Vec<DimGraphic> {
         let sk = &data.sketch;
@@ -3675,7 +3712,9 @@ impl SketchEditor {
                 if let Some(a) = anchors.first() {
                     let r = (anchors.get(1).copied().unwrap_or(c) - *a).length();
                     if valid(r) {
-                        out.push((beside(*a, *a + (c - *a).normalize_or_zero() * r, None), dia(r * 2.0)));
+                        // Outside the circle, opposite the cursor (live sketch/09).
+                        let label_w = label_width_px(&dia(r * 2.0)) * 0.5 + 6.0;
+                        out.push((*a - (c - *a).normalize_or_zero() * (r + px * label_w), dia(r * 2.0)));
                     }
                 }
             }
@@ -4193,8 +4232,9 @@ impl SketchEditor {
             .into_iter()
             .map(|(cid, pos, text, _)| (cid, (pos, DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px)))
             .collect();
+        let beside = self.labels_beside_line(data);
         for mut g in self.dimension_graphics(data) {
-            if let Some((c, half)) = gaps.get(&g.constraint) {
+            if let Some((c, half)) = gaps.get(&g.constraint).filter(|_| !beside.contains(&g.constraint)) {
                 g.segments = g.segments.iter().flat_map(|sg| clip_outside_box(*sg, *c, *half)).collect();
             }
             let selected = self.selected_constraints.contains(&g.constraint);
@@ -5281,6 +5321,8 @@ impl SketchEditor {
 
 /// Onshape's frame around the sketch being edited.
 pub const SKETCH_BOX_COLOR: u32 = 0xb2ddf6;
+/// Half height of an empty sketch's frame (metres).
+const EMPTY_SKETCH_BOX_HALF_HEIGHT: f64 = 0.05625;
 
 impl SketchEditor {
     /// The light-blue frame Onshape draws around the sketch being edited
@@ -5297,7 +5339,10 @@ impl SketchEditor {
                 half = half.max(p.abs());
             }
         }
-        let h = (half.y.max(half.x * 9.0 / 16.0) * 1.55).max(self.world_per_px * 150.0);
+        // An empty (or small) sketch's frame is 200 x 112.5 mm, twice the
+        // width of the default planes (live sketch/00, 44 and ui's pixel
+        // comparison: 2.0x the Top plane across, 1.15x along).
+        let h = (half.y.max(half.x * 9.0 / 16.0) * 1.55).max(EMPTY_SKETCH_BOX_HALF_HEIGHT).max(self.world_per_px * 150.0);
         let half = DVec2::new(h * 16.0 / 9.0, h);
         (-half, half)
     }
@@ -5675,13 +5720,17 @@ mod tests {
         let inch_text = dimension_edit_text(&data, cid, &inches).unwrap();
         assert!(inch_text.ends_with("in"), "entry uses document units: {inch_text}");
         let inch_value = noshape_units::evaluate_as(&inch_text, Dim::LENGTH, &inches, &noshape_units::EmptyScope).unwrap();
-        assert!((inch_value.value - 0.02).abs() < 1e-10);
+        assert_eq!(inch_text, "0.787402 in", "6 decimals like live sketch/141");
+        assert!((inch_value.value - 0.02).abs() < 1e-7);
         ed.apply_dimension(&mut data, cid, &text, &units, &noshape_units::EmptyScope).unwrap();
         assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - 0.01).abs() < 1e-12);
         // An expression typed into an ellipse diameter is kept (shown scale).
         ed.apply_dimension(&mut data, cid, "2 * 15 mm", &units, &noshape_units::EmptyScope).unwrap();
         assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - 0.015).abs() < 1e-12, "radius = diameter / 2");
         assert_eq!(dimension_edit_text(&data, cid, &units).as_deref(), Some("2 * 15 mm"), "expression survives");
+        // A plain number reopens with the document unit (QA3: "80" → "80 mm").
+        ed.apply_dimension(&mut data, cid, "40", &units, &noshape_units::EmptyScope).unwrap();
+        assert_eq!(dimension_edit_text(&data, cid, &units).as_deref(), Some("40 mm"));
         let conic = data.sketch.add_conic(v(0.05, 0.01), v(0.06, 0.02), v(0.07, 0.01), 0.7).unwrap();
         let rho = data.sketch.add_constraint(ConstraintKind::Rho { conic, value: 0.7 }).unwrap();
         let text = dimension_edit_text(&data, rho, &units).unwrap();
@@ -5797,6 +5846,22 @@ mod tests {
         }
         assert!(ed.confirm_spline(&mut d).changed);
         assert_eq!(count(&d, EntityKind::FitSpline), 2);
+    }
+
+    #[test]
+    fn choosing_a_drawing_tool_clears_the_selection() {
+        // Live sketch/401–402: L with a line selected deselects it.
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        ed.selection.push(line);
+        ed.set_tool(Tool::Line);
+        assert!(ed.selection.is_empty());
+        assert_eq!(ed.tool, Tool::Line);
+        // Non-drawing tools keep it (Transform acts on the selection).
+        ed.set_tool(Tool::Select);
+        ed.selection.push(line);
+        ed.set_tool(Tool::Transform);
+        assert_eq!(ed.selection, vec![line]);
     }
 
     #[test]

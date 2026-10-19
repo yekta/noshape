@@ -229,7 +229,7 @@ fn helix_on_cylinder_face_uses_face_height() {
     });
     // Tangent plane to the cylinder parallel to the Right plane.
     s.add("cPlane", move |p| {
-        p.set("cplaneType", ParamValue::Enum("TANGENT_CYLINDER".into()));
+        p.set("cplaneType", ParamValue::Enum("TANGENT_PLANE".into()));
         p.set("entities", ParamValue::Query(vec![side, Reference::Plane(DatumPlane::Right)]));
     });
     let r = s.ok();

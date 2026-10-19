@@ -9,7 +9,7 @@
 use crate::doc_model::DocModel;
 use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -84,15 +84,20 @@ impl FsSearchPane {
         Self { doc, mode: Mode::Text, find, replace, filter, exclude, match_case: false, regex: false, replace_open: false, symbol: None, groups: Vec::new(), collapsed: HashSet::new(), summary: String::new(), _subs: subs }
     }
 
-    pub fn focus_find(&self, window: &mut Window, cx: &mut App) {
-        self.find.update(cx, |s, cx| s.focus(window, cx));
+    pub fn find_field(&self) -> Entity<InputState> {
+        self.find.clone()
     }
 
-    /// Symbol search for `name` (from a Feature Studio's cursor).
-    pub fn search_symbol(&mut self, name: String, at: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.mode = Mode::Symbol;
+    /// Symbol search for `name` (a Feature Studio's right-click › Find
+    /// usages / Rename in workspace; Rename opens the replace row).
+    pub fn search_symbol(&mut self, name: String, at: String, rename: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_mode(Mode::Symbol, window, cx);
+        self.find.update(cx, |s, cx| s.set_value("", window, cx));
         self.symbol = Some((name, at));
-        self.replace.update(cx, |s, cx| s.set_placeholder("Replace with", window, cx));
+        if rename {
+            self.replace_open = true;
+            self.replace.update(cx, |s, cx| s.focus(window, cx));
+        }
         self.run(cx);
     }
 
@@ -125,7 +130,7 @@ impl FsSearchPane {
                 let name = if typed.is_empty() { self.symbol.as_ref()?.0.clone() } else { typed };
                 (name, true, true)
             }
-            // Scripts import no standard library modules: `import(path : "…", version : "…")`.
+            // Standard library imports: `import(path : "onshape/std/…", version : "…")`.
             Mode::Import => (r#"import\s*\(\s*path\s*:\s*"onshape/std/[^"]*"\s*,\s*version\s*:\s*"[^"]*"\s*\)"#.to_string(), false, false),
         };
         if src.is_empty() {
@@ -137,6 +142,12 @@ impl FsSearchPane {
         }
         let case = self.match_case || self.mode == Mode::Symbol;
         Some(regex::RegexBuilder::new(&pat).case_insensitive(!case).build().map_err(|e| e.to_string()))
+    }
+
+    /// The symbol searched for in Symbol mode (typed, else the one picked).
+    fn symbol_name(&self, cx: &App) -> Option<String> {
+        let typed = self.find.read(cx).value().trim().to_string();
+        if typed.is_empty() { self.symbol.as_ref().map(|s| s.0.clone()) } else { Some(typed) }
     }
 
     /// Feature Studio name filter: `*` matches anything.
@@ -178,11 +189,20 @@ impl FsSearchPane {
                 return;
             }
         };
+        // Symbol mode finds references (identifier tokens), not text in
+        // strings, comments or field names.
+        let symbol = (self.mode == Mode::Symbol).then(|| self.symbol_name(cx)).flatten();
         let mut total = 0;
         for (tab, name, text) in self.studios(cx) {
             let mut hits = Vec::new();
+            let refs = symbol.as_ref().map(|s| noshape_model::custom::symbol_occurrences(&text, s));
+            let mut line_start = 0;
             for (i, line) in text.split('\n').enumerate() {
-                let marks: Vec<Range<usize>> = re.find_iter(line).filter(|m| !m.range().is_empty()).map(|m| m.range()).collect();
+                let marks: Vec<Range<usize>> = match &refs {
+                    Some(refs) => refs.iter().filter(|r| r.start >= line_start && r.end <= line_start + line.len()).map(|r| r.start - line_start..r.end - line_start).collect(),
+                    None => re.find_iter(line).filter(|m| !m.range().is_empty()).map(|m| m.range()).collect(),
+                };
+                line_start += line.len() + 1;
                 if let Some(first) = marks.first() {
                     total += marks.len();
                     hits.push(Hit { line: i + 1, column: line[..first.start].chars().count() + 1, text: line.to_string(), marks });
@@ -199,7 +219,8 @@ impl FsSearchPane {
         };
         let tabs = self.groups.len();
         let filter = self.filter.read(cx).value().trim().to_string();
-        let scope = if filter.is_empty() { format!("in all {tabs} tab{}", if tabs == 1 { "" } else { "s" }) } else { format!("in {tabs} tab{} matching '{filter}'", if tabs == 1 { "" } else { "s" }) };
+        // Onshape writes "tabs" even for one ("found in all 1 tabs").
+        let scope = if filter.is_empty() { format!("in all {tabs} tabs") } else { format!("in {tabs} tabs matching '{filter}'") };
         self.summary = if total == 0 { format!("No occurrences of {what} found") } else { format!("All {total} occurrence{} of {what} found {scope}", if total == 1 { "" } else { "s" }) };
         self.publish(cx);
         cx.notify();
@@ -208,8 +229,12 @@ impl FsSearchPane {
     /// Highlight the matches in the Feature Studios' code.
     fn publish(&self, cx: &mut App) {
         let re = self.pattern(cx).and_then(|r| r.ok());
+        let symbol = (self.mode == Mode::Symbol).then(|| self.symbol_name(cx)).flatten();
         for (tab, _, text) in self.studios(cx) {
-            let ranges = re.as_ref().map(|re| re.find_iter(&text).filter(|m| !m.range().is_empty()).map(|m| m.range()).collect()).unwrap_or_default();
+            let ranges = match &symbol {
+                Some(s) => noshape_model::custom::symbol_occurrences(&text, s),
+                None => re.as_ref().map(|re| re.find_iter(&text).filter(|m| !m.range().is_empty()).map(|m| m.range()).collect()).unwrap_or_default(),
+            };
             crate::feature_studio::set_matches(tab, ranges);
         }
         cx.refresh_windows();
@@ -219,6 +244,7 @@ impl FsSearchPane {
     fn replace_all(&mut self, cx: &mut Context<Self>) {
         let Some(Ok(re)) = self.pattern(cx) else { return };
         let with = self.replace.read(cx).value().to_string();
+        let symbol = (self.mode == Mode::Symbol).then(|| self.symbol_name(cx)).flatten();
         if self.mode == Mode::Import && with.trim().is_empty() {
             return;
         }
@@ -229,7 +255,18 @@ impl FsSearchPane {
                 let doc = &self.doc.read(cx).session.doc;
                 let TabContent::FeatureStudio(f) = &doc.tab(g.tab)?.content else { return None };
                 let text = f.text();
-                let new = if self.mode == Mode::Text && self.regex { re.replace_all(text, with.as_str()).into_owned() } else { re.replace_all(text, regex::NoExpand(&with)).into_owned() };
+                let new = match &symbol {
+                    // Rename: replace the references only, back to front.
+                    Some(sym) => {
+                        let mut t = text.to_string();
+                        for r in noshape_model::custom::symbol_occurrences(text, sym).into_iter().rev() {
+                            t.replace_range(r, with.trim());
+                        }
+                        t
+                    }
+                    None if self.mode == Mode::Text && self.regex => re.replace_all(text, with.as_str()).into_owned(),
+                    None => re.replace_all(text, regex::NoExpand(&with)).into_owned(),
+                };
                 (new != text).then_some((g.tab, new))
             })
             .collect();
@@ -338,8 +375,7 @@ impl FsSearchPane {
 impl Render for FsSearchPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        let blue = ButtonCustomVariant::new(cx).color(rgb(0x1651b0).into()).foreground(rgb(0xffffff).into()).hover(rgb(0x0e3f8c).into()).active(rgb(0x0e3f8c).into()).shadow(false);
-        let primary = |id: &'static str, label: &'static str| Button::new(id).custom(blue).h(px(30.)).px(px(10.5)).rounded(px(5.25)).child(div().text_size(px(14.)).child(label));
+        let primary = |id: &'static str, label: &'static str| Button::new(id).primary().h(px(30.)).px(px(10.5)).rounded(px(5.25)).child(div().text_size(px(14.)).child(label));
         let field = |st: &Entity<InputState>| Input::new(st).h(px(30.)).text_size(px(14.));
         let check = |id: &'static str, label: &'static str, on: bool| os::checkbox(id, label, on).flex_none().cursor_pointer();
         let mode_anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -362,7 +398,7 @@ impl Render for FsSearchPane {
             .cursor_pointer()
             .child(os::glyph(mode_glyph, 20., pal.text))
             .child(os::glyph(os::GLYPH_CARET, 8., pal.text))
-            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().size_full())
+            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 let b = mode_anchor.get();
                 this.open_mode_menu(point(b.left(), b.bottom() + px(2.)), window, cx);

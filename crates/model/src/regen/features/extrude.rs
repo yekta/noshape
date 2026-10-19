@@ -24,7 +24,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return err(if thin { "Select edges or faces to define the path of the thin wall" } else { "Select sketch regions or planar faces to extrude" });
+        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall" } else { "Select face or sketch region to extrude." });
     }
     let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {

@@ -143,9 +143,9 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     }
     let target_ids: Vec<BodyId> = ev.resolve_bodies(ev.query("targets")).into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect();
     if target_ids.is_empty() {
-        return err("Select parts, surfaces or curves to split");
+        return crate::regen::eval::err_at(&["targets"], "Select parts, surfaces, or curves to split.");
     }
-    let Some(tool_ref) = ev.query("tool").first() else { return err("Select an entity to split with") };
+    let Some(tool_ref) = ev.query("tool").first() else { return crate::regen::eval::err_at(&["tool"], "Select an entity to split with") };
     let tool = resolve_tool(ev, tool_ref, ev.bool("useTrimmed"))?;
     let both = ev.bool("keepBothSides");
     let front = ev.bool("keepFront");

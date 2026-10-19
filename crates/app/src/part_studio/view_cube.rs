@@ -1,5 +1,5 @@
 //! Onshape's View cube (upper right of the graphics area): it turns with
-//! the camera; clicking a face, edge or corner animates to that view;
+//! the camera; clicking a face or corner animates to that view;
 //! arrows around it rotate 15° (Shift 90°, Ctrl 5°) and roll; the
 //! dropdown under it is the *Camera and render options* menu.
 
@@ -9,22 +9,40 @@ use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::h_flex;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_render::{Camera, Projection, StandardView};
 
 /// Side of the whole widget (cube, arrows and the view menu button): Onshape's
 /// `VIEW_CUBE_SCREEN_SIZE_PX`.
 const WIDGET_PX: f32 = 150.0;
-/// Side of the cube's hit box in logical pixels.
-const CUBE_PX: f32 = 120.0;
-/// The cube center sits slightly below the widget's center (measured live).
-const CUBE_CENTER_Y: f32 = 78.0;
-/// Fraction of a face (from its center) that belongs to the face cell;
-/// the rest are edge and corner cells.
-const FACE_FRACTION: f64 = 0.56;
+
+// Onshape's view cube geometry (its WebGL view manipulator), in pixels from
+// the widget's center with y up.
+const G: f64 = WIDGET_PX as f64;
+/// The arrow tips touch the widget's edge.
+const ARROW_OUT: f64 = 0.5 * G;
+/// Half of `VIEW_CUBE_ARROW_WIDTH` and `VIEW_CUBE_ARROW_HEIGHT`.
+const ARROW_HALF_W: f64 = 0.05 * G;
+const ARROW_HALF_H: f64 = 0.065 * G;
+/// `VIEW_CUBE_ARROW_ARC_WIDTH`: the roll arcs' thickness.
+const ARC_W: f64 = 0.04 * G;
+/// Half the cube's edge: what's left inside the arrows, less room for the
+/// 12 px axis labels.
+const HALF_EDGE: f64 = ((0.5 - 2.0 * 0.05) / 1.6 - 12.0 / G / 1.5) * G;
+/// Each face is a rounded square: white on the near side, a light frame
+/// seen through on the far side (`VIEW_CUBE_FRONT_SIZE`, `_BACK_SIZE`,
+/// `_CORNER_SIZE` of the edge length).
+const FRONT_SIZE: f64 = 0.75;
+const BACK_SIZE: f64 = 0.97;
+const CORNER_SIZE: f64 = 0.2;
+/// The axis lines start `VIEW_CUBE_AXIS_GAP` outside the cube's corner.
+const AXIS_GAP: f64 = 1.0;
+/// Axis parts behind the cube (`VIEW_CUBE_HIDDEN_AXIS_OPACITY`).
+const HIDDEN_AXIS_OPACITY: f32 = 0.3;
 
 /// A clickable region of the cube, identified by the view direction it
-/// stands for: one non-zero component = face, two = edge, three = corner.
+/// stands for: one non-zero component = face, three = corner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CubeCell(pub [i8; 3]);
 
@@ -33,7 +51,9 @@ impl CubeCell {
         DVec3::new(self.0[0] as f64, self.0[1] as f64, self.0[2] as f64)
     }
 
-    /// Camera rotation looking at the cube from this cell's direction.
+    /// Camera rotation for this cell: a face's standard view, or for a
+    /// corner Onshape's trimetric view from that side (30° off the side
+    /// face nearest the corner's front, 30° above or below the ground).
     pub fn rotation(self) -> DQuat {
         let view = match self.0 {
             [0, -1, 0] => Some(StandardView::Front),
@@ -44,85 +64,203 @@ impl CubeCell {
             [0, 0, -1] => Some(StandardView::Bottom),
             _ => None,
         };
-        match view {
-            Some(v) => Camera::rotation_for(v),
-            None => Camera::look_rotation(-self.dir().normalize(), DVec3::Z),
+        if let Some(v) = view {
+            return Camera::rotation_for(v);
         }
+        let quarter = match (self.0[0] > 0, self.0[1] > 0) {
+            (true, false) => 0.0,
+            (true, true) => 1.0,
+            (false, true) => 2.0,
+            (false, false) => 3.0,
+        };
+        let t = (quarter * 90.0 + 30.0f64).to_radians();
+        let eye = DVec3::new(0.75f64.sqrt() * t.sin(), -(0.75f64.sqrt()) * t.cos(), 0.5 * self.0[2].signum() as f64);
+        Camera::look_rotation(-eye, DVec3::Z)
     }
 }
 
 /// Face labels by outward normal (Onshape: Front looks along +Y).
 const FACES: [([i8; 3], &str); 6] = [([0, -1, 0], "Front"), ([0, 1, 0], "Back"), ([-1, 0, 0], "Left"), ([1, 0, 0], "Right"), ([0, 0, 1], "Top"), ([0, 0, -1], "Bottom")];
 
-/// A cell polygon in widget coordinates (origin at the widget center,
-/// y down, cube half-diagonal fits in `radius`).
-#[derive(Clone, Debug)]
-pub struct CellPoly {
-    pub cell: CubeCell,
-    pub corners: [DVec2; 4],
+/// A face's in-plane axes: its label runs along the first, upright along
+/// the second.
+fn face_axes(n: [i8; 3]) -> (DVec3, DVec3) {
+    match n {
+        [0, -1, 0] => (DVec3::X, DVec3::Z),
+        [0, 1, 0] => (DVec3::NEG_X, DVec3::Z),
+        [-1, 0, 0] => (DVec3::NEG_Y, DVec3::Z),
+        [1, 0, 0] => (DVec3::Y, DVec3::Z),
+        [0, 0, 1] => (DVec3::X, DVec3::Y),
+        _ => (DVec3::X, DVec3::NEG_Y),
+    }
 }
 
-/// Visible cell polygons for a camera rotation, back to front.
-pub fn cube_polys(rotation: DQuat, radius: f64) -> Vec<CellPoly> {
-    let inv = rotation.inverse();
-    let s = radius / 3f64.sqrt();
-    let to_screen = |w: DVec3| {
-        let c = inv * w;
-        DVec2::new(c.x * s, -c.y * s)
-    };
-    let mut faces: Vec<(f64, usize)> = FACES
-        .iter()
-        .enumerate()
-        .filter_map(|(i, (n, _))| {
-            let z = (inv * CubeCell(*n).dir()).z;
-            (z > 1e-3).then_some((z, i))
-        })
-        .collect();
-    faces.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let bands = [(-1.0, -FACE_FRACTION), (-FACE_FRACTION, FACE_FRACTION), (FACE_FRACTION, 1.0)];
-    let mut out = Vec::new();
-    for (_, fi) in faces {
-        let n = FACES[fi].0;
-        let axis = n.iter().position(|v| *v != 0).unwrap_or(0);
-        let (ua, va) = ((axis + 1) % 3, (axis + 2) % 3);
-        for (iu, (u0, u1)) in bands.iter().enumerate() {
-            for (iv, (v0, v1)) in bands.iter().enumerate() {
-                let mut cell = n;
-                cell[ua] = iu as i8 - 1;
-                cell[va] = iv as i8 - 1;
-                let pt = |u: f64, v: f64| {
-                    let mut w = CubeCell(n).dir();
-                    w[ua] = u;
-                    w[va] = v;
-                    to_screen(w)
-                };
-                out.push(CellPoly { cell: CubeCell(cell), corners: [pt(*u0, *v0), pt(*u1, *v0), pt(*u1, *v1), pt(*u0, *v1)] });
-            }
+/// The rotate and roll arrows around the cube. While hovered, an arrow
+/// sits in the owner's hover slot as a pseudo cell ([`Arrow::cell`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Arrow {
+    Up,
+    Down,
+    Left,
+    Right,
+    Cw,
+    Ccw,
+}
+
+/// Marks an arrow's pseudo cell (no cube cell has a component this big).
+const ARROW_TAG: i8 = 9;
+
+impl Arrow {
+    const ALL: [Arrow; 6] = [Arrow::Up, Arrow::Down, Arrow::Left, Arrow::Right, Arrow::Cw, Arrow::Ccw];
+
+    fn cell(self) -> CubeCell {
+        CubeCell([ARROW_TAG, self as i8, 0])
+    }
+
+    fn of(cell: CubeCell) -> Option<Arrow> {
+        if cell.0[0] != ARROW_TAG {
+            return None;
+        }
+        Self::ALL.get(cell.0[1] as usize).copied()
+    }
+
+    /// Outline polygons, from the widget center with y up: a triangle on
+    /// each side; a roll arrow is an arc band with its head at the outer end.
+    fn polys(self) -> Vec<Vec<DVec2>> {
+        let (o, w) = (ARROW_OUT, ARROW_HALF_W);
+        let b = o - ARROW_HALF_H;
+        let tri = |p: [[f64; 2]; 3]| vec![p.iter().map(|q| DVec2::from(*q)).collect::<Vec<_>>()];
+        let arc = |a0: f64, a1: f64| {
+            let (r0, r1) = (o - w - ARC_W / 2.0, o - w + ARC_W / 2.0);
+            let at = |k: usize| a0 + (a1 - a0) * k as f64 / 6.0;
+            let mut p: Vec<DVec2> = (0..=6).map(|k| DVec2::from_angle(at(k)) * r1).collect();
+            p.extend((0..=6).rev().map(|k| DVec2::from_angle(at(k)) * r0));
+            p
+        };
+        let head = |sx: f64| {
+            let d = DVec2::new(sx, 1.0) * std::f64::consts::FRAC_1_SQRT_2;
+            let q = std::f64::consts::FRAC_PI_4 - ARROW_HALF_H / o;
+            vec![d * o, d * (o - 2.0 * w), DVec2::new(sx * q.cos(), q.sin()) * (o - w)]
+        };
+        use std::f64::consts::PI;
+        match self {
+            Arrow::Up => tri([[0.0, o], [-w, b], [w, b]]),
+            Arrow::Down => tri([[0.0, -o], [w, -b], [-w, -b]]),
+            Arrow::Left => tri([[-o, 0.0], [-b, -w], [-b, w]]),
+            Arrow::Right => tri([[o, 0.0], [b, w], [b, -w]]),
+            Arrow::Cw => vec![head(1.0), arc(0.25 * PI, 0.4 * PI)],
+            Arrow::Ccw => vec![head(-1.0), arc(0.6 * PI, 0.75 * PI)],
+        }
+    }
+}
+
+/// One visible piece of the cube, in pixels from the widget center with y up.
+#[derive(Clone, Debug)]
+struct CubeShape {
+    cell: CubeCell,
+    poly: Vec<DVec2>,
+    /// A far face's frame (light) rather than a white near face or corner.
+    frame: bool,
+}
+
+/// A rounded square in the plane through `c` spanned by `u` and `v`:
+/// half side `a`, corner radius `r`, 9 segments per corner.
+fn rounded_square(c: DVec3, u: DVec3, v: DVec3, a: f64, r: f64) -> Vec<DVec3> {
+    let mut out = Vec::with_capacity(40);
+    for (k, (su, sv)) in [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].into_iter().enumerate() {
+        let corner = c + u * (su * (a - r)) + v * (sv * (a - r));
+        for j in 0..=9 {
+            let t = (k as f64 + j as f64 / 9.0) * std::f64::consts::FRAC_PI_2;
+            out.push(corner + (u * t.cos() + v * t.sin()) * r);
         }
     }
     out
 }
 
-/// Front-most cell under a widget-local point.
-pub fn cube_hit(rotation: DQuat, radius: f64, p: DVec2) -> Option<CubeCell> {
-    cube_polys(rotation, radius).into_iter().rev().find(|c| point_in_quad(p, &c.corners)).map(|c| c.cell)
-}
-
-fn point_in_quad(p: DVec2, q: &[DVec2; 4]) -> bool {
-    let mut sign = 0.0f64;
-    for i in 0..4 {
-        let (a, b) = (q[i], q[(i + 1) % 4]);
-        let c = (b - a).perp_dot(p - a);
-        if c.abs() < 1e-12 {
+/// The cube's visible pieces for a camera rotation, back to front, like
+/// Onshape's back-face-culled mesh: the far faces' frames seen through
+/// the gaps, a white disk under each near corner, the near faces' white
+/// squares.
+fn cube_shapes(rotation: DQuat) -> Vec<CubeShape> {
+    let inv = rotation.inverse();
+    let h = HALF_EDGE;
+    let (mut far, mut corners, mut near) = (Vec::new(), Vec::new(), Vec::new());
+    for (n, _) in FACES {
+        let cell = CubeCell(n);
+        let z = (inv * cell.dir()).z;
+        if z.abs() < 1e-6 {
             continue;
         }
-        if sign == 0.0 {
-            sign = c.signum();
-        } else if c.signum() != sign {
-            return false;
+        let (u, v) = face_axes(n);
+        let size = if z > 0.0 { FRONT_SIZE } else { BACK_SIZE };
+        let poly = rounded_square(cell.dir() * h, u, v, size * h, CORNER_SIZE * 2.0 * h).into_iter().map(|p| (inv * p).truncate()).collect();
+        if z > 0.0 {
+            near.push(CubeShape { cell, poly, frame: false });
+        } else {
+            far.push(CubeShape { cell, poly, frame: true });
         }
     }
-    true
+    for i in 0..8 {
+        let s = |bit: i32| if i & bit == 0 { -1i8 } else { 1 };
+        let cell = CubeCell([s(1), s(2), s(4)]);
+        let d = cell.dir().normalize();
+        if (inv * d).z <= 1e-6 {
+            continue;
+        }
+        let center = cell.dir() * (0.8 * h);
+        let u = d.cross(DVec3::Z).normalize();
+        let v = d.cross(u);
+        let poly = (0..36)
+            .map(|k| {
+                let t = k as f64 / 36.0 * std::f64::consts::TAU;
+                (inv * (center + (u * t.cos() + v * t.sin()) * (0.24 * h))).truncate()
+            })
+            .collect();
+        corners.push(CubeShape { cell, poly, frame: false });
+    }
+    far.into_iter().chain(corners).chain(near).collect()
+}
+
+/// Front-most cube cell under a point (pixels from the widget center, y up).
+pub fn cube_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
+    cube_shapes(rotation).into_iter().rev().find(|s| point_in_poly(p, &s.poly)).map(|s| s.cell)
+}
+
+/// What's under a widget point: an arrow's pseudo cell or a cube cell.
+fn widget_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
+    Arrow::ALL.into_iter().find(|a| a.polys().iter().any(|q| point_in_poly(p, q))).map(Arrow::cell).or_else(|| cube_hit(rotation, p))
+}
+
+fn point_in_poly(p: DVec2, poly: &[DVec2]) -> bool {
+    let mut inside = false;
+    let mut j = poly.len().saturating_sub(1);
+    for i in 0..poly.len() {
+        let (a, b) = (poly[i], poly[j]);
+        if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+/// Whether the cube hides a point (pixels, world axes) from a viewer
+/// towards `eye`.
+fn behind_cube(p: DVec3, eye: DVec3) -> bool {
+    let h = HALF_EDGE;
+    let (mut t0, mut t1) = (0.0f64, f64::INFINITY);
+    for i in 0..3 {
+        if eye[i].abs() < 1e-12 {
+            if p[i].abs() > h {
+                return false;
+            }
+        } else {
+            let (a, b) = ((-h - p[i]) / eye[i], (h - p[i]) / eye[i]);
+            t0 = t0.max(a.min(b));
+            t1 = t1.min(a.max(b));
+        }
+    }
+    t0 < t1
 }
 
 /// See [`CubeHooks::state`].
@@ -131,10 +269,10 @@ pub type CubeState<'a> = (&'a mut Option<CubeCell>, &'a mut Option<Point<Pixels>
 /// What a view owning a [`view_cube`] provides: where it keeps the cube's
 /// hover cell and screen origin, its camera rotation, and the camera moves.
 pub struct CubeHooks<V: 'static> {
-    /// The owner's hover cell and the cube's last painted origin.
+    /// The owner's hover cell and the widget's last painted origin.
     pub state: fn(&mut V) -> CubeState<'_>,
     pub rotation: fn(&V, &App) -> DQuat,
-    /// Animate to a face, edge or corner view.
+    /// Animate to a face's or corner's view.
     pub click: fn(&mut V, CubeCell, &mut Context<V>),
     /// Rotate by (yaw, pitch) degrees (triangle arrows).
     pub rotate: fn(&mut V, f64, f64, &mut Context<V>),
@@ -150,145 +288,154 @@ impl<V: 'static> Clone for CubeHooks<V> {
 
 impl<V: 'static> Copy for CubeHooks<V> {}
 
+fn fill_polys(window: &mut Window, polys: &[Vec<DVec2>], at: &impl Fn(DVec2) -> Point<Pixels>, color: Hsla) {
+    let mut b = PathBuilder::fill();
+    for poly in polys.iter().filter(|p| p.len() >= 3) {
+        b.move_to(at(poly[0]));
+        for q in &poly[1..] {
+            b.line_to(at(*q));
+        }
+        b.close();
+    }
+    if let Ok(path) = b.build() {
+        window.paint_path(path, color);
+    }
+}
+
 /// Onshape's 150 px View cube widget with its arrows and `menu` (the
 /// camera and render options button) at the bottom right. Shared by the
 /// Part Studio and the Assembly: place it 15 px from the graphics area's
 /// top-right corner.
 pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Context<V>) -> AnyElement {
-    let pal = p();
-    let radius = CUBE_PX as f64 * 0.5 - 5.0;
-    let polys = cube_polys(rotation, radius);
-    // Onshape (§1.10): white faces, rounded edge/corner cells in #cedbe5
-    // at 60%, hover #90cef1 at 60%, black labels, XYZ triad.
-    let face_fill: Hsla = pal.panel.into();
-    let edge_fill: Hsla = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6).into();
-    let hover_fill: Hsla = with_alpha(gpui_kit::rgb(0x90cef1), 0.6).into();
-    let polys2 = polys.clone();
-    // Triad from the cube's back-bottom-left corner (x red, y green, z blue).
-    let inv_t = rotation.inverse();
-    let s_t = radius / 3f64.sqrt();
-    let scr = move |w: DVec3| {
-        let c = inv_t * w;
-        DVec2::new(c.x * s_t, -c.y * s_t)
-    };
-    let t_origin = DVec3::new(-1.0, -1.0, -1.0);
-    let triad: Vec<(DVec2, DVec2, Hsla, &'static str)> = [(DVec3::X, 0xcd0000u32, "X"), (DVec3::Y, 0x009400, "Y"), (DVec3::Z, 0x0000d0, "Z")]
-        .into_iter()
-        .map(|(axis, c, l)| (scr(t_origin), scr(t_origin + axis * 2.55), Hsla::from(gpui_kit::rgb(c)), l))
-        .collect();
-    let triad_labels: Vec<AnyElement> = triad
+    let inv = rotation.inverse();
+    let eye = rotation * DVec3::Z;
+    let to_view = move |w: DVec3| (inv * w).truncate();
+    // Onshape (tokens): faces and corners white, frames and arrows
+    // #cedbe5 at 60%, the hovered piece #90cef1 at 60%, black labels.
+    let white: Hsla = gpui_kit::rgb(0xffffff).into();
+    let harbor: Hsla = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6).into();
+    let highlight: Hsla = with_alpha(gpui_kit::rgb(0x90cef1), 0.6).into();
+    let lit = move |cell: CubeCell, base: Hsla| if hover == Some(cell) { highlight } else { base };
+    let arrows: Vec<(Vec<Vec<DVec2>>, Hsla)> = Arrow::ALL.into_iter().map(|a| (a.polys(), lit(a.cell(), harbor))).collect();
+    let pieces = cube_shapes(rotation);
+    // Hidden = behind the cube and under something drawn: the rounded
+    // corners leave the axes visible next to them (live).
+    let covered = |p: DVec3| behind_cube(p, eye) && pieces.iter().any(|s| point_in_poly(to_view(p), &s.poly));
+    let shapes: Vec<(Vec<DVec2>, Hsla)> = pieces.iter().map(|s| (s.poly.clone(), lit(s.cell, if s.frame { harbor } else { white }))).collect();
+    // Labels drawn *on* the near faces, like Onshape's label textures:
+    // glyph outlines laid out in the face plane and projected.
+    let label_polys: Vec<Vec<Vec<DVec2>>> = FACES
         .iter()
-        .map(|(_, tip, c, l)| {
-            let d = *tip * 1.08;
+        .filter(|(n, _)| (inv * CubeCell(*n).dir()).z > 1e-6)
+        .map(|(n, name)| {
+            let (right, up) = face_axes(*n);
+            let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
+            // Ascender height in cube units (a face spans -1..1).
+            let asc = 0.4;
+            let base = CubeCell(*n).dir() - right * (layout.width * asc * 0.5) - up * (asc * 0.36);
+            layout.polylines(5).into_iter().map(|c| c.into_iter().map(|q| to_view((base + right * (q.x * asc) + up * (q.y * asc)) * HALF_EDGE)).collect()).collect()
+        })
+        .collect();
+    // The triad runs along the cube's edges from just outside its
+    // back-bottom-left corner; what the cube hides shows through faintly.
+    let origin = DVec3::splat(-(HALF_EDGE + AXIS_GAP));
+    let mut axis_runs: Vec<(DVec2, DVec2, Hsla, bool)> = Vec::new();
+    let mut axis_labels: Vec<AnyElement> = Vec::new();
+    for (axis, rgb, name) in [(DVec3::X, 0xcd0000u32, "X"), (DVec3::Y, 0x009400, "Y"), (DVec3::Z, 0x0000d0, "Z")] {
+        let color: Hsla = gpui_kit::rgb(rgb).into();
+        let len = 2.0 * HALF_EDGE;
+        let steps = 48;
+        let hidden = |k: usize| covered(origin + axis * (len * (k as f64 + 0.5) / steps as f64));
+        let mut k0 = 0;
+        while k0 < steps {
+            let h = hidden(k0);
+            let mut k1 = k0 + 1;
+            while k1 < steps && hidden(k1) == h {
+                k1 += 1;
+            }
+            let at = |k: usize| to_view(origin + axis * (len * k as f64 / steps as f64));
+            axis_runs.push((at(k0), at(k1), if h { Hsla { a: HIDDEN_AXIS_OPACITY, ..color } } else { color }, h));
+            k0 = k1;
+        }
+        // Past the tip by half the label's diagonal plus 3 px; faded out
+        // as the axis turns end-on (8° to 2°), faint behind the cube.
+        let at = origin + axis * (len + (7.5f64.hypot(12.0) / 2.0 + 3.0));
+        let t = (((eye.dot(axis).abs().min(1.0).acos()).to_degrees() - 2.0) / 6.0).clamp(0.0, 1.0);
+        let fade = (t * t * (3.0 - 2.0 * t)) as f32;
+        let alpha = if covered(at) { fade.min(HIDDEN_AXIS_OPACITY) } else { fade };
+        let v = to_view(at);
+        axis_labels.push(
             div()
                 .absolute()
-                .left(px(CUBE_PX * 0.5 + d.x as f32 - 5.0))
-                .top(px(CUBE_PX * 0.5 + d.y as f32 - 8.0))
+                .left(px(WIDGET_PX * 0.5 + v.x as f32 - 10.0))
+                .top(px(WIDGET_PX * 0.5 - v.y as f32 - 8.0))
+                .w(px(20.))
+                .h(px(16.))
+                .flex()
+                .items_center()
+                .justify_center()
                 .text_size(px(12.))
+                .line_height(px(16.))
                 .font_weight(FontWeight::MEDIUM)
-                .text_color(*c)
-                .child(*l)
-                .into_any_element()
-        })
-        .collect();
-    let triad2 = triad.clone();
-    // Labels drawn *on* the faces turned towards the viewer, like
-    // Onshape: glyph outlines laid out in the face plane and projected.
-    let inv = rotation.inverse();
-    let label_polys: Vec<(Vec<Vec<DVec2>>, f32)> = FACES
-        .iter()
-        .filter_map(|(n, name)| {
-            let c = inv * CubeCell(*n).dir();
-            if c.z < 0.2 {
-                return None;
-            }
-            // Face axes: text runs left to right along `right`, upright along `up`.
-            let (right, up) = match *n {
-                [0, -1, 0] => (DVec3::X, DVec3::Z),
-                [0, 1, 0] => (DVec3::NEG_X, DVec3::Z),
-                [-1, 0, 0] => (DVec3::NEG_Y, DVec3::Z),
-                [1, 0, 0] => (DVec3::Y, DVec3::Z),
-                [0, 0, 1] => (DVec3::X, DVec3::Y),
-                _ => (DVec3::X, DVec3::NEG_Y),
-            };
-            let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
-            // Ascender height in cube units (the face spans -1..1).
-            let asc = 0.46;
-            let base = CubeCell(*n).dir() - right * (layout.width * asc * 0.5) - up * (asc * 0.36);
-            let polys: Vec<Vec<DVec2>> = layout.polylines(5).into_iter().map(|c| c.into_iter().map(|q| scr(base + right * (q.x * asc) + up * (q.y * asc))).collect()).collect();
-            Some((polys, c.z as f32))
-        })
-        .collect();
-    let cube = div()
+                .text_color(Hsla { a: alpha, ..color })
+                .child(name)
+                .into_any_element(),
+        );
+    }
+    let local = |pos: Point<Pixels>, o: Point<Pixels>| {
+        let d = DVec2::new(f64::from(f32::from(pos.x - o.x)), f64::from(f32::from(pos.y - o.y))) - DVec2::splat(G * 0.5);
+        DVec2::new(d.x, -d.y)
+    };
+    let view = cx.entity();
+    div()
         .id("view-cube")
-        .occlude()
-        .absolute()
-        .left(px(WIDGET_PX * 0.5 - CUBE_PX * 0.5))
-        .top(px(CUBE_CENTER_Y - CUBE_PX * 0.5))
-        .size(px(CUBE_PX))
-        .cursor_pointer()
+        .relative()
+        .size(px(WIDGET_PX))
+        .when(hover.is_some(), |d| d.cursor_pointer())
         .child(
             canvas(
-                |_, _, _| {},
+                move |bounds, _, cx| {
+                    // Records the widget origin for hit testing.
+                    view.update(cx, |this, _| *(hooks.state)(this).1 = Some(bounds.origin));
+                },
                 move |bounds, _, window, _| {
                     let o = bounds.origin;
-                    let half = CUBE_PX * 0.5;
-                    let pt = |v: DVec2| point(o.x + px(half + v.x as f32), o.y + px(half + v.y as f32));
-                    for poly in &polys2 {
-                        let mut b = PathBuilder::fill();
-                        b.move_to(pt(poly.corners[0]));
-                        for c in &poly.corners[1..] {
-                            b.line_to(pt(*c));
-                        }
-                        b.close();
-                        let is_face = poly.cell.0.iter().filter(|v| **v != 0).count() == 1;
-                        let fill = if hover == Some(poly.cell) {
-                            hover_fill
-                        } else if is_face {
-                            face_fill
-                        } else {
-                            edge_fill
-                        };
-                        if let Ok(path) = b.build() {
-                            window.paint_path(path, fill);
-                        }
+                    let at = |v: DVec2| point(o.x + px((G * 0.5 + v.x) as f32), o.y + px((G * 0.5 - v.y) as f32));
+                    for (polys, color) in &arrows {
+                        fill_polys(window, polys, &at, *color);
                     }
-                    for (polys, facing) in &label_polys {
-                        let mut b = PathBuilder::fill();
-                        for poly in polys {
-                            if poly.len() < 3 {
+                    for (poly, color) in &shapes {
+                        fill_polys(window, std::slice::from_ref(poly), &at, *color);
+                    }
+                    for polys in &label_polys {
+                        fill_polys(window, polys, &at, with_alpha(gpui_kit::rgb(0x000000), 0.85).into());
+                    }
+                    // Hidden axis parts show through first, then the visible ones.
+                    for hidden_pass in [true, false] {
+                        for (a, b, color, hidden) in &axis_runs {
+                            if *hidden != hidden_pass {
                                 continue;
                             }
-                            b.move_to(pt(poly[0]));
-                            for q in &poly[1..] {
-                                b.line_to(pt(*q));
+                            let mut p = PathBuilder::stroke(px(1.));
+                            p.move_to(at(*a));
+                            p.line_to(at(*b));
+                            if let Ok(path) = p.build() {
+                                window.paint_path(path, *color);
                             }
-                            b.close();
-                        }
-                        if let Ok(path) = b.build() {
-                            window.paint_path(path, with_alpha(gpui_kit::rgb(0x000000), 0.3 + 0.7 * facing));
-                        }
-                    }
-                    for (a, tip, c, _) in &triad2 {
-                        let mut b = PathBuilder::stroke(px(1.));
-                        b.move_to(pt(*a));
-                        b.line_to(pt(*tip));
-                        if let Ok(path) = b.build() {
-                            window.paint_path(path, *c);
                         }
                     }
                 },
             )
             .absolute()
+            .top_0()
+            .left_0()
             .size_full(),
         )
-        .children(triad_labels)
-        .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, window, cx| {
-            let _ = window;
+        .children(axis_labels)
+        .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
             let rot = (hooks.rotation)(this, cx);
             let (hover, origin) = (hooks.state)(this);
-            let local = origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
-            let hit = local.and_then(|l| cube_hit(rot, radius, l));
+            let hit = origin.and_then(|o| widget_hit(rot, local(e.position, o)));
             if hit != *hover {
                 *hover = hit;
                 cx.notify();
@@ -302,79 +449,33 @@ pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: Any
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, e: &MouseDownEvent, _, cx| {
-                cx.stop_propagation();
                 let rot = (hooks.rotation)(this, cx);
-                let origin = *(hooks.state)(this).1;
-                let local = origin.map(|o| DVec2::new(f64::from(f32::from(e.position.x - o.x)), f64::from(f32::from(e.position.y - o.y))) - DVec2::splat(CUBE_PX as f64 * 0.5));
-                if let Some(cell) = local.and_then(|l| cube_hit(rot, radius, l)) {
+                let Some(o) = *(hooks.state)(this).1 else { return };
+                // Anything but the cube and its arrows is the graphics area's.
+                let Some(cell) = widget_hit(rot, local(e.position, o)) else { return };
+                cx.stop_propagation();
+                let Some(arrow) = Arrow::of(cell) else {
                     (hooks.click)(this, cell, cx);
+                    return;
+                };
+                // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
+                let k = if e.modifiers.shift {
+                    6.0
+                } else if e.modifiers.control || e.modifiers.platform {
+                    1.0 / 3.0
+                } else {
+                    1.0
+                };
+                match arrow {
+                    Arrow::Up => (hooks.rotate)(this, 0.0, -15.0 * k, cx),
+                    Arrow::Down => (hooks.rotate)(this, 0.0, 15.0 * k, cx),
+                    Arrow::Left => (hooks.rotate)(this, -15.0 * k, 0.0, cx),
+                    Arrow::Right => (hooks.rotate)(this, 15.0 * k, 0.0, cx),
+                    Arrow::Ccw => (hooks.roll)(this, 15.0 * k, cx),
+                    Arrow::Cw => (hooks.roll)(this, -15.0 * k, cx),
                 }
             }),
         )
-        .child(
-            // Records the widget origin for hit testing.
-            canvas(
-                {
-                    let view = cx.entity();
-                    move |bounds, _, cx| {
-                        view.update(cx, |this, _| *(hooks.state)(this).1 = Some(bounds.origin));
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .size_full(),
-        );
-    // Onshape: four triangle nudge arrows around the cube and two curved
-    // roll arrows above it, `#cedbe5` at 60% (hover `#90cef1` at 60%),
-    // as tinted glyphs positioned in the 150 px widget.
-    let arrow_color = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6);
-    let arrow_hover = with_alpha(gpui_kit::rgb(0x90cef1), 0.6);
-    let arrow = |id: &'static str, icon: &'static str, size: f32, cx_: f32, cy: f32, tip: &'static str, dx: f64, dy: f64, roll: f64, cx: &mut Context<V>| {
-        div()
-            .id(id)
-            .absolute()
-            .left(px(cx_ - size * 0.5))
-            .top(px(cy - size * 0.5))
-            .size(px(size))
-            .flex()
-            .items_center()
-            .justify_center()
-            .text_color(arrow_color)
-            .cursor_pointer()
-            .hover(|d| d.text_color(arrow_hover))
-            .child(crate::ui::glyph(icon, size, arrow_color))
-            .tooltip(crate::ui::tooltip(tip))
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, e: &MouseDownEvent, _, cx| {
-                    cx.stop_propagation();
-                    // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
-                    let k = if e.modifiers.shift {
-                        6.0
-                    } else if e.modifiers.control || e.modifiers.platform {
-                        1.0 / 3.0
-                    } else {
-                        1.0
-                    };
-                    if roll != 0.0 {
-                        (hooks.roll)(this, roll * k, cx);
-                    } else {
-                        (hooks.rotate)(this, dx * k, dy * k, cx);
-                    }
-                }),
-            )
-    };
-    div()
-        .relative()
-        .size(px(WIDGET_PX))
-        .child(arrow("cube-up", "cube-up", 13., 75., 6., "Rotate up", 0.0, -15.0, 0.0, cx))
-        .child(arrow("cube-down", "cube-down", 13., 75., 144., "Rotate down", 0.0, 15.0, 0.0, cx))
-        .child(arrow("cube-left", "cube-left", 13., 6., 76., "Rotate left", -15.0, 0.0, 0.0, cx))
-        .child(arrow("cube-right", "cube-right", 13., 144., 76., "Rotate right", 15.0, 0.0, 0.0, cx))
-        .child(arrow("cube-roll-l", "cube-roll-left", 30., 36., 24., "Roll counterclockwise", 0.0, 0.0, 15.0, cx))
-        .child(arrow("cube-roll-r", "cube-roll-right", 30., 114., 24., "Roll clockwise", 0.0, 0.0, -15.0, cx))
-        .child(cube)
         .child(div().absolute().left(px(106.)).top(px(128.)).child(menu))
         .into_any_element()
 }
@@ -444,7 +545,7 @@ impl PartStudioView {
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("camera-menu")
             .custom(variant)
-            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-chevron-down", 8., pal.text)))
+            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-caret-down", 9., pal.text)))
             .w(px(44.))
             .h(px(28.))
             .p_0()
@@ -453,12 +554,8 @@ impl PartStudioView {
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 // Opens under the button, right-aligned with it (live: 222 px,
                 // Onshape's context-menu style). The button's bottom-right
-                // corner, from the cube's painted origin.
-                // The widget's origin is the cube's minus its inset in the widget.
-                let at = this.ui.cube_origin.map(|o| {
-                    let widget = point(o.x - px(WIDGET_PX * 0.5 - CUBE_PX * 0.5), o.y - px(CUBE_CENTER_Y - CUBE_PX * 0.5));
-                    point(widget.x + px(150.), widget.y + px(158.))
-                }).unwrap_or_default();
+                // corner, from the widget's painted origin.
+                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(158.))).unwrap_or_default();
                 let view = view.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
                 // Onshape (live, dom/menu-camera-render.txt): views | named and
@@ -579,27 +676,33 @@ mod tests {
     use std::prelude::v1::test;
 
     #[test]
-    fn front_view_shows_front_face_in_the_middle() {
+    fn front_view_hits() {
         let rot = Camera::rotation_for(StandardView::Front);
-        assert_eq!(cube_hit(rot, 40.0, DVec2::ZERO), Some(CubeCell([0, -1, 0])));
-        // Upper band of the front face is the front-top edge.
-        assert_eq!(cube_hit(rot, 40.0, DVec2::new(0.0, -21.0)), Some(CubeCell([0, -1, 1])));
-        // Upper right corner.
-        assert_eq!(cube_hit(rot, 40.0, DVec2::new(21.0, -21.0)), Some(CubeCell([1, -1, 1])));
-        // Outside the cube.
-        assert_eq!(cube_hit(rot, 40.0, DVec2::new(60.0, 0.0)), None);
+        assert_eq!(cube_hit(rot, DVec2::ZERO), Some(CubeCell([0, -1, 0])));
+        // Past the white square: the back face's frame, seen through.
+        assert_eq!(cube_hit(rot, DVec2::new(0.0, 26.0)), Some(CubeCell([0, 1, 0])));
+        // The upper right corner's disk.
+        assert_eq!(cube_hit(rot, DVec2::new(23.6, 23.6)), Some(CubeCell([1, -1, 1])));
+        assert_eq!(cube_hit(rot, DVec2::new(40.0, 0.0)), None);
+        assert_eq!(widget_hit(rot, DVec2::new(0.0, 70.0)), Some(Arrow::Up.cell()));
+        assert_eq!(widget_hit(rot, DVec2::from_angle(0.3 * std::f64::consts::PI) * 67.5), Some(Arrow::Cw.cell()));
+        assert_eq!(Arrow::of(Arrow::Ccw.cell()), Some(Arrow::Ccw));
+        assert_eq!(Arrow::of(CubeCell([1, -1, 1])), None);
     }
 
     #[test]
     fn isometric_corner_and_rotations() {
         let rot = Camera::rotation_for(StandardView::Isometric);
         // The corner nearest the viewer projects to the center.
-        assert_eq!(cube_hit(rot, 40.0, DVec2::ZERO), Some(CubeCell([1, -1, 1])));
-        assert_eq!(cube_polys(rot, 40.0).len(), 27);
-        // Face cells reproduce the standard views.
+        assert_eq!(cube_hit(rot, DVec2::ZERO), Some(CubeCell([1, -1, 1])));
+        // Three near faces, three far frames, four corner disks.
+        assert_eq!(cube_shapes(rot).len(), 10);
         assert!(CubeCell([0, 0, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Top), 1e-9));
-        // Edge cells look along the negated diagonal.
-        let fwd = CubeCell([1, -1, 0]).rotation() * DVec3::NEG_Z;
-        assert!(fwd.abs_diff_eq(DVec3::new(-1.0, 1.0, 0.0).normalize(), 1e-9));
+        // Corners give Onshape's trimetric views.
+        assert!(CubeCell([1, -1, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Trimetric), 1e-6));
+        let fwd = CubeCell([-1, 1, -1]).rotation() * DVec3::NEG_Z;
+        assert!(fwd.z > 0.0 && fwd.x > 0.0 && fwd.y < 0.0, "{fwd}");
+        // The roll arcs sit around the cube, which stays inside them.
+        assert!((HALF_EDGE - 29.5).abs() < 1e-9);
     }
 }

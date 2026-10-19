@@ -1,0 +1,148 @@
+//! Robust shell: the offset and the boolean (slab) constructions agree, and
+//! cases OCCT's offset can't do still give the right solid.
+
+use glam::DVec3;
+use noshape_kernel::*;
+
+fn bx(a: [f64; 3], b: [f64; 3]) -> Shape {
+    make_box_corners(DVec3::from(a), DVec3::from(b)).unwrap()
+}
+
+fn cyl_z(x: f64, y: f64, z0: f64, r: f64, h: f64) -> Shape {
+    make_cylinder(&Plane::from_normal(DVec3::new(x, y, z0), DVec3::Z), r, h, std::f64::consts::TAU).unwrap()
+}
+
+fn vol(s: &Shape) -> f64 {
+    volume_properties(s).unwrap().mass
+}
+
+fn edges_where(s: &Shape, f: impl Fn(&EdgeInfo) -> bool) -> Vec<Shape> {
+    s.edges().into_iter().filter(|e| e.edge_info().map(|i| !i.degenerated && f(&i)).unwrap_or(false)).collect()
+}
+
+fn faces_where(s: &Shape, f: impl Fn(DVec3) -> bool) -> Vec<Shape> {
+    s.faces().into_iter().filter(|x| f(x.centroid().unwrap())).collect()
+}
+
+/// 40 x 20 x 10 block, optionally with 3 mm vertical corner fillets and a
+/// 1 mm chamfer all round the top.
+fn block(fillets: bool, chamfer_top: bool) -> Shape {
+    let mut s = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    if fillets {
+        let v = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-6);
+        s = fillet(&s, &v, 3.0).unwrap().shape;
+    }
+    if chamfer_top {
+        let t = edges_where(&s, |i| i.start.z > 9.99 && i.end.z > 9.99);
+        s = chamfer(&s, &t, ChamferSpec::Equal(1.0), &[]).unwrap().shape;
+    }
+    s
+}
+
+fn top(s: &Shape, z: f64) -> Vec<Shape> {
+    faces_where(s, |c| c.z > z - 1e-6)
+}
+
+fn shelled(s: &Shape, faces: &[Shape], t: f64, side: ShellSide, m: ShellMethod) -> Option<(Shape, f64)> {
+    let r = shell_solid(s, faces, t, side, m).ok()?;
+    assert!(r.shape.is_valid(), "{m:?}: invalid solid");
+    let v = vol(&r.shape);
+    Some((r.shape, v))
+}
+
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-6 * a.abs().max(b.abs()).max(1.0)
+}
+
+/// Where OCCT's offset works, the slab construction gives the same solid.
+#[test]
+fn offset_and_slabs_agree() {
+    let plate_hole = |y: f64| cut(&bx([0.0; 3], [100.0, 40.0, 12.0]), &cyl_z(50.0, y, -1.0, 5.0, 14.0)).unwrap().shape;
+    let step = cut(&bx([0.0; 3], [40.0, 40.0, 20.0]), &bx([-1.0, -1.0, 10.0], [20.0, 41.0, 21.0])).unwrap().shape;
+    let cases: Vec<(&str, Shape, Vec<Shape>)> = {
+        let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+        let p = plate_hole(20.0);
+        let f = block(true, false);
+        let c = block(false, true);
+        let fc = block(true, true);
+        let cy = cyl_z(0.0, 0.0, 0.0, 15.0, 40.0);
+        vec![
+            ("box", b.clone(), top(&b, 10.0)),
+            ("box hollow", b.clone(), vec![]),
+            ("plate hole", p.clone(), top(&p, 12.0)),
+            ("fillets", f.clone(), top(&f, 10.0)),
+            ("chamfer", c.clone(), top(&c, 10.0)),
+            ("fillets+chamfer", fc.clone(), top(&fc, 10.0)),
+            ("step", step.clone(), faces_where(&step, |c| c.z < 1e-6)),
+            ("cylinder", cy.clone(), top(&cy, 40.0)),
+        ]
+    };
+    for (name, s, faces) in &cases {
+        for t in [1.0, 2.5] {
+            for side in [ShellSide::Inside, ShellSide::Outside] {
+                let a = shelled(s, faces, t, side, ShellMethod::Offset);
+                let b = shelled(s, faces, t, side, ShellMethod::Slabs);
+                match (a, b) {
+                    (Some((_, va)), Some((_, vb))) => assert!(close(va, vb), "{name} t={t} {side:?}: offset {va} vs slabs {vb}"),
+                    (a, b) => eprintln!("{name} t={t} {side:?}: offset {:?}, slabs {:?}", a.map(|x| x.1), b.map(|x| x.1)),
+                }
+            }
+        }
+    }
+}
+
+/// QA3 case A: a Ø10 hole 3 mm from the front of a 12 mm plate, shelled
+/// 2.5 mm from the top: the hole's wall merges with the front wall.
+#[test]
+fn shell_walls_that_overlap() {
+    let s = cut(&bx([0.0; 3], [100.0, 40.0, 12.0]), &cyl_z(50.0, 8.0, -1.0, 5.0, 14.0)).unwrap().shape;
+    let faces = top(&s, 12.0);
+    // Cavity: 95 x 35 x 9.5 box minus the hole grown by 2.5 mm (r = 7.5),
+    // which reaches 0.5 mm past the inner front wall (y = 2.5).
+    let r: f64 = 7.5;
+    let d = 8.0 - 2.5;
+    let segment = r * r * (d / r).acos() - d * (r * r - d * d).sqrt();
+    let cavity = 95.0 * 35.0 * 9.5 - (std::f64::consts::PI * r * r - segment) * 9.5;
+    let want = vol(&s) - cavity;
+    for m in [ShellMethod::Auto, ShellMethod::Slabs] {
+        let (_, v) = shelled(&s, &faces, 2.5, ShellSide::Inside, m).expect("shell");
+        assert!(close(v, want), "{m:?}: {v} vs {want}");
+    }
+}
+
+/// QA3 case B: 3 mm corner fillets and a 1 mm chamfer round the top,
+/// shelled 2.5 mm from the top. The chamfer's corner cones vanish in the
+/// offset (OCCT's offset fails); the exact solid has volume 4125.9988 mm³
+/// (built from half-spaces in the kernel scratch study).
+#[test]
+fn shell_where_offset_faces_vanish() {
+    let s = block(true, true);
+    let faces = top(&s, 10.0);
+    let (r, v) = shelled(&s, &faces, 2.5, ShellSide::Inside, ShellMethod::Auto).expect("shell");
+    assert!((v - 4125.9988).abs() < 1e-3, "{v}");
+    assert!(r.faces().len() < 40, "{} faces", r.faces().len());
+    // 1 mm (no vanishing): offset and slabs agree with the exact 1846.8729.
+    let (_, v) = shelled(&s, &faces, 1.0, ShellSide::Inside, ShellMethod::Auto).expect("shell");
+    assert!((v - 1846.8729).abs() < 1e-3, "{v}");
+}
+
+/// History: original faces Modified, offset faces Generated by their face,
+/// the rim Modified from the removed face; every output face has a parent.
+#[test]
+fn shell_history_names_every_face() {
+    let s = block(true, true);
+    let faces = top(&s, 10.0);
+    let top_index = s.index_of(&faces[0], ShapeType::Face).unwrap() as u32;
+    for (t, m) in [(1.0, ShellMethod::Offset), (1.0, ShellMethod::Slabs), (2.5, ShellMethod::Auto)] {
+        let r = shell_solid(&s, &faces, t, ShellSide::Inside, m).unwrap();
+        let n = r.shape.faces().len();
+        for i in 0..n as u32 {
+            let parents: Vec<_> = r.history.of_output(ShapeType::Face, i).collect();
+            assert!(!parents.is_empty(), "t={t} {m:?}: face {i} has no parent");
+        }
+        let rim: Vec<_> = r.history.of_input(0, ShapeType::Face, top_index).filter(|h| h.relation == Relation::Modified).collect();
+        assert_eq!(rim.len(), 1, "t={t} {m:?}: rim");
+        let generated = r.history.records.iter().filter(|h| h.relation == Relation::Generated && h.output_kind == ShapeType::Face).count();
+        assert!(generated > 0, "t={t} {m:?}: no offset faces");
+    }
+}

@@ -1,0 +1,476 @@
+//! Release management (Onshape "Release…", local: no approvers or
+//! notifications). A release package lists items (parts, assemblies,
+//! drawings) with their part number and revision; releasing records it
+//! against a version of the document. Revisions follow the default
+//! alphabetical scheme (A, B, C… skipping I O Q S X Z); a new revision of a
+//! part number obsoletes the previous one automatically, and a revision can
+//! be obsoleted on its own (an obsoletion package). The log is kept per
+//! document, outside the editable history.
+
+use crate::document::TabId;
+use crate::reference::BodyId;
+use serde::{Deserialize, Serialize};
+
+/// Letters of the default revision scheme ("Alphabetical A B C skipping
+/// I O Q S X Z").
+const LETTERS: [char; 20] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'T', 'U', 'V', 'W', 'Y'];
+
+/// Position of a revision label in the scheme (A = 0 … Y = 19, AA = 20 …),
+/// `None` when it isn't a label of the scheme.
+pub fn label_index(label: &str) -> Option<u64> {
+    if label.is_empty() {
+        return None;
+    }
+    let digits: Option<Vec<u64>> = label.chars().map(|c| LETTERS.iter().position(|l| *l == c).map(|p| p as u64)).collect();
+    let digits = digits?;
+    // Bijective base 20: A…Y, then AA…AY, BA… (like spreadsheet columns).
+    let mut n = 0u64;
+    for d in &digits {
+        n = n * 20 + d + 1;
+    }
+    Some(n - 1)
+}
+
+/// The label at a position of the scheme.
+pub fn label_at(mut index: u64) -> String {
+    let mut out = Vec::new();
+    loop {
+        out.push(LETTERS[(index % 20) as usize]);
+        if index < 20 {
+            break;
+        }
+        index = index / 20 - 1;
+    }
+    out.iter().rev().collect()
+}
+
+/// The revision after `prev` (A for a first release).
+pub fn next_label(prev: Option<&str>) -> String {
+    match prev.and_then(label_index) {
+        Some(i) => label_at(i + 1),
+        None => label_at(0),
+    }
+}
+
+/// Revision schemes of Release management settings (Revisions and part
+/// numbers › Revision scheme; Help: "Alphabetical, Numeric, Custom").
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum RevisionScheme {
+    /// "Alphabetical A B C skipping I O Q S X Z" (Onshape's default).
+    #[default]
+    Alphabetical,
+    /// Numbers, zero-padded to `width` digits ("1 2 3", "01 02 03"…).
+    Numeric { width: u8 },
+    /// The labels in order.
+    Custom(Vec<String>),
+}
+
+impl RevisionScheme {
+    /// The settings select, in order (custom last).
+    pub const CHOICES: [&'static str; 5] = ["Alphabetical A B C skipping I O Q S X Z", "Numeric 1 2 3", "Numeric 01 02 03", "Numeric 001 002 003", "Custom"];
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            RevisionScheme::Alphabetical => Self::CHOICES[0],
+            RevisionScheme::Numeric { width: 2 } => Self::CHOICES[2],
+            RevisionScheme::Numeric { width: 3 } => Self::CHOICES[3],
+            RevisionScheme::Numeric { .. } => Self::CHOICES[1],
+            RevisionScheme::Custom(_) => Self::CHOICES[4],
+        }
+    }
+
+    /// Position of a label in the scheme, `None` when it isn't one.
+    pub fn index(&self, label: &str) -> Option<u64> {
+        match self {
+            RevisionScheme::Alphabetical => label_index(label),
+            RevisionScheme::Numeric { width } => {
+                let n: u64 = label.parse().ok()?;
+                // Labels start at 1 and are written with at least `width` digits.
+                (n >= 1 && label.len() >= usize::from(*width) && (label.len() == usize::from(*width) || !label.starts_with('0'))).then_some(n - 1)
+            }
+            RevisionScheme::Custom(list) => list.iter().position(|l| l == label).map(|p| p as u64),
+        }
+    }
+
+    /// The label at a position (custom schemes past their end: none).
+    pub fn at(&self, index: u64) -> Option<String> {
+        match self {
+            RevisionScheme::Alphabetical => Some(label_at(index)),
+            RevisionScheme::Numeric { width } => Some(format!("{:0w$}", index + 1, w = usize::from(*width))),
+            RevisionScheme::Custom(list) => list.get(index as usize).cloned(),
+        }
+    }
+
+    /// The revision after `prev` (the first label for a first release).
+    pub fn next(&self, prev: Option<&str>) -> String {
+        let i = prev.and_then(|p| self.index(p)).map_or(0, |i| i + 1);
+        self.at(i).unwrap_or_default()
+    }
+}
+
+/// What an item is (the release dialog's type column).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ItemKind {
+    Part,
+    Assembly,
+    Drawing,
+    /// Release__typical_release_workflow: "For any tab (Part Studio,
+    /// Assembly, Drawing, Variable Studio, or imported file)".
+    VariableStudio,
+    File,
+}
+
+impl ItemKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            ItemKind::Part => "Part",
+            ItemKind::Assembly => "Assembly",
+            ItemKind::Drawing => "Drawing",
+            ItemKind::VariableStudio => "Variable Studio",
+            ItemKind::File => "File",
+        }
+    }
+}
+
+/// One released (or obsoleted) item.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseItem {
+    pub tab: TabId,
+    /// The part, for part items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part: Option<BodyId>,
+    pub name: String,
+    pub kind: ItemKind,
+    pub part_number: String,
+    pub revision: String,
+    /// Properties › "Not revision managed": released without a revision.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not_revision_managed: bool,
+    /// Reverted to its last revision (unchanged since): listed for
+    /// reference, not released again (Help: "Reverting items to their last
+    /// revision").
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reverted: bool,
+    /// The configuration of a configured part or assembly: each one is its
+    /// own revisionable object (Help: Releasing a configuration).
+    #[serde(default, skip_serializing_if = "crate::configuration::ConfigValues::is_empty")]
+    pub config: crate::configuration::ConfigValues,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PackageKind {
+    Release,
+    Obsoletion,
+}
+
+/// A release or obsoletion package.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Package {
+    pub id: u64,
+    pub kind: PackageKind,
+    pub name: String,
+    pub notes: String,
+    /// Milliseconds since the epoch.
+    pub created: i64,
+    /// The version it was released at (store ids as text).
+    pub version: Option<String>,
+    pub items: Vec<ReleaseItem>,
+    /// Obsoletion: the revisions may be released again.
+    #[serde(default)]
+    pub re_releasable: bool,
+}
+
+/// A revision's place in a part number's history.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RevisionEntry {
+    pub revision: String,
+    /// The release package (index into [`ReleaseLog::packages`]).
+    pub release: usize,
+    /// Obsoleted: by an obsoletion package (`Some(index)`), or automatically by
+    /// a later revision (`auto`).
+    pub obsoleted_by: Option<usize>,
+    pub auto_obsolete: bool,
+    pub re_releasable: bool,
+}
+
+/// Release state of an item (Properties › State).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ItemState {
+    InProgress,
+    Released,
+    Obsolete,
+}
+
+impl ItemState {
+    pub fn label(self) -> &'static str {
+        match self {
+            ItemState::InProgress => "In progress",
+            ItemState::Released => "Released",
+            ItemState::Obsolete => "Obsolete",
+        }
+    }
+}
+
+/// Every package of a document, oldest first, plus saved drafts.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ReleaseLog {
+    pub packages: Vec<Package>,
+    #[serde(default)]
+    pub drafts: Vec<Package>,
+    #[serde(default)]
+    next_id: u64,
+    /// The revision scheme of the Release management settings (not stored
+    /// with the log; set by the app).
+    #[serde(skip)]
+    pub scheme: RevisionScheme,
+}
+
+/// A problem with an item of a candidate ("N item(s) needs attention").
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Issue {
+    /// The part number is empty (required).
+    MissingPartNumber,
+    /// The revision isn't a label of the scheme.
+    InvalidRevision,
+    /// Lower than (or equal to) a released revision of the part number.
+    RevisionTooLow { latest: String },
+    /// The same part number appears twice in the candidate.
+    DuplicatePartNumber,
+}
+
+impl Issue {
+    pub fn message(&self) -> String {
+        match self {
+            Issue::MissingPartNumber => "Required field must not be empty.".into(),
+            Issue::InvalidRevision => "Revision does not follow the revision scheme.".into(),
+            Issue::RevisionTooLow { latest } => format!("Revision must be later than {latest}, the latest released revision."),
+            Issue::DuplicatePartNumber => "Part number is used by another item of this release.".into(),
+        }
+    }
+}
+
+impl ReleaseLog {
+    pub fn from_json(bytes: &[u8]) -> Self {
+        serde_json::from_slice(bytes).unwrap_or_default()
+    }
+
+    pub fn to_json(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
+
+    /// The history of a part number, oldest first.
+    pub fn revisions(&self, part_number: &str) -> Vec<RevisionEntry> {
+        let mut out: Vec<RevisionEntry> = Vec::new();
+        for (pi, p) in self.packages.iter().enumerate() {
+            for it in p.items.iter().filter(|it| it.part_number == part_number && !it.not_revision_managed && !it.reverted) {
+                match p.kind {
+                    PackageKind::Release => {
+                        // A newer revision obsoletes the earlier ones.
+                        for e in out.iter_mut().filter(|e| e.obsoleted_by.is_none() && !e.auto_obsolete) {
+                            e.auto_obsolete = true;
+                        }
+                        out.push(RevisionEntry { revision: it.revision.clone(), release: pi, obsoleted_by: None, auto_obsolete: false, re_releasable: false });
+                    }
+                    PackageKind::Obsoletion => {
+                        if let Some(e) = out.iter_mut().rev().find(|e| e.revision == it.revision) {
+                            e.obsoleted_by = Some(pi);
+                            e.re_releasable = p.re_releasable;
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// The latest released revision of a part number.
+    pub fn latest_revision(&self, part_number: &str) -> Option<String> {
+        self.revisions(part_number).last().map(|e| e.revision.clone())
+    }
+
+    /// The revision a new release of the part number gets.
+    pub fn next_revision(&self, part_number: &str) -> String {
+        let hist = self.revisions(part_number);
+        // Labels obsoleted as re-releasable can be used again.
+        match hist.iter().rev().find(|e| !(e.obsoleted_by.is_some() && e.re_releasable)) {
+            Some(e) => self.scheme.next(Some(&e.revision)),
+            None => hist.last().map_or_else(|| self.scheme.next(None), |e| e.revision.clone()),
+        }
+    }
+
+    /// State of a part number (in a workspace: In progress unless the
+    /// latest revision is obsolete).
+    pub fn state(&self, part_number: &str) -> ItemState {
+        match self.revisions(part_number).last() {
+            Some(e) if e.obsoleted_by.is_some() => ItemState::Obsolete,
+            Some(_) => ItemState::Released,
+            None => ItemState::InProgress,
+        }
+    }
+
+    /// Problems of each item of a candidate.
+    pub fn validate(&self, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
+        items
+            .iter()
+            .enumerate()
+            .map(|(i, it)| {
+                let mut v = Vec::new();
+                if it.part_number.trim().is_empty() {
+                    v.push(Issue::MissingPartNumber);
+                    return v;
+                }
+                if items.iter().enumerate().any(|(j, o)| j != i && o.part_number == it.part_number) {
+                    v.push(Issue::DuplicatePartNumber);
+                }
+                if it.not_revision_managed || it.reverted {
+                    return v;
+                }
+                match self.scheme.index(&it.revision) {
+                    None => v.push(Issue::InvalidRevision),
+                    Some(r) => {
+                        let hist = self.revisions(&it.part_number);
+                        let blocking = hist.iter().filter(|e| !(e.obsoleted_by.is_some() && e.re_releasable)).filter_map(|e| self.scheme.index(&e.revision)).max();
+                        if let Some(max) = blocking
+                            && r <= max
+                        {
+                            v.push(Issue::RevisionTooLow { latest: self.scheme.at(max).unwrap_or_default() });
+                        }
+                    }
+                }
+                v
+            })
+            .collect()
+    }
+
+    /// Record a release (or obsoletion) package; returns its id. The caller
+    /// checks [`Self::validate`] first.
+    pub fn record(&mut self, mut package: Package) -> u64 {
+        self.next_id = self.next_id.max(self.packages.iter().chain(&self.drafts).map(|p| p.id).max().unwrap_or(0)) + 1;
+        package.id = self.next_id;
+        self.drafts.retain(|d| d.name != package.name || d.kind != package.kind);
+        self.packages.push(package);
+        self.next_id
+    }
+
+    /// Delete a saved draft (Review Release › Save draft ▴ › Delete draft).
+    pub fn delete_draft(&mut self, name: &str) {
+        self.drafts.retain(|d| d.name != name);
+    }
+
+    /// Save (or replace, by name) a draft.
+    pub fn save_draft(&mut self, draft: Package) {
+        match self.drafts.iter_mut().find(|d| d.name == draft.name) {
+            Some(d) => *d = draft,
+            None => self.drafts.push(draft),
+        }
+    }
+
+    /// The version of the release that released `revision` of `part_number`
+    /// (an obsoletion marks that version, Release__typical_release_workflow:
+    /// "the version is marked with a solid triangle with a dot").
+    pub fn release_version_of(&self, part_number: &str, revision: &str) -> Option<String> {
+        self.packages
+            .iter()
+            .rev()
+            .filter(|p| p.kind == PackageKind::Release)
+            .find(|p| p.items.iter().any(|i| i.part_number == part_number && i.revision == revision && !i.reverted))
+            .and_then(|p| p.version.clone())
+    }
+
+    /// The packages released at a version.
+    pub fn at_version(&self, version: &str) -> Vec<&Package> {
+        self.packages.iter().filter(|p| p.version.as_deref() == Some(version)).collect()
+    }
+
+    /// A suggested name for the next release ("Release 1", "Release 2"…).
+    pub fn suggested_name(&self) -> String {
+        let n = self.packages.iter().filter(|p| p.kind == PackageKind::Release).count() + 1;
+        format!("Release {n}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn numeric_and_custom_revision_schemes() {
+        let n = RevisionScheme::Numeric { width: 2 };
+        assert_eq!(n.next(None), "01");
+        assert_eq!(n.next(Some("09")), "10");
+        assert_eq!(n.index("7"), None);
+        let n1 = RevisionScheme::Numeric { width: 1 };
+        assert_eq!(n1.next(Some("9")), "10");
+        let c = RevisionScheme::Custom(vec!["X1".into(), "X2".into()]);
+        assert_eq!(c.next(None), "X1");
+        assert_eq!(c.next(Some("X1")), "X2");
+        assert_eq!(c.next(Some("X2")), "");
+        let mut log = ReleaseLog { scheme: n, ..Default::default() };
+        assert_eq!(log.next_revision("PN"), "01");
+        log.record(Package { id: 0, kind: PackageKind::Release, name: "R".into(), notes: String::new(), created: 0, version: None, items: vec![item("PN", "01")], re_releasable: false });
+        assert_eq!(log.next_revision("PN"), "02");
+        assert!(log.validate(&[item("PN", "01")])[0].iter().any(|i| matches!(i, Issue::RevisionTooLow { .. })));
+        assert!(log.validate(&[item("PN", "A")])[0].contains(&Issue::InvalidRevision));
+    }
+
+    fn item(pn: &str, rev: &str) -> ReleaseItem {
+        ReleaseItem { tab: TabId(1), part: None, name: "Part 1".into(), kind: ItemKind::Part, part_number: pn.into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default() }
+    }
+
+    fn package(kind: PackageKind, name: &str, items: Vec<ReleaseItem>) -> Package {
+        Package { id: 0, kind, name: name.into(), notes: String::new(), created: 0, version: Some(format!("v-{name}")), items, re_releasable: false }
+    }
+
+    #[test]
+    fn revision_scheme_skips_letters() {
+        assert_eq!(next_label(None), "A");
+        assert_eq!(next_label(Some("H")), "J");
+        assert_eq!(next_label(Some("N")), "P");
+        assert_eq!(next_label(Some("R")), "T");
+        assert_eq!(next_label(Some("W")), "Y");
+        assert_eq!(next_label(Some("Y")), "AA");
+        assert_eq!(next_label(Some("AY")), "BA");
+        assert!(label_index("I").is_none() && label_index("O").is_none() && label_index("").is_none());
+        for i in 0..500 {
+            assert_eq!(label_index(&label_at(i)), Some(i));
+        }
+    }
+
+    #[test]
+    fn releases_obsolete_and_validate() {
+        let mut log = ReleaseLog::default();
+        assert_eq!(log.next_revision("P-1"), "A");
+        assert_eq!(log.state("P-1"), ItemState::InProgress);
+        log.record(package(PackageKind::Release, "R1", vec![item("P-1", "A")]));
+        assert_eq!(log.latest_revision("P-1").as_deref(), Some("A"));
+        assert_eq!(log.next_revision("P-1"), "B");
+        assert_eq!(log.state("P-1"), ItemState::Released);
+        // Releasing A again, or an earlier label, is refused; a later one is fine.
+        assert_eq!(log.validate(&[item("P-1", "A")]), vec![vec![Issue::RevisionTooLow { latest: "A".into() }]]);
+        assert!(log.validate(&[item("P-1", "C")])[0].is_empty());
+        assert_eq!(log.validate(&[item("", "A")]), vec![vec![Issue::MissingPartNumber]]);
+        assert_eq!(log.validate(&[item("P-1", "I")]), vec![vec![Issue::InvalidRevision]]);
+        assert_eq!(log.validate(&[item("Q", "A"), item("Q", "A")])[0], vec![Issue::DuplicatePartNumber]);
+        // B auto-obsoletes A.
+        log.record(package(PackageKind::Release, "R2", vec![item("P-1", "B")]));
+        let h = log.revisions("P-1");
+        assert!(h[0].auto_obsolete && !h[1].auto_obsolete);
+        // Obsoleting B (re-releasable) makes B available again.
+        let mut ob = package(PackageKind::Obsoletion, "O1", vec![item("P-1", "B")]);
+        ob.re_releasable = true;
+        log.record(ob);
+        assert_eq!(log.state("P-1"), ItemState::Obsolete);
+        assert_eq!(log.next_revision("P-1"), "B");
+        assert!(log.validate(&[item("P-1", "B")])[0].is_empty());
+        // JSON round trip; drafts are replaced by name and cleared on release.
+        let mut log2 = ReleaseLog::from_json(&log.to_json());
+        assert_eq!(log2, log);
+        log2.save_draft(package(PackageKind::Release, "R3", vec![item("P-2", "A")]));
+        log2.save_draft(package(PackageKind::Release, "R3", vec![item("P-2", "B")]));
+        assert_eq!(log2.drafts.len(), 1);
+        log2.record(package(PackageKind::Release, "R3", vec![item("P-2", "A")]));
+        assert!(log2.drafts.is_empty());
+        assert_eq!(log2.at_version("v-R3").len(), 1);
+        assert_eq!(log2.suggested_name(), "Release 4");
+    }
+}

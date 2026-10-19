@@ -19,8 +19,7 @@ use noshape_model::reference::{FeatureId, Reference};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Per-body per-vertex sRGB colors handed to the scene builder.
-pub type VertexColors = Arc<HashMap<BodyId, Arc<Vec<[u8; 4]>>>>;
+pub use crate::scene_builder::VertexColors;
 
 /// Palette of the color picker (sRGB), Onshape-like hues in light/dark rows.
 pub const PALETTE: &[u32] = &[
@@ -111,13 +110,25 @@ impl PartStudioView {
     /// face/feature appearances. Cached per display and inputs.
     pub(super) fn vertex_colors(&mut self, cx: &App) -> Option<VertexColors> {
         let appearances = self.studio(cx).map(|s| s.appearances.clone()).unwrap_or_default();
-        let key = (Arc::as_ptr(&self.display) as usize, format!("{:?}{:?}", appearances, self.ui.analysis));
+        let curvature = self.ui.curvature_map.as_ref().map(|c| (c.kind, c.bar.palette, c.bar.bounds));
+        let key = (Arc::as_ptr(&self.display) as usize, format!("{:?}{:?}{:?}", appearances, self.ui.analysis, curvature));
         if let Some((k, v)) = &self.ui.vcolor_cache
             && *k == key
         {
             return v.clone();
         }
         let mut map: HashMap<BodyId, Arc<Vec<[u8; 4]>>> = HashMap::new();
+        if matches!(self.ui.analysis, Some(super::analysis::Analysis::Curvature)) {
+            let m = self.doc.read(cx).session.doc.settings.units.length.meters();
+            let (colors, range) = super::analysis::curvature_colors(&self.display.bodies, self.ui.curvature_map.as_ref(), m);
+            if let Some(c) = &mut self.ui.curvature_map {
+                c.range = range;
+            }
+            map = colors;
+            let v = (!map.is_empty()).then(|| Arc::new(map));
+            self.ui.vcolor_cache = Some((key, v.clone()));
+            return v;
+        }
         for b in self.display.bodies.iter().filter(|b| !b.hidden) {
             let colors = match &self.ui.analysis {
                 Some(a) => Some(super::analysis::analysis_colors(b, a)),

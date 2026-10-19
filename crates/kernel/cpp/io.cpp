@@ -15,6 +15,7 @@
 #include <IGESControl_Writer.hxx>
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Reader.hxx>
+#include <DESTEP_Parameters.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
@@ -290,7 +291,7 @@ StepImport read_step(rust::Str path)
 
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                rust::Str path)
+                rust::Str path, uint8_t schema, uint8_t file_unit)
 {
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
@@ -323,9 +324,26 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
   STEPCAFControl_Writer w;
   w.SetColorMode(true);
   w.SetNameMode(true);
-  bool ok = w.Transfer(doc, STEPControl_AsIs);
-  if (ok)
-    ok = w.Write(p.c_str()) == IFSelect_RetDone;
+  // Shapes are in millimetres here (see io.rs); the file unit and schema are the user's.
+  DESTEP_Parameters params;
+  params.InitFromStatic();
+  switch (schema)
+  {
+    case 1:
+      params.WriteSchema = DESTEP_Parameters::WriteMode_StepSchema_AP242DIS;
+      break;
+    case 2:
+      params.WriteSchema = DESTEP_Parameters::WriteMode_StepSchema_AP214IS;
+      break;
+    case 3:
+      params.WriteSchema = DESTEP_Parameters::WriteMode_StepSchema_AP203;
+      break;
+    default:
+      break; // OCCT's default (AP214 IS)
+  }
+  if (file_unit != 0)
+    params.WriteUnit = static_cast<UnitsMethods_LengthUnit>(file_unit);
+  bool ok = w.Perform(doc, p.c_str(), params);
   app->Close(doc);
   if (!ok)
     fail_io("could not write STEP file " + p);

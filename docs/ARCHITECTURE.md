@@ -15,6 +15,7 @@ as the B-rep kernel.
 | `noshape-sketch` | crates/sketch | – | 2D sketch entities, constraints, dimensions and the geometric constraint solver (Newton/LM, DOF analysis, drag solving), region (profile) detection, trim/extend/offset/fillet helpers. Pure Rust. |
 | `noshape-kernel` | crates/kernel | (C++ OCCT) | Safe Rust wrapper over a `cxx` bridge to OCCT: shapes, topology exploration, primitive/feature operations, booleans, fillets, offsets, sweeps, lofts, tessellation, HLR projection, STEP/IGES/BREP I/O plus STL/OBJ mesh import and export, mass properties, measurement. Knows nothing about features. |
 | `noshape-model` | crates/model | units, sketch, kernel | The CAD document model: Part Studio feature list & regeneration engine, persistent topological naming, feature definitions (extrude, revolve, ...), variables, configurations, assemblies & mate solver, drawings model. Deterministic, headless, fully testable. |
+| `noshape-featurescript` | crates/featurescript | – | FeatureScript: lexer, parser, compiler, evaluator, core builtins, and the embedded Onshape FeatureScript Standard Library (MIT). The model crate registers the modeling builtins (`custom/host`). |
 | `noshape-store` | crates/store | – | Local persistence: single-file document (`.noshape`, SQLite) with content-addressed snapshots, microversion history (undo/redo across sessions), named versions, branches, merges. Generic over opaque blobs. |
 | `noshape-render` | crates/render | – | wgpu renderer: GPU meshes for faces/edges/vertices, sketch overlay, grid, triad, picking via an ID buffer, highlight/selection states, section planes, offscreen rendering with pipelined BGRA readback for GPUI, frame-time instrumentation (`perf`). Its own scene types; no OCCT. |
 | `noshape` | crates/app | all | GPUI application: start window (document library), document windows with tabs, feature list, toolbars, feature dialogs, sketch tools, selection, mouse/keyboard interaction, viewport element. |
@@ -178,7 +179,8 @@ like a 125 Hz mouse drag and logs the presented fps; with
   microversion.
 * **Feature dialogs.** `feature_dialog.rs` renders any feature from its
   `ParamSpec` schema. Built-in features have static schemas. Custom features
-  (`crates/model/src/custom`, Rhai scripts in Feature Studios) register schemas
+  (`crates/model/src/custom`, FeatureScript in Feature Studios, run by the
+  `noshape-featurescript` crate with Onshape's standard library) register schemas
   at runtime under `custom:<tab>:<name>`. Dialog edits regenerate a preview
   rolled to the edited feature (or the finished model with "Final").
 * **Part Studio extras.**

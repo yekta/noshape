@@ -18,7 +18,6 @@ use crate::drawing_scene::{self, Overlay};
 use crate::gpu::{FrameResult, Gpu};
 use crate::theme::p;
 use gpui_kit::component::input::{InputState, TextareaState};
-use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::v_flex;
 use gpui_kit::*;
 use glam::DVec3;
@@ -92,7 +91,18 @@ pub enum TableTool {
     General,
     Bom,
     Hole,
+    Revision,
+    CutList,
 }
+
+/// A model edge (body and topological name), for associative references.
+pub type EdgeRef = (noshape_model::BodyId, noshape_model::reference::TopoName);
+
+/// Uploaded meshes with their linear colors.
+pub type ColoredHandles = Vec<(MeshHandle, [f32; 4])>;
+
+/// Top of the drawing tool dialogs (below the sheet chips).
+pub const DIALOG_TOP: f32 = 28.;
 
 #[derive(Clone, Debug)]
 pub enum Tool {
@@ -115,7 +125,7 @@ pub enum Tool {
     /// Circle centerline through 3 points, or (`three` false) center + point.
     CircleCenterline { three: bool, points: Vec<PickedPoint> },
     /// Virtual sharp: two straight edges (with the first edge's reference).
-    VirtualSharp { first: Option<(PickedPoint, PickedPoint, Option<(noshape_model::BodyId, noshape_model::reference::TopoName)>)> },
+    VirtualSharp { first: Option<(PickedPoint, PickedPoint, Option<EdgeRef>)> },
     Balloon { anchor: Option<PickedPoint> },
     /// Jogged section: orthogonal cutting line points (parent view coords);
     /// `done` once the line is finished (Enter / double-click).
@@ -133,6 +143,8 @@ pub enum Tool {
     Gdt,
     Datum { anchor: Option<[f64; 2]> },
     SurfaceFinish,
+    /// Place a revision callout of `revision` (drawing_revision.rs).
+    RevisionCallout { revision: String },
     /// Broken-out section: profile points in the view (view coordinates),
     /// closed with Enter / double-click; then a depth (panel) or a depth point.
     BrokenOut { parent: Option<ViewId>, points: Vec<[f64; 2]>, done: bool },
@@ -141,6 +153,13 @@ pub enum Tool {
     DatumTarget { anchor: Option<PickedPoint> },
     /// Add a leader to geometric tolerance `id`.
     GdtLeader { id: u64 },
+    /// Drawing sketch tools (see `drawing_sketch`): the clicked points and
+    /// the sketch point the next segment starts from.
+    Sketch { tool: crate::drawing_sketch::SkTool, pts: Vec<[f64; 2]>, from: Option<u32> },
+    /// Drawing constraints: the picked sketch entities.
+    Constrain { kind: crate::drawing_sketch::SkCon, picks: Vec<u32> },
+    /// Insert image: the file, its aspect ratio and the drag start.
+    PlaceImage { name: String, data: std::sync::Arc<str>, aspect: f64, start: Option<[f64; 2]> },
 }
 
 impl Tool {
@@ -170,14 +189,20 @@ impl Tool {
             Tool::Table { kind: TableTool::General, .. } => "Table",
             Tool::Table { kind: TableTool::Bom, .. } => "BOM table",
             Tool::Table { kind: TableTool::Hole, .. } => "Hole table",
+            Tool::Table { kind: TableTool::Revision, .. } => "Revision table",
+            Tool::Table { kind: TableTool::CutList, .. } => "Cut list table",
             Tool::Gdt => "Geometric tolerance",
             Tool::Datum { .. } => "Datum",
             Tool::SurfaceFinish => "Surface finish",
+            Tool::RevisionCallout { .. } => "Revision callout",
             Tool::BrokenOut { .. } => "Broken-out section",
             Tool::CropPoly { spline: false, .. } => "Crop view (polygon)",
             Tool::CropPoly { .. } => "Crop view (spline)",
             Tool::DatumTarget { .. } => "Datum target",
             Tool::GdtLeader { .. } => "Add leader",
+            Tool::Sketch { tool, .. } => tool.name(),
+            Tool::Constrain { kind, .. } => kind.name(),
+            Tool::PlaceImage { .. } => "Insert image",
         }
     }
 }
@@ -189,6 +214,11 @@ pub enum Sel {
     Table(u64),
     /// Break `1` of view `0`.
     Break(ViewId, usize),
+    /// A drawing sketch entity / hatch region.
+    Sketch(u32),
+    Hatch(u64),
+    /// An inserted image.
+    Image(u64),
 }
 
 #[derive(Clone, Debug)]
@@ -201,6 +231,9 @@ pub enum Drag {
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
     /// Resize a table from its free corner (scales column widths and rows).
     ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
+    /// A table divider: column boundary `col` or row boundary `row` (index
+    /// into the layout's xs / ys), with the widths and heights at the start.
+    TableDivider { id: u64, col: Option<usize>, row: Option<usize>, start: [f64; 2], widths: Vec<f64>, heights: Vec<f64> },
     /// Move a section view's cutting line (parallel offset).
     MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
     /// Move a detail view's circle in its parent.
@@ -209,11 +242,15 @@ pub enum Drag {
     MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
     /// Drag annotation `0`'s inspection item onto another annotation.
     MoveInspection(u64),
+    /// Move an inserted image.
+    MoveImage { id: u64, start: [f64; 2], orig: [f64; 2] },
+    /// Drag a drawing sketch entity (from `orig`).
+    MoveSketch { id: u32, start: [f64; 2], orig: noshape_model::drawing::sheet_sketch::SheetSketch },
 }
 
 /// Inline property panels shown over the canvas.
 pub enum Panel {
-    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2] },
+    Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
     /// Dimension properties (precision, units, tolerance, texts).
     Dimension { id: u64, angular: bool, units: Option<DimUnits>, show_units: bool, tol: usize, precision: Entity<InputState>, upper: Entity<InputState>, lower: Entity<InputState>, hole: Entity<InputState>, shaft: Entity<InputState>, prefix: Entity<InputState>, suffix: Entity<InputState>, text: Option<Entity<InputState>> },
     Gdt { edit: Option<u64>, pos: [f64; 2], symbol: usize, diameter: bool, modifier: usize, tolerance: Entity<InputState>, datums: [Entity<InputState>; 3] },
@@ -231,6 +268,10 @@ pub enum Panel {
     CutAngle { view: ViewId, input: Entity<InputState> },
     /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.
     CellFormat { table: u64, row: usize, col: usize, scope: usize, align: CellAlign, bold: bool, height: Entity<InputState> },
+    /// BOM cell: the value and "Override" (`enabled`: the row has a part number).
+    BomCell { table: u64, item: String, col: usize, input: Entity<InputState>, over: bool, enabled: bool },
+    /// Table cell › Resize: the column's width and the row height (sheet mm).
+    CellResize { table: u64, col: usize, width: Entity<InputState>, height: Entity<InputState> },
     DatumTarget { id: u64, label: Entity<InputState>, area: usize, width: Entity<InputState>, height: Entity<InputState> },
 }
 
@@ -258,29 +299,6 @@ impl MenuEntry {
         }
         self
     }
-}
-
-/// Fill a popup menu with entries bound to the editor.
-pub fn fill_menu(mut menu: PopupMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<PopupMenu>) -> PopupMenu {
-    for e in entries {
-        match e {
-            MenuEntry::Item { label, checked, act, .. } => {
-                let ed = ed.clone();
-                let act = act.clone();
-                menu = menu.item(PopupMenuItem::new(label.clone()).checked(*checked).on_click(move |_, window, cx| {
-                    let act = act.clone();
-                    ed.update(cx, |t, cx| act(t, window, cx));
-                }));
-            }
-            MenuEntry::Separator => menu = menu.separator(),
-            MenuEntry::Submenu(label, children) => {
-                let children = children.clone();
-                let ed = ed.clone();
-                menu = menu.submenu(label.clone(), window, cx, move |m, w, cx| fill_menu(m, &children, &ed, w, cx));
-            }
-        }
-    }
-    menu
 }
 
 /// A drawing toolbar dropdown (Onshape's editor list: 26 px rows, 18 px
@@ -320,7 +338,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
 pub struct DrawingEditor {
     pub doc: Entity<DocModel>,
     pub tab: TabId,
-    gpu: Gpu,
+    pub(crate) gpu: Gpu,
     target_id: u64,
     pub focus: FocusHandle,
 
@@ -356,6 +374,10 @@ pub struct DrawingEditor {
     fills: Option<MeshHandle>,
     /// Filled sheet text: (ink, dangling).
     texts: [Option<MeshHandle>; 2],
+    /// Colored fills and texts (see `drawing_scene::sheet_colored`).
+    colored: (ColoredHandles, ColoredHandles),
+    /// Backdrops under the ink (see `drawing_scene::sheet_backdrops`).
+    backdrops: ColoredHandles,
     paper: Option<(MeshHandle, MeshHandle, [f64; 2])>,
     overlay_handles: Option<(LinesHandle, PointsHandle)>,
     geometry_dirty: bool,
@@ -373,7 +395,6 @@ pub struct DrawingEditor {
     pub drag: Drag,
     pub cursor: [f64; 2],
     pub overlay: Overlay,
-    pub menu: Option<(Entity<PopupMenu>, Point<Pixels>, Subscription)>,
     pub panel: Option<Panel>,
     /// View properties dialog (double-click a view; see `drawing_props`).
     pub view_props: Option<crate::drawing_props::ViewProps>,
@@ -393,6 +414,35 @@ pub struct DrawingEditor {
     pub drawing_props: crate::drawing_drawprops::DrawingPropsUi,
     /// Section view dialog (see `drawing_section`).
     pub section_dlg: Option<crate::drawing_section::SectionDlg>,
+    /// Auxiliary view dialog (see `drawing_aux`) and its label text.
+    pub aux_dlg: Option<crate::drawing_aux::AuxDlg>,
+    pub aux_letter: String,
+    /// Edit auxiliary view: the view and its dialog.
+    pub aux_edit: Option<(noshape_model::drawing::ViewId, crate::drawing_aux::AuxDlg)>,
+    /// Detail view dialog (see `drawing_detail`) and its label text.
+    pub detail_dlg: Option<crate::drawing_detail::DetailDlg>,
+    /// Revision table dialog (drawing_revision.rs).
+    pub revision_dlg: Option<crate::drawing_revision::RevisionDlg>,
+    /// Show/hide sketches dialog (drawing_view_sketches.rs).
+    pub view_sketches: Option<crate::drawing_view_sketches::ViewSketchesDlg>,
+    /// Note editor › Insert property: the text format and date time format
+    /// (indices into `format::TEXT_FORMATS` / `DATE_FORMATS`).
+    pub note_field_fmt: (usize, usize),
+    /// Color dialog (drawing_color.rs).
+    pub color_dlg: Option<crate::drawing_color::ColorDlg>,
+    /// Reference manager (drawing_refs.rs).
+    pub ref_manager: Option<crate::drawing_refs::RefManager>,
+    /// Selected table cells (drawing_cells.rs).
+    pub cell_sel: Option<crate::drawing_cells::CellSel>,
+    /// Paste as table: the cells waiting for the placing click.
+    pub paste_table: Option<Vec<Vec<String>>>,
+    /// Note tool: the leader anchored by the first click (on a snap point).
+    pub note_leader: Option<Leader>,
+    /// Show/hide parts dialog (drawing_hide_parts.rs).
+    pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
+    pub detail_label: String,
+    /// Break view dialog (see `drawing_break`).
+    pub break_dlg: Option<crate::drawing_break::BreakDlg>,
     /// Shift+Q: midpoints and quadrant points snap for the current dimension command.
     pub snap_mid_quad: bool,
     /// Placement inference lines (sheet mm) while placing or dragging annotations.
@@ -409,6 +459,14 @@ pub struct DrawingEditor {
     pub right_panel: Option<crate::drawing_panels::RightPanel>,
     pub panel_highlight: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
+    /// Inserted image textures (see `drawing_images`).
+    pub image_cache: crate::drawing_images::ImageCache,
+    /// The hovered drawing-sketch constraint glyph (constraint id).
+    pub glyph_hover: Option<u32>,
+    /// The sketch entity whose glyphs show.
+    pub glyph_entity: Option<u32>,
+    /// Hatch region dialog (see `drawing_hatch`).
+    pub hatch_dlg: Option<crate::drawing_hatch::HatchDlg>,
     /// Inspection item dialog (see `drawing_inspection`).
     pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
     pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
@@ -480,6 +538,8 @@ impl DrawingEditor {
             lines_zoom: 0.0,
             fills: None,
             texts: [None, None],
+            colored: (Vec::new(), Vec::new()),
+            backdrops: Vec::new(),
             paper: None,
             overlay_handles: None,
             geometry_dirty: true,
@@ -495,7 +555,6 @@ impl DrawingEditor {
             drag: Drag::None,
             cursor: [0.0, 0.0],
             overlay: Overlay::default(),
-            menu: None,
             panel: None,
             view_props: None,
             insert: Default::default(),
@@ -505,6 +564,21 @@ impl DrawingEditor {
             sheet_props: None,
             drawing_props: Default::default(),
             section_dlg: None,
+            break_dlg: None,
+            detail_dlg: None,
+            revision_dlg: None,
+            view_sketches: None,
+            hide_parts: None,
+            note_leader: None,
+            cell_sel: None,
+            ref_manager: None,
+            color_dlg: None,
+            paste_table: None,
+            note_field_fmt: (4, 0),
+            detail_label: String::new(),
+            aux_dlg: None,
+            aux_letter: String::new(),
+            aux_edit: None,
             snap_mid_quad: false,
             infer_lines: Vec::new(),
             shortcut_toolbar: None,
@@ -512,6 +586,10 @@ impl DrawingEditor {
             align_centermark: None,
             painter: None,
             inspection: None,
+            hatch_dlg: None,
+            glyph_hover: None,
+            glyph_entity: None,
+            image_cache: Default::default(),
             right_panel: None,
             panel_highlight: None,
             insp_table: Default::default(),
@@ -537,7 +615,7 @@ impl DrawingEditor {
 
     fn update_info(&mut self, cx: &App) {
         let d = self.doc.read(cx);
-        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default() };
+        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default(), revisions: crate::drawing_revision::revisions(d, self.tab) };
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
@@ -555,6 +633,9 @@ impl DrawingEditor {
             Sel::Annotation(a) => sheet.annotations.iter().any(|x| x.id == *a),
             Sel::Table(t) => sheet.table(*t).is_some(),
             Sel::Break(v, i) => sheet.view(*v).is_some_and(|v| *i < v.breaks.len()),
+            Sel::Sketch(e) => sheet.sketch.sketch.entity(noshape_sketch::EntityId(*e)).is_some(),
+            Sel::Hatch(h) => sheet.sketch.hatches.iter().any(|x| x.id == *h),
+            Sel::Image(i) => sheet.images.iter().any(|x| x.id == *i),
         });
         self.ensure_sources(false, cx);
         self.refresh(cx);
@@ -810,7 +891,12 @@ impl DrawingEditor {
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
         let (ink, red) = drawing_scene::sheet_text(&built, &dangling);
         self.texts = [ink, red].map(|m| (!m.indices.is_empty()).then(|| up.upload_mesh(&m)));
+        let lin = |c: [u8; 3]| crate::theme::lin(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32);
+        let (cf, ct) = drawing_scene::sheet_colored(&built);
+        self.colored = (cf.iter().map(|(m, c)| (up.upload_mesh(m), lin(*c))).collect(), ct.iter().map(|(m, c)| (up.upload_mesh(m), lin(*c))).collect());
+        self.backdrops = drawing_scene::sheet_backdrops(&built).iter().map(|(m, c)| (up.upload_mesh(m), lin(*c))).collect();
         self.geometry_dirty = false;
+        self.sync_images();
     }
 
     fn rebuild_overlay(&mut self) {
@@ -825,6 +911,26 @@ impl DrawingEditor {
         self.overlay_handles = Some((up.upload_lines(&l), up.upload_points(&pts)));
     }
 
+    /// Click on a selected dimension's flip node (the diamond near its
+    /// arrows): flip the arrows. True when used.
+    pub fn flip_node_click(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(b) = &self.built else { return false };
+        let r = 6.0 / self.zoom.max(1e-6);
+        let c = self.cursor;
+        let hit = self.selection.iter().find_map(|s| {
+            let Sel::Annotation(id) = *s else { return None };
+            let picks = self.picks_of(*s);
+            b.geometry.grips.iter().any(|g| g.kind == noshape_model::drawing::sheet::GripKind::Handle && picks.contains(&g.pick) && (g.pos[0] - c[0]).abs() <= r && (g.pos[1] - c[1]).abs() <= r).then_some(id)
+        });
+        let Some(id) = hit else { return false };
+        self.edit_sheet("Flip arrows", cx, |s| {
+            if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+                a.flip_arrows = !a.flip_arrows;
+            }
+        });
+        true
+    }
+
     /// Pick ids belonging to a selection entry.
     fn picks_of(&self, sel: Sel) -> Vec<u32> {
         let Some(b) = &self.built else { return vec![] };
@@ -836,6 +942,9 @@ impl DrawingEditor {
                 (Sel::Annotation(a), PickTarget::Annotation(b) | PickTarget::Inspection(b)) => a == *b,
                 (Sel::Table(a), PickTarget::Table(b)) => a == *b,
                 (Sel::Break(v, i), PickTarget::BreakLine { view, index }) => v == *view && i == *index,
+                (Sel::Sketch(a), PickTarget::SketchEntity(b)) => a == *b,
+                (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
+                (Sel::Image(a), PickTarget::Image(b)) => a == *b,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -849,6 +958,10 @@ impl DrawingEditor {
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
+            PickTarget::SketchEntity(id) => Some(Sel::Sketch(*id)),
+            PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),
+            PickTarget::Image(id) => Some(Sel::Image(*id)),
+            PickTarget::AuxIndicator(v) => Some(Sel::View(*v)),
             _ => None,
         }
     }
@@ -858,6 +971,11 @@ impl DrawingEditor {
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = &self.paper {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
+        }
+        // Inserted images and backdrops, under the sheet geometry.
+        scene.instances.extend(self.image_instances());
+        for (m, color) in &self.backdrops {
+            scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().unpickable().layer(-1));
         }
         if let Some(f) = &self.fills {
             scene.instances.push(Instance::new(Drawable::Mesh(f.clone())).with_color(drawing_scene::FILL_COLOR).unpickable());
@@ -869,6 +987,13 @@ impl DrawingEditor {
             if let Some(m) = m {
                 scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(color).unlit());
             }
+        }
+        // Colored fills (e.g. solid inspection items), then colored texts on top.
+        for (m, color) in &self.colored.0 {
+            scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().unpickable().layer(1));
+        }
+        for (m, color) in &self.colored.1 {
+            scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().layer(2));
         }
         if let Some((l, pts)) = &self.overlay_handles {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color().unpickable().layer(20));
@@ -895,6 +1020,10 @@ impl DrawingEditor {
                         }
                     }
                 }
+            }
+            // A hovered BOM row's callouts.
+            for p in self.table_row_highlight() {
+                scene.add_flag(p, state::ACCENT);
             }
         }
         scene
@@ -1049,6 +1178,11 @@ impl DrawingEditor {
                     _ => None,
                 }
             }
+            // Sketch tools and constraints: sketch geometry and view edges.
+            (Tool::Sketch { .. } | Tool::Constrain { .. }, Some(h)) => match self.built.as_ref().and_then(|b| b.picks.get(h as usize)) {
+                Some(PickTarget::Edge { .. } | PickTarget::SketchEntity(_)) => Some(h),
+                _ => None,
+            },
             (
                 Tool::Select
                 | Tool::Projected { parent: None }
@@ -1060,7 +1194,7 @@ impl DrawingEditor {
                 | Tool::AlignedSection { parent: None, .. }
                 | Tool::Crop { parent: None, .. }
                 | Tool::Break { parent: None, .. }
-                | Tool::Table { kind: TableTool::Bom | TableTool::Hole, view: None, .. },
+                | Tool::Table { kind: TableTool::Bom | TableTool::Hole | TableTool::CutList, view: None, .. },
                 h,
             ) => h,
             _ => None,
@@ -1105,6 +1239,14 @@ impl DrawingEditor {
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sync_section_dlg(window, cx);
+        self.sync_break_dlg(window, cx);
+        self.sync_aux_dlg(window, cx);
+        self.sync_detail_dlg(window, cx);
+        self.sync_revision_dlg(window, cx);
+        // The label typed in the Auxiliary view dialog (pending_view has no cx).
+        if let Some(d) = &self.aux_dlg {
+            self.aux_letter = d.label.read(cx).value().trim().to_string();
+        }
         self.sync_centermark_dlg();
         self.sync_insert_inputs(window, cx);
         self.sync_drawprops_inputs(window, cx);
@@ -1121,7 +1263,6 @@ impl Render for DrawingEditor {
         let status = self.render_status(cx);
         let sheet_bar = self.render_sheet_bar(cx);
         let panel = self.render_panel(cx);
-        let menu = self.menu.as_ref().map(|(m, pos, _)| (m.clone(), *pos));
         let canvas_el = div()
             .id("drawing-canvas")
             .flex_1()
@@ -1159,13 +1300,24 @@ impl Render for DrawingEditor {
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
             .children(self.render_section_dlg(cx))
+            .children(self.render_break_dlg(cx))
+            .children(self.render_aux_dlg(cx))
+            .children(self.render_aux_edit(cx))
+            .children(self.render_detail_dlg(cx))
+            .children(self.render_revision_dlg(cx))
+            .children(self.render_view_sketches(cx))
+            .children(self.render_hide_parts(cx))
             .children(self.render_centermark_dlg(cx))
             .children(self.render_painter(cx))
             .children(self.render_inspection_dlg(cx))
+            .children(self.render_hatch_dlg(cx))
+            .children(self.render_sketch_glyphs(window, cx))
             .children(self.render_right_panel(cx))
             .child(self.render_panel_strip(cx))
             .children(self.render_insert_view_panel(cx))
             .children(self.render_insert_chooser(cx))
+            .children(self.render_ref_manager(cx))
+            .children(self.render_color_dialog(cx))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
@@ -1181,12 +1333,21 @@ impl Render for DrawingEditor {
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &Cancel, _, cx| this.cancel(cx)))
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
-            .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_views(None, cx)))
+            .on_action(cx.listener(|this, _: &Copy, _, cx| {
+                if !this.copy_cells(cx) {
+                    this.copy_views(None, cx)
+                }
+            }))
             .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.start_zoom_window(cx)))
             .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_shortcut_toolbar(cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
-            .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_views(cx)))
+            .on_action(cx.listener(|this, _: &Paste, _, cx| {
+                // Spreadsheet cells paste as a new table; copied views as views.
+                if !this.start_paste_table(cx) {
+                    this.paste_views(cx)
+                }
+            }))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {
                 let s = this.size_px();
@@ -1203,6 +1364,5 @@ impl Render for DrawingEditor {
             .on_key_down(cx.listener(Self::on_key))
             .child(toolbar)
             .child(gpui_kit::component::h_flex().flex_1().min_h_0().relative().child(canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border)).child(sheet_bar))
-            .children(menu.map(|(m, pos)| deferred(anchored().position(pos).snap_to_window().child(m)).with_priority(2)))
     }
 }

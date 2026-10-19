@@ -118,7 +118,8 @@ pub fn init(cx: &mut App) {
     crate::start_window::init(cx);
     cx.on_window_closed(|cx, id| {
         cx.global_mut::<OpenDocs>().0.retain(|_, h| h.window_id() != id);
-        let was_start = crate::start_window::forget_if(id, cx);
+        // The Preferences page closes like the start window (last window: quit).
+        let was_start = crate::start_window::forget_if(id, cx) | crate::preferences_window::forget_if(id, cx);
         if !cx.windows().is_empty() {
             crate::start_window::refresh(cx);
             return;
@@ -140,12 +141,6 @@ pub fn show_start_window(cx: &mut App) {
     crate::start_window::show(cx);
 }
 
-/// Open the folder containing `path` in the system file manager.
-pub fn reveal_in_file_manager(path: &Path) -> anyhow::Result<()> {
-    let dir = if path.is_dir() { path.to_path_buf() } else { path.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from(".")) };
-    open::that_detached(&dir)?;
-    Ok(())
-}
 
 /// Open (or create) a document in a new window. If it is already open, its
 /// window is brought to the front instead.
@@ -273,6 +268,27 @@ pub fn request_open_path(title: &'static str, filter_name: &'static str, exts: &
     window.defer(cx, move |window, cx| in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, then));
 }
 
+/// Ask for one or more files (Onshape's import picker allows several), then
+/// call `then` with them. The in-app prompt takes paths separated by `;`.
+pub fn request_open_paths(title: &'static str, filter_name: &'static str, exts: &'static [&'static str], window: &mut Window, cx: &mut App, then: impl FnOnce(Vec<PathBuf>, &mut App) + 'static) {
+    if native_dialogs_available() {
+        cx.spawn(async move |cx| {
+            let picked: Vec<PathBuf> = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).add_filter(filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();
+            if !picked.is_empty() {
+                cx.update(|cx| then(picked, cx));
+            }
+        })
+        .detach();
+        return;
+    }
+    window.defer(cx, move |window, cx| {
+        in_app_save_prompt(title, "Open", documents_dir().join(""), window, cx, move |p, cx| {
+            let paths: Vec<PathBuf> = p.to_string_lossy().split(';').map(|s| PathBuf::from(s.trim())).filter(|p| !p.as_os_str().is_empty()).collect();
+            then(paths, cx)
+        })
+    });
+}
+
 /// The continuation of a path prompt, taken once when the user confirms.
 type PendingPath = std::rc::Rc<std::cell::RefCell<Option<Box<dyn FnOnce(PathBuf, &mut App)>>>>;
 
@@ -326,19 +342,3 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
     });
 }
 
-/// Ask for a folder, then call `then` with it (native dialog when
-/// available, otherwise an in-app path prompt).
-pub fn request_folder_path(title: &'static str, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
-    if native_dialogs_available() {
-        cx.spawn(async move |cx| {
-            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(documents_dir()).pick_folder().await.map(|f| f.path().to_path_buf());
-            if let Some(p) = picked {
-                cx.update(|cx| then(p, cx));
-            }
-        })
-        .detach();
-        return;
-    }
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
-    in_app_save_prompt(title, "Add", home, window, cx, then);
-}

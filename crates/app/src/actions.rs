@@ -34,11 +34,15 @@ actions!(
         CreateDrawing,
         /// Activate the tab set by `workspace::request_activate_tab`.
         ActivateRequestedTab,
+        /// Open the Export modal of the item set by `workspace::request_export`.
+        ExportRequestedItem,
         OpenDocument,
         SaveCopyAs,
         CloseWindow,
         Quit,
         ToggleVersionGraph,
+        /// The Release drafts panel (left rail).
+        ToggleReleaseDrafts,
         CreateVersion,
         // Part Studio
         NewSketch,
@@ -129,7 +133,14 @@ actions!(
     ]
 );
 
+/// Binds the default keys with the user's customizations
+/// (Preferences › Keyboard shortcuts, see `shortcuts`).
 pub fn bind_default_keys(cx: &mut App) {
+    crate::shortcuts::init(cx, default_key_bindings());
+}
+
+/// Onshape's default key bindings (before user customizations).
+pub fn default_key_bindings() -> Vec<KeyBinding> {
     // Bare-letter bindings must not fire while typing in an input.
     let ps = Some("PartStudio && !Input");
     let sk = Some("Sketch && !Input");
@@ -138,7 +149,7 @@ pub fn bind_default_keys(cx: &mut App) {
     let doc_mod = Some("Workspace");
     let doc = Some("Workspace && !Input");
     let dlg = Some("FeatureDialog && !Input");
-    cx.bind_keys([
+    vec![
         // General / document
         KeyBinding::new("secondary-z", Undo, doc_mod),
         KeyBinding::new("secondary-shift-z", Redo, doc_mod),
@@ -279,5 +290,5 @@ pub fn bind_default_keys(cx: &mut App) {
         KeyBinding::new("q", ReorientSecondaryAxis, asm),
         // Drawing
         KeyBinding::new("ctrl-q", DrawingUpdate, Some("Drawing")),
-    ]);
+    ]
 }

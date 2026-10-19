@@ -64,6 +64,12 @@ pub struct Configuration {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ConfigValues(pub BTreeMap<String, String>);
 
+impl ConfigValues {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 pub const SUPPRESSED_PARAM: &str = "__suppressed";
 
 impl Configuration {

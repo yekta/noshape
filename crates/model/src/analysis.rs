@@ -247,6 +247,96 @@ pub fn surface_deviation(a_points: &[DVec3], b_tris: &[[DVec3; 3]]) -> Option<(E
     Some((min?, max?))
 }
 
+/// Principal curvatures (k1 ≥ k2, signed: positive where the surface bends
+/// away from its normal, like a convex part) at each vertex of a triangle
+/// mesh with vertex normals, by fitting each triangle's second fundamental
+/// form to the normal change along its sides and averaging it at the
+/// vertices (Rusinkiewicz 2004).
+pub fn principal_curvatures(positions: &[[f32; 3]], normals: &[[f32; 3]], indices: &[u32]) -> Vec<(f64, f64)> {
+    let p3 = |v: [f32; 3]| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64);
+    let n = positions.len();
+    // Per vertex: accumulated tensor [a, b, c] in the vertex frame, and weight.
+    let mut acc = vec![([0.0f64; 3], 0.0f64); n];
+    let frame = |nrm: DVec3| {
+        let u = nrm.any_orthonormal_vector();
+        (u, nrm.cross(u))
+    };
+    for t in indices.as_chunks::<3>().0 {
+        let [i0, i1, i2] = t.map(|i| i as usize);
+        if i0 >= n || i1 >= n || i2 >= n {
+            continue;
+        }
+        let p = [p3(positions[i0]), p3(positions[i1]), p3(positions[i2])];
+        let nv = [p3(normals[i0]).normalize_or_zero(), p3(normals[i1]).normalize_or_zero(), p3(normals[i2]).normalize_or_zero()];
+        let face_n = (p[1] - p[0]).cross(p[2] - p[0]);
+        let area = face_n.length() * 0.5;
+        if area <= 0.0 {
+            continue;
+        }
+        let face_n = face_n.normalize();
+        let u = (p[1] - p[0]).normalize();
+        let v = face_n.cross(u);
+        // Least squares for [a b; b c] from the three sides: e·II = dn.
+        let (mut m, mut r) = ([[0.0f64; 3]; 3], [0.0f64; 3]);
+        for (a, b) in [(0, 1), (1, 2), (2, 0)] {
+            let e = p[b] - p[a];
+            let dn = nv[b] - nv[a];
+            let (eu, ev) = (e.dot(u), e.dot(v));
+            for (row, rhs) in [([eu, ev, 0.0], dn.dot(u)), ([0.0, eu, ev], dn.dot(v))] {
+                for i in 0..3 {
+                    for j in 0..3 {
+                        m[i][j] += row[i] * row[j];
+                    }
+                    r[i] += row[i] * rhs;
+                }
+            }
+        }
+        let Some(abc) = solve3(m, r) else { continue };
+        // Into each vertex's frame (project the face frame onto its tangent plane).
+        for (k, &vi) in [i0, i1, i2].iter().enumerate() {
+            let (vu, vv) = frame(nv[k]);
+            let (uu, uv, vu2, vv2) = (vu.dot(u), vu.dot(v), vv.dot(u), vv.dot(v));
+            let ii = |x: [f64; 2], y: [f64; 2]| x[0] * (abc[0] * y[0] + abc[1] * y[1]) + x[1] * (abc[1] * y[0] + abc[2] * y[1]);
+            let (a2, b2, c2) = (ii([uu, uv], [uu, uv]), ii([uu, uv], [vu2, vv2]), ii([vu2, vv2], [vu2, vv2]));
+            let w = area / 3.0;
+            acc[vi].0[0] += a2 * w;
+            acc[vi].0[1] += b2 * w;
+            acc[vi].0[2] += c2 * w;
+            acc[vi].1 += w;
+        }
+    }
+    acc.into_iter()
+        .map(|(t, w)| {
+            if w <= 0.0 {
+                return (0.0, 0.0);
+            }
+            let (a, b, c) = (t[0] / w, t[1] / w, t[2] / w);
+            // Eigenvalues of [a b; b c] (outward normals: convex is positive).
+            let mean = (a + c) * 0.5;
+            let d = (((a - c) * 0.5).powi(2) + b * b).sqrt();
+            (mean + d, mean - d)
+        })
+        .collect()
+}
+
+/// Solve a 3×3 linear system (Cramer's rule); `None` when singular.
+fn solve3(m: [[f64; 3]; 3], r: [f64; 3]) -> Option<[f64; 3]> {
+    let det = |m: [[f64; 3]; 3]| m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    let d = det(m);
+    if d.abs() < 1e-300 {
+        return None;
+    }
+    let mut out = [0.0; 3];
+    for (k, o) in out.iter_mut().enumerate() {
+        let mut mk = m;
+        for i in 0..3 {
+            mk[i][k] = r[i];
+        }
+        *o = det(mk) / d;
+    }
+    Some(out)
+}
+
 /// Continuity of a connection (Onshape: Connection analysis), weakest
 /// first; each class implies the ones before it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -603,5 +693,39 @@ mod tests {
         // One face alone connects to nothing: its boundary is shown.
         let one = face_connections(&ctx, &faces[..1], 8, &tol);
         assert!(one.segments.is_empty() && !one.unconnected.is_empty());
+    }
+
+    #[test]
+    fn principal_curvatures_of_a_sphere_and_a_cylinder() {
+        // Sphere of radius 2 (outward normals): both curvatures 1/2.
+        let r = 2.0f64;
+        let (mut pos, mut nrm, mut idx) = (Vec::new(), Vec::new(), Vec::new());
+        let (nu, nv) = (32, 16);
+        for j in 0..=nv {
+            for i in 0..=nu {
+                let (th, ph) = (j as f64 / nv as f64 * std::f64::consts::PI, i as f64 / nu as f64 * std::f64::consts::TAU);
+                let d = DVec3::new(th.sin() * ph.cos(), th.sin() * ph.sin(), th.cos());
+                pos.push([(d.x * r) as f32, (d.y * r) as f32, (d.z * r) as f32]);
+                nrm.push([d.x as f32, d.y as f32, d.z as f32]);
+            }
+        }
+        let at = |i: usize, j: usize| (j * (nu + 1) + i) as u32;
+        for j in 0..nv {
+            for i in 0..nu {
+                idx.extend_from_slice(&[at(i, j), at(i, j + 1), at(i + 1, j + 1), at(i, j), at(i + 1, j + 1), at(i + 1, j)]);
+            }
+        }
+        let k = principal_curvatures(&pos, &nrm, &idx);
+        let mid = at(nu / 4, nv / 2) as usize;
+        assert!((k[mid].0 - 0.5).abs() < 0.03 && (k[mid].1 - 0.5).abs() < 0.03, "{:?}", k[mid]);
+        // Cylinder of radius 2 around Z: 1/2 and 0.
+        for (p, n) in pos.iter_mut().zip(nrm.iter_mut()) {
+            let d = DVec3::new(p[0] as f64, p[1] as f64, 0.0).normalize_or_zero();
+            let z = p[2];
+            *p = [(d.x * r) as f32, (d.y * r) as f32, z];
+            *n = [d.x as f32, d.y as f32, 0.0];
+        }
+        let k = principal_curvatures(&pos, &nrm, &idx);
+        assert!((k[mid].0 - 0.5).abs() < 0.05 && k[mid].1.abs() < 0.05, "{:?}", k[mid]);
     }
 }

@@ -179,6 +179,7 @@ pub enum BreakStyle {
     ZigZag,
     Straight,
     Curve,
+    SmallZigZag,
 }
 
 /// A break (broken view): the band between `a` and `b` (view coordinates,
@@ -254,8 +255,14 @@ pub struct DrawingView {
     pub style: RenderStyle,
     #[serde(default)]
     pub show_tangent_edges: bool,
+    /// Auto centermarks on face-on circles (and, unless
+    /// `auto_centerlines` says otherwise, centerlines on cylinder axes).
     #[serde(default)]
     pub show_centerlines: bool,
+    /// Auto centerlines on cylinders seen from the side (None: as
+    /// `show_centerlines`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_centerlines: Option<bool>,
     #[serde(default)]
     pub label: Option<String>,
     /// Rotation of the view on the sheet (radians, counter-clockwise).
@@ -273,6 +280,66 @@ pub struct DrawingView {
     /// the cutting line (its ends are not extended past the model).
     #[serde(default)]
     pub partial: bool,
+    /// Section views: "Show cut geometry only" (just the cut faces).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut_only: bool,
+    /// Section views: "Section depth" Blind (meters behind the cutting
+    /// plane; beyond it the model is left out).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section_depth: Option<f64>,
+    /// Section depth "Up to entity": the depth reaches this point (kept
+    /// associative; overrides `section_depth`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section_depth_ref: Option<PointRef>,
+    /// Section views of assemblies: "Exclude from cut" (these parts stay whole).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_from_cut: Vec<crate::BodyId>,
+    /// A sketch view (Onshape: insert a sketch; Part Studio "Create Drawing
+    /// of Sketch N…"): base views of this sketch feature of the source show
+    /// its curves; views derived from it too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch: Option<crate::FeatureId>,
+    /// Part views: source sketches shown in the view (Show/hide sketches),
+    /// and whether their points are hidden (Show/Hide sketch points).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shown_sketches: Vec<crate::FeatureId>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_sketch_points: bool,
+    /// Pin view reference: base views shown from a version of the source
+    /// (Onshape shows a pin and the version name in the Sheets panel).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned: Option<PinnedVersion>,
+    /// Show/Hide center of mass.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_com: bool,
+    /// Parts left out of this view (Show/hide parts › Hidden parts).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_parts: Vec<BodyId>,
+    /// Detail views: the profile as a polygon in the parent view (rectangle,
+    /// polygon or sampled spline; None: the circle of the view kind).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_profile: Option<Vec<[f64; 2]>>,
+    /// Detail views: Profile style 0 In line, 1 Connected, 2 Leader.
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    pub detail_style: u8,
+    /// Detail views: "Show detail view profile" off.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub detail_hide_profile: bool,
+    /// Detail views: "Clip border to geometry".
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub detail_clip_border: bool,
+    /// Detail views: Add leader — where the label sits (sheet mm offset from
+    /// the profile), with a leader to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_label_at: Option<[f64; 2]>,
+    /// Auxiliary views: the view reference indicator (letter, where it sits
+    /// on the picked edge in the parent, shown or not).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aux_ref: Option<AuxRef>,
+    /// Section and auxiliary views: "Flip direction" (look the other way
+    /// across the cutting line / reference edge).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flip: bool,
     /// Broken-out sections (base, projected and auxiliary views).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub broken_out: Vec<BrokenOut>,
@@ -299,6 +366,17 @@ pub struct DrawingView {
     /// View simplification (None: the parent's, Auto for base views).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub simplification: Option<Simplification>,
+}
+
+/// An auxiliary view's reference indicator: the arrow at `anchor` (parent
+/// view coordinates, on the picked edge) labelled `letter`; the view is
+/// labelled "VIEW <letter>".
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AuxRef {
+    pub anchor: [f64; 2],
+    pub letter: String,
+    #[serde(default = "yes")]
+    pub show: bool,
 }
 
 /// Onshape's View simplification: geometry below a threshold is left out.
@@ -338,12 +416,30 @@ impl Default for DrawingView {
             style: RenderStyle::HiddenLinesRemoved,
             show_tangent_edges: true,
             show_centerlines: false,
+            auto_centerlines: None,
             label: None,
             rotation: 0.0,
             crop: None,
             breaks: Vec::new(),
             explode: None,
             partial: false,
+            cut_only: false,
+            section_depth: None,
+            flip: false,
+            aux_ref: None,
+            sketch: None,
+            shown_sketches: Vec::new(),
+            hide_sketch_points: false,
+            hidden_parts: Vec::new(),
+            show_com: false,
+            pinned: None,
+            detail_profile: None,
+            detail_style: 0,
+            detail_hide_profile: false,
+            detail_clip_border: false,
+            detail_label_at: None,
+            section_depth_ref: None,
+            exclude_from_cut: Vec::new(),
             broken_out: Vec::new(),
             custom_frame: None,
             tangent_phantom: false,
@@ -357,7 +453,13 @@ impl Default for DrawingView {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AnnotationKind {
-    Note { text: String, height_mm: f64 },
+    Note {
+        text: String,
+        height_mm: f64,
+        /// Note editor formatting and leaders.
+        #[serde(default, skip_serializing_if = "note::NoteStyle::is_default")]
+        style: note::NoteStyle,
+    },
     LinearDimension { view: ViewId, a: [f64; 2], b: [f64; 2], offset: f64, orientation: DimOrientation, override_text: Option<String> },
     RadialDimension { view: ViewId, center: [f64; 2], radius: f64, diameter: bool, angle: f64 },
     AngularDimension { view: ViewId, vertex: [f64; 2], a: [f64; 2], b: [f64; 2], radius: f64 },
@@ -382,6 +484,16 @@ pub enum AnnotationKind {
     VirtualSharp { view: ViewId, a1: [f64; 2], b1: [f64; 2], a2: [f64; 2], b2: [f64; 2] },
     Balloon { view: ViewId, anchor: [f64; 2], text: String },
     SurfaceFinish { anchor: [f64; 2], value: String },
+    /// Revision callout: a triangle with the revision label (Add revision
+    /// callout; shown while the drawing has a revision table). Grouped with
+    /// a dimension (`group`, dropped onto it), `anchor` is the offset from
+    /// the upper right of that dimension's text and the callout follows it.
+    RevisionCallout {
+        anchor: [f64; 2],
+        revision: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        group: Option<u64>,
+    },
     /// Feature control frame with its lower-left corner at `anchor` (sheet
     /// mm) and optional leaders to the toleranced geometry.
     Gdt {
@@ -446,6 +558,9 @@ pub struct Leader {
     #[serde(default)]
     pub view: Option<ViewId>,
     pub point: [f64; 2],
+    /// Bend nodes between the shoulder and the point (sheet mm).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<[f64; 2]>,
 }
 
 /// Target area of a datum target (sizes in model meters).
@@ -580,8 +695,19 @@ pub enum TableKind {
         #[serde(default)]
         header: bool,
     },
-    /// Bill of materials of the assembly shown by `view`.
-    Bom { view: ViewId },
+    /// Bill of materials of the assembly shown by `view`: Flattened or
+    /// Structured; Order "Bottom to top" puts the header at the bottom and
+    /// reverses the rows.
+    Bom {
+        view: ViewId,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        structured: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        bottom_to_top: bool,
+        /// Overridden cells: (item number, column, value).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        overrides: Vec<(String, usize, String)>,
+    },
     /// Holes (face-on circular bores) of `view`, located from `origin`
     /// (view coordinates, associative through `origin_ref`).
     Hole {
@@ -591,7 +717,56 @@ pub enum TableKind {
         origin_ref: Option<PointRef>,
         #[serde(default)]
         precision: Option<u8>,
+        /// Tag axis › Flip X direction / Flip Y direction.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        flip_x: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        flip_y: bool,
     },
+    /// Cut list of the frame members of the Part Studio shown by `view`
+    /// (the Cut list feature's rows); Order "Bottom to top" reverses it.
+    CutList {
+        view: ViewId,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        bottom_to_top: bool,
+    },
+    /// The drawing's revisions from the release log (rows resolved when the
+    /// sheet is built, from [`build::SheetInfo::revisions`]).
+    Revision {
+        /// Multi-sheet "See sheet 1": a small pointer table on the other
+        /// sheets; else "Linked", the full table on every sheet.
+        #[serde(default)]
+        see_sheet1: bool,
+        #[serde(default = "default_visible_rows")]
+        visible_rows: u32,
+        /// Order "Bottom to top" (newest at the top); else "Top to bottom".
+        #[serde(default)]
+        newest_top: bool,
+        /// Hide revision callouts no longer shown in the table.
+        #[serde(default)]
+        hide_callouts: bool,
+        /// Edited title and column headers (None = the default).
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        headers: Vec<Option<String>>,
+        /// Edited descriptions (revision, text).
+        #[serde(default)]
+        descriptions: Vec<(String, String)>,
+        /// Revisions whose callouts are hidden (row › Hide revision callouts).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        hidden: Vec<String>,
+    },
+}
+
+fn default_visible_rows() -> u32 {
+    5
+}
+
+impl TableKind {
+    pub fn revision() -> Self {
+        TableKind::Revision { see_sheet1: false, visible_rows: default_visible_rows(), newest_top: false, hide_callouts: false, title: None, headers: Vec::new(), descriptions: Vec::new(), hidden: Vec::new() }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -615,6 +790,14 @@ pub struct Table {
     /// Merged cell ranges.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub merges: Vec<CellMerge>,
+    /// Split BOM / cut list tables: the data rows this part shows
+    /// [start, end) (None: all).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rows: Option<[usize; 2]>,
+    /// Row heights set by dragging dividers (displayed rows below the
+    /// title; empty or wrong length = automatic).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub row_heights: Vec<f64>,
 }
 
 /// Horizontal alignment of a table cell's text.
@@ -678,7 +861,7 @@ fn default_table_text() -> f64 {
 
 impl Table {
     pub fn new(id: u64, kind: TableKind, position: [f64; 2]) -> Self {
-        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), cell_formats: Vec::new(), merges: Vec::new() }
+        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), cell_formats: Vec::new(), merges: Vec::new(), rows: None, row_heights: Vec::new() }
     }
 
     /// Formatting of a cell (defaults when none is set).
@@ -840,12 +1023,14 @@ impl Table {
             TableKind::General { .. } => "Table",
             TableKind::Bom { .. } => "BOM table",
             TableKind::Hole { .. } => "Hole table",
+            TableKind::Revision { .. } => "Revision table",
+            TableKind::CutList { .. } => "Cut list table",
         }
     }
     pub fn view(&self) -> Option<ViewId> {
         match self.kind {
-            TableKind::Bom { view } | TableKind::Hole { view, .. } => Some(view),
-            TableKind::General { .. } => None,
+            TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => Some(view),
+            TableKind::General { .. } | TableKind::Revision { .. } => None,
         }
     }
 }
@@ -872,11 +1057,20 @@ pub struct Annotation {
     /// Inspection item number (Onshape's numbered bubble on the annotation).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection: Option<u32>,
+    /// Arrows flipped to outside the extension lines (the selected
+    /// dimension's flip node).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flip_arrows: bool,
+    /// Grouped with another annotation (a callout dropped onto a
+    /// dimension): `position` is then the offset from the upper right of
+    /// that annotation's text, so it moves with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<u64>,
 }
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::Note { text: String::new(), height_mm: 3.5 }, position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, group: None }
     }
 }
 
@@ -891,6 +1085,11 @@ impl ViewKind {
 }
 
 impl AnnotationKind {
+    /// A plain note.
+    pub fn note(text: impl Into<String>, height_mm: f64) -> Self {
+        AnnotationKind::Note { text: text.into(), height_mm, style: note::NoteStyle::default() }
+    }
+
     /// Center and radius of a circle centerline (view coordinates).
     pub fn circle_centerline(points: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
         match points {
@@ -999,6 +1198,7 @@ impl AnnotationKind {
             AnnotationKind::HoleCallout { .. } => "Hole callout",
             AnnotationKind::Balloon { .. } => "Callout",
             AnnotationKind::SurfaceFinish { .. } => "Surface finish",
+            AnnotationKind::RevisionCallout { .. } => "Revision callout",
             AnnotationKind::Gdt { .. } => "Geometric tolerance",
             AnnotationKind::OrdinateDimension { .. } => "Ordinate dimension",
             AnnotationKind::ChamferDimension { .. } => "Chamfer dimension",
@@ -1041,6 +1241,23 @@ pub struct Sheet {
     pub tables: Vec<Table>,
     #[serde(default)]
     pub title_style: TitleBlockStyle,
+    /// Drawing sketch geometry and hatch regions.
+    #[serde(default, skip_serializing_if = "sheet_sketch::SheetSketch::is_empty")]
+    pub sketch: sheet_sketch::SheetSketch,
+    /// Inserted images (logos, QR and bar codes).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<SheetImage>,
+}
+
+/// An image placed on a sheet (Insert image): the encoded file (PNG, JPEG
+/// or GIF, base64), its lower-left corner and size (mm).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SheetImage {
+    pub id: u64,
+    pub name: String,
+    pub data_base64: std::sync::Arc<str>,
+    pub pos: [f64; 2],
+    pub size: [f64; 2],
 }
 
 impl Sheet {
@@ -1146,7 +1363,7 @@ impl Sheet {
             .iter()
             .filter_map(|v| match &v.kind {
                 ViewKind::Section { label, .. } | ViewKind::Detail { label, .. } | ViewKind::AlignedSection { label, .. } => Some(label.clone()),
-                _ => None,
+                _ => v.aux_ref.as_ref().map(|a| a.letter.clone()),
             })
             .collect();
         for round in 0.. {
@@ -1168,7 +1385,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![] }
     }
 }
 
@@ -1235,6 +1452,236 @@ pub struct DrawingProps {
     pub inspection_text_height: f64,
     #[serde(default = "inspection_border")]
     pub inspection_border_size: f64,
+    /// Inspection › Border color (None = black) and Solid fill.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_color: Option<[u8; 3]>,
+    #[serde(default)]
+    pub inspection_solid_fill: bool,
+    /// Views › Insert view defaults (new base views; derived views copy
+    /// their parent).
+    #[serde(default)]
+    pub view_defaults: ViewDefaults,
+    /// Dimensions › All dimensions and Annotations › All annotations:
+    /// text height and arrowhead (mm), arrowhead type, color.
+    #[serde(default = "text_35")]
+    pub dim_text_height: f64,
+    #[serde(default = "arrow_3")]
+    pub dim_arrow: f64,
+    #[serde(default)]
+    pub dim_arrow_type: sheet::ArrowType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dim_color: Option<[u8; 3]>,
+    #[serde(default = "text_35")]
+    pub ann_text_height: f64,
+    #[serde(default = "arrow_3")]
+    pub ann_arrow: f64,
+    #[serde(default)]
+    pub ann_arrow_type: sheet::ArrowType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ann_color: Option<[u8; 3]>,
+    /// Image context menu › Show / Hide image borders (all images).
+    #[serde(default)]
+    pub image_borders: bool,
+    /// Font of dimensions, annotations and inspection items (None: the
+    /// default sans).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dim_font: Option<sheet::TextFont>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ann_font: Option<sheet::TextFont>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_font: Option<sheet::TextFont>,
+    /// Dimensions › Gaps and extensions (mm): text gap (text to the
+    /// dimension line), geometry gap (geometry to the extension line) and
+    /// extension past the dimension line; text aligned horizontally
+    /// instead of with the dimension line.
+    #[serde(default = "gap_text")]
+    pub dim_text_gap: f64,
+    #[serde(default = "gap_geometry")]
+    pub dim_geometry_gap: f64,
+    #[serde(default = "gap_extension")]
+    pub dim_extension: f64,
+    #[serde(default)]
+    pub dim_text_horizontal: bool,
+    /// Tables › All tables: horizontal and vertical cell padding (mm, each
+    /// side; Onshape's default is 0.06 in).
+    #[serde(default = "table_padding")]
+    pub table_h_padding: f64,
+    #[serde(default = "table_padding")]
+    pub table_v_padding: f64,
+    /// Formats: Locked (the border and title block can't be selected), and
+    /// the colors of the border frame, border zones and title block.
+    #[serde(default)]
+    pub formats_locked: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border_color: Option<[u8; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone_color: Option<[u8; 3]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_block_color: Option<[u8; 3]>,
+    /// Annotations › per type (Notes, Callouts, Datums, ...): font, text
+    /// height, color overrides; Datums › Datum size (mm); Notes › Hide
+    /// property placeholder (empty fields show nothing instead of "----").
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ann_types: Vec<(sheet::AnnType, sheet::AnnTypeStyle)>,
+    #[serde(default = "datum_size")]
+    pub datum_size: f64,
+    #[serde(default)]
+    pub hide_placeholder: bool,
+    /// Views tab per view type and the Construction geometry tab.
+    #[serde(default)]
+    pub view_tab: ViewTabProps,
+    /// Annotations › Center of mass › indicator diameter (mm).
+    #[serde(default = "com_diameter")]
+    pub com_diameter: f64,
+    /// The color dialog's Custom colors.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom_colors: Vec<[u8; 3]>,
+}
+
+/// A version a view reference is pinned to.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PinnedVersion {
+    /// The store's version id (as text).
+    pub id: String,
+    /// Its name ("V1").
+    pub name: String,
+}
+
+/// Drawing properties › Views (per view type) and › Construction geometry.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ViewTabProps {
+    /// Hidden and tangent edge colors (None: ink).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hidden_color: Option<[u8; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tangent_color: Option<[u8; 3]>,
+    /// Section views: hatch line spacing (mm) and label prefix.
+    pub hatch_spacing: f64,
+    pub section_prefix: String,
+    /// Detail views: profile lines (0 Phantom, 1 Dashed, 2 Solid), label
+    /// prefix, and the defaults of new detail views (style 0 In line,
+    /// 1 Connected, 2 Leader; show profile; clip border).
+    pub detail_line: u8,
+    pub detail_prefix: String,
+    pub detail_style: u8,
+    pub detail_show_profile: bool,
+    pub detail_clip_border: bool,
+    /// Auxiliary views: show the view reference indicator, label prefix,
+    /// label style ("A" or "A-A") and suffix.
+    pub aux_indicator: bool,
+    pub aux_prefix: String,
+    pub aux_double_label: bool,
+    pub aux_suffix: String,
+    /// Construction geometry: centermark and centerline colors (None: ink)
+    /// and how far centermark arms pass the circle (mm).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub centermark_color: Option<[u8; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub centerline_color: Option<[u8; 3]>,
+    pub centermark_extension: f64,
+}
+
+impl Default for ViewTabProps {
+    fn default() -> Self {
+        Self {
+            hidden_color: None,
+            tangent_color: None,
+            hatch_spacing: 2.5,
+            section_prefix: "SECTION".into(),
+            detail_line: 2,
+            detail_prefix: "DETAIL".into(),
+            detail_style: 0,
+            detail_show_profile: true,
+            detail_clip_border: false,
+            aux_indicator: true,
+            aux_prefix: "VIEW".into(),
+            aux_double_label: false,
+            aux_suffix: String::new(),
+            centermark_color: None,
+            centerline_color: None,
+            centermark_extension: 1.0,
+        }
+    }
+}
+
+fn datum_size() -> f64 {
+    3.0
+}
+
+impl DrawingProps {
+    /// An annotation type's style (mutable; added when missing).
+    pub fn ann_type_mut(&mut self, t: sheet::AnnType) -> &mut sheet::AnnTypeStyle {
+        if let Some(i) = self.ann_types.iter().position(|(k, _)| *k == t) {
+            return &mut self.ann_types[i].1;
+        }
+        self.ann_types.push((t, sheet::AnnTypeStyle::default()));
+        &mut self.ann_types.last_mut().expect("just pushed").1
+    }
+
+    pub fn ann_type(&self, t: sheet::AnnType) -> sheet::AnnTypeStyle {
+        self.ann_types.iter().find(|(k, _)| *k == t).map(|(_, s)| s.clone()).unwrap_or_default()
+    }
+}
+
+fn com_diameter() -> f64 {
+    6.35
+}
+
+fn table_padding() -> f64 {
+    1.524
+}
+
+fn text_35() -> f64 {
+    3.5
+}
+
+fn gap_text() -> f64 {
+    1.2
+}
+
+fn gap_geometry() -> f64 {
+    1.0
+}
+
+fn gap_extension() -> f64 {
+    2.0
+}
+
+fn arrow_3() -> f64 {
+    3.0
+}
+
+/// Drawing properties › Views › Insert view defaults.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ViewDefaults {
+    pub simplification: Simplification,
+    pub auto_centermarks: bool,
+    pub auto_centerlines: bool,
+    /// Hidden lines Shown.
+    pub hidden_lines: bool,
+    /// Tangent edges: 0 Hidden, 1 Solid, 2 Phantom.
+    pub tangent: u8,
+    pub scale_label: bool,
+}
+
+impl Default for ViewDefaults {
+    fn default() -> Self {
+        Self { simplification: Simplification::Auto, auto_centermarks: false, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true }
+    }
+}
+
+impl ViewDefaults {
+    /// Apply to a new base view.
+    pub fn apply(&self, v: &mut DrawingView) {
+        v.style = if self.hidden_lines { RenderStyle::HiddenLinesVisible } else { RenderStyle::HiddenLinesRemoved };
+        v.show_tangent_edges = self.tangent != 0;
+        v.tangent_phantom = self.tangent == 2;
+        v.show_centerlines = self.auto_centermarks;
+        v.auto_centerlines = Some(self.auto_centerlines);
+        v.simplification = Some(self.simplification);
+        v.scale_label = (!self.scale_label).then_some(false);
+    }
 }
 
 fn inspection_text() -> f64 {
@@ -1273,13 +1720,47 @@ fn yes() -> bool {
     true
 }
 
+fn is_zero_u8(x: &u8) -> bool {
+    *x == 0
+}
+
 fn is_zero(x: &f64) -> bool {
     *x == 0.0
 }
 
 impl Default for DrawingProps {
     fn default() -> Self {
-        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2 }
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_color: None, inspection_solid_fill: false,
+            view_defaults: ViewDefaults::default(),
+            dim_text_height: 3.5,
+            dim_arrow: 3.0,
+            dim_arrow_type: sheet::ArrowType::Filled,
+            dim_color: None,
+            ann_text_height: 3.5,
+            ann_arrow: 3.0,
+            ann_arrow_type: sheet::ArrowType::Filled,
+            ann_color: None,
+            image_borders: false,
+            dim_text_gap: gap_text(),
+            dim_geometry_gap: gap_geometry(),
+            dim_extension: gap_extension(),
+            dim_text_horizontal: false,
+            table_h_padding: table_padding(),
+            table_v_padding: table_padding(),
+            formats_locked: false,
+            border_color: None,
+            zone_color: None,
+            title_block_color: None,
+            ann_types: Vec::new(),
+            datum_size: datum_size(),
+            hide_placeholder: false,
+            view_tab: ViewTabProps::default(),
+            custom_colors: Vec::new(),
+            com_diameter: com_diameter(),
+            dim_font: None,
+            ann_font: None,
+            inspection_font: None,
+        }
     }
 }
 
@@ -1432,8 +1913,8 @@ impl Drawing {
             let mut t = t.clone();
             t.id = id;
             match &mut t.kind {
-                TableKind::Bom { view } | TableKind::Hole { view, .. } => *view = remap(*view),
-                TableKind::General { .. } => {}
+                TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => *view = remap(*view),
+                TableKind::General { .. } | TableKind::Revision { .. } => {}
             }
             tbls.push(t);
         }
@@ -1469,10 +1950,13 @@ impl Drawing {
 pub mod build;
 pub mod clipboard;
 pub mod create;
+pub mod cad_export;
+pub mod sheet_sketch;
 pub mod export;
 pub mod font;
 pub mod format;
 pub mod inspection;
+pub mod note;
 pub mod painter;
 pub mod sheet;
 pub mod showcase;

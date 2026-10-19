@@ -116,10 +116,6 @@ pub(super) struct SketchUi {
     offset_input: Option<(Entity<InputState>, Subscription)>,
     /// Open pattern glyph menu: pattern id and viewport position.
     pattern_menu: Option<(u32, f32, f32)>,
-    /// Keystroke interceptor applying the user's sketch shortcuts.
-    shortcut_interceptor: Option<Subscription>,
-    /// Sketch shortcut preferences, edited without leaving the sketch.
-    shortcut_edit: Option<(Tool, Entity<InputState>)>,
     /// Dimension whose tolerance panel is open.
     tol_open: Option<noshape_sketch::ConstraintId>,
     /// Hover reference the Use preview was computed for.
@@ -165,52 +161,6 @@ fn entity_name(sk: &noshape_sketch::Sketch, e: noshape_sketch::EntityId) -> Stri
 /// Configuration parameter id of a sketch dimension.
 fn configured_dim_key(cid: noshape_sketch::ConstraintId) -> String {
     format!("{}{}", noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX, cid.0)
-}
-
-/// User sketch shortcuts: `{"<tool name>": "<keystroke>"}` in
-/// `<config>/noshape/sketch-shortcuts.json`, tool names as in the toolbar
-/// tooltips without the shortcut ("Midpoint line": "alt-l").
-fn custom_shortcuts() -> &'static parking_lot::RwLock<HashMap<String, Tool>> {
-    static MAP: std::sync::OnceLock<parking_lot::RwLock<HashMap<String, Tool>>> = std::sync::OnceLock::new();
-    MAP.get_or_init(|| {
-        let path = crate::files::config_dir().join("sketch-shortcuts.json");
-        let map = std::fs::read_to_string(path).ok().map(|text| parse_custom_shortcuts(&text)).unwrap_or_default();
-        parking_lot::RwLock::new(map)
-    })
-}
-
-/// Parses a sketch shortcut file into keystroke -> tool.
-fn parse_custom_shortcuts(text: &str) -> HashMap<String, Tool> {
-    let Ok(map) = serde_json::from_str::<HashMap<String, String>>(text) else { return HashMap::new() };
-    let tools: Vec<Tool> = all_sketch_tools().chain([Tool::Select]).collect();
-    map.into_iter()
-        .filter_map(|(name, key)| {
-            let tool = tools.iter().copied().find(|t| t.label().split(" (").next().is_some_and(|n| n.eq_ignore_ascii_case(name.trim())))?;
-            let key = Keystroke::parse(&key.trim().to_lowercase()).ok()?;
-            Some((shortcut_key(&key), tool))
-        })
-        .collect()
-}
-
-/// The tool bound to a keystroke by the user, if any.
-fn custom_shortcut(k: &Keystroke) -> Option<Tool> {
-    let map = custom_shortcuts().read();
-    if map.is_empty() {
-        return None;
-    }
-    map.get(&shortcut_key(k)).copied()
-}
-
-fn shortcut_key(k: &Keystroke) -> String {
-    let m = &k.modifiers;
-    let mut s = String::new();
-    for (on, name) in [(m.control, "ctrl-"), (m.alt, "alt-"), (m.shift, "shift-"), (m.platform, "cmd-")] {
-        if on {
-            s.push_str(name);
-        }
-    }
-    s.push_str(&k.key.to_lowercase());
-    s
 }
 
 /// A sketch context menu entry's action on the view.
@@ -302,11 +252,9 @@ impl PartStudioView {
                 if let Some(ed) = &mut self.sketch {
                     ed.apply_unit_defaults(length);
                 }
-                // A fresh sketch starts with the line tool, like Onshape.
-                let empty = self.edit.as_ref().and_then(|e| e.dialog.read(cx).sketch_data().map(|d| d.sketch.entity_count() == 0)).unwrap_or(false);
-                if empty && let Some(ed) = &mut self.sketch {
-                    ed.set_tool(Tool::Line);
-                }
+                // A fresh sketch starts with no tool active (live
+                // sketch/00, 01, 44: no toolbar button is down after the
+                // plane is picked).
             }
         }
         self.update_conflicts();
@@ -370,7 +318,6 @@ impl PartStudioView {
             let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
             regen.regenerate(&studio, &config, &units, &RegenOptions { upto, editing_sketch, document_variables, derived: Some(derived), ..Default::default() })
         };
-        self.regenerating = false;
         self.regen_task = None;
         self.context = Some(result.context.clone());
         self.update_conflicts();
@@ -1064,6 +1011,19 @@ impl PartStudioView {
 
     fn commit_dimension(&mut self, cid: noshape_sketch::ConstraintId, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
+        // Enter on the untouched box keeps the exact value (the box shows it
+        // rounded to 6 / 7 decimals).
+        if self.sketch_data(cx).and_then(|data| crate::sketch_mode::dimension_edit_text(&data, cid, &units)).is_some_and(|shown| shown == text.trim()) {
+            if let Some(ed) = &mut self.sketch {
+                ed.dim_edit = None;
+                ed.selection.clear();
+                ed.selected_constraints = vec![cid];
+            }
+            self.dim_input = None;
+            window.focus(&self.focus, cx);
+            cx.notify();
+            return;
+        }
         let vars = self.display.variables.clone();
         // A configured dimension edits the value of the active configuration.
         if let Some((input, option)) = self.dimension_configuration(cid, cx) {
@@ -1500,7 +1460,7 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ sketch diagnostics
 
-    fn toggle_constraint_manager(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn toggle_constraint_manager(&mut self, cx: &mut Context<Self>) {
         if let Some(ui) = self.ui_mut() {
             ui.cm = if ui.cm.is_some() { None } else { Some(ConstraintManager { auto_select: true, ..Default::default() }) };
         }
@@ -1508,7 +1468,7 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn toggle_profile_inspector(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn toggle_profile_inspector(&mut self, cx: &mut Context<Self>) {
         let open = self.ui_ref().is_some_and(|u| u.pi.is_some());
         if let Some(ui) = self.ui_mut() {
             ui.pi = if open { None } else { Some(0) };
@@ -1838,100 +1798,6 @@ impl PartStudioView {
     /// User sketch shortcuts run before the default key bindings: a
     /// keystroke interceptor for the sketch session (only when the user
     /// defined some).
-    fn install_shortcut_interceptor(&mut self, cx: &mut Context<Self>) {
-        if self.ui_ref().is_some_and(|u| u.shortcut_interceptor.is_some()) {
-            return;
-        }
-        let view = cx.entity().downgrade();
-        let sub = cx.intercept_keystrokes(move |ev, window, cx| {
-            let Some(view) = view.upgrade() else { return };
-            if window.has_focused_input(cx) || !view.read(cx).focus.contains_focused(window, cx) || view.read(cx).sketch.is_none() {
-                return;
-            }
-            if let Some(tool) = custom_shortcut(&ev.keystroke) {
-                view.update(cx, |this, cx| this.activate_tool(tool, window, cx));
-                cx.stop_propagation();
-            }
-        });
-        if let Some(ui) = self.ui_mut() {
-            ui.shortcut_interceptor = Some(sub);
-        }
-    }
-
-    pub(super) fn open_sketch_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let current = custom_shortcuts().read().iter().find_map(|(key, tool)| (*tool == Tool::Line).then(|| key.clone())).unwrap_or_default();
-        let key = cx.new(|cx| InputState::new(window, cx).placeholder("For example: shift-t").default_value(current));
-        if let Some(ui) = self.ui_mut() {
-            ui.shortcut_edit = Some((Tool::Line, key));
-        }
-        cx.notify();
-    }
-
-    fn save_sketch_shortcut(&mut self, restore: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((tool, field)) = self.ui_ref().and_then(|u| u.shortcut_edit.clone()) else { return };
-        let text = field.read(cx).value().trim().to_lowercase();
-        let key = Keystroke::parse(&text).ok().map(|k| shortcut_key(&k));
-        if !restore && (text.is_empty() || key.is_none()) {
-            if let Some(ed) = &mut self.sketch {
-                ed.message = Some("Enter a shortcut such as shift-t or alt-l.".into());
-            }
-            cx.notify();
-            return;
-        }
-        let mut map = custom_shortcuts().read().clone();
-        map.retain(|_, t| *t != tool);
-        if !restore && let Some(key) = key {
-            map.insert(key, tool);
-        }
-        let names: std::collections::BTreeMap<_, _> = map.iter().map(|(key, tool)| (tool.label().split(" (").next().unwrap_or(tool.label()).to_string(), key.clone())).collect();
-        let path = crate::files::config_dir().join("sketch-shortcuts.json");
-        let saved = serde_json::to_string_pretty(&names).map_err(|e| e.to_string()).and_then(|text| {
-            std::fs::create_dir_all(crate::files::config_dir()).and_then(|_| std::fs::write(path, text)).map_err(|e| e.to_string())
-        });
-        match saved {
-            Ok(()) => {
-                *custom_shortcuts().write() = map;
-                if let Some(ui) = self.ui_mut() { ui.shortcut_edit = None; }
-                window.focus(&self.focus, cx);
-            }
-            Err(e) => {
-                if let Some(ed) = &mut self.sketch { ed.message = Some(format!("Could not save shortcuts: {e}")); }
-            }
-        }
-        cx.notify();
-    }
-
-    fn render_sketch_shortcuts(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (tool, field) = self.ui_ref()?.shortcut_edit.clone()?;
-        let pal = p();
-        let view = cx.entity();
-        let choose = Button::new("sk-shortcut-tool").label(tool.label()).ghost().small().dropdown_caret(true).dropdown_menu(move |mut menu, _, _| {
-            for t in all_sketch_tools().chain([Tool::Select]) {
-                let view = view.clone();
-                menu = menu.item(PopupMenuItem::new(t.label()).checked(tool == t).on_click(move |_, window, cx| {
-                    view.update(cx, |this, cx| {
-                        let key = custom_shortcuts().read().iter().find_map(|(key, tool)| (*tool == t).then(|| key.clone())).unwrap_or_default();
-                        if let Some((selected, field)) = this.ui_mut().and_then(|u| u.shortcut_edit.as_mut()) {
-                            *selected = t;
-                            field.update(cx, |s, cx| s.set_value(key, window, cx));
-                        }
-                        cx.notify();
-                    })
-                }));
-            }
-            menu
-        });
-        Some(v_flex().id("sk-shortcut-preferences").absolute().left(px(340.)).top(px(32.)).w(px(340.)).occlude().p_3().gap_2().bg(pal.panel_raised).border_1().border_color(pal.border).shadow_lg()
-            .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child("Sketch keyboard shortcuts"))
-            .child(choose)
-            .child(Input::new(&field).small())
-            .child(h_flex().gap_2()
-                .child(Button::new("sk-shortcut-save").label("Save").primary().small().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.save_sketch_shortcut(false, w, cx))))
-                .child(Button::new("sk-shortcut-reset").label("Restore default").ghost().small().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.save_sketch_shortcut(true, w, cx))))
-                .child(crate::os_ui::secondary_button("sk-shortcut-close", "Cancel", cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| { if let Some(ui) = this.ui_mut() { ui.shortcut_edit = None; } cx.notify(); }))))
-            .into_any_element())
-    }
-
     fn accept_sketch_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(out) = self.with_sketch(cx, |ed, data| ed.accept_text(data)) {
             self.apply_outcome(out, window, cx);
@@ -2406,7 +2272,6 @@ impl PartStudioView {
         let Some(data) = self.sketch_data(cx) else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
         let mut out = Vec::new();
-        self.install_shortcut_interceptor(cx);
 
         // Tool options box (creates inputs lazily, needs &mut self).
         let tool = self.sketch.as_ref().map(|s| s.tool).unwrap_or(Tool::Select);
@@ -2553,8 +2418,11 @@ impl PartStudioView {
         // ---- dimension labels
         let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
         let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
+        let beside = ed.labels_beside_line(&data);
         for (cid, pos, mut text, driving) in ed.dimension_labels(&data, &units) {
             let Some((x, y)) = project(pos) else { continue };
+            // Steep dimension lines: the text sits right of the line (live sketch/17).
+            let x = if beside.contains(&cid) { x + crate::sketch_mode::label_width_px(&text) as f32 * 0.5 + 8.0 } else { x };
             let is_configured = configured.contains(&cid.0);
             // Configured dimensions show the active configuration's value.
             if is_configured
@@ -3059,9 +2927,6 @@ impl PartStudioView {
             out.push(panel.into_any_element());
         }
 
-        if let Some(panel) = self.render_sketch_shortcuts(cx) {
-            out.push(panel);
-        }
         if let Some(panel) = self.render_text_dialog(window, cx) {
             out.push(panel);
         }
@@ -3109,7 +2974,7 @@ impl PartStudioView {
         out
     }
 
-    pub(super) fn render_sketch_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_sketch_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
         let Some(ed) = &self.sketch else { return div().into_any_element() };
         let active = ed.tool;
         let construction = ed.construction;
@@ -3149,7 +3014,7 @@ impl PartStudioView {
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {
             crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
         };
-        let mut bar = h_flex().flex_1().min_w_0().overflow_hidden().gap(px(2.));
+        let mut bar = h_flex().flex_initial().min_w_0().overflow_hidden().gap(px(2.));
         bar = bar
             .child(action_btn("sk-undo", "undo", "Undo (cmd+z/ctrl+z)", Box::new(Undo), cx))
             .child(action_btn("sk-redo", "redo", "Redo (ctrl+y/shift+cmd+z)", Box::new(Redo), cx))
@@ -3158,6 +3023,27 @@ impl PartStudioView {
             .child(action_btn("sk-extrude", "extrude", "Extrude (Shift+E)", Box::new(Extrude), cx))
             .child(action_btn("sk-revolve", "revolve", "Revolve (Shift+W)", Box::new(Revolve), cx))
             .child(sep());
+        // Live (sketch/420-421): when the tools don't fit, the drawing tools
+        // (with Use, Intersection, Construction), the edit tools and the
+        // constraints collapse into "Line ▾", "Sketch fillet ▾" and
+        // "Coincident ▾"; Dimension stays.
+        let (cell, caret) = (crate::ui::TOOL_CELL + 2., crate::ui::TOOL_CARET_W);
+        let groups_w = |gs: &[&[Tool]]| gs.iter().map(|g| cell + if g.len() > 1 { caret } else { 0. }).sum::<f32>();
+        let full = 4. * cell + 6. * 4. + groups_w(DRAW_TOOLS) + groups_w(USE_TOOLS) + cell + groups_w(EDIT_TOOLS) + groups_w(INSERT_TOOLS) + cell + CONSTRAINT_TOOLS.len() as f32 * cell;
+        if full > viewport_w - crate::ui::RAIL_W - 4. - 172. {
+            let draw: Vec<Tool> = DRAW_TOOLS.iter().chain(USE_TOOLS).flat_map(|g| g.iter().copied()).collect();
+            let edit: Vec<Tool> = EDIT_TOOLS.iter().chain(INSERT_TOOLS).flat_map(|g| g.iter().copied()).collect();
+            let cons: Vec<Tool> = CONSTRAINT_TOOLS.iter().map(|c| Tool::Constraint(*c)).collect();
+            for (members, construction_item) in [(draw, true), (edit, false)] {
+                bar = self.collapsed_sketch_group(bar, members, construction_item, active, cx).child(sep());
+            }
+            bar = bar.child(tool_btn(Tool::Dimension, cx)).child(sep());
+            bar = self.collapsed_sketch_group(bar, cons, false, active, cx);
+            return crate::ui::toolbar()
+                .child(bar)
+                .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
+                .into_any_element();
+        }
         for g in DRAW_TOOLS {
             bar = group(bar, g, cx);
         }
@@ -3200,6 +3086,37 @@ impl PartStudioView {
             .child(bar)
             .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
             .into_any_element()
+    }
+
+    /// A collapsed sketch toolbar group (narrow window): the active member,
+    /// else the first, with every member in its dropdown (and Construction
+    /// at the end of the drawing tools).
+    fn collapsed_sketch_group(&mut self, bar: gpui_kit::Div, members: Vec<Tool>, construction_item: bool, active: Tool, cx: &mut Context<Self>) -> gpui_kit::Div {
+        let face = members.iter().copied().find(|t| *t == active).unwrap_or(members[0]);
+        let key = format!("{:?}", members[0]);
+        let main = crate::ui::with_tool_tooltip(
+            SharedString::from(format!("skt-c-{key}")),
+            face.label(),
+            crate::ui::split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+        );
+        let view = cx.entity();
+        let caret = crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx).dropdown_menu(move |mut menu, _, _| {
+            menu = menu.min_w(px(180.));
+            for t in &members {
+                let (v, t) = (view.clone(), *t);
+                // "Line (L)": the name, and the shortcut as chips.
+                let label: &'static str = t.label();
+                let shortcut = label.rsplit_once(" (").map(|(_, k)| k.trim_end_matches(')')).filter(|k| k.len() <= 7);
+                let name = label.split(" (").next().unwrap_or_default();
+                menu = menu.item(crate::ui::menu_tool_item(name, t.icon(), shortcut).on_click(move |_, window, cx| v.update(cx, |this, cx| this.activate_tool(t, window, cx))));
+            }
+            if construction_item {
+                let v = view.clone();
+                menu = menu.item(crate::ui::menu_tool_item("Construction", "construction", Some("q")).on_click(move |_, window, cx| v.update(cx, |this, cx| this.toggle_construction(window, cx))));
+            }
+            menu
+        });
+        bar.child(crate::ui::tool_group(SharedString::from(format!("skg-c-{key}")), main, caret))
     }
 
     fn paste_sketch_entities(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -3281,6 +3198,14 @@ impl PartStudioView {
         let n = ed.selection.len();
         let tool = ed.tool;
         let drawing_spline = matches!(tool, Tool::Spline | Tool::Bezier) && !ed.clicks_empty();
+        let tool_active = tool != Tool::Select && !drawing_spline;
+        let tool_name = tool.label().split(" (").next().unwrap_or("tool").to_lowercase();
+        // A single selected line: Align view with vertical axis (tool menu).
+        let (sel0, frame) = ((n == 1).then(|| ed.selection[0]), ed.frame);
+        let single_line = sel0.zip(self.sketch_data(cx)).and_then(|(e, d)| match d.sketch.curve(e)? {
+            noshape_sketch::Curve2::Line { a, b } => Some(frame.to_world(b) - frame.to_world(a)),
+            _ => None,
+        });
         let has_clip = cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("noshape_sketch_entities"));
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
@@ -3292,6 +3217,13 @@ impl PartStudioView {
                     f(this, window, cx)
                 }))
             };
+            // A tool is active: "Escape <tool>" first, and the first Esc
+            // exits the tool with the menu left open (live sketch/400–406).
+            if tool_active {
+                m = m.item(item(&format!("Escape {tool_name}"), Box::new(|this, _, cx| this.set_tool(Tool::Select, cx))));
+                let v = v.clone();
+                m = m.on_first_escape(move |_, cx| v.update(cx, |this, cx| this.set_tool(Tool::Select, cx)));
+            }
             m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
             m = m.separator();
             if drawing_spline {
@@ -3344,7 +3276,7 @@ impl PartStudioView {
                     cx.notify();
                 })));
                 if let Some(r) = model_ref.clone() {
-                    let criteria: &[noshape_model::select::Criterion] = if matches!(r, Reference::Face(_)) { &noshape_model::select::Criterion::FACE } else { &noshape_model::select::Criterion::EDGE };
+                    let criteria: &[noshape_model::select::Criterion] = if matches!(r, Reference::Face(_)) { &noshape_model::select::Criterion::FACE } else { &noshape_model::select::Criterion::SKETCH_EDGE };
                     let vs = v.clone();
                     m = m.submenu("Select", window, cx, move |mut sm, _, _| {
                         for c in criteria {
@@ -3354,15 +3286,10 @@ impl PartStudioView {
                                 this.select_related(&r, c, cx);
                             })));
                         }
-                        let (v, r) = (vs.clone(), r.clone());
+                        let v = vs.clone();
                         sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
                             this.close_context_menu(cx);
-                            if !this.selection.contains(&r) {
-                                this.selection.push(r.clone());
-                            }
-                            this.ui.create_selection = true;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
+                            this.open_create_selection_at(this.ui.menu_pos, cx);
                         })))
                     });
                 }
@@ -3393,7 +3320,9 @@ impl PartStudioView {
                         cx.write_to_clipboard(ClipboardItem::new_string(text));
                     }
                 })));
-                m = m.item(item("Transform sketch entities", Box::new(|this, _, cx| this.set_tool(Tool::Transform, cx))));
+                if !tool_active {
+                    m = m.item(item("Transform sketch entities", Box::new(|this, _, cx| this.set_tool(Tool::Transform, cx))));
+                }
             } else {
                 m = m.item(item("Copy sketch", Box::new(|this, _, cx| {
                     let text = this.sketch_data(cx).and_then(|d| {
@@ -3415,9 +3344,11 @@ impl PartStudioView {
             if n == 0 {
                 m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
             }
-            m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
+            if !tool_active {
+                m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
+            }
             if n > 0 {
-                if let Some(plane) = own_plane.clone() {
+                if let Some(plane) = own_plane.clone().filter(|_| !tool_active) {
                     m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through(plane.clone(), w, cx))));
                 }
                 m = m.separator();
@@ -3447,27 +3378,21 @@ impl PartStudioView {
                     let v = vs.clone();
                     sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
                         this.close_context_menu(cx);
-                        if let Some(ed) = &this.sketch {
-                            this.selection = ed.selection.iter().map(|e| Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).collect();
-                        }
-                        this.ui.create_selection = true;
-                        this.refresh_scene(false, cx);
-                        cx.notify();
+                        this.open_create_selection_at(this.ui.menu_pos, cx);
                     })))
                 });
             } else {
-                // Nothing selected: the Part Studio's "select everything of
-                // a kind" submenu (live sketch/37 shows Select ▸ here too).
+                // Nothing selected: only "Create selection…" (live
+                // menus/rmb-sketch-empty-select-submenu.png), after a
+                // separator (live rmb-sketch-linetool-empty).
+                m = m.separator();
                 let vs = v.clone();
-                m = m.submenu("Select", window, cx, move |mut sm, _, _| {
-                    for (label, kind) in [("All parts", 0u8), ("All surfaces", 1), ("All sketches", 2), ("All planes", 3), ("All mate connectors", 4)] {
-                        let v = vs.clone();
-                        sm = sm.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| {
-                            this.close_context_menu(cx);
-                            this.select_all_of(kind, cx);
-                        })));
-                    }
-                    sm
+                m = m.submenu("Select", window, cx, move |sm, _, _| {
+                    let v = vs.clone();
+                    sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        this.open_create_selection_at(this.ui.menu_pos, cx);
+                    })))
                 });
             }
             m = m.item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))));
@@ -3487,10 +3412,20 @@ impl PartStudioView {
                 this.view_normal(cx);
                 this.selection = prev;
             })));
-            if tool != Tool::Select {
-                m = m.item(item(&format!("Exit {}", tool.label().split(" (").next().unwrap_or("tool").to_lowercase()), Box::new(|this, _, cx| this.set_tool(Tool::Select, cx))));
+            if tool_active
+                && let Some(d) = single_line
+            {
+                m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| {
+                    let cam = this.viewport.read(cx).camera;
+                    let fwd = cam.forward();
+                    let Some(mut up) = (d - fwd * d.dot(fwd)).try_normalize() else { return };
+                    if up.dot(cam.up()) < 0.0 {
+                        up = -up;
+                    }
+                    this.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, up, cx));
+                })));
             }
-            if n > 0 {
+            if n > 0 && !tool_active {
                 let label = if n == 1 { "Delete sketch entity".to_string() } else { format!("Delete {n} sketch entities") };
                 m = m.separator().item(item(&label, Box::new(|this, w, cx| this.sketch_delete(w, cx))));
             }
@@ -3596,12 +3531,6 @@ impl PartStudioView {
                 let transient = this.show_shortcuts || this.context_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.select_other.is_some() || this.ui.dependencies.is_some() || this.viewport.read(cx).zoom_window;
                 if !transient && this.sketch.is_some() {
                     if let Some(ui) = this.ui_mut() {
-                        if ui.shortcut_edit.take().is_some() {
-                            window.focus(&this.focus, cx);
-                            cx.notify();
-                            cx.stop_propagation();
-                            return;
-                        }
                         ui.degree_edit = None;
                         ui.tol_open = None;
                     }
@@ -3677,19 +3606,6 @@ mod tests {
     use super::*;
     // The glob import brings GPUI's `test` attribute; use the built-in one.
     use std::prelude::v1::test;
-
-    #[test]
-    fn custom_sketch_shortcuts_parse_tool_names() {
-        let m = parse_custom_shortcuts(r#"{"Midpoint line": "alt-l", "slot": "Shift-T", "nonsense": "x", "Coincident": "ctrl-i"}"#);
-        assert_eq!(m.get("alt-l"), Some(&Tool::MidpointLine));
-        assert_eq!(m.get("shift-t"), Some(&Tool::Slot));
-        assert_eq!(m.get("ctrl-i"), Some(&Tool::Constraint(ConstraintTool::Coincident)));
-        assert_eq!(m.len(), 3);
-        assert!(parse_custom_shortcuts("not json").is_empty());
-        let m = parse_custom_shortcuts(r#"{"Line":"shift-ctrl-l","Slot":"ctrl-shift-t"}"#);
-        assert_eq!(m.get("ctrl-shift-l"), Some(&Tool::Line));
-        assert_eq!(m.get("ctrl-shift-t"), Some(&Tool::Slot));
-    }
 
     #[test]
     fn toolbar_groups_cover_every_tool_once() {
