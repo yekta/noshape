@@ -29,6 +29,9 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
   Each test binary is ~130 MB (OCCT is linked in), so old ones pile up. When you're not building, delete the stale
   executables: `find <target>/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +60 -delete`.
   Never delete `debug/deps` files while a build might be running.
+- **Memory:** 15 GB RAM for everyone; earlyoom kills compilers when it runs out ("could not compile" with no
+  error = killed). `~/.cargo/config.toml` sets a rustc wrapper (`~/.local/bin/rustc-throttle`) that lets at most 3
+  compiles of noshape's big crates run at once machine-wide, so a build may wait a little for a slot. Don't bypass it.
 - **Never use broad `pkill -f` patterns.** Kill only your own processes (`pkill -f "[t]arget-<you>/debug/noshape"`).
 - **Keep the shared tree compiling.** Make edits in small steps that build. If someone else's file breaks the
   build, wait a few minutes and retry instead of "fixing" their in-progress code. Stay in your area; if you need a

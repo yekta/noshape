@@ -1,6 +1,6 @@
 # noshape: handoff for the next lead
 
-Read this first, then `docs/handoff/*.md` (one file per workstream, written by the agents),
+Read this first (new lead: start with `docs/handoff/lead.md`), then `docs/handoff/*.md` (one file per workstream, written by the agents),
 `docs/AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/ONSHAPE_UI_SPEC.md` and `docs/parity/*.md`.
 
 ## What the user wants
@@ -80,13 +80,14 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | Agent | Motile id | Account / model | Display, target | Handoff |
 |---|---|---|---|---|
 | ui: Part Studio chrome, dialogs, viewport | 6b6696ee-ea16-473c-878c-1835191a432a | Yekta / Opus 5.5 | :101, target-ui | `docs/handoff/theme-layout.md` |
-| ui2: sketch/assembly/drawing/start-window visuals | 7ca75884-7b95-41f3-b02c-a59dc5100855 | Stablecog / Opus 5.5 | :105, target-ui2 | `docs/handoff/theme-studios.md` |
-| live: answers `live/REQUESTS.md` (first capture agent finished; this one is on call) | b2bbb233-344b-4035-821b-3b324b8af3a2 | Motile / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
-| psb: Part Studio behaviour | b98a1037-8119-4552-9514-fba9ad39e0d0 | Motile / Opus 5.5 | :102, target-psb | `docs/handoff/part-studio-behaviour.md` |
-| skb: sketch behaviour (done), now assembly behaviour | 275d333d-fa18-4bfb-9bae-624c1bd70f2d | Stablecog / Opus 5.5 (moved from Codex after its session limit) | :103, target-skb | `docs/handoff/sketch-behaviour.md` |
+| ui2: sketch/assembly/drawing/start-window/document visuals | 7b0f2083-47b0-4d93-aa1d-9d73fb5cdb0e | Stablecog / Opus 5.5 | :105, target-ui2 | `docs/handoff/theme-studios.md` |
+| live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
+| psb: Part Studio behaviour (+ release workflow, per-dialog pass) | 61e81b26-c8ac-4b52-8472-23f7276a16b3 | Stablecog / Opus 5.5 | :102, target-psb | `docs/handoff/part-studio-behaviour.md` |
+| skb: assembly behaviour (+ sketch leftovers) | f8d74a13-f182-4cdd-be8f-c73977d91c96 | Unbind / Opus 5.5 | :103, target-skb | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
 | asb: drawing behaviour (assembly handed to skb) | c50462f8-b3d4-499a-8dbc-7d866ee473ea | Yekta / Opus 5.5 | :104, target-asb | `docs/handoff/assembly-behaviour.md`, `drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
 | kern: kernel robustness (shell, fillet, chamfer, other features succeed where Onshape does) | c758f55c-6cdb-46d5-a2cf-0c7d8138e3ad | Unbind / Opus 5.5 | :106, target-kern | `docs/handoff/kernel-robustness.md` |
+| fs: FeatureScript language + std library (replaces Rhai) | 80461700-2f11-4bd2-afd0-170152385f77 | Ngyekta / Opus 5.5 | :108, target-fs | `docs/handoff/featurescript.md` |
 
 Use Opus 5.5 for all agents (user, 2026-10-18; not Fable). Unbind and Codex hit session limits on 2026-10-18; their agents were moved.
 Motile bug: an agent in "waiting_for_usage_limit" ignores stop_agent; send it a message (that wakes it), then stop_agent while it shows "running".
