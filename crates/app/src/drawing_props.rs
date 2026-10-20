@@ -11,6 +11,8 @@ use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::Disableable as _;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::TabContent;
 use noshape_model::drawing::views;
@@ -87,6 +89,15 @@ pub struct ViewProps {
     scale: Option<f64>,
     scale_input: Entity<InputState>,
     rotation: Entity<InputState>,
+    /// Rotation angle › reverse direction (the angle turns clockwise).
+    rot_reverse: bool,
+    /// Suppress alignment with parent (child views).
+    unaligned: bool,
+    /// Apply parent view section cut (projected views of section views).
+    parent_cut: bool,
+    /// Show sketch appearances, Show annotations from model.
+    sketch_appearances: bool,
+    model_annotations: bool,
     tangent: TangentMode,
     sheet: usize,
     name: Entity<InputState>,
@@ -253,9 +264,14 @@ impl DrawingEditor {
         // live drawing/447: after Move to sheet…).
         if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
             let un = v.unaligned;
-            out.push(MenuEntry::item(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, move |t, _, cx| {
-                t.edit_view(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, id, cx, |v| v.unaligned = !un)
-            }));
+            // Help H:views: a rotated view can't be re-aligned.
+            let rotated = v.rotation.abs() > 1e-9;
+            out.push(
+                MenuEntry::item(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, move |t, _, cx| {
+                    t.edit_view(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, id, cx, |v| v.unaligned = !un)
+                })
+                .disabled(un && rotated),
+            );
         }
         out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
@@ -397,8 +413,14 @@ impl DrawingEditor {
     pub fn open_view_props(&mut self, id: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(v) = self.current_sheet().view(id).cloned() else { return };
         self.panel = None;
-        let deg = v.rotation.to_degrees();
-        let scale_text = v.scale.map(noshape_model::drawing::sheet::format_scale).unwrap_or_default();
+        // Rotation angle 0–360 (counter-clockwise).
+        let deg = v.rotation.to_degrees().rem_euclid(360.0);
+        // The Scale combo shows "1:1 (Sheet)" / "1:2 (Parent)" or the view's own scale.
+        let inherit = if self.current_sheet().parent_of(id).is_some() { "Parent" } else { "Sheet" };
+        let scale_text = match v.scale {
+            Some(s) => noshape_model::drawing::sheet::format_scale(s),
+            None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(views::view_scale(self.current_sheet(), id))),
+        };
         let name = v.name.clone().unwrap_or_else(|| default_view_name(&self.drawing, self.current_sheet(), &v));
         let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
         let label = match &v.kind {
@@ -415,6 +437,11 @@ impl DrawingEditor {
             scale: v.scale,
             scale_input: input(scale_text, window, cx),
             rotation: input(format!("{}", (deg * 1000.0).round() / 1000.0), window, cx),
+            rot_reverse: false,
+            unaligned: v.unaligned,
+            parent_cut: v.cut_from_section,
+            sketch_appearances: v.sketch_appearances,
+            model_annotations: v.model_annotations,
             tangent: TangentMode::of(&v),
             sheet: self.sheet,
             name: input(name, window, cx),
@@ -430,9 +457,14 @@ impl DrawingEditor {
     fn apply_view_props(&mut self, cx: &mut Context<Self>) {
         let Some(p) = self.view_props.take() else { return };
         let id = p.view;
-        let typed_scale = crate::drawing_ui::parse_scale(&p.scale_input.read(cx).value());
-        let scale = if p.scale_input.read(cx).value().trim().is_empty() { p.scale } else { typed_scale.or(p.scale) };
-        let rotation = p.rotation.read(cx).value().trim().trim_end_matches('°').parse::<f64>().ok();
+        // Scale: "(Sheet)" / "(Parent)" keep the inherited scale; a typed N:N
+        // or N/N sets the view's own.
+        let typed = p.scale_input.read(cx).value().trim().to_string();
+        let scale = if typed.is_empty() || typed.ends_with("(Sheet)") || typed.ends_with("(Parent)") { p.scale } else { crate::drawing_ui::parse_scale(&typed).or(p.scale) };
+        // Rotation angle: 0–360; the reverse button turns it clockwise.
+        let rotation = p.rotation.read(cx).value().trim().trim_end_matches('°').parse::<f64>().ok().filter(|a| (0.0..=360.0).contains(a)).map(|a| if p.rot_reverse { -a } else { a });
+        let (unaligned, parent_cut) = (p.unaligned, p.parent_cut);
+        let (sketch_appearances, model_annotations) = (p.sketch_appearances, p.model_annotations);
         let name = p.name.read(cx).value().trim().to_string();
         let label = p.label.read(cx).value().trim().to_string();
         let (view_label, scale_label, tangent, orientation) = (p.view_label, p.scale_label, p.tangent, p.orientation);
@@ -446,6 +478,10 @@ impl DrawingEditor {
                 v.rotation = r.to_radians();
             }
             tangent.apply(v);
+            v.unaligned = unaligned;
+            v.cut_from_section = parent_cut;
+            v.sketch_appearances = sketch_appearances;
+            v.model_annotations = model_annotations;
             v.simplification = simplification;
             v.name = (!name.is_empty() && name != default_name).then_some(name);
             v.scale_label = Some(scale_label);
@@ -476,58 +512,91 @@ impl DrawingEditor {
     }
 
     pub fn render_view_props(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // Live drawing/177 + dom/drawing-flat-view-properties.txt (help images
+        // viewproperties-new-01 for child views): a 295 px dialog; a 28 px
+        // header (13 px / 500 title, ✓ on #009500, ✕); the reference block
+        // (75 px labels: Document, Workspace, Type, Reference with the part
+        // icon and a link, the release badge), then 134 px labels with
+        // 120 x 25 controls (inputs 13.33 px #555 on a #ddd bottom line),
+        // checkboxes, and the BOM / cut list table references. Labels 12 px #333.
         let pal = p();
         let props = self.view_props.as_ref()?;
         let sheet = self.current_sheet();
         let v = sheet.view(props.view)?.clone();
         let root = views::root_view(sheet, props.view).and_then(|r| sheet.view(r)).cloned();
         let doc = &self.doc.read(cx).session.doc;
-        let (source_name, is_asm) = match root.as_ref().map(|r| &r.kind) {
-            Some(ViewKind::Base { source, .. }) => match doc.tab(*source) {
-                Some(t) => (t.name.clone(), matches!(t.content, TabContent::Assembly(_))),
-                None => (String::new(), false),
+        let (source_tab, source_name, is_asm) = match root.as_ref().map(|r| &r.kind) {
+            Some(ViewKind::Base { source, part, .. }) => match doc.tab(*source) {
+                Some(t) => {
+                    // Live: the reference is the part ("Part 1"), or the Part Studio / assembly shown whole.
+                    let part_name = part.as_ref().and_then(|b| self.sources.get(&views::SourceKey::studio(*source)).and_then(|s| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())));
+                    (Some(*source), part_name.unwrap_or_else(|| t.name.clone()), matches!(t.content, TabContent::Assembly(_)))
+                }
+                None => (None, String::new(), false),
             },
-            _ => (String::new(), false),
+            _ => (None, String::new(), false),
         };
+        let pinned = root.as_ref().and_then(|r| r.pinned.clone());
         let doc_name = self.doc.read(cx).name();
-        let has_parent = sheet.parent_of(props.view).is_some();
+        let parent = sheet.parent_of(props.view);
+        let has_parent = parent.is_some();
+        let parent_is_section = parent.and_then(|p| sheet.view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
         let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(props.view));
         let parent_scale = views::view_scale(sheet, props.view);
-        let label_w = px(125.);
-        let row = |label: &'static str, body: AnyElement| h_flex().min_h(px(28.)).gap_2().child(div().w(label_w).flex_none().text_color(pal.text).child(label)).child(div().flex_1().min_w_0().child(body)).into_any_element();
+        let ink = gpui_kit::rgb(0x333333);
+        let field_ink = gpui_kit::rgb(0x555555);
+        let line = gpui_kit::rgb(0xdddddd);
+        let label = |w: f32, t: &'static str| div().w(px(w)).flex_none().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(ink).child(t);
+        let info_row = |t: &'static str, body: AnyElement| h_flex().items_start().min_h(px(25.)).child(label(76., t)).child(div().flex_1().min_w_0().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(ink).child(body)).into_any_element();
+        let row = |t: &'static str, body: AnyElement| h_flex().items_start().min_h(px(26.)).child(label(136., t)).child(div().w(px(120.)).flex_none().mt(px(1.)).child(body)).into_any_element();
         let text = |s: String| div().truncate().child(s).into_any_element();
+        let value = |s: String| div().pl(px(5.)).pt(px(6.)).text_size(px(12.)).text_color(ink).child(s).into_any_element();
         let view = cx.entity();
-        let dropdown = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>| {
+        // Onshape's select: white, 120 x 25, a #ddd bottom line, ▾ at the right.
+        let select = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>, enabled: bool| {
             let view = view.clone();
-            Button::new(id)
-                .label(current)
-                .outline()
-                .xsmall()
-                .w_full()
-                .dropdown_caret(true)
-                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
-                    for (label, checked, f) in &items {
-                        let (v, f) = (view.clone(), f.clone());
-                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| {
-                            v.update(cx, |this, cx| {
-                                if let Some(p) = &mut this.view_props {
-                                    f(p);
-                                }
-                                cx.notify();
-                            })
-                        }));
-                    }
-                    menu
-                })
-                .into_any_element()
+            let b = Button::new(id).label(current).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).dropdown_caret(true);
+            if !enabled {
+                return div().opacity(0.5).child(b).into_any_element();
+            }
+            b.os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
+                for (label, checked, f) in &items {
+                    let (v, f) = (view.clone(), f.clone());
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.view_props {
+                                f(p);
+                            }
+                            cx.notify();
+                        })
+                    }));
+                }
+                menu
+            })
+            .into_any_element()
         };
+        let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall()).into_any_element();
+        // Reference block.
+        let reference = h_flex()
+            .gap(px(3.))
+            .child(crate::assets::icon(if is_asm { "assembly" } else { "part" }, 20., cx))
+            .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().child(source_name).on_click(move |_, w, cx| {
+                if let Some(tab) = source_tab {
+                    crate::workspace::request_activate_tab(tab, w, cx);
+                }
+            }))
+            .into_any_element();
+        // The reference's state: "In progress" for the workspace, else the version.
+        let badge = div().ml(px(82.)).mt(px(4.)).mb(px(2.)).px(px(3.)).py(px(1.)).rounded(px(3.)).bg(gpui_kit::rgb(0x90cef1)).text_size(px(12.)).text_color(gpui_kit::rgb(0x000000)).child(pinned.map(|p| p.name).unwrap_or_else(|| "In progress".into()));
         let mut rows: Vec<AnyElement> = vec![
-            row("Document", text(doc_name)),
-            row("Workspace", text("Main".into())),
-            row("Type", text(if is_asm { "Assembly".into() } else { "Part".into() })),
-            row("Reference", text(source_name)),
+            info_row("Document", text(doc_name)),
+            info_row("Workspace", text("Main".into())),
+            info_row("Type", text(if is_asm { "Assembly".into() } else { "Part".into() })),
+            info_row("Reference", reference),
+            h_flex().child(badge).into_any_element(),
+            div().h(px(6.)).into_any_element(),
         ];
-        // View orientation (base views).
+        // View orientation (base views choose it; derived views show theirs).
         if let Some(cur) = props.orientation {
             let items = ORIENTATIONS
                 .iter()
@@ -536,30 +605,99 @@ impl DrawingEditor {
                     (n.to_string(), o == cur, f)
                 })
                 .collect();
-            rows.push(row("View orientation", dropdown("vp-orient", orientation_name(cur).into(), items)));
+            rows.push(row("View orientation", select("vp-orient", orientation_name(cur).into(), items, true)));
         } else {
-            rows.push(row("View orientation", text(match &v.kind {
-                ViewKind::Projected { .. } => "Projected".into(),
-                _ => default_view_name(&self.drawing, sheet, &v),
-            })));
+            rows.push(row("View orientation", value(default_view_name(&self.drawing, sheet, &v))));
         }
-        // Scale: "1:2 (Parent)" / "(Sheet)" or a standard scale; typing sets a custom one.
+        // Scale: one combo ("1:1 (Sheet)" / "(Parent)" or a scale): type N:N
+        // or N/N, or pick one from its menu.
         let inherit = if has_parent { "Parent" } else { "Sheet" };
-        let scale_label_text = match props.scale {
+        let text_for = move |s: Option<f64>| match s {
             None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(parent_scale)),
             Some(s) => noshape_model::drawing::sheet::format_scale(s),
         };
-        let mut scale_items: Vec<(String, bool, PropsAct)> = vec![(format!("{inherit} scale"), props.scale.is_none(), std::rc::Rc::new(|p: &mut ViewProps| p.scale = None))];
+        let mut scale_items: Vec<(String, bool, PropsAct)> = vec![(text_for(None), props.scale.is_none(), std::rc::Rc::new(|p: &mut ViewProps| p.scale = None))];
         for s in [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05] {
             scale_items.push((noshape_model::drawing::sheet::format_scale(s), props.scale == Some(s), std::rc::Rc::new(move |p: &mut ViewProps| p.scale = Some(s))));
         }
-        rows.push(row("Scale", h_flex().gap_1().child(div().flex_1().child(dropdown("vp-scale", scale_label_text, scale_items))).child(Input::new(&props.scale_input).xsmall().w(px(64.))).into_any_element()));
-        // Rotation: only views without a parent or children.
-        let can_rotate = !has_parent && !has_children;
-        rows.push(row(
-            "Rotation angle",
-            if can_rotate { Input::new(&props.rotation).xsmall().into_any_element() } else { div().text_color(pal.text_faint).child(format!("{}", (v.rotation.to_degrees() * 1000.0).round() / 1000.0)).into_any_element() },
-        ));
+        let scale_menu = {
+            let view = view.clone();
+            Button::new("vp-scale-dd").ghost().xsmall().w(px(20.)).h(px(24.)).dropdown_caret(true).os_dropdown_menu("vp-scale-menu", true, move |mut menu, _, _| {
+                for (label, checked, f) in &scale_items {
+                    let (v, f) = (view.clone(), f.clone());
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, w, cx| {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.view_props {
+                                f(p);
+                                let t = text_for(p.scale);
+                                p.scale_input.update(cx, |s, cx| s.set_value(t, w, cx));
+                            }
+                            cx.notify();
+                        })
+                    }));
+                }
+                menu
+            })
+        };
+        rows.push(row("Scale", h_flex().h(px(26.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(&props.scale_input).appearance(false).xsmall())).child(scale_menu).into_any_element()));
+        let check = |id: &'static str, t: &'static str, on: bool, f: fn(&mut ViewProps, bool), cx: &mut Context<Self>| {
+            // A rotated view can't be re-aligned with its parent (help H:views).
+            let locked = id == "vp-unaligned" && on && v.rotation.abs() > 1e-9;
+            div()
+                .pl(px(5.))
+                .py(px(4.))
+                .child(Checkbox::new(id).label(t).small().checked(on).disabled(locked).on_click(cx.listener(move |this, on: &bool, _, cx| {
+                    if let Some(p) = &mut this.view_props {
+                        f(p, *on);
+                    }
+                    cx.notify();
+                })))
+                .into_any_element()
+        };
+        // Child views: Suppress alignment with parent; projected views of a
+        // section view: Apply parent view section cut (help H:views).
+        if has_parent && !matches!(v.kind, ViewKind::Detail { .. }) {
+            rows.push(check("vp-unaligned", "Suppress alignment with parent", props.unaligned, |p, on| p.unaligned = on, cx));
+        }
+        if parent_is_section && matches!(v.kind, ViewKind::Projected { .. }) {
+            rows.push(check("vp-parent-cut", "Apply parent view section cut", props.parent_cut, |p, on| p.parent_cut = on, cx));
+        }
+        // Rotation angle (0–360) with the reverse-direction button: editable
+        // only without parent and children, or with the parent alignment
+        // suppressed (help H:views).
+        let can_rotate = (!has_parent || props.unaligned) && !has_children;
+        let rev = props.rot_reverse;
+        let angle = if can_rotate {
+            field(&props.rotation)
+        } else {
+            div().h(px(25.)).pl(px(3.)).pt(px(5.)).border_b_1().border_color(line).text_size(px(13.33)).text_color(field_ink).child(format!("{}", (v.rotation.to_degrees().rem_euclid(360.0) * 1000.0).round() / 1000.0)).into_any_element()
+        };
+        let rotation = h_flex()
+            .gap(px(6.))
+            .child(div().w(px(120.)).flex_none().when(!can_rotate, |d| d.opacity(0.5)).child(angle))
+            .child(
+                div()
+                    .id("vp-rot-reverse")
+                    .size(px(26.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xd3d7d9))
+                    .when(rev, |d| d.bg(gpui_kit::rgb(0xd4e8f8)))
+                    .when(!can_rotate, |d| d.opacity(0.5))
+                    .child(crate::assets::icon("rotation-reverse", 20., cx))
+                    .when(can_rotate, |d| {
+                        d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(p) = &mut this.view_props {
+                                p.rot_reverse = !p.rot_reverse;
+                            }
+                            cx.notify();
+                        }))
+                    }),
+            )
+            .into_any_element();
+        rows.push(h_flex().items_start().min_h(px(28.)).child(label(136., "Rotation angle")).child(rotation).into_any_element());
         let tangent_items = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom]
             .into_iter()
             .map(|m| {
@@ -567,7 +705,7 @@ impl DrawingEditor {
                 (m.label().to_string(), m == props.tangent, f)
             })
             .collect();
-        rows.push(row("Tangent edges", dropdown("vp-tangent", props.tangent.label().into(), tangent_items)));
+        rows.push(row("Tangent edges", select("vp-tangent", props.tangent.label().into(), tangent_items, true)));
         // View simplification (child views follow the parent unless set).
         let eff = props.simplification.unwrap_or_else(|| sheet.parent_of(props.view).map(|p| views::view_simplification(sheet, p)).unwrap_or(Simplification::Auto));
         let simp_items = crate::drawing_insert::simplification_choices(eff)
@@ -577,81 +715,76 @@ impl DrawingEditor {
                 (c.name().to_string(), std::mem::discriminant(&c) == std::mem::discriminant(&eff), f)
             })
             .collect();
-        rows.push(row("View simplification", dropdown("vp-simp", eff.name().into(), simp_items)));
+        rows.push(row("View simplification", select("vp-simp", eff.name().into(), simp_items, true)));
         if !crate::drawing_insert::simplification_text(eff, true).is_empty() && props.simplification.is_some() {
-            rows.push(row("", Input::new(&props.simp_value).xsmall().into_any_element()));
+            rows.push(row("", field(&props.simp_value)));
         }
-        let sheet_items = self
-            .drawing
-            .sheets
-            .iter()
-            .enumerate()
-            .map(|(i, s)| {
-                let f: PropsAct = std::rc::Rc::new(move |p| p.sheet = i);
-                (s.name.clone(), i == props.sheet, f)
-            })
-            .collect();
+        // Sheet: the sheet's name; with several sheets a list that moves the view.
         let sheet_name = self.drawing.sheets.get(props.sheet).map(|s| s.name.clone()).unwrap_or_default();
-        rows.push(row("Sheet", dropdown("vp-sheet", sheet_name, sheet_items)));
-        rows.push(row("Name", Input::new(&props.name).xsmall().into_any_element()));
-        let (vl, sl) = (props.view_label, props.scale_label);
-        rows.push(
-            Checkbox::new("vp-view-label")
-                .label("View label")
-                .checked(vl)
-                .on_click(cx.listener(|this, on: &bool, _, cx| {
-                    if let Some(p) = &mut this.view_props {
-                        p.view_label = *on;
-                    }
-                    cx.notify();
-                }))
-                .into_any_element(),
-        );
-        if vl {
-            rows.push(row("Label", Input::new(&props.label).xsmall().into_any_element()));
+        if self.drawing.sheets.len() > 1 {
+            let sheet_items = self
+                .drawing
+                .sheets
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let f: PropsAct = std::rc::Rc::new(move |p| p.sheet = i);
+                    (s.name.clone(), i == props.sheet, f)
+                })
+                .collect();
+            rows.push(row("Sheet", select("vp-sheet", sheet_name, sheet_items, true)));
+        } else {
+            rows.push(row("Sheet", value(sheet_name)));
         }
-        rows.push(
-            Checkbox::new("vp-scale-label")
-                .label("Scale label")
-                .checked(sl)
-                .on_click(cx.listener(|this, on: &bool, _, cx| {
-                    if let Some(p) = &mut this.view_props {
-                        p.scale_label = *on;
-                    }
-                    cx.notify();
-                }))
-                .into_any_element(),
-        );
+        rows.push(row("Name", field(&props.name)));
+        let (vl, sl) = (props.view_label, props.scale_label);
+        rows.push(check("vp-view-label", "View label", vl, |p, on| p.view_label = on, cx));
+        if vl {
+            rows.push(row("Label", field(&props.label)));
+        }
+        rows.push(check("vp-scale-label", "Scale label", sl, |p, on| p.scale_label = on, cx));
+        // BOM / cut list table references: the table listing this view's parts.
+        let root_id = root.as_ref().map(|r| r.id);
+        let table_of = |bom: bool| {
+            sheet.tables.iter().any(|t| match &t.kind {
+                TableKind::Bom { view, .. } => bom && views::root_view(sheet, *view) == root_id,
+                TableKind::CutList { view, .. } => !bom && views::root_view(sheet, *view) == root_id,
+                _ => false,
+            })
+        };
+        let bom = if table_of(true) { "Bill of materials" } else { "Unassigned" };
+        let cut = if table_of(false) { "Cut list" } else { "Unassigned" };
+        rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));
+        rows.push(check("vp-model-ann", "Show annotations from model", props.model_annotations, |p, on| p.model_annotations = on, cx));
+        rows.push(row("BOM table reference", select("vp-bom", bom.into(), Vec::new(), false)));
+        rows.push(row("Cut list table reference", select("vp-cut", cut.into(), Vec::new(), false)));
         Some(
             v_flex()
                 .id("dr-view-props")
                 .absolute()
-                .top_2()
+                .top(px(DIALOG_TOP))
                 // Beside the Sheets panel when it is open (it opened under it).
                 .left(px(self.dialog_left()))
-                .w(px(300.))
+                .w(px(295.))
                 .bg(pal.dialog_bg)
                 .shadow(crate::drawing_chrome::dialog_shadow())
-                .text_size(px(13.))
-                .text_color(pal.text)
+                .text_color(ink)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
-                    // Onshape dialog header: title, green check, red X.
                     h_flex()
                         .h(px(28.))
-                        .pl(px(6.))
-                        .bg(pal.panel)
+                        .pl(px(11.))
                         .border_b_1()
-                        .border_color(pal.border)
-                        .child(div().flex_1().font_weight(FontWeight::MEDIUM).child("View properties"))
-                        .child(Button::new("vp-ok").ghost().child(crate::ui::glyph("check", 16., pal.accept)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_view_props(cx))))
-                        .child(Button::new("vp-cancel").ghost().child(crate::drawing_chrome::cancel_x(cx)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("View properties"))
+                        .child(div().id("vp-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_view_props(cx))))
+                        .child(div().id("vp-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.view_props = None;
                             cx.notify();
                         }))),
                 )
-                .child(v_flex().p_2().gap_1().children(rows))
+                .child(v_flex().p(px(3.)).pb(px(6.)).children(rows))
                 .into_any_element(),
         )
     }

@@ -503,6 +503,14 @@ State: run 5's edits were complete (no half-done code found); everything below b
   - Docked panes as live 181 / part-studio/77: fixed 712 px flush right with the strip at the pane's left edge, and
     the graphics canvas (with its fit and bottom-right tools) ends at the strip (`pane_docked`, `AsmUi.dock_w`).
 
+* After v0.4.1 (GO): live answers 760–780 / 800–826 / 840–845:
+  - Mate default alignment: `deliver_connector` sets the flip when both connectors of a new mate are picked
+    (`MateDialog::set_flip`, Z axes agree ⇔ `flip_primary`); the flip button shows Onshape's flag (`!flip_primary`).
+  - Explode step dialog rebuilt (`StepEdit`, `open_step_edit(k, created)`, `step_from_edit` (also the live preview
+    through `explode_view`), `accept_step_edit`, `cancel_step_edit`, `step_edit_pick`, `render_step_edit`); model
+    `ExplodeStep::{name, lines, line_refs, display_name}`; tree, menus and clicks per live 805–826 (see G5).
+  - Replace picker = the Insert panel in `picking_replacement` mode (see T5).
+
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 
 * Evaluation: `AsmConfiguration::value_of` → `inputs_only().value_of` → `Configuration::effective`, so

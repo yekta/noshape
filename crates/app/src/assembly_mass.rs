@@ -185,9 +185,10 @@ impl AssemblyView {
         // Onshape's selection box; parts without a material listed in red.
         let field = |label: &str, items: Vec<String>, active: bool, invalid: bool| {
             let empty = items.is_empty();
+            // Live dom dialog-mass-properties: 5 px above each query field.
             v_flex()
                 .mx(px(3.))
-                .my(px(2.))
+                .mt(px(5.))
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if active { pal.accent } else { pal.border })
@@ -212,11 +213,11 @@ impl AssemblyView {
                 .child("Override")
         };
         let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).text_size(px(12.)).text_color(rgb(c)).child(l).child(glyph);
-        let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("amass-tab-part", "Part", false, cx)).child(tab("amass-tab-face", "Face", true, cx)));
+        let mut body = v_flex().w_full().child(h_flex().w_full().child(tab("amass-tab-part", "Part", false, cx)).child(tab("amass-tab-face", "Face", true, cx)));
         body = body
             .child(field(if faces { "Faces to measure" } else { "Instances to measure" }, names, true, missing))
             .child(field("Mate connector for reference frame", Vec::new(), false, false))
-            .child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", false));
+            .child(div().mt(px(8.)).child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", false)));
         // Every row is shown; values only once something is measured.
         let props = mass.as_ref().map(|m| &m.props);
         // Without a material Onshape leaves mass, center of mass and inertia empty.

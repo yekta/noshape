@@ -86,6 +86,7 @@ impl DrawingEditor {
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
         self.woken_centers.clear();
+        self.woken_points.clear();
         self.datum_target_letter = None;
         // Clicking the active tool's button again exits it.
         // Dimension tools exit only when the same kind is chosen again.
@@ -179,6 +180,10 @@ impl DrawingEditor {
         }
         if self.palette.is_some() {
             self.close_palette(false, cx);
+            return;
+        }
+        if self.datum_dlg.as_ref().is_some_and(|d| !d.rows.is_empty()) {
+            self.close_datum_dlg(false, cx);
             return;
         }
         if self.move_sheet.take().is_some() {
@@ -645,6 +650,8 @@ impl DrawingEditor {
                 v.scale = self.insert.scale;
                 v.simplification = Some(self.insert.simplification);
                 v.flat = self.insert.flat;
+                v.sketch_appearances = self.insert.sketch_appearances;
+                v.model_annotations = self.insert.model_annotations;
                 // All views of a part use the same version: a pinned
                 // reference pins the new view too.
                 v.pinned = self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone());
@@ -749,6 +756,13 @@ impl DrawingEditor {
             && !self.woken_centers.contains(&(view, center))
         {
             self.woken_centers.push((view, center));
+        }
+        // Sketch tools: hovering an endpoint wakes it (SK8).
+        if matches!(self.tool, Tool::Sketch { .. })
+            && let Some((_, p)) = self.sketch_point_at(c)
+            && !self.woken_points.iter().any(|w| (w[0] - p[0]).abs() < 1e-9 && (w[1] - p[1]).abs() < 1e-9)
+        {
+            self.woken_points.push(p);
         }
         if matches!(self.tool, Tool::Dimension { .. }) {
             let r = self.tol_mm(4.0);
@@ -992,6 +1006,12 @@ impl DrawingEditor {
                 let pick = self.snap_at(c).or_else(|| near.and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
                 if pick.is_none() {
                     self.status = Some("Select a view to section".into());
+                }
+                // Help drawing_section_view: no angular sections on views with breaks.
+                let angular = self.section_dlg.as_ref().is_some_and(|d| d.mode == 2);
+                if angular && pick.as_ref().and_then(|pp| self.current_sheet().view(pp.view)).is_some_and(|v| !v.breaks.is_empty()) {
+                    self.status = Some("Angular section views can't be created from views with breaks".into());
+                    return;
                 }
                 if let Some(pp) = pick {
                     // Section view dialog › Vertical / Horizontal: one click places the whole line.
@@ -1932,8 +1952,14 @@ impl DrawingEditor {
                 match note {
                     Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => {
                         self.open_note_panel(Some(id), position, window, cx);
+                        // After the editor takes the focus (deferred in `textarea`).
                         if triple && let Some(Panel::Note { input, .. }) = &self.panel {
-                            input.update(cx, |s, cx| s.select_all(window, cx));
+                            let input = input.downgrade();
+                            window.defer(cx, move |window, cx| {
+                                if let Some(input) = input.upgrade() {
+                                    input.update(cx, |s, cx| s.select_all(window, cx));
+                                }
+                            });
                         }
                     }
                     Some(Annotation { kind: AnnotationKind::Weld { .. }, .. }) => self.open_weld_edit(id, window, cx),
@@ -2013,7 +2039,7 @@ impl DrawingEditor {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::Annotation(id)) => {
                 // Linear dimensions: Onshape's own menu.
-                if let Some(entries) = self.dimension_entries(id) {
+                if let Some(entries) = self.dimension_entries(id).or_else(|| self.ordinate_entries(id)) {
                     return entries;
                 }
                 // Centermarks (live drawing/487): Paste as table, Align

@@ -12,6 +12,8 @@ pub struct ViewId(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SheetSize {
     A4,
+    /// ISO / JIS A4 portrait (210 x 297 mm; Onshape's ISO_A4_Portrait template).
+    A4Portrait,
     A3,
     A2,
     A1,
@@ -31,6 +33,7 @@ impl SheetSize {
     pub fn size_mm(self) -> (f64, f64) {
         match self {
             SheetSize::A4 => (297.0, 210.0),
+            SheetSize::A4Portrait => (210.0, 297.0),
             SheetSize::A3 => (420.0, 297.0),
             SheetSize::A2 => (594.0, 420.0),
             SheetSize::A1 => (841.0, 594.0),
@@ -46,12 +49,32 @@ impl SheetSize {
     }
 
     /// Standard sheet sizes (ISO A4..A0, then ANSI A..E).
-    pub const STANDARD: [SheetSize; 11] = [SheetSize::A4, SheetSize::A3, SheetSize::A2, SheetSize::A1, SheetSize::A0, SheetSize::AnsiA, SheetSize::AnsiAPortrait, SheetSize::AnsiB, SheetSize::AnsiC, SheetSize::AnsiD, SheetSize::AnsiE];
+    pub const STANDARD: [SheetSize; 12] = [SheetSize::A4, SheetSize::A4Portrait, SheetSize::A3, SheetSize::A2, SheetSize::A1, SheetSize::A0, SheetSize::AnsiA, SheetSize::AnsiAPortrait, SheetSize::AnsiB, SheetSize::AnsiC, SheetSize::AnsiD, SheetSize::AnsiE];
+
+    /// The name in Onshape's size lists ("A Portrait", "A4 Portrait", else
+    /// the designation).
+    pub fn list_name(self) -> &'static str {
+        match self {
+            SheetSize::AnsiAPortrait => "A Portrait",
+            SheetSize::A4Portrait => "A4 Portrait",
+            s => s.label(),
+        }
+    }
+
+    /// Onshape's size list of a standard (live drawing/800–825: ANSI A, A
+    /// Portrait, B, C, D; ISO and JIS A4, A4 Portrait, A3, A2, A1, A0).
+    pub fn standard_list(ansi: bool) -> &'static [SheetSize] {
+        if ansi {
+            &[SheetSize::AnsiA, SheetSize::AnsiAPortrait, SheetSize::AnsiB, SheetSize::AnsiC, SheetSize::AnsiD]
+        } else {
+            &[SheetSize::A4, SheetSize::A4Portrait, SheetSize::A3, SheetSize::A2, SheetSize::A1, SheetSize::A0]
+        }
+    }
 
     /// Size designation for title blocks ("A3", "B", "Custom").
     pub fn label(self) -> &'static str {
         match self {
-            SheetSize::A4 => "A4",
+            SheetSize::A4 | SheetSize::A4Portrait => "A4",
             SheetSize::A3 => "A3",
             SheetSize::A2 => "A2",
             SheetSize::A1 => "A1",
@@ -80,7 +103,7 @@ impl SheetSize {
             SheetSize::AnsiB => [4, 2],
             SheetSize::AnsiC => [4, 4],
             SheetSize::AnsiD | SheetSize::AnsiE => [8, 4],
-            SheetSize::A4 => [0, 0],
+            SheetSize::A4 | SheetSize::A4Portrait => [0, 0],
             SheetSize::A3 => [6, 4],
             SheetSize::A2 => [8, 6],
             SheetSize::A1 => [12, 8],
@@ -368,6 +391,12 @@ pub struct DrawingView {
     /// Show/hide edges: model edges left out of the view.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_edges: Vec<(BodyId, TopoName)>,
+    /// View properties › Show sketch appearances and Show annotations from
+    /// model (Insert view sets them; V49, V5).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sketch_appearances: bool,
+    #[serde(default = "yes", skip_serializing_if = "Clone::clone")]
+    pub model_annotations: bool,
     /// While the Show/hide edges dialog is open (not saved): hidden edges
     /// draw thick and grey and occluded edges grey, so both can be picked.
     #[serde(skip)]
@@ -498,6 +527,8 @@ impl Default for DrawingView {
             hide_threads: false,
             edge_styles: Vec::new(),
             hidden_edges: Vec::new(),
+            sketch_appearances: false,
+            model_annotations: true,
             deleted_centermarks: Vec::new(),
             editing_edges: false,
             pinned: None,
@@ -693,8 +724,12 @@ pub enum DatumTargetArea {
     /// Point target drawn as an X.
     #[default]
     Point,
+    /// "Point (dot)": a filled dot.
+    Dot,
     Circle { diameter: f64 },
     Rectangle { width: f64, height: f64 },
+    /// A custom shape (no origin; live drawing/509).
+    Custom,
 }
 
 /// Units of a dimension value.
@@ -1400,6 +1435,46 @@ pub struct Annotation {
     /// Hole callouts: the panel's options (None: the defaults).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hole: Option<Box<HoleCalloutOpts>>,
+    /// Datum targets: style, origin and its dimensions (None: the defaults).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<Box<DatumTargetOpts>>,
+}
+
+/// A datum target symbol's style (live drawing/510).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TargetStyle {
+    #[default]
+    Inside,
+    MoveableHorizontal,
+    MoveableRotational,
+}
+
+impl TargetStyle {
+    pub const ALL: [TargetStyle; 3] = [TargetStyle::Inside, TargetStyle::MoveableHorizontal, TargetStyle::MoveableRotational];
+    pub fn name(self) -> &'static str {
+        match self {
+            TargetStyle::Inside => "Inside",
+            TargetStyle::MoveableHorizontal => "Moveable horizontal inside",
+            TargetStyle::MoveableRotational => "Moveable rotational inside",
+        }
+    }
+}
+
+/// Datum target options (live drawing/507–518, help datum): the symbol
+/// style, the origin (view coordinates; the target's X / Y position
+/// dimensions measure from it), Length or Angle positioning, the flipped
+/// directions and "Hide dimension".
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DatumTargetOpts {
+    pub style: TargetStyle,
+    pub origin: Option<[f64; 2]>,
+    pub origin_ref: Option<PointRef>,
+    /// Angle positioning (origin at an arc center) instead of Length.
+    pub angular: bool,
+    pub flip_x: bool,
+    pub flip_y: bool,
+    pub hide_dims: bool,
 }
 
 /// Where dual values sit relative to the primary ones.
@@ -1551,7 +1626,7 @@ impl AnnStyle {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None }
     }
 }
 
@@ -1918,6 +1993,21 @@ impl Sheet {
 
     /// The points a section's cutting line passes through (Edit section):
     /// the stored ones, else the middle of the line's first segment.
+    /// Does `id` show an angular cutting line (an aligned section of it, or
+    /// a section whose line has a leg off the view's axes)? Such views take
+    /// no breaks (help drawing_section_view).
+    pub fn has_angular_cut(&self, id: ViewId) -> bool {
+        self.views.iter().any(|v| match &v.kind {
+            ViewKind::AlignedSection { parent, .. } => *parent == id,
+            ViewKind::Section { parent, line, .. } if *parent == id => line.windows(2).any(|w| {
+                let d = [w[1][0] - w[0][0], w[1][1] - w[0][1]];
+                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+                (d[0] / l).abs() > 1e-6 && (d[1] / l).abs() > 1e-6
+            }),
+            _ => false,
+        })
+    }
+
     pub fn section_cuts(&self, id: ViewId) -> Option<Vec<[f64; 2]>> {
         match &self.view(id)?.kind {
             ViewKind::Section { cuts, .. } if !cuts.is_empty() => Some(cuts.clone()),
@@ -2917,14 +3007,13 @@ impl Drawing {
         Some(i + 1)
     }
 
-    /// Sheets panel › Paste of a copied sheet: appended at the bottom (help
-    /// H:sheets), named like a duplicate when the name is taken. Returns
-    /// its index.
+    /// Sheets panel › Paste of a copied sheet: appended at the end, named
+    /// "<name> (1)", "(2)" … (live "Sheets panel with several sheets").
+    /// Returns its index.
     pub fn paste_sheet(&mut self, mut sheet: Sheet) -> usize {
+        // Live: "<name> (1)", then "(2)" for a second copy.
         let base = sheet.name.clone();
-        if self.sheets.iter().any(|s| s.name == base) {
-            sheet.name = (1..).map(|n| if n == 1 { format!("{base} copy") } else { format!("{base} copy {n}") }).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
-        }
+        sheet.name = (1..).map(|n| format!("{base} ({n})")).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
         self.sheets.push(sheet);
         self.sheets.len() - 1
     }

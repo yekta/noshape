@@ -46,6 +46,8 @@ impl PatternDialogKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RenameTarget {
     Explode(usize),
+    /// An explode step (view, step).
+    ExplodeStep(usize, usize),
 }
 
 /// Where a feature dialog's preview slider rests (as the Part Studio's: from
@@ -1491,6 +1493,13 @@ impl AssemblyView {
                     }
                 });
             }
+            RenameTarget::ExplodeStep(i, k) => {
+                self.edit(&format!("Rename : {name}"), cx, |a| {
+                    if let Some(st) = a.exploded_views.get_mut(i).and_then(|v| v.steps.get_mut(k)) {
+                        st.name = Some(name);
+                    }
+                });
+            }
         }
         cx.notify();
     }
@@ -1629,13 +1638,40 @@ impl AssemblyView {
                             }
                             cx.notify();
                         }))
+                        // Live 814: Collapse / Expand <view> | Rename | Show all
+                        // explode lines | Hide all explode lines | ⊗ Delete.
                         .os_context_menu({
                             let view = cx.entity();
                             move |m, _, _| {
-                                let (v1, v2, n) = (view.clone(), view.clone(), name.clone());
-                                m.list_no_icons()
-                                    .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_rename(RenameTarget::Explode(i), n.clone(), window, cx))))
-                                    .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.delete_exploded_view(i, cx))))
+                                let (v0, v1, v2, v3, v4, n) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), name.clone());
+                                let all_lines = move |v: Entity<AssemblyView>, on: bool| {
+                                    move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                                        v.update(cx, |this, cx| {
+                                            this.edit(if on { "Show all explode lines" } else { "Hide all explode lines" }, cx, |a| {
+                                                if let Some(v) = a.exploded_views.get_mut(i) {
+                                                    for st in &mut v.steps {
+                                                        st.lines = on;
+                                                    }
+                                                }
+                                            });
+                                            this.reapply_display(cx);
+                                        })
+                                    }
+                                };
+                                m.item(crate::os_menu::OsMenuItem::new(format!("{} {}", if open { "Collapse" } else { "Expand" }, n)).on_click(move |_, _, cx| {
+                                    v0.update(cx, |this, cx| {
+                                        if !this.ui.explode_open.remove(&i) {
+                                            this.ui.explode_open.insert(i);
+                                        }
+                                        cx.notify();
+                                    })
+                                }))
+                                .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_rename(RenameTarget::Explode(i), n.clone(), window, cx))))
+                                .separator()
+                                .item(crate::os_menu::OsMenuItem::new("Show all explode lines").on_click(all_lines(v3, true)))
+                                .item(crate::os_menu::OsMenuItem::new("Hide all explode lines").on_click(all_lines(v4, false)))
+                                .separator()
+                                .item(crate::os_menu::OsMenuItem::new("Delete").icon_name("remove-circle").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.delete_exploded_view(i, cx))))
                             }
                         }),
                 );
@@ -1660,42 +1696,64 @@ impl AssemblyView {
                         .into_any_element()
                 };
                 for (k, st) in v.steps.iter().enumerate() {
-                    if k == upto {
+                    if active && k == upto {
                         tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                     }
                     let rotation = st.rotation_axis.is_some();
                     let step_sel = sel == Some((i, Some(k)));
-                    let label: SharedString = format!("{} {}", if rotation { "Rotation" } else { "Translation" }, k + 1).into();
+                    let label: SharedString = st.display_name(k).into();
+                    let rolled_back = active && k >= upto;
                     let accent = pal.accent;
+                    let ids = st.instances.clone();
+                    let step_name = label.to_string();
+                    let step_el: AnyElement = match self.rename_input(RenameTarget::ExplodeStep(i, k), cx) {
+                        Some(inp) => inp,
+                        // Live 821: rolled-back steps are italic grey.
+                        None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).when(rolled_back, |d| d.italic().text_color(pal.text_faint)).child(label.clone()).into_any_element(),
+                    };
                     tree = tree.child(
                         h_flex()
                             .id(SharedString::from(format!("ex-step-{i}-{k}")))
                             .h(px(26.))
                             .pl(px(5. + 20. + 15.))
-                            .when(k >= upto, |d| d.opacity(0.5))
                             .when(step_sel, |d| d.bg(pal.accent_soft))
                             .when(!step_sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                            .tooltip(crate::ui::tooltip(label.clone()))
                             .child(div().w(px(23.)).flex_none().child(crate::assets::icon(if rotation { "explode-step-rotation" } else { "explode-step-translation" }, 17., cx)))
-                            .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).child(label.clone()))
+                            .child(step_el)
+                            // Live 812–813: a click selects the step (its
+                            // instances get the triad); a double click edits it.
                             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                                 this.ui.explode_sel = Some((i, Some(k)));
+                                this.selected = ids.clone();
                                 if ev.click_count() >= 2 {
-                                    // Explode mode up to this step, editing it.
                                     if this.explode != Some(i) {
                                         this.explode_edit = true;
                                         this.activate_explode(Some(i), cx);
                                     }
-                                    this.set_explode_progress((k + 1) as f64, cx);
-                                    this.open_step_edit(k, window, cx);
+                                    this.open_step_edit(k, false, window, cx);
                                 }
+                                this.refresh_scene(false, cx);
                                 cx.notify();
                             }))
+                            // Live 815: Edit… | Rename | ⊗ Delete.
                             .os_context_menu({
                                 let view = cx.entity();
                                 move |m, _, _| {
-                                    let v = view.clone();
-                                    m.list_no_icons().item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| {
-                                        v.update(cx, |this, cx| {
+                                    let (v1, v2, v3, n) = (view.clone(), view.clone(), view.clone(), step_name.clone());
+                                    m.item(crate::os_menu::OsMenuItem::new("Edit…").on_click(move |_, window, cx| {
+                                        v1.update(cx, |this, cx| {
+                                            if this.explode != Some(i) {
+                                                this.explode_edit = true;
+                                                this.activate_explode(Some(i), cx);
+                                            }
+                                            this.open_step_edit(k, false, window, cx);
+                                        })
+                                    }))
+                                    .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_rename(RenameTarget::ExplodeStep(i, k), n.clone(), window, cx))))
+                                    .separator()
+                                    .item(crate::os_menu::OsMenuItem::new("Delete").icon_name("remove-circle").on_click(move |_, _, cx| {
+                                        v3.update(cx, |this, cx| {
                                             if this.explode != Some(i) {
                                                 this.activate_explode(Some(i), cx);
                                             }
@@ -1718,13 +1776,15 @@ impl AssemblyView {
                             })),
                     );
                 }
-                if upto >= n {
+                // The rollback bar only in explode mode (live 816: after Done
+                // the view is plain).
+                if active && upto >= n {
                     tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                 }
             }
             pane = pane.child(tree);
-            // The how-to box: one view with at most one step (bundle `A()`).
-            if views.len() == 1 && views[0].steps.len() <= 1 {
+            // The how-to box: one view, gone after its first step (live 805).
+            if views.len() == 1 && views[0].steps.is_empty() {
                 pane = pane.child(
                     div().mx(px(18.)).mt(px(18.)).mb(px(14.)).p(px(15.)).rounded(px(4.)).border_1().border_color(rgb(0xa6d5ec)).bg(rgb(0xd9edf7)).text_size(px(13.33)).text_color(rgb(0x094174)).child(
                         v_flex()
@@ -1900,6 +1960,21 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Whether the Replace instance dialog's component picker is open.
+    pub(super) fn picking_replacement(&self) -> bool {
+        self.replace_panel.as_ref().is_some_and(|s| s.picking)
+    }
+
+    /// A picker item clicked: it becomes the replacement and the picker
+    /// closes (live 842). False when the picker isn't open (an insert).
+    pub(super) fn pick_replacement(&mut self, source: InstanceSource, name: String, cx: &mut Context<Self>) -> bool {
+        let Some(s) = self.replace_panel.as_mut().filter(|s| s.picking) else { return false };
+        s.replacement = Some((source, name));
+        s.picking = false;
+        cx.notify();
+        true
+    }
+
     /// ✓: replace every instance to replace (and, with Replace all
     /// instances, the others of the same source) with the replacement.
     fn accept_replace(&mut self, cx: &mut Context<Self>) {
@@ -2031,54 +2106,10 @@ impl AssemblyView {
         if !picking {
             return dialog.into_any_element();
         }
-        // The replacement components of this document (Part Studios whole,
-        // and their parts), beside the dialog.
-        let mut list = v_flex().id("rep-list").w(px(260.)).max_h(px(440.)).overflow_y_scroll().occlude().bg(pal.dialog_bg).border_1().border_color(pal.border).p(px(4.)).gap(px(1.));
-        for st in self.catalog.studios.clone() {
-            let (tab, sname) = (st.tab, st.name.clone());
-            list = list.child(
-                h_flex()
-                    .id(SharedString::from(format!("rep-ps-{tab}")))
-                    .h(px(26.))
-                    .px(px(4.))
-                    .gap(px(6.))
-                    .cursor_pointer()
-                    .text_size(px(13.33))
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::assets::icon("part-studio", 17., cx))
-                    .child(div().flex_1().truncate().child(sname.clone()))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(s) = &mut this.replace_panel {
-                            s.replacement = Some((InstanceSource::PartStudio { studio: tab, config: ConfigValues::default() }, sname.clone()));
-                            s.picking = false;
-                        }
-                        cx.notify();
-                    })),
-            );
-            for (body_id, pname, _, _) in st.parts {
-                list = list.child(
-                    h_flex()
-                        .id(SharedString::from(format!("rep-part-{tab}-{body_id}")))
-                        .h(px(26.))
-                        .pl(px(24.))
-                        .pr(px(4.))
-                        .gap(px(6.))
-                        .cursor_pointer()
-                        .text_size(px(13.33))
-                        .hover(|d| d.bg(pal.panel_hover))
-                        .child(crate::assets::icon("part", 17., cx))
-                        .child(div().flex_1().truncate().child(pname.clone()))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            if let Some(s) = &mut this.replace_panel {
-                                s.replacement = Some((InstanceSource::Part { studio: tab, body: body_id.clone(), config: ConfigValues::default() }, pname.clone()));
-                                s.picking = false;
-                            }
-                            cx.notify();
-                        })),
-                );
-            }
-        }
-        h_flex().items_start().gap(px(1.)).child(dialog).child(list).into_any_element()
+        // Live 840–841: the "Select replacement component" panel (the Insert
+        // dialog's tabs, list and filters) docked right of the dialog.
+        let picker = self.render_insert_panel(cx);
+        h_flex().items_start().gap(px(1.)).child(dialog).child(picker).into_any_element()
     }
 }
 
@@ -2572,86 +2603,302 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
-    pub(super) fn open_step_edit(&mut self, k: usize, window: &mut Window, cx: &mut Context<Self>) {
+    /// Open the "Explode step" dialog for step `k` of the view in explode
+    /// mode (`created`: just made by a drag, live 805; else Edit…, 813).
+    pub(super) fn open_step_edit(&mut self, k: usize, created: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(i) = self.explode else { return };
         let Some(step) = self.assembly(cx).and_then(|a| a.exploded_views.get(i).and_then(|v| v.steps.get(k).cloned())) else { return };
         let units = self.units(cx);
-        let fmt_len = |v: f64| noshape_units::format_quantity(Quantity::meters(v), &units);
-        let texts = [fmt_len(step.translation[0]), fmt_len(step.translation[1]), fmt_len(step.translation[2]), noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units)];
-        let inputs: [Entity<InputState>; 4] = std::array::from_fn(|j| {
-            let t = texts[j].clone();
-            cx.new(|cx| InputState::new(window, cx).default_value(t))
+        let rotation = step.rotation_axis.is_some();
+        let t = DVec3::from(step.translation);
+        let base_dir = match step.rotation_axis {
+            Some(a) => DVec3::from(a).normalize_or(DVec3::Z),
+            None => t.normalize_or(DVec3::Z),
+        };
+        let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units) } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
+        let value = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &InputEvent, _, cx| match ev {
+            InputEvent::Change => this.reapply_display(cx),
+            InputEvent::PressEnter { .. } => this.accept_step_edit(cx),
+            _ => {}
         });
-        self.step_edit = Some(StepEdit { view: i, step: k, instances: step.instances.clone(), inputs, rotation: step.rotation_axis.is_some() });
-        cx.notify();
+        self.selected = step.instances.clone();
+        self.step_edit = Some(StepEdit {
+            view: i,
+            step: k,
+            created,
+            rotation,
+            instances: step.instances.clone(),
+            specify: false,
+            direction: None,
+            value,
+            lines: step.lines,
+            line_refs: step.line_refs.clone(),
+            active: 0,
+            base_dir,
+            pivot: step.pivot,
+            _sub: sub,
+        });
+        self.update_capture(cx);
+        self.reapply_display(cx);
     }
 
-    fn accept_step_edit(&mut self, cx: &mut Context<Self>) {
-        let Some(s) = self.step_edit.take() else { return };
+    /// The step as the dialog defines it (None while a value doesn't parse).
+    pub(super) fn step_from_edit(&self, cx: &App) -> Option<ExplodeStep> {
+        let s = self.step_edit.as_ref()?;
+        let stored = self.assembly(cx).and_then(|a| a.exploded_views.get(s.view).and_then(|v| v.steps.get(s.step).cloned()))?;
         let units = self.units(cx);
-        let val = |st: &Entity<InputState>, dim: Dim| noshape_units::evaluate_as(st.read(cx).value().as_ref(), dim, &units, &EmptyScope).map(|q| q.value);
-        let (tx, ty, tz, ang) = (val(&s.inputs[0], Dim::LENGTH), val(&s.inputs[1], Dim::LENGTH), val(&s.inputs[2], Dim::LENGTH), val(&s.inputs[3], Dim::ANGLE));
-        let (Ok(tx), Ok(ty), Ok(tz), Ok(ang)) = (tx, ty, tz, ang) else {
-            self.message = Some((true, "Explode step: enter valid distances and angle.".into()));
-            self.step_edit = Some(s);
-            cx.notify();
-            return;
+        let dim = if s.rotation { Dim::ANGLE } else { Dim::LENGTH };
+        let v = noshape_units::evaluate_as(s.value.read(cx).value().as_ref(), dim, &units, &EmptyScope).ok()?.value;
+        // ☑ Specify direction / axis: the picked entity's Z (and, for a
+        // rotation, its origin as the pivot).
+        let picked = s.specify.then(|| s.direction.as_ref().and_then(|d| self.result.connector_world(d, &units))).flatten();
+        let dir = picked.map(|f| f.z()).unwrap_or(s.base_dir);
+        let mut step = if s.rotation {
+            let pivot = picked.map(|f| f.origin.into()).or(s.pivot).unwrap_or_default();
+            ExplodeStep::rotate(s.instances.clone(), dir.into(), v, pivot)
+        } else {
+            ExplodeStep::translate(s.instances.clone(), (dir * v).into())
         };
+        if !s.rotation || picked.is_none() {
+            step.pivot = if s.rotation { s.pivot } else { None };
+        }
+        step.name = stored.name;
+        step.lines = s.lines;
+        step.line_refs = s.line_refs.clone();
+        Some(step)
+    }
+
+    /// ✓: store the step (an empty Instances field keeps the dialog open).
+    pub(super) fn accept_step_edit(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = &self.step_edit else { return };
         if s.instances.is_empty() {
-            self.message = Some((false, "Explode step: select at least one instance.".into()));
-            self.step_edit = Some(s);
-            cx.notify();
             return;
         }
-        let (vi, k, ids, rotation) = (s.view, s.step, s.instances.clone(), s.rotation);
+        let Some(step) = self.step_from_edit(cx) else { return };
+        let (vi, k) = (s.view, s.step);
+        self.step_edit = None;
         self.edit("Edit : Explode step", cx, |a| {
-            if let Some(step) = a.exploded_views.get_mut(vi).and_then(|v| v.steps.get_mut(k)) {
-                step.instances = ids;
-                step.translation = [tx, ty, tz];
-                if rotation {
-                    step.rotation_angle = ang;
-                }
+            if let Some(slot) = a.exploded_views.get_mut(vi).and_then(|v| v.steps.get_mut(k)) {
+                *slot = step;
             }
         });
         self.explode_progress = None;
+        self.update_capture(cx);
         self.reapply_display(cx);
+    }
+
+    /// ✕ / Esc: a step just made by a drag is undone; an edit is dropped.
+    pub(super) fn cancel_step_edit(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = self.step_edit.take() else { return };
+        if s.created {
+            self.delete_explode_step(s.step, cx);
+        }
+        self.update_capture(cx);
+        self.reapply_display(cx);
+    }
+
+    /// A pick while the dialog is open: Instances toggles the instance; the
+    /// direction / axis and explode-line fields take the entity.
+    pub(super) fn step_edit_pick(&mut self, t: AsmPickTarget, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.step_edit else { return };
+        let entity = MateConnectorRef::on(t.path[0], t.path[1..].to_vec(), t.reference.clone());
+        match s.active {
+            0 => {
+                let top = t.path[0];
+                match s.instances.iter().position(|x| *x == top) {
+                    Some(i) => {
+                        s.instances.remove(i);
+                    }
+                    None => s.instances.push(top),
+                }
+                self.selected = s.instances.clone();
+            }
+            1 => {
+                s.direction = Some(entity);
+                s.active = 0;
+            }
+            _ => {
+                if !s.line_refs.contains(&entity) {
+                    s.line_refs.push(entity);
+                }
+            }
+        }
+        self.reapply_display(cx);
+    }
+
+    /// The 220 px "Explode step" dialog (live 805 / 810 / 813,
+    /// dom/explode-step-dialog-edit.html).
+    /// Click on a step dialog field: it becomes the one picks go to.
+    fn step_edit_activate(k: u8, cx: &mut Context<Self>) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
+        cx.listener(move |this: &mut Self, _: &ClickEvent, _, cx| {
+            if let Some(s) = &mut this.step_edit {
+                s.active = k;
+            }
+            cx.notify();
+        })
     }
 
     pub(super) fn render_step_edit(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.step_edit else { return div().into_any_element() };
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let who = if s.instances.is_empty() { "None".to_string() } else { s.instances.iter().filter_map(|i| names.get(i).cloned()).collect::<Vec<_>>().join(", ") };
+        let title = if s.created { "Explode step".to_string() } else { self.explode_view(cx).and_then(|v| v.steps.get(s.step).map(|st| st.display_name(s.step))).unwrap_or_default() };
+        let (rotation, specify, lines, active) = (s.rotation, s.specify, s.lines, s.active);
+        let invalid = s.instances.is_empty();
+        let red = gpui_kit::rgb(0xbd3039);
+        let entity_name = |r: &MateConnectorRef| {
+            let inst = names.get(&r.instance).cloned().unwrap_or_default();
+            let kind = match r.reference {
+                noshape_model::reference::Reference::Edge(_) => "Edge",
+                noshape_model::reference::Reference::Vertex(_) => "Vertex",
+                _ => "Face",
+            };
+            format!("{kind} of {inst}")
+        };
+        let remove_row = |id: SharedString, label: String, act: std::rc::Rc<dyn Fn(&mut StepEdit)>, cx: &mut Context<Self>| {
+            crate::os_ui::query_row(id.clone(), label.clone())
+                .child(
+                    div()
+                        .id(SharedString::from(format!("{id}-x")))
+                        .px(px(5.))
+                        .text_size(px(16.67))
+                        .text_color(rgb(0x666666))
+                        .cursor_pointer()
+                        .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                        .child("×")
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            if let Some(s) = &mut this.step_edit {
+                                act(s);
+                                this.selected = s.instances.clone();
+                            }
+                            this.reapply_display(cx);
+                        })),
+                )
+                .into_any_element()
+        };
+        let inst_rows: Vec<AnyElement> = s
+            .instances
+            .clone()
+            .into_iter()
+            .map(|id| remove_row(SharedString::from(format!("se-i-{}", id.0)), names.get(&id).cloned().unwrap_or_default(), std::rc::Rc::new(move |s: &mut StepEdit| s.instances.retain(|x| *x != id)), cx))
+            .collect();
+        let dir_rows: Vec<AnyElement> = s.direction.clone().into_iter().map(|d| remove_row("se-dir".into(), entity_name(&d), std::rc::Rc::new(|s: &mut StepEdit| s.direction = None), cx)).collect();
+        let line_rows: Vec<AnyElement> = s
+            .line_refs
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(k, r)| remove_row(SharedString::from(format!("se-l-{k}")), entity_name(&r), std::rc::Rc::new(move |s: &mut StepEdit| {
+                if k < s.line_refs.len() {
+                    s.line_refs.remove(k);
+                }
+            }), cx))
+            .collect();
+        let value = s.value.clone();
+        let view = cx.entity();
+        let kind_select = div()
+            .id("se-kind")
+            .w(px(194.))
+            .h(px(26.))
+            .px(px(6.))
+            .flex()
+            .items_center()
+            .border_b_1()
+            .border_color(pal.border)
+            .cursor_pointer()
+            .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).child(if rotation { "Rotation" } else { "Translation" })).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))))
+            .os_dropdown_menu("se-kind-dd", true, move |mut menu, _, _| {
+                for (label, rot) in [("Translation", false), ("Rotation", true)] {
+                    let v = view.clone();
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, window, cx| {
+                        v.update(cx, |this, cx| {
+                            let zero = if rot { "0 deg" } else { "0 mm" };
+                            if let Some(s) = &mut this.step_edit
+                                && s.rotation != rot
+                            {
+                                s.rotation = rot;
+                                s.value.update(cx, |st, cx| st.set_value(zero, window, cx));
+                            }
+                            this.reapply_display(cx);
+                        })
+                    }));
+                }
+                menu
+            });
         let mut body = v_flex()
-            .p_3()
-            .gap_2()
-            .child(section("INSTANCES"))
-            .child(
-                h_flex().gap_2().child(div().flex_1().text_sm().truncate().child(who)).child(Button::new("se-usesel").label("Use selection").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    let sel = this.selected.clone();
-                    if let Some(s) = &mut this.step_edit
-                        && !sel.is_empty()
-                    {
-                        s.instances = sel;
-                    }
-                    cx.notify();
-                }))),
-            )
-            .child(section("TRANSLATION"))
-            .child(field_row("X", Input::new(&s.inputs[0]).xsmall()))
-            .child(field_row("Y", Input::new(&s.inputs[1]).xsmall()))
-            .child(field_row("Z", Input::new(&s.inputs[2]).xsmall()));
-        if s.rotation {
-            body = body.child(section("ROTATION")).child(field_row("Angle", Input::new(&s.inputs[3]).xsmall()));
+            .child(div().py(px(1.5)).child(kind_select))
+            .child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-instances", "Instances", active == 0, inst_rows).on_click(Self::step_edit_activate(0, cx))))
+            .child(crate::os_ui::checkbox("se-specify", if rotation { "Specify axis" } else { "Specify direction" }, specify).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(s) = &mut this.step_edit {
+                    s.specify = !s.specify;
+                    s.active = if s.specify { 1 } else { 0 };
+                }
+                this.reapply_display(cx);
+            })));
+        if specify {
+            body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-direction", if rotation { "Axis" } else { "Direction" }, active == 1, dir_rows).on_click(Self::step_edit_activate(1, cx))));
         }
-        body = body.child(h_flex().justify_end().gap_2().child(Button::new("se-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_step_edit(cx)))));
-        let title = format!("Explode step {}", s.step + 1);
-        let _ = pal;
-        Self::panel_frame(&title, body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.step_edit = None;
-            cx.notify();
-        }), "se-close")
-        .into_any_element()
+        body = body
+            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(Input::new(&value).appearance(false).text_size(px(13.33)).text_right().h(px(25.))))))
+            .child(crate::os_ui::checkbox("se-lines", "Explode lines", lines).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(s) = &mut this.step_edit {
+                    s.lines = !s.lines;
+                    if !s.lines && s.active == 2 {
+                        s.active = 0;
+                    }
+                }
+                this.reapply_display(cx);
+            })));
+        if lines {
+            body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-line-refs", "Edges, vertices, or faces", active == 2, line_rows).on_click(Self::step_edit_activate(2, cx))));
+        }
+        v_flex()
+            .id("se-dialog")
+            .occlude()
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .pl(px(6.))
+                    .bg(rgb(0xffffff))
+                    .border_b_1()
+                    .border_color(rgb(0xd7d7d7))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red.into() } else { pal.text }).child(title))
+                    .child(
+                        div()
+                            .id("se-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(pal.accept)
+                            .cursor_pointer()
+                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_step_edit(cx))),
+                    )
+                    .child(
+                        div()
+                            .id("se-cancel")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_step_edit(cx))),
+                    ),
+            )
+            .child(body.pb(px(2.)))
+            .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))
+            .into_any_element()
     }
 
     // ------------------------------------------------------------ replace with geometric matching
@@ -2855,7 +3102,14 @@ impl AssemblyView {
     pub(super) fn insert_search_box(&self, cx: &App) -> Option<AnyElement> {
         let st = self.ui.insert_search.as_ref()?;
         let empty = st.read(cx).value().is_empty();
-        let ph = if self.ui.insert_tab == 0 { "Search Part Studios" } else { "Search Assemblies" };
+        // Live 841: the replacement picker's box reads "Search entities or features".
+        let ph = if self.picking_replacement() {
+            "Search entities or features"
+        } else if self.ui.insert_tab == 0 {
+            "Search Part Studios"
+        } else {
+            "Search Assemblies"
+        };
         Some(
             div()
                 .pt(px(6.))
@@ -3328,6 +3582,9 @@ impl AssemblyView {
 
     /// Insert the parts (or the whole Part Studio, rigid) of an external Part Studio.
     fn insert_external(&mut self, key: String, only: Option<BodyId>, studio_name: String, cx: &mut Context<Self>) {
+        if self.pick_replacement(InstanceSource::External { key: key.clone(), body: only.clone(), config: ConfigValues::default() }, studio_name.clone(), cx) {
+            return;
+        }
         let evaluator = self.evaluator.clone();
         let rigid = self.insert_rigid && only.is_none();
         let k2 = key.clone();
@@ -3371,6 +3628,9 @@ impl AssemblyView {
     /// as one subassembly instance, pinned to the chosen version (it lists
     /// in the Reference manager like the other document's parts).
     fn insert_external_assembly(&mut self, key: String, name: String, cx: &mut Context<Self>) {
+        if self.pick_replacement(InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, name.clone(), cx) {
+            return;
+        }
         let id = self.edit(&format!("Insert : {name} (other document)"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);

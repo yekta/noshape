@@ -58,6 +58,7 @@ mod drawing_section_edit;
 mod drawing_replicate;
 mod drawing_toolbar;
 mod drawing_palette;
+mod drawing_datum;
 mod drawing_table_tool;
 mod drawing_weld;
 mod file_tab_view;

@@ -61,3 +61,10 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
   so a fresh agent can continue if you run out of quota. Keep the parity checklist for your area current.
 - **Final message:** say what you finished, what's left, and anything the lead must do (cross-area changes,
   Cargo.lock changes, files that are half done).
+
+## C++ must build on GCC 13
+The release runners use Ubuntu 24.04 (GCC 13); this machine has GCC 15, which accepts things GCC 13 rejects
+(v0.4.1's release build failed on an implicit `handle<Derived>` -> `handle<Base>` return). Spell such
+conversions out (`occ::handle<Base>(x)`). Before you finish C++ kernel changes, syntax-check them with
+`g++-13 -std=c++17 -fsyntax-only -w -Icpp -I/root/occt/include/opencascade -I<out>/cxxbridge/include -I<out>/cxxbridge/crate <file>`
+(`<out>` = your target dir's `debug/build/noshape-kernel-*/out`).

@@ -163,6 +163,7 @@ struct XtPart
   std::string           name;
   std::array<double, 3> colour{0, 0, 0};
   bool                  has_colour = false;
+  double                opacity    = 1; // 1 - the file's transparency
   // Colours of single faces: (index in TopExp::MapShapes order, sRGB).
   std::vector<std::pair<int, std::array<double, 3>>> face_colours;
 };

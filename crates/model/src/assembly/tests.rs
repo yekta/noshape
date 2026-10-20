@@ -1036,7 +1036,7 @@ fn face_of_kind(r: &crate::regen::RegenResult, pred: impl Fn(&noshape_kernel::Su
 fn explode_lines_and_step_reorder() {
     let f = doc_with(vec![block_studio()]);
     let mut ev = AssemblyEvaluator::new();
-    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (body, regen) = body_of(&mut ev, &f.doc, f.studios[0]);
     let asm = Assembly {
         instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.01), false)],
         ..Default::default()
@@ -1054,6 +1054,16 @@ fn explode_lines_and_step_reorder() {
     r2.apply_placements_progress(res.solved.clone(), Some((&view, 0.5)));
     assert_eq!(r2.explode_trails.len(), 1);
     assert!((r2.explode_trails[0].1.z - (c0.z + 0.025)).abs() < 1e-9);
+    // ☐ Explode lines: none for that step; lines from a picked face start
+    // at the face (its centroid), not the instance's center.
+    let mut no_lines = view.clone();
+    no_lines.steps[1].lines = false;
+    assert_eq!(eval::explode_trails(&res, &no_lines, f64::INFINITY).len(), 1);
+    let mut from_face = view.clone();
+    from_face.steps[0].line_refs = vec![conn(2, face_with(&regen, "CapEnd"), Inference::Centroid)];
+    let l = eval::explode_trails(&res, &from_face, f64::INFINITY);
+    assert!((l[0].0.z - 0.02).abs() < 1e-9 && (l[0].1.z - 0.07).abs() < 1e-9, "from the top face: {l:?}");
+    assert_eq!(view.steps[0].display_name(0), "Explode step 1");
     // Reordering steps.
     assert!(view.move_step(1, 0));
     assert_eq!(view.steps[0].translation, [0.03, 0.0, 0.0]);

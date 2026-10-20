@@ -90,6 +90,9 @@ pub struct Viewport {
     target_id: u64,
     pub camera: Camera,
     scene: Arc<Scene>,
+    /// `scene.bounds()`, computed once per scene: it walks every vertex, and
+    /// `project` (called per point by the in-plane labels every frame) needs it.
+    scene_bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub style: Style,
     image: Option<Arc<RenderImage>>,
     /// Newest pick-buffer rectangle read back (around the cursor or a box),
@@ -293,6 +296,7 @@ impl Viewport {
             target_id,
             camera: Camera::default(),
             scene: Arc::new(Scene::default()),
+            scene_bounds: None,
             style: Style::default(),
             image: None,
             pick_cache: None,
@@ -368,6 +372,7 @@ impl Viewport {
             // Nothing visible changed (e.g. a refresh with the same highlights).
             return;
         }
+        self.scene_bounds = scene.bounds();
         self.scene = scene;
         if geometry_changed {
             self.pick_dirty = true;
@@ -405,8 +410,7 @@ impl Viewport {
     }
 
     fn scene_radius(&self) -> f64 {
-        self.scene
-            .bounds()
+        self.scene_bounds
             .map(|(lo, hi)| (hi - lo).length() as f64 * 0.5 + ((lo + hi) * 0.5).as_dvec3().distance(self.camera.target))
             .unwrap_or(1.0)
     }
@@ -488,7 +492,7 @@ impl Viewport {
     pub fn animate_to_rotation_fit(&mut self, rotation: glam::DQuat, cx: &mut Context<Self>) {
         let mut to = self.camera;
         to.rotation = rotation;
-        if let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene.bounds().map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) {
+        if let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) {
             fit_camera_to_box(&mut to, lo, hi, self.size(), self.fit_inset_left);
         }
         self.animate_to(to, cx);
@@ -519,7 +523,7 @@ impl Viewport {
     /// Onshape: parts fill the view, default planes only count when there is
     /// nothing else, and an overlay at the left is kept clear.
     pub fn zoom_to_fit(&mut self, animate: bool, cx: &mut Context<Self>) {
-        let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene.bounds().map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) else { return };
+        let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) else { return };
         let size = self.size();
         let mut to = self.camera;
         fit_camera_to_box(&mut to, lo, hi, size, self.fit_inset_left);
@@ -858,7 +862,7 @@ impl Viewport {
 
     /// The bounds Onshape's zoom limits are measured on (the scene).
     fn zoom_bounds(&self) -> Option<(DVec3, DVec3)> {
-        self.scene.bounds().map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())).or(self.fit_bounds)
+        self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())).or(self.fit_bounds)
     }
 
     /// Rotate / pan centre for a drag starting at `at` (Onshape's

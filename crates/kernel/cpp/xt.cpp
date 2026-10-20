@@ -1642,6 +1642,7 @@ StepImport import_of(const std::vector<XtPart>& parts)
     for (double c : p.colour)
       out.colors.push_back((float)c);
     out.has_color.push_back(p.has_colour);
+    out.opacity.push_back((float)p.opacity);
     for (const auto& [face, c] : p.face_colours)
     {
       out.face_part.push_back((uint32_t)(out.names.size() - 1));

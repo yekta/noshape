@@ -512,6 +512,27 @@ pub struct ExplodeStep {
     /// of the step's instances.
     #[serde(default)]
     pub pivot: Option<[f64; 3]>,
+    /// Renamed (None: "Explode step N" by position; live assembly/805).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// ☑ Explode lines (the dashed trails; on by default).
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub lines: bool,
+    /// "Edges, vertices, or faces" the explode lines start from (empty: the
+    /// instances' centers).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub line_refs: Vec<MateConnectorRef>,
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
+}
+
+impl ExplodeStep {
+    /// The step's name in the Exploded views tree (index from 0).
+    pub fn display_name(&self, index: usize) -> String {
+        self.name.clone().unwrap_or_else(|| format!("Explode step {}", index + 1))
+    }
 }
 
 impl ExplodedView {
@@ -528,10 +549,10 @@ impl ExplodedView {
 
 impl ExplodeStep {
     pub fn translate(instances: Vec<InstanceId>, t: [f64; 3]) -> Self {
-        Self { instances, translation: t, rotation_axis: None, rotation_angle: 0.0, pivot: None }
+        Self { instances, translation: t, rotation_axis: None, rotation_angle: 0.0, pivot: None, name: None, lines: true, line_refs: Vec::new() }
     }
     pub fn rotate(instances: Vec<InstanceId>, axis: [f64; 3], angle: f64, pivot: [f64; 3]) -> Self {
-        Self { instances, translation: [0.0; 3], rotation_axis: Some(axis), rotation_angle: angle, pivot: Some(pivot) }
+        Self { instances, translation: [0.0; 3], rotation_axis: Some(axis), rotation_angle: angle, pivot: Some(pivot), name: None, lines: true, line_refs: Vec::new() }
     }
 }
 

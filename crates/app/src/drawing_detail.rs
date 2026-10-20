@@ -209,8 +209,9 @@ impl DrawingEditor {
             _ => self.current_sheet().scale,
         };
         let fmt = |s: f64| noshape_model::drawing::sheet::format_scale(s);
-        // Live: the scale stays blank until the detail is placed.
-        let placed = matches!(self.tool, Tool::Detail { radius: Some(_), .. });
+        // Live 127 / 132 / 604: the scale is blank until the profile exists
+        // (a circle, or a rectangle / spline / polygon profile).
+        let placed = matches!(self.tool, Tool::Detail { radius: Some(_), .. }) || d.profile.is_some();
         let current = scale.or(placed.then_some(parent_scale * 2.0));
         let shown = current.map(fmt).unwrap_or_default();
         let ed2 = ed.clone();

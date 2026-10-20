@@ -79,12 +79,30 @@ fn matches_of(tab: TabId) -> Vec<Range<usize>> {
     MATCHES.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(t, _)| *t == tab).map(|(_, r)| r.clone()).unwrap_or_default()
 }
 
+/// A place in the back / forward reference history. Live
+/// (dom/fs-nav-shortcuts.txt) the ▾ lists show "<tab>: <line>, <column>"
+/// for caret positions, "<tab>: Symbol - <name>" for jump targets and
+/// "<tab>: Use - <name>" for the ctrl+clicked use.
+#[derive(Clone)]
+struct NavEntry {
+    pos: Position,
+    label: String,
+}
+
+impl NavEntry {
+    fn caret(pos: Position) -> Self {
+        NavEntry { pos, label: format!("{}, {}", pos.line + 1, pos.character + 1) }
+    }
+}
+
 /// A top-level symbol in the Module outline: name, parameter list, 1-based line.
 #[derive(Clone)]
 struct Symbol {
     name: String,
     params: String,
     line: usize,
+    /// 0-based column of the name.
+    column: usize,
 }
 
 /// FeatureScript top-level symbols: `export const myFeature =
@@ -104,11 +122,15 @@ fn outline(src: &str) -> Vec<Symbol> {
             if let Some(rest) = t.strip_prefix("const ") {
                 let (name, value) = rest.split_once('=')?;
                 let inner = value.split_once("function").map(|(_, r)| r).unwrap_or("");
-                return Some(Symbol { name: name.trim().to_string(), params: params_of(inner), line: i + 1 });
+                let name = name.trim().to_string();
+                let column = column_of(l, &name);
+                return Some(Symbol { name, params: params_of(inner), line: i + 1, column });
             }
             let rest = t.strip_prefix("function ").or_else(|| t.strip_prefix("predicate "))?;
             let open = rest.find('(')?;
-            Some(Symbol { name: rest[..open].trim().to_string(), params: params_of(rest), line: i + 1 })
+            let name = rest[..open].trim().to_string();
+            let column = column_of(l, &name);
+            Some(Symbol { name, params: params_of(rest), line: i + 1, column })
         })
         .collect()
 }
@@ -283,6 +305,38 @@ fn format_source(src: &str) -> String {
     out
 }
 
+/// Character column of `name` (as a whole word) in `line`.
+fn column_of(line: &str, name: &str) -> usize {
+    let is_id = |c: char| c.is_alphanumeric() || c == '_';
+    let mut from = 0;
+    while let Some(i) = line[from..].find(name).map(|i| i + from) {
+        let before = line[..i].chars().next_back();
+        let after = line[i + name.len()..].chars().next();
+        if !before.is_some_and(is_id) && !after.is_some_and(is_id) {
+            return line[..i].chars().count();
+        }
+        from = i + name.len();
+    }
+    0
+}
+
+/// Where `name` is defined in a studio's text: a top-level or nested
+/// `function` / `predicate` / `const` / `enum` / `type` / `operator`
+/// declaration (the first one), at the name.
+fn definition_of(src: &str, name: &str) -> Option<Position> {
+    for (i, l) in src.lines().enumerate() {
+        let t = l.trim_start();
+        let t = t.strip_prefix("export ").unwrap_or(t);
+        let decl = ["function ", "predicate ", "const ", "enum ", "type "].iter().find_map(|k| t.strip_prefix(k));
+        let Some(rest) = decl else { continue };
+        let declared: String = rest.trim_start().chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if declared == name {
+            return Some(Position { line: i as u32, character: column_of(l, name) as u32 });
+        }
+    }
+    None
+}
+
 pub struct FeatureStudioView {
     tab: TabId,
     doc: Entity<DocModel>,
@@ -295,8 +349,8 @@ pub struct FeatureStudioView {
     compile_task: Option<Task<()>>,
     /// Module outline popover: its "Search symbols…" field.
     outline: Option<Entity<InputState>>,
-    /// Cursor positions visited by jumps (back / forward).
-    nav: Vec<Position>,
+    /// Places visited by jumps (back / forward), oldest first.
+    nav: Vec<NavEntry>,
     nav_at: usize,
     focus: FocusHandle,
     /// The toolbar's Import panel and the button's bounds (it hangs under it).
@@ -536,13 +590,61 @@ impl FeatureStudioView {
         if line == 0 {
             return;
         }
-        let here = self.editor.read(cx).cursor_position();
-        self.nav.truncate(self.nav_at);
-        self.nav.push(here);
         let to = Position { line: (line - 1) as u32, character: column.saturating_sub(1) as u32 };
+        let here = NavEntry::caret(self.editor.read(cx).cursor_position());
+        self.jump(here, NavEntry::caret(to), window, cx);
+    }
+
+    /// Jump from `from` to `to`, both added to the reference history.
+    fn jump(&mut self, from: NavEntry, to: NavEntry, window: &mut Window, cx: &mut Context<Self>) {
+        self.nav.truncate((self.nav_at + 1).min(self.nav.len()));
+        if self.nav.last().is_none_or(|l| l.pos != from.pos || l.label != from.label) {
+            self.nav.push(from);
+        }
+        let pos = to.pos;
         self.nav.push(to);
         self.nav_at = self.nav.len() - 1;
-        self.move_cursor(to, window, cx);
+        self.move_cursor(pos, window, cx);
+    }
+
+    /// Ctrl+click (cmd+click on macOS) on a symbol: to its definition in this
+    /// studio (live: the caret lands on the defined name).
+    fn goto_definition(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((name, _)) = self.symbol_at_cursor(cx) else { return };
+        let text = self.editor.read(cx).value().to_string();
+        let Some(to) = definition_of(&text, &name) else { return };
+        let here = self.editor.read(cx).cursor_position();
+        let from = NavEntry { pos: here, label: format!("Use - {name}") };
+        self.jump(from, NavEntry { pos: to, label: format!("Symbol - {name}") }, window, cx);
+    }
+
+    /// Back ▾ / Forward ▾: the history entries on that side, nearest first.
+    fn open_history(&mut self, back: bool, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let tab = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let items: Vec<(usize, String)> = if back {
+            (0..self.nav_at.min(self.nav.len())).rev().map(|i| (i, format!("{tab}: {}", self.nav[i].label))).collect()
+        } else {
+            (self.nav_at + 1..self.nav.len()).map(|i| (i, format!("{tab}: {}", self.nav[i].label))).collect()
+        };
+        if items.is_empty() {
+            return;
+        }
+        let view = cx.entity();
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+            m = m.dropdown();
+            for (i, label) in items.iter().cloned() {
+                let v = view.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| {
+                    v.update(cx, |this, cx| {
+                        this.nav_at = i;
+                        let pos = this.nav[i].pos;
+                        this.move_cursor(pos, w, cx);
+                    })
+                }));
+            }
+            m
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
     }
 
     fn move_cursor(&mut self, to: Position, window: &mut Window, cx: &mut Context<Self>) {
@@ -559,7 +661,7 @@ impl FeatureStudioView {
             return;
         }
         self.nav_at = at as usize;
-        self.move_cursor(self.nav[self.nav_at], window, cx);
+        self.move_cursor(self.nav[self.nav_at].pos, window, cx);
     }
 
     fn toggle_outline(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -761,6 +863,8 @@ impl FeatureStudioView {
             .enumerate()
             .map(|(i, s)| {
                 let line = s.line;
+                let label = format!("Symbol - {}({})", s.name, s.params);
+                let column = s.column;
                 h_flex()
                     .id(SharedString::from(format!("sym-{i}")))
                     .h(px(34.))
@@ -772,7 +876,9 @@ impl FeatureStudioView {
                     .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(format!("{}({})", s.name, s.params)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         this.outline = None;
-                        this.goto_line(line, 1, window, cx);
+                        let here = NavEntry::caret(this.editor.read(cx).cursor_position());
+                        let to = Position { line: (line - 1) as u32, character: column as u32 };
+                        this.jump(here, NavEntry { pos: to, label: label.clone() }, window, cx);
                     }))
                     .into_any_element()
             })
@@ -961,7 +1067,12 @@ impl Render for FeatureStudioView {
                     .opacity(if can_back { 1. } else { 0.4 })
                     .tooltip(crate::ui::tooltip("Back reference (ctrl+[/cmd+[)"))
                     .child(os::glyph(os::GLYPH_ARROW_LEFT, 20., pal.text_muted))
-                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted))
+                    .child(
+                        div().id("fs-back-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.open_history(true, e.position() + point(px(-24.), px(14.)), window, cx);
+                        })),
+                    )
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(-1, window, cx))),
             )
             .child(
@@ -969,7 +1080,12 @@ impl Render for FeatureStudioView {
                     .opacity(if can_fwd { 1. } else { 0.4 })
                     .tooltip(crate::ui::tooltip("Forward reference (ctrl+]/cmd+])"))
                     .child(os::glyph(os::GLYPH_ARROW_RIGHT, 20., pal.text_muted))
-                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted))
+                    .child(
+                        div().id("fs-forward-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            this.open_history(false, e.position() + point(px(-24.), px(14.)), window, cx);
+                        })),
+                    )
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
             )
             .child(div().flex_none().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)));
@@ -1016,6 +1132,11 @@ impl Render for FeatureStudioView {
                         }
                     }))
                     // After the editor placed the caret at the click.
+                    .on_mouse_down(MouseButton::Left, cx.listener(|_, e: &MouseDownEvent, window, cx| {
+                        if e.modifiers.secondary() && !e.modifiers.alt && !e.modifiers.shift {
+                            cx.defer_in(window, |this, window, cx| this.goto_definition(window, cx));
+                        }
+                    }))
                     .on_mouse_down(MouseButton::Right, cx.listener(|_, e: &MouseDownEvent, window, cx| {
                         let at = e.position;
                         cx.defer_in(window, move |this, window, cx| this.symbol_menu(at, window, cx));

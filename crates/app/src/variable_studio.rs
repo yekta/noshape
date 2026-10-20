@@ -37,6 +37,9 @@ pub struct VariableStudioView {
     inserted_views: HashMap<TabId, Entity<VariableStudioView>>,
     /// The last "Collapse all tables" seen ([collapse_generation]).
     collapse_seen: u64,
+    /// Enter added a variable from the Name row: focus the next (empty)
+    /// Name row once it's rebuilt, as Onshape does.
+    focus_add_row: bool,
 }
 
 thread_local! {
@@ -78,6 +81,7 @@ impl VariableStudioView {
             footer_bounds: Default::default(),
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
+            focus_add_row: false,
         }
     }
 
@@ -142,6 +146,9 @@ impl VariableStudioView {
                 // follows added the variable twice ("cd", "cd").
                 if add_row && !v.trim().is_empty() {
                     st.update(cx, |s, cx| s.set_value("", window, cx));
+                    if matches!(ev, InputEvent::PressEnter { .. }) {
+                        this.focus_add_row = true;
+                    }
                 }
                 commit(this, v, cx);
             }
@@ -584,6 +591,9 @@ impl Render for VariableStudioView {
             this.inputs.remove("new");
             this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), import: None }));
         });
+        if std::mem::take(&mut self.focus_add_row) {
+            new_name.update(cx, |s, cx| s.focus(window, cx));
+        }
         let collapsed = self.collapsed;
         let more_view = view.clone();
         let host_menu = host_refs.map(|(target, list)| {

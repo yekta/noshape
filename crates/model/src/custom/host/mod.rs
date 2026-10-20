@@ -16,6 +16,7 @@ mod builtin;
 pub(crate) mod convert;
 mod evaluate;
 pub mod hole;
+mod sheetmetal;
 mod offsets;
 mod packed;
 mod ops;
@@ -111,6 +112,9 @@ pub struct CtxState {
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
     pub sketch_names: sketch::SketchNames,
+    /// Bodies hidden from the Part Studio (std sheet metal definition
+    /// sheets): skipped by `qEverything` & co., found by attribute queries.
+    pub hidden: HashSet<BodyId>,
     /// Holes built by each `opHole` (`qOpHoleFace` / `qOpHoleProfile`).
     pub holes: HashMap<FsId, Vec<hole::HoleRecord>>,
 }
@@ -140,7 +144,12 @@ impl Builtin for FsContext {
 }
 
 impl FsContext {
-    pub fn new(ctx: Context, feature: FeatureId, feature_name: String, units: UnitPrefs, outer_vars: BTreeMap<String, Quantity>, xform: Option<DMat4>) -> Arc<Self> {
+    pub fn new(mut ctx: Context, feature: FeatureId, feature_name: String, units: UnitPrefs, outer_vars: BTreeMap<String, Quantity>, xform: Option<DMat4>) -> Arc<Self> {
+        // Hidden bodies and attributes of earlier features come back.
+        let hidden_bodies = std::mem::take(&mut ctx.fs_hidden_bodies);
+        let hidden: HashSet<BodyId> = hidden_bodies.iter().map(|b| b.id.clone()).collect();
+        ctx.bodies.extend(hidden_bodies);
+        let attributes = std::mem::take(&mut ctx.fs_attributes);
         Arc::new(FsContext {
             serial: next_serial(),
             state: Mutex::new(CtxState {
@@ -160,13 +169,26 @@ impl FsContext {
                 status: HashMap::new(),
                 started: Vec::new(),
                 variables: BTreeMap::new(),
-                attributes: Vec::new(),
+                attributes,
                 debug_entities: Vec::new(),
                 sketches: HashMap::new(),
                 sketch_names: HashMap::new(),
+                hidden,
                 holes: HashMap::new(),
             }),
         })
+    }
+
+    /// The regeneration context after the feature: hidden bodies and
+    /// attributes move to their side stores for the next feature.
+    pub fn take_context(&self) -> Context {
+        let mut st = self.state.lock();
+        let mut ctx = std::mem::take(&mut st.ctx);
+        let (hidden, shown): (Vec<_>, Vec<_>) = std::mem::take(&mut ctx.bodies).into_iter().partition(|b| st.hidden.contains(&b.id));
+        ctx.bodies = shown;
+        ctx.fs_hidden_bodies = hidden;
+        ctx.fs_attributes = st.attributes.clone();
+        ctx
     }
 
     /// The context as a FeatureScript value (tagged `Context`).
@@ -375,6 +397,7 @@ pub fn register() {
         all.extend_from_slice(query::NATIVES);
         all.extend_from_slice(evaluate::NATIVES);
         all.extend_from_slice(hole::NATIVES);
+        all.extend_from_slice(sheetmetal::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);
         all.extend_from_slice(ops::NATIVES);

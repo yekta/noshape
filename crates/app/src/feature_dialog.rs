@@ -46,7 +46,8 @@ pub enum DialogEvent {
     LeaveFocus { forward: bool },
     /// The "Create variable" popup's ✓ (live part-studio/153): a Variable
     /// feature (or, `configuration`, a configuration variable) named `name`.
-    CreateVariable { name: String, kind: &'static str, value: String, description: String, configuration: bool },
+    /// `range`: a configuration variable's (minimum, maximum).
+    CreateVariable { name: String, kind: &'static str, value: String, description: String, configuration: bool, range: Option<(String, String)> },
 }
 
 /// The "Create variable" popup of a numeric field (live
@@ -54,14 +55,56 @@ pub enum DialogEvent {
 struct CreateVar {
     path: String,
     configuration: bool,
-    /// LENGTH, ANGLE, NUMBER, ANY.
+    /// Feature tab: LENGTH, ANGLE, NUMBER, ANY.
     kind: usize,
+    /// Configuration tab: LENGTH, ANGLE, INTEGER, REAL, TEXT.
+    config_kind: usize,
     name: Entity<InputState>,
+    /// Value (Feature) / Default (Configuration).
     value: Entity<InputState>,
     description: Entity<InputState>,
+    min: Entity<InputState>,
+    max: Entity<InputState>,
 }
 
 const CREATE_VAR_KINDS: [(&str, &str); 4] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any")];
+const CREATE_CONFIG_KINDS: [(&str, &str); 5] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("INTEGER", "Integer"), ("REAL", "Real"), ("TEXT", "Text")];
+
+impl CreateVar {
+    /// The name's error (bundle: `^[a-zA-Z_][a-zA-Z_0-9]*$`, no empty name).
+    fn name_error(&self, cx: &App) -> Option<&'static str> {
+        let n = self.name.read(cx).value().to_string();
+        let n = n.trim().trim_start_matches('#');
+        (!noshape_model::variable_table::is_identifier(n)).then_some("Variable name must be a letter followed by a string of letters or numbers.")
+    }
+
+    /// A configuration variable's range error and the fields it marks
+    /// (default, minimum, maximum) (bundle `validateRange`).
+    fn range_error(&self, units: &noshape_units::UnitPrefs, cx: &App) -> Option<(&'static str, [bool; 3])> {
+        if !self.configuration || CREATE_CONFIG_KINDS[self.config_kind].0 == "TEXT" {
+            return None;
+        }
+        let dim = match CREATE_CONFIG_KINDS[self.config_kind].0 {
+            "LENGTH" => noshape_units::Dim::LENGTH,
+            "ANGLE" => noshape_units::Dim::ANGLE,
+            _ => noshape_units::Dim::UNITLESS,
+        };
+        let unit_of = |st: &Entity<InputState>| st.read(cx).value().split_whitespace().nth(1).map(str::to_string);
+        let val = |st: &Entity<InputState>| noshape_units::evaluate_as(&st.read(cx).value(), dim, units, &noshape_units::EmptyScope).ok().map(|q| q.value);
+        let (Some(d), Some(lo), Some(hi)) = (val(&self.value), val(&self.min), val(&self.max)) else { return None };
+        if unit_of(&self.value) != unit_of(&self.min) || unit_of(&self.min) != unit_of(&self.max) {
+            Some(("The default value, minimum, and maximum must all be in the same units.", [true, true, true]))
+        } else if lo > d {
+            Some(("The default value must be greater or equal to the minimum.", [true, true, false]))
+        } else if hi < d {
+            Some(("The default value must be less than or equal to the maximum.", [true, false, true]))
+        } else if lo >= hi {
+            Some(("The minimum must be less than the maximum.", [false, true, true]))
+        } else {
+            None
+        }
+    }
+}
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
 
@@ -933,18 +976,34 @@ impl FeatureDialog {
         }))
     }
 
-    /// The "Create variable" popup for field `path`: Name `name`, Value the
-    /// default length selected (live 153: "1 in"), Feature / Length tabs.
+    /// The "Create variable" popup for field `path` (live 10-20 o, 577–579;
+    /// bundle CreateVariable): Name `name`; Value / Default = the field's
+    /// previous value, selected; the type tab matching the field;
+    /// Configuration adds Minimum 0 and Maximum 100000 in the workspace
+    /// unit.
     fn open_create_variable(&mut self, path: String, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let value_text = noshape_model::params::default_expr(&noshape_model::params::NumSpec::length(25.0, 1.0), &self.units).text;
+        use noshape_model::params::NumKind;
+        let kind = self.spec_for_path(&path).and_then(|s| if let ParamKind::Num(n) = &s.kind { Some(n.kind) } else { None });
+        let (k, ck, unit) = match kind {
+            Some(NumKind::Angle) => (1, 1, Some(self.units.angle.symbol())),
+            Some(NumKind::Integer) => (2, 2, None),
+            Some(NumKind::Real) => (2, 3, None),
+            _ => (0, 0, Some(self.units.length.symbol())),
+        };
+        let fallback = noshape_model::params::default_expr(&noshape_model::params::NumSpec::length(25.0, 1.0), &self.units).text;
+        let value_text = self.baselines.get(&path).filter(|b| !b.trim().starts_with('#')).cloned().unwrap_or(fallback);
+        let bound = |n: &str| unit.map(|u| format!("{n} {u}")).unwrap_or_else(|| n.to_string());
+        let (lo, hi) = (bound("0"), bound("100000"));
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let value = cx.new(|cx| InputState::new(window, cx).default_value(value_text));
         let description = cx.new(|cx| InputState::new(window, cx));
+        let min = cx.new(|cx| InputState::new(window, cx).default_value(lo));
+        let max = cx.new(|cx| InputState::new(window, cx).default_value(hi));
         value.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
-        self.create_var = Some(CreateVar { path, configuration: false, kind: 0, name, value, description });
+        self.create_var = Some(CreateVar { path, configuration: false, kind: k, config_kind: ck, name, value, description, min, max });
     }
 
     /// The "Create variable" popup (live part-studio/153, dom/dialog-create-
@@ -982,22 +1041,54 @@ impl FeatureDialog {
                 }
                 cx.notify();
             })));
-        let widths = [60., 53., 65., 42.];
         let mut kinds = h_flex();
-        for (i, (_, label)) in CREATE_VAR_KINDS.iter().enumerate() {
-            kinds = kinds.child(tab(SharedString::from(format!("cv-kind-{i}")), label, c.kind == i, widths[i]).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                if let Some(c) = &mut this.create_var {
-                    c.kind = i;
-                }
-                cx.notify();
-            })));
+        if c.configuration {
+            for (i, (_, label)) in CREATE_CONFIG_KINDS.iter().enumerate() {
+                kinds = kinds.child(tab(SharedString::from(format!("cv-ckind-{i}")), label, c.config_kind == i, 44.).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(c) = &mut this.create_var {
+                        c.config_kind = i;
+                    }
+                    cx.notify();
+                })));
+            }
+        } else {
+            let widths = [60., 53., 65., 42.];
+            for (i, (_, label)) in CREATE_VAR_KINDS.iter().enumerate() {
+                kinds = kinds.child(tab(SharedString::from(format!("cv-kind-{i}")), label, c.kind == i, widths[i]).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(c) = &mut this.create_var {
+                        c.kind = i;
+                    }
+                    cx.notify();
+                })));
+            }
         }
-        let row = |label: &'static str, st: &Entity<InputState>| {
+        // A field in error is outlined red with the reason as tooltip (the
+        // bundle's parameter errors).
+        let row = |label: &'static str, st: &Entity<InputState>, err: Option<&'static str>| {
             h_flex()
+                .id(SharedString::from(format!("cv-row-{label}")))
                 .h(px(26.))
                 .w(px(194.))
                 .child(div().flex_none().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
-                .child(gpui_kit::base::input::input_frame(div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(st).small().appearance(false).text_size(px(13.33)))))
+                .child(gpui_kit::base::input::input_frame(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .border_b_1()
+                        .border_color(if err.is_some() { pal.error_outline } else { gpui_kit::rgb(0xd7d7d7) })
+                        .when(err.is_some(), |d| d.bg(pal.error_fill))
+                        .child(Input::new(st).small().appearance(false).text_size(px(13.33))),
+                ))
+                .when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e)))
+        };
+        let name_err = c.name_error(cx);
+        let range = c.range_error(&self.units, cx);
+        let marked = |i: usize| range.and_then(|(e, m)| m[i].then_some(e));
+        let text = c.configuration && CREATE_CONFIG_KINDS[c.config_kind].0 == "TEXT";
+        let fields = if c.configuration {
+            v_flex().child(row("Name", &c.name, name_err)).child(row("Default", &c.value, marked(0))).when(!text, |d| d.child(row("Minimum", &c.min, marked(1))).child(row("Maximum", &c.max, marked(2))))
+        } else {
+            v_flex().child(row("Name", &c.name, name_err)).child(row("Value", &c.value, None)).child(row("Description", &c.description, None))
         };
         let popup = v_flex()
             .id("create-variable")
@@ -1033,29 +1124,32 @@ impl FeatureDialog {
             )
             .child(target)
             .child(kinds)
-            .child(row("Name", &c.name))
-            .child(row("Value", &c.value))
-            .child(row("Description", &c.description));
+            .child(fields);
         // Anchored at a zero-size box under the field: up beside it.
         div().relative().w_full().h_0().child(deferred(anchored().offset(point(px(107.), px(-40.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
     }
 
     /// ✓: create the variable; the field then resolves.
     fn commit_create_variable(&mut self, cx: &mut Context<Self>) {
+        // ✓ does nothing while a field is in error (bundle `disableSave`).
+        if self.create_var.as_ref().is_some_and(|c| c.name_error(cx).is_some() || c.range_error(&self.units, cx).is_some()) {
+            return;
+        }
         let Some(c) = self.create_var.take() else { return };
         let name = c.name.read(cx).value().trim().trim_start_matches('#').to_string();
         let value = c.value.read(cx).value().to_string();
-        let kind = CREATE_VAR_KINDS[c.kind].0;
+        let kind = if c.configuration { CREATE_CONFIG_KINDS[c.config_kind].0 } else { CREATE_VAR_KINDS[c.kind].0 };
         if let Some(dim) = match kind {
             "LENGTH" => Some(noshape_units::Dim::LENGTH),
             "ANGLE" => Some(noshape_units::Dim::ANGLE),
-            "NUMBER" => Some(noshape_units::Dim::UNITLESS),
+            "NUMBER" | "INTEGER" | "REAL" => Some(noshape_units::Dim::UNITLESS),
             _ => None,
         } && let Ok(q) = noshape_units::evaluate_as(&value, dim, &self.units, &self.variables)
         {
             self.variables.insert(name.clone(), q);
         }
-        cx.emit(DialogEvent::CreateVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration });
+        let range = (c.configuration && kind != "TEXT").then(|| (c.min.read(cx).value().to_string(), c.max.read(cx).value().to_string()));
+        cx.emit(DialogEvent::CreateVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration, range });
         cx.emit(DialogEvent::Changed);
         cx.notify();
     }

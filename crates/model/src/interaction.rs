@@ -226,10 +226,14 @@ pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str
         }
         None => (String::new(), q.to_string()),
     };
+    // A quoted argument matches exactly (Help: `:part "Part 1"`; live
+    // Variable table › Filter feature list puts `:variable "height"`).
+    let exact = arg.len() >= 2 && arg.starts_with('"') && arg.ends_with('"');
+    let arg = if exact { arg[1..arg.len() - 1].to_string() } else { arg };
     let arg_l = arg.to_lowercase();
     let status = |id: FeatureId| display.feature_state(id).map(|s| s.status);
     let type_name = |f: &Feature| f.feature_type().map(|t| t.name.to_lowercase()).unwrap_or_else(|| f.type_id.to_lowercase());
-    let name_match = |f: &Feature| arg_l.is_empty() || f.name.to_lowercase().contains(&arg_l);
+    let name_match = |f: &Feature| arg_l.is_empty() || if exact { f.name.to_lowercase() == arg_l } else { f.name.to_lowercase().contains(&arg_l) };
     fn part_number(p: &crate::partstudio::PartProperties) -> Option<&str> {
         p.part_number.as_deref()
     }
@@ -260,7 +264,8 @@ pub fn filter_features(studio: &PartStudio, display: &StudioDisplay, query: &str
             // Case-sensitive, like Onshape.
             "variable" => {
                 let arg = arg.trim_start_matches('#');
-                used_variables(f).iter().any(|v| v.contains(arg)) || defined_variable(f).is_some_and(|n| n.contains(arg))
+                let hit = |v: &str| if exact { v == arg } else { v.contains(arg) };
+                used_variables(f).iter().any(|v| hit(v)) || defined_variable(f).is_some_and(hit)
             }
             "part" => part_feature(i, f, &|b| b.name.to_lowercase().contains(&arg_l)),
             "partnumber" => part_feature(i, f, &|b| prop(b, part_number)),
@@ -782,6 +787,10 @@ mod tests {
         assert_eq!(filter_features(&ps, &d, ":type extr").unwrap().len(), 1);
         assert_eq!(filter_features(&ps, &d, ":suppressed").unwrap(), [FeatureId(1004)].into_iter().collect());
         assert_eq!(filter_features(&ps, &d, ":variable d").unwrap(), [FeatureId(1002), FeatureId(1003)].into_iter().collect());
+        // Quoted = exact: `"d"` matches `#d` only.
+        assert_eq!(filter_features(&ps, &d, ":variable \"d\"").unwrap(), [FeatureId(1002), FeatureId(1003)].into_iter().collect());
+        assert!(filter_features(&ps, &d, ":variable \"dd\"").unwrap().is_empty());
+        assert_eq!(filter_features(&ps, &d, "\"Variable 1\"").unwrap(), [FeatureId(1002)].into_iter().collect());
         assert!(filter_features(&ps, &d, ":errors").unwrap().is_empty());
     }
 

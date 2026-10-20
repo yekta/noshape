@@ -126,34 +126,44 @@ impl Focusable for CreateDrawingDialog {
 
 /// Sheet sizes of the Custom template tab per standard.
 /// (sheet setup name, size); the size label is the name's last word.
+/// Live drawing/800–825: ANSI A (default), A Portrait, B, C, D; ISO and
+/// JIS A4 (default), A4 Portrait, A3, A2, A1, A0.
 fn custom_sizes(standard: &str) -> Vec<(&'static str, SheetSize)> {
-    match standard {
-        "ISO" => ISO.iter().map(|&(_, n, s)| (n, s)).collect(),
-        "JIS" => JIS_NAMES.iter().zip(ISO.iter()).map(|(&n, &(_, _, s))| (n, s)).collect(),
-        _ => ANSI.iter().filter(|a| a.3 && a.2 != SheetSize::AnsiAPortrait).map(|&(_, n, s, _)| (n, s)).collect(),
-    }
+    let names: &[&'static str] = match standard {
+        "ISO" => &["ISO A4", "ISO A4 Portrait", "ISO A3", "ISO A2", "ISO A1", "ISO A0"],
+        "JIS" => &["JIS A4", "JIS A4 Portrait", "JIS A3", "JIS A2", "JIS A1", "JIS A0"],
+        _ => &["ANSI A", "ANSI A Portrait", "ANSI B", "ANSI C", "ANSI D"],
+    };
+    names.iter().copied().zip(SheetSize::standard_list(standard == "ANSI").iter().copied()).collect()
 }
 
-const JIS_NAMES: [&str; 5] = ["JIS A0", "JIS A1", "JIS A2", "JIS A3", "JIS A4"];
+/// The Custom template's default zones per size (live: ANSI A and A Portrait
+/// 2 x 2, B and C 4 x 4, D 8 x 4; ISO / JIS A4 0 x 0, A3 6 x 4, A2 8 x 6, A1
+/// 12 x 8, A0 16 x 12).
+fn custom_zones(size: SheetSize) -> [u32; 2] {
+    match size {
+        SheetSize::AnsiB | SheetSize::AnsiC => [4, 4],
+        s => s.standard_zones(),
+    }
+}
 
 /// Custom template › Units (help H:custom_drawing_templates; "Feet and
 /// inches" exists only in drawings).
 const CUSTOM_UNITS: [(DimUnits, &str); 7] = [
     (DimUnits::Millimeter, "Millimeters"),
-    (DimUnits::Centimeter, "Centimeters"),
-    (DimUnits::Meter, "Meters"),
+    (DimUnits::Centimeter, "Centimeter"),
+    (DimUnits::Meter, "Meter"),
     (DimUnits::Inch, "Inches"),
     (DimUnits::FeetInches, "Feet and inches"),
     (DimUnits::Foot, "Foot"),
-    (DimUnits::Yard, "Yards"),
+    (DimUnits::Yard, "Yard"),
 ];
 
-/// Title block languages (drw2: the full list is requested, live
-/// REQUESTS.md "drw2 (10-20 a)").
-const LANGUAGES: [&str; 1] = ["English"];
+/// Title block languages in Onshape's order (live; English preselected).
+const LANGUAGES: [&str; 9] = ["繁體中文", "Français", "English", "Deutsch", "简体中文", "日本語", "한국어", "Español", "Italiano"];
 
-/// Zone counts offered by Horizontal / Vertical zones.
-const ZONE_COUNTS: std::ops::RangeInclusive<u32> = 1..=16;
+/// Zone counts offered by Horizontal / Vertical zones: even numbers 0–20 (live).
+const ZONE_COUNTS: [u32; 11] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
 
 /// The Custom template tab's choices (live drawing/02).
 #[derive(Clone, Copy, Debug)]
@@ -172,26 +182,29 @@ struct CustomTemplate {
 
 impl CustomTemplate {
     fn new(metric: bool) -> Self {
-        let mut t = Self { standard: "ANSI", language: 0, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
+        let mut t = Self { standard: "ANSI", language: 2, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
         t.set_standard(if metric { "ISO" } else { "ANSI" });
         t
     }
 
-    /// Choosing a standard resets the size and its zones, the units and the
-    /// projection to the standard's defaults.
+    /// Choosing a standard resets the size (A / A4) and its zones, the
+    /// units, the decimal separator and the projection (live: ANSI Inches,
+    /// Period, Third angle; ISO Millimeters, Comma, First angle; JIS
+    /// Millimeters, Comma, Third angle). Border, start zones and title block
+    /// stay.
     fn set_standard(&mut self, standard: &'static str) {
         self.standard = standard;
         let ansi = standard == "ANSI";
         self.units = if ansi { DimUnits::Inch } else { DimUnits::Millimeter };
-        self.first_angle = !ansi;
-        // ANSI A; ISO / JIS A3.
-        self.set_size(if ansi { 0 } else { 3 });
+        self.comma = !ansi;
+        self.first_angle = standard == "ISO";
+        self.set_size(0);
     }
 
     fn set_size(&mut self, i: usize) {
         self.size = i;
         if let Some((_, size)) = custom_sizes(self.standard).get(i) {
-            self.zones = size.standard_zones().map(|n| n.max(1));
+            self.zones = custom_zones(*size);
         }
     }
 
@@ -471,10 +484,10 @@ impl CreateDrawingDialog {
                 }))
         };
         let standards = ["ANSI", "ISO", "JIS"].into_iter().fold(h_flex(), |r, s| r.child(choice(format!("cd-cs-{s}"), s, ct.standard == s, cx, Box::new(move |t| t.set_standard(s)))));
-        let sizes: Vec<String> = custom_sizes(ct.standard).iter().map(|(n, _)| n.rsplit(' ').next().unwrap_or(n).to_string()).collect();
+        let sizes: Vec<String> = custom_sizes(ct.standard).iter().map(|(_, s)| s.list_name().to_string()).collect();
         let units = CUSTOM_UNITS.iter().position(|(u, _)| *u == ct.units).unwrap_or(0);
-        let zones: Vec<String> = ZONE_COUNTS.map(|n| n.to_string()).collect();
-        let zone_at = |n: u32| ZONE_COUNTS.clone().position(|z| z == n).unwrap_or(0);
+        let zones: Vec<String> = ZONE_COUNTS.iter().map(|n| n.to_string()).collect();
+        let zone_at = |n: u32| ZONE_COUNTS.iter().position(|z| *z == n).unwrap_or(0);
         let left = v_flex()
             .w(px(440.))
             .flex_none()
@@ -503,9 +516,12 @@ impl CreateDrawingDialog {
             .flex_1()
             .pt(px(11.))
             .child(row(122., "Border", h_flex().child(choice("cd-border-on".into(), "Include", ct.border, cx, Box::new(|t| t.border = true))).child(choice("cd-border-off".into(), "Do not include", !ct.border, cx, Box::new(|t| t.border = false))).into_any_element()))
-            .child(row(122., "Horizontal zones", drop("cd-hzones", zones.clone(), zone_at(ct.zones[0]), |t, i| t.zones[0] = ZONE_COUNTS.start() + i as u32).into_any_element()))
-            .child(row(122., "Vertical zones", drop("cd-vzones", zones, zone_at(ct.zones[1]), |t, i| t.zones[1] = ZONE_COUNTS.start() + i as u32).into_any_element()))
-            .child(row(122., "Start zones", h_flex().child(choice("cd-start-br".into(), "Bottom right", !ct.top_left, cx, Box::new(|t| t.top_left = false))).child(choice("cd-start-tl".into(), "Top left", ct.top_left, cx, Box::new(|t| t.top_left = true))).into_any_element()))
+            // Live 815-a: "Do not include" hides the zone rows.
+            .when(ct.border, |c| {
+                c.child(row(122., "Horizontal zones", drop("cd-hzones", zones.clone(), zone_at(ct.zones[0]), |t, i| t.zones[0] = ZONE_COUNTS[i]).into_any_element()))
+                    .child(row(122., "Vertical zones", drop("cd-vzones", zones, zone_at(ct.zones[1]), |t, i| t.zones[1] = ZONE_COUNTS[i]).into_any_element()))
+                    .child(row(122., "Start zones", h_flex().child(choice("cd-start-br".into(), "Bottom right", !ct.top_left, cx, Box::new(|t| t.top_left = false))).child(choice("cd-start-tl".into(), "Top left", ct.top_left, cx, Box::new(|t| t.top_left = true))).into_any_element()))
+            })
             .child(row(122., "Titleblock", h_flex().child(choice("cd-tb-on".into(), "Include", ct.title_block, cx, Box::new(|t| t.title_block = true))).child(choice("cd-tb-off".into(), "Do not include", !ct.title_block, cx, Box::new(|t| t.title_block = false))).into_any_element()));
         h_flex()
             .flex_1()

@@ -248,6 +248,8 @@ pub struct PartStudioView {
     show_mass: bool,
     right_panel: Option<config_panel::RightPanel>,
     panel_inputs: std::collections::HashMap<String, (Entity<gpui_kit::component::input::InputState>, String)>,
+    /// Panel cells whose value must pass a check before it commits.
+    panel_checks: std::collections::HashMap<String, fn(&str) -> bool>,
     panel_subs: Vec<Subscription>,
     /// Panel cell that had the keyboard focus at the last render, and the
     /// commit actions of all cells: a cell is committed when the focus
@@ -352,6 +354,7 @@ impl PartStudioView {
             show_mass: false,
             right_panel: None,
             panel_inputs: Default::default(),
+            panel_checks: Default::default(),
             panel_subs: Vec::new(),
             panel_focused: None,
             panel_commits: Default::default(),
@@ -821,10 +824,20 @@ impl PartStudioView {
     // ------------------------------------------------------------ viewport events
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
-        // Clicking the graphics area takes the keyboard focus from a panel
-        // field (which then commits), so shortcuts like F don't type into it.
-        if self.panel_focused.is_some() && matches!(ev, ViewportEvent::Click { .. } | ViewportEvent::ContextMenu { .. } | ViewportEvent::ToolDown { .. } | ViewportEvent::BoxSelect { .. }) {
-            window.focus(&self.focus, cx);
+        // Clicking the graphics area takes the keyboard focus from any text
+        // field (a panel cell, which then commits, the feature-list filter, a
+        // dialog value), so shortcuts like F or Shift+E don't type into it and
+        // its caret stops blinking (each blink redrew the window), like
+        // Onshape. An open feature dialog takes it (Enter, Esc, Tab stay its
+        // own, as the assembly's mate dialog). Sketch mode does this itself
+        // (pressed dimension labels keep their field).
+        let press = matches!(ev, ViewportEvent::Click { .. } | ViewportEvent::ContextMenu { .. } | ViewportEvent::ToolDown { .. } | ViewportEvent::BoxSelect { .. });
+        let target = match &self.edit {
+            Some(e) => e.dialog.read(cx).focus_handle(cx),
+            None => self.focus.clone(),
+        };
+        if press && (self.panel_focused.is_some() || (self.sketch.is_none() && !target.is_focused(window))) {
+            window.focus(&target, cx);
             cx.notify();
         }
         // A press-drag-release gesture (a sketch click that adds a line,
@@ -1217,7 +1230,7 @@ impl PartStudioView {
             DialogEvent::LeaveFocus { forward: true } => window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx),
             DialogEvent::LeaveFocus { forward: false } => window.focus(&this.focus, cx),
             DialogEvent::CreateSelection(field) => this.open_create_selection_for_field(field.clone(), cx),
-            DialogEvent::CreateVariable { name, kind, value, description, configuration } => this.create_variable_from_field(name, kind, value, description, *configuration, cx),
+            DialogEvent::CreateVariable { name, kind, value, description, configuration, range } => this.create_variable_from_field(name, kind, value, description, *configuration, range.clone(), cx),
             DialogEvent::ImportReference { param, file } => this.import_reference_file(param.clone(), file.clone(), cx),
             // Create version…: this document's dialog, or another document opened in its window.
             DialogEvent::CreateVersion(None) => crate::history_panel::open_create_version_in(this.doc.clone(), window, cx),
@@ -3392,9 +3405,9 @@ fn preselect(ty: &FeatureType, feature: &mut Feature, selection: &[Reference], b
 /// outlines laid out from the corner `top_left` (inside, along `x`, with
 /// `y` up) with ascender height `asc`, projected to viewport polygons.
 pub(super) fn in_plane_text(vp: &crate::viewport::Viewport, text: &str, top_left: glam::DVec3, x: glam::DVec3, y: glam::DVec3, asc: f64, polys: &mut Vec<Vec<Point<Pixels>>>) {
-    let layout = noshape_sketch::text::layout_text(text, noshape_sketch::text::DEFAULT_FONT, false, false);
+    let layout = plane_text(text);
     let base = top_left + x * (0.25 * asc) - y * (1.3 * asc);
-    for contour in layout.polylines(6) {
+    for contour in &layout.polylines {
         let mut poly = Vec::with_capacity(contour.len());
         for q in contour {
             match vp.project(base + x * (q.x * asc) + y * (q.y * asc)) {
@@ -3409,6 +3422,36 @@ pub(super) fn in_plane_text(vp: &crate::viewport::Viewport, text: &str, top_left
             polys.push(poly);
         }
     }
+}
+
+/// A label laid out for [`in_plane_text`]: its width (in ascender units) and
+/// glyph outlines.
+pub(super) struct PlaneText {
+    pub width: f64,
+    pub polylines: Vec<Vec<glam::DVec2>>,
+}
+
+/// [`PlaneText`] of `text`, laid out once: the plane and sketch names are
+/// drawn every frame (a keystroke anywhere re-renders the Part Studio), and
+/// laying out the font outlines each time was a measurable part of a frame.
+pub(super) fn plane_text(text: &str) -> std::rc::Rc<PlaneText> {
+    thread_local! {
+        static CACHE: std::cell::RefCell<std::collections::HashMap<String, std::rc::Rc<PlaneText>>> = Default::default();
+    }
+    CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        if let Some(t) = c.get(text) {
+            return t.clone();
+        }
+        // Names are few; renames could grow it without bound.
+        if c.len() > 512 {
+            c.clear();
+        }
+        let layout = noshape_sketch::text::layout_text(text, noshape_sketch::text::DEFAULT_FONT, false, false);
+        let t = std::rc::Rc::new(PlaneText { width: layout.width, polylines: layout.polylines(6) });
+        c.insert(text.to_string(), t.clone());
+        t
+    })
 }
 
 /// Fills projected glyph polygons (from [`in_plane_text`]) over the viewport.

@@ -278,6 +278,13 @@ pub struct Context {
     /// Appearances features gave single faces (Import), by body and face
     /// name: the body's faces descending from it keep it. Linear RGBA.
     pub face_appearance: Vec<(BodyId, crate::naming::Name, [f32; 4])>,
+    /// FeatureScript attributes (`setAttribute`), kept from feature to
+    /// feature (custom/host loads and saves them around each custom feature).
+    pub fs_attributes: Vec<(crate::reference::Reference, noshape_featurescript::Value)>,
+    /// Bodies FeatureScript keeps out of the Part Studio (std sheet metal's
+    /// definition sheets): no part, no display; custom features see them
+    /// through attribute queries only.
+    pub fs_hidden_bodies: Vec<Arc<Body>>,
 }
 
 /// One hole of a Hole feature: where it starts, its direction into the

@@ -1547,7 +1547,7 @@ fn custom_template_border_zones_and_units() {
     assert_eq!(top.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "1");
     assert_eq!(left.len(), 3);
     assert_eq!(left.iter().max_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "A");
-    // No border: only the sheet edge.
+    // No border: only the inner frame (no sheet edge, no zones).
     s.format.border = false;
     let (left, top, none) = zone_texts(&s);
     assert!(left.is_empty() && top.is_empty() && none < lines);
@@ -1618,5 +1618,21 @@ fn dimension_labels_draw_above_below_and_oval() {
     assert!(y("TYP") > y("100") && y("2X") < y("100"));
     // The oval: one closed polyline around the value.
     assert!(g.lines.iter().any(|l| l.pick == 5 && l.closed && l.points.len() > 20));
+}
+
+#[test]
+fn datum_target_origin_dimensions_show_and_hide() {
+    let (doc, mut drawing) = demo();
+    let vid = drawing.sheets[0].views[0].id;
+    let target = DatumTargetOpts { origin: Some([-0.02, -0.01]), ..Default::default() };
+    drawing.sheets[0].annotations.push(Annotation { id: 902, kind: AnnotationKind::DatumTarget { view: vid, anchor: [0.01, 0.005], label: "A1".into(), area: DatumTargetArea::Dot }, position: [300.0, 200.0], target: Some(Box::new(target)), ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let texts = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry.texts.iter().map(|t| t.text.clone()).collect::<Vec<_>>();
+    // 30 mm and 15 mm from the origin.
+    let shown = texts(&drawing);
+    assert!(shown.iter().any(|t| t == "30") && shown.iter().any(|t| t == "15"), "{shown:?}");
+    drawing.sheets[0].annotations.last_mut().unwrap().target.as_mut().unwrap().hide_dims = true;
+    let hidden = texts(&drawing);
+    assert!(!hidden.iter().any(|t| t == "30"), "{hidden:?}");
 }
 

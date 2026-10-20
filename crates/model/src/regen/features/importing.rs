@@ -201,12 +201,12 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             if p.count(ShapeType::Face) == 0 {
                 // Wire bodies come in as curves ("Curve 1", live G38/G38d).
                 if p.count(ShapeType::Edge) > 0 {
-                    wires.push((p, Look { name: part.name.clone(), color: part.color, faces: Vec::new() }));
+                    wires.push((p, Look { name: part.name.clone(), color: part.color, opacity: part.opacity, faces: Vec::new() }));
                 }
                 continue;
             }
             let faces = colored_faces.iter().filter(|(f, _)| p.index_of(f, ShapeType::Face).is_some()).cloned().collect();
-            looks.push(Look { name: part.name.clone(), color: part.color, faces });
+            looks.push(Look { name: part.name.clone(), color: part.color, opacity: part.opacity, faces });
             tools.push(p);
         }
     }
@@ -279,6 +279,7 @@ type Tool = (k::Shape, Look);
 struct Look {
     name: Option<String>,
     color: Option<[f32; 3]>,
+    opacity: Option<f32>,
     faces: Vec<(k::Shape, [f32; 3])>,
 }
 
@@ -299,7 +300,9 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     }
     let body = ev.ctx.bodies[bi].clone();
     if let Some(c) = look.color {
-        ev.ctx.part_appearance.insert(body.id.clone(), linear(c));
+        let mut c = linear(c);
+        c[3] = look.opacity.unwrap_or(1.0);
+        ev.ctx.part_appearance.insert(body.id.clone(), c);
     }
     for (face, c) in &look.faces {
         if let Some(fi) = body.shape.index_of(face, ShapeType::Face) {

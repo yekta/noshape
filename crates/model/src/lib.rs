@@ -26,6 +26,7 @@ pub mod in_context;
 pub mod interaction;
 pub mod material_library;
 pub mod merge;
+pub mod native_assembly;
 pub mod naming;
 pub mod params;
 pub mod partstudio;

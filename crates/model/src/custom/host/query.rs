@@ -135,18 +135,25 @@ impl<'a> QueryCx<'a> {
 
     /// Every entity of a type (or of all types), in a stable order.
     pub fn all(&self, t: Option<EType>) -> Vec<Ent> {
+        self.all_with(t, false)
+    }
+
+    /// [`Self::all`], with the hidden bodies (sheet metal definitions) if
+    /// `hidden` (attribute queries find them; live dom/fs-smprobe2-*.txt).
+    pub fn all_with(&self, t: Option<EType>, hidden: bool) -> Vec<Ent> {
         let ctx = &self.st.ctx;
+        let shown = |b: &usize| hidden || !self.st.hidden.contains(&ctx.bodies[*b].id);
         let mut out = Vec::new();
         let want = |x: EType| t.is_none_or(|t| t == x);
         if want(EType::Body) {
-            out.extend((0..ctx.bodies.len()).map(Ent::Body));
+            out.extend((0..ctx.bodies.len()).filter(shown).map(Ent::Body));
             out.extend((0..ctx.sketches.len()).map(Ent::SketchBody));
             out.extend((0..ctx.connectors.len()).map(Ent::Connector));
         }
         if want(EType::Face) {
             out.extend([DatumPlane::Top, DatumPlane::Front, DatumPlane::Right].map(Ent::Datum));
             out.extend((0..ctx.planes.len()).map(Ent::Plane));
-            for (b, body) in ctx.bodies.iter().enumerate() {
+            for (b, body) in ctx.bodies.iter().enumerate().filter(|(b, _)| shown(b)) {
                 out.extend((0..body.faces.len()).map(|f| Ent::Face(b, f)));
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
@@ -154,7 +161,7 @@ impl<'a> QueryCx<'a> {
             }
         }
         if want(EType::Edge) {
-            for (b, body) in ctx.bodies.iter().enumerate() {
+            for (b, body) in ctx.bodies.iter().enumerate().filter(|(b, _)| shown(b)) {
                 out.extend((0..body.edges.len()).map(|e| Ent::Edge(b, e)));
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
@@ -164,7 +171,7 @@ impl<'a> QueryCx<'a> {
         if want(EType::Vertex) {
             out.push(Ent::Origin);
             out.extend((0..ctx.points.len()).map(Ent::Point));
-            for (b, body) in ctx.bodies.iter().enumerate() {
+            for (b, body) in ctx.bodies.iter().enumerate().filter(|(b, _)| shown(b)) {
                 out.extend((0..body.vertices.len()).map(|v| Ent::Vertex(b, v)));
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
@@ -998,7 +1005,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "HISTORICAL" => Vec::new(),
         "ATTRIBUTE_FILTER" => {
-            let base = if query.get("subquery").is_undefined() { q.all(None) } else { sub(i, "subquery")? };
+            let base = if query.get("subquery").is_undefined() { q.all_with(None, true) } else { sub(i, "subquery")? };
             let name = query.get("name").clone();
             let pattern = query.get("attributePattern").clone();
             let exact = query.get("valueToMatchExactly").clone();

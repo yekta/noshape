@@ -104,7 +104,7 @@ fn solid_kind(s: &Shape) -> BodyKind {
 }
 
 /// Names for a shape created from nothing: faces ordered geometrically.
-fn fresh_names(ev: &EvalCtx, shape: &Shape) -> Vec<Name> {
+pub(super) fn fresh_names(ev: &EvalCtx, shape: &Shape) -> Vec<Name> {
     let empty = ShapeNames::default();
     let hist = k::History::default();
     ev.name_result(&[&empty], &hist, shape, &BTreeMap::new(), None)
@@ -163,17 +163,32 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let names = sweep_names(ev, p, &res, true, true);
             tools.push(NamedShape::new(res.shape.clone(), names));
         }
-        // Edges extrude to sheets.
+        // Edges extrude to sheets; connected curves give one sheet (live: an
+        // open polyline extrudes to one sheet body, dom/fs-smprobe-3.txt).
+        let mut sheets = Vec::new();
         for (n, edge) in edge_shapes(ev, &refs)?.into_iter().enumerate() {
             let (s, e) = (start.unwrap_or(0.0), end.unwrap_or(0.0));
-            let res = k::extrude_between(&edge, -d * s, d * e, 0.0).map_err(|e| fe(format!("Extrude failed: {e}")))?;
+            let mut res = k::extrude_between(&edge, -d * s, d * e, 0.0).map_err(|e| fe(format!("Extrude failed: {e}")))?;
+            // Onshape's sheet faces the side `tangent × direction` (live sm3:
+            // (0,0)→(30,0) extruded +z faces −y).
+            if let Ok(info) = edge.edge_info() {
+                let t_mid = (info.first_param + info.last_param) * 0.5;
+                if let (Ok(p), Ok(t)) = (edge.point_at(t_mid), edge.tangent_at(t_mid))
+                    && let Some(face) = res.shape.faces().first()
+                    && face.normal_at_point(p).is_ok_and(|nf| nf.dot(t.cross(d)) < 0.0)
+                    && let Ok(r) = res.shape.reversed()
+                {
+                    res.shape = r;
+                }
+            }
             let mut roles = BTreeMap::new();
             for f in 0..res.shape.count(ShapeType::Face) {
                 roles.insert(f as u32, Role::Side(Source::Index(n as u32 * 64 + f as u32)));
             }
             let names = ev.name_result(&[&ShapeNames::default()], &res.history, &res.shape, &roles, None);
-            tools.push(NamedShape::new(res.shape, names));
+            sheets.push(NamedShape::new(res.shape, names));
         }
+        tools.extend(sew_sheets(sheets)?);
         if tools.is_empty() {
             return err("Could not use selected entities to extrude");
         }
@@ -181,6 +196,36 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         add_bodies(ev, tools, kind)
     })?;
     Ok(Value::Undefined)
+}
+
+/// Sheets sewn along their shared edges (each connected set one shell);
+/// faces keep their names.
+fn sew_sheets(sheets: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
+    if sheets.len() < 2 {
+        return Ok(sheets);
+    }
+    let shapes: Vec<Shape> = sheets.iter().map(|s| s.shape.clone()).collect();
+    let Ok(sewn) = k::sew(&shapes, 1e-7, false) else { return Ok(sheets) };
+    let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    let named: Vec<(Option<(DVec3, f64)>, Name)> = sheets.iter().flat_map(|s| s.shape.faces().iter().map(key).zip(s.names.faces.iter().cloned()).collect::<Vec<_>>()).collect();
+    let mut out = Vec::new();
+    let shells = sewn.shape.shells();
+    let pieces = if shells.is_empty() { vec![sewn.shape.clone()] } else { shells };
+    for p in pieces {
+        let names: Option<Vec<Name>> = p
+            .faces()
+            .iter()
+            .map(|f| {
+                let kf = key(f)?;
+                named.iter().find(|(k, _)| k.is_some_and(|k| k.0.distance(kf.0) < 1e-9 && (k.1 - kf.1).abs() < 1e-9)).map(|(_, n)| n.clone())
+            })
+            .collect();
+        match names {
+            Some(names) => out.push(NamedShape::new(p, names)),
+            None => return Ok(sheets),
+        }
+    }
+    Ok(out)
 }
 
 /// Kernel edges of curve references (sketch curves, body edges).

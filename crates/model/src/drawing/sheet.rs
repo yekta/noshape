@@ -537,10 +537,14 @@ impl SheetGeometry {
         // number zones from the right and letter them from the bottom (live
         // drawing/09 ANSI A: 2 x 2, 5 mm labels; drawing/156 ISO A3: 6 x 4,
         // 7 mm labels).
-        self.rect(0.0, 0.0, w, h, LineStyle::Thin);
+        // Border "Do not include" (live drawing/820-a): only the inner frame
+        // stays; no sheet-edge line and no zone strip.
         let format = sheet.format;
         if format.border {
-            self.rect(m, m, w - m, h - m, LineStyle::Border);
+            self.rect(0.0, 0.0, w, h, LineStyle::Thin);
+        }
+        self.rect(m, m, w - m, h - m, LineStyle::Border);
+        if format.border {
             self.add_zones(sheet, m);
         }
         let value_of = |k: &str, v: &str| -> String {
@@ -1472,9 +1476,19 @@ impl SheetGeometry {
                     let k = env.scale(*view);
                     let rot = env.rotation(*view);
                     let size = match area {
-                        DatumTargetArea::Point => {
+                        DatumTargetArea::Point | DatumTargetArea::Custom => {
                             for d in [[1.0, 1.0], [1.0, -1.0]] {
                                 self.lines.push(Polyline2 { points: vec![[p[0] - d[0] * 1.6, p[1] - d[1] * 1.6], [p[0] + d[0] * 1.6, p[1] + d[1] * 1.6]], style: LineStyle::Visible, closed: false, pick });
+                            }
+                            String::new()
+                        }
+                        DatumTargetArea::Dot => {
+                            let pts: Vec<[f64; 2]> = (0..16).map(|i| {
+                                let t = i as f64 / 16.0 * std::f64::consts::TAU;
+                                [p[0] + 0.7 * t.cos(), p[1] + 0.7 * t.sin()]
+                            }).collect();
+                            for i in 1..pts.len() - 1 {
+                                self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
                             }
                             String::new()
                         }
@@ -1516,6 +1530,31 @@ impl SheetGeometry {
                     let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
                     if l > r + 0.5 {
                         self.lines.push(Polyline2 { points: vec![[c[0] + d[0] / l * r, c[1] + d[1] / l * r], p], style: LineStyle::Thin, closed: false, pick });
+                    }
+                    let opts = a.target.as_deref().cloned().unwrap_or_default();
+                    // Moveable styles: a pointer on the bubble (horizontal, or
+                    // turned toward the target).
+                    if opts.style != super::TargetStyle::Inside && l > 1e-9 {
+                        let u = if opts.style == super::TargetStyle::MoveableHorizontal { [if d[0] < 0.0 { -1.0 } else { 1.0 }, 0.0] } else { [d[0] / l, d[1] / l] };
+                        let n = [-u[1], u[0]];
+                        let tip = [c[0] + u[0] * (r + 2.5), c[1] + u[1] * (r + 2.5)];
+                        let s1 = [c[0] + u[0] * r * 0.6 + n[0] * r * 0.8, c[1] + u[1] * r * 0.6 + n[1] * r * 0.8];
+                        let s2 = [c[0] + u[0] * r * 0.6 - n[0] * r * 0.8, c[1] + u[1] * r * 0.6 - n[1] * r * 0.8];
+                        self.lines.push(Polyline2 { points: vec![s1, tip, s2], style: LineStyle::Thin, closed: false, pick });
+                    }
+                    // The target's position dimensions from its origin (X and
+                    // Y; hidden with "Hide dimension").
+                    if let (Some(o), false) = (opts.origin, opts.hide_dims) {
+                        let os = env.to_sheet(*view, o);
+                        let (dx, dy) = ((anchor[0] - o[0]).abs(), (anchor[1] - o[1]).abs());
+                        if dx > 1e-9 {
+                            let t = env.text(a, dx, false, "");
+                            self.linear_dimension_text(os, [p[0], os[1]], -8.0, DimOrientation::Horizontal, &t, pick);
+                        }
+                        if dy > 1e-9 {
+                            let t = env.text(a, dy, false, "");
+                            self.linear_dimension_text([p[0], os[1]], p, 8.0, DimOrientation::Vertical, &t, pick);
+                        }
                     }
                 }
             }

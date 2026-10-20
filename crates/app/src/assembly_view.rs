@@ -225,13 +225,27 @@ struct FeatureRow {
 }
 
 /// Explode step edit dialog.
+/// The "Explode step" dialog (live assembly/805–813): a step just made by
+/// a drag (`created`) or one being edited (double click / Edit…).
 pub(crate) struct StepEdit {
     pub view: usize,
     pub step: usize,
-    pub instances: Vec<InstanceId>,
-    /// Translation X / Y / Z, rotation angle.
-    pub inputs: [Entity<InputState>; 4],
+    pub created: bool,
     pub rotation: bool,
+    pub instances: Vec<InstanceId>,
+    /// ☐ Specify direction / axis and the picked direction (its Z).
+    pub specify: bool,
+    pub direction: Option<MateConnectorRef>,
+    /// Distance or Rotation angle.
+    pub value: Entity<InputState>,
+    pub lines: bool,
+    pub line_refs: Vec<MateConnectorRef>,
+    /// Field taking picks: 0 Instances, 1 direction / axis, 2 explode line entities.
+    pub active: u8,
+    /// The step's direction (translation) or axis (rotation) as dragged.
+    pub base_dir: DVec3,
+    pub pivot: Option<[f64; 3]>,
+    pub _sub: Subscription,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -1042,6 +1056,15 @@ impl AssemblyView {
     }
 
     fn insert_and_place(&mut self, studio: TabId, body: Option<CatalogPart>, cx: &mut Context<Self>) {
+        // Replace instance's picker: the item becomes the replacement.
+        let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
+        let picked = match &body {
+            Some((b, n, _, _)) => (InstanceSource::Part { studio, body: b.clone(), config }, n.clone()),
+            None => (InstanceSource::PartStudio { studio, config }, self.doc.read(cx).session.doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default()),
+        };
+        if self.pick_replacement(picked.0, picked.1, cx) {
+            return;
+        }
         if let Some(id) = self.insert_part(studio, body, cx) {
             self.start_placing(vec![id], cx);
         }
@@ -1049,6 +1072,10 @@ impl AssemblyView {
 
     /// Insert › Sketches: a sketch of a Part Studio as an instance.
     fn insert_sketch(&mut self, studio: TabId, sketch: FeatureId, name: String, cx: &mut Context<Self>) {
+        let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
+        if self.pick_replacement(InstanceSource::Sketch { studio, sketch, config }, name.clone(), cx) {
+            return;
+        }
         let id = self.edit(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
@@ -1061,6 +1088,10 @@ impl AssemblyView {
     }
 
     fn insert_studio_parts(&mut self, s: CatalogStudio, cx: &mut Context<Self>) {
+        let config = self.ui.insert_config.get(&s.tab).cloned().unwrap_or_default();
+        if self.pick_replacement(InstanceSource::PartStudio { studio: s.tab, config }, s.name.clone(), cx) {
+            return;
+        }
         if self.insert_rigid {
             self.insert_and_place(s.tab, None, cx);
         } else {
@@ -1073,6 +1104,10 @@ impl AssemblyView {
     }
 
     fn insert_assembly(&mut self, tab: TabId, name: String, cx: &mut Context<Self>) {
+        let config = self.ui.insert_config.get(&tab).cloned().unwrap_or_default();
+        if self.pick_replacement(InstanceSource::Assembly { assembly: tab, config }, name.clone(), cx) {
+            return;
+        }
         let config = self.ui.insert_config.get(&tab).cloned().unwrap_or_default();
         let id = self.edit(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
@@ -1561,6 +1596,13 @@ impl AssemblyView {
         if let Some(p) = &self.explode_preview {
             v.steps.push(p.clone());
         }
+        // The step being edited shows the dialog's values (live preview).
+        if let Some(se) = self.step_edit.as_ref().filter(|se| Some(se.view) == self.explode)
+            && let Some(step) = self.step_from_edit(cx)
+            && se.step < v.steps.len()
+        {
+            v.steps[se.step] = step;
+        }
         Some(v)
     }
 
@@ -1784,7 +1826,7 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none();
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
@@ -1831,6 +1873,18 @@ impl AssemblyView {
             dialog.update(cx, |d, cx| d.set_connector(c, cx));
             // Both connectors picked: the heads-up checkmark appears at the cursor.
             if is_new && !dialog.read(cx).awaiting_pick() {
+                // Default primary-axis alignment (live assembly/760–780): the
+                // moving (first) instance keeps its current orientation, so
+                // the Z axes are made to agree when they point the same way
+                // now and opposed otherwise (Onshape's flip = !flip_primary).
+                let units = self.units(cx);
+                let (a, b) = { let d = dialog.read(cx); (d.field(0).cloned(), d.field(1).cloned()) };
+                if let (Some(a), Some(b)) = (a, b)
+                    && let (Some(fa), Some(fb)) = (self.result.connector_world(&a, &units), self.result.connector_world(&b, &units))
+                {
+                    let agree = fa.z().dot(fb.z()) > 0.0;
+                    dialog.update(cx, |d, cx| d.set_flip(agree, cx));
+                }
                 let at = self.pointer;
                 if let Some(s) = &mut self.mate {
                     s.hud = Some(at);
@@ -2006,6 +2060,13 @@ impl AssemblyView {
                     // Auto-size fastener: the clicked hole sizes the part.
                     if let Some(t) = self.pick(*pick) {
                         self.std_pick_hole(t, cx);
+                    }
+                    return;
+                }
+                if self.step_edit.is_some() {
+                    // Explode step dialog: picks go to its active field.
+                    if let Some(t) = self.pick(*pick) {
+                        self.step_edit_pick(t, cx);
                     }
                     return;
                 }
@@ -2271,7 +2332,10 @@ impl AssemblyView {
                             && (d.value.abs() > 1e-9 || d.offset.length() > 1e-9)
                         {
                             self.push_explode_step(step, cx);
-                            self.open_manip_value(&d, window, cx);
+                            // Live 805: the "Explode step" dialog opens at once.
+                            if let Some(k) = self.explode_view(cx).map(|v| v.steps.len().saturating_sub(1)) {
+                                self.open_step_edit(k, true, window, cx);
+                            }
                         }
                         self.reapply_display(cx);
                     } else {
@@ -3776,6 +3840,51 @@ impl AssemblyView {
                     .child(div().absolute().right(px(4.)).bottom(px(4.)).child(props::help_dot())),
             );
         let pal = p();
+        // Replace instance's "Select replacement component" picker (live
+        // 840–841): the same panel, 559 px, titled so, with only ✕ and no
+        // Inserted / Undo footer.
+        if self.picking_replacement() {
+            return v_flex()
+                .id("rep-picker")
+                .occlude()
+                .w(px(300.))
+                .h(px(559.))
+                .max_h_full()
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .flex_none()
+                        .pl(px(6.))
+                        .bg(gpui_kit::white())
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd7d7d7))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Select replacement component"))
+                        .child(
+                            div()
+                                .id("rep-picker-close")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .opacity(0.5)
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip("Close"))
+                                .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., pal.text))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(s) = &mut this.replace_panel {
+                                        s.picking = false;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(head)
+                .child(body)
+                .into_any_element();
+        }
         v_flex()
             .w(px(300.))
             .h(px(587.))
@@ -4405,7 +4514,7 @@ impl Render for AssemblyView {
                     this.triad_menu = None;
                     cx.notify();
                 } else if this.step_edit.is_some() {
-                    this.step_edit = None;
+                    this.cancel_step_edit(cx);
                     cx.notify();
                 } else if this.placing.is_some() || this.insert_open {
                     // Esc ends the insertion: placed instances stay (Undo removes them).

@@ -820,6 +820,10 @@ fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -
             break;
         }
         let before: Vec<(InstanceId, Option<DVec3>)> = step.instances.iter().map(|id| (*id, instance_center(result, *id, acc.get(id).copied().unwrap_or(DMat4::IDENTITY)))).collect();
+        // Explode lines from picked edges / vertices / faces: their assembled
+        // position, carried by their instance's explode so far.
+        let line_points: Vec<(InstanceId, DVec3)> = step.line_refs.iter().filter_map(|r| result.connector_world(r, &UnitPrefs::default()).map(|f| (r.instance, f.origin))).collect();
+        let line_before: Vec<(InstanceId, DVec3)> = line_points.iter().map(|(id, p)| (*id, acc.get(id).copied().unwrap_or(DMat4::IDENTITY).transform_point3(*p))).collect();
         let mut m = DMat4::from_translation(DVec3::from(step.translation) * t);
         if let Some(axis) = step.rotation_axis {
             let pivot = match step.pivot {
@@ -844,7 +848,15 @@ fn explode_matrices(result: &AssemblyResult, ev: &ExplodedView, progress: f64) -
             let e = acc.entry(*id).or_insert(DMat4::IDENTITY);
             *e = m * *e;
         }
-        for (id, c0) in before {
+        if step.lines && !line_points.is_empty() {
+            for ((id, p), (_, a)) in line_points.iter().zip(&line_before) {
+                let b = acc.get(id).copied().unwrap_or(DMat4::IDENTITY).transform_point3(*p);
+                if a.distance(b) > 1e-12 {
+                    trails.push((*a, b));
+                }
+            }
+        }
+        for (id, c0) in before.into_iter().filter(|_| step.lines && line_points.is_empty()) {
             if let (Some(a), Some(b)) = (c0, instance_center(result, id, acc.get(&id).copied().unwrap_or(DMat4::IDENTITY)))
                 && a.distance(b) > 1e-12
             {

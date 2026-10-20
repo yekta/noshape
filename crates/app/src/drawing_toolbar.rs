@@ -127,8 +127,6 @@ impl DrawingEditor {
             MenuEntry::item("Crop view (circle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: true }, cx)),
             MenuEntry::item("Crop view (polygon)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: false }, cx)),
             MenuEntry::item("Crop view (spline)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: true }, cx)),
-            MenuEntry::Separator,
-            MenuEntry::item("Datum target", |e, _, cx| e.set_tool(Tool::DatumTarget { anchor: None }, cx)),
         ];
         let table = |kind: TableTool| move || Tool::Table { kind, view: None, origin: None };
         let is_table = |k: TableTool| matches!(t, Tool::Table { kind, .. } if kind == k);

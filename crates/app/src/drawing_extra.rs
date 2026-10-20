@@ -69,48 +69,28 @@ impl DrawingEditor {
         self.switch_sheet(at, cx);
     }
 
-    /// The Sheets panel sheet-row menu (live dom/context-menus-drawing-sheets.txt:
-    /// Rename... | Properties... | Duplicate | Copy; help H:sheets adds Paste,
-    /// Delete, Move up, Move down with more sheets / a copied sheet).
+    /// The Sheets panel sheet-row menu (live dom/context-menus-drawing-sheets.txt
+    /// with one sheet: Rename... | Properties... | Duplicate | Copy; behaviours.md
+    /// "Sheets panel with several sheets": Rename... · Duplicate · Paste · Copy
+    /// | Move up · Move down | Delete, no Move up on the first sheet). Paste is
+    /// offered with a copied sheet on the clipboard.
     fn sheet_entries(&self, i: usize, cx: &App) -> Vec<MenuEntry> {
         let n = self.drawing.sheets.len();
-        let mut out = vec![
-            MenuEntry::item("Rename...", move |t, w, cx| t.open_sheet_name_panel(i, w, cx)),
-            MenuEntry::item("Properties...", move |t, w, cx| t.open_sheet_props(i, w, cx)),
-            MenuEntry::item("Duplicate", move |t, _, cx| {
-                let mut d = t.drawing.clone();
-                if let Some(j) = d.duplicate_sheet(i) {
-                    t.commit("Duplicate sheet", d, cx);
-                    t.switch_sheet(j, cx);
-                }
-            }),
-            MenuEntry::item("Copy", move |t, _, cx| {
-                if let Some(s) = t.drawing.sheets.get(i) {
-                    cx.write_to_clipboard(ClipboardItem::new_string(clipboard::SheetClipboard::new(s.clone()).to_json()));
-                }
-            }),
-        ];
-        // A copied sheet pastes at the bottom of the list.
-        if let Some(copied) = cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::SheetClipboard::from_json(&t)) {
-            out.push(MenuEntry::item("Paste", move |t, _, cx| {
-                let mut d = t.drawing.clone();
-                let j = d.paste_sheet(copied.sheet.clone());
-                t.commit("Paste sheet", d, cx);
+        let mut out = vec![MenuEntry::item("Rename...", move |t, w, cx| t.open_sheet_name_panel(i, w, cx))];
+        if n == 1 {
+            out.push(MenuEntry::item("Properties...", move |t, w, cx| t.open_sheet_props(i, w, cx)));
+        }
+        out.push(MenuEntry::item("Duplicate", move |t, _, cx| {
+            let mut d = t.drawing.clone();
+            if let Some(j) = d.duplicate_sheet(i) {
+                t.commit("Duplicate sheet", d, cx);
                 t.switch_sheet(j, cx);
-            }));
+            }
+        }));
+        if let Some(paste) = self.sheet_paste_entry(cx) {
+            out.push(paste);
         }
-        if n > 1 {
-            out.push(MenuEntry::item("Delete", move |t, _, cx| {
-                let mut d = t.drawing.clone();
-                if d.delete_sheet(i) {
-                    let cur = t.sheet;
-                    t.selection.clear();
-                    t.sheet = if cur > i || cur >= d.sheets.len() { cur.saturating_sub(1) } else { cur };
-                    t.commit("Delete sheet", d, cx);
-                    t.fitted = false;
-                }
-            }));
-        }
+        out.push(Self::sheet_copy_entry(vec![i]));
         let mv = |label: &'static str, to: usize| {
             MenuEntry::item(label, move |t, _, cx| {
                 let cur = t.sheet;
@@ -125,17 +105,82 @@ impl DrawingEditor {
                 t.refresh(cx);
             })
         };
-        if i > 0 {
-            out.push(mv("Move up", i - 1));
+        if n > 1 {
+            out.push(MenuEntry::Separator);
+            if i > 0 {
+                out.push(mv("Move up", i - 1));
+            }
+            if i + 1 < n {
+                out.push(mv("Move down", i + 1));
+            }
+            out.push(MenuEntry::Separator);
+            out.push(MenuEntry::item("Delete", move |t, _, cx| {
+                let mut d = t.drawing.clone();
+                if d.delete_sheet(i) {
+                    let cur = t.sheet;
+                    t.selection.clear();
+                    t.sheet = if cur > i || cur >= d.sheets.len() { cur.saturating_sub(1) } else { cur };
+                    t.commit("Delete sheet", d, cx);
+                    t.fitted = false;
+                }
+            }));
         }
-        if i + 1 < n {
-            out.push(mv("Move down", i + 1));
+        out
+    }
+
+    /// Paste of copied sheets: appended at the end of the list (live).
+    fn sheet_paste_entry(&self, cx: &App) -> Option<MenuEntry> {
+        let copied = cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::SheetClipboard::from_json(&t))?;
+        Some(MenuEntry::item("Paste", move |t, _, cx| {
+            let mut d = t.drawing.clone();
+            let mut last = None;
+            for s in &copied.sheets {
+                last = Some(d.paste_sheet(s.clone()));
+            }
+            t.commit("Paste sheet", d, cx);
+            if let Some(j) = last {
+                t.switch_sheet(j, cx);
+            }
+        }))
+    }
+
+    fn sheet_copy_entry(rows: Vec<usize>) -> MenuEntry {
+        MenuEntry::item("Copy", move |t, _, cx| {
+            let sheets: Vec<Sheet> = rows.iter().filter_map(|i| t.drawing.sheets.get(*i).cloned()).collect();
+            if !sheets.is_empty() {
+                cx.write_to_clipboard(ClipboardItem::new_string(clipboard::SheetClipboard::new(sheets).to_json()));
+            }
+        })
+    }
+
+    /// Several selected sheet rows: Paste · Copy · Delete (live).
+    fn sheet_multi_entries(&self, rows: Vec<usize>, cx: &App) -> Vec<MenuEntry> {
+        let mut out: Vec<MenuEntry> = self.sheet_paste_entry(cx).into_iter().collect();
+        out.push(Self::sheet_copy_entry(rows.clone()));
+        if rows.len() < self.drawing.sheets.len() {
+            out.push(MenuEntry::item("Delete", move |t, _, cx| {
+                let mut d = t.drawing.clone();
+                let mut rows = rows.clone();
+                rows.sort_unstable_by(|a, b| b.cmp(a));
+                for i in rows {
+                    d.delete_sheet(i);
+                }
+                t.selection.clear();
+                t.sheet_rows.clear();
+                t.sheet = t.sheet.min(d.sheets.len() - 1);
+                t.commit("Delete sheets", d, cx);
+                t.fitted = false;
+            }));
         }
         out
     }
 
     fn open_sheet_menu(&mut self, i: usize, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        let entries = self.sheet_entries(i, cx);
+        // Live: a right-click adds the row to the selection.
+        if !self.sheet_rows.contains(&i) {
+            self.sheet_rows.push(i);
+        }
+        let entries = if self.sheet_rows.len() > 1 { self.sheet_multi_entries(self.sheet_rows.clone(), cx) } else { self.sheet_entries(i, cx) };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
@@ -240,9 +285,8 @@ impl DrawingEditor {
                     MenuEntry::item(v.name, move |t, _, cx| t.pin_reference(tab, part.clone(), Some(pin.clone()), cx))
                 })
                 .collect();
-            if items.is_empty() {
-                out.push(MenuEntry::item("Pin view reference (no versions)", |_, _, _| {}));
-            } else {
+            // Pinning needs a version of the document.
+            if !items.is_empty() {
                 out.push(MenuEntry::Submenu("Pin view reference".into(), items));
             }
         }
@@ -485,8 +529,8 @@ impl DrawingEditor {
         let si = self.sheet;
         let by_ref = self.sheets_by_ref;
         let mut list = gpui_kit::component::v_flex().id("dr-sheets").flex_1().min_h_0().pt(px(2.)).overflow_y_scroll();
-        let sheet_row = |i: usize, s: &Sheet, active: bool, cx: &mut Context<Self>| {
-            crate::ui::tree_row(("dr-sheet-tab", i), false)
+        let sheet_row = |i: usize, s: &Sheet, active: bool, selected: bool, cx: &mut Context<Self>| {
+            crate::ui::tree_row(("dr-sheet-tab", i), selected && !active)
                 .relative()
                 // Live drawing/281: chevron at x 18, page icon at 37, name at 60.
                 .pl(px(13.))
@@ -494,14 +538,27 @@ impl DrawingEditor {
                 .when(active, |d| d.bg(rgb(0xe9eef2)).text_color(blue).font_weight(FontWeight::SEMIBOLD).border_b_1().border_color(rgb(0x90cef1)))
                 .child(crate::ui::caret(active))
                 .child(div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("sheet-page", 18., cx)))
-                .child(div().flex_1().truncate().child(format!("{} ({})", s.name, s.views.len())))
+                // Live: "Sheet2 (2)" = the name and the sheet's position.
+                .child(div().flex_1().truncate().child(format!("{} ({})", s.name, i + 1)))
                 .when(active, |d| d.child(div().absolute().left(px(3.)).top_0().bottom_0().w(px(4.)).bg(blue)))
-                .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                // Live: a click selects the row (Ctrl+click adds), a
+                // double-click makes the sheet active.
+                .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
+                    let m = e.modifiers();
                     if e.click_count() >= 2 {
-                        this.open_sheet_name_panel(i, window, cx);
-                    } else {
+                        this.sheet_rows = vec![i];
                         this.switch_sheet(i, cx);
+                    } else if m.control || m.platform {
+                        match this.sheet_rows.iter().position(|r| *r == i) {
+                            Some(k) => {
+                                this.sheet_rows.remove(k);
+                            }
+                            None => this.sheet_rows.push(i),
+                        }
+                    } else {
+                        this.sheet_rows = vec![i];
                     }
+                    cx.notify();
                 }))
                 .on_mouse_down(
                     MouseButton::Right,
@@ -594,7 +651,7 @@ impl DrawingEditor {
         } else {
             for (i, s) in self.drawing.sheets.iter().enumerate() {
                 let active = i == self.sheet;
-                list = list.child(sheet_row(i, s, active, cx));
+                list = list.child(sheet_row(i, s, active, self.sheet_rows.contains(&i), cx));
                 if active {
                     for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
                         let src = vs.first().and_then(|v| self.reference_source(s, v.id));
@@ -751,7 +808,7 @@ impl DrawingEditor {
         }
     }
 
-    fn next_datum_label(&self) -> String {
+    pub fn next_datum_label(&self) -> String {
         let used: Vec<String> = self.current_sheet().annotations.iter().filter_map(|a| if let AnnotationKind::Datum { label, .. } = &a.kind { Some(label.clone()) } else { None }).collect();
         "ABCDEFGHJKLMNPRTUVWY".chars().map(|c| c.to_string()).find(|l| !used.contains(l)).unwrap_or_else(|| "A".into())
     }
@@ -826,7 +883,7 @@ impl DrawingEditor {
                 if len(sub(c, *a)) < 3.0 {
                     return None;
                 }
-                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: self.next_datum_label() }, position: c, ..Default::default() })
+                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: self.datum_dialog_label() }, position: c, ..Default::default() })
             }
             _ => None,
         }
@@ -1012,6 +1069,11 @@ impl DrawingEditor {
                     self.status = Some("Break views can't be created from detail views".into());
                     return true;
                 }
+                // Help drawing_section_view: no breaks on views with angular cut lines.
+                if v.is_some_and(|v| self.current_sheet().has_angular_cut(v)) {
+                    self.status = Some("Break views can't be created on views with angular section lines".into());
+                    return true;
+                }
                 if v.is_some() {
                     self.tool = Tool::Break { parent: v, first: Some(c), vertical };
                 }
@@ -1091,6 +1153,7 @@ impl DrawingEditor {
                     self.edit_sheet("Datum", cx, |s| s.annotations.push(a));
                     // Help datum: the tool stays active for more datums.
                     self.tool = Tool::Datum { anchor: None };
+                    self.datum_placed(window, cx);
                 }
             }
             Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, "Ra 3.2", window, cx),

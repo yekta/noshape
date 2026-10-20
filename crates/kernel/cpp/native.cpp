@@ -261,7 +261,7 @@ bool config_name(const std::string& n)
 // name (RGB bytes); an appearance it names (a UTF-16 string, 0x02, RGB)
 // overrides it. Matches Onshape's import (live G38: Bell Crank (229,234,237),
 // fluxpad (255,241,135), McMaster's "satinfinishstainlesssteel" (255,242,232)).
-bool solidworks_colour(const std::string& config, std::array<double, 3>& rgb)
+bool solidworks_colour(const std::string& config, std::array<double, 3>& rgb, double& opacity)
 {
   static const std::string tag = "moVisualProperties_c";
   const size_t             at  = config.find(tag);
@@ -271,6 +271,27 @@ bool solidworks_colour(const std::string& config, std::array<double, 3>& rgb)
   size_t      base = at + tag.size();
   for (int k = 0; k < 3; ++k)
     rgb[(size_t)k] = b[base + (size_t)k] / 255.0;
+  // Then (after the RGBA, 4 bytes and a second RGBA) two counted UTF-16
+  // strings (ff fe ff <n> <n chars>; the second the material), then six
+  // doubles: ambient, diffuse, specular, shininess, transparency, emission
+  // (live G38e: the polycarb window's 0.125 = Onshape's opacity 223).
+  {
+    size_t i  = base + 12;
+    bool   ok = true;
+    for (int k = 0; k < 2 && ok; ++k)
+    {
+      ok = i + 4 <= config.size() && b[i] == 0xff && b[i + 1] == 0xfe && b[i + 2] == 0xff;
+      if (ok)
+        i += 4 + 2 * (size_t)b[i + 3];
+    }
+    if (ok && i + 48 <= config.size())
+    {
+      double t;
+      std::memcpy(&t, config.data() + i + 32, 8);
+      if (t >= 0 && t < 1)
+        opacity = 1 - t;
+    }
+  }
   // A named appearance: ff fe ff <n> <n UTF-16 chars> 02 R G B.
   const size_t end = std::min(config.size(), base + 1024);
   for (size_t i = base; i + 4 < end; ++i)
@@ -331,12 +352,14 @@ std::vector<XtPart> solidworks_parts(const Streams& parts, int config)
     if (n == stream)
     {
       std::array<double, 3> rgb{};
-      if (solidworks_colour(d, rgb))
+      double                opacity = 1;
+      if (solidworks_colour(d, rgb, opacity))
         for (XtPart& p : out)
           if (!p.has_colour)
           {
             p.colour     = rgb;
             p.has_colour = true;
+            p.opacity    = opacity;
           }
     }
   for (const auto& [n, d] : parts)
@@ -442,7 +465,64 @@ std::string nx_transmit(const std::string& s)
 
 } // namespace
 
+namespace
+{
+
+// Solid Edge's part colour: the diffuse colour of its "Model Default" style
+// (Display/Styles/Library0: two size words, then zlib; the style name in
+// UTF-16, then 01 00 ff ff, ambient RGBA and diffuse RGBA floats). Live G38
+// and G38e: Onshape's (129,136,140) on three files.
+bool solid_edge_colour(Compound& cf, std::array<double, 3>& rgb)
+{
+  std::string s;
+  if (!cf.stream("Display/Styles/Library0", s) || s.size() < 10 || (unsigned char)s[8] != 0x78)
+    return false;
+  std::string x;
+  try
+  {
+    x = pvz::inflate_raw((const unsigned char*)s.data() + 10, s.size() - 10);
+  }
+  catch (const std::runtime_error&)
+  {
+    return false;
+  }
+  const std::string name = std::string("M\0o\0d\0e\0l\0 \0D\0e\0f\0a\0u\0l\0t\0", 26);
+  const size_t      at   = x.find(name);
+  if (at == std::string::npos)
+    return false;
+  const size_t mark = x.find(std::string("\x01\x00\xff\xff", 4), at + name.size());
+  if (mark == std::string::npos || mark > at + name.size() + 64 || mark + 4 + 32 > x.size())
+    return false;
+  for (int k = 0; k < 3; ++k)
+  {
+    float f;
+    std::memcpy(&f, x.data() + mark + 4 + 16 + 4 * k, 4);
+    if (!(f >= 0 && f <= 1))
+      return false;
+    rgb[(size_t)k] = f;
+  }
+  return true;
+}
+
+std::vector<XtPart> native_parts_of(const std::string& path, int config);
+
+} // namespace
+
 std::vector<XtPart> read_native_parts(const std::string& path, int config)
+{
+  // The partitions' own face colours (SOLIDWORKS: the material's base
+  // colour; NX: not its display colour) are not what Onshape imports: no
+  // face of a native import has its own colour (live G38e).
+  std::vector<XtPart> parts = native_parts_of(path, config);
+  for (XtPart& p : parts)
+    p.face_colours.clear();
+  return parts;
+}
+
+namespace
+{
+
+std::vector<XtPart> native_parts_of(const std::string& path, int config)
 {
   std::string data = read_file(path);
   // NX (since NX 9, "SPLMSSTR" files): the part stream is stored whole.
@@ -470,7 +550,18 @@ std::vector<XtPart> read_native_parts(const std::string& path, int config)
     return solidworks_parts(parts, config);
   // Solid Edge: a Parasolid transmit file.
   if (cf.stream("PARASOLID/STREAM0.P_B", s))
-    return read_xt_data(s.substr(std::min(s.find("**ABCDEFGHIJ"), s.size())));
+  {
+    std::vector<XtPart>   parts = read_xt_data(s.substr(std::min(s.find("**ABCDEFGHIJ"), s.size())));
+    std::array<double, 3> rgb{};
+    if (solid_edge_colour(cf, rgb))
+      for (XtPart& p : parts)
+        if (!p.has_colour)
+        {
+          p.colour     = rgb;
+          p.has_colour = true;
+        }
+    return parts;
+  }
   // Inventor: the B-rep segment's ShapeManager (ACIS) data. Each segment
   // has a meta stream "RSeStorage/M<id>" naming it and a data stream
   // "RSeStorage/B<id>" (a header, then zlib).
@@ -516,6 +607,8 @@ std::vector<XtPart> read_native_parts(const std::string& path, int config)
   }
   fail_unsupported("this native CAD file has no geometry noshape can read yet");
 }
+
+} // namespace
 
 
 // ---- SOLIDWORKS assemblies

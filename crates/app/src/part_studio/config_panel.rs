@@ -121,6 +121,11 @@ impl PartStudioView {
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
+                // A refused value isn't committed and keeps the focus (live
+                // Variable table: Enter on an invalid name does nothing).
+                if this.panel_checks.get(&k).is_some_and(|ok| !ok(&v)) {
+                    return;
+                }
                 // Committed: losing the focus later must not commit it again
                 // (qa4 Fixed 9: Enter then the Blur that follows added an
                 // add-row variable twice). An unchanged value commits nothing.
@@ -253,20 +258,25 @@ impl PartStudioView {
     /// The "Create variable" popup's ✓ (live part-studio/153): a Variable
     /// feature placed before the feature being edited (new or existing), or
     /// a configuration variable.
-    pub(super) fn create_variable_from_field(&mut self, name: &str, kind: &str, value: &str, description: &str, configuration: bool, cx: &mut Context<Self>) {
+    pub(super) fn create_variable_from_field(&mut self, name: &str, kind: &str, value: &str, description: &str, configuration: bool, range: Option<(String, String)>, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
         if configuration {
             let vkind = match kind {
                 "ANGLE" => VariableKind::Angle,
-                "NUMBER" => VariableKind::Real,
-                "ANY" => VariableKind::Text,
+                "INTEGER" => VariableKind::Integer,
+                "REAL" => VariableKind::Real,
+                "TEXT" => VariableKind::Text,
                 _ => VariableKind::Length,
             };
             let (name, value) = (name.to_string(), value.to_string());
+            let (min, max) = match range {
+                Some((lo, hi)) => (Some(ExprValue::new(lo)), Some(ExprValue::new(hi))),
+                None => (None, None),
+            };
             self.edit_config("Add configuration variable", cx, |ps| {
                 let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
                 let id = noshape_model::configuration::fs_identifier(&name, &taken);
-                ps.configuration.inputs.push(ConfigInput { id, name, kind: ConfigInputKind::Variable { kind: vkind, default: ExprValue::new(value), min: None, max: None }, visible_when: None, excluded: false });
+                ps.configuration.inputs.push(ConfigInput { id, name, kind: ConfigInputKind::Variable { kind: vkind, default: ExprValue::new(value), min, max }, visible_when: None, excluded: false });
             });
         } else {
             // A new feature is drafted at `index` too, so the variable takes
@@ -291,10 +301,12 @@ impl PartStudioView {
             "ANGLE" => "Angle",
             "NUMBER" => "Number",
             "ANY" => "Any",
+            "MEASURED" => "Measured",
+            "TABLE" => "From import",
             _ => "Length",
         };
         let mut lines = vec!["Name\tVariable type\tValue\tDescription".to_string()];
-        for r in noshape_model::variable_table::rows(studio) {
+        for r in noshape_model::variable_table::active_rows(studio) {
             lines.push(format!("{}\t{}\t{}\t{}", r.name, kind(&r.kind), r.value, r.description));
         }
         cx.write_to_clipboard(ClipboardItem::new_string(lines.join("\n")));
@@ -344,8 +356,7 @@ impl PartStudioView {
             .bg(gpui_kit::rgb(0xeaeaea))
             .border_1()
             .border_color(grid)
-            // ⌄ folds the table; ⋯ = Copy table | Collapse all tables (live 161:
-            // the Part Studio's own table has only these two).
+            // ⌄ folds the table; ⋯ = Copy table only (live part-studio/562).
             .child(
                 div()
                     .id("pvar-fold")
@@ -358,18 +369,12 @@ impl PartStudioView {
             )
             .child(div().flex_1().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(tab_name))
             .child({
-                let (v1, v2) = (cx.entity(), cx.entity());
+                let v1 = cx.entity();
                 div().id("pvar-more").cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
-                    let (v1, v2) = (v1.clone(), v2.clone());
+                    let v1 = v1.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                        let (v1, v2) = (v1.clone(), v2.clone());
+                        let v1 = v1.clone();
                         m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_variable_table(cx))))
-                            .item(crate::os_menu::OsMenuItem::new("Collapse all tables").on_click(move |_, _, cx| {
-                                v2.update(cx, |this, cx| {
-                                    this.ui.var_folded = true;
-                                    cx.notify();
-                                })
-                            }))
                     });
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
@@ -378,29 +383,45 @@ impl PartStudioView {
         let columns = h_flex().border_l_1().border_color(grid).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.)).bg(gpui_kit::rgb(0xeaeaea))));
         // The Part Studio's own variables are its Variable features (Help
         // PartStudio__variable_table); every cell edits them.
-        let var_rows = self.studio(cx).map(noshape_model::variable_table::rows).unwrap_or_default();
+        // Only the variables before the rollback bar (live 10-20 o).
+        let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
         let input_cell = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(13.33))));
+        // A Name cell holding an invalid name: pink with a red border and the
+        // reason as tooltip (live part-studio/554–555).
+        let name_cell = |st: &Entity<InputState>, cx: &App| {
+            let v = st.read(cx).value().to_string();
+            let bad = !v.trim().is_empty() && !noshape_model::variable_table::is_identifier(v.trim().trim_start_matches('#'));
+            div()
+                .id(SharedString::from(format!("pvar-cell-{}", st.entity_id())))
+                .when(bad, |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_1().border_color(gpui_kit::rgb(0xbd3039)).tooltip(crate::ui::tooltip("Variable name must be a letter followed by a string of letters or numbers.")))
+                .child(input_cell(st))
+        };
         let mut rows: Vec<AnyElement> = Vec::new();
         for (k, r) in var_rows.into_iter().enumerate() {
             let fid = r.feature;
+            // Renaming to a taken name silently reverts (live 556–557).
             let name_st = self.cell_input(format!("pvar-name-{fid}"), r.name.clone(), window, cx, move |this, v, cx| {
                 if v.trim().is_empty() {
                     return;
                 }
-                let mut res = Ok(());
-                this.edit_config("Rename variable", cx, |ps| res = noshape_model::variable_table::rename(ps, fid, &v));
-                this.variable_name_error(res.err(), &v, cx);
+                this.edit_config("Rename variable", cx, |ps| {
+                    let _ = noshape_model::variable_table::rename(ps, fid, &v);
+                });
                 this.config_dirty(cx);
+                cx.notify();
             });
+            self.panel_checks.insert(format!("pvar-name-{fid}"), valid_variable_name);
             let value_st = self.cell_input(format!("pvar-value-{fid}"), r.value.clone(), window, cx, move |this, v, cx| {
-                this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_value(ps, fid, &v));
+                let units = this.doc.read(cx).session.doc.settings.units;
+                this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_value(ps, fid, &v, &units));
                 this.config_dirty(cx);
             });
             let desc_st = self.cell_input(format!("pvar-desc-{fid}"), r.description.clone(), window, cx, move |this, v, cx| {
                 this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_description(ps, fid, &v));
             });
-            const KINDS: [(&str, &str); 4] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any")];
+            // Live part-studio/558.
+            const KINDS: [(&str, &str); 6] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any"), ("MEASURED", "Measured"), ("TABLE", "From import")];
             let current = KINDS.iter().position(|(k, _)| *k == r.kind).unwrap_or(0);
             let v_kind = cx.entity();
             let kind_select = crate::os_ui::select_field(SharedString::from(format!("pvar-kind-{fid}")), KINDS.iter().map(|(_, n)| n.to_string()).collect(), current, move |i, _, cx| {
@@ -414,8 +435,32 @@ impl PartStudioView {
             .h(px(32.))
             .border_0()
             .rounded(px(0.));
-            let (n1, name) = (r.name.clone(), r.name.clone());
+            let (n1, name, n2) = (r.name.clone(), r.name.clone(), r.name.clone());
             let view = cx.entity();
+            // Measured / From import: the evaluated value, or "Not set", and
+            // a ✎ that opens the feature (live 559).
+            let value_cell = if matches!(r.kind.as_str(), "MEASURED" | "TABLE") {
+                let shown = self.display.variables.get(&r.name).map(|q| q.to_string()).unwrap_or_else(|| "Not set".into());
+                h_flex()
+                    .w(px(140.))
+                    .h(px(34.))
+                    .flex_none()
+                    .px(px(5.))
+                    .border_r_1()
+                    .border_b_1()
+                    .border_color(grid)
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(pal.text).child(shown))
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("pvar-pencil-{fid}")))
+                            .cursor_pointer()
+                            .child(crate::ui::glyph("pencil", 12., pal.text_muted))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_feature(fid, window, cx))),
+                    )
+                    .into_any_element()
+            } else {
+                input_cell(&value_st).into_any_element()
+            };
             rows.push(
                 h_flex()
                     .id(SharedString::from(format!("var-row-{fid}")))
@@ -430,66 +475,67 @@ impl PartStudioView {
                             cx.notify();
                         }
                     }))
-                    .child(input_cell(&name_st))
-                    .child(div().w(px(140.)).h(px(34.)).flex_none().border_r_1().border_b_1().border_color(grid).child(kind_select))
-                    .child(input_cell(&value_st))
-                    .child(input_cell(&desc_st))
                     // Help: Filter feature list, Delete, Move up / down; the row
                     // menu also over the cells' inputs (qa4 Fixed 11).
-                    .os_context_menu_over_inputs(move |menu, _, _| {
-                        let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
-                        let n = name.clone();
-                        let mut menu = menu
-                            .item(crate::os_menu::OsMenuItem::new("Filter feature list").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.set_filter(&format!(":variable {n}"), w, cx))))
-                            .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| {
-                                v2.update(cx, |this, cx| {
-                                    this.edit_config("Delete variable", cx, |ps| {
-                                        ps.remove(fid);
-                                    });
-                                    this.config_dirty(cx);
-                                })
-                            }));
-                        if k > 0 {
-                            menu = menu.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| {
-                                v3.update(cx, |this, cx| {
-                                    this.edit_config("Move variable", cx, |ps| noshape_model::variable_table::move_row(ps, fid, -1));
-                                    this.config_dirty(cx);
-                                })
-                            }));
-                        }
-                        if k + 1 < count {
-                            menu = menu.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| {
-                                v4.update(cx, |this, cx| {
-                                    this.edit_config("Move variable", cx, |ps| noshape_model::variable_table::move_row(ps, fid, 1));
-                                    this.config_dirty(cx);
-                                })
-                            }));
-                        }
-                        menu
+                    .child(
+                        h_flex()
+                            .child(name_cell(&name_st, cx))
+                            .child(div().w(px(140.)).h(px(34.)).flex_none().border_r_1().border_b_1().border_color(grid).child(kind_select))
+                            .child(value_cell)
+                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count)),
+                    )
+                    // Right-clicking the Description adds Copy (live 563).
+                    .child({
+                        let (view, text) = (cx.entity(), r.description.clone());
+                        div().child(input_cell(&desc_st)).os_context_menu_over_inputs(move |menu, _, _| {
+                            let text = text.clone();
+                            var_row_menu(menu, view.clone(), fid, &name, k, count).item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
+                        })
                     })
                     .into_any_element(),
             );
         }
         // The italic "Name" row: typing a name and Enter (or Tab) creates a
         // Length variable, 0 in the document unit (Help steps 3–4).
-        let new_st = self.cell_input(format!("pvar-new-{count}"), String::new(), window, cx, move |this, v, cx| {
+        // A taken name is created as `name_0` with an info bubble; the focus
+        // then moves to the next add row (live 550–554).
+        let new_key = format!("pvar-new-{count}");
+        let new_st = self.cell_input(new_key.clone(), String::new(), window, cx, move |this, v, cx| {
             let name = v.trim().to_string();
             if name.is_empty() {
                 return;
             }
             let units = this.doc.read(cx).session.doc.settings.units;
-            let mut res = Ok(noshape_model::FeatureId(0));
+            let mut renamed = false;
             this.edit_config("Add variable", cx, |ps| {
-                res = noshape_model::variable_table::create(ps, &name, "LENGTH", &noshape_model::variable_table::default_value("LENGTH", &units), "", None, &units);
+                let unique = noshape_model::variable_table::unique_name(ps, &name);
+                renamed = unique != name.trim_start_matches('#');
+                let _ = noshape_model::variable_table::create(ps, &unique, "LENGTH", &noshape_model::variable_table::default_value("LENGTH", &units), "", None, &units);
             });
-            this.variable_name_error(res.err(), &name, cx);
+            if renamed {
+                this.message = Some((noshape_model::display::FeatureStatus::Info, "Renamed some new variables to avoid name conflicts.".into()));
+            }
+            this.ui.var_focus_new = true;
             this.config_dirty(cx);
         });
+        self.panel_checks.insert(new_key, valid_variable_name);
+        if std::mem::take(&mut self.ui.var_focus_new) {
+            new_st.update(cx, |s, cx| s.focus(window, cx));
+        }
         let new_empty = new_st.read(cx).value().is_empty();
         let new_row = h_flex().border_l_1().border_color(grid).child(
             div()
                 .relative()
-                .child(input_cell(&new_st))
+                .child(name_cell(&new_st, cx))
+                // Esc clears the add row (live 555).
+                .on_key_down({
+                    let st = new_st.clone();
+                    move |e: &KeyDownEvent, window, cx| {
+                        if e.keystroke.key == "escape" {
+                            st.update(cx, |s, cx| s.set_value("", window, cx));
+                        }
+                    }
+                })
                 .when(new_empty, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().italic().text_size(px(13.33)).text_color(pal.text_faint).child("Name"))),
         );
         // Variable Studio tables inserted here (Onshape: below the Part
@@ -849,6 +895,21 @@ impl PartStudioView {
                         cx.notify();
                     })),
             )
+            // An input excluded from properties shows
+            // `configuration-exclude-properties` between the chevron and the
+            // name (live part-studio/531).
+            .when(input.excluded, |d| {
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("cfg-excluded-{iid}")))
+                        .size(px(25.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(crate::assets::icon("configuration-exclude-properties", 20., cx))
+                        .tooltip(crate::ui::tooltip("Excluded from affecting configured properties")),
+                )
+            })
             .child(self.config_name_cell(format!("in-name-{iid}"), input.name.clone(), (px(16.), FontWeight::MEDIUM), window, cx, move |this, v, cx| {
                 let id = i2.clone();
                 this.edit_config("Rename configuration input", cx, |ps| {
@@ -895,20 +956,6 @@ impl PartStudioView {
                         .child(crate::assets::icon("configuration-visibiliity", 20., cx))
                         .tooltip(crate::ui::tooltip("Modify visibility conditions"))
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_visibility_conditions(Some(vid.clone()), window, cx))),
-                )
-            })
-            // Bundle: an input excluded from properties shows
-            // `configuration-exclude-properties` next to it.
-            .when(input.excluded, |d| {
-                d.child(
-                    div()
-                        .id(SharedString::from(format!("cfg-excluded-{iid}")))
-                        .size(px(25.))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(crate::assets::icon("configuration-exclude-properties", 20., cx))
-                        .tooltip(crate::ui::tooltip("Excluded from affecting configured properties")),
                 )
             })
             .child({
@@ -1440,7 +1487,17 @@ impl PartStudioView {
                     .min_h(px(26.))
                     .gap(px(4.))
                     .child(div().w(px(80.)).flex_none().pl(px(4.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone()))
-                    .child(div().flex_1().min_w_0().child(control)),
+                    .child(div().flex_1().min_w_0().child(control))
+                    // Live part-studio/535: the excluded icon follows the value.
+                    .when(input.excluded, |d| {
+                        d.child(
+                            div()
+                                .id(SharedString::from(format!("cfgbox-excluded-{}", input.id)))
+                                .flex_none()
+                                .child(crate::assets::icon("configuration-exclude-properties", 20., cx))
+                                .tooltip(crate::ui::tooltip("Excluded from affecting configured properties")),
+                        )
+                    }),
             );
         }
         Some(col.into_any_element())
@@ -1756,4 +1813,40 @@ impl PartStudioView {
             .when(self.has_frames(), |d| d.child(btn("panel-cut", "cut-list", "Cut list", RightPanel::CutList, cx)))
             .into_any_element()
     }
+}
+
+/// The Variable table's name check (FeatureScript identifier; empty is
+/// allowed, it commits nothing).
+fn valid_variable_name(v: &str) -> bool {
+    let v = v.trim();
+    v.is_empty() || noshape_model::variable_table::is_identifier(v.trim_start_matches('#'))
+}
+
+/// A Variable table row's right-click menu (live part-studio/561): Filter
+/// feature list | Delete | Move up (not the first row) | Move down (not the
+/// last).
+fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid: noshape_model::FeatureId, name: &str, k: usize, count: usize) -> crate::os_menu::OsMenu {
+    type RowEdit = fn(&mut noshape_model::partstudio::PartStudio, noshape_model::FeatureId);
+    let edit = |label: &'static str, undo: &'static str, f: RowEdit| {
+        let view = view.clone();
+        crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| {
+            view.update(cx, |this, cx| {
+                this.edit_config(undo, cx, |ps| f(ps, fid));
+                this.config_dirty(cx);
+            })
+        })
+    };
+    // Live 564: the filter matches the name exactly.
+    let filter = format!(":variable \"{name}\"");
+    let v = view.clone();
+    let mut menu = menu.item(crate::os_menu::OsMenuItem::new("Filter feature list").on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_filter(&filter, w, cx)))).item(edit("Delete", "Delete variable", |ps, fid| {
+        ps.remove(fid);
+    }));
+    if k > 0 {
+        menu = menu.item(edit("Move up", "Move variable", |ps, fid| noshape_model::variable_table::move_row(ps, fid, -1)));
+    }
+    if k + 1 < count {
+        menu = menu.item(edit("Move down", "Move variable", |ps, fid| noshape_model::variable_table::move_row(ps, fid, 1)));
+    }
+    menu
 }

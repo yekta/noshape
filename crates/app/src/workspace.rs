@@ -54,6 +54,11 @@ pub struct Workspace {
     /// The pointer is over the navbar, which shows Onshape's selection-count
     /// cursor too (`.navbar` gets the canvas's selection cursor).
     navbar_hovered: bool,
+    /// The tab strip's scroll, and whether the active tab still has to be
+    /// scrolled into view (live: activating a hidden tab, opening the Tab
+    /// manager).
+    tab_scroll: ScrollHandle,
+    reveal_active_tab: bool,
     cursor_sync: crate::cursor::CursorSync,
     /// Left rail › Document notes or Performance.
     doc_panel: Option<(DocPanel, Vec<Subscription>)>,
@@ -106,7 +111,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -211,6 +216,7 @@ impl Workspace {
     }
 
     fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        self.reveal_active_tab = true;
         if let Some(prev) = self.active.filter(|p| *p != tab) {
             self.recent.retain(|t| *t != prev && *t != tab);
             self.recent.insert(0, prev);
@@ -820,7 +826,14 @@ impl Workspace {
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
         });
-        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(3.)).overflow_x_scroll();
+        // The active tab's place among the strip's children (home, the
+        // breadcrumb tab and the open folder come first inside a folder).
+        let lead = if open_name.is_some() { 2 + usize::from(!crumbs.is_empty()) } else { 0 };
+        if let Some(ix) = items.iter().position(|(id, _, _)| self.active == Some(*id)).filter(|_| self.reveal_active_tab) {
+            self.tab_scroll.scroll_to_item(lead + ix);
+            self.reveal_active_tab = false;
+        }
+        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(3.)).overflow_x_scroll().track_scroll(&self.tab_scroll);
         if let Some(name) = open_name {
             let folder = open.unwrap_or(TabId(0));
             // "All tabs" (home): back to every tab; dropping here moves to the root.
@@ -1031,7 +1044,50 @@ impl Workspace {
                     }),
             );
         }
-        (tab_list.into_any_element(), h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).into_any_element())
+        let arrows = self.render_tab_scroll_buttons(cx);
+        (tab_list.into_any_element(), h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).into_any_element())
+    }
+
+    /// Live (behaviours "Document tab bar scroll buttons"): ‹ › at the right
+    /// end of the bar, 24x30 each, only while the tabs overflow; the one at
+    /// an end dimmed to 0.4. A press scrolls about a page, a right press to
+    /// the first / last tab. (The wheel scrolls the strip already.)
+    fn render_tab_scroll_buttons(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (off, max) = (self.tab_scroll.offset().x, self.tab_scroll.max_offset().x);
+        if max <= px(0.5) {
+            return None;
+        }
+        let button = |left: bool, enabled: bool, cx: &mut Context<Self>| {
+            div()
+                .id(if left { "tab-scroll-left" } else { "tab-scroll-right" })
+                .w(px(24.))
+                .h(px(crate::ui::TAB_BAR_H))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .when(!enabled, |d| d.opacity(0.4))
+                .child(crate::ui::glyph(if left { "ui-chevron-left" } else { "ui-chevron-right" }, 22., gpui_kit::rgb(0x555555)))
+                .tip(if left { "Scroll left (RMB: to first)" } else { "Scroll right (RMB: to last)" }, TipSide::Above)
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.scroll_tabs(left, false, cx)))
+                .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.scroll_tabs(left, true, cx)))
+        };
+        Some(h_flex().flex_none().child(button(true, off < px(-0.5), cx)).child(button(false, off > -max + px(0.5), cx)).into_any_element())
+    }
+
+    /// Scrolls the tab strip a page (about the visible width less one tab),
+    /// or to its first / last tab.
+    fn scroll_tabs(&mut self, left: bool, to_end: bool, cx: &mut Context<Self>) {
+        let (mut off, max) = (self.tab_scroll.offset(), self.tab_scroll.max_offset().x);
+        let page = (self.tab_scroll.bounds().size.width - px(201.)).max(px(201.));
+        off.x = match (left, to_end) {
+            (true, true) => px(0.),
+            (false, true) => -max,
+            (true, false) => (off.x + page).min(px(0.)),
+            (false, false) => (off.x - page).max(-max),
+        };
+        self.tab_scroll.set_offset(off);
+        cx.notify();
     }
 
     /// Onshape's left document-panel rail (§3.3): 40 px `#fafafa`.
@@ -1584,6 +1640,7 @@ impl Workspace {
 impl Workspace {
     fn toggle_tab_manager(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         use crate::tab_manager::{TabManager as Panel, TabManagerEvent};
+        self.reveal_active_tab = true;
         if self.tab_manager.take().is_some() {
             if let Some(a) = self.active {
                 self.activate(a, window, cx);
@@ -1667,7 +1724,7 @@ fn tab_chip(id: impl Into<ElementId>, active: bool) -> Stateful<Div> {
 
 /// File types "Import files…" translates.
 pub(crate) const IMPORT_EXTS: &[&str] =
-    &["step", "stp", "iges", "igs", "brep", "stl", "obj", "pvz", "x_t", "x_b", "xmt_txt", "xmt_bin", "3dm", "sldprt", "par", "psm", "prt", "ipt", "sat", "sab", "3mf", "gltf", "glb", "jt"];
+    &["step", "stp", "iges", "igs", "brep", "stl", "obj", "pvz", "x_t", "x_b", "xmt_txt", "xmt_bin", "3dm", "sldprt", "par", "psm", "prt", "ipt", "sat", "sab", "3mf", "gltf", "glb", "jt", "zip"];
 
 /// Tab (and document) name of an imported file: the file name without its
 /// extension; and the full file name.
@@ -1705,7 +1762,7 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
     // Parts with names and colours: one compound child each, described in `info`.
     let mut info: Vec<noshape_model::features::importing::ImportPartInfo> = Vec::new();
     let mut compound = |parts: Vec<k::ImportedShape>| {
-        info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, faces: p.face_colors.clone() }).collect();
+        info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
         k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
     };
     let shape = match ext.as_str() {
@@ -1727,6 +1784,55 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
     };
     let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
     Ok(Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts })
+}
+
+/// A native assembly as Onshape imports it (live G38): a flat zip named like
+/// its root assembly, with the part files the assembly references by name.
+pub(crate) struct AssemblyZip {
+    pub root: String,
+    pub components: Vec<noshape_kernel::NativeComponent>,
+    pub files: Vec<noshape_model::native_assembly::PartFile>,
+}
+
+pub(crate) fn read_assembly_zip(path: &std::path::Path) -> anyhow::Result<AssemblyZip> {
+    use noshape_kernel as k;
+    const NO_ROOT: &str = "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders";
+    let dir = std::env::temp_dir().join(format!("noshape-zip-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
+    std::fs::create_dir_all(&dir)?;
+    let result = (|| {
+        let names = k::extract_zip(path, &dir)?;
+        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        if names.iter().any(|n| n.contains('/') || n.contains('\\')) {
+            anyhow::bail!(NO_ROOT);
+        }
+        let split = |n: &str| n.rsplit_once('.').map(|(a, b)| (a.to_string(), b.to_ascii_lowercase())).unwrap_or((n.to_string(), String::new()));
+        let Some(root) = names.iter().find(|n| {
+            let (base, ext) = split(n);
+            ext == "sldasm" && base.eq_ignore_ascii_case(&stem)
+        }) else {
+            anyhow::bail!(NO_ROOT)
+        };
+        let components = k::read_native_assembly(&dir.join(root))?;
+        let mut files = Vec::new();
+        for n in &names {
+            let mut configs: Vec<Option<i32>> = Vec::new();
+            for c in components.iter().filter(|c| !c.assembly && c.file.eq_ignore_ascii_case(n)) {
+                if !configs.contains(&c.configuration_id) {
+                    configs.push(c.configuration_id);
+                }
+            }
+            for configuration in configs {
+                let bodies = k::read_native_parts_configuration(&dir.join(n), k::LengthUnit::Meter, configuration)?;
+                files.push(noshape_model::native_assembly::PartFile { file: n.clone(), configuration, bodies });
+            }
+        }
+        if files.is_empty() {
+            anyhow::bail!(noshape_model::native_assembly::NO_GEOMETRY);
+        }
+        Ok(AssemblyZip { root: split(root).0, components, files })
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
 }
 
 /// Append an Import feature ("Import N") holding `brep` to `ps`.

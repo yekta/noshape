@@ -420,3 +420,22 @@ schema. 44 of 65 are identical (pinned in the test). Built-in deviations found (
 - Errors are `KernelError::Invalid` with a message (bad knot count, decreasing knots, multiplicity > degree + 1,
   degree outside 1..25, non-positive weights). Onshape's own error text for these is not captured; map them to
   Onshape's message where you know it.
+
+## Plan: std sheet-metal internals (fs), from live dom/fs-smprobe{,2}-{1,2,3}.txt
+Definition body (hidden from qEverything, reached via getSMDefinitionEntities / association attrs):
+- sheet of planar WALL faces meeting at SHARP edges; bends = shared edges with JOINT attr
+  {jointType BEND, radius, angle, bendType STANDARD, holdAdjacentEdges}; rips = JOINT RIP (sm3 to confirm);
+  body: MODEL attr (thickness, defaultBendRadius, kFactor, relief scales, active, controllingFeatureId…).
+- definition plane = the "back" side face (sm1 thicken: definition at z=2 n=-z, part z 0..2).
+Solid built by updateSheetMetalGeometry:
+- each wall thickened by T in the thickness direction, trimmed back by the bend's inner radius
+  from every BEND edge (base 40x20 -> 40x19 with r=1); bend = cylinders r and r+T (axis = edge offset by r);
+  free edges -> side faces; association attr on every solid face/edge/vertex = transient of its definition entity
+  (walls -> both caps; free edge -> side face + its 2 edges; vertex -> corner edge+verts; bend edge -> both cylinders + 4 lines).
+Natives to write: updateSheetMetalGeometry (rebuild solid from definition + attrs), queryContainsFlattenedSheetMetal,
+evSheetMetalFlatTransformation (live: walls of flat sm1 -> translation (0,0,-T)), sheetMetalApplyInFlat, opSMFlatOperation,
+evSheetMetalBendUp, opDerip, evSheetMetalHole/FormToolBodies.
+Order: (1) hidden definition bodies + association attributes in host (getSMDefinitionEntities works);
+(2) updateSheetMetalGeometry for walls + BEND joints (sm1, sm2 exact face areas as tests);
+(3) RIP / corners / reliefs; (4) flat ops. Reuse sheetmetal_util / flange kernels where possible (kern's files: coordinate).
+Test fixtures: sm1 6 faces (800/800/80/80/40/40), sm2 14 faces (760,760,38,38,80,280,280,14,14,80, cyl 188.4956 r3, 62.8319 r1, 6.2832 x2).

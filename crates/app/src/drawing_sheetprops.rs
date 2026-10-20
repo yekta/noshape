@@ -19,6 +19,40 @@ use noshape_model::drawing::*;
 pub struct SheetPropsState {
     pub sheet: usize,
     pub scale: Entity<InputState>,
+    /// Size › Custom: width and height (drawing units).
+    pub width: Entity<InputState>,
+    pub height: Entity<InputState>,
+}
+
+/// Zone counts of Size › Custom (live 825: 0–20).
+const ZONES: [u32; 11] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+
+/// A sheet length (mm) in the drawing's units ("17 in", "432 mm").
+fn sheet_len(mm: f64, inches: bool) -> String {
+    let v = if inches { mm / 25.4 } else { mm };
+    let t = format!("{v:.3}");
+    let t = t.trim_end_matches('0').trim_end_matches('.');
+    format!("{t} {}", if inches { "in" } else { "mm" })
+}
+
+/// A typed sheet length in mm (a bare number is in the drawing's units).
+fn parse_sheet_len(text: &str, inches: bool) -> Option<f64> {
+    let t = text.trim();
+    let (num, unit) = match t.find(|c: char| c.is_ascii_alphabetic()) {
+        Some(i) => (t[..i].trim(), t[i..].trim()),
+        None => (t, ""),
+    };
+    let v = num.parse::<f64>().ok()?;
+    let mm = match unit {
+        "in" => v * 25.4,
+        "mm" => v,
+        "cm" => v * 10.0,
+        "" if inches => v * 25.4,
+        "" => v,
+        _ => return None,
+    };
+    // Help H:sheets: at most 1800 in x 1800 in.
+    (mm > 0.0 && mm <= 1800.0 * 25.4).then_some(mm)
 }
 
 const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
@@ -31,9 +65,13 @@ impl DrawingEditor {
         self.view_props = None;
         self.panel = None;
         let text = format_scale(s.scale);
+        let (w, h) = s.size.size_mm();
+        let inches = !self.drawing.units_mm;
         let scale = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let width = cx.new(|cx| InputState::new(window, cx).default_value(sheet_len(w, inches)));
+        let height = cx.new(|cx| InputState::new(window, cx).default_value(sheet_len(h, inches)));
         scale.update(cx, |st, cx| st.focus(window, cx));
-        self.sheet_props = Some(SheetPropsState { sheet, scale });
+        self.sheet_props = Some(SheetPropsState { sheet, scale, width, height });
         cx.notify();
     }
 
@@ -45,6 +83,17 @@ impl DrawingEditor {
         {
             let i = st.sheet;
             self.edit("Sheet scale", cx, |d| d.sheets[i].scale = s);
+        }
+        // Size › Custom: the typed width and height.
+        let inches = !self.drawing.units_mm;
+        if let Some(SheetSize::Custom { width_mm, height_mm }) = self.drawing.sheets.get(st.sheet).map(|x| x.size) {
+            let w = parse_sheet_len(&st.width.read(cx).value(), inches).unwrap_or(width_mm);
+            let h = parse_sheet_len(&st.height.read(cx).value(), inches).unwrap_or(height_mm);
+            if (w - width_mm).abs() > 1e-9 || (h - height_mm).abs() > 1e-9 {
+                let i = st.sheet;
+                self.edit("Sheet size", cx, |d| d.sheets[i].size = SheetSize::Custom { width_mm: w, height_mm: h });
+                self.fitted = false;
+            }
         }
         cx.notify();
     }
@@ -130,22 +179,91 @@ impl DrawingEditor {
             .collect();
         let format_label = cur_tmpl.map(|n| n.replace(' ', "_") + ".dwt").unwrap_or_else(|| "Custom".into());
         let dwt = Button::new("sp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").into_any_element();
-        // Size: Onshape lists A, A Portrait, B... for ANSI, A4... for ISO.
-        let size_items: Vec<(String, bool, Act)> = SheetSize::STANDARD
-            .iter()
-            .filter(|s| s.is_ansi() == sheet.size.is_ansi())
-            .map(|&s| {
-                let label = if s == SheetSize::AnsiAPortrait { "A Portrait".to_string() } else { s.label().to_string() };
+        // Size: Onshape lists the standard's sizes (A, A Portrait, B, C, D;
+        // A4, A4 Portrait, A3 … A0), then Custom (live 825).
+        let ansi = match sheet.size {
+            SheetSize::Custom { .. } => !self.drawing.units_mm,
+            s => s.is_ansi(),
+        };
+        let mut sizes: Vec<SheetSize> = SheetSize::standard_list(ansi).to_vec();
+        if !matches!(sheet.size, SheetSize::Custom { .. }) && !sizes.contains(&sheet.size) {
+            sizes.push(sheet.size);
+        }
+        let mut size_items: Vec<(String, bool, Act)> = sizes
+            .into_iter()
+            .map(|s| {
                 let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
                     t.edit("Sheet size", cx, |d| d.sheets[si].size = s);
                     t.fitted = false;
                 });
-                (label, s == sheet.size, act)
+                (s.list_name().to_string(), s == sheet.size, act)
             })
             .collect();
-        let size_label = match sheet.size {
-            SheetSize::AnsiAPortrait => "A Portrait".to_string(),
-            s => s.label().to_string(),
+        let is_custom = matches!(sheet.size, SheetSize::Custom { .. });
+        size_items.push((
+            "Custom".into(),
+            is_custom,
+            std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
+                // Custom keeps the current paper size and zones, with the border.
+                t.edit("Sheet size", cx, |d| {
+                    let sh = &mut d.sheets[si];
+                    if !matches!(sh.size, SheetSize::Custom { .. }) {
+                        let (w, h) = sh.size.size_mm();
+                        sh.format.zones = Some(sh.format.zone_counts(sh.size));
+                        sh.size = SheetSize::Custom { width_mm: w, height_mm: h };
+                    }
+                });
+                t.fitted = false;
+            }),
+        ));
+        let size_label = sheet.size.list_name().to_string();
+        // Size › Custom: width × height, Zones (start corner, horizontal and
+        // vertical counts) and Include border.
+        let custom_rows: Vec<AnyElement> = if is_custom {
+            let format = sheet.format;
+            let [nx, ny] = format.zone_counts(sheet.size);
+            let zone_items = |vertical: bool| -> Vec<(String, bool, Act)> {
+                ZONES
+                    .iter()
+                    .map(|&n| {
+                        let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
+                            t.edit("Sheet zones", cx, |d| {
+                                let sh = &mut d.sheets[si];
+                                let mut z = sh.format.zone_counts(sh.size);
+                                z[vertical as usize] = n;
+                                sh.format.zones = Some(z);
+                            });
+                        });
+                        (n.to_string(), n == if vertical { ny } else { nx }, act)
+                    })
+                    .collect()
+            };
+            let start_items: Vec<(String, bool, Act)> = [(ZoneStart::BottomRight, "Start from bottom right"), (ZoneStart::TopLeft, "Start from top left")]
+                .into_iter()
+                .map(|(z, l)| {
+                    let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| t.edit("Sheet zones", cx, |d| d.sheets[si].format.start = z));
+                    (l.to_string(), format.start == z, act)
+                })
+                .collect();
+            let start_label = if format.start == ZoneStart::TopLeft { "Start from top left" } else { "Start from bottom right" };
+            let icon = |name: &str, cx: &App| div().flex_none().child(crate::assets::icon(name, 24., cx));
+            let len_field = |input: &Entity<InputState>| div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(input).appearance(false).small()).into_any_element();
+            let border = format.border;
+            vec![
+                row("", h_flex().gap(px(4.)).child(icon("sheet-width", cx)).child(len_field(&st.width)).child(icon("sheet-height", cx)).child(len_field(&st.height)).into_any_element(), None).into_any_element(),
+                row("Zones", dropdown("sp-zone-start", start_label.into(), start_items).into_any_element(), None).into_any_element(),
+                row("", h_flex().gap(px(4.)).child(icon("zones-horizontal", cx)).child(div().flex_1().child(dropdown("sp-hzones", nx.to_string(), zone_items(false)))).child(icon("zones-vertical", cx)).child(div().flex_1().child(dropdown("sp-vzones", ny.to_string(), zone_items(true)))).into_any_element(), None).into_any_element(),
+                div()
+                    .pl(px(8.))
+                    .py(px(6.))
+                    .child(gpui_kit::component::checkbox::Checkbox::new("sp-border").label("Include border").small().checked(border).on_click(cx.listener(move |this, on: &bool, _, cx| {
+                        let on = *on;
+                        this.edit("Sheet border", cx, |d| d.sheets[si].format.border = on);
+                    })))
+                    .into_any_element(),
+            ]
+        } else {
+            Vec::new()
         };
         let reference = self.sheet_reference(&sheet, cx);
         // Live 124: "Unassigned" in grey when the sheet has no reference.
@@ -227,6 +345,7 @@ impl DrawingEditor {
                         .child(row("Scale", scale_field, None))
                         .child(row("Format", dropdown("sp-format", format_label, format_items).into_any_element(), Some(dwt)))
                         .child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None))
+                        .children(custom_rows)
                         .child(row("Reference", div().when(unassigned, |d| d.text_color(gpui_kit::rgb(0xaaaaaa))).child(dropdown("sp-ref", ref_label, ref_items)).into_any_element(), link)),
                 )
                 .into_any_element(),

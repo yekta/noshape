@@ -501,6 +501,9 @@ pub struct DrawingEditor {
     /// Dimension tool: circle centers woken by hovering their edges (view,
     /// view point); shown until the tool changes (help drawing_dimensions).
     pub woken_centers: Vec<(ViewId, [f64; 2])>,
+    /// Sketch tools: endpoints hovered so far (SK8: the cursor aligns with
+    /// them along red dotted inference lines).
+    pub woken_points: Vec<[f64; 2]>,
     /// Datum target tool: the letter of the set being placed (A1, A2…; a
     /// new run of the tool starts the next letter's set).
     pub datum_target_letter: Option<char>,
@@ -517,6 +520,8 @@ pub struct DrawingEditor {
     pub replicate_dlg: Option<crate::drawing_replicate::ReplicateDlg>,
     /// The dimension palette / hole callout panel (double-click).
     pub palette: Option<crate::drawing_palette::PaletteDlg>,
+    /// The Datum dialog (Datum / Datum target tabs).
+    pub datum_dlg: Option<crate::drawing_datum::DatumDlg>,
     pub table_tool: Option<crate::drawing_table_tool::TableToolDlg>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
@@ -539,6 +544,8 @@ pub struct DrawingEditor {
     pub right_panel: Option<crate::drawing_panels::RightPanel>,
     /// MBD status panel › Model (0 Current sheet, 1 All models, then the parts).
     pub mbd_model: usize,
+    /// Selected rows of the Sheets panel (sheet indices).
+    pub sheet_rows: Vec<usize>,
     pub panel_highlight: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
@@ -661,6 +668,7 @@ impl DrawingEditor {
             gdt_dlg: None,
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
+            woken_points: Vec::new(),
             datum_target_letter: None,
             menu_at: [0.0; 2],
             move_sheet: None,
@@ -671,6 +679,7 @@ impl DrawingEditor {
             replication: None,
             replicate_dlg: None,
             palette: None,
+            datum_dlg: None,
             table_tool: None,
             note_leader: None,
             cell_sel: None,
@@ -696,6 +705,7 @@ impl DrawingEditor {
             image_cache: Default::default(),
             right_panel: None,
             mbd_model: 0,
+            sheet_rows: Vec::new(),
             panel_highlight: None,
             insp_table: Default::default(),
             measure: None,
@@ -734,6 +744,8 @@ impl DrawingEditor {
             self.drawing.sheets.push(Sheet::default());
         }
         self.sheet = self.sheet.min(self.drawing.sheets.len() - 1);
+        let n = self.drawing.sheets.len();
+        self.sheet_rows.retain(|i| *i < n);
         let sheet = &self.drawing.sheets[self.sheet];
         self.selection.retain(|s| match s {
             Sel::View(v) => sheet.view(*v).is_some(),
@@ -1395,6 +1407,7 @@ impl Render for DrawingEditor {
         self.sync_table_dlg();
         self.sync_custom_dlg(cx);
         self.sync_table_tool(window, cx);
+        self.sync_datum_dlg(window, cx);
         self.sync_gdt_dlg(window, cx);
         // The label typed in the Auxiliary view dialog (pending_view has no cx).
         if let Some(d) = &self.aux_dlg {
@@ -1480,6 +1493,7 @@ impl Render for DrawingEditor {
             .children(self.render_section_edit(cx))
             .children(self.render_replicate_dlg(cx))
             .children(self.render_palette(cx))
+            .children(self.render_datum_dlg(cx))
             .children(self.render_table_tool(cx))
             .children(self.render_gdt_dlg(cx))
             .children(self.render_stack_banner(cx))

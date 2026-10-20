@@ -1255,3 +1255,23 @@ export const showStudio = defineFeature(function(context is Context, id is Id, d
          1\n"
     );
 }
+
+/// std sheet metal (sheetMetalStart & co.) through updateSheetMetalGeometry,
+/// against live dom/fs-smprobe{,2}-{1,2}.txt (tests/fs/sm_harness.fs).
+#[test]
+fn std_sheet_metal_matches_onshape() {
+    let fx = Fixture::new(include_str!("fs/sm_harness.fs"));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("smHarness"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let _ = fx.regen(&mut reg, &ps);
+    let out = custom::run::output_of(fid).expect("output");
+    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
+    println!("{}\n{}", out.output, notices.join("\n"));
+    // Face areas (mm², largest first) of the live parts.
+    let want = ["sm1 parts 1 areas [ 800 , 800 , 80 , 80 , 40 , 40 ]", "sm3 parts 1 areas [ 420 , 420 , 270 , 270 , 82.4668 , 47.1239 , 42 , 42 , 27 , 27 , 22.5 , 22.5 , 6.4795 , 6.4795 ]", "parts 2"];
+    let lines: Vec<&str> = out.output.lines().collect();
+    assert!(want.iter().all(|w| lines.contains(w)), "{}\n{}", out.output, notices.join("\n"));
+}

@@ -47,17 +47,18 @@ impl ViewClipboard {
     }
 }
 
-/// A whole sheet on the clipboard (Sheets panel › Copy).
+/// Whole sheets on the clipboard (Sheets panel › Copy of one or several
+/// selected sheets).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct SheetClipboard {
-    /// Marker so other clipboard JSON is not taken for a sheet.
+    /// Marker so other clipboard JSON is not taken for sheets.
     pub noshape_drawing_sheet: u32,
-    pub sheet: Sheet,
+    pub sheets: Vec<Sheet>,
 }
 
 impl SheetClipboard {
-    pub fn new(sheet: Sheet) -> Self {
-        Self { noshape_drawing_sheet: 1, sheet }
+    pub fn new(sheets: Vec<Sheet>) -> Self {
+        Self { noshape_drawing_sheet: 1, sheets }
     }
 
     pub fn to_json(&self) -> String {
@@ -221,15 +222,17 @@ mod tests {
         let mut d = Drawing::default();
         d.sheets[0].name = "Sheet1".into();
         d.add_sheet(0);
-        let clip = SheetClipboard::new(d.sheets[0].clone());
+        let clip = SheetClipboard::new(vec![d.sheets[0].clone()]);
         let json = clip.to_json();
         assert!(ViewClipboard::from_json(&json).is_none(), "a sheet is not a view copy");
         let back = SheetClipboard::from_json(&json).expect("round trip");
         assert!(SheetClipboard::from_json(&ViewClipboard::default().to_json()).is_none());
         // Pasted at the bottom, renamed when the name is taken.
-        let i = d.paste_sheet(back.sheet);
+        let i = d.paste_sheet(back.sheets[0].clone());
         assert_eq!(i, d.sheets.len() - 1);
-        assert_eq!(d.sheets[i].name, "Sheet1 copy");
+        assert_eq!(d.sheets[i].name, "Sheet1 (1)");
+        let j = d.paste_sheet(SheetClipboard::from_json(&json).unwrap().sheets.remove(0));
+        assert_eq!(d.sheets[j].name, "Sheet1 (2)");
     }
 
     #[test]

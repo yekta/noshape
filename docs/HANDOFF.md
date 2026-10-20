@@ -83,7 +83,7 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | ui2: sketch/assembly/drawing/start-window/document visuals | 73f8d178-6349-40d3-8581-fdad4d67f77d | Stablecog / Opus 5.5 | :105, target-shared | `docs/handoff/theme-studios.md` |
 | nav: view navigation (FINISHED; only real-hardware touch checks remain, see docs/handoff/navigation.md) | 98da8819-1a7a-4be9-a814-e167275fcc08 | Motile / Opus 5.5 | :109, target-shared | `docs/handoff/navigation.md`, `docs/parity/navigation.md` |
 | icons: redrew 21 icons copied from Onshape + added no_onshape_assets guard test (FINISHED) | ddea0979-7067-4399-9ade-2a18dbe32300 | Yekta / Opus 5.5 | - | report to lead |
-| qa4: QA round 4, click-everything sweep (user found dead controls in v0.4.0) | 51fa0c4b-5d3d-4c38-a63d-0b7b3cdd979d | Stablecog / Opus 5.5 | :110, target-shared | `docs/handoff/qa-round-4.md` |
+| qa4: QA round 4 done (see qa-round-4.md); now Part Studio keystroke latency profiling + fix | 51fa0c4b-5d3d-4c38-a63d-0b7b3cdd979d | Stablecog / Opus 5.5 | :110, target-shared | `docs/handoff/qa-round-4.md` |
 | drw2: verifies/finishes the 🔧 rows of docs/parity/drawing.md | 0885a73c-7226-4028-810b-b15186c9a054 | Motile / Opus 5.5 | :111, target-behave | `docs/handoff/drawing-verify.md` |
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
 | psb: Part Studio behaviour (+ release workflow, materials) | 76bd77b6-fcaf-41ed-a850-3e55a5059984 | Yekta / Opus 5.5 | :102, target-behave | `docs/handoff/part-studio-behaviour.md` |

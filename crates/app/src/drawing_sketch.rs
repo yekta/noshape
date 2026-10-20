@@ -120,7 +120,7 @@ impl DrawingEditor {
     }
 
     /// The sketch point nearest the cursor (within 6 px), if any.
-    fn sketch_point_at(&self, c: [f64; 2]) -> Option<(EntityId, [f64; 2])> {
+    pub(crate) fn sketch_point_at(&self, c: [f64; 2]) -> Option<(EntityId, [f64; 2])> {
         let tol = self.tol_mm(6.0);
         let sk = &self.sketch().sketch;
         sk.entities()
@@ -166,7 +166,28 @@ impl DrawingEditor {
                 }
             }
         }
-        (c, None, None)
+        (self.sketch_aligned(c).0, None, None)
+    }
+
+    /// The cursor aligned with woken endpoints (SK8, live: hovering an
+    /// endpoint shows a red dotted horizontal or vertical inference line;
+    /// no constraint is added), with the inference lines (from, to).
+    pub fn sketch_aligned(&self, c: [f64; 2]) -> ([f64; 2], Vec<([f64; 2], [f64; 2])>) {
+        let tol = self.tol_mm(4.0);
+        let mut p = c;
+        let (mut vx, mut vy) = (None, None);
+        for w in &self.woken_points {
+            if vx.is_none() && (c[0] - w[0]).abs() < tol && (c[1] - w[1]).abs() > tol {
+                p[0] = w[0];
+                vx = Some(*w);
+            }
+            if vy.is_none() && (c[1] - w[1]).abs() < tol && (c[0] - w[0]).abs() > tol {
+                p[1] = w[1];
+                vy = Some(*w);
+            }
+        }
+        let lines = [vx, vy].into_iter().flatten().map(|w| (w, p)).collect();
+        (p, lines)
     }
 
     fn edit_sketch(&mut self, name: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut SheetSketch)) {
@@ -405,6 +426,9 @@ impl DrawingEditor {
     pub fn sketch_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
         let Tool::Sketch { tool, pts, from } = &self.tool else { return };
         let (p, _, infer) = self.sketch_target(pts.last().copied());
+        if infer.is_none() {
+            overlay.infer.extend(self.sketch_aligned(self.cursor).1);
+        }
         let Some(a) = pts.last().copied() else { return };
         match tool {
             SkTool::TangentArc => {

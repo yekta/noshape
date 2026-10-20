@@ -606,3 +606,35 @@ fn native_assembly_tree() {
         }
     }
 }
+
+/// Native parts' appearance as Onshape imports it (live G38/G38e): the part
+/// colour (and opacity) from the file; no face of its own colour.
+#[test]
+fn native_part_appearances() {
+    let dir = std::path::Path::new("/root/kern-native-samples");
+    for (file, rgb, alpha) in [
+        ("sldprt/nist_mtc_91304A112_BLUE_FLAT-HEAD_SOCKET_CAP_SCREW.SLDPRT", [255, 242, 232], 255),
+        ("sldprt/fluxpad_101_HOUSING.SLDPRT", [71, 227, 255], 255),
+        ("sldprt/nist_mtc_crada_polycarb-window.SLDPRT", [255, 255, 255], 223),
+        ("se_par/ktane_Hull_Left.par", [129, 136, 140], 255),
+        ("se_par/ktane_LedStrip.par", [129, 136, 140], 255),
+        ("se_par/ktane_Bracket.par", [129, 136, 140], 255),
+    ] {
+        let path = dir.join(file);
+        if !path.exists() {
+            continue;
+        }
+        let parts = read_native_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
+        let solid = parts.iter().find(|p| p.shape.count(ShapeType::Face) > 0).unwrap();
+        assert_eq!(solid.color.map(|c| c.map(|v| (v * 255.0).round() as u8)), Some(rgb), "{file}");
+        assert_eq!((solid.opacity.unwrap_or(1.0) * 255.0).round() as u8, alpha, "{file}");
+        assert!(parts.iter().all(|p| p.face_colors.is_empty()), "{file}: face colours");
+        // The blue screw's thread helix ("Curve 1", 179.7916 mm).
+        if file.contains("91304A112") {
+            let curves: Vec<_> = parts.iter().filter(|p| p.shape.count(ShapeType::Face) == 0).collect();
+            assert_eq!(curves.len(), 1);
+            let l = linear_properties(&curves[0].shape).unwrap().mass * 1e3;
+            assert!((l - 179.7916).abs() < 1e-3, "{l}");
+        }
+    }
+}

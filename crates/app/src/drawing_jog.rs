@@ -115,6 +115,43 @@ impl DrawingEditor {
         Some(out)
     }
 
+    /// An ordinate dimension's menu (live behaviours.md "Ordinate dimensions"):
+    /// Add to ordinate dimension group · Edit... · Paste · Paste as table ·
+    /// Reset ordinate · Unbreak dimension | Clear selection · Zoom to fit ·
+    /// Delete. (Add comment is a cloud feature.)
+    pub fn ordinate_entries(&self, id: u64) -> Option<Vec<MenuEntry>> {
+        let a = self.resolved_annotation(id)?;
+        let AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } = a.kind else { return None };
+        let r = a.refs.iter().find(|x| x.slot == 0).map(|x| x.point.clone());
+        let mut out = vec![MenuEntry::item("Add to ordinate dimension group", move |t, _, cx| {
+            let o = PickedPoint { view, p: origin, r: r.clone() };
+            t.set_tool(Tool::Ordinate { origin: Some(o), horizontal: Some(horizontal), group: Some(id) }, cx)
+        })];
+        let a2 = a.clone();
+        out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+        out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)));
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        // The values sit on the group's text line (no moved values to reset).
+        out.push(MenuEntry::item("Reset ordinate", |_, _, _| {}));
+        let unbroken = a.unbroken;
+        out.push(MenuEntry::item(if unbroken { "Break dimension" } else { "Unbreak dimension" }, move |t, _, cx| {
+            t.edit_sheet(if unbroken { "Break dimension" } else { "Unbreak dimension" }, cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.unbroken = !unbroken))
+        }));
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection.clear();
+            t.edit_sheet("Delete annotation", cx, |s| s.annotations.retain(|x| x.id != id));
+        }));
+        Some(out)
+    }
+
     /// A jog snap point of the selected dimension under `start`: (dimension,
     /// extension line, the far point).
     pub fn jog_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize, bool)> {

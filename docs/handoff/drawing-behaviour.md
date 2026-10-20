@@ -463,3 +463,17 @@ at 1920 px and collapses only below ~1790 px.
 - `templates.rs`: `DrawingTemplate` gained `units`, `decimal_comma`, `format`; build them with
   `DrawingTemplate::standard(..)`. `units_note_of(DimUnits)`.
 - `drawing_tools.rs`: `double_click(triple, ..)` (triple-click a note selects all), Projected refuses Detail parents.
+
+## 20 Oct (after v0.4.1): Datum dialog, palette layout, small rows
+- app/drawing_datum.rs: the Datum dialog (`DrawingEditor::datum_dlg`, synced with Tool::Datum / DatumTarget):
+  Datum tab label (`label_text`, used by the Datum tool's annotations), Datum target tab with area / style /
+  area size and the Targets rows (pending annotations previewed; ✓ `close_datum_dlg(true)` commits). The views
+  ▾ "Datum target" item is gone (it's the dialog's tab, as live). Model: `DatumTargetArea::{Dot, Custom}`,
+  `Annotation::target: Option<Box<DatumTargetOpts { style, origin, origin_ref, angular, flip_x, flip_y,
+  hide_dims }>>`; sheet.rs draws the moveable pointers and the X / Y position dimensions from the origin.
+- Dimension palette: the dimension form now follows live 15's sizes (prefix 80 / value 85 + ▾ / tolerance
+  icon 45 / units 60 / suffix 80; bottom row Ø ▾, reset, (XX), oval, dual ▾).
+- Detail view scale: blank until a profile exists (any shape), then the parent × 2.
+- SK8 woken endpoints (`woken_points`, `sketch_aligned`), V26 refusals (`Sheet::has_angular_cut`), V49 view
+  toggles (`DrawingView::sketch_appearances / model_annotations`).
+- Surgical: assembly_panels.rs 2757–2791 `Rc` → `std::rc::Rc` (left unresolved for 20 minutes).

@@ -166,7 +166,7 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
     let definition = match definition(&cx, &def.params, &values, ev, Some(&*provider)) {
         Ok(d) => d,
         Err(e) => {
-            ev.ctx = std::mem::take(&mut cx.state.lock().ctx);
+            ev.ctx = cx.take_context();
             return Err(e);
         }
     };
@@ -198,8 +198,8 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
     OUTPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output });
 
-    let mut st = cx.state.lock();
-    ev.ctx = std::mem::take(&mut st.ctx);
+    ev.ctx = cx.take_context();
+    let st = cx.state.lock();
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
     drop(st);

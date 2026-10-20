@@ -14,7 +14,8 @@ use noshape_units::{ExprValue, UnitPrefs};
 pub struct VarRow {
     pub feature: FeatureId,
     pub name: String,
-    /// `LENGTH`, `ANGLE`, `NUMBER` or `ANY`.
+    /// `LENGTH`, `ANGLE`, `NUMBER` or `ANY`; `MEASURED` or `TABLE` for the
+    /// Measured and From import modes.
     pub kind: String,
     /// The value expression as typed.
     pub value: String,
@@ -59,6 +60,11 @@ pub fn default_value(kind: &str, units: &UnitPrefs) -> String {
 }
 
 fn kind_of(f: &Feature) -> String {
+    if let Some(ParamValue::Enum(m)) = f.params.get("mode")
+        && (m == "MEASURED" || m == "TABLE")
+    {
+        return m.clone();
+    }
     match f.params.get("variableType") {
         Some(ParamValue::Enum(k)) => k.clone(),
         _ => "LENGTH".into(),
@@ -87,6 +93,24 @@ pub fn rows(ps: &PartStudio) -> Vec<VarRow> {
             })
         })
         .collect()
+}
+
+/// The rows the panel lists: only variables before the rollback bar (live
+/// 10-20 o).
+pub fn active_rows(ps: &PartStudio) -> Vec<VarRow> {
+    let end = ps.rollback.unwrap_or(usize::MAX);
+    rows(ps).into_iter().filter(|r| ps.index_of(r.feature).is_some_and(|i| i < end)).collect()
+}
+
+/// The add row's name: a taken one gets `_0`, `_1`, … (live: `height` when
+/// `height` exists is created as `height_0`, with the info "Renamed some new
+/// variables to avoid name conflicts.").
+pub fn unique_name(ps: &PartStudio, name: &str) -> String {
+    let name = name.trim().trim_start_matches('#');
+    if !taken(ps, name, None) {
+        return name.to_string();
+    }
+    (0..).map(|i| format!("{name}_{i}")).find(|n| !taken(ps, n, None)).unwrap_or_default()
 }
 
 fn taken(ps: &PartStudio, name: &str, except: Option<FeatureId>) -> bool {
@@ -198,6 +222,13 @@ pub fn rename(ps: &mut PartStudio, feature: FeatureId, new: &str) -> Result<(), 
 /// set for that type, else gets the type's default.
 pub fn set_kind(ps: &mut PartStudio, feature: FeatureId, kind: &str, units: &UnitPrefs) {
     if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
+        // Measured / From import are the feature's other modes (tabs
+        // Assigned | Measured | From import).
+        if kind == "MEASURED" || kind == "TABLE" {
+            f.params.set("mode", ParamValue::Enum(kind.to_string()));
+            return;
+        }
+        f.params.set("mode", ParamValue::Enum("ASSIGNED".into()));
         f.params.set("variableType", ParamValue::Enum(kind.to_string()));
         if value_text(f, kind).is_empty() {
             set_value_param(f, kind, &default_value(kind, units));
@@ -205,11 +236,18 @@ pub fn set_kind(ps: &mut PartStudio, feature: FeatureId, kind: &str, units: &Uni
     }
 }
 
-/// The Value cell.
-pub fn set_value(ps: &mut PartStudio, feature: FeatureId, value: &str) {
+/// The Value cell. A bare number in a Length or Angle row takes the
+/// workspace unit (live: `5` + Enter is rewritten to `5 mm`).
+pub fn set_value(ps: &mut PartStudio, feature: FeatureId, value: &str, units: &UnitPrefs) {
     if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
         let kind = kind_of(f);
-        set_value_param(f, &kind, value);
+        let bare = value.trim().parse::<f64>().is_ok();
+        let value = match kind.as_str() {
+            "LENGTH" if bare => format!("{} {}", value.trim(), units.length.symbol()),
+            "ANGLE" if bare => format!("{} {}", value.trim(), units.angle.symbol()),
+            _ => value.to_string(),
+        };
+        set_value_param(f, &kind, &value);
     }
 }
 
@@ -275,9 +313,31 @@ mod tests {
         set_kind(&mut ps, a, "NUMBER", &mm());
         assert_eq!(rows(&ps)[0].kind, "NUMBER");
         assert_eq!(rows(&ps)[0].value, "0");
-        set_value(&mut ps, a, "5");
+        set_value(&mut ps, a, "5", &mm());
         assert_eq!(rows(&ps)[0].value, "5");
+        // A bare number in a Length row takes the workspace unit.
+        set_value(&mut ps, b, "5", &mm());
+        assert_eq!(rows(&ps)[1].value, format!("5 {}", mm().length.symbol()));
+        set_value(&mut ps, b, "#w * 2", &mm());
+        assert_eq!(rows(&ps)[1].value, "#w * 2");
         move_row(&mut ps, a, 1);
         assert_eq!(rows(&ps)[0].name, "h");
+        // Live: the value is kept per type; Measured is the feature's mode.
+        set_kind(&mut ps, a, "MEASURED", &mm());
+        assert_eq!(rows(&ps)[1].kind, "MEASURED");
+        set_kind(&mut ps, a, "NUMBER", &mm());
+        assert_eq!((rows(&ps)[1].kind.as_str(), rows(&ps)[1].value.as_str()), ("NUMBER", "5"));
+    }
+
+    #[test]
+    fn add_row_renames_duplicates_and_lists_before_the_rollback_bar() {
+        let mut ps = studio();
+        create(&mut ps, "height", "LENGTH", "1 mm", "", None, &mm()).unwrap();
+        assert_eq!(unique_name(&ps, "height"), "height_0");
+        create(&mut ps, "height_0", "LENGTH", "1 mm", "", None, &mm()).unwrap();
+        assert_eq!(unique_name(&ps, "#height"), "height_1");
+        assert_eq!(unique_name(&ps, "width"), "width");
+        ps.rollback = Some(1);
+        assert_eq!(active_rows(&ps).iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), ["height"]);
     }
 }

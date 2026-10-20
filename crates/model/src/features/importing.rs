@@ -81,6 +81,9 @@ pub struct ImportPartInfo {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<[f32; 3]>,
+    /// Opacity 0..1 when translucent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faces: Vec<(usize, [f32; 3])>,
 }

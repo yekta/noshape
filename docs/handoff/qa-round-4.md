@@ -11,6 +11,78 @@ State 11:10: integration still not landed (the lead's run fails on asb's in-prog
 `drawing::format::tests::numbers_and_tolerances`), so step 2's re-run was done on the 10:03 / 10:45 builds of the
 shared tree; redo the three user reports once it lands. Verifying the input-padding fix proposal on a private
 copy (/root/noshape-qa4; delete it after).
+### R4 (14:00–): Part Studio typing latency (lead's task)
+Measured on the v0.4.1-era build (/tmp/qa4/noshape-r3), Xvfb :110, filter box, XTest key → XGetImage polling
+(/tmp/qa4/tools/keylat.c, /tmp/qa4/lat.sh): **median 358 ms** (15 samples, 31–584).
+Profile (`perf record` on the whole process, then the main thread alone, while typing):
+- ~95% of CPU is Mesa **llvmpipe** threads (Xvfb software rasterizer drawing the window); the UI thread is
+  ~4%. Most of the 358 ms is that rasterization + present, which a Mac GPU does in ~1 ms.
+- **UI thread: 15–25 ms per frame** (dev build). Split: gpui element build/prepaint/paint 27%, allocation 21%,
+  std/hash 18%, taffy layout 10%, kernel 9%, lyon path tessellation 6% (view cube + in-plane labels), app code
+  4%, `Scene::bounds` 3.5%. I.e. the whole window's element tree is rebuilt, laid out and painted per
+  keystroke: GPUI marks the notifying view's **ancestors** dirty (window.rs `mark_view_dirty`), and the app
+  uses `.cached()` nowhere, so PartStudioView (and Workspace above it) fully re-render.
+- **The window also redraws at 2 Hz when idle**: after typing in the feature filter and clicking the 3D view,
+  the filter keeps keyboard focus and its caret keeps blinking (each blink = full-window frame). User-visible
+  bug too: Shift+E then types "E" into the filter instead of opening Extrude. The Part Studio only takes the
+  focus back from right-panel fields (`on_viewport_event`, `panel_focused`); the assembly
+  (`focus_from_viewport`) and sketch mode already do it for any field.
+- Wasted per-frame work: `Viewport::project` → `scene_radius` → `Scene::bounds()` walks every vertex of every
+  mesh, once per projected point; `in_plane_text` (plane names, sketch name) re-runs `layout_text` and
+  projects every glyph-outline vertex each frame.
+Done: **viewport.rs caches the scene bounds in `set_scene`** (all 5 `scene.bounds()` uses).
+14:40 lead: do (1)+(2) (done in the shared tree: `on_viewport_event` focus incl. feature dialog → dialog focus;
+`plane_text` cache used by `in_plane_text` and sketch.rs's sketch-name width); hold (3) for ui's reply.
+App-side frame metric: perf uprobes on `<gpui::window::Window>::draw` (layout+prepaint+paint, UI thread) and
+`X11Window::draw` (present, includes waiting on llvmpipe), script /tmp/qa4/frametime.sh BIN SECONDS
+typing|idlefocus (computes file offsets from nm + readelf; probes per binary).
+Baseline (0839f5e-era binary): typing 10×(7, BackSpace) → Window::draw **median 22.2 ms**, p90 35.8, max 56.3
+(27 draws); present median 342 ms. Idle after a viewport click with the filter still focused: **25 draws in
+12 s** (2 Hz caret), Window::draw median 30.0 ms.
+The shared tree doesn't compile (assembly_panels.rs, drawing_datum.rs, drawing_more.rs, model drawing/mod.rs,
+other agents, since ~13:50), so before/after are built in a private worktree /root/noshape-qa4 at HEAD 53feac6:
+`noshape-base` = HEAD, `noshape-v1` = HEAD + /tmp/qa4/mine.patch (only qa4's hunks).
+Planned (part_studio/mod.rs, ui's file, waiting for the lead to forward to ui):
+1. `on_viewport_event`: a press in the graphics takes focus from any field (not sketch mode, which does its
+   own), so the caret stops and shortcuts work.
+2. `in_plane_text`: cache the laid-out polylines per name.
+3. The real fix for "a keystroke only redraws what changed": render the big, rarely-changing parts
+   (toolbar, view cube, right strip, viewport overlays / labels, Workspace chrome) as **cached child views**
+   (`Entity::cached(style)`), each observing the entity it reads (its own notify invalidates it), so a
+   keystroke in a field re-renders only the feature list (when the filter changes) or the field itself.
+### R3 (13:10–13:45): retest on v0.4.1 / current tree (0839f5e + 3 uncommitted files), :110
+Method: click a point, wait, type `7`, wait 1 s, crop (script /tmp/qa4/probe.sh; points on every corner, edge,
+padding strip and the text area).
+- **Input padding** ✅ everywhere tested: Part Studio filter box 12/12; Part Studio Variable table Name cell
+  12/12 (incl. the old dead strip 832–838); Variable Studio Name cell 12/12 (incl. 542–546); documents search
+  box 12/12 (I-beam over the padding, ▾ keeps the pointer and opens advanced search); advanced search Name
+  field 6/6.
+- **Hide/show eyes** ✅ (fast taps): Default geometry Top, Sketch 1, Part 1, assembly instance and mate eyes
+  toggle both ways. Solid features (Fillet 1) have no eye, as in Onshape.
+- **Variable table** ✅ (Part Studio panel): Name row + Enter adds one variable (`#wq = 0 mm`), Value cell
+  click in its padding + `5` Enter commits, Type ▾ (Length/Angle/Number/Any), row menu on every cell (Filter
+  feature list, Delete), header ⌄ collapses, ⋯ (Copy table, Collapse all tables). Two parity gaps:
+  - ✗ (psb, Variable Studio: ui2) **after Enter in the Name add row the focus doesn't move to the next empty
+    Name row** (live behaviours.md psb 10-20 o: "Focus moves to the next empty italic Name add row"): typing
+    the next name goes nowhere.
+  - ? a bare `5` in a Length value shows `5` / `#wq = 5` (Onshape probably `5 mm`; live check requested).
+- **My earlier "intermittent misses inside the text area" were not misses**: in the Part Studio the typed
+  character appears 150–630 ms after the key (measured with /tmp/qa4/tools/keylat.c: XTest key + XGetImage
+  polling), so a screenshot 0.5 s later sometimes raced it. Same measure in the Variable Studio tab: 40–110 ms.
+  With NOSHAPE_PERF=1 no viewport frames are rendered per keystroke (`ps.refresh_scene` ~0.05 ms), so the cost
+  is the Part Studio window's own layout/paint. On Xvfb that composite runs on llvmpipe, so the real-hardware
+  number is unknown. **For ui/lead (perf):** measure keystroke-to-paint in the Part Studio on a Mac; if it's
+  above ~16 ms, profile `PartStudioView::render` (whole feature list / panels rebuilt per keystroke?).
+### Notes from the freeze (11:45–13:05)
+- frame_hit fix verified on private build /tmp/qa4/noshape-fh (claim every enclosing frame): Part Studio
+  filter box padding x 166–174 now takes the click (was dead 166–172). Proposed diff = FrameHitArea::prepaint
+  loop over all frames containing bounds.origin, cloning press/release (Claim is Clone).
+- Inside the text element itself: intermittent misses, 2/24 on the private build (both at the start of a
+  run), 1/12 earlier; not tied to the key typed or to a 1.5 s settle time. Open; to investigate.
+- Clippy at freeze (11:4x): clean for qa4's files; warnings in drawing_create.rs (2), drawing_jog.rs,
+  drawing_table_tool.rs, part_studio/config_panel.rs (other agents).
+- 13:09 GO: v0.4.1 = 0839f5e (includes ui's nested-frame fix from the prototype); private copy and test binaries
+  deleted.
 ### R2 fixed
 - (none yet) Window size on small screens is fine: `Bounds::centered` already fits the window into the
   display's visible bounds (macOS: minus menu bar and Dock), so a 1280x800 Mac gets a 1280x≈775 window.

@@ -125,6 +125,14 @@ impl DrawingEditor {
     pub fn textarea(&mut self, value: &str, rows: usize, window: &mut Window, cx: &mut Context<Self>) -> Entity<TextareaState> {
         let st = cx.new(|cx| TextareaState::new(window, cx).rows(rows).default_value(value.to_string()));
         st.update(cx, |s, cx| s.focus(window, cx));
+        // Opened from a click on the canvas: the canvas takes the focus back
+        // while that click is handled, so focus the editor again after it.
+        let again = st.downgrade();
+        window.defer(cx, move |window, cx| {
+            if let Some(st) = again.upgrade() {
+                st.update(cx, |s, cx| s.focus(window, cx));
+            }
+        });
         st
     }
 

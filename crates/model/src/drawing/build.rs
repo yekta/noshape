@@ -457,6 +457,12 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
                 (AnnotationKind::ForeshortenedDiameter { axis, .. }, k @ (0 | 1)) => axis[k as usize] = p,
                 (AnnotationKind::ForeshortenedDiameter { edge, .. }, 2) => *edge = p,
                 (AnnotationKind::DatumTarget { anchor, .. }, 0) => *anchor = p,
+                // The target's origin (its position dimensions measure from it).
+                (AnnotationKind::DatumTarget { .. }, 1) => {
+                    if let Some(o) = a.target.as_mut() {
+                        o.origin = Some(p);
+                    }
+                }
                 _ => {}
             }
         }

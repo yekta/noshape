@@ -224,6 +224,8 @@ pub(crate) mod ffi {
         names: Vec<String>,
         colors: Vec<f32>,
         has_color: Vec<bool>,
+        /// Opacity per shape (1 = opaque; may be empty).
+        opacity: Vec<f32>,
         /// Face colours: (shape index, face index, sRGB) per entry.
         face_part: Vec<u32>,
         face_index: Vec<u32>,

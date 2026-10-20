@@ -160,7 +160,16 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
     let units = doc.read(cx).session.doc.settings.units;
     let mut read: Vec<(String, String, crate::workspace::Foreign)> = Vec::new();
+    // Native assemblies (a zip named like the root assembly; live G38).
+    let mut assemblies: Vec<crate::workspace::AssemblyZip> = Vec::new();
     for path in paths {
+        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+            match crate::workspace::read_assembly_zip(path) {
+                Ok(a) => assemblies.push(a),
+                Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
+            }
+            continue;
+        }
         match crate::workspace::read_foreign(path, &units) {
             Ok(foreign) => {
                 let (name, file) = crate::workspace::import_names(path);
@@ -169,11 +178,12 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
             Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
         }
     }
-    if read.is_empty() {
+    if read.is_empty() && assemblies.is_empty() {
         return None;
     }
     let mut first = None;
-    let label = read.iter().map(|r| r.1.clone()).collect::<Vec<_>>().join(", ");
+    let label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.root))).collect::<Vec<_>>().join(", ");
+    let mut errors: Vec<String> = Vec::new();
     let files: Vec<noshape_model::file_tab::FileTab> = if keep_files {
         paths.iter().filter_map(|p| Some(noshape_model::file_tab::FileTab::new(&crate::workspace::import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect()
     } else {
@@ -188,8 +198,19 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
                     crate::file_tab_view::add_file_tab(d, f, Some(folder), None);
                 }
             }
-            let groups: Vec<Vec<&(String, String, crate::workspace::Foreign)>> = if c.combine { vec![read.iter().collect()] } else { read.iter().map(|r| vec![r]).collect() };
             let mut at = after;
+            for a in &assemblies {
+                match noshape_model::native_assembly::add_native_assembly(d, &a.root, &a.components, &a.files, c.appearances, &units) {
+                    Ok((studio, assembly)) => {
+                        crate::workspace::place_after(d, assembly, at);
+                        crate::workspace::place_after(d, studio, Some(assembly));
+                        at = Some(studio);
+                        first.get_or_insert(assembly);
+                    }
+                    Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
+                }
+            }
+            let groups: Vec<Vec<&(String, String, crate::workspace::Foreign)>> = if c.combine { vec![read.iter().collect()] } else { read.iter().map(|r| vec![r]).collect() };
             for g in groups {
                 let mut ps = PartStudio::new();
                 for (_, file, foreign) in &g {
@@ -211,6 +232,9 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
                 first.get_or_insert(id);
             }
         });
+        for e in errors {
+            cx.emit(DocEvent::Error(e));
+        }
     });
     first
 }

@@ -110,6 +110,9 @@ pub struct UiState {
     pub var_hover: Option<String>,
     /// The Variable table's own table is folded (header ⌄ / Collapse all tables).
     pub var_folded: bool,
+    /// The Variable table's add row takes the focus on the next render
+    /// (after a variable was added from it).
+    pub var_focus_new: bool,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
@@ -296,6 +299,7 @@ impl UiState {
             palette_closed: None,
             var_hover: None,
             var_folded: false,
+            var_focus_new: false,
             inspection_tool: None,
             inspection_more: false,
             ct: Default::default(),

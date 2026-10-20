@@ -282,6 +282,9 @@ impl DrawingEditor {
                 }
             }
             Tool::DatumTarget { anchor: None } => {
+                if self.datum_origin_click(window, cx) {
+                    return true;
+                }
                 if let Some(p) = self.any_point(c) {
                     self.tool = Tool::DatumTarget { anchor: Some(p) };
                 }
@@ -291,8 +294,11 @@ impl DrawingEditor {
                     if let AnnotationKind::DatumTarget { label, .. } = &a.kind {
                         self.datum_target_letter = label.chars().next();
                     }
-                    self.edit_sheet("Datum target", cx, |s| s.annotations.push(a));
                     self.tool = Tool::DatumTarget { anchor: None };
+                    // The Datum dialog lists it until ✓.
+                    if !self.datum_target_add(a.clone(), window, cx) {
+                        self.edit_sheet("Datum target", cx, |s| s.annotations.push(a));
+                    }
                 }
             }
             Tool::GdtLeader { id } => {
@@ -541,6 +547,29 @@ impl DrawingEditor {
             AnnotationKind::DatumTarget { .. } => {
                 let a2 = a.clone();
                 out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_more_panel(&a2, w, cx)));
+                // Help datum: a target's position dimensions › Hide dimension;
+                // a target with hidden ones › Show dimensions ▸ This target /
+                // All targets.
+                let id = a.id;
+                let opts = a.target.as_deref().cloned().unwrap_or_default();
+                let set = |hide: bool, all: bool| {
+                    move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
+                        t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| {
+                            for x in s.annotations.iter_mut().filter(|x| (all || x.id == id) && matches!(x.kind, AnnotationKind::DatumTarget { .. })) {
+                                if let Some(o) = x.target.as_mut() {
+                                    o.hide_dims = hide;
+                                }
+                            }
+                        })
+                    }
+                };
+                if opts.origin.is_some() && !opts.hide_dims {
+                    out.push(MenuEntry::item("Hide dimension", set(true, false)));
+                }
+                let any_hidden = self.current_sheet().annotations.iter().any(|x| x.target.as_ref().is_some_and(|o| o.hide_dims && o.origin.is_some()));
+                if opts.hide_dims || any_hidden {
+                    out.push(MenuEntry::Submenu("Show dimensions".into(), vec![MenuEntry::item("This target", set(false, false)).disabled(!opts.hide_dims), MenuEntry::item("All targets", set(false, true))]));
+                }
             }
             _ => {}
         }
@@ -602,7 +631,7 @@ impl DrawingEditor {
             let u = format::length_units(&self.drawing, &DimFormat::default());
             let num = |m: f64| format::format_number(m / u.meters(), None, 4);
             let (ai, w, h) = match area {
-                DatumTargetArea::Point => (0, String::new(), String::new()),
+                DatumTargetArea::Point | DatumTargetArea::Dot | DatumTargetArea::Custom => (0, String::new(), String::new()),
                 DatumTargetArea::Circle { diameter } => (1, num(*diameter), String::new()),
                 DatumTargetArea::Rectangle { width, height } => (2, num(*width), num(*height)),
             };

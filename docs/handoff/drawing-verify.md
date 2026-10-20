@@ -41,3 +41,19 @@ Tools: `/tmp/drw2/bin/row.py claim|set|show <ID> …` edits checklist rows. Buil
   Properties... | Duplicate | Copy (+ Paste of a copied sheet at the bottom, Delete, Move up / Move down;
   `SheetClipboard`, `Drawing::paste_sheet`); reference row Switch to reference | Replace... (all sheets,
   `InsertViewState.replace_part`) + pin; view row Properties... | Replace... | Delete. Request "drw2 (10-20 c)".
+
+## After v0.4.1 (20 Oct afternoon)
+- ✅ now: K22, T23, C5, V9, V11, V14, V58, CR7, D4, TB10. Verified but kept 🔧 (pending live answers or missing
+  pieces): S6, S7, S8, C3, V55, V59, CR12–CR15, EX10.
+- Fix: editors opened by a double / triple click (note, table cell) got no keyboard focus — the canvas takes the
+  focus back while the click is handled. `DrawingEditor::textarea` now focuses again in `window.defer`; the
+  triple-click select-all is deferred after it (K25). Re-verify K24 (cell Tab / Enter) with that.
+- Section geometry: `section_geometry(.., frame, section, parent, ..)` — `section` = the frame of the section view
+  whose cut it is (sight normal to the cut), so a Shift+click projected view doesn't hatch the removal tool's caps.
+- View properties (app/drawing_props.rs `render_view_props`) redone to live 177 / dom drawing-flat-view-properties:
+  reference link + "In progress" badge, Scale combo, Rotation angle 0–360 + reverse button (icon
+  `rotation-reverse`), editable only without parent / children or with alignment suppressed; child views get
+  "Suppress alignment with parent", projected views of sections "Apply parent view section cut"; Sheet is a list only
+  with several sheets; BOM / Cut list table reference rows (read-only). Not yet: View render mode, Show sketch
+  appearances (no effect in our renderer yet), Synchronize breaks from parent, multi-view properties (V39).
+- Reference row menu no longer shows "Pin view reference (no versions)".

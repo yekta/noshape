@@ -58,6 +58,8 @@ pub struct ImportedShape {
     pub name: Option<String>,
     /// Surface color (sRGB, 0..1), if present.
     pub color: Option<[f32; 3]>,
+    /// Opacity (0..1) when the file makes the part translucent.
+    pub opacity: Option<f32>,
     /// Colours of single faces (index into the shape's faces, sRGB 0..1)
     /// where the file gives them; they override `color`.
     pub face_colors: Vec<(usize, [f32; 3])>,
@@ -85,7 +87,7 @@ pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false))
                 .then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, face_colors: face_colors_of(&r, i) })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(&r, i) })
         })
         .collect()
 }
@@ -378,7 +380,7 @@ fn imported(r: ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> 
         .map(|(i, s)| {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false)).then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, face_colors: face_colors_of(&r, i) })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(&r, i) })
         })
         .collect()
 }

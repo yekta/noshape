@@ -664,6 +664,60 @@ new render flags into `DrawMode` rather than new arguments.
 - **Measure panel (x)**: per row (not areas or %), opens a new Variable feature dialog with the type and
   value (live behaviour requested, psb 10-20 o).
 
+## Pass 13 (20 Oct, after v0.4.1; live answers psb 10-20 n/o, qa4 10-20 13:30)
+
+- **Default planes still drawn after Hide** (Pass 12 leftover): the root cause was `display::build`, which
+  never applied `studio.hidden_defaults` to the default planes (they come from `StudioDisplay::defaults()`,
+  not `ctx.planes`). Fixed there; test `hidden_default_planes_and_origin`.
+- **Add folder**: the header button (tooltip "New folder") and right-click "Add selection to folder…" open
+  the Folder name popup. With nothing selected, an empty folder sits at the rollback bar
+  (`Folder.after`, `PartStudio::empty_folders_after`); folders that wrap features start collapsed; rows read
+  "name (count)".
+- **Inspection panel**: ⋯ opens its (empty) dropdown. The tools (Datum, Dimension ▾, Geometric tolerance,
+  Weld symbol, Set coincident / parallel / text alignment) toggle `ui.inspection_tool`, and Esc clears it.
+  The Datum / GD&T / Weld dialogs themselves are still open.
+- **Variable table** (live 10-20 o, part-studio/550–565):
+  - It lists only the variables before the rollback bar (`variable_table::active_rows`).
+  - Enter in the add row creates at the rollback bar and moves the focus to the next empty Name row
+    (`ui.var_focus_new`).
+  - A taken name is created as `name_0` (`unique_name`) with the info bubble "Renamed some new variables to
+    avoid name conflicts.".
+  - An invalid name turns the cell pink (`#f9ebec`, `#bd3039` border) with the tooltip "Variable name must
+    be a letter followed by a string of letters or numbers.". Enter then does nothing, because
+    `panel_checks` (a per-cell validator in `cell_input`) blocks the commit. Esc clears the add row.
+  - Renaming a row to a taken name silently reverts.
+  - Types add Measured / From import (the feature's modes). Their value cell shows the evaluated value or
+    "Not set" plus a ✎ that opens the feature.
+  - The row menu omits Move up on the first row and Move down on the last. Filter feature list puts
+    `:variable "name"`; quoted filter arguments now match exactly (model `filter_features`).
+  - The Description cell adds Copy.
+  - The header ⋯ has only Copy table.
+  - A bare number in a Length or Angle value takes the workspace unit (`5` → `5 mm`, qa4 10-20 13:30).
+- **Measure (x)** (live 566–572): only distance-type rows (distances and their X/Y/Z sub-rows, Length,
+  Diameter, Radius) have it; tooltip "Add variable for this measurement". It closes the panel and opens a
+  new Variable feature at the rollback bar on its **Measured** tab, picks prefilled and Name empty:
+  - Min / Max dist → Distance with Minimum / Maximum;
+  - an X/Y/Z sub-row → Axis measurements on, Value to record = Along X/Y/Z;
+  - Length → Length;
+  - Diameter / Radius → Diameter (Radius ticked).
+- **Create variable popup** (live 577–584, bundle CreateVariable):
+  - Value / Default = the field's previous value; the type tab matches the field.
+  - The Configuration tab has Length | Angle | Integer | Real | Text with Name, Default, Minimum 0 and
+    Maximum 100000 in the workspace unit (Text: Default only).
+  - Name and range errors use the bundle texts; ✓ is refused while there are errors.
+- **Edit FeatureScript IDs** (live 10-20 n, 520–525):
+  - An invalid id shows only a tooltip (no red cell).
+  - A duplicate only disables the button (no message).
+  - Spaces can't be typed (`InputState::validate`).
+- **Exclude from properties** (live 530–535): the icon moved between the chevron and the name, and it also
+  appears after the value in the compact Configurations box.
+- **Still open (mine)**:
+  - **Configured properties tab** (live 526–536): "Properties for <part> ▾", Add property ▾ (17 entries),
+    ⋯, the per-input + per-property table, the empty-state info and the "not affecting" info line. The
+    model has no configured property values yet, so this is a feature, not a fix.
+  - Description cell "Convert to expression" (semantics unknown).
+  - Datum / GD&T / Weld dialogs; Edit definition…
+
 ## From ui (20 Oct): input hit area (lead's high-priority bug)
 - Cause: the kit's input frame (`gpui_base::InputBase`, used by `Input`) draws the border and
   padding, but only the inner text element (`InputBaseState`'s root) took presses and set the

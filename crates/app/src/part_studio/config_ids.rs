@@ -53,9 +53,11 @@ impl PartStudioView {
             ConfigInputKind::Text { default } => default.clone(),
         };
         let others = studio.configuration.inputs.iter().filter(|i| i.id != input).map(|i| i.id.clone()).collect();
-        let id = cx.new(|cx| InputState::new(window, cx).default_value(inp.id.clone()));
+        // Spaces are not accepted (live: typing "my size" leaves "size").
+        let no_space = |s: &str, _: &mut App| !s.contains(char::is_whitespace);
+        let id = cx.new(|cx| InputState::new(window, cx).validate(no_space).default_value(inp.id.clone()));
         let options = match &inp.kind {
-            ConfigInputKind::List { options, .. } => options.iter().map(|o| (o.id.clone(), o.name.clone(), cx.new(|cx| InputState::new(window, cx).default_value(o.id.clone())))).collect(),
+            ConfigInputKind::List { options, .. } => options.iter().map(|o| (o.id.clone(), o.name.clone(), cx.new(|cx| InputState::new(window, cx).validate(no_space).default_value(o.id.clone())))).collect(),
             _ => Vec::new(),
         };
         let view = cx.entity().downgrade();
@@ -113,16 +115,16 @@ impl Render for FsIdsDialog {
         let id_change = new_id != self.input_id;
         let option_change = !renames.is_empty();
         let errors = id_error(&new_id).is_some() || self.options.iter().any(|(_, _, st)| id_error(&st.read(cx).value()).is_some());
-        let duplicate = self.duplicate(cx);
-        let can_confirm = duplicate.is_none() && (id_change || option_change) && !errors;
+        // A duplicate only disables the button (live 10-20 n: no message).
+        let can_confirm = self.duplicate(cx).is_none() && (id_change || option_change) && !errors;
         let cell = |w: f32| h_flex().w(px(w)).h(px(34.)).flex_none().px(px(4.)).border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text);
         let head = |w: f32, t: &str| cell(w).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child(t.to_string());
-        // An id cell: editable, red with the reason while invalid.
+        // An id cell: editable; while invalid only its tooltip says why (live
+        // 10-20 n: no red text or border).
         let id_cell = |st: &Entity<InputState>, cx: &App| {
             let value = st.read(cx).value().to_string();
             let err = id_error(&value);
             cell(300.)
-                .when(err.is_some(), |d| d.border_1().border_color(pal.error_outline).bg(pal.error_fill))
                 .child(div().id(SharedString::from(format!("fsid-{}", st.entity_id()))).flex_1().when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e))).child(Input::new(st).appearance(false).text_size(px(14.))))
         };
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
@@ -174,9 +176,6 @@ impl Render for FsIdsDialog {
                     })
                     .when(can_confirm && !id_change && option_change, |d| {
                         d.child(warning(format!("This change will break all references to {} in any assemblies, drawings, and other tabs which use a row of {} whose ID has changed.", self.studio_name, self.input_name)))
-                    })
-                    .when_some(duplicate, |d, dup| {
-                        d.child(h_flex().px(px(12.)).py(px(8.)).rounded(px(4.)).bg(pal.error_fill).border_1().border_color(pal.error_outline).text_size(px(13.)).text_color(pal.text).child(format!("IDs must be unique. Cannot use duplicate ID \"{dup}\".")))
                     })
                     .child(
                         h_flex()

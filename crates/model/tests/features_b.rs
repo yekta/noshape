@@ -451,8 +451,8 @@ fn import_foreign_names_and_colors() {
     let brep = String::from_utf8(noshape_kernel::Shape::compound(&[a, b.clone()]).to_brep_bytes().unwrap()).unwrap();
     // Box B's face 0 is red, the part itself blue; box A has only a name.
     let info = vec![
-        ImportPartInfo { name: Some("Bracket".into()), color: None, faces: Vec::new() },
-        ImportPartInfo { name: None, color: Some([0.0, 0.0, 1.0]), faces: vec![(0, [1.0, 0.0, 0.0])] },
+        ImportPartInfo { name: Some("Bracket".into()), color: None, opacity: None, faces: Vec::new() },
+        ImportPartInfo { name: None, color: Some([0.0, 0.0, 1.0]), opacity: None, faces: vec![(0, [1.0, 0.0, 0.0])] },
     ];
     let json = serde_json::to_string(&info).unwrap();
     let mut s = Studio::new();

@@ -584,9 +584,14 @@ impl PartStudioView {
         noshape_units::format_quantity(q, &units)
     }
 
-    /// The Measure panel's (x): a new Variable feature with the measured
-    /// value, in its dialog.
-    fn create_variable_from_measure(&mut self, kind: &str, value: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// The Measure panel's (x) (live 10-20 o, part-studio/566–572): the
+    /// panel closes and a new Variable feature opens at the rollback bar on
+    /// its Measured tab, the measured picks filled in and the Name empty:
+    /// a distance row → Distance (Minimum / Maximum as the row; an X/Y/Z
+    /// sub-row records "Along X/Y/Z"), Length → Length, Diameter / Radius →
+    /// Diameter.
+    fn create_variable_from_measure(&mut self, var: MeasureVar, axis: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
+        use noshape_model::params::ParamValue;
         if self.edit.is_some() {
             return;
         }
@@ -594,9 +599,34 @@ impl PartStudioView {
         let Some(studio) = self.studio(cx) else { return };
         let Some(mut feature) = studio.new_feature("assignVariable", &units) else { return };
         let index = studio.rollback_index();
-        feature.params.set("mode", noshape_model::params::ParamValue::Enum("ASSIGNED".into()));
-        feature.params.set("variableType", noshape_model::params::ParamValue::Enum(kind.into()));
-        feature.params.set(noshape_model::variable_table::value_param(kind), noshape_model::params::ParamValue::Expr(noshape_units::ExprValue::new(value)));
+        let picks = self.selection.clone();
+        let (mode, max) = var;
+        let p = &mut feature.params;
+        p.set("mode", ParamValue::Enum("MEASURED".into()));
+        match mode {
+            "LENGTH" => {
+                p.set("measurementMode", ParamValue::Enum("LENGTH".into()));
+                p.set("lengthEntities", ParamValue::Query(picks));
+            }
+            "DIAMETER" | "RADIUS" => {
+                p.set("measurementMode", ParamValue::Enum("DIAMETER".into()));
+                p.set("radius", ParamValue::Bool(mode == "RADIUS"));
+                p.set("diameterEntity", ParamValue::Query(picks.into_iter().take(1).collect()));
+            }
+            _ => {
+                p.set("measurementMode", ParamValue::Enum("DISTANCE".into()));
+                p.set("minmax", ParamValue::Enum(if max { "MAXIMUM" } else { "MINIMUM" }.into()));
+                p.set("entityCouple", ParamValue::Query(picks));
+                if let Some(i) = axis {
+                    p.set("axisMeasurements", ParamValue::Bool(true));
+                    p.set("componentSelector", ParamValue::Enum(["X", "Y", "Z"][i].into()));
+                }
+            }
+        }
+        // The Measure panel closes.
+        self.show_mass = false;
+        self.ui.measure_pinned = false;
+        self.selection.clear();
         self.open_dialog(feature, index, true, window, cx);
     }
 
@@ -867,17 +897,20 @@ impl PartStudioView {
                     Measurement::Point(p) => format!("{} {} {}", l(p.x), l(p.y), l(p.z)),
                     Measurement::Distance { distance, .. } => l(distance),
                 };
-                // (x) creates a variable with the value (not for areas or %).
-                let var = match m {
-                    Measurement::Angle(_) => Some(("ANGLE", v.clone())),
-                    Measurement::Area(_) | Measurement::Volume(_) | Measurement::Percent(_) | Measurement::Point(_) => None,
-                    _ => Some(("LENGTH", v.clone())),
+                // (x) on distance-type rows only: angles, areas and
+                // positions have none (live 566).
+                let var: Option<MeasureVar> = match m {
+                    Measurement::Distance { .. } => Some(("DISTANCE", label.starts_with("Max"))),
+                    Measurement::Length(_) => Some(("LENGTH", false)),
+                    Measurement::Diameter(_) => Some(("DIAMETER", false)),
+                    Measurement::Radius(_) => Some(("RADIUS", false)),
+                    _ => None,
                 };
                 mrows.push((label, v, None, var));
                 // Live: signed X / Y / Z sub-rows under a distance.
                 if let Measurement::Distance { dx, dy, dz, .. } = m {
                     for (i, d) in [dx, dy, dz].into_iter().enumerate() {
-                        mrows.push((String::new(), l(d), Some(i), Some(("LENGTH", l(d)))));
+                        mrows.push((String::new(), l(d), Some(i), var));
                     }
                 }
             }
@@ -1130,13 +1163,13 @@ impl PartStudioView {
                     // Live (behaviours.md: each row has an (x) "create variable"
                     // icon at the right).
                     let view = view_rows.clone();
-                    row.child(div().flex_1()).children(var.map(|(kind, text)| {
+                    row.child(div().flex_1()).children(var.map(|var| {
                         div()
                             .id(SharedString::from(format!("measure-var-{n}")))
                             .cursor_pointer()
-                            .child(crate::assets::icon("variable", 16., cx))
-                            .tooltip(crate::ui::tooltip("Create variable"))
-                            .on_click(move |_, window, cx| view.update(cx, |this, cx| this.create_variable_from_measure(kind, &text, window, cx)))
+                            .child(crate::assets::icon("variable", 14., cx))
+                            .tooltip(crate::ui::tooltip("Add variable for this measurement"))
+                            .on_click(move |_, window, cx| view.update(cx, |this, cx| this.create_variable_from_measure(var, axis, window, cx)))
                     }))
                 }))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().bg(gpui_kit::rgb(0xeeeeee)).child(help()))
@@ -1159,8 +1192,12 @@ struct MassView {
 
 /// Kind of a measurement for the measure type selector.
 /// A Measure panel row: label, value, X/Y/Z sub-row axis, and the (x)
-/// variable it creates (type, value).
-type MeasureRow = (String, String, Option<usize>, Option<(&'static str, String)>);
+/// variable it creates.
+type MeasureRow = (String, String, Option<usize>, Option<MeasureVar>);
+
+/// What a Measure row's (x) measures: `DISTANCE`, `LENGTH`, `DIAMETER` or
+/// `RADIUS`, and whether it is a maximum distance.
+type MeasureVar = (&'static str, bool);
 
 /// A Measure panel unit choice: its name and what picking it does.
 type UnitAction = Box<dyn Fn(&mut PartStudioView)>;

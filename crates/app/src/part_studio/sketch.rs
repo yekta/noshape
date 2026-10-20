@@ -2494,7 +2494,7 @@ impl PartStudioView {
             // corner (`PLANE_TEXT_MARGIN`), shrunk to fit a small frame.
             let mut polys = Vec::new();
             let wpp = ed.world_per_px;
-            let width = noshape_sketch::text::layout_text(&name, noshape_sketch::text::DEFAULT_FONT, false, false).width;
+            let width = super::plane_text(&name).width;
             let (text_w, text_h) = ((width * 16.5 + 4.0) * wpp, 24.0 * wpp);
             let (avail_w, avail_h) = (hi.x - lo.x - 10.0 * wpp, hi.y - lo.y - 10.0 * wpp);
             let scale = if text_w > avail_w || text_h > avail_h { (avail_w / text_w).min(avail_h / text_h) } else { 1.0 };

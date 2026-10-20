@@ -90,3 +90,5 @@ New in this pass: `composite-part`, `cube`, `decal`, `derived-mirror`, `f-sphere
 `section-cut-line`, `section-flip` (Section view dialog buttons). Full color, 24-unit viewBox.
 `projection-third-angle`, `projection-first-angle` (Create Drawing › Custom template › Projection tiles; agent drw2,
 drawn from scratch on the ISO 128 projection symbols).
+`rotation-reverse` (View properties › Rotation angle reverse-direction button; agent drw2).
+`sheet-width`, `sheet-height`, `zones-horizontal`, `zones-vertical` (Sheet properties › Size › Custom; agent drw2).
