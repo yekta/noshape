@@ -243,5 +243,41 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const area = evArea(context, { "entities" : qCreatedBy(sub + "w", EntityType.BODY) });
             check("opWrap", abs(area - 100 * mm ^ 2) < 1e-6 * meter ^ 2, area);
         });
+        step(context, id, "ruled", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 2100) * mm, "corner2" : vector(10, 10, 2110) * mm });
+            const edge = qContainsPoint(qCreatedBy(sub + "c", EntityType.EDGE), vector(5, 0, 2110) * mm);
+            opRuledSurface(context, sub + "r", { "path" : edge, "width" : 5 * mm, "ruledSurfaceType" : RuledSurfaceType.ALIGNED_WITH_VECTOR,
+                    "ruledDirection" : vector(0, 0, 1), "angle" : 0 * degree });
+            const area = evArea(context, { "entities" : qCreatedBy(sub + "r", EntityType.BODY) });
+            check("opRuledSurface", abs(area - 50 * mm ^ 2) < 1e-6 * meter ^ 2, area);
+        });
+        step(context, id, "editcurve", function(sub) {
+            opPolyline(context, sub + "w", { "points" : [vector(0, 0, 2200) * mm, vector(30, 0, 2200) * mm] });
+            const pts = [vector(0, 0, 2200) * mm, vector(10, 5, 2200) * mm, vector(20, -5, 2200) * mm, vector(30, 0, 2200) * mm];
+            opCreateBSplineCurve(context, sub + "c", { "bSplineCurve" : approximateSpline(context, { "degree" : 3, "tolerance" : 1e-5 * meter, "isPeriodic" : false,
+                    "targets" : [approximationTarget({ "positions" : pts })] })[0] });
+            const wire = qCreatedBy(sub + "w", EntityType.BODY);
+            const curve = qCreatedBy(sub + "c", EntityType.EDGE);
+            const dev = evMaxPathDeviation(context, { "side1" : wire, "side2" : curve }).deviation;
+            opEditCurve(context, sub + "e", { "wire" : wire, "edge" : curve });
+            const after = evMaxPathDeviation(context, { "side1" : wire, "side2" : curve }).deviation;
+            check("opEditCurve+evMaxPathDeviation", dev > 3 * mm && after < 1e-6 * mm, [dev, after]);
+        });
+        step(context, id, "extracttangent", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 2300) * mm, "corner2" : vector(10, 10, 2310) * mm });
+            opFillet(context, sub + "f", { "entities" : qContainsPoint(qCreatedBy(sub + "c", EntityType.EDGE), vector(5, 10, 2310) * mm), "radius" : 2 * mm });
+            const top = qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(5, 5, 2310) * mm);
+            opExtractSurface(context, sub + "x", { "faces" : top, "tangentPropagation" : true });
+            const n = size(evaluateQuery(context, qOwnedByBody(qCreatedBy(sub + "x", EntityType.BODY), EntityType.FACE)));
+            check("opExtractSurface tangentPropagation", n == 3, n);
+        });
+        step(context, id, "conicpart", function(sub) {
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 2400) * mm, vector(0, 0, 1)) });
+            skConicSegment(sk, "c", { "start" : vector(0, 0) * mm, "controlPoint" : vector(5, 10) * mm, "end" : vector(10, 0) * mm, "rho" : 0.5,
+                    "lowParameter" : 0, "highParameter" : 0.5 });
+            skSolve(sk);
+            const n = size(evaluateQuery(context, qContainsPoint(qCreatedBy(sub + "sk", EntityType.VERTEX), vector(5, 5, 2400) * mm)));
+            check("skConicSegment low/highParameter", n == 1, n);
+        });
         println("done");
     });

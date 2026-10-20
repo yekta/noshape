@@ -287,3 +287,26 @@ pub fn display_bodies(c: &AssemblyContext, bodies: &[Arc<Body>]) -> Vec<crate::d
 
 /// Default opacity of context bodies.
 pub const CONTEXT_ALPHA: f32 = 0.2;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Faces of a context body (named as `regen_bodies` names them) measure
+    /// alone and in pairs (the in-context measure readout, live assembly/706–707).
+    #[test]
+    fn context_body_faces_are_measured_alone_and_in_pairs() {
+        let shape = k::make_box(&k::Plane::xy(), 0.04, 0.02, 0.01).unwrap();
+        let feature = context_feature(1, 0);
+        let nf = shape.count(k::ShapeType::Face);
+        let faces: Vec<Arc<TopoName>> = (0..nf).map(|f| Arc::new(TopoName::Face { feature, role: Role::New(f as u32) })).collect();
+        let body = Body::new(BodyId { feature, index: 0 }, "Part 1".into(), BodyKind::Solid, shape, faces.clone(), 0, feature);
+        let ctx = crate::regen::context::Context { bodies: vec![Arc::new(body)], ..Default::default() };
+        let face = |i: usize| Reference::Face((*faces[i]).clone());
+        for i in 0..nf {
+            assert!(!crate::regen::measure::measure(&ctx, &[face(i)]).is_empty(), "face {i}");
+        }
+        let pair = crate::regen::measure::measure(&ctx, &[face(0), face(2)]);
+        assert!(!pair.is_empty(), "{pair:?}");
+    }
+}

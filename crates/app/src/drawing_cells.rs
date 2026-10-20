@@ -111,7 +111,12 @@ impl DrawingEditor {
         let [a, b] = t.rows.unwrap_or([0, shown]);
         let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. } | TableKind::Custom { bottom_to_top: true, .. });
         // Live custom-tables-14: "Split custom table below".
-        let split_label = if matches!(t.kind, TableKind::Custom { .. }) { "Split custom table below" } else { "Split table below" };
+        let split_label = match t.kind {
+            TableKind::Custom { .. } => "Split custom table below",
+            TableKind::Bom { .. } => "Split BOM table below",
+            TableKind::CutList { .. } => "Split cut list",
+            _ => "Split table below",
+        };
         if let Some((r, _)) = cell {
             let data_r = if header_bottom { r } else { r.wrapping_sub(1) };
             if data_r < shown && data_r + 1 < shown {

@@ -11,6 +11,7 @@ use noshape_kernel::ShapeType;
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("clusterBodies", cluster_bodies),
     ("constructPaths", construct_paths),
+    ("evMaxPathDeviation", ev_max_path_deviation),
     ("approximateSpline", approximate_spline),
     ("evApproximateBSplineCurve", ev_approximate_bspline_curve),
     ("evVertexPoint", ev_vertex_point),
@@ -579,7 +580,7 @@ fn ev_surface_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// Convexity of an edge between two faces.
-fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
+pub(super) fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
     let Ent::Edge(b, x) = e else { return None };
     let shape = &q.st.ctx.bodies[*b].shape;
     let ef = shape.edge_faces().ok()?;
@@ -925,4 +926,43 @@ fn approximate_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     Ok(Value::array(out))
+}
+
+/// `@evMaxPathDeviation`: the largest distance between two paths (sampled
+/// both ways along their edges): `{ deviation, side1Point, side2Point }`.
+fn ev_max_path_deviation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    const SAMPLES: usize = 64;
+    let cx = context_arg(i, &a)?;
+    let edges_of = |i: &mut Interp, key: &str| -> R<Vec<k::Shape>> {
+        with_ents(i, &cx, &field(&a, key), |_, q, ents| {
+            let mut out = Vec::new();
+            for e in &ents {
+                match e {
+                    Ent::Edge(..) => out.extend(q.shape(e)),
+                    _ => out.extend(q.shape(e).map(|s| s.edges()).unwrap_or_default()),
+                }
+            }
+            Ok(out)
+        })
+    };
+    let (s1, s2) = (edges_of(i, "side1")?, edges_of(i, "side2")?);
+    if s1.is_empty() || s2.is_empty() {
+        return Err(raise_error(i, "INVALID_INPUT", None));
+    }
+    let (c1, c2) = (k::Shape::compound(&s1), k::Shape::compound(&s2));
+    let mut best = (0.0f64, DVec3::ZERO, DVec3::ZERO);
+    for (from, to, flip) in [(&s1, &c2, false), (&s2, &c1, true)] {
+        for e in from.iter() {
+            let Ok(info) = e.edge_info() else { continue };
+            for j in 0..=SAMPLES {
+                let u = info.first_param + (info.last_param - info.first_param) * j as f64 / SAMPLES as f64;
+                let Ok(p) = e.point_at(u) else { continue };
+                let Ok(d) = k::make_vertex(p).and_then(|v| k::distance(&v, to)) else { continue };
+                if d.distance > best.0 {
+                    best = if flip { (d.distance, d.point_b, p) } else { (d.distance, p, d.point_b) };
+                }
+            }
+        }
+    }
+    Ok(Value::map_from([("deviation", length_value(best.0)), ("side1Point", point_value(best.1)), ("side2Point", point_value(best.2))]))
 }

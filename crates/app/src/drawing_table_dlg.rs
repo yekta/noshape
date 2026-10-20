@@ -20,6 +20,9 @@ const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, 
 /// BOM / cut list table dialog state.
 pub struct TableDlg {
     pub kind: TableTool,
+    /// The table edited (BOM / Cut list table properties); None while inserting.
+    pub table: Option<u64>,
+    original: Option<(TableKind, TableCorner)>,
     /// The view whose source the table lists.
     pub view: Option<ViewId>,
     pub structured: bool,
@@ -65,16 +68,179 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let view = preferred.or_else(|| sources.first().map(|s| s.0));
-                self.table_dlg = Some(TableDlg { kind: k, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight });
+                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, bottom_to_top: false, corner: TableCorner::TopRight });
             }
             Some(_) => {}
-            None => self.table_dlg = None,
+            // The properties dialog of a placed table stays.
+            None if self.table_dlg.as_ref().is_some_and(|d| d.table.is_none()) => self.table_dlg = None,
+            None => {}
         }
+    }
+
+    /// Right-click › BOM table properties… / Cut list table properties….
+    pub fn open_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
+        let Some(t) = self.current_sheet().table(id).cloned() else { return };
+        let (kind, view, structured, bottom_to_top) = match t.kind {
+            TableKind::Bom { view, structured, bottom_to_top, .. } => (TableTool::Bom, view, structured, bottom_to_top),
+            TableKind::CutList { view, bottom_to_top } => (TableTool::CutList, view, false, bottom_to_top),
+            _ => return,
+        };
+        self.tool = Tool::Select;
+        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, bottom_to_top, corner: t.corner });
+        cx.notify();
+    }
+
+    /// Editing a table: apply the dialog live.
+    fn apply_table_dlg(&mut self, cx: &mut Context<Self>) {
+        if let Some(d) = &self.table_dlg
+            && let Some(id) = d.table
+        {
+            let (structured_v, bottom, corner) = (d.structured, d.bottom_to_top, d.corner);
+            self.edit_table(id, if d.kind == TableTool::Bom { "BOM table properties" } else { "Cut list table properties" }, cx, |t| {
+                match &mut t.kind {
+                    TableKind::Bom { structured, bottom_to_top, .. } => (*structured, *bottom_to_top) = (structured_v, bottom),
+                    TableKind::CutList { bottom_to_top, .. } => *bottom_to_top = bottom,
+                    _ => {}
+                }
+                t.corner = corner;
+            });
+        }
+        cx.notify();
+    }
+
+    pub fn close_table_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
+        let Some(d) = self.table_dlg.take() else { return };
+        match (d.table, d.original) {
+            (Some(id), Some((kind, corner))) if !accept => self.edit_table(id, "Table properties", cx, |t| {
+                t.kind = kind;
+                t.corner = corner;
+            }),
+            (None, _) => self.tool = Tool::Select,
+            _ => {}
+        }
+        cx.notify();
+    }
+
+    /// Right-click with cells of a general table selected (help
+    /// drawings-table-contextmenu-04): Insert ▸ Column Left / Column Right /
+    /// Row Above / Row Below, Remove ▸, Duplicate ▸ | Size ▸ | Merge ▸,
+    /// Unmerge, Resize… | Copy.
+    pub fn general_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
+        let id = t.id;
+        let (r0, r1, c0, c1) = (*cs.rows().start(), *cs.rows().end(), *cs.cols().start(), *cs.cols().end());
+        let edit = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
+            let f = std::rc::Rc::new(f);
+            MenuEntry::item(label, move |ed, _, cx| {
+                let f = f.clone();
+                ed.cell_sel = None;
+                ed.edit_table(id, label, cx, move |t| f(t));
+            })
+        };
+        let mut out = vec![
+            MenuEntry::Submenu(
+                "Insert".into(),
+                vec![
+                    edit("Column Left", Box::new(move |t| t.insert_col(c0))),
+                    edit("Column Right", Box::new(move |t| t.insert_col(c1 + 1))),
+                    edit("Row Above", Box::new(move |t| t.insert_row(r0))),
+                    edit("Row Below", Box::new(move |t| t.insert_row(r1 + 1))),
+                ],
+            ),
+            MenuEntry::Submenu(
+                "Remove".into(),
+                vec![
+                    edit("Rows", Box::new(move |t| {
+                        for r in (r0..=r1).rev() {
+                            t.delete_row(r);
+                        }
+                    })),
+                    edit("Columns", Box::new(move |t| {
+                        for c in (c0..=c1).rev() {
+                            t.delete_col(c);
+                        }
+                    })),
+                ],
+            ),
+            MenuEntry::Submenu("Duplicate".into(), vec![edit("Rows", Box::new(move |t| t.duplicate_rows(r0, r1))), edit("Columns", Box::new(move |t| t.duplicate_cols(c0, c1)))]),
+            MenuEntry::Separator,
+        ];
+        let mut size = self.size_entries(t, cs, "Resize…");
+        let resize = size.pop();
+        out.extend(size);
+        out.push(MenuEntry::Separator);
+        let multi = r1 > r0 || c1 > c0;
+        out.push(MenuEntry::Submenu("Merge".into(), vec![edit("Merge cells", Box::new(move |t| {
+            t.merge_cells((r0, c0), (r1, c1));
+        }))]));
+        if !multi {
+            // One cell: nothing to merge (live: greyed).
+            if let Some(MenuEntry::Submenu(_, items)) = out.last_mut() {
+                for i in items.iter_mut() {
+                    *i = std::mem::replace(i, MenuEntry::Separator).disabled(true);
+                }
+            }
+        }
+        out.push(edit("Unmerge", Box::new(move |t| {
+            t.unmerge(r0, c0);
+        })).disabled(t.merge_at(r0, c0).is_none()));
+        out.extend(resize);
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Copy", |ed, _, cx| {
+            ed.copy_cells(cx);
+        }));
+        out
+    }
+
+    /// Right-click with cells of a BOM, cut list or custom table selected
+    /// (help BOM-table-context-menu-01): Size ▸ Columns Equally / Rows
+    /// Equally (of the selected columns / rows), Resize.
+    pub fn cell_size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
+        self.size_entries(t, cs, "Resize")
+    }
+
+    /// Size ▸ and the resize item (`resize`: its label).
+    fn size_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel, resize: &'static str) -> Vec<MenuEntry> {
+        let id = t.id;
+        let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return Vec::new() };
+        let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
+        let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
+        let (cols, rows): (Vec<usize>, Vec<usize>) = (cs.cols().filter(|c| *c < widths.len()).collect(), cs.rows().filter(|r| *r < heights.len()).collect());
+        let avg = |v: &[f64], ix: &[usize]| ix.iter().map(|i| v[*i]).sum::<f64>() / ix.len().max(1) as f64;
+        let (cw, rh) = (avg(&widths, &cols), avg(&heights, &rows));
+        let (w1, c1, h1, r1) = (widths.clone(), cols.clone(), heights.clone(), rows.clone());
+        let size = vec![
+            MenuEntry::item("Columns Equally", move |t, _, cx| {
+                let mut w = w1.clone();
+                c1.iter().for_each(|c| w[*c] = cw);
+                t.edit_table(id, "Size columns equally", cx, |t| t.col_widths = w);
+            })
+            .disabled(cols.len() < 2),
+            MenuEntry::item("Rows Equally", move |t, _, cx| {
+                let mut h = h1.clone();
+                r1.iter().for_each(|r| h[*r] = rh);
+                t.edit_table(id, "Size rows equally", cx, |t| t.row_heights = h);
+            })
+            .disabled(rows.len() < 2),
+        ];
+        let col = cs.a.1;
+        let (w, h) = (widths.get(col).copied().unwrap_or(20.0), heights.get(cs.a.0).copied().unwrap_or(t.row_height));
+        vec![
+            MenuEntry::Submenu("Size".into(), size),
+            MenuEntry::item(resize, move |t, win, cx| {
+                let width = t.input(&noshape_model::drawing::format::format_number(w, None, 2), win, cx);
+                let height = t.input(&noshape_model::drawing::format::format_number(h, None, 2), win, cx);
+                t.panel = Some(Panel::CellResize { table: id, col, width, height });
+                cx.notify();
+            }),
+        ]
     }
 
     /// A click with the dialog open: place the table there. True when used.
     pub fn table_dlg_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(d) = &self.table_dlg else { return false };
+        if d.table.is_some() {
+            return false;
+        }
         let Some(view) = d.view else { return true };
         let c = self.cursor;
         let id = self.current_sheet().next_table_id();
@@ -101,6 +267,8 @@ impl DrawingEditor {
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
         let bom = d.kind == TableTool::Bom;
+        let editing = d.table.is_some();
+        let source_tab = d.view.and_then(|v| views::view_source(self.current_sheet(), v)).map(|(k, _)| k.tab);
         let sources = self.table_sources(d.kind);
         let source_label = sources.iter().find(|s| Some(s.0) == d.view).map(|s| s.1.clone()).unwrap_or_default();
         type Set = std::rc::Rc<dyn Fn(&mut TableDlg)>;
@@ -114,7 +282,7 @@ impl DrawingEditor {
                             if let Some(d) = &mut t.table_dlg {
                                 f(d);
                             }
-                            cx.notify();
+                            t.apply_table_dlg(cx);
                         })
                     }));
                 }
@@ -152,7 +320,7 @@ impl DrawingEditor {
                     if let Some(d) = &mut this.table_dlg {
                         d.corner = k;
                     }
-                    cx.notify();
+                    this.apply_table_dlg(cx);
                 }))
         };
         let corners: Vec<AnyElement> = CORNERS.iter().enumerate().map(|(i, k)| corner_btn(*k, i, cx).into_any_element()).collect();
@@ -174,21 +342,40 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(28.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if bom { "BOM table" } else { "Cut list table" }))
-                        .child(div().id("table-dlg-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.table_dlg = None;
-                            this.tool = Tool::Select;
-                            cx.notify();
-                        }))),
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(match (bom, editing) {
+                            (true, false) => "BOM table",
+                            (false, false) => "Cut list table",
+                            (true, true) => "BOM table properties",
+                            (false, true) => "Cut list table properties",
+                        }))
+                        .when(editing, |h| h.child(div().id("table-dlg-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_dlg(true, cx)))))
+                        .child(div().id("table-dlg-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_dlg(false, cx)))),
                 )
-                .child(
-                    h_flex()
-                        .px(px(4.))
-                        .gap(px(4.))
-                        // Insert lists the drawing's suitable sources, like the select.
-                        .child(select("table-dlg-insert", "Insert".into(), 64., source_items.clone()))
-                        .child(select("table-dlg-source", source_label, 120., source_items)),
-                )
+                // Properties: the Reference link to the source tab (help TB18);
+                // inserting: Insert + the drawing's suitable sources.
+                .when(editing, |v| {
+                    v.child(row(
+                        "Reference",
+                        div()
+                            .id("table-dlg-ref")
+                            .text_size(px(12.))
+                            .text_color(gpui_kit::rgb(0x1651b0))
+                            .cursor_pointer()
+                            .child(source_label.clone())
+                            .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)))
+                            .into_any_element(),
+                    ))
+                })
+                .when(!editing, |v| {
+                    v.child(
+                        h_flex()
+                            .px(px(4.))
+                            .gap(px(4.))
+                            // Insert lists the drawing's suitable sources, like the select.
+                            .child(select("table-dlg-insert", "Insert".into(), 64., source_items.clone()))
+                            .child(select("table-dlg-source", source_label.clone(), 120., source_items)),
+                    )
+                })
                 .when(bom, |v| v.child(row("Template", div().w(px(120.)).text_size(px(11.)).child("Follow assembly").into_any_element())).child(row("BOM type", select("table-dlg-type", if d.structured { "Structured".into() } else { "Flattened".into() }, 120., types).into_any_element())))
                 .child(row("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))

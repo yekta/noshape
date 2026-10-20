@@ -14,6 +14,8 @@
 #include <array>
 #include <Geom_Surface.hxx>
 #include <Geom2d_Curve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2d_BSplineCurve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBndLib.hxx>
@@ -690,27 +692,46 @@ Moments face_moments(const TopoDS_Face& face, bool volume)
       continue;
     if (e.Orientation() == TopAbs_REVERSED)
       std::swap(a, b);
-    // Segments short in both u and v (sampled: an edge may wind and come back).
-    double du = 0, dv = 0;
-    for (int k = 0; k < 64; ++k)
+    // Pieces between the pcurve's knots (its parameterization may be very
+    // uneven), each cut into segments short in both u and v (sampled: an edge
+    // may wind and come back).
+    std::vector<double> cuts{std::min(a, b), std::max(a, b)};
     {
-      const gp_Pnt2d p = c->Value(a + (b - a) * k / 64), q = c->Value(a + (b - a) * (k + 1) / 64);
-      du += std::abs(q.X() - p.X());
-      dv += std::abs(q.Y() - p.Y());
+      occ::handle<Geom2d_Curve> basis = c;
+      while (auto tc = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+        basis = tc->BasisCurve();
+      if (auto bs = occ::down_cast<Geom2d_BSplineCurve>(basis))
+        for (int k = 1; k <= bs->NbKnots(); ++k)
+          if (bs->Knot(k) > cuts[0] && bs->Knot(k) < cuts[1])
+            cuts.push_back(bs->Knot(k));
+      std::sort(cuts.begin(), cuts.end());
+      if (b < a)
+        std::reverse(cuts.begin(), cuts.end());
     }
-    const int n = std::min(20000, std::max(4, (int)std::ceil(du / ust + dv / vst)));
-    for (int k = 0; k < n; ++k)
+    for (size_t piece = 0; piece + 1 < cuts.size(); ++piece)
     {
-      const double t0 = a + (b - a) * k / n, h = (b - a) / n;
-      for (int i = 0; i < 8; ++i)
+      const double p0 = cuts[piece], p1 = cuts[piece + 1];
+      double       du = 0, dv = 0;
+      for (int k = 0; k < 16; ++k)
       {
-        gp_Pnt2d     q;
-        gp_Vec2d     d;
-        const double t = t0 + h * (kGaussX[i] + 1) / 2;
-        c->D1(t, q, d);
-        const Moments g = G(q.X(), q.Y());
-        for (int j = 0; j < 10; ++j)
-          total[(size_t)j] += g[(size_t)j] * d.Y() * kGaussW[i] * h / 2;
+        const gp_Pnt2d p = c->Value(p0 + (p1 - p0) * k / 16), q = c->Value(p0 + (p1 - p0) * (k + 1) / 16);
+        du += std::abs(q.X() - p.X());
+        dv += std::abs(q.Y() - p.Y());
+      }
+      const int n = std::min(20000, std::max(1, (int)std::ceil(2 * (du / ust + dv / vst))));
+      for (int k = 0; k < n; ++k)
+      {
+        const double t0 = p0 + (p1 - p0) * k / n, h = (p1 - p0) / n;
+        for (int i = 0; i < 8; ++i)
+        {
+          gp_Pnt2d     q;
+          gp_Vec2d     d;
+          const double t = t0 + h * (kGaussX[i] + 1) / 2;
+          c->D1(t, q, d);
+          const Moments g = G(q.X(), q.Y());
+          for (int j = 0; j < 10; ++j)
+            total[(size_t)j] += g[(size_t)j] * d.Y() * kGaussW[i] * h / 2;
+        }
       }
     }
   }

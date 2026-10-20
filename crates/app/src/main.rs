@@ -47,6 +47,8 @@ mod drawing_gdt;
 mod drawing_ruler;
 mod drawing_table_dlg;
 mod drawing_custom_table;
+mod drawing_jog;
+mod drawing_related;
 mod drawing_weld;
 mod file_tab_view;
 mod drawing_props;
@@ -60,6 +62,7 @@ mod feature_dialog;
 mod feature_studio;
 mod fs_notices;
 mod fs_reference;
+mod select_item;
 mod fs_import;
 mod fs_search;
 mod import_dialog;
@@ -136,6 +139,17 @@ fn apply_theme(cx: &mut App) {
     // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit
     // line counts, numbers 21 px in, a 14 px fold column, the code 4 px after it,
     // the current line's cell #dcdcdc (patched gpui-base).
+    // Feature Studio squiggles show Ace's tooltip, drawn by feature_studio.rs.
+    gpui_kit::base::input::set_app_diagnostic_hover(true);
+    // Squiggles (live document/fs-squiggles-zoom8x): errors #df5528, warnings
+    // #fcc81a (the kit's theme status colors are a stub without tree-sitter).
+    cx.set_global(gpui_kit::base::input::DiagnosticColors { error: gpui_kit::rgb(0xdf5528).into(), warning: gpui_kit::rgb(0xfcc81a).into(), info: gpui_kit::rgb(0x3d8fd1).into(), hint: gpui_kit::rgb(0x3d8fd1).into() });
+    // Ace's gutter markers (live document/fs-gutter-*): the notice icons, 13 px
+    // in the 16 px cell 2 px into the gutter.
+    cx.set_global(gpui_kit::base::input::GutterMarkerRenderer(std::rc::Rc::new(|severity, cx| {
+        use gpui_kit::base::input::DiagnosticSeverity as S;
+        assets::icon(fs_notices::notice_icon(severity == S::Error, matches!(severity, S::Info | S::Hint)), 13., cx)
+    })));
     cx.set_global(gpui_kit::base::input::CodeGutterMetrics { min_digits: 1, number_inset: px(15.), right_margin: px(0.), fold_width: px(14.), text_gap: px(4.), active_background: Some(gpui_kit::rgb(0xdcdcdc).into()) });
     Theme::update(cx, |t| {
         t.font_family = UI_FONT.into();
@@ -211,6 +225,8 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     // Initializes the GPU on a background thread; the first use waits for it.
     let gpu = gpu::Gpu::new().expect("could not start the GPU thread");
+    // Feature Studio imports of other documents / versions read their snapshots.
+    noshape_model::custom::set_external_tab_loader(derived::external_tab);
     let args: Vec<String> = std::env::args().skip(1).collect();
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);

@@ -375,23 +375,41 @@ impl DrawingEditor {
                 .map(|&t| (t.name().to_string(), t == props.dim_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.dim_arrow_type = t) as Act))
                 .collect();
             let horiz = props.dim_text_horizontal;
+            // Live order: Align with dimension line | Horizontal.
             let align_items: Vec<(String, bool, Act)> = vec![
-                ("With dimension line".into(), !horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = false) as Act),
+                ("Align with dimension line".into(), !horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = false) as Act),
                 ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
             ];
+            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    let v = *v;
+                    this.set_drawing_prop(&move |p| f(p, v), cx);
+                })))
+            };
+            let just_items: Vec<(String, bool, Act)> = noshape_model::drawing::TextJustify::ALL.iter().map(|&j| (j.name().to_string(), j == props.dim_justify, std::rc::Rc::new(move |p: &mut DrawingProps| p.dim_justify = j) as Act)).collect();
+            let (fit_ansi, ord_ansi, radial_lines) = (self.drawing.dim_fit_ansi(), self.drawing.ordinate_ansi(), self.drawing.radial_dim_lines());
+            // ISO | ANSI (live order).
+            let std_items = |ansi: bool, set: fn(&mut DrawingProps, bool)| -> Vec<(String, bool, Act)> {
+                [("ISO", false), ("ANSI", true)].iter().map(|&(n, v)| (n.to_string(), ansi == v, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
+            };
+            let std_name = |ansi: bool| if ansi { "ANSI".to_string() } else { "ISO".to_string() };
             body = body
                 .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Dimensions"))
                 .child(section("All dimensions"))
                 .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
                 .child(row("Text height", field(0)))
                 .child(row("Color", swatch("dp-dcolor", props.dim_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.dim_color = c))))
-                .child(row("Arrowhead", field(1)))
-                .child(row("Arrowhead type", select("dp-darrow", props.dim_arrow_type.name().into(), arrow_items)))
+                .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-darrow", props.dim_arrow_type.name().into(), arrow_items)).into_any_element()))
+                .child(row("Text justification", select("dp-djust", props.dim_justify.name().into(), just_items)))
+                .child(check("dp-dunder", "Underline overridden dimensions", props.underline_overridden, |p, v| p.underline_overridden = v, cx))
+                .child(check("dp-dbreak", "Break dimension by default", props.break_dims, |p, v| p.break_dims = v, cx))
+                .child(row("Fit standard", select("dp-dfit", std_name(fit_ansi), std_items(fit_ansi, |p, v| p.dim_fit_ansi = Some(v)))))
                 .child(section("Gaps and extensions"))
-                .child(row("Text alignment", select("dp-dalign", if horiz { "Horizontal".into() } else { "With dimension line".into() }, align_items)))
+                .child(row("Text alignment", select("dp-dalign", if horiz { "Horizontal".into() } else { "Align with dimension line".into() }, align_items)))
                 .child(row("Text gap", field(2)))
                 .child(row("Geometry gap", field(3)))
-                .child(row("Extension past line", field(4)));
+                .child(row("Extension past line", field(4)))
+                .child(check("dp-djog45", "Lock the angle of all jogged dimensions to 45 degrees", props.lock_jog_45, |p, v| p.lock_jog_45 = v, cx));
             // Chamfer: 45 degree style / content, the others', precisions.
             let style_items = |cur: bool, set: fn(&mut DrawingProps, bool)| -> Vec<(String, bool, Act)> {
                 let opts = [("Note", false), ("Dimensions", true)];
@@ -408,7 +426,11 @@ impl DrawingEditor {
                 .child(row("Non 45 degree style", select("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v))))
                 .child(row("Non 45 degree content", select("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false))))
                 .child(row("Length precision", select("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v))))
-                .child(row("Angle precision", select("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v))));
+                .child(row("Angle precision", select("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v))))
+                .child(section("Ordinate dimensions"))
+                .child(row("Dimension style", select("dp-ordstd", std_name(ord_ansi), std_items(ord_ansi, |p, v| p.ordinate_ansi = Some(v)))))
+                .child(section("Diameter and radial dimensions"))
+                .child(check("dp-radlines", "Show dimension lines by default", radial_lines, |p, v| p.radial_dim_lines = Some(v), cx));
         } else if self.drawing_props.tab == 2 {
             // Annotations, in Onshape's groups: All annotations (Arrowhead),
             // then each type's font, text height and color with its extras.

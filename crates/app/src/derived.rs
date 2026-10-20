@@ -110,6 +110,44 @@ pub fn external_snapshot(path: &std::path::Path, mv: noshape_store::Microversion
     Ok(doc)
 }
 
+/// Document files by document id (`fs_import::document_id`), found by
+/// scanning the local documents once per unknown id.
+static DOCUMENT_IDS: std::sync::LazyLock<Mutex<HashMap<String, std::path::PathBuf>>> = std::sync::LazyLock::new(Default::default);
+
+/// Another document's (or a version's) tab from a reference or import path:
+/// an `ext:` key, or a Feature Studio import path
+/// `<document id>/<version microversion>/<tab id>` (fs_import.rs).
+pub fn import_ref(path: &str) -> Option<ExternalRef> {
+    if path.starts_with("ext:") {
+        return ExternalRef::parse(path);
+    }
+    let mut it = path.splitn(3, '/');
+    let (doc, mv, tab) = (it.next()?, it.next()?, it.next()?);
+    let microversion = mv.parse().ok()?;
+    let known = DOCUMENT_IDS.lock().get(doc).cloned();
+    let file = match known {
+        Some(f) => f,
+        None => {
+            let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+            let mut ids = DOCUMENT_IDS.lock();
+            for d in docs {
+                if let Some(id) = crate::fs_import::document_id(&d.path) {
+                    ids.insert(id.as_uuid().simple().to_string(), d.path.clone());
+                }
+            }
+            ids.get(doc).cloned()?
+        }
+    };
+    Some(ExternalRef { path: file, microversion, tab: tab.to_string() })
+}
+
+/// A tab of another document or version (Feature Studio imports, references).
+pub fn external_tab(key: &str) -> Option<noshape_model::document::Tab> {
+    let r = import_ref(key)?;
+    let doc = external_snapshot(&r.path, r.microversion).ok()?;
+    doc.tabs.iter().find(|t| t.id.to_string() == r.tab).cloned()
+}
+
 /// Versions of another document available for pinning.
 pub fn external_doc_info(path: &std::path::Path) -> anyhow::Result<ExternalDocInfo> {
     let store = noshape_store::Document::open_read_only(path)?;
@@ -182,7 +220,7 @@ impl DocStudios {
 
 impl DerivedProvider for DocStudios {
     fn file(&self, key: &str) -> Option<noshape_model::file_tab::FileTab> {
-        let r = ExternalRef::parse(key)?;
+        let r = import_ref(key)?;
         let doc = external_snapshot(&r.path, r.microversion).ok()?;
         match &doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.content {
             noshape_model::document::TabContent::File(f) => Some(f.clone()),
@@ -190,8 +228,31 @@ impl DerivedProvider for DocStudios {
         }
     }
 
+    fn feature_type(&self, tab: &str, feature: noshape_model::reference::FeatureId) -> Option<String> {
+        let find = |ps: &noshape_model::PartStudio| ps.features.iter().find(|f| f.id == feature).map(|f| f.type_id.clone());
+        if let Some(r) = import_ref(tab) {
+            let doc = external_snapshot(&r.path, r.microversion).ok()?;
+            return match &doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.content {
+                TabContent::PartStudio(ps) => find(ps),
+                _ => None,
+            };
+        }
+        self.studio(tab).and_then(find)
+    }
+
+    fn configuration(&self, tab: &str) -> Option<noshape_model::configuration::Configuration> {
+        if let Some(r) = import_ref(tab) {
+            let doc = external_snapshot(&r.path, r.microversion).ok()?;
+            return match &doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.content {
+                TabContent::PartStudio(ps) => Some(ps.configuration.clone()),
+                _ => None,
+            };
+        }
+        self.studio(tab).map(|ps| ps.configuration.clone())
+    }
+
     fn context(&self, tab: &str) -> Option<Arc<Context>> {
-        if let Some(r) = ExternalRef::parse(tab) {
+        if let Some(r) = import_ref(tab) {
             return external_context(&r);
         }
         let studio = self.studio(tab)?.clone();
@@ -212,7 +273,7 @@ impl DerivedProvider for DocStudios {
     }
 
     fn context_configured(&self, tab: &str, values: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
-        if values.is_empty() || tab.starts_with("ext:") {
+        if values.is_empty() || tab.starts_with("ext:") || tab.contains('/') {
             return self.context(tab);
         }
         // Cached per configuration like the default one.
@@ -240,7 +301,7 @@ impl DerivedProvider for DocStudios {
 
     fn version(&self, tab: &str) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        if tab.starts_with("ext:") {
+        if tab.starts_with("ext:") || tab.contains('/') {
             // Pinned: the key fully identifies the content.
             tab.hash(&mut h);
             return h.finish();

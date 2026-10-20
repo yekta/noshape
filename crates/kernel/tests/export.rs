@@ -148,7 +148,22 @@ fn jt_import() {
     let nist = std::path::Path::new("/root/kern-native-samples/jt/nist_mtc_crada_assembly_NX.jt");
     if nist.exists() {
         let parts = read_jt_parts(nist, LengthUnit::Meter).unwrap();
-        assert_eq!(parts.len(), 7);
+        // Placed by the scene graph: every instance (10 nuts, 18 + 4 cap screws, 4
+        // flat-head screws, box, cover, plate, window), the box from a multi-XT
+        // segment.
+        assert_eq!(parts.len(), 36);
+        let centre = |p: &ImportedShape| {
+            let b = p.shape.bounding_box(false).unwrap();
+            (b.min + b.max) * 0.5e3
+        };
+        let nuts: Vec<_> = parts.iter().filter(|p| p.name.as_deref().is_some_and(|n| n.contains("HEX NUT"))).map(centre).collect();
+        let screws: Vec<_> = parts.iter().filter(|p| p.name.as_deref().is_some_and(|n| n.contains("91274A118"))).map(centre).collect();
+        assert_eq!(nuts.len(), 10);
+        // Each nut sits on a screw's axis.
+        for n in &nuts {
+            assert!(screws.iter().any(|s| (s.x - n.x).hypot(s.y - n.y) < 0.6), "a nut off every screw at {n:?}");
+        }
+        assert!(parts.iter().any(|p| p.shape.count(ShapeType::Face) > 300), "the box (multi-XT segment)");
         let polycarb = parts.iter().find(|p| p.shape.count(ShapeType::Face) == 35).expect("the polycarbonate window");
         let v = volume_properties(&polycarb.shape).unwrap().mass * 1e9;
         assert!((v - 17025.66823867636).abs() < 1e-3, "polycarb {v}"); // = Onshape's import of the NX part (G38)
@@ -259,7 +274,17 @@ fn rhino_breps_are_valid() {
             let path = dir.join(format!("{}-{version}.3dm", name.replace(' ', "-")));
             let shapes = [ExportShape { shape: s.clone(), name: Some(name.into()), color: None }];
             match write_rhino(&path, &shapes, LengthUnit::Meter, version) {
-                Ok(()) => assert_eq!(rhino_brep_count(&path).unwrap_or_else(|e| panic!("{name} v{version}: {e}")), 1, "{name} v{version}"),
+                Ok(()) => {
+                    assert_eq!(rhino_brep_count(&path).unwrap_or_else(|e| panic!("{name} v{version}: {e}")), 1, "{name} v{version}");
+                    if version == 8 {
+                        // And back through our reader: the same solid, named.
+                        let back = read_rhino_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
+                        assert_eq!(back.len(), 1, "{name}");
+                        assert_eq!(back[0].name.as_deref(), Some(name), "{name}");
+                        let (v, want) = (volume_properties(&back[0].shape).unwrap().mass, volume_properties(&s).unwrap().mass);
+                        assert!(back[0].shape.is_valid() && (v - want).abs() < 2e-5 * want, "{name}: {v} vs {want}");
+                    }
+                }
                 Err(e) => {
                     assert!(e.to_string().contains("openNURBS"), "{name} v{version}: {e}");
                     return;
@@ -427,11 +452,51 @@ fn parasolid_from_onshape() {
         n += 1;
     }
     assert!(n == 0 || n == 50, "{n} G36 files");
+    // Onshape's own Parasolid of its fluxpad import (live G38b): cliff-edge
+    // blends, against Onshape's mass properties of it (G38).
+    if samples.join("g38b-fluxpad_102_STEM.x_t").exists() {
+        let parts = read_parasolid_parts(&samples.join("g38b-fluxpad_102_STEM.x_t"), LengthUnit::Meter).unwrap();
+        let s = &parts[0].shape;
+        assert!(s.is_valid(), "fluxpad: invalid");
+        assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, 167), "fluxpad");
+        let v = volume_properties(s).unwrap().mass * 1e9;
+        assert!((v - 255.7688571778665).abs() < 5e-3, "fluxpad: {v}");
+    }
     // Onshape's cone (r 6 mm, apex 10 mm up): the axis points the way it widens.
     if samples.join("onshape-cone.x_t").exists() {
         let parts = read_parasolid_parts(&samples.join("onshape-cone.x_t"), LengthUnit::Meter).unwrap();
         let v = volume_properties(&parts[0].shape).unwrap().mass * 1e9;
         assert!(parts[0].shape.is_valid() && (v - 120.0 * std::f64::consts::PI).abs() < 1e-6, "cone: {v}");
+    }
+}
+
+/// Onshape's own Parasolid of three more G38 imports against Onshape's mass
+/// properties of them: thread faces (McMaster), procedural faces (Bell Crank),
+/// planes and cylinders (the bracket: its exact volume, a 40 x 100 x 5 plate,
+/// two r 3.5 holes, r 2 top fillets mitred at the corners, is 19377.869;
+/// Onshape reports 19378.847).
+#[test]
+#[ignore = "waits for Onshape's mass-property bounds (live G38c): McMaster reads 254.463 from Onshape's XT vs Onshape's 254.404"]
+fn parasolid_from_onshape_mass_bounds() {
+    let samples = std::path::Path::new("/root/onshape-research/live/samples");
+    let r = 2.0f64;
+    let bracket = 20000.0 - 2.0 * std::f64::consts::PI * 3.5 * 3.5 * 5.0 - (r * r - std::f64::consts::PI * r * r / 4.0) * 280.0
+        + 4.0 * 2.0 * r.powi(3) * (5.0 / 6.0 - std::f64::consts::PI / 4.0);
+    for (file, faces, want, tol) in [
+        ("g38b-mcmaster-91274A118.x_t", 25, 254.4037797834923, 0.03),
+        ("g38b-psas_Bell_Crank.x_t", 27, 2050.83652761612, 0.05),
+        ("g38b-ktane_Bracket.x_t", 12, bracket, 1e-6),
+    ] {
+        if !samples.join(file).exists() {
+            continue;
+        }
+        let parts = read_parasolid_parts(&samples.join(file), LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
+        assert_eq!(parts.len(), 1, "{file}");
+        let s = &parts[0].shape;
+        assert!(s.is_valid(), "{file}: invalid");
+        assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, faces), "{file}");
+        let v = volume_properties(s).unwrap().mass * 1e9;
+        assert!((v - want).abs() < tol, "{file}: {v} vs {want}");
     }
 }
 
@@ -444,6 +509,7 @@ fn native_cad_parts() {
     let dir = std::path::Path::new("/root/kern-native-samples");
     for (file, faces, want, tol) in [
         ("sldprt/psas_Bell_Crank.SLDPRT", 27, 2050.83652761612, 0.05),       // Onshape (2 blend faces)
+        ("sldprt/fluxpad_102_STEM.SLDPRT", 167, 255.7688571778665, 5e-3),   // Onshape (cliff-edge blends)
         ("se_par/ktane_Hull_ModuleHolder_Long.par", 14, 76000.0, 1e-4),     // a 76 cm³ block
         ("nx_prt/nist_d2mi_827-9999-905.prt", 9, 272.2753042096831, 1e-4),   // Onshape = its STEP
         ("nx_prt/nist_mtc_nx_NIST_mtc_crada_polycarb.prt", 35, 17025.66823867636, 1e-3), // Onshape

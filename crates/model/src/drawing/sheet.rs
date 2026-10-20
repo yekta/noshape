@@ -113,6 +113,10 @@ pub struct SheetGeometry {
     in_dim: bool,
     /// The annotation being drawn has its arrows flipped (outside).
     flip_arrows: bool,
+    /// The linear dimension being drawn: its extension line jogs, and where
+    /// other dimensions' lines cross its lines (Break dimension).
+    jogs: [Option<super::ExtJog>; 2],
+    cuts: Vec<[f64; 2]>,
     /// Inserted images (drawn under the geometry; exports embed them).
     pub images: Vec<GeomImage>,
     /// Texts in a font other than the default (last span wins).
@@ -317,6 +321,10 @@ pub struct SheetStyle {
     pub callout_stack_gap: f64,
     /// Datum target areas' hatch (standard, pattern).
     pub target_hatch: (usize, usize),
+    /// Dimensions › Underline overridden dimensions (drawn on screen).
+    pub underline_overridden: bool,
+    /// Gaps and extensions › Lock the angle of all jogged dimensions to 45°.
+    pub lock_jog_45: bool,
 }
 
 impl SheetStyle {
@@ -328,7 +336,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0) }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false }
     }
 }
 
@@ -361,6 +369,8 @@ pub enum GripKind {
     End,
     /// Arrow / flip handle on the dimension line (orange diamond).
     Handle,
+    /// The two snap points of a jogged extension line (orange dots).
+    Jog,
 }
 
 impl SheetGeometry {
@@ -761,18 +771,52 @@ impl SheetGeometry {
 
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
     /// View-relative coordinates are mapped through `env`.
+    /// Break dimension: where linear dimensions' lines (extension lines and
+    /// dimension lines) cross, the first of the two (in sheet order) that is
+    /// broken gets a gap; only one of two crossing lines is broken.
+    fn dimension_crossings(&self, sheet: &Sheet, env: &dyn AnnotationEnv) -> std::collections::HashMap<u64, Vec<[f64; 2]>> {
+        let mut segs: Vec<DimSegments> = Vec::new();
+        for a in &sheet.annotations {
+            let AnnotationKind::LinearDimension { view, a: pa, b: pb, offset, orientation, .. } = &a.kind else { continue };
+            let f = linear_frame(env.to_sheet(*view, *pa), env.to_sheet(*view, *pb), *offset, *orientation, &a.jogs, self.style.lock_jog_45, self.style.geometry_gap, self.style.extension);
+            let mut s: Vec<[[f64; 2]; 2]> = f.ext.iter().flat_map(|e| e.windows(2).map(|w| [w[0], w[1]]).collect::<Vec<_>>()).collect();
+            s.push([f.dp, f.dq]);
+            segs.push((a.id, !a.unbroken, s));
+        }
+        let mut cuts: std::collections::HashMap<u64, Vec<[f64; 2]>> = std::collections::HashMap::new();
+        for i in 0..segs.len() {
+            for j in i + 1..segs.len() {
+                let cut = if segs[i].1 { Some(segs[i].0) } else if segs[j].1 { Some(segs[j].0) } else { None };
+                let Some(cut) = cut else { continue };
+                for a in &segs[i].2 {
+                    for b in &segs[j].2 {
+                        if let Some(x) = crossing(*a, *b) {
+                            cuts.entry(cut).or_default().push(x);
+                        }
+                    }
+                }
+            }
+        }
+        cuts
+    }
+
     pub fn add_annotations(&mut self, sheet: &Sheet, env: &dyn AnnotationEnv) {
         // Where each annotation's geometry starts (inspection bubbles go
         // at the upper left of its text, after the loop).
         let mut starts: Vec<(&Annotation, usize, usize, usize)> = Vec::new();
         self.style = env.sheet_style();
         let (dh, ah0) = (self.style.dim_text, self.style.ann_text);
+        let mut cuts = self.dimension_crossings(sheet, env);
         for a in &sheet.annotations {
             let pick = (a.id & 0xFFFF_FFFF) as u32;
             let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
             starts.push((a, self.texts.len(), self.lines.len(), self.fills.len()));
             self.in_dim = a.kind.is_dimension();
             self.flip_arrows = a.flip_arrows;
+            (self.jogs, self.cuts) = match a.kind {
+                AnnotationKind::LinearDimension { .. } => (a.jogs, cuts.remove(&a.id).unwrap_or_default()),
+                _ => ([None; 2], Vec::new()),
+            };
             match &a.kind {
                 AnnotationKind::Note { text, height_mm, style } => {
                     let h = *height_mm;
@@ -877,7 +921,7 @@ impl SheetGeometry {
                     let at = [out[0] + if left { -1.0 } else { 1.0 }, out[1] + 0.8];
                     self.dim_label(at, 0.0, if left { 1.0 } else { 0.0 }, false, &t, dh, pick);
                 }
-                AnnotationKind::AngularDimension { view, vertex, a: pa, b: pb, radius } => {
+                AnnotationKind::AngularDimension { view, vertex, a: pa, b: pb, radius, .. } => {
                     let v = env.to_sheet(*view, *vertex);
                     let pa = env.to_sheet(*view, *pa);
                     let pb = env.to_sheet(*view, *pb);
@@ -1411,6 +1455,7 @@ impl SheetGeometry {
         }
         self.in_dim = false;
         self.flip_arrows = false;
+        (self.jogs, self.cuts) = ([None; 2], Vec::new());
         // Dimension and annotation colors (construction geometry keeps ink).
         let end = self.mark();
         for (k, &(a, t0, l0, f0)) in starts.iter().enumerate() {
@@ -1734,37 +1779,17 @@ impl SheetGeometry {
 
     /// Linear dimension with a formatted label.
     pub fn linear_dimension_text(&mut self, p: [f64; 2], q: [f64; 2], offset: f64, orientation: DimOrientation, text: &DimText, pick: u32) {
-        // Dimension line direction and normal.
-        let (dir, nrm) = match orientation {
-            DimOrientation::Horizontal => ([1.0, 0.0], [0.0, 1.0]),
-            DimOrientation::Vertical => ([0.0, 1.0], [1.0, 0.0]),
-            DimOrientation::Aligned => {
-                let d = [q[0] - p[0], q[1] - p[1]];
-                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
-                ([d[0] / l, d[1] / l], [-d[1] / l, d[0] / l])
+        let f = linear_frame(p, q, offset, orientation, &self.jogs, self.style.lock_jog_45, self.style.geometry_gap, self.style.extension);
+        let (dir, dp, dq) = (f.dir, f.dp, f.dq);
+        let half = self.style.dim_text * 0.4;
+        let cuts = std::mem::take(&mut self.cuts);
+        for e in &f.ext {
+            for piece in cut_polyline(e, &cuts, half) {
+                self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
             }
-        };
-        let proj = |x: [f64; 2]| x[0] * dir[0] + x[1] * dir[1];
-        let base = |x: [f64; 2]| x[0] * nrm[0] + x[1] * nrm[1];
-        let level = base(p).max(base(q)) + offset;
-        let at = |x: [f64; 2]| {
-            let s = proj(x);
-            [dir[0] * s + nrm[0] * level, dir[1] * s + nrm[1] * level]
-        };
-        let (dp, dq) = (at(p), at(q));
-        let (gap, ext) = (self.style.geometry_gap, self.style.extension);
-        for (src, dst) in [(p, dp), (q, dq)] {
-            let v = [dst[0] - src[0], dst[1] - src[1]];
-            let l = (v[0] * v[0] + v[1] * v[1]).sqrt();
-            if l > gap {
-                let u = [v[0] / l, v[1] / l];
-                self.lines.push(Polyline2 {
-                    points: vec![[src[0] + u[0] * gap, src[1] + u[1] * gap], [dst[0] + u[0] * ext, dst[1] + u[1] * ext]],
-                    style: LineStyle::Thin,
-                    closed: false,
-                    pick,
-                });
-            }
+        }
+        for j in &f.jog_points {
+            self.grips.push(Grip { pick, pos: *j, kind: GripKind::Jog });
         }
         let d = [dq[0] - dp[0], dq[1] - dp[1]];
         let dl = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
@@ -1772,11 +1797,15 @@ impl SheetGeometry {
         if self.flip_arrows {
             // Flipped: arrows outside pointing in, the line runs past them.
             let ext = self.style.dim_arrow + 3.0;
-            self.lines.push(Polyline2 { points: vec![[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]], style: LineStyle::Thin, closed: false, pick });
+            for piece in cut_polyline(&[[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]], &cuts, half) {
+                self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+            }
             self.arrow(dp, d, 3.0);
             self.arrow(dq, [-d[0], -d[1]], 3.0);
         } else {
-            self.lines.push(Polyline2 { points: vec![dp, dq], style: LineStyle::Thin, closed: false, pick });
+            for piece in cut_polyline(&[dp, dq], &cuts, half) {
+                self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+            }
             self.arrow(dp, [-d[0], -d[1]], 3.0);
             self.arrow(dq, d, 3.0);
         }
@@ -1813,6 +1842,120 @@ impl SheetGeometry {
             self.dim_label(mid, angle, 0.5, false, text, self.style.dim_text, pick);
         }
     }
+}
+
+/// Where a linear dimension's lines go (sheet mm): its direction, the
+/// dimension line's ends (moved sideways by jogs), the extension lines as
+/// polylines (with their jogs) and the jogs' snap points.
+pub struct LinearFrame {
+    pub dir: [f64; 2],
+    pub dp: [f64; 2],
+    pub dq: [f64; 2],
+    pub ext: Vec<Vec<[f64; 2]>>,
+    pub jog_points: Vec<[f64; 2]>,
+    /// Per extension line: (model point, unit direction, length to the
+    /// dimension line) — for jog editing.
+    pub legs: [([f64; 2], [f64; 2], f64); 2],
+}
+
+/// The geometry of a linear dimension between sheet points `p` and `q`.
+#[allow(clippy::too_many_arguments)]
+pub fn linear_frame(p: [f64; 2], q: [f64; 2], offset: f64, orientation: DimOrientation, jogs: &[Option<super::ExtJog>; 2], lock45: bool, gap: f64, ext: f64) -> LinearFrame {
+    let (dir, nrm) = match orientation {
+        DimOrientation::Horizontal => ([1.0, 0.0], [0.0, 1.0]),
+        DimOrientation::Vertical => ([0.0, 1.0], [1.0, 0.0]),
+        DimOrientation::Aligned => {
+            let d = [q[0] - p[0], q[1] - p[1]];
+            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+            ([d[0] / l, d[1] / l], [-d[1] / l, d[0] / l])
+        }
+    };
+    let proj = |x: [f64; 2]| x[0] * dir[0] + x[1] * dir[1];
+    let base = |x: [f64; 2]| x[0] * nrm[0] + x[1] * nrm[1];
+    let level = base(p).max(base(q)) + offset;
+    let at = |x: [f64; 2]| {
+        let s = proj(x);
+        [dir[0] * s + nrm[0] * level, dir[1] * s + nrm[1] * level]
+    };
+    let mut ends = [at(p), at(q)];
+    let mut out = Vec::new();
+    let mut jog_points = Vec::new();
+    let mut legs = [([0.0; 2], [0.0, 1.0], 0.0); 2];
+    for (k, src) in [p, q].into_iter().enumerate() {
+        let dst = ends[k];
+        let v = [dst[0] - src[0], dst[1] - src[1]];
+        let l = (v[0] * v[0] + v[1] * v[1]).sqrt();
+        let u = if l > 1e-9 { [v[0] / l, v[1] / l] } else { nrm };
+        legs[k] = (src, u, l);
+        let start = [src[0] + u[0] * gap, src[1] + u[1] * gap];
+        match jogs[k] {
+            Some(j) => {
+                let j0 = [src[0] + u[0] * l * j.at.clamp(0.0, 1.0), src[1] + u[1] * l * j.at.clamp(0.0, 1.0)];
+                let drop = if lock45 { j.shift.abs() } else { j.drop }.clamp(0.0, l * (1.0 - j.at.clamp(0.0, 1.0)));
+                let j1 = [j0[0] + u[0] * drop + dir[0] * j.shift, j0[1] + u[1] * drop + dir[1] * j.shift];
+                let end = [dst[0] + dir[0] * j.shift, dst[1] + dir[1] * j.shift];
+                out.push(vec![start, j0, j1, [end[0] + u[0] * ext, end[1] + u[1] * ext]]);
+                jog_points.extend([j0, j1]);
+                ends[k] = end;
+            }
+            None if l > gap => out.push(vec![start, [dst[0] + u[0] * ext, dst[1] + u[1] * ext]]),
+            None => {}
+        }
+    }
+    LinearFrame { dir, dp: ends[0], dq: ends[1], ext: out, jog_points, legs }
+}
+
+/// A polyline with gaps of `half` mm on each side of the `cuts` points
+/// that lie on it (Break dimension).
+pub fn cut_polyline(points: &[[f64; 2]], cuts: &[[f64; 2]], half: f64) -> Vec<Vec<[f64; 2]>> {
+    let mut out = vec![vec![points[0]]];
+    for w in points.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let d = [b[0] - a[0], b[1] - a[1]];
+        let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        if len < 1e-9 {
+            continue;
+        }
+        let u = [d[0] / len, d[1] / len];
+        // Cut points on this segment, by distance from `a`.
+        let mut ts: Vec<f64> = cuts
+            .iter()
+            .filter_map(|c| {
+                let t = (c[0] - a[0]) * u[0] + (c[1] - a[1]) * u[1];
+                let off = ((c[0] - a[0]) * u[1] - (c[1] - a[1]) * u[0]).abs();
+                (off < 1e-6 && t > -1e-9 && t < len + 1e-9).then_some(t)
+            })
+            .collect();
+        ts.sort_by(f64::total_cmp);
+        let pt = |t: f64| [a[0] + u[0] * t, a[1] + u[1] * t];
+        for t in ts {
+            let last = out.last_mut().expect("a piece");
+            last.push(pt((t - half).max(0.0)));
+            out.push(vec![pt((t + half).min(len))]);
+        }
+        out.last_mut().expect("a piece").push(b);
+    }
+    out.retain(|piece| piece.windows(2).map(|w| ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt()).sum::<f64>() > 1e-6);
+    out
+}
+
+/// A linear dimension's line segments for Break dimension: (annotation id,
+/// broken, segments).
+type DimSegments = (u64, bool, Vec<[[f64; 2]; 2]>);
+
+/// Where two segments cross (not at their ends).
+fn crossing(a: [[f64; 2]; 2], b: [[f64; 2]; 2]) -> Option<[f64; 2]> {
+    let r = [a[1][0] - a[0][0], a[1][1] - a[0][1]];
+    let s = [b[1][0] - b[0][0], b[1][1] - b[0][1]];
+    let den = r[0] * s[1] - r[1] * s[0];
+    if den.abs() < 1e-12 {
+        return None;
+    }
+    let w = [b[0][0] - a[0][0], b[0][1] - a[0][1]];
+    let t = (w[0] * s[1] - w[1] * s[0]) / den;
+    let u = (w[0] * r[1] - w[1] * r[0]) / den;
+    let eps = 1e-6;
+    (t > eps && t < 1.0 - eps && u > eps && u < 1.0 - eps).then(|| [a[0][0] + r[0] * t, a[0][1] + r[1] * t])
 }
 
 /// Text positions (along the measured axis) of ordinate values at `along`,

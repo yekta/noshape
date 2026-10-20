@@ -132,12 +132,21 @@ pub struct Viewport {
     drag: Drag,
     press_pos: DVec2,
     last_pos: DVec2,
-    /// Selected entities, drawn as a digit at the pointer (Onshape's
-    /// selection-count cursor: 1-5, "5" for five or more). Set by the owner.
+    /// Selected entities, shown in the cursor image (Onshape's
+    /// selection-count cursor: 1-5, "5+" for more). Set by the owner.
     pub selection_count: usize,
-    /// The count cursor last set through the platform (`None` = the arrow),
-    /// and whether the platform could (else the digit is drawn).
-    cursor_applied: Option<Option<usize>>,
+    /// The top of Onshape's cursor stack (sketch tool crosshair, `move` over
+    /// a dimension value, `no-drop`…), set by the owner; it wins over the
+    /// selection cursor (docs/parity/cursors.md).
+    pub tool_cursor: Option<crate::cursor::AppCursor>,
+    /// The cursor of an overlay drawn over the graphics area (a dimension's
+    /// value): shown although the viewport itself isn't hovered.
+    pub overlay_cursor: Option<crate::cursor::AppCursor>,
+    /// Ctrl is held during a box selection (Onshape's box-deselect cursor).
+    ctrl_in_box: bool,
+    /// The cursor last set through the platform (`None` = the arrow), and
+    /// whether the platform could.
+    cursor_applied: Option<Option<crate::cursor::AppCursor>>,
     cursor_platform: bool,
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
@@ -310,6 +319,9 @@ impl Viewport {
             press_pos: DVec2::ZERO,
             last_pos: DVec2::ZERO,
             selection_count: 0,
+            tool_cursor: None,
+            overlay_cursor: None,
+            ctrl_in_box: false,
             cursor_applied: None,
             cursor_platform: true,
             hover: None,
@@ -1071,6 +1083,7 @@ impl Viewport {
             }
             Drag::Box => {
                 self.box_rect = Some((self.press_pos, p));
+                self.ctrl_in_box = e.modifiers.control;
                 cx.notify();
             }
             Drag::Tool => {
@@ -1570,14 +1583,32 @@ impl Render for Viewport {
 }
 
 impl Viewport {
-    /// Onshape's selection-count cursor over the graphics area (cursor.rs).
+    /// Onshape's cursor over the graphics area (cursor.rs): the top of its
+    /// cursor stack (a tool's cursor, zoom to window, box deselect), else
+    /// the selection-count cursor. Navigation drags don't change it (the
+    /// bundle pushes nothing for them).
     fn sync_cursor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let want = (self.selection_count > 0 && self.pointer_inside && matches!(self.drag, Drag::None | Drag::Pending(_))).then_some(self.selection_count.min(5));
+        use crate::cursor::AppCursor;
+        if self.drag != Drag::Box {
+            self.ctrl_in_box = false;
+        }
+        let stack = if self.drag == Drag::Box && self.ctrl_in_box {
+            Some(AppCursor::RemoveSelection)
+        } else if self.zoom_window {
+            Some(AppCursor::ZoomIn)
+        } else {
+            self.tool_cursor
+        };
+        let want = self.overlay_cursor.or_else(|| self.pointer_inside.then(|| stack.or_else(|| (self.selection_count > 0).then(|| AppCursor::count(self.selection_count)))).flatten());
         if self.cursor_applied == Some(want) || (want.is_none() && self.cursor_applied.is_none_or(|a| a.is_none())) {
             return;
         }
         self.cursor_platform = crate::cursor::set(window, want, cx);
         self.cursor_applied = Some(want);
+        if want.is_none() {
+            // Let GPUI put back the hovered element's cursor.
+            window.refresh();
+        }
         if want.is_some() && self.cursor_platform {
             // GPUI sets its own cursor at the end of a frame in which the
             // hovered style changed; set ours again once that frame is out.

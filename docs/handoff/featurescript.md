@@ -80,9 +80,20 @@ Done since the blockers:
   Values from other documents / versions are `ext:<microversion>|<tab>|<path>` (`#part` after the tab),
   read through `DerivedProvider::file` (new default method; app's DocStudios implements it) and
   `DocStudios::context`. "No CSV files available." etc. per kind.
-  **Still open:** the Create version modal is the app's (title "Create version from…", no "Publish custom
-  features and tables" row — history_panel owner); PartStudioData `configuration` of configured studios;
-  partQuery prints as transient queries (Onshape: ORIGINAL_DEPENDENCY queries).
+  **Round 4 (live dom/fs-refcfg*, fs-partquery):** configured Part Studios: the panel shows the inputs under
+  an expanded configured studio (OsSelect / checkbox / fields, 40 px indent) + Generate (pale until a
+  change) and a "Set to last viewed configuration" ▾ button on the row (release_dialog::last_viewed_config);
+  the value stores the configuration after a tab (`key[#part]\tinput=value;…`). PartStudioData:
+  `configuration` / `configurationData` keyed by the inputs' FeatureScript ids (= names, sanitized), list
+  values = option names, quantities in meters, `referenceType` WORKSPACE / VERSION, `buildFunction(cfg)`
+  regenerates in that configuration (missing inputs default; `DerivedProvider::context_configured`).
+  partQuery: whole studio = UNION › UNION › BODY EVERYTHING; a part made by a sweep-like feature from sketch
+  edges = Onshape's SWEPT_BODY query (`<feature>.opExtrude`, originals `<sketch>.wireOp` + sketch entity
+  ids; new `DerivedProvider::feature_type`), resolved by query.rs `historical` "SWEPT_BODY"; other parts
+  fall back to transient queries. Pinned by `part_studio_reference_configurations` and
+  `part_studio_reference_swept_body_query`.
+  **Still open:** Onshape's sketch entity ids are its own (ours print our entity numbers); external
+  (`ext:`) studios ignore configurations; the panel's Generate "Generating preview" pictures.
 
 **Rhai:** it is already gone in the working tree — the previous "fs" deleted `custom/{api,compile,eval,schema}.rs`
 and dropped `rhai` from Cargo.toml before I took over; the FeatureScript path replaced it everywhere
@@ -90,15 +101,34 @@ and dropped `rhai` from Cargo.toml before I took over; the FeatureScript path re
 those files back from git HEAD and re-adding a language switch; I did not do that. **Lead: decide** whether
 FeatureScript replacing Rhai now is acceptable (tests were 8/8 at the previous agent's last run).
 
-## Std features routed to built-in evaluators
+## Std operations backed by built-in evaluators (std's own feature code runs)
 
-When a custom feature calls a std feature whose std operation we don't provide but whose dialog is
-identical to our built-in schema (pinned list), the std constant is replaced by a native
-(`interp::override_global`, host/builtin.rs `STD_FEATURES`: bodyDraft, constrainedSurface, fitSpline,
-isocline, projectCurves, wrap) that runs the built-in evaluator with the definition as parameters;
-failures carry the built-in's message (`CUSTOM_ERROR`). Also new: `@constructPaths`,
-`@approximateSpline` (OCCT interpolation, start/end derivatives), `opFaceBlend` (builtin adapter with
-field renames `flipSide1Normal`→`flipSide1`…). All pinned in tests/fs/ops_harness.fs.
+The std features bodyDraft, constrainedSurface, fitSpline, isocline, projectCurves and wrap now run std's
+own code; their missing operations are natives (host/builtin.rs `BuiltinOp`: op fields → the built-in
+feature's parameters, `renames`, `vectors` = Vector fields passed as a temporary plane with that normal,
+`defaults`): opCreateIsocline / opSplitByIsocline (isocline), opBodyDraft (bodyDraft), opSplineThroughEdges
+(fitSpline EDGES), opDropCurve (projectCurves CURVE_TO_FACE), opFaceBlend (renames), opRuledSurface (`adjust`
+hook: width sign, ANGLE_FROM_FACE → Tangent + angle, vector types; returns frames at manipulatorPositions;
+vertexOverrides ignored); plus opConstrainedSurface
+and opWrap (WrapSurface plane/cylinder/cone/face + anchors) written against the kernel directly. Also
+@constructPaths, @approximateSpline. All in tests/fs/ops_harness.fs. (`interp::override_global` remains
+available but is unused.)
+
+## Feature Studio imports of other tabs (live dom/fs-import-*, behaviours.md "Import button")
+
+`import(path : "<tab id>", version : "…")` of a file tab exports `BLOB_DATA` (the reference-parameter map)
+and `processedForeingDataInfo` (sic, a BuiltIn); of a Part Studio exports `build(configuration)` (prints
+`<function 6>` like live); Variable Studio imports compile but export nothing yet (not captured). Two
+un-namespaced imports that export different constants of one name → "Duplicate top level symbol name 'X'"
+(reported at our import statement; Onshape lists it under each imported module). `skImage` places an
+imported image keeping its proportions (BLOB_DATA's dataId finds the bytes). Pinned by
+`imports_of_files_and_part_studios`. The Import panel itself is ui2's (fs_import.rs); its paths resolve here:
+same document = tab id; other documents / versions = `<document id>/<version microversion>/<tab id>`
+(document id = first microversion), turned into an ExternalRef by app `derived::import_ref` (documents
+found by scanning the local library once per unknown id) and loaded through
+`custom::set_external_tab_loader` (registered in main.rs). The reference panel is now its own entity
+(select_item.rs `SelectItemPanel`, events Picked / Close / CreateVersion / ImportFile; asb uses its
+`document_versions` / `changes_since` for drawing custom tables).
 
 ## Custom tables (`defineTable`) — API for asb (drawings) and the Part Studio Custom tables panel
 

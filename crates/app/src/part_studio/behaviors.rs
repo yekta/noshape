@@ -479,7 +479,7 @@ impl PartStudioView {
         // edges only, faces keep their color (live 635).
         if let Some(refs) = &self.ui.ct.hover {
             return refs.iter().flat_map(|r| match r {
-                Reference::Body(b) => self.body_geometry(b).into_iter().filter(|r| matches!(r, Reference::Edge(_))).collect(),
+                Reference::Body(b) => self.display.body(b).map(|b| b.edge_refs.clone()).unwrap_or_default(),
                 r => vec![r.clone()],
             }).collect();
         }
@@ -2280,13 +2280,13 @@ impl PartStudioView {
     /// Measure graphics (Onshape): a dotted line between the closest points
     /// of the measured entities, with its X (red), Y (green) and Z (blue)
     /// components.
-    pub(super) fn measure_overlay(&mut self) -> Vec<noshape_render::Instance> {
+    pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
         if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
             return Vec::new();
         }
-        let Some(ctx) = self.context.clone() else { return Vec::new() };
         let sel = self.selection.clone();
+        let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
         // Uploaded once per selection (refresh_scene runs on every hover).
         if let Some((s, inst)) = &self.ui.measure_lines
             && *s == sel

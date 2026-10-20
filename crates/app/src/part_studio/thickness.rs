@@ -102,6 +102,8 @@ pub struct BarUi {
     /// Offset from its default spot, and an active drag.
     offset: Point<Pixels>,
     drag: Option<LegendDrag>,
+    /// The pointer is over the color map (Onshape: the sketch crosshair).
+    pub map_hover: bool,
     /// The bound being typed (0 / 1) and its field.
     editing: Option<(usize, Entity<InputState>, Subscription)>,
 }
@@ -363,6 +365,7 @@ impl PartStudioView {
         let b = self.bar_ui(bar)?;
         let pal = p();
         let (palette, user, offset) = (b.palette, [b.bounds[0].is_some(), b.bounds[1].is_some()], b.offset);
+        let moving = matches!(b.drag, Some(LegendDrag::Move { .. }));
         let editing = b.editing.as_ref().map(|(i, st, _)| (*i, st.clone()));
         let dim = bar == Bar::Thickness && self.ui.thickness.as_ref().is_some_and(|t| t.dim);
         let table = palettes(bar);
@@ -459,7 +462,19 @@ impl PartStudioView {
             .items_end()
             .child(outside(user[0], BELOW, data_lo))
             .child(tick(0, cx))
-            .child(h_flex().w(px(BAR)).h(px(22.)).children(segments))
+            .child(
+                h_flex()
+                    .id(SharedString::from(format!("cb-map-{bar:?}")))
+                    .w(px(BAR))
+                    .h(px(22.))
+                    .children(segments)
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        if let Some(b) = this.bar_ui_mut(bar) {
+                            b.map_hover = *h;
+                        }
+                        this.push_tool_cursor(cx);
+                    })),
+            )
             .child(tick(1, cx))
             .child(outside(user[1], ABOVE, data_hi).flex().flex_row_reverse());
         // Tick labels: the bounds (blue, editable) and four between.
@@ -515,6 +530,8 @@ impl PartStudioView {
                         .py(px(6.))
                         .rounded(px(2.))
                         .hover(|d| d.bg(hsla(0., 0., 1., 0.85)))
+                        // Onshape's legend: grab, grabbing while it is moved.
+                        .cursor(if moving { CursorStyle::ClosedHand } else { CursorStyle::OpenHand })
                         .child(controls)
                         .child(strip)
                         .child(labels)

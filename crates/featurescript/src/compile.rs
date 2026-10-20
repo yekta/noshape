@@ -399,6 +399,14 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
             }
             None => {
                 for (n, s) in m.exports.iter() {
+                    // Live (dom/fs-import): two un-namespaced imports exporting
+                    // different constants of one name (every file import
+                    // exports BLOB_DATA) do not compile.
+                    if let (Some(ValueSym::Const(a)), Some(ValueSym::Const(b))) = (scope.symbols.get(n).and_then(|c| c.value.as_ref()), s.value.as_ref())
+                        && !Arc::ptr_eq(a, b)
+                    {
+                        err(&mut errors, item.pos, format!("Duplicate top level symbol name '{n}'"));
+                    }
                     merge_symbol(&mut scope.symbols, n, s);
                 }
             }

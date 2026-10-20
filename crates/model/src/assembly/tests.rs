@@ -208,6 +208,10 @@ fn a_mate_being_defined_is_solved_alone_until_solve() {
     assert!((origin_of(&res, 2) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-6, "{:?}", origin_of(&res, 2));
     assert!((origin_of(&res, 3) - (at2 + DVec3::new(0.0, 0.0, 0.01))).length() < 1e-9, "{:?}", origin_of(&res, 3));
     assert!(res.mates.iter().all(|m| m.ok));
+    // The instance list's degrees of freedom are the whole assembly's with
+    // the new mate: block 3 is fastened through block 2 to block 1.
+    let dof = |id: u64| res.nodes.iter().find(|n| n.path == [InstanceId(id)]).and_then(|n| n.dof);
+    assert_eq!((dof(2), dof(3)), (Some(0), Some(0)));
     // Solve (and accepting): every mate, so block 3 follows.
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!((origin_of(&res, 3) - DVec3::new(0.0, 0.0, 0.02)).length() < 1e-6, "{:?}", origin_of(&res, 3));
@@ -332,6 +336,15 @@ fn interference_bom_and_explode() {
     assert_eq!(hits.len(), 1, "{hits:?}");
     let expected = 0.04 * 0.02 * 0.005;
     assert!((hits[0].volume - expected).abs() < 1e-10, "{} vs {expected}", hits[0].volume);
+    // The Interference detection dialog: only the instances to analyze, with
+    // the overlap's box and mesh (live assembly/735–736).
+    let rows = super::analysis::instance_interferences(&res, &[InstanceId(1), InstanceId(2)], false);
+    assert_eq!(rows.len(), 1);
+    assert_eq!((rows[0].a.clone(), rows[0].b.clone()), (vec![InstanceId(1)], vec![InstanceId(2)]));
+    let (lo, hi) = rows[0].overlap.bounds;
+    assert!(((hi - lo) - DVec3::new(0.04, 0.02, 0.005)).length() < 1e-6, "{lo:?} {hi:?}");
+    assert!(!rows[0].overlap.indices.is_empty());
+    assert!(super::analysis::instance_interferences(&res, &[InstanceId(1), InstanceId(3)], false).is_empty());
     let b = bom(&res);
     assert_eq!(b.len(), 1);
     assert_eq!(b[0].quantity, 3);
@@ -1372,6 +1385,56 @@ impl eval::ExternalStudios for TestExternal {
     fn studio(&self, key: &str) -> Option<(std::sync::Arc<Document>, TabId)> {
         self.docs.iter().find(|(k, _, _)| k == key).map(|(_, d, t)| (d.clone(), *t))
     }
+    /// Keys `<version>/<tab>`: the same version, another tab.
+    fn sibling(&self, key: &str, tab: TabId) -> Option<String> {
+        Some(format!("{}/{tab}", key.split('/').next()?))
+    }
+}
+
+#[test]
+fn assemblies_from_other_documents() {
+    // Other document: Block <2> fastened on top of the fixed Block <1>.
+    let mut o = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (obody, or) = body_of(&mut ev, &o.doc, o.studios[0]);
+    let sub = Assembly {
+        instances: vec![part_instance(1, "Block <1>", o.studios[0], obody.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", o.studios[0], obody, DVec3::new(0.07, 0.03, -0.02), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, face_with(&or, "CapEnd"), Inference::Centroid), conn(2, face_with(&or, "CapStart"), Inference::Centroid))],
+        ..Default::default()
+    };
+    let sub_tab = o.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(sub)));
+    let odoc = std::sync::Arc::new(o.doc.clone());
+    let ext = TestExternal { docs: vec![(format!("ext:v1/{sub_tab}"), odoc.clone(), sub_tab), (format!("ext:v1/{}", o.studios[0]), odoc, o.studios[0])] };
+    ev.set_external(std::sync::Arc::new(ext));
+    // This document: a fixed block and the other document's assembly 0.2 m along X.
+    let mut f = doc_with(vec![block_studio()]);
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let key = format!("ext:v1/{sub_tab}");
+    let mut asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true)], ..Default::default() };
+    let at = Placement { translation: [0.2, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
+    asm.instances.push(Instance::new(InstanceId(2), "Assembly 1 <1>".into(), InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, at));
+    let top_tab = f.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(asm.clone())));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let node = &res.nodes[1];
+    assert!(node.error.is_none(), "{:?}", node.error);
+    assert_eq!(node.kind, eval::NodeKind::Assembly);
+    assert_eq!(node.children.len(), 2);
+    // Its parts sit where its own mates put them, carried by the instance.
+    let top = res.occurrences.iter().find(|o| o.path == [InstanceId(2), InstanceId(2)]).expect("nested part");
+    let (lo, _) = top.world_bounds().unwrap();
+    assert!((lo.z - 0.01).abs() < 1e-6 && (lo.x - 0.2).abs() < 1e-6, "{lo:?}");
+    assert!(top.external.as_deref().is_some_and(|k| k.starts_with("ext:v1/")), "{:?}", top.external);
+    // Structured BOM: a subassembly row (its name there) with its parts.
+    let settings = super::bom::BomSettings { bom_type: super::bom::BomType::Structured, ..Default::default() };
+    let st = super::bom::lines(&f.doc, top_tab, &res, &settings);
+    let summary: Vec<(String, usize, usize)> = st.iter().map(|l| (l.item.clone().unwrap_or_default(), l.depth, l.quantity)).collect();
+    assert_eq!(summary, vec![("1".into(), 0, 1), ("2".into(), 0, 1), ("2.1".into(), 1, 2)]);
+    assert_eq!(st[1].name, "Assembly 1");
+    assert!(matches!(st[1].source, super::bom::BomSource::ExternalAssembly { .. }));
+    // Reference updates re-point the whole subassembly; a missing version is reported.
+    assert_eq!(asm.update_external(&key, "ext:gone"), 1);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.nodes[1].error.is_some());
 }
 
 #[test]

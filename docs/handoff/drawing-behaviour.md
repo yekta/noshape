@@ -338,3 +338,23 @@ migrating the drawing menus to `os_menu` (`fill_os_menu`): keep edits surgical, 
 - Open: live request filed (REQUESTS.md asb 00:00) for the drawing table look (title row? error cell, TableArray,
   a thrown table), the Select a Part Studio dialog and the right-click menu of a workspace table. The shared table
   context menu (Format cell / Merge / Fixed corner …) is not Onshape's custom table menu (help custom-tables-14).
+
+## 20 Oct: table and dimension menus, jogs, breaks, Dimensions tab
+- Table menus (help custom-tables-14 / bom_table / cut_list_table): BOM, cut list and custom tables use
+  `data_table_entries` (app/drawing_custom_table.rs) when the whole table is selected, `cell_size_entries`
+  (app/drawing_table_dlg.rs: Size ▸ Columns Equally / Rows Equally, Resize) when cells are (`cell_sel`). General,
+  revision and hole tables keep the older menu (hole: needs Onshape's Hole table dialog, TB20). `Table.layer` (Move
+  to; colored / locked like annotations in build.rs), `order_table`, `move_table_to_sheet`. `MenuEntry::disabled`.
+- BOM / Cut list table properties: `TableDlg.table` (edit mode, `open_table_props`, `apply_table_dlg`,
+  `close_table_dlg`; Reference link instead of Insert).
+- Linear dimension menu as live (`dimension_entries`, app/drawing_jog.rs; other dimension kinds keep the old
+  menu). Jogs: `Annotation.jogs: [Option<ExtJog>; 2]`, drawn by `sheet::linear_frame` (shared with the app),
+  `GripKind::Jog`, `Drag::Jog`. Break dimension: `Annotation.unbroken` (new dimensions: `!props.break_dims`, set in
+  `pending_annotation`), `SheetGeometry::dimension_crossings` + `cut_polyline`. Test
+  `jogged_extension_lines_and_broken_dimensions`.
+- Dimensions tab: Text justification, Underline overridden (drawn on screen in drawing_scene `sheet_lines`), Break
+  by default, Fit standard, Lock jog 45°, Ordinate style, Show radial dimension lines (`Drawing::dim_fit_ansi /
+  ordinate_ansi / radial_dim_lines` default from the sheet standard). Justification / fit / ordinate / radial are
+  stored only (live request asb 10-20 d).
+- GD&T dialog limits (`limit_gdt_texts`), Add frame up to 5.
+- Surgical fix in fs's select_item.rs (borrow of `s.configuration` in the source rows) to unblock the build.

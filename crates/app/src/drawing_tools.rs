@@ -28,6 +28,14 @@ fn norm(a: [f64; 2]) -> [f64; 2] {
 
 /// Dimension offset that puts the dimension line through the cursor
 /// (mirrors `SheetGeometry::linear_dimension`).
+/// Whether `c` lies in the angle swept counterclockwise from leg point `a`
+/// to leg point `b` around `v`.
+pub fn in_sweep(v: [f64; 2], a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> bool {
+    let ang = |p: [f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]);
+    let norm = |x: f64| x.rem_euclid(std::f64::consts::TAU);
+    norm(ang(c) - ang(a)) <= norm(ang(b) - ang(a))
+}
+
 pub fn dim_offset(p: [f64; 2], q: [f64; 2], o: DimOrientation, c: [f64; 2]) -> f64 {
     let nrm = match o {
         DimOrientation::Horizontal => [0.0, 1.0],
@@ -77,6 +85,7 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        self.woken_centers.clear();
         // Clicking the active tool's button again exits it.
         // Dimension tools exit only when the same kind is chosen again.
         let same_dim = matches!((&tool, &self.tool), (Tool::Dimension { kind: a, .. }, Tool::Dimension { kind: b, .. }) if a == b)
@@ -149,6 +158,10 @@ impl DrawingEditor {
                 d.picker = None;
             }
             cx.notify();
+            return;
+        }
+        if self.table_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
+            self.close_table_dlg(false, cx);
             return;
         }
         if self.custom_tables.dlg.as_ref().is_some_and(|d| d.table.is_some()) {
@@ -469,6 +482,13 @@ impl DrawingEditor {
 
     /// The annotation the active dimension tool would create at the cursor.
     pub fn pending_annotation(&self) -> Option<Annotation> {
+        // New dimensions follow Drawing properties › Break dimension by default.
+        let mut a = self.pending_annotation_raw()?;
+        a.unbroken = a.kind.is_dimension() && !self.drawing.props.break_dims;
+        Some(a)
+    }
+
+    fn pending_annotation_raw(&self) -> Option<Annotation> {
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
         let ann = |kind, refs: Vec<(u8, Option<PointRef>)>| Annotation {
@@ -489,7 +509,11 @@ impl DrawingEditor {
                     // The smart Dimension (d): the picks decide the kind (drawing_smart).
                     _ => {
                         let (kind, refs) = self.smart_dimension(picks)?;
-                        return Some(ann(kind, refs));
+                        let mut a = ann(kind, refs);
+                        if matches!(a.kind, AnnotationKind::LinearDimension { .. }) && self.cylinder_silhouettes(picks) {
+                            a.format.prefix = "Ø".into();
+                        }
+                        return Some(a);
                     }
                 };
                 let (ps, qs) = (self.pick_sheet(&a)?, self.pick_sheet(&b)?);
@@ -515,10 +539,14 @@ impl DrawingEditor {
                 while sweep < 0.0 {
                     sweep += std::f64::consts::TAU;
                 }
-                let (a, b) = if sweep > std::f64::consts::PI { (pb, pa) } else { (pa, pb) };
+                let (mut a, mut b) = if sweep > std::f64::consts::PI { (pb, pa) } else { (pa, pb) };
                 let pl = self.placement(v.view)?;
+                // The arc on the other side of a leg: 360° minus the angle.
+                if !in_sweep(pl.to_sheet(v.p), pl.to_sheet(a.p), pl.to_sheet(b.p), c) {
+                    std::mem::swap(&mut a, &mut b);
+                }
                 let radius = len(sub(c, pl.to_sheet(v.p))).max(3.0);
-                Some(ann(AnnotationKind::AngularDimension { view: v.view, vertex: v.p, a: a.p, b: b.p, radius }, vec![(0, v.r.clone()), (1, a.r.clone()), (2, b.r.clone())]))
+                Some(ann(AnnotationKind::AngularDimension { view: v.view, vertex: v.p, a: a.p, b: b.p, radius, three_point: true }, vec![(0, v.r.clone()), (1, a.r.clone()), (2, b.r.clone())]))
             }
             Tool::Dimension { kind: DimTool::Angle, picks } => {
                 let [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] = picks.as_slice() else { return None };
@@ -672,6 +700,25 @@ impl DrawingEditor {
             | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
+        // Dimension tool: hovering a circular edge wakes its center mark,
+        // which stays (an orange center snap with a small cross).
+        if matches!(self.tool, Tool::Dimension { .. })
+            && let Some((view, me)) = self.hovered_edge()
+            && let views::EdgeGeom::Circle { center, .. } = me.geom
+            && !self.woken_centers.contains(&(view, center))
+        {
+            self.woken_centers.push((view, center));
+        }
+        if matches!(self.tool, Tool::Dimension { .. }) {
+            let r = self.tol_mm(4.0);
+            for (view, center) in self.woken_centers.clone() {
+                let Some(pl) = self.placement(view) else { continue };
+                let p = pl.to_sheet(center);
+                overlay.marks.push((p, crate::drawing_scene::SnapMark::Circle, self.tol_mm(9.0)));
+                overlay.lines.push((vec![[p[0] - r, p[1]], [p[0] + r, p[1]]], false));
+                overlay.lines.push((vec![[p[0], p[1] - r], [p[0], p[1] + r]], false));
+            }
+        }
         self.hover_snap = snap.as_ref().and_then(|s| self.pick_sheet(s));
         if let (Some(p), Some(s)) = (self.hover_snap, &snap) {
             // Shape-coded orange snap marker (live: drawing/10).
@@ -1311,6 +1358,22 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
+            Drag::Reattach { orig, k } => {
+                let a = self.reattached(&orig, k);
+                let mut dr = self.drawing.clone();
+                if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
+                    (x.kind, x.refs) = (a.kind, a.refs);
+                }
+                self.set_preview(Some(dr), cx);
+            }
+            Drag::Jog { orig, k, far } => {
+                let a = self.dragged_jog(&orig, k, far);
+                let mut dr = self.drawing.clone();
+                if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
+                    x.jogs = a.jogs;
+                }
+                self.set_preview(Some(dr), cx);
+            }
             Drag::MoveInspection(_) => self.update_hover(cx),
             Drag::MoveImage { id, start, orig } => {
                 let d = sub(self.cursor, start);
@@ -1459,6 +1522,11 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
+            Drag::Jog { .. } | Drag::Reattach { .. } => {
+                if let Some(p) = self.preview.take() {
+                    self.commit(if matches!(drag, Drag::Jog { .. }) { "Move jog" } else { "Re-attach dimension" }, p, cx);
+                }
+            }
             Drag::MoveInspection(id) => self.drop_inspection(id, cx),
             Drag::MoveSketch { .. } | Drag::MoveImage { .. } => {
                 if let Some(p) = self.preview.take() {
@@ -1581,18 +1649,17 @@ impl DrawingEditor {
         if self.table_cell_click(sel, m.shift, cx) {
             return;
         }
-        let additive = m.shift || m.control || m.platform;
+        // Onshape: selection is additive with a plain click (clicking a
+        // selected entity again deselects it); clicking empty space clears.
         match sel {
-            Some(s) if additive => {
+            Some(s) => {
                 if let Some(i) = self.selection.iter().position(|x| *x == s) {
                     self.selection.remove(i);
                 } else {
                     self.selection.push(s);
                 }
             }
-            Some(s) => self.selection = vec![s],
-            None if !additive => self.selection.clear(),
-            None => {}
+            None => self.selection.clear(),
         }
         self.status = None;
         self.redraw(cx);
@@ -1637,6 +1704,12 @@ impl DrawingEditor {
         }
         if let Some(id) = self.inspection_at(pick) {
             return Drag::MoveInspection(id);
+        }
+        if let Some((orig, k, far)) = self.jog_grip_at(start) {
+            return Drag::Jog { orig, k, far };
+        }
+        if let Some((orig, k)) = self.attach_grip_at(start) {
+            return Drag::Reattach { orig, k };
         }
         let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
         if !self.selection.contains(&sel) {
@@ -1695,9 +1768,20 @@ impl DrawingEditor {
                     *angle = v[1].atan2(v[0]);
                 }
             }
-            AnnotationKind::AngularDimension { vertex, radius, .. } => {
+            AnnotationKind::AngularDimension { vertex, radius, a: pa, b: pb, three_point, .. } => {
                 if let Some(pl) = pl {
                     *radius = len(sub(c, pl.to_sheet(*vertex))).max(3.0);
+                    // 3 point angular: across a leg, the arc measures 360° minus the angle.
+                    if *three_point && !in_sweep(pl.to_sheet(*vertex), pl.to_sheet(*pa), pl.to_sheet(*pb), c) {
+                        std::mem::swap(pa, pb);
+                        for r in &mut a.refs {
+                            r.slot = match r.slot {
+                                1 => 2,
+                                2 => 1,
+                                s => s,
+                            };
+                        }
+                    }
                 }
             }
             AnnotationKind::MaxMinDimension { a: pa, b: pb, offset, orientation, .. } => {
@@ -1724,7 +1808,21 @@ impl DrawingEditor {
             match (&mut out.kind, &a.kind) {
                 (AnnotationKind::LinearDimension { offset, .. }, AnnotationKind::LinearDimension { offset: o, .. }) => *offset = *o,
                 (AnnotationKind::RadialDimension { angle, .. }, AnnotationKind::RadialDimension { angle: g, .. }) => *angle = *g,
-                (AnnotationKind::AngularDimension { radius, .. }, AnnotationKind::AngularDimension { radius: r, .. }) => *radius = *r,
+                (AnnotationKind::AngularDimension { radius, a: pa, b: pb, .. }, AnnotationKind::AngularDimension { radius: r, a: na, .. }) => {
+                    *radius = *r;
+                    // Legs swapped by the drag: swap the stored legs and their references too.
+                    let swapped = matches!(&orig.kind, AnnotationKind::AngularDimension { a: oa, b: ob, .. } if na == ob && oa != ob);
+                    if swapped {
+                        std::mem::swap(pa, pb);
+                        for r in &mut out.refs {
+                            r.slot = match r.slot {
+                                1 => 2,
+                                2 => 1,
+                                s => s,
+                            };
+                        }
+                    }
+                }
                 (AnnotationKind::SurfaceFinish { anchor, .. }, AnnotationKind::SurfaceFinish { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::Gdt { anchor, .. }, AnnotationKind::Gdt { anchor: n, .. }) => *anchor = *n,
                 (AnnotationKind::RevisionCallout { anchor, .. }, AnnotationKind::RevisionCallout { anchor: n, .. }) => *anchor = *n,
@@ -1818,6 +1916,10 @@ impl DrawingEditor {
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::Annotation(id)) => {
+                // Linear dimensions: Onshape's own menu.
+                if let Some(entries) = self.dimension_entries(id, cx) {
+                    return entries;
+                }
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 if let Some(a) = &a {
                     out.extend(self.inspection_entries(a));
@@ -1902,8 +2004,25 @@ impl DrawingEditor {
                             })
                         }));
                     }
+                    // GD&T frames: Paste / Paste as table (help geometric_tolerance).
+                    if matches!(a.kind, AnnotationKind::Gdt { .. }) {
+                        if crate::drawing_props::view_clipboard(cx).is_some() {
+                            out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)));
+                        }
+                        if self.clipboard_cells(cx).is_some() {
+                            out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                                t.start_paste_table(cx);
+                            }));
+                        }
+                    }
                     out.push(MenuEntry::Separator);
                 }
+                // Onshape's menus end with Clear selection, Zoom to fit, Delete.
+                out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+                    t.selection.clear();
+                    t.redraw(cx);
+                }));
+                out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
                 out.push(MenuEntry::item("Delete", move |t, _, cx| {
                     t.selection.clear();
                     t.edit_sheet("Delete annotation", cx, |s| s.annotations.retain(|x| x.id != id));

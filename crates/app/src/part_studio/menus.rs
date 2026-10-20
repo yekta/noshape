@@ -584,12 +584,37 @@ impl PartStudioView {
         noshape_units::format_quantity(q, &units)
     }
 
+    /// A measured value as the Measure readout / panel show it (bundle
+    /// `formatValue`, live part-studio/81: "90.000 deg", "11.902 in²"): the
+    /// document's display precision with trailing zeros kept, "deg" for
+    /// degrees.
+    fn measure_fmt(&self, q: Quantity, cx: &App) -> String {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let angle = q.dim == Dim::ANGLE;
+        let decimals = usize::from(if angle { units.angle_precision } else { units.length_precision });
+        let mut num = format!("{:.*}", decimals, q.value / units.si_factor(q.dim));
+        if num.starts_with('-') && num[1..].chars().all(|c| c == '0' || c == '.') {
+            num.remove(0);
+        }
+        let unit = if angle {
+            units.angle.symbol().to_string()
+        } else {
+            let power = match q.dim.length {
+                2 => "²",
+                3 => "³",
+                _ => "",
+            };
+            format!("{}{power}", units.length.symbol())
+        };
+        format!("{num} {unit}")
+    }
+
     /// The live measurement of the selection left of the evaluation tools
     /// (live part-studio/81: "Perp planes angle: 90.000 deg", the number in
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let ctx = self.context.clone()?;
         let sel = self.selection.clone();
+        let ctx = self.measure_context(&sel, cx)?;
         let results = match &self.measure_cache {
             Some((s, r)) if *s == sel => r.clone(),
             _ => {
@@ -608,7 +633,7 @@ impl PartStudioView {
                 .child(div().font_family("monospace").text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(num))
                 .child(div().child(unit))
         };
-        let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
+        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
         let row = h_flex().gap(px(4.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
         Some(match m {
             Measurement::Point(pt) => {
@@ -618,9 +643,9 @@ impl PartStudioView {
             m => {
                 let text = match m {
                     Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
-                    Measurement::Area(x) => self.fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
-                    Measurement::Volume(x) => self.fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
-                    Measurement::Angle(x) => self.fmt(Quantity::new(x, Dim::ANGLE), cx),
+                    Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
+                    Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
+                    Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
                     Measurement::Distance { distance, .. } => l(distance),
                     Measurement::Point(_) => String::new(),
                 };
@@ -792,6 +817,7 @@ impl PartStudioView {
                 return Vec::new();
             }
             let sel = self.selection.clone();
+            let ctx = self.measure_context(&sel, cx).unwrap_or(ctx);
             let results = match &self.measure_cache {
                 Some((s, r)) if *s == sel => r.clone(),
                 _ => {
@@ -809,16 +835,16 @@ impl PartStudioView {
                     continue;
                 }
                 let v = match m {
-                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => self.fmt(Quantity::new(x, Dim::LENGTH), cx),
-                    Measurement::Area(x) => self.fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
-                    Measurement::Volume(x) => self.fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
-                    Measurement::Angle(x) => self.fmt(Quantity::new(x, Dim::ANGLE), cx),
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx),
+                    Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
+                    Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
+                    Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
                     Measurement::Point(p) => {
-                        let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
+                        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
                         format!("{}, {}, {}", l(p.x), l(p.y), l(p.z))
                     }
                     Measurement::Distance { distance, dx, dy, dz, .. } => {
-                        let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
+                        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
                         rows.push(("ΔX / ΔY / ΔZ".into(), format!("{} / {} / {}", l(dx), l(dy), l(dz))));
                         l(distance)
                     }

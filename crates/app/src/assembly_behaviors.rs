@@ -278,8 +278,8 @@ pub(crate) struct AsmUi {
     /// Reflection analysis: the open dialog, the accepted settings, the last
     /// environment used, the uploaded environment and the picker preview.
     pub reflection_dialog: Option<super::reflection::ReflectionDialog>,
-    /// Curve/surface analysis dialog.
-    pub curve_dialog: Option<super::curvature::CurveDialog>,
+    /// Interference detection dialog.
+    pub interference: Option<super::interference::InterferenceDialog>,
     pub reflection: Option<crate::part_studio::reflection::ReflectionSettings>,
     pub reflection_last: Option<crate::part_studio::reflection::ReflectionSettings>,
     pub env_gpu: std::cell::RefCell<Option<(String, noshape_render::ImageHandle)>>,
@@ -579,16 +579,25 @@ impl AssemblyView {
         if inst.fixed && fixed.len() > 1 {
             return Some("More than one part is fixed");
         }
-        if let InstanceSource::Assembly { assembly, .. } = &inst.source
-            && let Some(TabContent::Assembly(sub)) = self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content)
-            && sub.fixed_instances().len() > 1
-        {
+        let inside_fixed = match &inst.source {
+            InstanceSource::Assembly { assembly, .. } => match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
+                Some(TabContent::Assembly(sub)) => sub.fixed_instances().len(),
+                _ => 0,
+            },
+            _ => self.linked_assembly(id).map_or(0, |(_, sub)| sub.fixed_instances().len()),
+        };
+        if inside_fixed > 1 {
             return Some("More than one part inside is fixed");
         }
         let to_origin = a.mates.iter().any(|m| {
             !m.suppressed && m.mate_type == MateType::Fastened && ((m.a.instance == id && m.b.is_origin()) || (m.b.instance == id && m.a.is_origin()))
         });
         (to_origin && !fixed.is_empty()).then_some("Fastened to origin even though Assembly has fixed part(s)")
+    }
+
+    /// An instance of another document's Assembly: (its name there, content).
+    pub(super) fn linked_assembly(&self, id: InstanceId) -> Option<noshape_model::assembly::eval::LinkedAssembly> {
+        self.result.node(&[id]).and_then(|n| n.linked.clone())
     }
 
     // ------------------------------------------------------------ fix
@@ -798,7 +807,7 @@ impl AssemblyView {
         let targets = self.targets(Some(top));
         let multi = targets.len() > 1;
         let (fixed, hidden, suppressed) = (inst.fixed, inst.hidden, inst.suppressed);
-        let is_asm = matches!(inst.source, InstanceSource::Assembly { .. });
+        let is_asm = matches!(inst.source, InstanceSource::Assembly { .. }) || self.linked_assembly(top).is_some();
         let isolating = self.isolate.is_some() || self.ui.transparent.is_some();
         let name = inst.name.clone();
         let mut m: Vec<MenuEntry> = Vec::new();
@@ -853,10 +862,7 @@ impl AssemblyView {
         m.push(item(if best { "Use automatic tessellation setting" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
         if is_asm || multi {
             let tg = targets.clone();
-            m.push(item("Check interference…", move |t, _, cx| {
-                t.selected = tg.clone();
-                t.run_interference(cx);
-            }));
+            m.push(item("Check interference…", move |t, _, cx| t.open_interference_with(tg.clone(), cx)));
         }
         // Show mates (instances with mates).
         let mated = asm.mates.iter().any(|mt| mt.instances().contains(&top));
@@ -945,6 +951,22 @@ impl AssemblyView {
             && let Some(tname) = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())
         {
             edit.push(icon_item(format!("Switch to {tname}"), if is_asm { "assembly" } else { "part-studio" }, move |_, _, cx| cx.emit(AssemblyViewEvent::ActivateTab(tab))));
+        }
+        // From another document: "Open linked document" in that slot (bundle
+        // `switchToImageOwner`), opening the referenced version.
+        if !multi
+            && let Some(key) = inst.source.external_key().map(|k| k.to_string())
+            && let Some(r) = crate::derived::ExternalRef::parse(&key)
+        {
+            let gpu = self.gpu.clone();
+            edit.push(item("Open linked document", move |_, _, cx| {
+                use noshape_model::assembly::eval::ExternalStudios as _;
+                // The referenced version, on the referenced tab.
+                let Ok((handle, _)) = crate::files::open_version_window(r.path.clone(), r.microversion, gpu.clone(), cx) else { return };
+                if let Some((_, tab)) = AppExternal.studio(&key) {
+                    let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| crate::workspace::request_activate_tab(tab, window, cx)));
+                }
+            }));
         }
         // A configured assembly: "Configure suppression" (live 199).
         if !multi && self.can_configure_suppression(top, cx) {
@@ -1056,12 +1078,16 @@ impl AssemblyView {
     fn instance_source_entries(&self, inst: &Instance, multi: bool, cx: &App) -> Vec<MenuEntry> {
         let mut m = Vec::new();
         let top = inst.id;
-        if let (false, InstanceSource::Assembly { assembly, .. }) = (multi, &inst.source) {
-            // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
-            let names: Vec<String> = match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
+        let sub_positions: Option<Vec<String>> = match &inst.source {
+            InstanceSource::Assembly { assembly, .. } => Some(match self.doc.read(cx).session.doc.tab(*assembly).map(|t| &t.content) {
                 Some(TabContent::Assembly(a)) => a.named_positions.iter().map(|n| n.name.clone()).collect(),
                 _ => vec![],
-            };
+            }),
+            // Another document's Assembly: its named positions there.
+            _ => self.linked_assembly(top).map(|(_, a)| a.named_positions.iter().map(|n| n.name.clone()).collect()),
+        };
+        if let (false, Some(names)) = (multi, sub_positions) {
+            // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
             let cur = inst.lock.clone();
             let mut children = vec![MenuEntry::Item {
                 label: if cur == SubassemblyLock::Current { "✓ Lock current position".into() } else { "Lock current position".into() },
@@ -1605,8 +1631,8 @@ impl AssemblyView {
             m.push(icon_item("Unfix all", "fix", |t, _, cx| t.unfix_all(cx)));
         }
         m.push(item("Check interference…", |t, _, cx| {
-            t.selected.clear();
-            t.run_interference(cx);
+            let all: Vec<InstanceId> = t.assembly(cx).map(|a| a.instances.iter().filter(|i| !i.suppressed).map(|i| i.id).collect()).unwrap_or_default();
+            t.open_interference_with(all, cx);
         }));
         m.push(MenuEntry::Sep);
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
@@ -1922,7 +1948,8 @@ impl AssemblyView {
         });
         self.ui.filter_input = Some(st);
         self.ui.filter_sub = Some(sub);
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search Part Studios"));
+        // Its placeholder is drawn italic over the empty box (`insert_search_box`).
+        let st = cx.new(|cx| InputState::new(window, cx));
         self.ui.insert_search_sub = Some(cx.subscribe(&st, |_: &mut Self, _, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();
@@ -2079,6 +2106,7 @@ impl AssemblyView {
         }
         let kind = match inst.source {
             InstanceSource::Assembly { .. } => RowKind::Assembly,
+            _ if self.linked_assembly(inst.id).is_some() => RowKind::Assembly,
             _ => RowKind::Part,
         };
         let warning = self.instance_warning(inst.id, cx).is_some();

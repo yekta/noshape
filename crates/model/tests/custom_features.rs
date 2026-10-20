@@ -1063,3 +1063,194 @@ export const bad = defineTable(function(context is Context, definition is map) r
     let two = custom::table::evaluate_table(&*scripts, &fx.fs.to_string(), "two", &r.context, &fx.units).tables.unwrap();
     assert_eq!(two.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), ["First"]);
 }
+
+/// Feature Studio › Import of other tabs (live dom/fs-import-*): a file
+/// exports BLOB_DATA (its reference-parameter map), a Part Studio `build`;
+/// two un-namespaced file imports clash on BLOB_DATA.
+#[test]
+fn imports_of_files_and_part_studios() {
+    let mut doc = Document::new();
+    let csv = doc.add_tab("fsrefs.csv", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.csv", b"1,2,a\n3.5,4,b\nx,y,z\n", 0)));
+    let json = doc.add_tab("fsrefs.json", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.json", br#"{"a": [1, 2], "b": "c"}"#, 0)));
+    let ps = doc.add_tab("Part Studio 1", TabContent::PartStudio(PartStudio::new()));
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend_from_slice(&[0, 0, 0, 16, 0, 0, 0, 8, 8, 2, 0, 0, 0]);
+    let img = doc.add_tab("fsrefs.png", TabContent::File(noshape_model::file_tab::FileTab::new("fsrefs.png", &png, 0)));
+    let src = format!(
+        "FeatureScript 3095;\nimport(path : \"onshape/std/geometry.fs\", version : \"3095.0\");\nCsv::import(path : \"{csv}\", version : \"0\");\nPs::import(path : \"{ps}\", version : \"0\");\nImg::import(path : \"{img}\", version : \"0\");\n{}",
+        r#"
+annotation { "Feature Type Name" : "Imports" }
+export const imports = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        println(Csv::BLOB_DATA.csvData);
+        println(Csv::BLOB_DATA.blobType);
+        println(Ps::build);
+        const sketch = newSketchOnPlane(context, id + "sk", { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
+        skImage(sketch, "image1", { "blobInfo" : Img::BLOB_DATA, "firstCorner" : vector(0, 0) * inch, "secondCorner" : vector(1, 1) * inch });
+        skSolve(sketch);
+    });
+"#
+    );
+    let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    let compiled = scripts.studios().find(|(t, _, _)| *t == fs).unwrap().2.clone();
+    assert!(!compiled.has_errors(), "{:?}", compiled.diagnostics);
+    let units = UnitPrefs::default();
+    let mut host = PartStudio::new();
+    let f = host.new_feature(&custom::type_id(fs, "imports"), &units).unwrap();
+    let fid = f.id;
+    host.features.push(f);
+    let opts = RegenOptions { custom_features: Some(scripts), ..Default::default() };
+    let r = Regenerator::new().regenerate(&host, &ConfigValues::default(), &units, &opts);
+    assert_ok(&r);
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "[ [ 1 , 2 , a ] , [ 3.5 , 4 , b ] , [ x , y , z ] ]\nCSV\n<function 6>\n");
+    // skImage: the picture in its box (live document/91).
+    assert_eq!(r.context.sketches.iter().map(|s| s.images.len()).sum::<usize>(), 1);
+
+    // Two file imports without namespaces: BLOB_DATA is defined twice.
+    let clash = format!("FeatureScript 3095;\nimport(path : \"{csv}\", version : \"0\");\nimport(path : \"{json}\", version : \"0\");\n");
+    if let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(fs).map(|t| &mut t.content) {
+        f.source = clash;
+    }
+    let scripts = DocumentScripts::from_document(&doc);
+    let compiled = scripts.studios().find(|(t, _, _)| *t == fs).unwrap().2.clone();
+    let notes: Vec<&str> = compiled.diagnostics.iter().map(|d| d.message.as_str()).collect();
+    assert!(notes.contains(&"Duplicate top level symbol name 'BLOB_DATA'") && notes.contains(&"Duplicate top level symbol name 'processedForeingDataInfo'"), "{notes:?}");
+}
+
+/// A configured source for `PartStudioData` (live dom/fs-refcfg): regenerates
+/// in the asked configuration.
+struct ConfiguredStudio {
+    ps: PartStudio,
+    opts: RegenOptions,
+}
+
+impl std::fmt::Debug for ConfiguredStudio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ConfiguredStudio")
+    }
+}
+
+impl noshape_model::regen::derived::DerivedProvider for ConfiguredStudio {
+    fn context(&self, tab: &str) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {
+        self.context_configured(tab, &self.ps.configuration.defaults())
+    }
+    fn context_configured(&self, _tab: &str, config: &ConfigValues) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {
+        let mut values = self.ps.configuration.defaults();
+        values.0.extend(config.0.clone());
+        Some(Regenerator::new().regenerate(&self.ps, &values, &UnitPrefs::default(), &self.opts).context)
+    }
+    fn configuration(&self, _tab: &str) -> Option<noshape_model::configuration::Configuration> {
+        Some(self.ps.configuration.clone())
+    }
+    fn feature_type(&self, _tab: &str, feature: noshape_model::reference::FeatureId) -> Option<String> {
+        self.ps.features.iter().find(|f| f.id == feature).map(|f| f.type_id.clone())
+    }
+    fn version(&self, _tab: &str) -> u64 {
+        2
+    }
+}
+
+/// A part made by Sketch + Extrude prints as Onshape's SWEPT_BODY query
+/// (live dom/fs-partquery) and still resolves in `buildFunction`'s context.
+#[test]
+fn part_studio_reference_swept_body_query() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Part query" }
+export const partQuery = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Studio" }
+        definition.studio is PartStudioData;
+    }
+    {
+        println(definition.studio.partQuery);
+        println(size(evaluateQuery(definition.studio.buildFunction({}), definition.studio.partQuery)));
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let plate = noshape_model::demo::plate_studio();
+    let extrude = plate.features.iter().find(|f| f.type_id == "extrude").unwrap().id;
+    let sketch = plate.features.iter().find(|f| f.type_id == "sketch").unwrap().id;
+    let source = ConfiguredStudio { ps: plate, opts: fx.opts() };
+    let ctx = noshape_model::regen::derived::DerivedProvider::context(&source, "aaaa").unwrap();
+    let body = ctx.bodies.iter().find(|b| b.id.feature == extrude).expect("the extruded plate").id.clone();
+    let provider: std::sync::Arc<dyn noshape_model::regen::derived::DerivedProvider> = std::sync::Arc::new(source);
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("partQuery"), &fx.units).unwrap();
+    f.params.set("studio", ParamValue::Text(format!("aaaa#{body}")));
+    let fid = f.id;
+    ps.features.push(f);
+    let opts = RegenOptions { derived: Some(provider), ..fx.opts() };
+    assert_ok(&Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &opts));
+    let out = custom::run::output_of(fid).unwrap().output;
+    let head = format!("{{ queryType : UNION , subqueries : [ {{ disambiguationData : [ {{ disambiguationType : ORIGINAL_DEPENDENCY , originals : [ {{ entityType : EDGE , historyType : CREATION , operationId : [ {sketch}.wireOp ] , queryType : SKETCH_ENTITY , sketchEntityId : ");
+    assert!(out.starts_with(&head), "{out}");
+    assert!(out.contains(&format!("entityType : BODY , historyType : CREATION , operationId : [ {extrude}.opExtrude ] , queryType : SWEPT_BODY }} ] }}\n")), "{out}");
+    assert!(out.ends_with("\n1\n"), "{out}");
+}
+
+#[test]
+fn part_studio_reference_configurations() {
+    use noshape_model::configuration::{ConfigInput, ConfigInputKind, ListOption, VariableKind};
+    let src = format!(
+        "{}{}",
+        studio(SHAPES),
+        r#"
+annotation { "Feature Type Name" : "Show studio" }
+export const showStudio = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Studio" }
+        definition.studio is PartStudioData;
+    }
+    {
+        println(definition.studio.configuration);
+        println(definition.studio.configurationData);
+        println(definition.studio.referenceType);
+        println(definition.studio.partQuery);
+        const built = definition.studio.buildFunction({ "Len" : 30 * millimeter, "Size" : "Large" });
+        const cube = qContainsPoint(qEverything(EntityType.BODY), vector(30, 15, 15) * millimeter);
+        println(size(evaluateQuery(built, cube)));
+    });
+"#
+    );
+    let fx = Fixture::new(&src);
+    let mut source = PartStudio::new();
+    source.configuration.inputs.push(ConfigInput { id: "len1".into(), name: "Len".into(), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None });
+    source.configuration.inputs.push(ConfigInput {
+        id: "size1".into(),
+        name: "Size".into(),
+        kind: ConfigInputKind::List { options: vec![ListOption { id: "s".into(), name: "Small".into() }, ListOption { id: "l".into(), name: "Large".into() }], default: "s".into() },
+        visible_when: None,
+    });
+    source.configuration.inputs.push(ConfigInput { id: "hole1".into(), name: "Hole".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None });
+    let mut f = source.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
+    f.params.set("size", expr("#Len"));
+    f.params.set("radius", expr("4 mm"));
+    f.params.set("fillet", expr("1 mm"));
+    source.features.push(f);
+    let provider: std::sync::Arc<dyn noshape_model::regen::derived::DerivedProvider> = std::sync::Arc::new(ConfiguredStudio { ps: source, opts: fx.opts() });
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("showStudio"), &fx.units).unwrap();
+    // The chosen configuration: Len 20 mm, Hole on.
+    f.params.set("studio", ParamValue::Text("aaaa\tlen1=20 mm;hole1=true".into()));
+    let fid = f.id;
+    ps.features.push(f);
+    let opts = RegenOptions { derived: Some(provider), ..fx.opts() };
+    assert_ok(&Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &opts));
+    let out = custom::run::output_of(fid).unwrap().output;
+    assert_eq!(
+        out,
+        "{ Hole : true , Len : 0.02 meter , Size : Small }\n\
+         { Hole : { defaultValue : false } , Len : { defaultValue : 0.01 meter } , Size : { defaultValue : Small , options : { Large : Large , Small : Small } } }\n\
+         WORKSPACE\n\
+         { queryType : UNION , subqueries : [ { queryType : UNION , subqueries : [ { entityType : BODY , queryType : EVERYTHING } ] } ] }\n\
+         1\n"
+    );
+}

@@ -348,7 +348,7 @@ impl PartStudioView {
             let (tables, changes) = cx
                 .background_spawn(async move {
                     let tables = crate::derived::external_snapshot(&p2, mv).map(|doc| ct::version_tables(&doc, &p2, mv, &label)).unwrap_or_default();
-                    (tables, crate::fs_reference::changes_since(&p2, mv))
+                    (tables, crate::select_item::changes_since(&p2, mv))
                 })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
@@ -689,7 +689,7 @@ impl PartStudioView {
 
 /// A document opened at its latest version.
 fn doc_at(path: &std::path::Path) -> Option<DocAt> {
-    let (name, versions) = crate::fs_reference::document_versions(path)?;
+    let (name, versions) = crate::select_item::document_versions(path)?;
     let version = (!versions.is_empty()).then_some(0);
     Some(DocAt { path: path.to_path_buf(), name, versions, version, tables: None, changes: 0 })
 }

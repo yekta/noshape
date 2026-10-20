@@ -600,7 +600,7 @@ impl AssemblyView {
         let dm = self.doc.read(cx);
         let in_scope = |i: &Instance| scope.is_none_or(|s| s.contains(&i.id));
         // This document's workspace references (Main) and its versions.
-        let local = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }));
+        let local = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. }));
         if local && let Ok(vs) = dm.session.store.list_versions() {
             let versions: Vec<crate::derived::VersionChoice> = vs.iter().rev().map(|v| crate::derived::VersionChoice { label: v.name.clone(), microversion: v.microversion }).collect();
             if !versions.is_empty() {
@@ -667,6 +667,8 @@ impl AssemblyView {
                         let (tab, body, config) = match &i.source {
                             InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
                             InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
+                            // A subassembly: that version of the Assembly (evaluated as a linked assembly).
+                            InstanceSource::Assembly { assembly, config } => (*assembly, None, config.clone()),
                             _ => continue,
                         };
                         let key = crate::derived::ExternalRef { path: path.clone(), microversion: to.microversion, tab: tab.to_string() }.key();

@@ -5,7 +5,6 @@ use super::PartStudioView;
 use super::feature_icon;
 use crate::scene_builder::DisplayMode;
 use crate::theme::{p, with_alpha};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
@@ -565,8 +564,11 @@ impl PartStudioView {
         if self.named_views.take().is_some() {
             window.focus(&self.focus, cx);
         } else {
-            let st = cx.new(|cx| InputState::new(window, cx).placeholder("New view name"));
+            let st = cx.new(|cx| InputState::new(window, cx));
             let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    cx.notify();
+                }
                 if matches!(ev, InputEvent::PressEnter { .. }) {
                     let name = st.read(cx).value().trim().to_string();
                     this.save_named_view(name, cx);
@@ -604,7 +606,7 @@ impl PartStudioView {
         });
     }
 
-    fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, window: &mut Window, cx: &mut Context<Self>) {
         // Named views restore the section state too (Onshape).
         if !v.section.is_empty() || !self.ui.section.is_empty() {
             self.restore_section(&v.section, window, cx);
@@ -620,71 +622,134 @@ impl PartStudioView {
         });
     }
 
+    /// Onshape's Named views dialog (live part-studio/75-76,
+    /// dom/panel-named-views.txt): 265 px at the feature dialog's place; a
+    /// 29 px header "Named views" ×; the 220 px "New view name" field and a
+    /// 30 x 31 "+" (save the current view); then "No views created", or a
+    /// "Select a view" list (picking one goes there) and a 30 x 31 remove
+    /// button; the help row.
     pub(super) fn render_named_views(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (st, _) = self.named_views.as_ref()?;
         let st = st.clone();
         let pal = p();
         let views = self.studio(cx).map(|s| s.named_views.clone()).unwrap_or_default();
-        let rows: Vec<AnyElement> = views
-            .into_iter()
-            .enumerate()
-            .map(|(i, v)| {
-                let name = v.name.clone();
-                h_flex()
-                    .id(SharedString::from(format!("nv-{i}")))
-                    .h(px(24.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
-                    .text_sm()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(div().flex_1().truncate().child(v.name.clone()))
-                    .child(Button::new(SharedString::from(format!("nv-del-{i}"))).icon(IconName::Close).ghost().xsmall().tooltip("Delete view").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        cx.stop_propagation();
-                        let name = name.clone();
-                        this.doc.update(cx, |doc, cx| {
-                            doc.edit_studio(this.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
-                        });
-                    })))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.apply_named_view(&v, window, cx)))
-                    .into_any_element()
-            })
-            .collect();
-        let empty = rows.is_empty();
+        if self.named_view_picked.as_ref().is_some_and(|n| !views.iter().any(|v| &v.name == n)) {
+            self.named_view_picked = None;
+        }
+        let select = match &self.named_view_select {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|_| crate::os_select::OsSelect::new("named-view-select"));
+                let sub = cx.subscribe(&s, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                    let crate::os_select::OsSelectEvent::Picked(name) = ev;
+                    this.named_view_picked = (!name.is_empty()).then(|| name.to_string());
+                    // Applied on the next render (it needs the window).
+                    this.pending_named_view = this.studio(cx).and_then(|s| s.named_views.iter().find(|v| v.name.as_str() == name.as_ref()).cloned());
+                    cx.notify();
+                });
+                self.named_view_select = Some((s.clone(), sub));
+                s
+            }
+        };
+        // Live: the list reads "Select a view" until one is picked.
+        let items: Vec<(SharedString, SharedString)> = std::iter::once((SharedString::default(), SharedString::from("Select a view"))).chain(views.iter().map(|v| (SharedString::from(v.name.clone()), SharedString::from(v.name.clone())))).collect();
+        let current = self.named_view_picked.clone().unwrap_or_default();
+        select.update(cx, |s, _| s.set_items(items, current));
+        let empty_name = st.read(cx).value().is_empty();
+        let square = |id: &'static str, icon: &'static str, color: Rgba| {
+            div()
+                .id(id)
+                .size(px(30.))
+                .h(px(31.))
+                .flex_none()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui_kit::rgb(0xffffff))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xaaaaaa))
+                .rounded(px(3.5))
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.panel_hover))
+                .child(crate::ui::glyph(icon, 20., color))
+        };
+        // Live: "+" is pale until a name is typed.
+        let add_color = if empty_name { gpui_kit::rgb(0xcccccc) } else { gpui_kit::rgb(0x999999) };
+        let st2 = st.clone();
+        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }];
         Some(
             v_flex()
                 .id("named-views")
                 .occlude()
                 .absolute()
-                .top(px(12.))
-                .right(px(170.))
-                .w(px(220.))
-                .p_2()
-                .gap_1()
-                .rounded_md()
-                .bg(with_alpha(pal.panel_raised, 0.97))
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
+                .top(px(3.))
+                .left(px(0.))
+                .w(px(265.))
+                .bg(with_alpha(gpui_kit::rgb(0xffffff), 0.95))
+                .shadow(shadow)
+                .text_color(pal.text)
                 .child(
                     h_flex()
-                        .justify_between()
-                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("NAMED VIEWS"))
-                        .child(Button::new("nv-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_named_views(w, cx)))),
+                        .h(px(29.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Named views"))
+                        .child(
+                            div()
+                                .id("nv-close")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .opacity(0.5)
+                                .child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x000000)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_named_views(w, cx))),
+                        ),
                 )
-                .when(empty, |d| d.child(div().px_2().py_1().text_xs().text_color(pal.text_faint).child("No saved views yet.")))
-                .children(rows)
                 .child(
                     h_flex()
-                        .gap_1()
-                        .pt_1()
-                        .child(div().flex_1().child(Input::new(&st).xsmall()))
-                        .child(Button::new("nv-save").label("Save").xsmall().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            let name = st.read(cx).value().trim().to_string();
+                        .h(px(40.))
+                        .px(px(5.))
+                        .gap(px(5.))
+                        // Live: a focused 2 px blue underline (1 px + inset),
+                        // italic placeholder, text 6 px down.
+                        .child(
+                            div()
+                                .relative()
+                                .w(px(220.))
+                                .h(px(27.))
+                                .pt(px(3.))
+                                .border_b_1()
+                                .border_color(pal.accent)
+                                .child(Input::new(&st).appearance(false).small().text_size(px(13.33)))
+                                .when(empty_name, |d| d.child(div().absolute().left(px(3.)).top_0().bottom_0().pt(px(3.)).flex().items_center().text_size(px(13.33)).italic().text_color(pal.text_faint).child("New view name")))
+                                .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)),
+                        )
+                        .child(square("nv-add", "add-button", add_color).tooltip(crate::ui::tooltip("Add view")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let name = st2.read(cx).value().trim().to_string();
                             this.save_named_view(name, cx);
-                            st.update(cx, |s, cx| s.set_value("", window, cx));
+                            st2.update(cx, |s, cx| s.set_value("", window, cx));
                         }))),
                 )
+                .when(views.is_empty(), |d| d.child(div().px(px(5.)).h(px(22.)).flex().items_center().text_size(px(12.)).child("No views created")))
+                .when(!views.is_empty(), |d| {
+                    d.child(
+                        h_flex()
+                            .h(px(40.))
+                            .px(px(5.))
+                            .gap(px(5.))
+                            .child(div().w(px(220.)).child(select.clone()))
+                            .child(square("nv-remove", "remove-circle", gpui_kit::rgb(0x999999)).tooltip(crate::ui::tooltip("Remove view")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                let Some(name) = this.named_view_picked.take() else { return };
+                                this.doc.update(cx, |doc, cx| {
+                                    doc.edit_studio(this.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
+                                });
+                                cx.notify();
+                            }))),
+                    )
+                })
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
                 .into_any_element(),
         )
     }

@@ -113,6 +113,15 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>)
             push(&mut lines, &piece, color, l.pick, width);
         }
     }
+    // Drawing properties › Dimensions › Underline overridden dimensions.
+    if g.style.underline_overridden {
+        for &i in &g.overridden {
+            let Some(t) = g.texts.get(i) else { continue };
+            let b = font::text_box(t);
+            let color = g.text_color(i).map(|c| [c[0], c[1], c[2], 255]).unwrap_or(INK);
+            push(&mut lines, &[b[0], b[1]], color, t.pick, px_width(LineStyle::Thin, zoom));
+        }
+    }
     // Texts with symbols the filled font lacks (GD&T) stay stroked.
     for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !font::fill_supported(&t.text)) {
         let color = if dangling_picks.contains(&t.pick) { DANGLING_INK } else { g.text_color(ti).map(|c| [c[0], c[1], c[2], 255]).unwrap_or(INK) };

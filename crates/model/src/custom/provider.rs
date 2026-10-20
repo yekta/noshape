@@ -53,12 +53,64 @@ pub trait CustomFeatureProvider: Send + Sync + std::fmt::Debug {
 struct DocResolver<'a> {
     studios: &'a [(TabId, String, String)],
     compiled: &'a HashMap<TabId, Arc<CompiledStudio>>,
+    /// Other tabs a Feature Studio can import (Feature Studio › Import).
+    others: &'a [(TabId, Importable)],
+}
+
+/// Loads a tab of another document or version (`ext:` import paths); set
+/// by the app, which reads document snapshots.
+static EXTERNAL_TABS: std::sync::OnceLock<fn(&str) -> Option<crate::document::Tab>> = std::sync::OnceLock::new();
+
+pub fn set_external_tab_loader(f: fn(&str) -> Option<crate::document::Tab>) {
+    let _ = EXTERNAL_TABS.set(f);
+}
+
+/// A tab of another document or version, by its `ext:` key.
+pub fn external_tab(key: &str) -> Option<crate::document::Tab> {
+    EXTERNAL_TABS.get().and_then(|f| f(key))
+}
+
+/// A non-FeatureScript tab that can be imported.
+#[derive(Clone, Copy, Debug)]
+enum Importable {
+    /// A file tab: exports `BLOB_DATA` (the same map as a reference
+    /// parameter's) and `processedForeingDataInfo` (live dom/fs-import).
+    File,
+    /// A Part Studio: exports `build(configuration)` returning its Context.
+    PartStudio,
+    /// A Variable Studio (its exports are not captured yet: none).
+    VariableStudio,
+}
+
+/// The module an imported tab stands for. Part Studios' `build` sits on
+/// line 6, which is what Onshape prints for it ("<function 6>").
+fn imported_source(tab: impl std::fmt::Display, what: Importable) -> String {
+    match what {
+        Importable::File => format!("FeatureScript 3095;\nexport const BLOB_DATA = @blobData(\"{tab}\");\nexport const processedForeingDataInfo = @processedForeignDataInfo(\"{tab}\");\n"),
+        Importable::PartStudio => format!("FeatureScript 3095;\n\n\n\n\nexport const build = function(configuration)\n{{\n    return @buildPartStudio(\"{tab}\", configuration);\n}};\n"),
+        Importable::VariableStudio => "FeatureScript 3095;\n".to_string(),
+    }
 }
 
 impl Resolver for DocResolver<'_> {
     fn resolve(&self, path: &str) -> Option<(Arc<str>, Arc<str>)> {
-        let (tab, _, src) = self.studios.iter().find(|(t, _, _)| t.to_string() == path || module_path(*t) == path)?;
-        Some((module_path(*tab).into(), src.as_str().into()))
+        if let Some((tab, _, src)) = self.studios.iter().find(|(t, _, _)| t.to_string() == path || module_path(*t) == path) {
+            return Some((module_path(*tab).into(), src.as_str().into()));
+        }
+        // Another document or version (Import › Other documents, or a version).
+        if path.starts_with("ext:") || path.contains('/') {
+            let tab = external_tab(path)?;
+            let src = match &tab.content {
+                TabContent::FeatureStudio(fs) => fs.source.clone(),
+                TabContent::File(_) => imported_source(path, Importable::File),
+                TabContent::PartStudio(_) => imported_source(path, Importable::PartStudio),
+                TabContent::VariableStudio(_) => imported_source(path, Importable::VariableStudio),
+                _ => return None,
+            };
+            return Some((path.into(), src.into()));
+        }
+        let (tab, what) = self.others.iter().find(|(t, _)| t.to_string() == path || module_path(*t) == path)?;
+        Some((module_path(*tab).into(), imported_source(*tab, *what).into()))
     }
     fn cached(&self, path: &str) -> Option<Arc<CompiledModule>> {
         let (tab, _, _) = self.studios.iter().find(|(t, _, _)| module_path(*t) == path)?;
@@ -88,18 +140,37 @@ impl DocumentScripts {
                 _ => None,
             })
             .collect();
-        // Imports may refer to any studio: their sources take part in the cache key.
+        let others: Vec<(TabId, Importable)> = doc
+            .ordered_tabs()
+            .into_iter()
+            .filter_map(|t| match &t.content {
+                TabContent::File(_) => Some((t.id, Importable::File)),
+                TabContent::PartStudio(_) => Some((t.id, Importable::PartStudio)),
+                TabContent::VariableStudio(_) => Some((t.id, Importable::VariableStudio)),
+                _ => None,
+            })
+            .collect();
+        // Imports may refer to any studio or importable tab: they take part in the cache key.
         let mut h = std::collections::hash_map::DefaultHasher::new();
         for (t, _, s) in &sources {
             t.hash(&mut h);
             s.hash(&mut h);
         }
-        let deps = if sources.len() > 1 { h.finish() } else { 0 };
+        for (t, _) in &others {
+            t.hash(&mut h);
+        }
+        // Imported files' BLOB_DATA is a constant: a changed file recompiles.
+        for t in doc.tabs.iter() {
+            if let TabContent::File(f) = &t.content {
+                (t.id, &f.file_name, f.size, f.uploaded).hash(&mut h);
+            }
+        }
+        let deps = if sources.len() > 1 || !others.is_empty() { h.finish() } else { 0 };
         let mut compiled: HashMap<TabId, Arc<CompiledStudio>> = HashMap::new();
         let mut studios = Vec::new();
         for (tab, name, src) in &sources {
             let c = {
-                let resolver = DocResolver { studios: &sources, compiled: &compiled };
+                let resolver = DocResolver { studios: &sources, compiled: &compiled, others: &others };
                 compile_with(*tab, src, &resolver, deps)
             };
             // A studio with errors keeps its last good schemas active, so

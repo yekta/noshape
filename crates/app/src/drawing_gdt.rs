@@ -13,7 +13,7 @@ use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Disableable as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::{Annotation, AnnotationKind, GdtExtra, GdtLeader};
@@ -145,6 +145,25 @@ impl DrawingEditor {
         } else if !active && placing {
             self.gdt_dlg = None;
         }
+        self.limit_gdt_texts(window, cx);
+    }
+
+    /// The help's limits (H:geometric_tolerance): Upper text 50 characters,
+    /// Lower text 200, Prefix / Suffix 20 each, up to 7 symbols on each side
+    /// of the tolerance.
+    fn limit_gdt_texts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(d) = &self.gdt_dlg else { return };
+        let mut boxes: Vec<(Entity<InputState>, usize)> = vec![(d.upper.clone(), 50), (d.lower.clone(), 200)];
+        for r in &d.rows {
+            boxes.extend([(r.inputs[PREFIX].clone(), 20), (r.inputs[SUFFIX].clone(), 20), (r.inputs[BEFORE].clone(), 7), (r.inputs[AFTER].clone(), 7)]);
+        }
+        for (st, max) in boxes {
+            let v = st.read(cx).value().to_string();
+            if v.chars().count() > max {
+                let cut: String = v.chars().take(max).collect();
+                st.update(cx, |s, cx| s.set_value(cut, window, cx));
+            }
+        }
     }
 
     /// Edit… / double-click on a geometric tolerance.
@@ -258,6 +277,7 @@ impl DrawingEditor {
         let focus = d.focus;
         let leader = d.leader;
         let show_symbols = d.symbols;
+        let frames = d.rows.len();
         let (upper, lower) = (d.upper.clone(), d.lower.clone());
         let rows: Vec<(Option<usize>, Vec<Entity<InputState>>)> = d.rows.iter().map(|r| (r.symbol, r.inputs.clone())).collect();
         // A box that records the focused slot (for the symbol palette).
@@ -450,7 +470,8 @@ impl DrawingEditor {
                     h_flex()
                         .px(px(8.))
                         .gap(px(4.))
-                        .child(Button::new("gdt-add").label("+").ghost().small().tooltip("Add frame").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        // Up to 5 frames (help).
+                        .child(Button::new("gdt-add").label("+").ghost().small().tooltip("Add frame").disabled(frames >= 5).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let row = this.gdt_row(None, &[], "", "", window, cx);
                             if let Some(d) = &mut this.gdt_dlg {
                                 d.rows.push(row);

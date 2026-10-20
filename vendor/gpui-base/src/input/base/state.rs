@@ -646,6 +646,17 @@ impl<M: InputModeKind> InputBaseState<M> {
     }
 
     pub fn diagnostic_popover(&self) -> Option<Rc<crate::input::DiagnosticEntry>> {
+        // NOSHAPE PATCH: the app draws its own diagnostic tooltip
+        // (`set_app_diagnostic_hover`); the input shows no popover then.
+        if crate::input::app_diagnostic_hover() {
+            return None;
+        }
+        self.diagnostic_popover.clone()
+    }
+
+    /// NOSHAPE PATCH: the diagnostic under the pointer, for an app that
+    /// draws its own tooltip (`set_app_diagnostic_hover`).
+    pub fn hovered_diagnostic(&self) -> Option<Rc<crate::input::DiagnosticEntry>> {
         self.diagnostic_popover.clone()
     }
 

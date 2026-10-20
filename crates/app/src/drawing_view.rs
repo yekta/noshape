@@ -236,6 +236,12 @@ pub enum Drag {
     Zoom { anchor: [f64; 2], last_px: [f64; 2] },
     MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])> },
     MoveAnnotation { start: [f64; 2], orig: Annotation },
+    /// A jog snap point of a linear dimension (extension line `k`; `far`:
+    /// the diagonal's end).
+    Jog { orig: Annotation, k: usize, far: bool },
+    /// An attachment point (end `k`) of a linear dimension dragged to
+    /// another edge, point or center (re-attaches that end).
+    Reattach { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
     /// Resize a table from its free corner (scales column widths and rows).
     ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
@@ -290,17 +296,24 @@ pub type EditorAction = Rc<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<
 
 #[derive(Clone)]
 pub enum MenuEntry {
-    Item { label: SharedString, checked: bool, act: EditorAction, icon: Option<&'static str> },
+    Item { label: SharedString, checked: bool, act: EditorAction, icon: Option<&'static str>, disabled: bool },
     Separator,
     Submenu(SharedString, Vec<MenuEntry>),
 }
 
 impl MenuEntry {
     pub fn item(label: impl Into<SharedString>, act: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> Self {
-        MenuEntry::Item { label: label.into(), checked: false, act: Rc::new(act), icon: None }
+        MenuEntry::Item { label: label.into(), checked: false, act: Rc::new(act), icon: None, disabled: false }
     }
     pub fn check(label: impl Into<SharedString>, checked: bool, act: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> Self {
-        MenuEntry::Item { label: label.into(), checked, act: Rc::new(act), icon: None }
+        MenuEntry::Item { label: label.into(), checked, act: Rc::new(act), icon: None, disabled: false }
+    }
+    /// Greyed out (shown but not clickable).
+    pub fn disabled(mut self, on: bool) -> Self {
+        if let MenuEntry::Item { disabled, .. } = &mut self {
+            *disabled = on;
+        }
+        self
     }
     /// The tool icon shown in Onshape's toolbar dropdowns.
     pub fn with_icon(mut self, name: &'static str) -> Self {
@@ -324,7 +337,7 @@ pub fn open_tool_menu(entries: &[MenuEntry], ed: &Entity<DrawingEditor>, e: &Cli
 pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed: &Entity<DrawingEditor>, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu {
     for e in entries {
         match e {
-            MenuEntry::Item { label, checked, act, icon } => {
+            MenuEntry::Item { label, checked, act, icon, disabled } => {
                 let ed = ed.clone();
                 let act = act.clone();
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
@@ -332,7 +345,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                     ed.update(cx, |t, cx| act(t, window, cx));
                 });
                 let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
-                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: false, handler: Some(handler), keys: Vec::new() });
+                menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new() });
             }
             MenuEntry::Separator => menu = menu.separator(),
             MenuEntry::Submenu(label, children) => {
@@ -399,6 +412,9 @@ pub struct DrawingEditor {
 
     // Interaction.
     pub tool: Tool,
+    /// The pointer is over the sheet, and the app cursor shown there.
+    canvas_hovered: bool,
+    cursor_sync: crate::cursor::CursorSync,
     pub hover: Option<u32>,
     pub hover_snap: Option<[f64; 2]>,
     pub selection: Vec<Sel>,
@@ -463,6 +479,9 @@ pub struct DrawingEditor {
     pub gdt_dlg: Option<crate::drawing_gdt::GdtDlg>,
     /// Custom tables: the dialog and the evaluated tables.
     pub custom_tables: crate::drawing_custom_table::CustomState,
+    /// Dimension tool: circle centers woken by hovering their edges (view,
+    /// view point); shown until the tool changes (help drawing_dimensions).
+    pub woken_centers: Vec<(ViewId, [f64; 2])>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
     pub detail_label: String,
@@ -574,6 +593,8 @@ impl DrawingEditor {
             image: None,
             _frames: frames,
             tool: Tool::Select,
+            canvas_hovered: false,
+            cursor_sync: Default::default(),
             hover: None,
             hover_snap: None,
             selection: Vec::new(),
@@ -601,6 +622,7 @@ impl DrawingEditor {
             table_dlg: None,
             gdt_dlg: None,
             custom_tables: Default::default(),
+            woken_centers: Vec::new(),
             note_leader: None,
             cell_sel: None,
             ref_manager: None,
@@ -996,7 +1018,7 @@ impl DrawingEditor {
     }
 
     /// Pick ids belonging to a selection entry.
-    fn picks_of(&self, sel: Sel) -> Vec<u32> {
+    pub fn picks_of(&self, sel: Sel) -> Vec<u32> {
         let Some(b) = &self.built else { return vec![] };
         b.picks
             .iter()
@@ -1089,6 +1111,9 @@ impl DrawingEditor {
             for p in self.table_row_highlight() {
                 scene.add_flag(p, state::ACCENT);
             }
+            // The hovered / selected annotations' referenced edges (blue) and
+            // group members (yellow).
+            self.push_related_highlights(&mut scene);
         }
         scene
     }
@@ -1325,6 +1350,12 @@ impl Render for DrawingEditor {
         if self.geometry_dirty || self.frame_dirty {
             self.submit(window);
         }
+        let want = self.canvas_hovered.then(|| match self.tool {
+            Tool::Select => None,
+            Tool::Centermark => Some(crate::cursor::AppCursor::CrosshairBox),
+            _ => Some(crate::cursor::AppCursor::Crosshair),
+        });
+        crate::cursor::CursorSync::sync(self, want.flatten(), window, cx, |v| &mut v.cursor_sync);
         let pal = p();
         let entity = cx.entity();
         let image = self.image.clone();
@@ -1339,10 +1370,12 @@ impl Render for DrawingEditor {
             .relative()
             .overflow_hidden()
             .bg(rgb(crate::theme::viewport::DRAWING_BG))
-            .cursor(match self.tool {
-                Tool::Select => CursorStyle::Arrow,
-                _ => CursorStyle::Crosshair,
-            })
+            // Live (dom/cursors.txt): no tool `auto`; the tools Onshape's
+            // DrawingCrosshair-01.cur, Centermark DrawingCrosshairBox3-01.cur.
+            .on_hover(cx.listener(|this, h: &bool, _, cx| {
+                this.canvas_hovered = *h;
+                cx.notify();
+            }))
             .child(
                 canvas(
                     move |bounds, _window, cx| {

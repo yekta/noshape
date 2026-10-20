@@ -403,8 +403,7 @@ State: run 5's edits were complete (no half-done code found); everything below b
   `McSession.preview`, `h.connectors` 4th field = opacity).
 * Bottom-right tools (lead via ui2), new `assembly_mass.rs`: Show analysis tools = the assembly tool list (Curve/surface
   analysis…, Interference detection…, Zebra stripes…, Reflection analysis…); Interference and Zebra stripes work
-  (`AsmSceneOptions.zebra / hide_edges`, needs `rebuild_scene`), Curve/surface and Reflection still to port from
-  part_studio/analysis_tools.rs + reflection.rs. Display mass and section properties = 440 px dialog; model
+  (`AsmSceneOptions.zebra / hide_edges`, needs `rebuild_scene`); Curve/surface and Reflection: see below. Display mass and section properties = 440 px dialog; model
   `analysis::assembly_mass_properties` (test `assembly_mass_properties_combine_parts_where_they_sit`). Note for psb:
   `regen::measure::mass_properties` sums the bodies' inertia about their own centres (no parallel-axis term).
 * L17: "Add selection to folder…" opens the live "Folder name" dialog (536), default "New folder" (the
@@ -415,6 +414,46 @@ State: run 5's edits were complete (no half-done code found); everything below b
 * Double-click under Xvfb still doesn't register (also with `--delay 80`): gpui stamps clicks at processing time and
   llvmpipe frames are slower than the 400 ms window. Logic covered by the conversion unit test.
 * REQUESTS: skb (10-19 assembly analysis + mass).
+* Analysis tools now complete in the menu: Reflection analysis (`assembly_reflection.rs`, reuses
+  `part_studio::reflection::{EnvImageRef, ReflectionSettings}` and `part_studio::environment_maps` — those two modules
+  and `EnvImageRef::{key, decode}` were made pub(crate): lead, cross-area visibility change in psb's files) and
+  Curve/surface analysis (`assembly_curvature.rs`). Opening one closes the other view tools.
+* Insert › Other documents: Part Studio rows show rendered thumbnails of the other document's version
+  (`AssemblyView::request_external_thumbs`, assembly_thumbs.rs; an empty Part Studio keeps the generic icon);
+  the search placeholder is an italic overlay (`insert_search_box`), so the field itself has no placeholder.
+* Mate dialog preview: the instance list's degrees of freedom are the whole assembly's with the new mate
+  (eval `solve`: a DOF-only full solve when `only_mate`); before, the one-mate preview showed e.g. a fastened
+  instance as "Has degrees of freedom (6)". Model test `a_mate_being_defined_is_solved_alone_until_solve`.
+* GUI-verified this round (:103): LA39 (categories, Owned by me, document view with thumbnails, italic
+  placeholder), N13 (Insert › Sketches, hovering a sketch region snaps to its centroid with Z on the sketch normal,
+  Fastened onto a hole), L17 (folder menu = live 537), I13 (▾ menu, OsSelect inputs).
+* In-context look without a dialog (live answer, assembly/700–710): a selected context face gets a translucent amber
+  fill (`CONTEXT_SELECTED_FILL` 0xe9b94d at 80 %, blended in linear light, fitted to 706–707) and the amber outline;
+  several can be selected; they are measured. `PartStudioView::measure_context` (in_context.rs) adds the shown
+  context's bodies (`AssemblyContext::regen_bodies`) when the selection holds a context entity. Surgical edits in psb's
+  files: `selection_readout` and the pinned Measure panel (menus.rs) and `measure_overlay` (behaviors.rs, now takes
+  `cx`; call in mod.rs) measure through it; before, `measure_overlay` cached an empty result for two context faces
+  and blanked the readout. Model test `in_context::tests::context_body_faces_are_measured_alone_and_in_pairs`.
+  Note for psb: two planar faces read "Total area" in our readout; live part-studio/81 reads "Perp planes angle".
+
+## skb run 8 (20 Oct): linked assemblies, R11, session
+
+* LA39 done: Insert › Other documents › Assemblies inserts the other document's Assembly as one linked
+  subassembly. No new source variant: `InstanceSource::External { key, body: None }` whose key names an Assembly
+  tab, so the Reference manager, Change to version / Update all, BOM and key updates work unchanged.
+  Model: `AssemblyEvaluator::external_assembly` (cached per key + configuration) configures it and re-points its
+  instances (Part / PartStudio / Assembly → External keys of the same pinned version via the new
+  `ExternalStudios::sibling`, default None; app `AppExternal::sibling`); `prepare_inner` evaluates it through the
+  shared `prepare_subassembly` (factored out of the Assembly arm; flexible, named positions, mates to its parts);
+  `InstanceNode.linked` = (name there, content). BOM: `BomSource::ExternalAssembly` row (read-only properties of
+  the linked Assembly) with its parts as children; `BomSource::is_assembly`. Test `assemblies_from_other_documents`.
+  App: `insert_external_assembly`, instance menu "Open linked document" (bundle `switchToImageOwner`: replaces
+  "Switch to …" for other documents' instances, parts too; opens the version on the referenced tab), subassembly
+  entries for linked ones (`AssemblyView::linked_assembly`), Change to version… on this document's subassemblies
+  makes them version references. Not yet: mirrored parts and inserted sketches inside a linked assembly (no keyed
+  form; they read as missing), thumbnails of other documents' Assemblies rows.
+* R11 GUI-checked: under Xvfb a double-click registers with `xdotool click --repeat 2 --delay 1` (both presses in
+  one gpui batch); 80 ms splits them.
 
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 
@@ -427,7 +466,7 @@ State: run 5's edits were complete (no half-done code found); everything below b
   the Insert dialog's configured-row inputs (`render_insert_config`, assembly_behaviors.rs) and the
   instance's Change configuration panel (`render_config_panel`, assembly_panels.rs). The stored
   values are left as chosen (Onshape keeps them; evaluation applies the conditions).
-* Analysis tools now complete in the menu: Reflection analysis (`assembly_reflection.rs`, reuses
-  `part_studio::reflection::{EnvImageRef, ReflectionSettings}` and `part_studio::environment_maps` — those two modules
-  and `EnvImageRef::{key, decode}` were made pub(crate): lead, cross-area visibility change in psb's files) and
-  Curve/surface analysis (`assembly_curvature.rs`). Opening one closes the other view tools.
+* (psb, lead's measure fixes) `assembly::analysis::measure_entities` now ends in
+  `regen::measure::measure_shapes` (shared Onshape readout rules: "Perp planes angle" for two
+  perpendicular faces as live 707, "Min dist" instead of "Distance", "Area"/"Length" totals). Your
+  `assembly_mass_properties` already had the parallel-axis term; the Part Studio one now does too.

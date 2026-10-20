@@ -1365,11 +1365,10 @@ impl X11Client {
                     // when the window is blocked
                     let style = CursorStyle::Arrow;
 
-                    let current_style = state
-                        .cursor_styles
-                        .get(&window.x_window)
-                        .unwrap_or(&CursorStyle::Arrow);
-                    if *current_style != style
+                    // A window whose cursor was never set shows its parent's
+                    // (the root's) cursor, so "unset" isn't the arrow.
+                    let current_style = state.cursor_styles.get(&window.x_window).copied();
+                    if current_style != Some(style)
                         && let Some(cursor) = state.get_cursor_icon(style)
                     {
                         state.cursor_styles.insert(window.x_window, style);
@@ -1794,16 +1793,16 @@ impl X11Client {
         let Some(focused_window) = state.mouse_focused_window else {
             return;
         };
-        let current_style = state
-            .cursor_styles
-            .get(&focused_window)
-            .unwrap_or(&CursorStyle::Arrow);
+        // A window whose cursor was never set shows its parent's (the root's)
+        // cursor, so "unset" isn't the arrow; nor is a cursor the app set.
+        let stale = crate::custom_cursor::take_style_stale();
+        let current_style = if stale { None } else { state.cursor_styles.get(&focused_window).copied() };
 
         let window = state
             .mouse_focused_window
             .and_then(|w| state.windows.get(&w));
 
-        let should_change = *current_style != style
+        let should_change = current_style != Some(style)
             && (window.is_none() || window.is_some_and(|w| !w.is_blocked()));
 
         if !should_change {

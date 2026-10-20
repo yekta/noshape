@@ -90,6 +90,8 @@ pub struct FeatureDialog {
     pub ref_sources: Vec<crate::fs_reference::RefSource>,
     /// The open "Select …" panel of a reference parameter.
     pub(crate) ref_picker: Option<crate::fs_reference::RefPicker>,
+    /// Its "Import…" was clicked (handled at the next render, which has a window).
+    pub(crate) ref_import: Option<noshape_model::params::ReferenceKind>,
     /// The document name its "Current document" tab shows.
     pub ref_document_name: String,
     /// Pictures of Part Studios and parts in that panel (`tab`, `tab#part`).
@@ -221,6 +223,7 @@ impl FeatureDialog {
             derived_sources: Vec::new(),
             ref_sources: Vec::new(),
             ref_picker: None,
+            ref_import: None,
             ref_document_name: String::new(),
             ref_thumbs: HashMap::new(),
             ref_document_path: None,
@@ -1315,9 +1318,19 @@ impl FeatureDialog {
                         let toggle = std::rc::Rc::new(toggle);
                         let (t1, t2) = (toggle.clone(), toggle);
                         let focus = self.tab_stop(&format!("cb:{path}"), cx);
-                        let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), s.label, on, focus.is_focused(window)).rounded(px(2.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| t1(this, cx)));
+                        let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), "", on, focus.is_focused(window))
+                            .child(div().flex_1().min_w_0().ml(px(-4.)).child(s.label))
+                            .rounded(px(2.))
+                            // Long labels wrap inside the dialog (HTML labels do),
+                            // e.g. Derived's "Preserve active sheet metal models".
+                            .h_auto()
+                            .min_h(px(27.))
+                            .flex_shrink(1.)
+                            .min_w_0()
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| t1(this, cx)));
                         div()
                             .id(SharedString::from(format!("cbw-{path}")))
+                            .min_w_0()
                             .child(Self::tab_stop_element(cb, &focus, Focus::Box, move |this, _, cx| t2(this, cx), cx))
                             // Right-click > Convert to expression (e.g. `#Length > 3`).
                             .os_context_menu(move |m, _, _| {
@@ -2469,7 +2482,7 @@ impl Render for FeatureDialog {
         let tip_name = if name == self.feature.name { name.clone() } else { format!("{name} [{}]", self.ty.name) };
         // The sketch's red title has no tooltip: the bubble asks for a plane.
         let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
-        let ref_panel = self.render_reference_panel(cx);
+        let ref_panel = self.render_reference_panel(window, cx);
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
@@ -2535,7 +2548,9 @@ impl Render for FeatureDialog {
                         Some(state) => div().flex_1().child(Input::new(&state).xsmall()).into_any_element(),
                         None => div()
                             .id("dialog-title")
-                            // Drag the title to move the dialog (Onshape).
+                            // Drag the title to move the dialog (Onshape; its
+                            // drag area shows `grab`, docs/parity/cursors.md).
+                            .cursor(CursorStyle::OpenHand)
                             .on_drag(DialogMove(self.drag_grab.clone()), |d, offset, _, cx| {
                                 *d.0.lock() = offset;
                                 cx.new(|_| DialogMoveGhost)
@@ -2589,6 +2604,8 @@ impl Render for FeatureDialog {
                             .p_0()
                             .rounded(px(0.))
                             .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            // Live (dom/cursors.txt): the disabled ✓ shows the default arrow.
+                            .when(invalid, |b| b.cursor(CursorStyle::Arrow))
                             .tooltip("Accept (Enter)")
                             // Onshape: the ✓ is disabled while the feature errors
                             // (Enter still commits it).

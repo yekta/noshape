@@ -9,12 +9,12 @@
 #if defined(NOSHAPE_OPENNURBS)
 
 #include <BRepLib.hxx>
+#include <BSplCLib.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
-#include <ShapeFix_Shape.hxx>
 #include <TopoDS_Compound.hxx>
 
 #include "opennurbs.h"
@@ -130,6 +130,42 @@ occ::handle<Geom_BSplineSurface> surface(const ON_Surface& s, double scale)
                      : new Geom_BSplineSurface(p, arr(uk), arr(vk), arr(um), arr(vm), ns.m_order[0] - 1, ns.m_order[1] - 1);
 }
 
+// openNURBS edges and trims are proxies: a sub-domain of their curve,
+// possibly reversed. The 3D curve over the edge's part of it, in the edge's
+// direction.
+occ::handle<Geom_BSplineCurve> edge_curve(const ON_BrepEdge& e, double scale)
+{
+  occ::handle<Geom_BSplineCurve> c   = curve3d(*e.EdgeCurveOf(), scale);
+  const ON_Interval              dom = e.ProxyCurveDomain();
+  if (dom[0] > c->FirstParameter() + 1e-12 || dom[1] < c->LastParameter() - 1e-12)
+    c->Segment(std::max(dom[0], c->FirstParameter()), std::min(dom[1], c->LastParameter()));
+  if (e.ProxyCurveIsReversed())
+    c->Reverse();
+  return c;
+}
+
+// A trim's 2D curve running along its edge, reparametrized onto the edge's
+// range [t0, t1] (OCCT's pcurves share the edge's parameter; SameParameter
+// refines the match).
+occ::handle<Geom2d_BSplineCurve> trim_curve(const ON_BrepTrim& t, bool along_edge, double t0, double t1)
+{
+  occ::handle<Geom2d_BSplineCurve> c   = curve2d(*t.TrimCurveOf());
+  const ON_Interval                dom = t.ProxyCurveDomain();
+  if (dom[0] > c->FirstParameter() + 1e-12 || dom[1] < c->LastParameter() - 1e-12)
+    c->Segment(std::max(dom[0], c->FirstParameter()), std::min(dom[1], c->LastParameter()));
+  if (t.ProxyCurveIsReversed())
+    c->Reverse();
+  if (along_edge && t.m_bRev3d)
+    c->Reverse();
+  if (t1 > t0)
+  {
+    NCollection_Array1<double> k = c->Knots();
+    BSplCLib::Reparametrize(t0, t1, k);
+    c->SetKnots(k);
+  }
+  return c;
+}
+
 // An ON_Brep as OCCT faces sharing edges; a solid when it is closed.
 TopoDS_Shape brep_shape(const ON_Brep& b, double scale, double tol)
 {
@@ -148,10 +184,9 @@ TopoDS_Shape brep_shape(const ON_Brep& b, double scale, double tol)
     TopoDS_Edge        E;
     if (c)
     {
-      occ::handle<Geom_BSplineCurve> gc = curve3d(*c, scale);
-      const ON_Interval              d  = e.Domain();
+      occ::handle<Geom_BSplineCurve> gc = edge_curve(e, scale);
       B.MakeEdge(E, gc, std::max(tol, e.m_tolerance * scale));
-      B.Range(E, d[0], d[1]);
+      B.Range(E, gc->FirstParameter(), gc->LastParameter());
     }
     else
       B.MakeEdge(E);
@@ -184,16 +219,15 @@ TopoDS_Shape brep_shape(const ON_Brep& b, double scale, double tol)
         const ON_Curve*    c2 = t.TrimCurveOf();
         if (!c2)
           continue;
-        occ::handle<Geom2d_BSplineCurve> pc = curve2d(*c2);
-        const ON_Interval                td = t.Domain();
         if (t.m_ei < 0)
         {
           // A singular trim (a pole): a degenerate edge.
+          occ::handle<Geom2d_BSplineCurve> pc = trim_curve(t, false, 0, 0);
           TopoDS_Edge   E;
           TopoDS_Vertex V = verts[t.m_vi[0]];
           B.MakeEdge(E);
           B.UpdateEdge(E, pc, F, tol);
-          B.Range(E, td[0], td[1]);
+          B.Range(E, pc->FirstParameter(), pc->LastParameter());
           B.Degenerated(E, true);
           V.Orientation(TopAbs_FORWARD);
           B.Add(E, V);
@@ -212,15 +246,13 @@ TopoDS_Shape brep_shape(const ON_Brep& b, double scale, double tol)
             if (o != L.m_ti[ti] && b.m_T[o].Face() == &f)
               mate = o;
           }
-        // The 3D curve runs one way; the pcurve must follow it (same parameter).
-        occ::handle<Geom2d_Curve> c = pc;
-        if (t.m_bRev3d)
-          c = pc->Reversed();
+        // The pcurve runs along the 3D curve, on its range.
+        double e0, e1;
+        BRep_Tool::Range(E, e0, e1);
+        occ::handle<Geom2d_Curve> c = trim_curve(t, true, e0, e1);
         if (mate >= 0)
         {
-          occ::handle<Geom2d_Curve> c2m = curve2d(*b.m_T[mate].TrimCurveOf());
-          if (b.m_T[mate].m_bRev3d)
-            c2m = c2m->Reversed();
+          occ::handle<Geom2d_Curve> c2m = trim_curve(b.m_T[mate], true, e0, e1);
           // OCCT: first pcurve for the FORWARD use of the edge.
           if (!t.m_bRev3d)
             B.UpdateEdge(E, c, c2m, F, tol);
@@ -248,12 +280,7 @@ TopoDS_Shape brep_shape(const ON_Brep& b, double scale, double tol)
     B.Add(so, shell);
     out = so;
   }
-  BRepLib::SameParameter(out, tol, true);
-  occ::handle<ShapeFix_Shape> fix = new ShapeFix_Shape(out);
-  fix->SetPrecision(tol);
-  fix->SetMaxTolerance(1e-4);
-  fix->Perform();
-  return fix->Shape();
+  return heal_import(out, tol);
 }
 
 TopoDS_Shape mesh_shape_of(const ON_Mesh& m, double scale)

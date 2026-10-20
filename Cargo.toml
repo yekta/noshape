@@ -84,7 +84,11 @@ gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
 # app sets `input::PlainSelectionColors`; code editors keep the theme color.
 # NOSHAPE PATCH (agent ui2): code editors take their gutter metrics (minimum
 # digits, number inset, margin, fold column) from `input::CodeGutterMetrics`
-# when the app sets it (Feature Studio = Ace's 42 px gutter).
-# Only the lines marked "NOSHAPE PATCH" in src/input/mod.rs and
-# src/input/base/element.rs differ from 0.7.3.
+# when the app sets it (Feature Studio = Ace's 42 px gutter), and an app can
+# draw its own diagnostic tooltip (`input::set_app_diagnostic_hover`,
+# `hovered_diagnostic()`), gutter markers (`input::GutterMarkerRenderer`) and
+# squiggle colors (`input::DiagnosticColors` as a global).
+# Only the lines marked "NOSHAPE PATCH" in src/input/mod.rs,
+# src/input/base/element.rs, src/input/base/state.rs and
+# src/input/editor/highlighting.rs differ from 0.7.3.
 gpui-base = { path = "vendor/gpui-base" }

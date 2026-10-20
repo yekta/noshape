@@ -21,6 +21,7 @@
 #include <GeomAPI_Interpolate.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Extrema_GenLocateExtPS.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
 #include <GeomLib.hxx>
@@ -54,6 +55,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <set>
 
 namespace noshape {
@@ -569,6 +571,15 @@ struct Builder
   const Parser&                                  r;
   BRep_Builder                                   B;
   std::map<long long, occ::handle<Geom_Surface>> surfs;
+  struct Projector
+  {
+    occ::handle<Geom_Surface>  s;
+    GeomAdaptor_Surface        a;
+    GeomAPI_ProjectPointOnSurf pj;
+    bool                       seeded = false;
+    double                     u = 0, v = 0; // the last foot
+  };
+  std::map<const Geom_Surface*, std::unique_ptr<Projector>> projectors;
   std::map<long long, occ::handle<Geom_Curve>>   curves;
   std::map<long long, double>                    cone_cos; // cones: OCCT (u, v) = (u, v / cos a)
   std::map<long long, TopoDS_Vertex>             verts;
@@ -893,6 +904,48 @@ struct Builder
     return new Geom_BSplineSurface(poles, wts, r0->Knots(), vk, r0->Multiplicities(), vm, 3, 2);
   }
 
+  // The foot of x on a surface (false when there is none). Points come
+  // along curves, so Newton from the last foot on the same surface first,
+  // kept when it lands on x (within a micron); else the global search, one
+  // projector per surface (its sampling grid built once), with a parametric
+  // tolerance for a model in metres (OCCT's default, Precision::Confusion,
+  // stops short on a blend tube whose u range is a few centimetres).
+  bool project(const gp_Pnt& x, const occ::handle<Geom_Surface>& s, gp_Pnt2d& uv, gp_Pnt* foot = nullptr)
+  {
+    std::unique_ptr<Projector>& p = projectors[s.get()];
+    if (!p)
+    {
+      double u1, u2, v1, v2;
+      s->Bounds(u1, u2, v1, v2);
+      p    = std::make_unique<Projector>();
+      p->s = s;
+      p->a.Load(s);
+      p->pj.Init(s, u1, u2, v1, v2, Precision::PConfusion());
+    }
+    if (p->seeded)
+    {
+      Extrema_GenLocateExtPS loc(p->a);
+      loc.Perform(x, p->u, p->v);
+      if (loc.IsDone() && loc.SquareDistance() < 1e-12)
+      {
+        loc.Point().Parameter(p->u, p->v);
+        uv = gp_Pnt2d(p->u, p->v);
+        if (foot)
+          *foot = loc.Point().Value();
+        return true;
+      }
+    }
+    p->pj.Perform(x);
+    if (p->pj.NbPoints() == 0)
+      return false;
+    p->pj.LowerDistanceParameters(p->u, p->v);
+    p->seeded = true;
+    uv        = gp_Pnt2d(p->u, p->v);
+    if (foot)
+      *foot = p->pj.NearestPoint();
+    return true;
+  }
+
   occ::handle<Geom_Curve> curve(long long idx)
   {
     auto it = curves.find(idx);
@@ -1030,17 +1083,10 @@ struct Builder
     bool                fixed_first = false, fixed_last = false;
     std::vector<gp_Pnt> cp = chart_points(n, fixed_first, fixed_last);
     GeomAdaptor_Surface a1(s1), a2(s2);
-    GeomAPI_ProjectPointOnSurf pj1, pj2;
     auto refine = [&](const gp_Pnt& x, const gp_Vec& t, gp_Pnt& out) {
-      pj1.Init(x, s1);
-      pj2.Init(x, s2);
-      if (pj1.NbPoints() == 0 || pj2.NbPoints() == 0)
+      gp_Pnt2d p1, p2;
+      if (!project(x, s1, p1) || !project(x, s2, p2))
         return false;
-      double u, v;
-      pj1.LowerDistanceParameters(u, v);
-      gp_Pnt2d p1(u, v);
-      pj2.LowerDistanceParameters(u, v);
-      gp_Pnt2d p2(u, v);
       return t.Magnitude() > 0 && on_both(a1, a2, p1, p2, x, t.Normalized(), out);
     };
     std::vector<gp_Pnt> exact;
@@ -1091,7 +1137,9 @@ struct Builder
         GeomAPI_ProjectPointOnCurve pc(mid, c);
         const gp_Pnt on = pc.NbPoints() ? pc.NearestPoint() : mid;
         gp_Pnt       q;
-        if (refine(on, gp_Vec(exact[i], exact[i + 1]), q))
+        // A point that jumps (to another branch, another turn of a helix)
+        // is not this segment's.
+        if (refine(on, gp_Vec(exact[i], exact[i + 1]), q) && q.Distance(on) < exact[i].Distance(exact[i + 1]) / 2)
         {
           worst = std::max(worst, q.Distance(on));
           more.push_back(q);
@@ -1118,16 +1166,12 @@ struct Builder
     bool                            fixed_first = false, fixed_last = false;
     const std::vector<gp_Pnt>       cp = chart_points(n, fixed_first, fixed_last);
     GeomAPI_ProjectPointOnCurve pc;
-    GeomAPI_ProjectPointOnSurf  ps;
     auto contact = [&](const gp_Pnt& x, gp_Pnt& out) {
       pc.Init(x, spine);
       if (pc.NbPoints() == 0)
         return false;
-      ps.Init(pc.NearestPoint(), support);
-      if (ps.NbPoints() == 0)
-        return false;
-      out = ps.NearestPoint();
-      return true;
+      gp_Pnt2d uv;
+      return project(pc.NearestPoint(), support, uv, &out);
     };
     std::vector<gp_Pnt> exact;
     for (size_t i = 0; i < cp.size(); ++i)
@@ -1146,7 +1190,7 @@ struct Builder
         more.push_back(exact[i]);
         GeomAPI_ProjectPointOnCurve on(gp_Pnt((exact[i].XYZ() + exact[i + 1].XYZ()) / 2), c);
         gp_Pnt                      q;
-        if (on.NbPoints() && contact(on.NearestPoint(), q))
+        if (on.NbPoints() && contact(on.NearestPoint(), q) && q.Distance(on.NearestPoint()) < exact[i].Distance(exact[i + 1]) / 2)
         {
           worst = std::max(worst, q.Distance(on.NearestPoint()));
           more.push_back(q);
@@ -1287,6 +1331,13 @@ struct Builder
             if (v1.IsSame(v2) && t2 - t1 < 1e-9)
               t2 = t1 + per;
           }
+          else if (v1.IsSame(v2) && std::abs(t2 - t1) < 1e-9)
+          {
+            // A closed edge on a closed, non-periodic curve (an intersection
+            // curve's chart that returns to its start): all of it.
+            t1 = c->FirstParameter();
+            t2 = c->LastParameter();
+          }
         }
       }
       B.MakeEdge(E, c, etol);
@@ -1367,13 +1418,11 @@ struct Builder
       const occ::handle<Geom_Curve> c = BRep_Tool::Curve(TopoDS::Edge(ee.Current()), f, l);
       if (c.IsNull())
         continue;
-      const gp_Pnt               p = c->Value((f + l) / 2);
-      GeomAPI_ProjectPointOnSurf ps(p, s);
-      if (ps.NbPoints() == 0)
+      gp_Pnt2d uv;
+      if (!project(c->Value((f + l) / 2), s, uv))
         continue;
-      double u, v;
-      ps.LowerDistanceParameters(u, v);
-      gp_Pnt q;
+      const double u = uv.X(), v = uv.Y();
+      gp_Pnt       q;
       gp_Vec du, dv;
       s->D1(u, v, q, du, dv);
       const gp_Vec nat = du.Crossed(dv);

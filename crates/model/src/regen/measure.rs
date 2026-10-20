@@ -104,10 +104,61 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
 /// Measurements for a selection (single entity properties, or pairwise
 /// distance/angle for two entities).
 pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> {
-    let mut out = Vec::new();
     let shapes: Vec<Vec<Shape>> = refs.iter().map(|r| resolve_shapes(ctx, r)).collect();
+    measure_shapes(&shapes)
+}
+
+/// The geometry a pair measurement looks at.
+#[derive(Clone, Copy)]
+enum Geo {
+    Plane { origin: DVec3, normal: DVec3 },
+    /// A cylinder's axis.
+    Axis { origin: DVec3, dir: DVec3 },
+    Line { origin: DVec3, dir: DVec3 },
+    /// A circle's or sphere's center.
+    Center(DVec3),
+    Other,
+}
+
+fn geo(s: &Shape) -> Geo {
+    match s.shape_type() {
+        ShapeType::Face => match s.face_surface() {
+            Ok(k::Surface::Plane(p)) => Geo::Plane { origin: p.origin, normal: p.normal.normalize() },
+            Ok(k::Surface::Cylinder { origin, axis, .. }) => Geo::Axis { origin, dir: axis.normalize() },
+            Ok(k::Surface::Sphere { center, .. }) => Geo::Center(center),
+            _ => Geo::Other,
+        },
+        ShapeType::Edge => match s.edge_curve() {
+            Ok(k::Curve::Line { origin, direction }) => Geo::Line { origin, dir: direction.normalize() },
+            Ok(k::Curve::Circle { center, .. }) => Geo::Center(center),
+            _ => Geo::Other,
+        },
+        _ => Geo::Other,
+    }
+}
+
+fn parallel(a: DVec3, b: DVec3) -> bool {
+    a.cross(b).length() < 1e-9
+}
+
+/// Distance from `p` to the line through `o` along unit `d`.
+fn line_distance(p: DVec3, o: DVec3, d: DVec3) -> f64 {
+    let v = p - o;
+    (v - d * v.dot(d)).length()
+}
+
+/// Measurements of resolved shapes, one list per selected entity, in the
+/// order Onshape's quick readout and Measure panel use: the server's
+/// measurements reordered like the client (`setMeasurements` in the
+/// bundle): the first Diameter / Radius / Parallel (axis) distance or
+/// angular measurement (not Curvature deviation) comes first; the readout
+/// shows the first row. Pair names as live (part-studio/81, assembly/707:
+/// "Perp planes angle"; "Min dist"; "Area" for faces, Help: "Perp axes
+/// angle", "Center dist").
+pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
+    let mut out = Vec::new();
     // Single-entity measurements.
-    if refs.len() == 1 {
+    if shapes.len() == 1 {
         for s in &shapes[0] {
             match s.shape_type() {
                 ShapeType::Edge => {
@@ -141,27 +192,79 @@ pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> 
                 _ => {}
             }
         }
+        // Client order: Diameter / Radius before Length / Area.
+        if let Some(i) = out.iter().position(|(_, m)| matches!(m, Measurement::Radius(_) | Measurement::Diameter(_))) {
+            out.swap(0, i);
+        }
         return out;
     }
-    // Totals for multiple edges/faces of the same kind.
+    // Pairs: the priority / angular measurement first.
+    if shapes.len() == 2
+        && let (Some(a), Some(b)) = (shapes[0].first(), shapes[1].first())
+    {
+        let angle = || k::angle_between(a, b).ok();
+        match (geo(a), geo(b)) {
+            (Geo::Plane { origin: o1, normal: n1 }, Geo::Plane { origin: o2, normal: n2 }) => {
+                if parallel(n1, n2) {
+                    out.push(("Parallel dist".into(), Measurement::Length((o2 - o1).dot(n1).abs())));
+                } else if let Some(t) = angle() {
+                    out.push(("Perp planes angle".into(), Measurement::Angle(t)));
+                }
+            }
+            (Geo::Axis { origin: o1, dir: d1 }, Geo::Axis { origin: o2, dir: d2 }) => {
+                if parallel(d1, d2) {
+                    out.push(("Parallel axes dist".into(), Measurement::Length(line_distance(o2, o1, d1))));
+                } else {
+                    let t = d1.angle_between(d2);
+                    out.push(("Perp axes angle".into(), Measurement::Angle(t.min(std::f64::consts::PI - t))));
+                }
+            }
+            (Geo::Line { origin: o1, dir: d1 }, Geo::Line { origin: o2, dir: d2 }) => {
+                if parallel(d1, d2) {
+                    out.push(("Parallel dist".into(), Measurement::Length(line_distance(o2, o1, d1))));
+                } else if let Some(t) = angle() {
+                    out.push(("Perp lines angle".into(), Measurement::Angle(t)));
+                }
+            }
+            (Geo::Line { origin: o, dir: d }, Geo::Plane { origin: p, normal: n }) | (Geo::Plane { origin: p, normal: n }, Geo::Line { origin: o, dir: d }) => {
+                // A line parallel to the plane: their distance (like parallel planes).
+                if d.dot(n).abs() < 1e-9 {
+                    out.push(("Parallel dist".into(), Measurement::Length((o - p).dot(n).abs())));
+                } else if let Some(t) = angle() {
+                    out.push(("Perp line and plane angle".into(), Measurement::Angle(t)));
+                }
+            }
+            _ => {}
+        }
+    }
+    // Totals for edges / faces of the same kind (live: two faces read "Area").
     let flat: Vec<&Shape> = shapes.iter().flatten().collect();
     if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == ShapeType::Edge) {
         let total: f64 = flat.iter().filter_map(|s| s.length().ok()).sum();
-        out.push(("Total length".into(), Measurement::Length(total)));
+        out.push(("Length".into(), Measurement::Length(total)));
     }
     if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == ShapeType::Face) {
         let total: f64 = flat.iter().filter_map(|s| s.area().ok()).sum();
-        out.push(("Total area".into(), Measurement::Area(total)));
+        out.push(("Area".into(), Measurement::Area(total)));
     }
-    if refs.len() == 2 && !shapes[0].is_empty() && !shapes[1].is_empty() {
-        let a = &shapes[0][0];
-        let b = &shapes[1][0];
+    if shapes.len() == 2
+        && let (Some(a), Some(b)) = (shapes[0].first(), shapes[1].first())
+    {
         if let Ok(d) = k::distance(a, b) {
             let v = d.point_b - d.point_a;
-            out.push(("Distance".into(), Measurement::Distance { distance: d.distance, a: d.point_a, b: d.point_b, dx: v.x.abs(), dy: v.y.abs(), dz: v.z.abs() }));
+            out.push(("Min dist".into(), Measurement::Distance { distance: d.distance, a: d.point_a, b: d.point_b, dx: v.x.abs(), dy: v.y.abs(), dz: v.z.abs() }));
         }
-        if let Ok(ang) = k::angle_between(a, b) {
-            out.push(("Angle".into(), Measurement::Angle(ang)));
+        let center = |s: &Shape| match (geo(s), s.shape_type()) {
+            (Geo::Center(c), _) => Some(c),
+            (_, ShapeType::Vertex) => s.vertex_point().ok(),
+            _ => None,
+        };
+        // Center distance needs at least one circle / sphere.
+        if (matches!(geo(a), Geo::Center(_)) || matches!(geo(b), Geo::Center(_)))
+            && let (Some(p), Some(q)) = (center(a), center(b))
+        {
+            let v = q - p;
+            out.push(("Center dist".into(), Measurement::Distance { distance: v.length(), a: p, b: q, dx: v.x.abs(), dy: v.y.abs(), dz: v.z.abs() }));
         }
     }
     out
@@ -174,12 +277,11 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     let mut mass = 0.0;
     let mut have_density = true;
     let mut com = DVec3::ZERO;
-    let mut inertia = glam::DMat3::ZERO;
-    let mut any = false;
+    // (weight, own center, inertia about the own center, weighted).
+    let mut parts: Vec<(f64, DVec3, glam::DMat3)> = Vec::new();
     for b in ctx.bodies.iter().filter(|b| bodies.is_empty() || bodies.contains(&b.id)) {
         let Ok(p) = k::volume_properties(&b.shape) else { continue };
         let Ok(s) = k::surface_properties(&b.shape) else { continue };
-        any = true;
         let rho = densities(&b.id);
         if rho.is_none() {
             have_density = false;
@@ -189,20 +291,35 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
         area += s.mass;
         mass += w;
         com += p.center * w;
-        inertia += p.inertia * rho.unwrap_or(1.0);
+        parts.push((w, p.center, p.inertia * rho.unwrap_or(1.0)));
     }
-    if !any {
+    if parts.is_empty() {
         return None;
     }
     let total = if mass > 0.0 { mass } else { 1.0 };
+    let com = com / total;
     Some(MassProperties {
         volume,
         surface_area: area,
         density: None,
         mass: have_density.then_some(mass),
-        center_of_mass: com / total,
-        inertia,
+        center_of_mass: com,
+        inertia: combined_inertia(&parts, com),
     })
+}
+
+/// Inertia tensors of parts (each about its own center of mass, the
+/// kernel's convention: off-diagonals are the negated products) moved to
+/// the common center `com` by the parallel-axis theorem and summed:
+/// `I + m (|d|² E − d dᵀ)`, `d` = part center − `com`.
+pub fn combined_inertia(parts: &[(f64, DVec3, glam::DMat3)], com: DVec3) -> glam::DMat3 {
+    let mut out = glam::DMat3::ZERO;
+    for &(m, c, i) in parts {
+        let d = c - com;
+        let outer = glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z);
+        out += i + (glam::DMat3::IDENTITY * d.length_squared() - outer) * m;
+    }
+    out
 }
 
 /// Distance between two entities for a Measured variable (variable.fs):
@@ -277,4 +394,65 @@ pub fn entity_diameter(ctx: &Context, r: &Reference) -> Option<f64> {
         },
         _ => None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::reference::{BodyId, FeatureId};
+    use std::sync::Arc;
+
+    fn body(index: u32, shape: Shape) -> Arc<super::super::context::Body> {
+        Arc::new(super::super::context::Body::new(BodyId { feature: FeatureId(1), index }, format!("Part {}", index + 1), crate::display::BodyKind::Solid, shape, Vec::new(), 0, FeatureId(1)))
+    }
+
+    /// Two 2×4×6 boxes 10 apart along X (unit density): mass 48 each,
+    /// centres (1, 2, 3) and (11, 2, 3), joint centre (6, 2, 3). About it:
+    /// Ixx = 2·48(4² + 6²)/12 = 416; Iyy = 2·(48(2² + 6²)/12 + 48·5²) = 2720;
+    /// Izz = 2·(48(2² + 4²)/12 + 48·5²) = 2560; no products.
+    #[test]
+    fn mass_properties_move_each_part_to_the_joint_centre() {
+        let a = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap();
+        let b = k::make_box(&k::Plane::new(DVec3::new(10.0, 0.0, 0.0), DVec3::Z, DVec3::X), 2.0, 4.0, 6.0).unwrap();
+        let ctx = Context { bodies: vec![body(0, a), body(1, b)], ..Default::default() };
+        let m = mass_properties(&ctx, &[], &|_| None).unwrap();
+        assert!((m.volume - 96.0).abs() < 1e-6);
+        assert!((m.center_of_mass - DVec3::new(6.0, 2.0, 3.0)).length() < 1e-9);
+        let i = m.inertia;
+        assert!((i.x_axis.x - 416.0).abs() < 1e-6, "Ixx {}", i.x_axis.x);
+        assert!((i.y_axis.y - 2720.0).abs() < 1e-6, "Iyy {}", i.y_axis.y);
+        assert!((i.z_axis.z - 2560.0).abs() < 1e-6, "Izz {}", i.z_axis.z);
+        assert!(i.x_axis.y.abs() < 1e-6 && i.x_axis.z.abs() < 1e-6 && i.y_axis.z.abs() < 1e-6);
+        // One part alone: its own inertia (no shift).
+        let one = mass_properties(&ctx, &[BodyId { feature: FeatureId(1), index: 0 }], &|_| None).unwrap();
+        assert!((one.inertia.y_axis.y - 160.0).abs() < 1e-6);
+    }
+
+    /// Live part-studio/81: two perpendicular faces read "Perp planes
+    /// angle: 90.000 deg" (not the total area); opposite faces read the
+    /// parallel distance; one face its area.
+    #[test]
+    fn readout_rules_for_face_pairs() {
+        let b = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap();
+        let faces = b.faces();
+        let normal = |s: &Shape| match s.face_surface() {
+            Ok(k::Surface::Plane(p)) => p.normal.normalize(),
+            _ => DVec3::ZERO,
+        };
+        let x: Vec<&Shape> = faces.iter().filter(|f| normal(f).x.abs() > 0.9).collect();
+        let z = faces.iter().find(|f| normal(f).z.abs() > 0.9).unwrap();
+        let perp = measure_shapes(&[vec![x[0].clone()], vec![z.clone()]]);
+        assert_eq!(perp[0].0, "Perp planes angle");
+        assert!(matches!(perp[0].1, Measurement::Angle(t) if (t - std::f64::consts::FRAC_PI_2).abs() < 1e-9));
+        assert!(perp.iter().any(|(l, _)| l == "Area") && perp.iter().any(|(l, _)| l == "Min dist"));
+        let par = measure_shapes(&[vec![x[0].clone()], vec![x[1].clone()]]);
+        assert_eq!(par[0].0, "Parallel dist");
+        assert!(matches!(par[0].1, Measurement::Length(d) if (d - 2.0).abs() < 1e-9));
+        // An edge of the top face against a side face it is parallel to.
+        let top_edge = z.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { direction, .. }) if direction.x.abs() < 1e-9)).unwrap();
+        let edge_par = measure_shapes(&[vec![top_edge], vec![x[0].clone()]]);
+        assert_eq!(edge_par[0].0, "Parallel dist");
+        let single = measure_shapes(&[vec![z.clone()]]);
+        assert_eq!(single[0].0, "Area");
+    }
 }

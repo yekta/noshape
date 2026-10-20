@@ -263,6 +263,10 @@ pub struct PartStudioView {
     manip_drag: Option<manipulators::ManipDrag>,
     folder_renaming: Option<(u32, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// The Named views dialog's "Select a view" list and the view picked in it.
+    named_view_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
+    named_view_picked: Option<String>,
+    pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
@@ -280,7 +284,10 @@ impl PartStudioView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
-        subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
+        subs.push(cx.subscribe_in(&viewport, window, |this, vp, ev, window, cx| {
+            this.on_viewport_event(vp, ev, window, cx);
+            this.push_tool_cursor(cx);
+        }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.schedule_regen(window, cx),
             DocEvent::TabChanged(t) => {
@@ -355,6 +362,9 @@ impl PartStudioView {
             manip_drag: None,
             folder_renaming: None,
             named_views: None,
+            named_view_select: None,
+            named_view_picked: None,
+            pending_named_view: None,
             flat_cache: None,
             flat_task: None,
             ui: behaviors::UiState::new(cx),
@@ -695,7 +705,7 @@ impl PartStudioView {
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
         extra.extend(self.manipulator_overlay(cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
-        extra.extend(self.measure_overlay());
+        extra.extend(self.measure_overlay(cx));
         extra.extend(self.midpoint_overlay(cx));
         extra.extend(self.shown_dims_overlay(cx));
         extra.extend(self.hole_callout_overlay(cx));
@@ -756,9 +766,11 @@ impl PartStudioView {
             (None, None) => self.selection.len(),
             _ => 0,
         };
+        let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
         self.viewport.update(cx, |vp, cx| {
             (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
             vp.selection_count = count;
+            (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -2072,7 +2084,7 @@ impl PartStudioView {
                     .h(px(30.))
                     .flex_none()
                     .pl(px(4.))
-                    .pr(px(10.))
+                    .pr(px(15.))
                     // Live (part-studio/94, 570): with failed features a red
                     // icon comes first (click: show only them) and the title
                     // truncates to "Features …".
@@ -2155,7 +2167,8 @@ impl PartStudioView {
                     .id("parts-separator")
                     .h(px(5.))
                     .flex_none()
-                    .cursor(CursorStyle::ResizeUpDown)
+                    // Live: `div.os-splitter` is row-resize.
+                    .cursor(CursorStyle::ResizeRow)
                     .border_t_1()
                     .border_color(pal.border)
                     .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
@@ -2473,6 +2486,58 @@ impl PartStudioView {
         .into_any_element()
     }
 
+    /// The top of Onshape's cursor stack over the graphics area
+    /// (docs/parity/cursors.md): `move` over a dimension value, the sketch
+    /// tools' crosshair (the pattern tools keep the arrow), else none (the
+    /// selection cursor shows).
+    /// Sketch hover changes don't rebuild the scene; hand the viewport its
+    /// tool cursor after every viewport event (it applies it on render).
+    fn push_tool_cursor(&self, cx: &mut Context<Self>) {
+        let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
+        self.viewport.update(cx, |vp, cx| {
+            if (vp.tool_cursor, vp.overlay_cursor) != (tool_cursor, overlay_cursor) {
+                (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
+                cx.notify();
+            }
+        });
+    }
+
+    /// Cursors of overlays over the graphics area: a sketch dimension value
+    /// is draggable (CSS `move`); an analysis legend's color map shows the
+    /// crosshair.
+    fn viewport_overlay_cursor(&self) -> Option<crate::cursor::AppCursor> {
+        use crate::cursor::AppCursor;
+        if self.sketch.as_ref().is_some_and(|ed| ed.hover_constraint.is_some()) {
+            return Some(AppCursor::Move);
+        }
+        let map = |b: Option<&thickness::BarUi>| b.is_some_and(|b| b.map_hover);
+        (map(self.ui.thickness.as_ref().map(|t| &t.bar)) || map(self.ui.curvature_map.as_ref().map(|c| &c.bar))).then_some(AppCursor::Crosshair)
+    }
+
+    fn viewport_tool_cursor(&self) -> Option<crate::cursor::AppCursor> {
+        use crate::cursor::AppCursor;
+        use crate::sketch_mode::Tool;
+        let ed = self.sketch.as_ref()?;
+        if ed.box_dragging() && ed.box_remove {
+            return Some(AppCursor::RemoveSelection);
+        }
+        // Pattern, transform and offset: once the operation can be created and
+        // nothing is pre-highlighted, the "click to accept" cursor (Onshape's
+        // showConfirmationCursor; not while a dimension box is open).
+        let complete = match ed.tool {
+            Tool::LinearPattern | Tool::CircularPattern | Tool::Transform => !ed.selection.is_empty(),
+            Tool::Offset => ed.offset_pending.is_some(),
+            _ => false,
+        };
+        if complete && ed.hover.is_none() && ed.hover_region.is_none() && ed.dim_edit.is_none() {
+            return Some(AppCursor::Confirmation);
+        }
+        match ed.tool {
+            Tool::Select | Tool::LinearPattern | Tool::CircularPattern | Tool::Transform => None,
+            _ => Some(AppCursor::Crosshair),
+        }
+    }
+
     /// The open feature dialog can't regenerate (live: its row turns red and
     /// the Features header shows the error icon until it can).
     fn edit_invalid(&self, cx: &App) -> bool {
@@ -2520,7 +2585,7 @@ impl PartStudioView {
             .flex()
             .flex_none()
             .items_center()
-            .cursor(CursorStyle::ResizeUpDown)
+            // Live (dom/cursors.txt): the default arrow, also while dragging.
             .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
             .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
@@ -3157,6 +3222,9 @@ pub(super) fn paint_paths(polys: Vec<Vec<Point<Pixels>>>, color: Hsla) -> AnyEle
 impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        if let Some(v) = self.pending_named_view.take() {
+            self.apply_named_view(&v, window, cx);
+        }
         self.ensure_filter_input(window, cx);
         // A feature row's context menu closed: drop its highlight.
         if self.ui.list_menu.is_some() && !crate::os_menu::is_open(cx) {

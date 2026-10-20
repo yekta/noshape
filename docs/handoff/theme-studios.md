@@ -5,7 +5,7 @@ drawing, start window / documents page, Variable Studio, versions panel, tab man
 toasts. The Part Studio chrome and theme.rs belong to agent "ui" (docs/handoff/theme-layout.md).
 Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side-by-side shots (ours | Onshape) in /tmp/ui2-shots/.
 
-## State (2026-10-19 17:45 UTC) — summary for the lead (third ui2 of the day)
+## State (2026-10-20 03:30 UTC) — summary for the lead (rounds 1–3: 19 Oct; round 4: 20 Oct)
 
 **Finished (all built and checked in the app, 17:14 build green, no warnings; clippy: nothing from my files):**
 - Queue 0: empty-state "Learning Center." opens https://github.com/yekta/noshape#readme. Queue 2: clippy
@@ -54,13 +54,73 @@ Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side
 - New windows: none of my files call `gpui_kit::open_window` (start_window uses os_menu::open_window).
 - Shots refreshed: final-tab-manager.png, final-versions.png, final-import-modal.png.
 
+**Round 3 (lead's decisions, 20 Oct ~00:00–):**
+- **Feature Studio gutter (vendor/gpui-base, NOSHAPE PATCH, Cargo.toml comment updated):** new global
+  `input::CodeGutterMetrics { min_digits, number_inset, right_margin, fold_width, text_gap,
+  active_background }` read by code editors (default = the crate's own constants); main.rs sets Ace's:
+  1 digit min, numbers 15 px in, no margin, 14 px fold column, 4 px to the text, `#dcdcdc` current-line
+  cell → 42 px gutter, numbers and code at live document/70's x. `line_number_len` is `#[cfg(test)]` now.
+  `cargo build --locked` is green (the vendored crate was already patched; Cargo.lock unchanged).
+- **Advanced search "Results from"** searches versions: `DocFacts { workspaces, versions, published }`
+  (every workspace head and every version), Workspaces / Versions / All × Latest / All
+  (`Query::from`, `all_versions`). Verified: a Material Library added after V1 is found from Workspaces,
+  not from Versions. No-result text "No documents match your search." (capture requested).
+- **Details "Document labels" chevron** collapses / expands (`details_labels_open`).
+- **Create version dialog (fs's report)**, history_panel.rs: two titles as live — "Create version from
+  **Main**" (versions panel, rail, shortcut) and "Create version in **<document>** Main" (Feature Studio
+  reference / Import panels, Insert dialog, Material Library link: `open_create_version_in`);
+  "☐ **Publish custom features and tables** *Allow searches…* ?" row when the document has a Feature
+  Studio (stores meta `published_featurescript:<version id>`; advanced search's Published FeatureScript
+  uses it); footer Create | Create version and edit properties | Cancel. Version row menu in live order
+  with new **Properties…** (name + description; new store API `Document::update_version`, test in
+  store tests.rs `versions`) and **Publish FeatureScript…**. Captures of those two dialogs and of what
+  "…and edit properties" opens are requested (REQUESTS.md ui2 23:50); until then they open our
+  Properties / publish modals. The out-of-date drawings box ("These drawings should be updated…") needs
+  asb to expose out-of-date drawings from the model (today only open DrawingEditors know).
+- **Feature Studio Import (live document/80–91)**: new fs_import.rs panel (300 px under the button:
+  Current / Other documents, header with Create version… and Version graph, Part Studios / Files /
+  Feature Studios / Variable Studios, search, rendered Part Studio thumbnails via the new shared
+  `tab_manager::tab_thumbnail`; stays open). A pick appends one line after the last import
+  (`fs_import::append_import`, unit test). **For fs (resolution):** same document →
+  `import(path : "<tab id>", version : "<workspace microversion, 32 hex>");` (your DocResolver already
+  resolves tab ids). Another document, or this one at a version → `import(path : "<document id>/<version
+  microversion>/<tab id>", version : "<version microversion>");` where the document id is the
+  document's first microversion (`fs_import::document_id(path)`, 32 hex). Blob / Part Studio imports
+  export BLOB_DATA / build etc. per behaviours.md "Import button" — that resolution is yours.
+- fs's editor requests: hover popover has no background (Ace tooltip: white, 1 px border, shadow,
+  monospace, ✕ icon) and squiggles not drawn — being debugged (diagnostics exist; the runs don't get the
+  wavy underline). Gutter ✕/⚠ markers (live fs-gutter-*) also missing.
+- Surgical fix in psb's part_studio/input_propagation.rs (broken ~30 min): the two toggle closures
+  became `toggle_all` / `toggle_row` fns returning `impl Fn + 'static + use<>`.
+
+**Round 4 (20 Oct ~03:20–, fourth ui2 of the day; the third lost its login mid-edit):**
+- Lead's queue check: items 1–4 were already done in round 3 (gutter `fold_width` patch → Ace's 42 px,
+  Results from Versions / All, Document labels chevron, Create version titles + Publish row). Item 5:
+  Rhai is gone; FeatureScript is the only language (fs's crates/featurescript); the Import panel is done
+  (fs_import.rs) and fs resolves its paths (featurescript.md "Feature Studio imports of other tabs").
+- Feature Studio diagnostics (fs's requests), finished: **squiggles** were invisible because the
+  kit's `DiagnosticColors` come from `highlight_theme.style.status`, and without gpui-component's
+  `tree-sitter` feature that is a stub that always returns transparent (setting it via serde does
+  nothing). New gpui-base patch: `input::DiagnosticColors` is a global the editor prefers; main.rs sets
+  error `#df5528` / warning `#fcc81a` (live fs-squiggles-zoom8x).
+  **Ace tooltip** drawn by feature_studio.rs (`render_diagnostic_tooltip`, follows the pointer; the
+  kit's popover is off via the `set_app_diagnostic_hover` patch). **Gutter markers**: new gpui-base
+  patch `input::GutterMarkerRenderer` (app global, `Fn(DiagnosticSeverity, &App) -> AnyElement`); the
+  editor lays one marker per line out of the line's most severe diagnostic, 2 px into the gutter cell,
+  centred (live fs-gutter-warning-error-zoom8x); main.rs gives it the notice icons (fs-error /
+  msg-warning / fs-info, 13 px). Squiggles cover the token at the notice's column like Ace
+  (`squiggle_len`: the identifier there, else 1 char; was a fixed 4; unit test
+  `squiggles_cover_the_token`). fs-error.svg redrawn as Ace's (red-orange box, dark rim, white ✕;
+  also the notices panel / tooltip icon). Shots: /tmp/ui2-shots/final-fs-squiggles.png (ours over live).
+- Create version dialog checked against live document/20 (final-create-version.png): same; Name text
+  selected on open. Note for screenshots on Xvfb: without a window manager the window is never active,
+  so carets/selections don't paint until `xdotool windowfocus <win>`.
+
 **Left / known differences:**
-- Feature Studio gutter 10 px wider than Ace's 42 px: gpui-base hard-codes an 18 px fold hitbox (kit
-  patch needed; lead's call).
 - Assembly ≡ button inert; tab manager ? button inert; ISO A4/A2/A1/A0 zone counts guessed — all waiting
-  for live answers (REQUESTS.md).
-- Advanced search "Results from: Versions / All" searches only the latest state; Details "Document labels"
-  chevron doesn't collapse.
+  for live answers (REQUESTS.md ui2 13:58 / 14:05 / 14:30, still open on 20 Oct 03:30).
+- Captures still open: advanced-search empty/result look (ui2 23:30); version Properties… / Publish
+  FeatureScript… / "…and edit properties" dialogs (ui2 23:50).
 
 **Cross-area edits (surgical):** ui's part_studio/mod.rs (toast centring); asb's drawing_create.rs,
 model drawing/sheet.rs, drawing_callout.rs (`Selectable as _` import that broke the tree); skb's

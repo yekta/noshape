@@ -15,6 +15,10 @@ pub(crate) struct InsertThumbs {
     /// Content hash each studio's pictures were made for.
     pub made_for: HashMap<TabId, u64>,
     pub busy: bool,
+    /// Other documents' Part Studios (external key, part) -> picture, and
+    /// the keys being rendered or done.
+    pub external: HashMap<ExternalThumbKey, Arc<RenderImage>>,
+    pub external_requested: HashSet<String>,
 }
 
 impl AssemblyView {
@@ -107,6 +111,60 @@ impl AssemblyView {
         .detach();
     }
 }
+
+impl AssemblyView {
+    pub(super) fn external_thumb(&self, key: &str, part: Option<&BodyId>) -> Option<Arc<RenderImage>> {
+        self.ui.thumbs.external.get(&(key.to_string(), part.cloned())).cloned()
+    }
+
+    /// Render the pictures of another document's Part Studio and its parts
+    /// (Insert › Other documents), once per pinned version.
+    pub(super) fn request_external_thumbs(&mut self, key: String, cx: &mut Context<Self>) {
+        if !self.ui.thumbs.external_requested.insert(key.clone()) {
+            return;
+        }
+        let (evaluator, gpu) = (self.evaluator.clone(), self.gpu.clone());
+        cx.spawn(async move |this, cx| {
+            let k2 = key.clone();
+            let made = cx
+                .background_spawn(async move {
+                    let mut out: Vec<(ExternalThumbKey, Arc<RenderImage>)> = Vec::new();
+                    let Some((_, result)) = evaluator.lock().external_studio(&k2, &ConfigValues::default()) else { return out };
+                    let display = &result.display;
+                    let parts: Vec<Option<BodyId>> = std::iter::once(None).chain(display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && !b.hidden).map(|b| Some(b.id.clone()))).collect();
+                    for part in parts {
+                        let mut d = display.clone();
+                        if let Some(p) = &part {
+                            for b in &mut d.bodies {
+                                b.hidden = &b.id != p;
+                            }
+                        }
+                        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+                        let mut cache = crate::scene_builder::GpuCache::default();
+                        let built = crate::scene_builder::build(&d, &opts, &mut cache, gpu.uploader());
+                        let Some((lo, hi)) = built.scene.bounds() else { continue };
+                        let (w, h) = crate::gpu::THUMBNAIL_SIZE;
+                        let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
+                        let Ok(png) = gpu.render_thumbnail(Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
+                        if let Some(img) = decode(&png) {
+                            out.push(((k2.clone(), part), img));
+                        }
+                    }
+                    out
+                })
+                .await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                this.ui.thumbs.external.extend(made);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+}
+
+/// Another document's Part Studio (pinned version key) and one of its parts
+/// (`None`: the whole studio).
+pub(crate) type ExternalThumbKey = (String, Option<BodyId>);
 
 /// A camera looking at the box normal to a sketch plane (its X right).
 fn fit_camera_normal(lo: DVec3, hi: DVec3, aspect: f64, frame: &noshape_model::display::PlaneFrame) -> noshape_render::Camera {

@@ -20,7 +20,7 @@ use noshape_model::document::TabId;
 use std::collections::{HashMap, HashSet};
 
 /// Icon of a notice: red ☒ error, ⚠ warning, ⓘ info.
-fn notice_icon(error: bool, info: bool) -> &'static str {
+pub(crate) fn notice_icon(error: bool, info: bool) -> &'static str {
     if error {
         "fs-error"
     } else if info {

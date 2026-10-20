@@ -478,7 +478,18 @@ pub enum AnnotationKind {
     },
     LinearDimension { view: ViewId, a: [f64; 2], b: [f64; 2], offset: f64, orientation: DimOrientation, override_text: Option<String> },
     RadialDimension { view: ViewId, center: [f64; 2], radius: f64, diameter: bool, angle: f64 },
-    AngularDimension { view: ViewId, vertex: [f64; 2], a: [f64; 2], b: [f64; 2], radius: f64 },
+    /// Angle from leg `a` counterclockwise to leg `b`. `three_point`: made
+    /// with the 3 point angular tool (dragging the arc across a leg swaps the
+    /// legs: 360° minus the angle).
+    AngularDimension {
+        view: ViewId,
+        vertex: [f64; 2],
+        a: [f64; 2],
+        b: [f64; 2],
+        radius: f64,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        three_point: bool,
+    },
     /// `angle`: the mark's rotation in the view (radians; Align centermark,
     /// pattern centermarks).
     Centermark {
@@ -858,6 +869,9 @@ pub struct Table {
     /// title; empty or wrong length = automatic).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub row_heights: Vec<f64>,
+    /// Move to: a format layer (its color, locked with the format).
+    #[serde(default, skip_serializing_if = "SheetLayer::is_drawing")]
+    pub layer: SheetLayer,
 }
 
 /// Horizontal alignment of a table cell's text.
@@ -921,7 +935,7 @@ fn default_table_text() -> f64 {
 
 impl Table {
     pub fn new(id: u64, kind: TableKind, position: [f64; 2]) -> Self {
-        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), cell_formats: Vec::new(), merges: Vec::new(), rows: None, row_heights: Vec::new() }
+        Self { id, kind, position, corner: TableCorner::TopRight, col_widths: Vec::new(), row_height: default_row_height(), text_height: default_table_text(), cell_formats: Vec::new(), merges: Vec::new(), rows: None, row_heights: Vec::new(), layer: SheetLayer::Drawing }
     }
 
     /// Formatting of a cell (defaults when none is set).
@@ -994,6 +1008,44 @@ impl Table {
                 m.rows += 1;
             }
         }
+    }
+
+    /// Duplicate rows `r0..=r1` below them (general tables: texts and
+    /// formats).
+    pub fn duplicate_rows(&mut self, r0: usize, r1: usize) {
+        for k in 0..=(r1 - r0) {
+            let (src, dst) = (r0 + k, r1 + 1 + k);
+            self.insert_row(dst);
+            if let Some(cells) = self.general_cells()
+                && let Some(row) = cells.get(src).cloned()
+                && let Some(d) = cells.get_mut(dst)
+            {
+                *d = row;
+            }
+            let copies: Vec<CellStyle> = self.cell_formats.iter().filter(|s| s.row == src).map(|s| CellStyle { row: dst, ..s.clone() }).collect();
+            self.cell_formats.extend(copies);
+        }
+        self.cell_formats.sort_by_key(|s| (s.row, s.col));
+    }
+
+    /// Duplicate columns `c0..=c1` right of them.
+    pub fn duplicate_cols(&mut self, c0: usize, c1: usize) {
+        for k in 0..=(c1 - c0) {
+            let (src, dst) = (c0 + k, c1 + 1 + k);
+            self.insert_col(dst);
+            if let Some(cells) = self.general_cells() {
+                for row in cells.iter_mut() {
+                    if let Some(v) = row.get(src).cloned()
+                        && let Some(d) = row.get_mut(dst)
+                    {
+                        *d = v;
+                    }
+                }
+            }
+            let copies: Vec<CellStyle> = self.cell_formats.iter().filter(|s| s.col == src).map(|s| CellStyle { col: dst, ..s.clone() }).collect();
+            self.cell_formats.extend(copies);
+        }
+        self.cell_formats.sort_by_key(|s| (s.row, s.col));
     }
 
     /// Delete row `r` (general tables keep at least one row).
@@ -1122,6 +1174,15 @@ pub struct Annotation {
     /// dimension's flip node).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub flip_arrows: bool,
+    /// Linear dimensions: jogged extension lines (right-click an extension
+    /// line › Add jog), one per extension line.
+    #[serde(default, skip_serializing_if = "no_jogs")]
+    pub jogs: [Option<ExtJog>; 2],
+    /// Unbreak dimension: crossing dimension lines don't cut this one's
+    /// lines (new dimensions follow Drawing properties › Break dimension
+    /// by default).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unbroken: bool,
     /// Grouped with another annotation (a callout dropped onto a
     /// dimension): `position` is then the offset from the upper right of
     /// that annotation's text, so it moves with it.
@@ -1141,7 +1202,7 @@ pub struct Annotation {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None }
     }
 }
 
@@ -1628,6 +1689,28 @@ pub struct DrawingProps {
     pub dim_extension: f64,
     #[serde(default)]
     pub dim_text_horizontal: bool,
+    /// Dimensions › All dimensions: Text justification, Underline overridden
+    /// dimensions (on), Break dimension by default (on), Fit standard (None:
+    /// the drawing's standard).
+    #[serde(default)]
+    pub dim_justify: TextJustify,
+    #[serde(default = "yes")]
+    pub underline_overridden: bool,
+    #[serde(default = "yes")]
+    pub break_dims: bool,
+    #[serde(default)]
+    pub dim_fit_ansi: Option<bool>,
+    /// Gaps and extensions › Lock the angle of all jogged dimensions to 45
+    /// degrees (off).
+    #[serde(default)]
+    pub lock_jog_45: bool,
+    /// Ordinate dimensions › Dimension style (None: the drawing's standard).
+    #[serde(default)]
+    pub ordinate_ansi: Option<bool>,
+    /// Diameter and radial dimensions › Show dimension lines by default
+    /// (None: on for ISO, off for ANSI).
+    #[serde(default)]
+    pub radial_dim_lines: Option<bool>,
     /// Tables › All tables: horizontal and vertical cell padding (mm, each
     /// side; Onshape's default is 0.06 in).
     #[serde(default = "table_padding")]
@@ -1969,6 +2052,29 @@ impl CalloutStyle {
     }
 }
 
+fn no_jogs(j: &[Option<ExtJog>; 2]) -> bool {
+    j.iter().all(Option::is_none)
+}
+
+/// A jog in a dimension's extension line (help: jogged extension lines):
+/// from `at` (fraction of the extension line from the model point) a
+/// diagonal goes `drop` mm further and `shift` mm sideways (along the
+/// dimension line); the rest of the line and the dimension line's end move
+/// by `shift`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExtJog {
+    pub at: f64,
+    pub shift: f64,
+    pub drop: f64,
+}
+
+impl ExtJog {
+    /// The jog Add jog makes: at the middle of the extension line, 45°.
+    pub fn new(shift: f64) -> Self {
+        Self { at: 0.5, shift, drop: shift.abs() }
+    }
+}
+
 /// Text justification (Callouts).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TextJustify {
@@ -2207,6 +2313,13 @@ impl Default for DrawingProps {
             target_hatch: (0, 0),
             hole_indicator: hole_indicator(),
             fit_iso: false,
+            dim_justify: TextJustify::Center,
+            underline_overridden: true,
+            break_dims: true,
+            dim_fit_ansi: None,
+            lock_jog_45: false,
+            ordinate_ansi: None,
+            radial_dim_lines: None,
             com_diameter: com_diameter(),
             dim_font: None,
             ann_font: None,
@@ -2220,6 +2333,26 @@ impl Drawing {
     /// symbols › Standard, else the drawing's standard (its sheet size).
     pub fn weld_ansi(&self) -> bool {
         self.props.weld_ansi.unwrap_or_else(|| self.sheets.first().is_none_or(|s| s.size.is_ansi()))
+    }
+
+    /// The drawing's standard is ANSI (its first sheet's size), else ISO.
+    pub fn is_ansi(&self) -> bool {
+        self.sheets.first().is_none_or(|s| s.size.is_ansi())
+    }
+
+    /// Dimensions › Fit standard ANSI (else ISO).
+    pub fn dim_fit_ansi(&self) -> bool {
+        self.props.dim_fit_ansi.unwrap_or_else(|| self.is_ansi())
+    }
+
+    /// Ordinate dimensions › Dimension style ANSI (else ISO).
+    pub fn ordinate_ansi(&self) -> bool {
+        self.props.ordinate_ansi.unwrap_or_else(|| self.is_ansi())
+    }
+
+    /// Diameter and radial dimensions › Show dimension lines by default.
+    pub fn radial_dim_lines(&self) -> bool {
+        self.props.radial_dim_lines.unwrap_or_else(|| !self.is_ansi())
     }
 
     /// "SheetN" with the smallest N not used by another sheet.

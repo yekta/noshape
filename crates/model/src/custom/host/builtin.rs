@@ -27,6 +27,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     }),
     ("opBodyDraft", |i, a| BuiltinOp { vectors: &[("pullDirection", "pullDirection")], ..BuiltinOp::new("bodyDraft", "BODY_DRAFT_FAILED") }.run(i, a, crate::regen::features::detail_a::body_draft)),
     ("opSplineThroughEdges", |i, a| BuiltinOp::new("fitSpline", "REGEN_ERROR").run(i, a, crate::regen::features::curves::fit_spline)),
+    ("opRuledSurface", op_ruled_surface),
     ("opDropCurve", |i, a| {
         let op = BuiltinOp { renames: &[("dropTools", "tools")], vectors: &[("directionQuery", "direction")], ..BuiltinOp::new("projectCurves", "REGEN_ERROR") };
         op.run(i, a, crate::regen::features::curves::project_curves)
@@ -44,11 +45,15 @@ struct BuiltinOp {
     defaults: &'static [(&'static str, ParamValue)],
     renames: &'static [(&'static str, &'static str)],
     vectors: &'static [(&'static str, &'static str)],
+    /// Parameters set by `adjust` rather than read from the op.
+    skip: &'static [&'static str],
+    /// Conversions the generic mapping can't express (definition → parameters).
+    adjust: Option<fn(&Value, &mut ParamValues)>,
 }
 
 impl BuiltinOp {
     const fn new(type_id: &'static str, failure: &'static str) -> Self {
-        BuiltinOp { type_id, failure, defaults: &[], renames: &[], vectors: &[] }
+        BuiltinOp { type_id, failure, defaults: &[], renames: &[], vectors: &[], skip: &[], adjust: None }
     }
 
     fn run(&self, i: &mut Interp, a: Vec<Value>, f: fn(&mut EvalCtx) -> FResult<()>) -> R<Value> {
@@ -88,7 +93,10 @@ impl BuiltinOp {
             p.set(param, ParamValue::Query(vec![r.clone()]));
             temp.push(r);
         }
-        let skip: Vec<&str> = self.vectors.iter().map(|(p, _)| *p).collect();
+        let skip: Vec<&str> = self.vectors.iter().map(|(p, _)| *p).chain(self.skip.iter().copied()).collect();
+        if let Some(f) = self.adjust {
+            f(&def, &mut p);
+        }
         let res = params_renamed_skipping(i, &cx, &ty.params, &def, self.renames, &skip, &mut p).and_then(|()| run_op_with(i, &cx, &id, self.failure, &p, f));
         cx.state.lock().ctx.planes.retain(|pl| !temp.contains(&pl.reference));
         res.map(|()| Value::Undefined)
@@ -181,4 +189,55 @@ fn builtin_op_with(i: &mut Interp, a: Vec<Value>, type_id: &str, failure: &str, 
     params_renamed(i, &cx, &ty.params, &def, renames, &mut p)?;
     run_op_with(i, &cx, &id, failure, &p, f)?;
     Ok(Value::Undefined)
+}
+
+/// `opRuledSurface` (std ruledSurface.fs builds it from the feature):
+/// `path`, `width` (negative = the other side), `ruledSurfaceType`
+/// ANGLE_FROM_FACE (std passes the feature's Normal as Tangent − 90°),
+/// ALIGNED_WITH_VECTOR / ANGLE_FROM_VECTOR with `ruledDirection`, `angle`.
+/// Returns a coordinate system at each `manipulatorPositions` entry.
+fn op_ruled_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    fn adjust(def: &Value, p: &mut ParamValues) {
+        let kind = def.get("ruledSurfaceType").as_str().map(|s| s.to_string()).unwrap_or_else(|| "ANGLE_FROM_FACE".into());
+        let angle = angle_of(def.get("angle")).unwrap_or(0.0);
+        match kind.as_str() {
+            "ALIGNED_WITH_VECTOR" | "ANGLE_FROM_VECTOR" => {
+                p.set("ruledType", ParamValue::Enum(kind.clone()));
+                p.set("angleFromVector", expr(format!("{angle} rad")));
+            }
+            _ => {
+                p.set("ruledType", ParamValue::Enum("TANGENT".into()));
+                p.set("angle", expr(format!("{angle} rad")));
+            }
+        }
+        let width = length_of(def.get("width")).unwrap_or(0.0);
+        p.set("distance", expr(format!("{} m", width.abs())));
+        p.set("oppositeDirection", ParamValue::Bool(width < 0.0));
+    }
+    let op = BuiltinOp {
+        renames: &[("edges", "path")],
+        vectors: &[("axis", "ruledDirection")],
+        skip: &["angle", "angleFromVector", "distance", "oppositeDirection", "ruledType", "vertexOverrides"],
+        adjust: Some(adjust),
+        ..BuiltinOp::new("ruledSurface", "RULED_SURFACE_ZERO_LENGTH")
+    };
+    let positions = def_arg(i, &a, 2)?.get("manipulatorPositions").clone();
+    let cx = context_arg(i, &a)?;
+    op.run(i, a, crate::regen::features::surfaces::ruled_surface)?;
+    // A frame at each requested edge position: origin on the edge, z along it.
+    let mut bases = Vec::new();
+    for pos in positions.as_array().iter().flat_map(|v| v.iter()) {
+        let t = pos.get("parameter").as_number().unwrap_or(0.0);
+        let frame = super::query::with_ents(i, &cx, pos.get("edge"), |_, q, ents| {
+            Ok(ents.first().and_then(|e| {
+                let s = q.shape(e)?;
+                let info = s.edge_info().ok()?;
+                let u = info.first_param + (info.last_param - info.first_param) * t;
+                Some((s.point_at(u).ok()?, s.tangent_at(u).ok()?.normalize_or_zero()))
+            }))
+        })?;
+        let (o, z) = frame.unwrap_or((glam::DVec3::ZERO, glam::DVec3::Z));
+        bases.push(coord_system_value(o, any_perpendicular(z), z));
+    }
+    Ok(Value::array(bases))
 }

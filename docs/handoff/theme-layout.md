@@ -689,6 +689,32 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   truncates to "Features …"; Add folder and Pause regeneration are grayed and inert while a dialog is
   open. `os_checkbox` boxes 8 px from the row top like live (were 7). final-fillet-new.png.
 
+## Round 11 (2026-10-20, cursor parity, lead's priority)
+
+- **Inventory**: docs/parity/cursors.md (from the bundle: the viewer's cursor stack, the image
+  cursors with their hot spots and mac/Windows variants, the CSS cursor rules by control). Live
+  capture of the ❓ states requested (REQUESTS.md 20 Oct). Onshape's cursor files can be looked at
+  for reference in /tmp/ui/cursor-ref (fetched from cad.onshape.com, never copied into the repo).
+- **Infrastructure** (cursor.rs, rewritten): `AppCursor` = `Count(1..=6)` (6 = "5+"), `Crosshair`
+  (15 px, hot 7.5), `Confirmation` (hot 1,1), `RemoveSelection`, `SnapMate` (hot 7.5), and CSS
+  standard `Move`, `ZoomIn`, `NoDrop`, `Wait`, `Help`. Image art is ours (SVG built at runtime;
+  Windows gets the white-arrow variants with hot 1,2, other OSes black arrows with hot 3,3).
+  Backends: X11 (RENDER image or the theme cursor by CSS name with fallbacks,
+  `cursor_x11::theme_names`), Wayland (patched gpui-pre-linux: `set_named_cursor` next to
+  `set_custom_cursor`; cursor-shape-v1 `css_to_shape` or theme icon names; `custom_cursor::active`),
+  macOS (`NSCursor` image; `operationNotAllowedCursor` for no-drop), Windows (`HCURSOR` image or
+  `IDC_SIZEALL/IDC_NO/IDC_WAIT/IDC_HELP`).
+- **Viewport**: `tool_cursor` (owner-set top of Onshape's stack) wins over the selection count;
+  the viewport adds Zoom to window (`zoom-in`) and Ctrl during a box select (remove-selection);
+  navigation drags keep the cursor (the bundle pushes nothing for them).
+- **Wired**: Part Studio sketch tools → crosshair (pattern tools keep the arrow), hovering a
+  dimension value → move (the label no longer sets the pointer hand); assembly selection count and
+  snap-mate while a snap drag runs (assembly_view.rs, surgical); feature dialog title = grab, a
+  disabled ✓ = not-allowed. Read back with /tmp/ui-tools/getcursor.py (XFixes).
+- Not yet: confirmation cursor states, no-drop for fixed assembly drags, analysis legend cursors,
+  drawing tools, remaining HTML rules (splitters/resizers/disabled controls/draggable headers);
+  see the ❌ rows in cursors.md.
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting

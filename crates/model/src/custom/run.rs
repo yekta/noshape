@@ -105,7 +105,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 // Other documents and versions: `ext:` keys, read through the Derived provider.
                 let file = if tab.is_empty() {
                     None
-                } else if tab.starts_with("ext:") {
+                } else if tab.starts_with("ext:") || tab.contains('/') {
                     ev.derived.as_ref().and_then(|d| d.file(tab))
                 } else {
                     provider.and_then(|p| p.file(tab))

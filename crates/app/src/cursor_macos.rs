@@ -1,8 +1,11 @@
-//! macOS backend of the selection-count cursor (see cursor.rs): an
-//! `NSCursor` made from the image. GPUI re-sets its cursor through cursor
-//! rects only when the hovered style changes; the viewport re-applies ours.
+//! macOS backend of the graphics-area cursors (see cursor.rs): an `NSCursor`
+//! made from the image, or AppKit's own cursor where Chrome uses one
+//! (`no-drop` = `operationNotAllowedCursor`; Chrome draws move and zoom-in
+//! itself, and so do we). GPUI re-sets its cursor through
+//! cursor rects only when the hovered style changes; the viewport re-applies
+//! ours.
 
-use super::CursorImage;
+use super::{AppCursor, CursorImage};
 use image::ImageEncoder as _;
 use objc2::AllocAnyThread as _;
 use objc2::rc::Retained;
@@ -13,7 +16,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 thread_local! {
-    static CURSORS: RefCell<HashMap<(usize, u32), Retained<NSCursor>>> = RefCell::new(HashMap::new());
+    static CURSORS: RefCell<HashMap<(AppCursor, u32), Retained<NSCursor>>> = RefCell::new(HashMap::new());
 }
 
 fn make(img: &CursorImage, scale: u32) -> Option<Retained<NSCursor>> {
@@ -29,25 +32,29 @@ fn make(img: &CursorImage, scale: u32) -> Option<Retained<NSCursor>> {
     let ns = NSImage::initWithData(NSImage::alloc(), &data)?;
     let pts = img.side as f64 * 100.0 / scale.max(1) as f64;
     ns.setSize(NSSize::new(pts, pts));
-    let hot = img.hot as f64 * 100.0 / scale.max(1) as f64;
-    Some(NSCursor::initWithImage_hotSpot(NSCursor::alloc(), &ns, NSPoint::new(hot, hot)))
+    let k = 100.0 / scale.max(1) as f64;
+    Some(NSCursor::initWithImage_hotSpot(NSCursor::alloc(), &ns, NSPoint::new(img.hot.0 as f64 * k, img.hot.1 as f64 * k)))
 }
 
-pub fn set(raw: RawWindowHandle, scale: u32, count: Option<usize>, image: &mut dyn FnMut(usize) -> Option<CursorImage>) -> bool {
+pub fn set(raw: RawWindowHandle, scale: u32, cursor: Option<AppCursor>, image: &mut dyn FnMut(AppCursor, bool) -> Option<CursorImage>) -> bool {
     if !matches!(raw, RawWindowHandle::AppKit(_)) {
         return false;
     }
-    match count {
+    match cursor {
         None => {
             NSCursor::arrowCursor().set();
             true
         }
-        Some(n) => CURSORS.with(|c| {
-            let mut c = c.borrow_mut();
-            let cur = match c.entry((n, scale)) {
+        Some(AppCursor::NoDrop) => {
+            NSCursor::operationNotAllowedCursor().set();
+            true
+        }
+        Some(c) => CURSORS.with(|m| {
+            let mut m = m.borrow_mut();
+            let cur = match m.entry((c, scale)) {
                 std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
                 std::collections::hash_map::Entry::Vacant(e) => {
-                    let Some(cur) = image(n).and_then(|img| make(&img, scale)) else { return false };
+                    let Some(cur) = image(c, false).and_then(|img| make(&img, scale)) else { return false };
                     e.insert(cur)
                 }
             };

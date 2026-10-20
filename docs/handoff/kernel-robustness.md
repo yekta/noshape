@@ -339,6 +339,63 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
   configuration choice, file units), **G34d** (Make joint on one sheet-metal part via Convert).
 - **Live requests**: G33c retry pending; G35-retry and G37 answered (G37 applied above); G34c superseded by G34d.
 
+### Round 7 (2026-10-20): thread faces, mass properties, JT / 3MF / glTF, CATIA & Creo report
+- **Ring faces get our own seams** (`xt_read.cpp::seam_ring`, in `heal_import` before ShapeFix): Parasolid's periodic
+  faces have no seam edge; ShapeFix's FixMissingSeam seams along a u iso-line and so cut a face bounded by a helix
+  over 16 turns (a thread's crest) into one piece per turn (McMaster screw: 41 faces, Onshape 25). A ring face (two
+  loops winding ±1) is now joined by a seam running straight in (u, v) between the loops' closest vertices, reusing
+  the face's edges (topology as in the file), pcurves one period apart, kept only if BRepCheck passes. McMaster/NX
+  screws now have Onshape's face counts (25, 32…).
+- **Mass properties of such faces** (`common.cpp`: `volume_props`, new `surface_props` used by `props_surface`):
+  OCCT's integrators take Green's inner integral across the whole u range of a face wrapping 16 turns: Gauss
+  268.69 mm³, adaptive 254.1–255.7 (unstable with its tolerance) for the screw. When a face wraps its periodic
+  surface more than once, every face of the shape is integrated by our own Green's-formula quadrature (inner
+  integral by whole periods + remainder, Gauss segments of a sixteenth of a period / half a knot span, halved;
+  converged to ~1e-7) — every face, because OCCT's per-face terms use a different divergence field and can't be
+  mixed with ours. Screw: **254.42322 mm³** (Onshape 254.40378), area 407.646 (Onshape 407.578; mesh 407.640).
+  `native_cad_parts` ungated, against Onshape's G38 numbers.
+- **3MF / glTF / GLB as mesh bodies** (`cpp/mesh_formats.cpp`, through `read_mesh_bodies`, app extensions): 3MF
+  objects/components/build items with transforms and the file's unit; glTF 2.0 default scene (matrix or TRS), triangle
+  primitives, GLB chunk / base64 / sibling buffer files (name only, no paths out of the folder); millimetres. Test
+  `mesh_import.rs::mesh_formats_3mf_gltf`. Not verified against Onshape (no samples imported there yet).
+- **JT import** (`cpp/jt_read.cpp`, `read_jt_parts`, app .jt): header + TOC (32-bit offsets before JT 10, 64-bit
+  after), every XT B-rep segment (type 17) decompressed — zlib, or **XZ/LZMA2** for JT 10 (`cpp/xz_read.cpp`, our own
+  decoder from the .xz/LZMA specs, bounds-checked, no new crate) — and read by the Parasolid reader. Our 12 JT exports
+  back exactly; NIST's NX JT 10.5 assembly gives its 7 parts with the native files' volumes (polycarb = Onshape).
+  **Placed by the scene graph**: the LSG's nodes (JT 10 versions are single bytes, JT 8/9 two), Geometric Transform
+  attributes (mask bit 15−i = element i stored; F64 after a 10-byte attribute header in JT 10, F32 after 7 in JT 8/9;
+  row vectors, translation in the file's unit — the property atom that is exactly "millimeters" etc.), composed from the
+  partition down; each Part node names its segments in the property table (JT_LLPROP_XTBREP, and JT 10's
+  JT_LLPROP_MULTIXTBREP → type-30 "multi XT" segments, where NIST's box lives); a copy per instance path. NIST's
+  assembly: 36 placed parts, every nut on its screw's axis. A scene graph that doesn't parse falls back to unplaced
+  parts. Tessellation-only JT fails with a clear message.
+- **Parasolid V9 / V11** (1999–2001 Unigraphics files, `SCH_901209_9008`, `SCH_1100203_11004`): still unreadable.
+  No schema is embedded and none is documented (`sch_9008` ships only with Parasolid); our 12006 layouts fail at
+  BODY (V9's starts with a node count). The pointer-checked search (`/root/kern-scratch/xt/infer_v9.py`, subsets of the
+  13006 layouts) is too slow as is (>15 min, no result); needs a token-kind-guided search. Onshape imports these in
+  metres (hub ~0.9 m across, 23 faces, 38799753.35 mm³ = the check). Low priority.
+- **CATIA V5 / Creo — what's feasible** (samples /root/kern-native-samples/{catpart,catproduct,creo_prt,creo_asm}):
+  - CATIA V5 (.CATPart, `V5_CFV2` container): named containers `CATBRepModeContainer` / `CGMGeom` / `CATMFBRP` hold
+    the exact B-rep in Dassault's CGM object stream (proprietary, binary, no embedded neutral format), `CATCGRCont` the
+    cached tessellation (CGR), plus a JPEG preview. Exact import = reverse-engineering CGM: very large, open-ended.
+    Feasible: a **mesh import from the CGR cache** (CGR format to reverse-engineer: days), as mesh parts.
+  - Creo (.prt/.asm, `#UGC:2 PART …`): a tagged stream with readable field names (`feat_id`, `local_sys`,
+    `outline`, `dl_header` display lists, `ModelView`) and doubles written as hex; geometry in PTC's own structures
+    (Granite), no Parasolid/ACIS inside. Exact import is reverse-engineerable in principle (the stream is
+    self-describing) but large (weeks: surfaces, curves, topology, many versions); a mesh from the display lists is the
+    smaller step.
+  - Onshape imports both exactly through licensed translators; matching that needs the exact paths. Recommendation:
+    mesh fallbacks first if the lead wants these formats, exact Creo later; exact CATIA only with much more time.
+- **Rhino import verified** (`rhino_read.cpp`, built against /root/opennurbs in the scratch harness — the shared
+  target builds without openNURBS): fixed openNURBS proxies (edges/trims are a sub-domain of their curve, maybe
+  reversed) and trim parameterization (each trim reparametrized onto its edge's range, SameParameter refines); healing
+  through `heal_import`. All 12 of our .3dm exports come back valid, named, coloured, with exact volumes (through
+  `volume_props`; OCCT's plain Gauss is +0.9 % on the rational cylinders). `export.rs::rhino_breps_are_valid` now also
+  reads each v8 file back (runs where openNURBS is built: CI).
+- Tests this round: kernel suite green (export 11 + 1 ignored sample writer; mesh_import 4; blend, features, …), model
+  suite green but for another agent's in-progress isocline tests in `custom_features.rs`; clippy `-D warnings` clean
+  for noshape-kernel and noshape-model (`--no-deps`).
+
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,
 shell.rs), `noshape-model` (kernel_robustness.rs 14/14), `noshape` app (`cargo check` clean). Nothing half-done;

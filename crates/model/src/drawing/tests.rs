@@ -1431,3 +1431,38 @@ export const partFaces = defineTable(function(context is Context, definition is 
     assert_eq!(d2.rows.last().map(|r| &r[0]), data.rows.first().map(|r| &r[0]));
     assert_eq!((d2.rows[0][2].as_str(), d2.overridden.as_slice()), ("edited", &[(0, 2)][..]));
 }
+
+#[test]
+fn jogged_extension_lines_and_broken_dimensions() {
+    use super::sheet::{GripKind, PlainEnv, SheetGeometry};
+    let drawing = Drawing::default();
+    let env = PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let dim = |id: u64, a: [f64; 2], b: [f64; 2], offset: f64| Annotation { id, kind: AnnotationKind::LinearDimension { view: ViewId(1), a, b, offset, orientation: DimOrientation::Horizontal, override_text: None }, ..Default::default() };
+    // A: 0..100 mm, line at y = -30; B: 20..80 mm from y = 10, line at
+    // y = -40: B's extension lines cross A's dimension line.
+    let mut sheet = Sheet::default();
+    sheet.annotations.push(dim(1, [0.0, 0.0], [0.1, 0.0], -30.0));
+    sheet.annotations.push(dim(2, [0.02, 0.01], [0.08, 0.01], -50.0));
+    let lines_of = |g: &SheetGeometry, id: u32| g.lines.iter().filter(|l| l.pick == id).count();
+    let mut g = SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&sheet, &env);
+    // Both broken (the default): only the first one gets the gaps — its
+    // dimension line in three pieces, B unchanged (2 extension lines + line).
+    assert_eq!(lines_of(&g, 1), 2 + 3);
+    assert_eq!(lines_of(&g, 2), 3);
+    // Unbreak A: B's extension lines are cut instead.
+    sheet.annotations[0].unbroken = true;
+    let mut g = SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&sheet, &env);
+    assert_eq!((lines_of(&g, 1), lines_of(&g, 2)), (3, 2 * 2 + 1));
+    // Add jog on A's first extension line: a diagonal at the middle, the
+    // dimension line's end moves 5 mm out, two snap points.
+    sheet.annotations[0].jogs[0] = Some(ExtJog::new(-5.0));
+    let mut g = SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&sheet, &env);
+    let jog = g.lines.iter().find(|l| l.pick == 1 && l.points.len() == 4).expect("jogged extension line");
+    let [x0, x1] = [jog.points[1][0], jog.points[2][0]];
+    assert!((x0 - 0.0).abs() < 1e-9 && (x1 + 5.0).abs() < 1e-9, "{:?}", jog.points);
+    assert!((jog.points[1][1] + 15.0).abs() < 1e-9 && (jog.points[2][1] + 20.0).abs() < 1e-9, "45° jog from the middle: {:?}", jog.points);
+    assert_eq!(g.grips.iter().filter(|gr| gr.pick == 1 && gr.kind == GripKind::Jog).count(), 2);
+}

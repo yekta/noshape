@@ -243,8 +243,10 @@ pub struct Highlights {
     pub value_arcs: Vec<ValueArc>,
     /// Selected mate's translation values.
     pub value_lines: Vec<ValueLine>,
-    /// Curve/surface analysis combs (world coordinates).
-    pub analysis_lines: Option<LineData>,
+    /// Interference detection: overlapping material (world), drawn red over
+    /// the see-through parts, and the hovered overlap's bounding box.
+    pub red_meshes: Vec<MeshHandle>,
+    pub boxes: Vec<(DVec3, DVec3)>,
 }
 
 /// A mate's translation value as a linear dimension: a dashed blue line from
@@ -449,8 +451,13 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             }
         }
     }
-    if let Some(extra) = &h.analysis_lines {
-        lines.segments.extend(extra.segments.iter().cloned());
+    // Interference detection: the hovered overlap's box (live analysis/83:
+    // the query-hover yellow, ~6 px).
+    for (lo, hi) in &h.boxes {
+        let c = |k: usize| DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z });
+        for (a, b) in [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)] {
+            lines.segments.push(LineSegment { a: c(a).as_vec3().into(), b: c(b).as_vec3().into(), color: [242, 255, 128, 255], pick_id: 0, width: 6.0, style: LineSegment::ON_TOP });
+        }
     }
     for (a, b) in &h.trails {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
@@ -462,6 +469,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
+    }
+    // The interfering material, red, drawn after the see-through parts
+    // (its faces are coplanar with theirs; live assembly/736).
+    for m in &h.red_meshes {
+        scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(theme::lin(0xc71010)).over_transparent().unpickable().layer(19));
     }
     // Pickable overlays: origin, assembly mate connectors, manipulator.
     let mut ol = LineData::default();

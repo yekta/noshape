@@ -534,7 +534,59 @@ new render flags into `DrawMode` rather than new arguments.
   with Show hidden inputs; ?, undo, redo, Save (valid + changed), Cancel. Opened from the Part
   Studio box button, the input ⋯ › Visibility conditions…, the input's visibility icon, and asb's
   assembly box button (small change in assembly_config.rs). The Part Studio box hides hidden inputs
-  and options. Not yet: the Insert dialogs and the assembly's own evaluation honouring the
-  conditions (asb), the panel's other ⋯ items (Copy table, Copy input, Input propagation…).
+  and options. Assemblies and the panel's ⋯ items: Pass 10.
 - Clippy: `UiState.consumed_lines` now uses `ConsumedLines` (type_complexity).
 - Build fixes in others' files while they were stuck: `Selectable as _` import in drawing_gdt.rs.
+
+## Pass 10 (20 Oct, lead's round 3)
+
+- **Part export options** (export.rs): `open_export_modal_with(base, assembly, parts_only, …)`;
+  exporting parts (parts list, release rows) drops "Export unique parts as individual files" and
+  "Include hidden instances in export", and one part is named "<Part Studio> - <Part>", as live.
+  `open_export_modal` (tabs) is unchanged. Verified from the parts list, a workspace release row and a
+  V1 release row (Add items › Current document › Version graph › V1 › Part 1; the row's Export opens
+  the read-only version window, then the dialog). Live request psb (10-20 k): the navbar of a version
+  window (ours says "History" + VIEWING HISTORY for every read-only view — workspace.rs:443).
+- **Create version… in Add Items to Release** did nothing (an action dispatched from the dialog layer
+  never reaches the Workspace): `release_add_source::create_version` now calls
+  `history_panel::open_create_version` directly.
+- **Configurations panel menus** (config_panel.rs + new input_propagation.rs): input ⋯ = Copy table,
+  Copy input, Move up/down, Rename, Visibility conditions…, Input propagation…, Delete; panel ⋯ =
+  Copy all inputs, Collapse/Expand all inputs; Paste inputs in the Configure Part Studio ▾ / Add
+  configuration input ▾ / box ▾ menus while inputs are copied (`config_visibility::copy_inputs` /
+  `copied_inputs`, an app-wide static: Onshape keeps them for the session; same ids are skipped).
+  Copy table writes TSV (feature names row, "Name" + parameter labels, one row per option).
+- **Derived from a configured Part Studio**: `DerivedSource.configuration`; the Derived dialog shows the
+  source's List/Checkbox inputs (visibility-filtered) and stores them as `configuration:<id>` params
+  (`importing::DERIVED_CONFIG_PREFIX`; ":" because the dialog reads "a.b" as array paths);
+  `DerivedProvider::context_configured` (default = `context`) and `DocStudios::context_configured`
+  regenerate the source with those values (cached per tab + values, same circular guard).
+- **Input propagation…**: candidates are Derived features whose source has an input with the same id
+  and kind (copied inputs keep their id); the dialog ("Input propagation for <studio>", References /
+  Configuration checkboxes, "N new inputs to propagate", Confirm) adds a configured column
+  `configuration:<id>` mapping each option to itself; its cells are option selects, its header
+  "<Derived 1> / Configuration". Verified with Pin (Length Standard/Long) derived into Part Studio 1.
+- **Visibility conditions in assemblies** (surgical, noted in assembly-behaviour.md): evaluation already
+  went through `effective`; the assembly box, the Insert dialog's configured rows and the instance's
+  Change configuration panel now skip hidden inputs/options. Test
+  `assembly_configuration_respects_visibility`.
+- **Search tools popover** (view_tools.rs): anchored at the window's right edge 10 px under the
+  toolbar (`UiState.palette_top` probe) and deferred, so it draws over the feature list and right
+  panels (it was clipped under the feature list while a right panel was open).
+- Others' files fixed while they blocked the build: `Disableable as _` import in drawing_custom_table.rs.
+- Not done: input ⋯ "Edit FeatureScript IDs…" and "Exclude from properties"; the live answers
+  psb (10-20 j/k).
+- **Measure (lead via skb, 20 Oct)**: `regen::measure::measure_shapes` holds the rules for both Part
+  Studios and assemblies (`assembly::analysis::measure_entities` now calls it): single entities as
+  before but Radius/Diameter first; pairs get the priority/angular row first like the client's
+  `setMeasurements` (bundle: `GBTAngularMeasureDisplayData` rows and Diameter / Radius / Parallel
+  (axis) distance move to the front; arc lengths to the back): planes → "Parallel dist" or "Perp planes
+  angle", cylinder axes → "Parallel axes dist" / "Perp axes angle", lines → "Parallel dist" / "Perp lines
+  angle", line + plane → "Perp line and plane angle"; then "Area" / "Length" totals, "Min dist" (was
+  "Distance"), "Center dist" with a circle/sphere. Only the plane labels and Min dist are live-confirmed;
+  request psb (10-20 m). skb's `measure_context` routing is untouched.
+- **Mass properties**: `mass_properties` now moves each part's inertia to the joint centre
+  (`combined_inertia`, parallel-axis term); test against two boxes by hand. The assembly version
+  already did this.
+- Feature dialog checkboxes: long labels wrap inside the 220 px dialog (label in a shrinkable div;
+  rows keep 27 px min height). Live check requested (psb 10-20 l).

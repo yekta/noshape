@@ -1641,6 +1641,8 @@ impl AssemblyView {
         let Some(inst) = self.assembly(cx).and_then(|a| a.instance(top).cloned()) else { return };
         let studio_inputs = |doc: &Document, tab: TabId| match doc.tab(tab).map(|t| &t.content) {
             Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+            // Another document's Assembly (External key on an Assembly tab).
+            Some(TabContent::Assembly(a)) => a.configuration.inputs.clone(),
             _ => vec![],
         };
         let (inputs, values) = match &inst.source {
@@ -2572,6 +2574,27 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The Insert dialog's "Search Part Studios" / "Search Assemblies" box;
+    /// the placeholder is italic (live 320, 612).
+    pub(super) fn insert_search_box(&self, cx: &App) -> Option<AnyElement> {
+        let st = self.ui.insert_search.as_ref()?;
+        let empty = st.read(cx).value().is_empty();
+        let ph = if self.ui.insert_tab == 0 { "Search Part Studios" } else { "Search Assemblies" };
+        Some(
+            div()
+                .pt(px(6.))
+                .px(px(6.))
+                .pb(px(6.))
+                .child(
+                    div()
+                        .relative()
+                        .child(Input::new(st).small().cleanable(true))
+                        .when(empty, |d| d.child(div().absolute().left(px(9.)).top_0().bottom_0().flex().items_center().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child(ph))),
+                )
+                .into_any_element(),
+        )
+    }
+
     /// Expand a Part Studio of the opened document: its parts (background).
     fn expand_other_studio(&mut self, tab: String, cx: &mut Context<Self>) {
         let Some(d) = &mut self.ui.insert_other_doc else { return };
@@ -2736,18 +2759,14 @@ impl AssemblyView {
                     .text_color(if on { pal.accent } else { pal.text })
                     .when(on, |d| d.font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                     .child(label)
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.ui.insert_tab = ix;
-                        let ph = if ix == 0 { "Search Part Studios" } else { "Search Assemblies" };
-                        if let Some(st) = &this.ui.insert_search {
-                            st.update(cx, |s, cx| s.set_placeholder(ph, window, cx));
-                        }
                         cx.notify();
                     }))
             };
             col = col.child(h_flex().h(px(32.)).border_b_1().border_color(rgb(0xeeeeee)).child(dtab("ins-other-ps", "Part Studios", 0, cx)).child(dtab("ins-other-asm", "Assemblies", 1, cx)));
-            if let Some(st) = &self.ui.insert_search {
-                col = col.child(div().pt(px(6.)).px(px(6.)).pb(px(6.)).child(Input::new(st).small().cleanable(true)));
+            if let Some(b) = self.insert_search_box(cx) {
+                col = col.child(b);
             }
             // Unversioned work in the document (live 612).
             if d.changes > 0 {
@@ -2787,7 +2806,14 @@ impl AssemblyView {
             if tabs.is_empty() {
                 col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(if tab == 0 { "No Part Studios available." } else { "No Assemblies available." }));
             }
-            let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, name: String, cx: &App| {
+            // Pictures of the shown Part Studios and their parts (as the
+            // Current document tab's), rendered in the background.
+            for (t, _, is_asm) in &tabs {
+                if let (false, Some(k)) = (*is_asm, d.key(t)) {
+                    self.request_external_thumbs(k, cx);
+                }
+            }
+            let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
                 h_flex()
                     .id(id)
                     .flex_none()
@@ -2796,13 +2822,21 @@ impl AssemblyView {
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.row_hover))
                     .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
-                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(&icon_path(icon), 28., cx)))
+                    .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                        Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                        None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
+                    }))
                     .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
             };
             for (t, name, is_asm) in tabs {
                 let key = d.key(&t);
                 if is_asm {
-                    col = col.child(item_row(SharedString::from(format!("ins-other-a-{t}")), 0., None, "sub-assembly", name, cx));
+                    let (k2, n2) = (key.clone(), name.clone());
+                    col = col.child(item_row(SharedString::from(format!("ins-other-a-{t}")), 0., None, "sub-assembly", None, name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(k) = k2.clone() {
+                            this.insert_external_assembly(k, n2.clone(), cx);
+                        }
+                    })));
                     continue;
                 }
                 let open = d.expanded.contains(&t);
@@ -2816,7 +2850,8 @@ impl AssemblyView {
                     }))
                     .into_any_element();
                 let (k2, n2) = (key.clone(), name.clone());
-                col = col.child(item_row(SharedString::from(format!("ins-other-s-{t}")), 0., Some(expander), "part-studio", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let studio_thumb = key.as_deref().and_then(|k| self.external_thumb(k, None));
+                col = col.child(item_row(SharedString::from(format!("ins-other-s-{t}")), 0., Some(expander), "part-studio", studio_thumb, name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(k) = k2.clone() {
                         this.insert_external(k, None, n2.clone(), cx);
                     }
@@ -2825,7 +2860,8 @@ impl AssemblyView {
                     for (i, (b, pname)) in d.parts.get(&t).cloned().unwrap_or_default().into_iter().enumerate() {
                         let k3 = key.clone();
                         let n3 = pname.clone();
-                        col = col.child(item_row(SharedString::from(format!("ins-other-p-{t}-{i}")), 14., None, "part", pname, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let part_thumb = key.as_deref().and_then(|k| self.external_thumb(k, Some(&b)));
+                        col = col.child(item_row(SharedString::from(format!("ins-other-p-{t}-{i}")), 14., None, "part", part_thumb, pname, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if let Some(k) = k3.clone() {
                                 this.insert_external(k, Some(b.clone()), n3.clone(), cx);
                             }
@@ -3053,6 +3089,21 @@ impl AssemblyView {
             });
         })
         .detach();
+    }
+
+    /// Insert › Other documents › Assemblies: the other document's Assembly
+    /// as one subassembly instance, pinned to the chosen version (it lists
+    /// in the Reference manager like the other document's parts).
+    fn insert_external_assembly(&mut self, key: String, name: String, cx: &mut Context<Self>) {
+        let id = self.edit(&format!("Insert : {name} (other document)"), cx, |a| {
+            let id = InstanceId(a.next_id());
+            let n = a.next_instance_name(&name);
+            a.instances.push(Instance::new(id, n, InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, Placement::default()));
+            id
+        });
+        if let Some(id) = id {
+            self.start_placing(vec![id], cx);
+        }
     }
 
     /// Look up (in the background) whether external references have newer versions.

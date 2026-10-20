@@ -104,6 +104,10 @@ pub struct DiagnosticColors {
     pub hint: Hsla,
 }
 
+/// NOSHAPE PATCH: when the app sets `DiagnosticColors` as a global, code
+/// editors underline diagnostics in these colors instead of the theme's.
+impl gpui::Global for DiagnosticColors {}
+
 /// Application-owned colors and highlight resolver consumed by editor painting.
 #[derive(Clone)]
 pub struct InputEditorStyle {

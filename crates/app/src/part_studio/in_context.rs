@@ -69,6 +69,10 @@ type StudioAct = Rc<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartSt
 /// assembly/504, 506).
 const CONTEXT_REF_FILL: u32 = 0xc573e4;
 const CONTEXT_REF_OUTLINE: [u8; 4] = crate::theme::rgb8(0xdc62f7);
+/// A selected context face outside a dialog: amber at 80 % over the
+/// see-through face (blended in linear light; fitted to live assembly/706–707).
+const CONTEXT_SELECTED_FILL: u32 = 0xe9b94d;
+const CONTEXT_SELECTED_ALPHA: f32 = 0.8;
 
 /// The boundary polylines of face `fi`: the mesh edges whose points all
 /// lie on the face's triangles.
@@ -158,14 +162,20 @@ impl PartStudioView {
                 outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::SELECTION), &mut lines);
             }
         }
-        // The see-through context faces don't show the usual hover / selection
-        // tint: a hovered one gets the preselection outline (`#ffc685`, live
-        // assembly/503), a selected one (outside a dialog) the selection outline.
+        // The see-through context faces don't show the usual hover tint: a
+        // hovered one gets the preselection outline (`#ffc685`, live
+        // assembly/503, 703); a selected one (outside a dialog) a translucent
+        // amber fill and the selection outline (live 706–707).
+        let mut selected: Vec<MeshData> = Vec::new();
         if self.edit.is_none() {
             for r in selection {
-                if let Some((b, fi)) = face(r) {
-                    outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::SELECTION), &mut lines);
+                let Some((b, fi)) = face(r) else { continue };
+                let m = &b.mesh;
+                if let Some(&(first, count)) = m.face_ranges.get(fi) {
+                    let indices = m.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]).to_vec();
+                    selected.push(MeshData { positions: m.positions.clone(), normals: m.normals.clone(), pick_ids: vec![0; m.positions.len()], indices });
                 }
+                outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::SELECTION), &mut lines);
             }
         }
         if let Some((b, fi)) = self.hover.as_ref().filter(|r| !selection.contains(r)).and_then(&face) {
@@ -184,10 +194,28 @@ impl PartStudioView {
         }
         let up = self.gpu.uploader();
         let mut out: Vec<noshape_render::Instance> = fills.iter().map(|m| noshape_render::Instance::new(Drawable::Mesh(up.upload_mesh(m))).with_color(crate::theme::lin(CONTEXT_REF_FILL)).unlit().unpickable().layer(8)).collect();
+        let [r, g, b, _] = crate::theme::lin(CONTEXT_SELECTED_FILL);
+        out.extend(selected.iter().map(|m| noshape_render::Instance::new(Drawable::Mesh(up.upload_mesh(m))).with_color([r, g, b, CONTEXT_SELECTED_ALPHA]).unlit().unpickable().layer(8)));
         if !lines.segments.is_empty() {
             out.push(noshape_render::Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
         }
         out
+    }
+
+    /// What the measure readout measures: the regenerated model, plus the
+    /// shown Assembly context's bodies when a context entity is selected
+    /// (live assembly/706–707: "Area", "Perp planes angle" of ghost faces).
+    pub(super) fn measure_context(&self, selection: &[Reference], cx: &App) -> Option<Arc<noshape_model::regen::context::Context>> {
+        let base = self.context.clone()?;
+        let ghost = |r: &Reference| self.display.context_bodies.iter().any(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r));
+        if !selection.iter().any(ghost) {
+            return Some(base);
+        }
+        let studio = self.studio(cx)?;
+        let c = studio.contexts.iter().find(|c| Some(c.id) == studio.active_context)?;
+        let mut ctx = (*base).clone();
+        ctx.bodies.extend(c.regen_bodies());
+        Some(Arc::new(ctx))
     }
 
     /// Context graphics: the other instances, translucent.

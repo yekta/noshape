@@ -454,6 +454,8 @@ struct FoldIconLayout {
     line_number_hitbox: Hitbox,
     /// List of (display_row, is_folded, icon_element) pairs for each fold candidate
     icons: Vec<(usize, bool, gpui::AnyElement)>,
+    /// NOSHAPE PATCH: the diagnostic markers (`GutterMarkerRenderer`), always shown.
+    markers: Vec<gpui::AnyElement>,
 }
 
 pub(super) struct TextElement<M: InputModeKind> {
@@ -1328,6 +1330,7 @@ impl<M: InputModeKind> TextElement<M> {
         let mut icon_layout = FoldIconLayout {
             line_number_hitbox,
             icons: vec![],
+            markers: self.layout_gutter_markers(origin_x, bounds, last_layout, window, cx),
         };
 
         let fold_infos: Vec<FoldInfo> = {
@@ -1445,6 +1448,63 @@ impl<M: InputModeKind> TextElement<M> {
         icon_layout
     }
 
+    /// NOSHAPE PATCH: one marker per visible line that has diagnostics (the
+    /// most severe one's), 2 px into the gutter and centred on the line's
+    /// first row, built by the app's `GutterMarkerRenderer`.
+    fn layout_gutter_markers(
+        &self,
+        origin_x: Pixels,
+        bounds: &Bounds<Pixels>,
+        last_layout: &LastLayout,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<gpui::AnyElement> {
+        use crate::input::DiagnosticSeverity as S;
+        const MARKER: Pixels = px(16.);
+        let Some(render) = cx.try_global::<crate::input::GutterMarkerRenderer>().map(|r| r.0.clone()) else {
+            return Vec::new();
+        };
+        let rank = |s: S| match s {
+            S::Error => 3,
+            S::Warning => 2,
+            S::Info => 1,
+            S::Hint => 0,
+        };
+        let rows: Vec<(Pixels, S)> = {
+            let state = self.state.read(cx);
+            let Some(diagnostics) = state.mode.diagnostics().filter(|d| !d.is_empty()) else {
+                return Vec::new();
+            };
+            // A diagnostic marks the line it starts on.
+            let mut worst = std::collections::HashMap::<usize, S>::new();
+            for entry in diagnostics.iter() {
+                let line = state.text.offset_to_point(entry.range.start).row;
+                let slot = worst.entry(line).or_insert(entry.severity);
+                if rank(entry.severity) > rank(*slot) {
+                    *slot = entry.severity;
+                }
+            }
+            let mut rows = Vec::new();
+            let mut offset_y = last_layout.visible_top;
+            for (line, buffer_line) in last_layout.lines.iter().zip(last_layout.visible_buffer_lines.iter()) {
+                if let Some(&severity) = worst.get(buffer_line) {
+                    rows.push((offset_y, severity));
+                }
+                offset_y += line.wrapped_lines.len() * last_layout.line_height;
+            }
+            rows
+        };
+        let line_height = last_layout.line_height;
+        rows.into_iter()
+            .map(|(offset_y, severity)| {
+                let mut marker = gpui::div().size(MARKER).flex().items_center().justify_center().child(render(severity, cx)).into_any_element();
+                let origin = point(origin_x + px(2.), bounds.origin.y + offset_y + (line_height - MARKER).half());
+                marker.prepaint_as_root(origin, size(MARKER, MARKER).into(), window, cx);
+                marker
+            })
+            .collect()
+    }
+
     /// Paint fold icons using prepaint hitboxes.
     ///
     /// This handles:
@@ -1470,6 +1530,10 @@ impl<M: InputModeKind> TextElement<M> {
                     cx.notify(entity_id);
                 }
             });
+        }
+        // NOSHAPE PATCH: diagnostic markers first, always visible.
+        for marker in fold_icon_layout.markers.iter_mut() {
+            marker.paint(window, cx);
         }
         for (display_row, is_folded, icon) in fold_icon_layout.icons.iter_mut() {
             let is_current_line = current_row == Some(*display_row);
@@ -2250,12 +2314,14 @@ impl<M: InputModeKind> TextElement<M> {
             flush_range(start_line, line, false, &mut styles);
         }
 
+        // NOSHAPE PATCH: the app's `DiagnosticColors` global first.
+        let diagnostic_colors = cx.try_global::<crate::input::DiagnosticColors>().copied().unwrap_or(state.editor_style.diagnostics);
         let diagnostic_styles: Vec<_> = diagnostics
             .range(visible_byte_range.clone())
             .map(|entry| {
                 (
                     entry.range.clone(),
-                    diagnostic_highlight_style(entry.severity, state.editor_style.diagnostics),
+                    diagnostic_highlight_style(entry.severity, diagnostic_colors),
                 )
             })
             .collect();

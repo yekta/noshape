@@ -673,7 +673,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, window: &mut 
         os::modal(dialog, "", 950.)
             .title(title)
             .child(version_dialog_body(&name, &desc, None))
-            .when(has_fs, |d| d.child(publish_row(publish.clone())))
+            .when(has_fs, |d| d.child(publish_row(publish.clone(), cx)))
             .footer(
                 os::modal_footer()
                     .child(os::modal_ok(os::primary_button("ok", "Create")))
@@ -794,7 +794,7 @@ fn version_dialog_title_in(doc_name: &str, workspace: &str) -> AnyElement {
 /// "☐ Publish custom features and tables  *Allow searches…*  ?" (live dom
 /// fs-refpanel2-create-version-current: 10 px padding, `#eaeaea` rule
 /// above, bold label, italic hint, help icon at the right).
-fn publish_row(on: Rc<std::cell::Cell<bool>>) -> AnyElement {
+fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
     let pal = p();
     let checked = on.get();
     h_flex()
@@ -808,7 +808,7 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>) -> AnyElement {
         .child(os::checkbox("publish-fs-box", "", checked))
         .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Publish custom features and tables"))
         .child(div().flex_1().text_size(px(14.)).italic().text_color(pal.text).child("Allow searches for published FeatureScript to find custom features and tables defined in this version"))
-        .child(div().id("publish-fs-help").size(px(16.)).flex_none().tooltip(crate::ui::tooltip("Published custom features and tables can be found with the advanced search's Published FeatureScript criterion")).child(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("help-faint")).size(px(16.))))
+        .child(div().id("publish-fs-help").size(px(16.)).flex_none().tooltip(crate::ui::tooltip("Published custom features and tables can be found with the advanced search's Published FeatureScript criterion")).child(crate::assets::icon("help-faint", 16., cx)))
         .on_click(move |_, window, _| {
             on.set(!on.get());
             window.refresh();
@@ -850,7 +850,7 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
         let (doc, key, on2) = (doc.clone(), key.clone(), on.clone());
         os::modal(dialog, "", 950.)
             .title(version_dialog_title("Publish FeatureScript", &name))
-            .child(publish_row(on.clone()))
+            .child(publish_row(on.clone(), cx))
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {
                 let v: Option<&[u8]> = if on2.get() { Some(b"1") } else { None };

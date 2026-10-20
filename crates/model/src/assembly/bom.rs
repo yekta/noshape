@@ -230,6 +230,15 @@ pub enum BomSource {
     Standard(StandardSpec),
     /// A subassembly (Assembly tab of this document).
     Assembly(TabId),
+    /// An Assembly of another document (read-only properties).
+    ExternalAssembly { key: String, config: ConfigValues },
+}
+
+impl BomSource {
+    /// A subassembly row (this document's or another's).
+    pub fn is_assembly(&self) -> bool {
+        matches!(self, BomSource::Assembly(_) | BomSource::ExternalAssembly { .. })
+    }
 }
 
 /// One BOM row.
@@ -321,6 +330,13 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
                     out.push(Use { source: BomSource::Part { studio: *studio, body: o.body.clone(), config: config.clone(), mirrored: false }, name: o.body_name.clone(), path: path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
                 }
             }
+            InstanceSource::External { key, body: None, config } if result.node(&path).is_some_and(|n| n.linked.is_some()) => {
+                let Some((name, sub)) = result.node(&path).and_then(|n| n.linked.clone()) else { continue };
+                let mut children = Vec::new();
+                walk(doc, &sub, &path, result, suppressed, depth + 1, &mut children);
+                let excluded = suppressed || sub.properties.meta.exclude_from_bom;
+                out.push(Use { source: BomSource::ExternalAssembly { key: key.clone(), config: config.clone() }, name, path, excluded, children, behavior: sub.properties.bom_behavior });
+            }
             InstanceSource::External { key, body, config } => match body {
                 Some(b) => {
                     let name = part_name(doc, result, &path, None, b);
@@ -370,7 +386,7 @@ fn group(uses: Vec<Use>) -> Vec<(Use, usize, Vec<InstancePath>)> {
 /// only" counts as one item instead of its parts.
 fn flatten(uses: Vec<Use>, out: &mut Vec<Use>) {
     for u in uses {
-        if matches!(u.source, BomSource::Assembly(_)) {
+        if u.source.is_assembly() {
             if u.behavior == BomBehavior::AssemblyOnly {
                 out.push(Use { children: Vec::new(), ..u });
             } else {
@@ -394,7 +410,7 @@ fn flatten(uses: Vec<Use>, out: &mut Vec<Use>) {
 fn structure(uses: Vec<Use>) -> Vec<Use> {
     let mut out = Vec::new();
     for mut u in uses {
-        if matches!(u.source, BomSource::Assembly(_)) {
+        if u.source.is_assembly() {
             let kids = structure(std::mem::take(&mut u.children));
             match u.behavior {
                 BomBehavior::ComponentsOnly => {
@@ -551,8 +567,14 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
                 BomColumn::Item | BomColumn::Quantity | BomColumn::Name => unreachable!(),
             }
         }
-        BomSource::Assembly(tab) => {
-            let Some(p) = assembly_of(doc, *tab).map(|a| &a.properties) else { return BomCell::Text(String::new()) };
+        BomSource::Assembly(_) | BomSource::ExternalAssembly { .. } => {
+            // Another document's Assembly: its own properties, read-only.
+            let linked = line.instances.first().and_then(|p| result.node(p)).and_then(|n| n.linked.clone());
+            let p = match &line.source {
+                BomSource::Assembly(tab) => assembly_of(doc, *tab).map(|a| (*a.properties).clone()),
+                _ => linked.map(|(_, a)| (*a.properties).clone()),
+            };
+            let Some(p) = p.as_ref() else { return BomCell::Text(String::new()) };
             match col {
                 BomColumn::PartNumber => t(p.part_number.as_ref()),
                 BomColumn::Description => t(p.description.as_ref()),
@@ -593,7 +615,7 @@ pub fn editable(line: &BomLine, col: BomColumn) -> bool {
     match &line.source {
         BomSource::Part { .. } => col.edit() != CellEdit::ReadOnly && col != BomColumn::SubassemblyBomBehavior,
         BomSource::Assembly(_) => col.edit() != CellEdit::ReadOnly && col != BomColumn::TessellationQuality,
-        BomSource::Standard(_) | BomSource::External { .. } => false,
+        BomSource::Standard(_) | BomSource::External { .. } | BomSource::ExternalAssembly { .. } => false,
     }
 }
 

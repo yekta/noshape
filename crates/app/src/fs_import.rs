@@ -150,7 +150,7 @@ impl ImportPanel {
 
     /// Another document opens at its latest version (live: never its workspace).
     fn open_other(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        let Some((name, versions)) = crate::fs_reference::document_versions(&path) else { return };
+        let Some((name, versions)) = crate::select_item::document_versions(&path) else { return };
         let id = document_id(&path);
         let tabs = versions.first().and_then(|v| crate::derived::external_snapshot(&path, v.microversion).ok());
         self.other_doc = Some(OtherDoc { path, name, id, versions, version: 0, tabs });
@@ -383,7 +383,7 @@ impl Render for ImportPanel {
                 self.other_doc.as_ref().map(|o| o.versions.iter().enumerate().map(|(i, v)| (Some(i), v.label.clone())).collect()).unwrap_or_default()
             } else {
                 let path = self.doc.read(cx).session.path.clone();
-                let versions = crate::fs_reference::document_versions(&path).map(|v| v.1).unwrap_or_default();
+                let versions = crate::select_item::document_versions(&path).map(|v| v.1).unwrap_or_default();
                 std::iter::once((None, "Main".to_string())).chain(versions.iter().enumerate().map(|(i, v)| (Some(i), v.label.clone()))).collect()
             };
             let mut list = v_flex().id("fsimp-graph-list").flex_1().min_h_0().overflow_y_scroll().pt(px(4.));
@@ -411,7 +411,7 @@ impl Render for ImportPanel {
                                 }
                             } else {
                                 let path = t.doc.read(cx).session.path.clone();
-                                t.current_version = ix.and_then(|i| crate::fs_reference::document_versions(&path).and_then(|v| v.1.get(i).cloned()));
+                                t.current_version = ix.and_then(|i| crate::select_item::document_versions(&path).and_then(|v| v.1.get(i).cloned()));
                                 t.current_snapshot = t.current_version.as_ref().and_then(|v| crate::derived::external_snapshot(&path, v.microversion).ok());
                             }
                             t.graph = false;

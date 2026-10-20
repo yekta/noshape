@@ -658,6 +658,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(p) = to_plane(self, *position, cx) else { return true };
+                // Ctrl during a box selection removes from the selection.
+                if let Some(ed) = &mut self.sketch {
+                    ed.box_remove = window.modifiers().control;
+                }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
@@ -665,6 +669,9 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { position, .. } => {
                 let Some(p) = to_plane(self, *position, cx) else { return true };
+                if let Some(ed) = &mut self.sketch {
+                    ed.box_remove = window.modifiers().control;
+                }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
@@ -2673,7 +2680,6 @@ impl PartStudioView {
                     .when(is_configured, |d| d.border_1().border_color(rgb(0xffc20e)))
                     .text_size(px(16.))
                     .text_color(fg)
-                    .cursor_pointer()
                     .whitespace_nowrap()
                     .child(text)
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {

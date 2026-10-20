@@ -30,7 +30,7 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::assembly::analysis::{self, Interference};
+use noshape_model::assembly::analysis;
 use noshape_model::assembly::eval::{AssemblyEvaluator, AssemblyResult, InferencePoint, InstanceNode, NodeKind, SolveOptions, frame_to_placement, inference_candidates, placement_to_frame};
 use noshape_model::assembly::solver::Frame;
 use noshape_model::assembly::{
@@ -63,6 +63,11 @@ impl noshape_model::assembly::eval::ExternalStudios for AppExternal {
         let doc = crate::derived::external_snapshot(&r.path, r.microversion).ok()?;
         let tab = doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.id;
         Some((doc, tab))
+    }
+
+    fn sibling(&self, key: &str, tab: TabId) -> Option<String> {
+        let r = crate::derived::ExternalRef::parse(key)?;
+        Some(crate::derived::ExternalRef { tab: tab.to_string(), ..r }.key())
     }
 }
 
@@ -133,6 +138,8 @@ pub(crate) use props::StaleContexts;
 mod standard_content;
 #[path = "assembly_thumbs.rs"]
 mod thumbs;
+#[path = "assembly_interference.rs"]
+mod interference;
 #[path = "assembly_props.rs"]
 mod props;
 #[path = "assembly_search.rs"]
@@ -145,8 +152,6 @@ mod bom_panel;
 mod mass;
 #[path = "assembly_reflection.rs"]
 mod reflection;
-#[path = "assembly_curvature.rs"]
-mod curvature;
 #[path = "assembly_config.rs"]
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
@@ -234,7 +239,6 @@ enum SidePanel {
     Bom,
     /// Assembly configurations (live "Configuration panel").
     Configurations,
-    Interference,
     Explode,
     Positions,
     /// Onshape's Variable table (docked like the Part Studio's).
@@ -280,8 +284,6 @@ pub struct AssemblyView {
     drag: Option<DragState>,
     anim: Option<AnimState>,
     panel: Option<SidePanel>,
-    interference: Option<Vec<Interference>>,
-    interference_running: bool,
     explode: Option<usize>,
     isolate: Option<HashSet<InstanceId>>,
     show_mates: bool,
@@ -440,8 +442,6 @@ impl AssemblyView {
             drag: None,
             anim: None,
             panel: None,
-            interference: None,
-            interference_running: false,
             explode: None,
             isolate: None,
             show_mates: false,
@@ -660,6 +660,12 @@ impl AssemblyView {
         if let Some(s) = &self.ui.section {
             o.section.push(s.clip());
         }
+        // Interference detection: everything see-through around the red
+        // overlaps, still pickable for Instances to analyze (live 736).
+        if self.interference_shown() && o.isolate.is_none() {
+            o.isolate = Some(HashSet::new());
+            o.pick_dimmed = true;
+        }
         if self.isolate.is_some() || self.ui.transparent.is_some() {
             o.dim_alpha = self.ui.transparency;
             // Select transparent geometry / Alt+click: pick through.
@@ -669,12 +675,6 @@ impl AssemblyView {
             && s.started
         {
             o.ghost_tops.insert(s.top);
-        }
-        if let (Some(list), Some(SidePanel::Interference)) = (&self.interference, self.panel) {
-            for i in list {
-                o.error_tops.insert(i.a[0]);
-                o.error_tops.insert(i.b[0]);
-            }
         }
         o
     }
@@ -759,10 +759,11 @@ impl AssemblyView {
         if let Some(m) = &self.ui.measure {
             h.selected_entities = m.clone();
         }
-        if let Some(d) = &self.ui.curve_dialog {
-            h.selected_entities.extend(d.picks.iter().cloned());
+        self.interference_highlights(&mut h);
+        // The instances to analyze show selected while the dialog is open.
+        if let Some(d) = &self.ui.interference {
+            h.selected_tops = d.instances.clone();
         }
-        h.analysis_lines = self.curve_surface_lines();
         // Group dialog: its instances are shown selected.
         if let Some((_, ids)) = &self.ui.group {
             h.selected_tops = ids.clone();
@@ -910,7 +911,18 @@ impl AssemblyView {
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
         let scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
-        self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
+        // Onshape's cursors (docs/parity/cursors.md): the selection count,
+        // and the snap-mate cursor while a drag snaps to a mate connector.
+        let (count, snapping, fixed_drag) = (self.selected.len(), self.snap_drag.is_some(), self.ui.fixed_drag.is_some());
+        self.viewport.update(cx, |vp, cx| {
+            vp.selection_count = count;
+            vp.tool_cursor = if fixed_drag {
+                Some(crate::cursor::AppCursor::NoDrop)
+            } else {
+                snapping.then_some(crate::cursor::AppCursor::SnapMate)
+            };
+            vp.set_scene(Arc::new(scene), geometry_changed, cx)
+        });
     }
 
     /// Instances the manipulator moves.
@@ -1740,23 +1752,6 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ interference
 
-    fn run_interference(&mut self, cx: &mut Context<Self>) {
-        self.panel = Some(SidePanel::Interference);
-        self.interference_running = true;
-        let result = self.result.clone();
-        cx.spawn(async move |this, cx| {
-            let list = cx.background_spawn(async move { analysis::interference(&result, 1e-12) }).await;
-            let _ = this.update(cx, |this: &mut Self, cx| {
-                this.interference_running = false;
-                this.interference = Some(list);
-                this.rebuild_scene(false, cx);
-                cx.notify();
-            });
-        })
-        .detach();
-        cx.notify();
-    }
-
     // ------------------------------------------------------------ viewport events
 
     fn pick(&self, id: Option<u32>) -> Option<AsmPickTarget> {
@@ -1825,7 +1820,7 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.curve_dialog.is_none();
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
@@ -2050,10 +2045,10 @@ impl AssemblyView {
                     if let Some(t) = self.pick(*pick) {
                         self.measure_pick(t, cx);
                     }
-                } else if self.ui.curve_dialog.is_some() {
-                    // Curve/surface analysis: clicked edges and faces are analyzed.
-                    if let Some(t) = self.pick(*pick) {
-                        self.curve_pick(t, cx);
+                } else if self.ui.interference.is_some() {
+                    // Interference detection: clicking an instance adds or removes it.
+                    if let Some(top) = self.pick(*pick).map(|t| t.path[0]) {
+                        self.toggle_interference_instance(top, cx);
                     }
                 } else if self.ui.group.is_some() {
                     // Group dialog: clicking an instance adds or removes it.
@@ -2861,6 +2856,10 @@ impl AssemblyView {
                 }
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+                if this.ui.interference.is_some() {
+                    this.toggle_interference_instance(p3[0], cx);
+                    return;
+                }
                 if this.ui.group.is_some() {
                     this.toggle_group_member(p3[0], cx);
                     return;
@@ -3524,12 +3523,8 @@ impl AssemblyView {
                 .when(on, |d| d.font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 // 100 px tabs wrap their label on two lines (Onshape).
                 .child(div().w_full().whitespace_normal().child(label))
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     f(&mut this.ui);
-                    let ph = if this.ui.insert_tab == 0 { "Search Part Studios" } else { "Search Assemblies" };
-                    if let Some(st) = &this.ui.insert_search {
-                        st.update(cx, |s, cx| s.set_placeholder(ph, window, cx));
-                    }
                     cx.notify();
                 }))
         };
@@ -3590,8 +3585,8 @@ impl AssemblyView {
                         .child(dtab("ins-tab-ps", "Part Studios", tab == 0, 150., 32., cx, |u| u.insert_tab = 0))
                         .child(dtab("ins-tab-asm", "Assemblies", tab == 1, 150., 32., cx, |u| u.insert_tab = 1)),
                 );
-            if let Some(st) = &self.ui.insert_search {
-                head = head.child(div().pt(px(6.)).px(px(6.)).pb(px(6.)).child(Input::new(st).small().cleanable(true)));
+            if let Some(b) = self.insert_search_box(cx) {
+                head = head.child(b);
             }
             if tab == 0 {
                 // Type filters (Parts, and Surfaces when there are any) and
@@ -3988,54 +3983,7 @@ impl AssemblyView {
     }
 
     fn render_side_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let path_name = |p: &Vec<InstanceId>| -> String {
-            let mut s = names.get(&p[0]).cloned().unwrap_or_default();
-            if p.len() > 1
-                && let Some(n) = self.result.node(p)
-            {
-                s = format!("{s} / {}", n.name);
-            }
-            s
-        };
         match self.panel {
-            Some(SidePanel::Interference) => {
-                let units = self.units(cx);
-                let mut body = v_flex().id("intf-body").p_2().gap_1().overflow_y_scroll().max_h(px(460.));
-                if self.interference_running {
-                    body = body.child(div().p_2().text_sm().text_color(pal.text_muted).child("Checking interference…"));
-                } else if let Some(list) = &self.interference {
-                    if list.is_empty() {
-                        body = body.child(div().p_2().text_sm().text_color(pal.success).child("No interference found."));
-                    }
-                    for (i, it) in list.iter().enumerate() {
-                        let (a, b) = (it.a[0], it.b[0]);
-                        body = body.child(
-                            v_flex()
-                                .id(SharedString::from(format!("intf-{i}")))
-                                .px_2()
-                                .py_1()
-                                .rounded_sm()
-                                .cursor_pointer()
-                                .hover(|d| d.bg(pal.panel_hover))
-                                .child(div().text_sm().text_color(pal.error).child(format!("{}  ×  {}", path_name(&it.a), path_name(&it.b))))
-                                .child(div().text_xs().text_color(pal.text_muted).child(format!("Volume ≈ {}", noshape_units::format_quantity(noshape_units::Quantity::new(it.volume, noshape_units::Dim::VOLUME), &units))))
-                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    this.selected = vec![a, b];
-                                    this.refresh_scene(false, cx);
-                                    cx.notify();
-                                })),
-                        );
-                    }
-                }
-                Self::panel_frame("Interference detection", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.panel = None;
-                    this.rebuild_scene(false, cx);
-                    cx.notify();
-                }), "intf-close")
-                .into_any_element()
-            }
             Some(SidePanel::Explode) => self.render_explode_panel(cx),
             Some(SidePanel::Bom) | Some(SidePanel::Configurations) | Some(SidePanel::Positions) | Some(SidePanel::Variables) | None => div().into_any_element(),
         }
@@ -4082,16 +4030,16 @@ impl AssemblyView {
             left = left.child(d);
             any_left = true;
         }
-        if let Some(c) = self.render_curve_dialog(cx) {
-            left = left.child(c);
-            any_left = true;
-        }
         if let Some(r) = self.render_reflection_dialog(cx) {
             left = left.child(r);
             any_left = true;
         }
         if let Some(z) = self.render_zebra_dialog(cx) {
             left = left.child(z);
+            any_left = true;
+        }
+        if let Some(d) = self.render_interference_dialog(cx) {
+            left = left.child(d);
             any_left = true;
         }
         if self.ui.mass.is_some() {
@@ -4227,8 +4175,9 @@ impl AssemblyView {
         out.extend(self.render_mate_values(cx));
         out.extend(self.render_center_of_mass(cx));
         if let Some(at) = self.ui.fixed_drag {
-            // Fixed instance drag: the fix glyph at the cursor, `no-drop` cursor.
-            out.push(div().absolute().top_0().left_0().size_full().cursor(CursorStyle::OperationNotAllowed).child(
+            // Fixed instance drag: the fix glyph at the cursor (the `no-drop`
+            // cursor is the viewport's, refresh_scene).
+            out.push(div().absolute().top_0().left_0().size_full().child(
                 div()
                     .absolute()
                     .left(px(at.x as f32 - 10.))
@@ -4449,8 +4398,8 @@ impl Render for AssemblyView {
                     this.close_mc(window, cx);
                 } else if this.ui.folder_name.is_some() {
                     this.close_folder_name(false, window, cx);
-                } else if this.ui.curve_dialog.is_some() {
-                    this.close_curve_surface(cx);
+                } else if this.ui.interference.is_some() {
+                    this.close_interference(cx);
                 } else if this.ui.reflection_dialog.is_some() {
                     this.close_reflection(false, cx);
                 } else if this.ui.zebra_dialog.is_some() {

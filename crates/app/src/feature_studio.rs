@@ -11,7 +11,7 @@ use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, HighlightStyleResolver, Input, InputEvent, InputHighlighter, InputState, Position, TabSize};
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
@@ -233,6 +233,14 @@ pub struct Notice {
     pub info: bool,
 }
 
+/// Characters Ace's squiggle covers from a notice's 0-based column: the
+/// identifier or number starting there (live fs-squiggles-zoom8x: `f`, `x`,
+/// `undefinedThing`), else one character.
+fn squiggle_len(line: &str, column: usize) -> usize {
+    let word = line.chars().skip(column).take_while(|c| c.is_alphanumeric() || *c == '_').count();
+    word.max(1)
+}
+
 /// **Compile hook** (agent fs plugs the FeatureScript parser / checker in
 /// here): the notices of a Feature Studio's source. Called on every save
 /// for the editor and on demand by the notices panel.
@@ -283,6 +291,8 @@ pub struct FeatureStudioView {
     /// The toolbar's Import panel and the button's bounds (it hangs under it).
     import_panel: Option<(Entity<crate::fs_import::ImportPanel>, Subscription)>,
     import_anchor: BoundsCell,
+    /// The pointer over the code (the diagnostic tooltip follows it).
+    hover_at: Option<Point<Pixels>>,
     _subs: Vec<Subscription>,
 }
 
@@ -326,7 +336,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), hover_at: None, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -352,6 +362,31 @@ impl FeatureStudioView {
             self.editor.update(cx, |e, cx| e.set_value(src.clone(), window, cx));
         }
         self.recompile(src, cx);
+    }
+
+    /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): `#f5f5f5`,
+    /// 1 px `#dadada`, the notice icon, the message in the code font.
+    fn render_diagnostic_tooltip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use gpui_kit::base::input::DiagnosticSeverity;
+        let at = self.hover_at?;
+        let entry = self.editor.read(cx).hovered_diagnostic()?;
+        let (error, info) = (entry.severity == DiagnosticSeverity::Error, matches!(entry.severity, DiagnosticSeverity::Info | DiagnosticSeverity::Hint));
+        let tip = h_flex()
+            .h(px(23.))
+            .pl(px(18.))
+            .pr(px(6.))
+            .gap(px(7.))
+            .bg(rgb(0xf5f5f5))
+            .border_1()
+            .border_color(rgb(0xdadada))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.15), offset: point(px(1.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }])
+            .text_size(px(13.))
+            .font_family(cx.theme().mono_font_family.clone())
+            .text_color(rgb(0x333333))
+            .whitespace_nowrap()
+            .child(crate::assets::icon(crate::fs_notices::notice_icon(error, info), 14., cx))
+            .child(entry.message.clone());
+        Some(deferred(anchored().position(at + point(px(6.), px(14.))).snap_to_window_with_margin(px(4.)).child(tip)).with_priority(2).into_any_element())
     }
 
     /// Import: open or close the panel (live document/81).
@@ -455,12 +490,15 @@ impl FeatureStudioView {
                 // Squiggles under the reported token (hover shows the message).
                 this.editor.update(cx, |e, cx| {
                     let text = e.text().clone();
+                    let source = text.to_string();
+                    let lines: Vec<&str> = source.split('\n').collect();
                     if let Some(set) = e.diagnostics_mut() {
                         use gpui_kit::base::input::{Diagnostic, DiagnosticSeverity};
                         set.reset(&text);
                         for n in notices.iter().filter(|n| n.line > 0) {
                             let at = Position { line: (n.line - 1) as u32, character: n.column.saturating_sub(1) as u32 };
-                            let end = Position { line: at.line, character: at.character + 4 };
+                            let len = squiggle_len(lines.get(n.line - 1).copied().unwrap_or(""), at.character as usize);
+                            let end = Position { line: at.line, character: at.character + len as u32 };
                             set.push(Diagnostic::new(at..end, n.message.clone()).with_severity(if n.error {
                                 DiagnosticSeverity::Error
                             } else if n.info {
@@ -932,6 +970,7 @@ impl Render for FeatureStudioView {
             .child(toolbar.border_b_1().border_color(rgb(0xd7d7d7)))
             .child(
                 div()
+                    .id("fs-code")
                     .flex_1()
                     .min_h_0()
                     .relative()
@@ -942,6 +981,21 @@ impl Render for FeatureStudioView {
                         // padding (its size's), clipped off here.
                         div().absolute().top(px(-8.)).left_0().right_0().bottom_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
                     )
+                    // The diagnostic tooltip follows the pointer (re-render only
+                    // while one shows or just hid).
+                    .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
+                        let shown = this.editor.read(cx).hovered_diagnostic().is_some();
+                        let was = this.hover_at.is_some();
+                        this.hover_at = shown.then_some(e.position);
+                        if shown || was {
+                            cx.notify();
+                        }
+                    }))
+                    .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
+                        if !*hovered && this.hover_at.take().is_some() {
+                            cx.notify();
+                        }
+                    }))
                     // After the editor placed the caret at the click.
                     .on_mouse_down(MouseButton::Right, cx.listener(|_, e: &MouseDownEvent, window, cx| {
                         let at = e.position;
@@ -949,6 +1003,7 @@ impl Render for FeatureStudioView {
                     })),
             )
             .children(outline)
+            .children(self.render_diagnostic_tooltip(cx))
             .children(self.import_panel.as_ref().map(|(panel, _)| {
                 let b = self.import_anchor.get();
                 deferred(anchored().position(point(b.left(), b.bottom() + px(2.))).child(panel.clone())).with_priority(1).into_any_element()
@@ -1146,5 +1201,15 @@ mod tests {
         assert_eq!(kinds.iter().filter(|k| **k == Tok::Variable).count(), 2);
         let outline = super::outline(super::NEW_FEATURE);
         assert_eq!((outline[0].name.as_str(), outline[0].params.as_str()), ("myFeature", "context, id, definition"));
+    }
+
+    #[::core::prelude::v1::test]
+    fn squiggles_cover_the_token() {
+        let line = "function f() { x = 1; } y = undefinedThing + 1;";
+        assert_eq!(super::squiggle_len(line, 9), 1);
+        assert_eq!(super::squiggle_len(line, 15), 1);
+        assert_eq!(super::squiggle_len(line, 28), "undefinedThing".len());
+        assert_eq!(super::squiggle_len(line, 10), 1);
+        assert_eq!(super::squiggle_len("", 3), 1);
     }
 }

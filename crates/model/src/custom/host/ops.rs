@@ -2,7 +2,7 @@
 //! operation's marker feature id names what it creates) and reuses the
 //! evaluator helpers of the built-in features.
 
-use super::query::{evaluate_refs, with_ents};
+use super::query::{Ent, evaluate_refs, with_ents};
 use super::{FsContext, context_arg, convert::*, raise_error, run_op, run_op_with};
 use crate::display::BodyKind;
 use crate::naming::{Name, ShapeNames};
@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opConstrainedSurface", op_constrained_surface),
+    ("opEditCurve", op_edit_curve),
     ("opWrap", op_wrap),
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
@@ -857,7 +858,30 @@ fn op_create_bspline_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// Tangent propagation of the seed faces is not applied yet.
 fn op_extract_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
-    let faces = evaluate_refs(i, &cx, def.get("faces"))?;
+    let faces = if def_bool(&def, "tangentPropagation", false) {
+        // The faces tangent-connected to the selection (smooth edges) too.
+        with_ents(i, &cx, def.get("faces"), |_, q, ents| {
+            let mut set: Vec<(usize, usize)> = ents.iter().filter_map(|e| if let Ent::Face(b, f) = e { Some((*b, *f)) } else { None }).collect();
+            let mut k = 0;
+            while k < set.len() {
+                let (b, f) = set[k];
+                k += 1;
+                let Ok(ef) = q.st.ctx.bodies[b].shape.edge_faces() else { continue };
+                for (x, fs) in ef.iter().enumerate() {
+                    if fs.len() != 2 || (fs[0] as usize != f && fs[1] as usize != f) {
+                        continue;
+                    }
+                    let other = if fs[0] as usize == f { fs[1] as usize } else { fs[0] as usize };
+                    if !set.contains(&(b, other)) && super::evaluate::convexity(q, &Ent::Edge(b, x)) == Some("SMOOTH") {
+                        set.push((b, other));
+                    }
+                }
+            }
+            Ok(set.into_iter().map(|(b, f)| q.to_ref(&Ent::Face(b, f))).collect::<Vec<_>>())
+        })?
+    } else {
+        evaluate_refs(i, &cx, def.get("faces"))?
+    };
     let offset = def_length_opt(&def, "offset").unwrap_or(0.0);
     let mut p = ParamValues::default();
     p.set("surfacesAndFaces", ParamValue::Query(faces));
@@ -1091,15 +1115,36 @@ fn op_move_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if groups.is_empty() {
             return err("Select faces to move.");
         }
+        // A translation along planar faces' normals offsets them (their
+        // neighbours follow, like the Move face feature); otherwise rigid.
+        let t = m.w_axis.truncate();
+        let pure = (m.x_axis.truncate() - DVec3::X).length() < 1e-12 && (m.y_axis.truncate() - DVec3::Y).length() < 1e-12 && (m.z_axis.truncate() - DVec3::Z).length() < 1e-12;
+        let mut offset = false;
         for (bi, fs) in groups.into_iter().rev() {
-            crate::regen::features::direct::move_rigid(ev, bi, &fs, &m)?;
+            let shapes: Vec<Shape> = fs.iter().map(|&f| ev.face_shape(bi, f)).collect::<FResult<_>>()?;
+            let each: Option<Vec<f64>> = (pure && t.length() > 1e-12)
+                .then(|| shapes.iter().map(|s| s.face_plane().ok().flatten().map(|p| p.unit_normal()).filter(|n| (n.dot(t.normalize()).abs() - 1.0).abs() < 1e-6).map(|n| n.dot(t))).collect::<Option<Vec<f64>>>())
+                .flatten();
+            match each {
+                Some(each) => {
+                    let body = ev.ctx.bodies[bi].clone();
+                    let res = k::offset_faces_each(&body.shape, &shapes, &each).map_err(|e| FeatureError::new(format!("Move face failed: {e}")))?;
+                    let offset_role = |n: &Name| Role::Offset(n.clone());
+                    let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
+                    ev.replace_body(bi, res.shape, names);
+                    offset = true;
+                }
+                None => crate::regen::features::direct::move_rigid(ev, bi, &fs, &m)?,
+            }
+        }
+        if offset {
+            keep_modified_names(ev);
         }
         Ok(())
     })?;
     Ok(Value::Undefined)
 }
 
-/// Bring the bodies of another context into this one.
 /// `opMergeContexts`: the bodies of `contextFrom` join this context; the
 /// result is, for each query of `trackThroughMerge` (evaluated in
 /// `contextFrom`), the transient ids of its entities after the merge.
@@ -1272,6 +1317,33 @@ fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 ev.apply_operation(vec![wrapped], "NEW", None, BodyKind::Surface)
             }
         }
+    })?;
+    Ok(Value::Undefined)
+}
+
+/// `opEditCurve`: the wire body of `wire` takes the curve of `edge`, in
+/// place (std editCurve.fs: "replaces queryToReplace's edges in place").
+fn op_edit_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let wire = evaluate_refs(i, &cx, def.get("wire"))?;
+    let edge = evaluate_refs(i, &cx, def.get("edge"))?;
+    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let mut bodies = ev.resolve_bodies(&wire);
+        bodies.extend(ev.resolve_edges(&wire).into_iter().map(|(b, _)| b));
+        let Some(&bi) = bodies.first() else { return err("Select a curve to edit") };
+        let Some(&(eb, ei)) = ev.resolve_edges(&edge).first() else { return err("The new curve no longer exists") };
+        let curve = ev.edge_shape(eb, ei)?;
+        let shape = k::make_wire(&[curve]).map_err(|e| FeatureError::new(format!("The curve could not be edited: {e}")))?;
+        let old = ev.ctx.bodies[bi].clone();
+        let creator = old.edges.first().and_then(|n| n.creator()).unwrap_or(ev.feature);
+        let mut body = crate::regen::context::Body::new(old.id.clone(), old.name.clone(), old.kind, shape, Vec::new(), old.color, creator);
+        // Same number of edges: references to them keep working.
+        if body.edges.len() == old.edges.len() {
+            body.edges = old.edges.clone();
+            body.vertices = old.vertices.clone();
+        }
+        ev.ctx.bodies[bi] = Arc::new(body);
+        Ok(())
     })?;
     Ok(Value::Undefined)
 }

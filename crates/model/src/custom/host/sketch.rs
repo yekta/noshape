@@ -29,6 +29,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("skEllipse", sk_ellipse),
     ("skConicSegment", sk_conic_segment),
     ("skText", sk_text),
+    ("skImage", sk_image),
     ("skEllipticalArc", sk_elliptical_arc),
     ("skFitSpline", sk_fit_spline),
     ("skInterpolatedSpline", sk_fit_spline),
@@ -48,6 +49,8 @@ pub struct SketchBuild {
     pub sketch: Sketch,
     pub marker: FeatureId,
     pub solved: bool,
+    /// skImage pictures (drawn in their solved boxes).
+    pub images: Vec<crate::regen::context::SketchResultImage>,
 }
 
 /// The `Sketch` builtin.
@@ -118,7 +121,7 @@ fn new_sketch(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             drop(st);
             return Err(raise_error(i, "DUPLICATE_ID", None));
         };
-        st.sketches.insert(id.clone(), SketchBuild { frame, sketch: Sketch::new(), marker: m, solved: false });
+        st.sketches.insert(id.clone(), SketchBuild { frame, sketch: Sketch::new(), marker: m, solved: false, images: Vec::new() });
         names(&mut st).insert(m, HashMap::new());
         m
     };
@@ -336,6 +339,9 @@ fn sk_conic_segment(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         check_new(i, map, &id)?;
         let (s, c, e) = (need_p2(i, &def, "start")?, need_p2(i, &def, "controlPoint")?, need_p2(i, &def, "end")?);
         let rho = def.get("rho").as_number().unwrap_or(0.5);
+        // `lowParameter` / `highParameter`: only that part of the conic.
+        let (lo, hi) = (def.get("lowParameter").as_number().unwrap_or(0.0), def.get("highParameter").as_number().unwrap_or(1.0));
+        let ((s, c, e), rho) = if (lo, hi) == (0.0, 1.0) { ((s, c, e), rho) } else { conic_segment(s, c, e, rho, lo, hi) };
         let Ok(conic) = b.sketch.add_conic(s, c, e, rho) else { return Err(raise_error(i, "REGEN_ERROR", None)) };
         if construction(&def) {
             let _ = b.sketch.set_construction(conic, true);
@@ -343,6 +349,23 @@ fn sk_conic_segment(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         register(&b.sketch, map, &id, conic);
         Ok(Value::Undefined)
     })
+}
+
+/// The part `lo..hi` of a conic (start, control point, end, rho) as a conic
+/// of its own: the rational quadratic Bézier's blossom in homogeneous
+/// coordinates, the weight renormalized (w = rho / (1 - rho)).
+fn conic_segment(s: DVec2, c: DVec2, e: DVec2, rho: f64, lo: f64, hi: f64) -> ((DVec2, DVec2, DVec2), f64) {
+    let w = rho / (1.0 - rho).max(1e-12);
+    let pts = [(s, 1.0), (c * w, w), (e, 1.0)];
+    let blossom = |u: f64, v: f64| {
+        let k = [(1.0 - u) * (1.0 - v), (1.0 - u) * v + u * (1.0 - v), u * v];
+        let p = pts[0].0 * k[0] + pts[1].0 * k[1] + pts[2].0 * k[2];
+        let wt = pts[0].1 * k[0] + pts[1].1 * k[1] + pts[2].1 * k[2];
+        (p, wt)
+    };
+    let (q0, q1, q2) = (blossom(lo, lo), blossom(lo, hi), blossom(hi, hi));
+    let w1 = q1.1 / (q0.1 * q2.1).sqrt();
+    ((q0.0 / q0.1, q1.0 / q1.1, q2.0 / q2.1), w1 / (1.0 + w1))
 }
 
 fn sk_ellipse(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -468,7 +491,7 @@ fn sk_solve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     b.solved = true;
     let name = id.last().map(|s| s.to_string()).unwrap_or_default();
     st.ctx.sketches.retain(|s| s.feature != b.marker);
-    st.ctx.sketches.push(Arc::new(SketchResult { feature: b.marker, name, frame: b.frame, sketch: b.sketch.clone(), report, regions, wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
+    st.ctx.sketches.push(Arc::new(SketchResult { feature: b.marker, name, frame: b.frame, sketch: b.sketch.clone(), report, regions, wires, dimension_text: BTreeMap::new(), images: b.images.clone() }));
     st.sketches.insert(id, b);
     Ok(Value::Undefined)
 }
@@ -476,4 +499,32 @@ fn sk_solve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// Entity ids of a FeatureScript sketch entity (`sketchEntityQuery`).
 pub fn sketch_entity(st: &CtxState, marker: FeatureId, name: &str) -> Option<u32> {
     st.sketch_names.get(&marker)?.get(name).copied()
+}
+
+/// `skImage`: an imported image (`BLOB_DATA` merged into the value) in the
+/// box from `firstCorner` towards `secondCorner`, keeping the picture's
+/// proportions (live document/91: a 16×8 image in a 1×1 in box is 1 × ½ in).
+fn sk_image(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let id = entity_id(i, &a)?;
+    let def = def_arg(i, &a, 2)?;
+    let Some(data) = def.get("dataId").as_str().and_then(|d| super::super::reference::blob_of(&d)) else {
+        return Err(i.error("skImage needs an imported image (blobInfo)"));
+    };
+    let (w, h) = (def.get("imageWidth").as_number().unwrap_or(1.0), def.get("imageHeight").as_number().unwrap_or(1.0));
+    let aspect = if h > 0.0 { w / h } else { 1.0 };
+    with_sketch(i, &a, |i, b, map| {
+        check_new(i, map, &id)?;
+        let c0 = p2(def.get("firstCorner")).unwrap_or(DVec2::ZERO);
+        let c1 = p2(def.get("secondCorner")).unwrap_or(c0 + DVec2::splat(0.0254));
+        let size = (c1 - c0).abs();
+        // The largest box of the image's proportions inside the corners.
+        let height = size.y.min(size.x / aspect).max(1e-6);
+        let tb = b.sketch.add_text_box(c0.min(c1), height, aspect).map_err(|_| i.error("The image rectangle could not be created"))?;
+        let n = b.images.len() as u32 + 1;
+        b.images.push(crate::regen::context::SketchResultImage { id: n, box_points: tb.points.iter().map(|p| p.0).collect(), data_base64: data.clone() });
+        for (k, p) in tb.points.iter().enumerate() {
+            register(&b.sketch, map, &format!("{id}.corner{k}"), *p);
+        }
+        Ok(Value::map_from([("imageId", Value::str(id.as_str()))]))
+    })
 }

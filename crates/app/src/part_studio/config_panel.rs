@@ -28,6 +28,8 @@ pub enum RightPanel {
 
 /// Commit action of a panel text cell (gets the cell's text).
 pub(super) type CellCommit = std::rc::Rc<dyn Fn(&mut PartStudioView, String, &mut Context<PartStudioView>)>;
+/// An input ⋯ menu entry's action.
+type MenuAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
 impl PartStudioView {
     /// Commit the cell that had the focus at the last render if the focus has
@@ -699,7 +701,7 @@ impl PartStudioView {
                             // Live (Help input-prop-contextmenu, config-copy-table):
                             // Copy table, Copy input, Move up / down, Rename,
                             // Visibility conditions…, Input propagation…, Delete.
-                            let item = |label: &str, f: Box<dyn Fn(&mut Self, &mut Window, &mut Context<Self>)>| {
+                            let item = |label: &str, f: MenuAction| {
                                 let v = v.clone();
                                 crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| f(this, window, cx)))
                             };

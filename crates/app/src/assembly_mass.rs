@@ -3,12 +3,10 @@
 //! View__interference_detection; live part-studio/80–82, analysis/03,
 //! dom/dialog-mass-properties.txt, menu-analysis-tools.txt).
 //!
-//! Analysis tools lists the tools the help marks as available in assemblies,
-//! in the Part Studio menu's order: Curve/surface analysis…, Interference
-//! detection…, Zebra stripes…, Reflection analysis…. Mass and section
-//! properties is the Part Studio's 440 px dialog computed for the parts of
-//! the selected instances (all instances when none is selected) where they
-//! sit in the assembly.
+//! Analysis tools in an assembly has three items (live assembly/734):
+//! Interference detection…, Zebra stripes…, Reflection analysis…. Mass and
+//! section properties is the 440 px dialog for the parts of the instances
+//! to measure where they sit in the assembly (live 737–739).
 
 use super::*;
 use gpui_kit::component::input::InputEvent;
@@ -23,8 +21,8 @@ pub(crate) struct AsmMassUi {
     pub warning_closed: bool,
 }
 
-/// The analysis tools available in an assembly, in menu order.
-const ANALYSIS_TOOLS: [&str; 4] = ["Curve/surface analysis…", "Interference detection…", "Zebra stripes…", "Reflection analysis…"];
+/// The analysis tools of an assembly, in menu order (live assembly/734).
+const ANALYSIS_TOOLS: [&str; 3] = ["Interference detection…", "Zebra stripes…", "Reflection analysis…"];
 
 impl AssemblyView {
     /// "Show analysis tools": the context-menu-style list (live analysis/03,
@@ -44,19 +42,14 @@ impl AssemblyView {
 
     fn run_analysis_tool(&mut self, k: usize, window: &mut Window, cx: &mut Context<Self>) {
         match k {
-            1 => self.run_interference(cx),
-            2 => {
+            0 => self.open_interference(cx),
+            1 => {
                 self.close_reflection(false, cx);
                 self.open_zebra(window, cx);
             }
-            3 => {
-                self.close_zebra(false, cx);
-                self.open_reflection(window, cx);
-            }
             _ => {
                 self.close_zebra(false, cx);
-                self.close_reflection(false, cx);
-                self.open_curve_surface(cx);
+                self.open_reflection(window, cx);
             }
         }
     }
@@ -67,9 +60,13 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Mass properties of the selected instances' parts (all when nothing is
-    /// selected), with each part's material density from its Part Studio.
+    /// Mass properties of the selected instances' parts (nothing when none is
+    /// selected: live 737 leaves every value blank), with each part's
+    /// material density from its Part Studio.
     fn assembly_mass(&self, cx: &App) -> Option<AssemblyMass> {
+        if self.selected.is_empty() {
+            return None;
+        }
         let doc = &self.doc.read(cx).session.doc;
         let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
             Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
@@ -85,13 +82,20 @@ impl AssemblyView {
         let (faces, warning_closed) = (ui.faces, ui.warning_closed);
         let pal = p();
         let units = self.units(cx);
-        let fmt = |q: noshape_units::Quantity| noshape_units::format_quantity(q, &units);
         let mass = if faces { None } else { self.assembly_mass(cx) };
+        // The top-level row selects every instance: the field then holds the
+        // assembly itself (live 739), whose Mass can be overridden.
+        let top_level = self.assembly(cx).is_some_and(|a| !self.selected.is_empty() && a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).all(|i| self.selected.contains(&i.id)));
         let names: Vec<String> = if faces {
             Vec::new()
+        } else if top_level {
+            self.doc.read(cx).session.doc.tab(self.tab).map(|t| vec![t.name.clone()]).unwrap_or_default()
         } else {
             self.selected.iter().filter_map(|id| self.assembly(cx).and_then(|a| a.instance(*id)).map(|i| i.name.clone())).collect()
         };
+        let (mass_sym, mass_factor) = mass_unit(&units);
+        let len_sym = units.length.symbol();
+        let in_units = |x: f64, dim: noshape_units::Dim| number(x / units.si_factor(dim));
         let missing = mass.as_ref().is_some_and(|m| !m.without_material.is_empty());
         let tab = |id: &'static str, label: &'static str, on_faces: bool, cx: &mut Context<Self>| {
             let on = faces == on_faces;
@@ -125,42 +129,54 @@ impl AssemblyView {
                 .border_color(if active { pal.accent } else { pal.border })
                 .when(active, |d| d.bg(rgb(0xdef1fb)))
                 .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(rgb(0x555555)).child(label.to_string()))
-                .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { rgb(0x555555).into() }).child(div().flex_1().truncate().child(t)).child(div().px(px(5.)).text_size(px(16.67)).text_color(rgb(0x666666)).child("×"))))
+                .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().px(px(5.)).text_size(px(16.67)).text_color(rgb(0x666666)).child("×"))))
         };
         let value = |v: String| div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v);
         let value_row = |label: &'static str, v: String| h_flex().h(px(28.)).child(div().px(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(label)).child(value(v));
-        let disabled_check = |id: &'static str| h_flex().id(id).h(px(27.)).pl(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(pal.text_muted).child(div().size(px(12.)).rounded(px(3.)).bg(rgb(0x999999))).child("Override");
+        // Override: a greyed box (live 737–738), white for the assembly's Mass (739).
+        let override_check = |id: &'static str, enabled: bool| {
+            h_flex()
+                .id(id)
+                .h(px(27.))
+                .pl(px(4.))
+                .gap(px(4.))
+                .text_size(px(13.33))
+                .text_color(pal.text_muted)
+                .child(div().size(px(12.)).rounded(px(3.)).when(enabled, |d| d.bg(rgb(0xffffff)).border_1().border_color(rgb(0x888888))).when(!enabled, |d| d.bg(rgb(0x999999))))
+                .child("Override")
+        };
         let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).text_size(px(12.)).text_color(rgb(c)).child(l).child(glyph);
         let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("amass-tab-part", "Part", false, cx)).child(tab("amass-tab-face", "Face", true, cx)));
         body = body
-            .child(field(if faces { "Faces to measure" } else { "Parts to measure" }, names, true, missing))
+            .child(field(if faces { "Faces to measure" } else { "Instances to measure" }, names, true, missing))
             .child(field("Mate connector for reference frame", Vec::new(), false, false))
             .child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", false));
-        if let Some(m) = &mass {
-            let p = &m.props;
-            let len = |x: f64| fmt(noshape_units::Quantity::new(x, noshape_units::Dim::LENGTH));
-            let c = p.center_of_mass;
-            // Without a material Onshape leaves mass, center of mass and inertia empty.
-            let have = p.mass.is_some();
-            let f = units.si_factor(noshape_units::Dim::LENGTH).powi(2);
-            let i = p.inertia;
-            let iv = |x: f64| if have { format!("{:.4}", x / f) } else { String::new() };
-            let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
-            body = body
-                .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(crate::ui::os_checkbox("amass-override", "Override", false)).child(value(p.mass.map(|m| format!("{m:.4} kg")).unwrap_or_default())))
-                .child(value_row("Volume", fmt(noshape_units::Quantity::new(p.volume, noshape_units::Dim { length: 3, angle: 0 }))))
-                .child(value_row("Surface area", fmt(noshape_units::Quantity::new(p.surface_area, noshape_units::Dim { length: 2, angle: 0 }))))
-                .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("amass-com-override")))
-                .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(26.)).child(axis(l, col, g)).child(value(if have { len(v) } else { String::new() }))))
-                .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({}² kg)", units.length.symbol()))).child(disabled_check("amass-moi-override")));
-            let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
-            for (r, row_names) in names.iter().enumerate() {
-                let mut row = h_flex().h(px(26.)).px(px(5.)).gap(px(8.));
-                for (k, n) in row_names.iter().enumerate() {
-                    row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
-                }
-                body = body.child(row);
+        // Every row is shown; values only once something is measured.
+        let props = mass.as_ref().map(|m| &m.props);
+        // Without a material Onshape leaves mass, center of mass and inertia empty.
+        let have = props.is_some_and(|p| p.mass.is_some());
+        let length = noshape_units::Dim::LENGTH;
+        let with_unit = |v: Option<String>, unit: String| v.map(|v| format!("{v} {unit}")).unwrap_or_default();
+        let c = props.map(|p| p.center_of_mass).unwrap_or_default();
+        let com = |v: f64| with_unit(have.then(|| in_units(v, length)), len_sym.to_string());
+        body = body
+            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(override_check("amass-override", top_level)).child(value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string()))))
+            .child(value_row("Volume", with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³"))))
+            .child(value_row("Surface area", with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²"))))
+            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
+            .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(26.)).child(axis(l, col, g)).child(value(com(v)))))
+            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
+        let f = units.si_factor(length).powi(2);
+        let i = props.map(|p| p.inertia).unwrap_or(glam::DMat3::ZERO);
+        let iv = |x: f64| if have { number(x * mass_factor / f) } else { String::new() };
+        let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
+        let labels = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
+        for (r, row_names) in labels.iter().enumerate() {
+            let mut row = h_flex().h(px(26.)).px(px(5.)).gap(px(8.));
+            for (k, n) in row_names.iter().enumerate() {
+                row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
             }
+            body = body.child(row);
         }
         let help = super::props::help_dot();
         let mut out = vec![
@@ -352,5 +368,42 @@ impl AssemblyView {
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))
                 .into_any_element(),
         )
+    }
+}
+
+/// The user's mass unit (Workspace units › Mass: Kilogram, Gram, Pound,
+/// Ounce): (symbol, per kilogram).
+fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
+    match units.other[2].0 {
+        1 => ("g", 1000.0),
+        2 => ("lb", 2.204_622_621_848_776),
+        3 => ("oz", 35.273_961_949_580_41),
+        _ => ("kg", 1.0),
+    }
+}
+
+/// A Mass and section properties value as Onshape writes it (live 738–739):
+/// three decimals without trailing zeros ("5.77", "11000"), and values that
+/// would read 0.000 in exponent form ("-3.307e-4").
+fn number(x: f64) -> String {
+    let fixed = format!("{x:.3}");
+    if x != 0.0 && fixed.trim_start_matches('-') == "0.000" {
+        return format!("{x:.3e}");
+    }
+    let t = fixed.trim_end_matches('0').trim_end_matches('.');
+    if t == "-0" { "0".into() } else { t.to_string() }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mass_values_are_written_like_onshape() {
+        use super::number;
+        assert_eq!(number(5.7700), "5.77");
+        assert_eq!(number(11000.0), "11000");
+        assert_eq!(number(0.138), "0.138");
+        assert_eq!(number(-0.00033071), "-3.307e-4");
+        assert_eq!(number(-0.00095), "-0.001");
+        assert_eq!(number(0.0), "0");
     }
 }

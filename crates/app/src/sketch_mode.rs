@@ -436,6 +436,8 @@ pub struct SketchEditor {
     pub glyph_entity: Option<(EntityId, std::time::Instant)>,
     drag: Option<DragState>,
     box_end: Option<DVec2>,
+    /// Ctrl held during the box selection: it removes from the selection.
+    pub box_remove: bool,
     /// Point snapped to while dragging a point (coincident on release).
     drag_snap: Option<(EntityId, DVec2, bool)>,
     /// Entities picked so far for a constraint/dimension tool.
@@ -789,6 +791,7 @@ impl SketchEditor {
             glyph_entity: None,
             drag: None,
             box_end: None,
+            box_remove: false,
             drag_snap: None,
             picks: Vec::new(),
             picks_placed: Vec::new(),
@@ -1351,6 +1354,7 @@ impl SketchEditor {
                     None => {
                         self.drag = Some(DragState::Box { start: p });
                         self.box_end = Some(p);
+                        self.box_remove = false;
                     }
                 }
                 EditOutcome::none()
@@ -2854,7 +2858,9 @@ impl SketchEditor {
                         let Some(bb) = data.sketch.entity_bbox(e.id) else { continue };
                         let inside = bb.min.x >= lo.x && bb.min.y >= lo.y && bb.max.x <= hi.x && bb.max.y <= hi.y;
                         let hit = inside || (crossing && crosses_box(&data.sketch, e.id, lo, hi, tol));
-                        if hit && !self.selection.contains(&e.id) {
+                        if hit && self.box_remove {
+                            self.selection.retain(|x| *x != e.id);
+                        } else if hit && !self.selection.contains(&e.id) {
                             self.selection.push(e.id);
                         }
                     }
@@ -5443,6 +5449,11 @@ impl SketchEditor {
     /// (with the sketch's name at its top-left). Returns the lower-left and
     /// upper-right corners in sketch coordinates; before the view placed it,
     /// a frame of 0.7 x 1000 px at the current zoom around the origin.
+    /// A box selection is being dragged.
+    pub fn box_dragging(&self) -> bool {
+        matches!(self.drag, Some(DragState::Box { .. }))
+    }
+
     pub fn sketch_box(&self) -> (DVec2, DVec2) {
         self.frame_bounds.unwrap_or_else(|| {
             let h = SKETCH_FRAME_VIEWPORT_RATIO * 1000.0 * self.world_per_px;

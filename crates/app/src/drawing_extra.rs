@@ -1420,7 +1420,19 @@ impl DrawingEditor {
         let mut out = Vec::new();
         let sheet = &self.drawing.sheets[self.sheet];
         let Some(t) = sheet.table(id).cloned() else { return out };
+        // BOM, cut list and custom tables: Onshape's menus — the cells' (Size,
+        // Resize) with cells selected, else the whole table's.
+        if matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. } | TableKind::Custom { .. }) {
+            return match self.cell_sel.filter(|c| c.table == id) {
+                Some(cs) => self.cell_size_entries(&t, cs),
+                None => self.data_table_entries(id, cx),
+            };
+        }
         let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
+        // General table with cells selected: Onshape's cell menu.
+        if let (TableKind::General { .. }, Some(cs)) = (&t.kind, self.cell_sel.filter(|c| c.table == id)) {
+            return self.general_cell_entries(&t, cs);
+        }
         if let TableKind::General { .. } = t.kind {
             out.push(MenuEntry::item("Edit cell…", move |t, w, cx| t.open_cell_panel(id, w, cx)));
             let (r, c) = cell.map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
@@ -1439,9 +1451,7 @@ impl DrawingEditor {
         if let TableKind::Revision { .. } = t.kind {
             out.extend(self.revision_table_entries(id, cell));
         }
-        if let TableKind::Custom { .. } = t.kind {
-            out.extend(self.custom_table_entries(id, cx));
-        }
+
         out.extend(self.table_more_entries(&t, cell));
         if let TableKind::Hole { precision, .. } = t.kind {
             let mut prec = vec![MenuEntry::check("Drawing default", precision.is_none(), move |t, _, cx| t.edit_table(id, "Hole table precision", cx, |t| if let TableKind::Hole { precision, .. } = &mut t.kind { *precision = None }))];

@@ -546,7 +546,7 @@ impl PartStudioView {
                 // Opens under the button, right-aligned with it (live: 222 px,
                 // Onshape's context-menu style). The button's bottom-right
                 // corner, from the widget's painted origin.
-                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(154.))).unwrap_or_default();
+                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(156.))).unwrap_or_default();
                 let view = view.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
                 m = m.camera();

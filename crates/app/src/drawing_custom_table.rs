@@ -18,7 +18,7 @@ use gpui_kit::*;
 use noshape_model::TabContent;
 use noshape_model::document::TabId;
 use noshape_model::drawing::tables::{CustomTableKey, custom_table_keys};
-use noshape_model::drawing::{Table, TableCorner, TableKind};
+use noshape_model::drawing::{SheetLayer, Table, TableCorner, TableKind};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -66,7 +66,7 @@ fn table_ref(kind: &TableKind, doc: &noshape_model::Document) -> Option<TableRef
         _ => None,
     }
     .unwrap_or_else(|| name.clone());
-    let version_label = ext.and_then(|e| crate::fs_reference::document_versions(&e.path).and_then(|(_, vs)| vs.into_iter().find(|v| v.microversion == e.microversion).map(|v| v.label)));
+    let version_label = ext.and_then(|e| crate::select_item::document_versions(&e.path).and_then(|(_, vs)| vs.into_iter().find(|v| v.microversion == e.microversion).map(|v| v.label)));
     Some(TableRef { fs: *fs, name: name.clone(), display, version: fs_version.clone(), version_label, fs_name })
 }
 
@@ -242,17 +242,64 @@ impl DrawingEditor {
         [[lo[0], lo[1]], [hi[0], lo[1]], [lo[0], hi[1]], [hi[0], hi[1]]].iter().any(|p| (self.cursor[0] - p[0]).hypot(self.cursor[1] - p[1]) < tol)
     }
 
-    /// Right-click on a custom table (help custom-tables-14).
-    pub fn custom_table_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
-        let mut out = vec![MenuEntry::item("Custom table properties…", move |t, _, cx| t.open_custom_props(id, cx))];
-        let Some(t) = self.current_sheet().table(id) else { return out };
-        let TableKind::Custom { studio, fs, fs_version, .. } = &t.kind else { return out };
+    /// Right-click on a BOM, cut list or custom table with the whole table
+    /// selected, in Onshape's order (help custom-tables-14, bom_table,
+    /// cut_list_table): <type> table properties…, Split …, (custom: Paste,)
+    /// Copy, (custom: Paste as table,) Move to ▸, Bring to front, Send to
+    /// back | Switch to <source>, Move to sheet… | Clear selection, Zoom to
+    /// fit, Delete.
+    pub fn data_table_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
+        let mut out = Vec::new();
+        let sheet = self.current_sheet();
+        let Some(t) = sheet.table(id) else { return out };
+        let custom = matches!(t.kind, TableKind::Custom { .. });
+        out.push(match t.kind {
+            TableKind::Custom { .. } => MenuEntry::item("Custom table properties…", move |t, _, cx| t.open_custom_props(id, cx)),
+            TableKind::Bom { .. } => MenuEntry::item("BOM table properties…", move |t, _, cx| t.open_table_props(id, cx)),
+            _ => MenuEntry::item("Cut list table properties…", move |t, _, cx| t.open_table_props(id, cx)),
+        });
         let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
         out.extend(self.split_entries(t, cell));
+        if custom {
+            let can_paste = crate::drawing_props::view_clipboard(cx).is_some();
+            out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)).disabled(!can_paste));
+        }
+        out.push(MenuEntry::item("Copy", move |t, _, cx| {
+            if !t.selection.contains(&Sel::Table(id)) {
+                t.selection = vec![Sel::Table(id)];
+            }
+            t.copy_entities(cx);
+        }));
+        if custom {
+            out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                t.start_paste_table(cx);
+            }).disabled(self.clipboard_cells(cx).is_none()));
+        }
+        let cur = t.layer;
+        let layers: Vec<MenuEntry> = SheetLayer::FORMAT
+            .iter()
+            .copied()
+            .chain((!cur.is_drawing()).then_some(SheetLayer::Drawing))
+            .filter(|l| *l != cur)
+            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
+            .collect();
+        out.push(MenuEntry::Submenu("Move to".into(), layers));
+        // The table list is the stacking order (last = front).
+        let at = sheet.tables.iter().position(|x| x.id == id).unwrap_or(0);
+        out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(at + 1 == sheet.tables.len()));
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(at == 0));
+        out.push(MenuEntry::Separator);
         let doc = &self.doc.read(cx).session.doc;
+        if let TableKind::Bom { view, .. } = t.kind
+            && let Some((key, _)) = noshape_model::drawing::views::view_source(sheet, view)
+            && let Some(name) = doc.tab(key.tab).map(|t| t.name.clone())
+        {
+            let tab = key.tab;
+            out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
+        }
+        if let TableKind::Custom { studio, fs, fs_version, .. } = &t.kind {
         let (studio, fs) = (*studio, *fs);
         let studio_name = doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default();
-        out.push(MenuEntry::Separator);
         out.push(MenuEntry::item(format!("Switch to Custom tables : {studio_name}"), move |_, w, cx| crate::workspace::request_activate_tab(studio, w, cx)));
         if let Some(e) = fs_version.as_deref().and_then(crate::derived::ExternalRef::parse) {
             let path = e.path;
@@ -266,8 +313,55 @@ impl DrawingEditor {
             let fs_name = doc.tab(fs).map(|t| t.name.clone()).unwrap_or_default();
             out.push(MenuEntry::item(format!("Switch to {fs_name}"), move |_, w, cx| crate::workspace::request_activate_tab(fs, w, cx)));
         }
+        }
+        let mut sheets: Vec<MenuEntry> = self.drawing.sheets.iter().enumerate().filter(|(i, _)| *i != self.sheet).map(|(i, s)| MenuEntry::item(s.name.clone(), move |t, _, cx| t.move_table_to_sheet(id, Some(i), cx))).collect();
+        if !sheets.is_empty() {
+            sheets.push(MenuEntry::Separator);
+        }
+        sheets.push(MenuEntry::item("New sheet", move |t, _, cx| t.move_table_to_sheet(id, None, cx)));
+        out.push(MenuEntry::Submenu("Move to sheet…".into(), sheets));
         out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection.clear();
+            t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
+        }));
         out
+    }
+
+    /// Bring to front / Send to back: the table list is the stacking order.
+    pub fn order_table(&mut self, id: u64, front: bool, cx: &mut Context<Self>) {
+        self.edit_sheet(if front { "Bring to front" } else { "Send to back" }, cx, |s| {
+            if let Some(i) = s.tables.iter().position(|t| t.id == id) {
+                let t = s.tables.remove(i);
+                if front {
+                    s.tables.push(t);
+                } else {
+                    s.tables.insert(0, t);
+                }
+            }
+        });
+    }
+
+    /// Move to sheet: the table goes to sheet `to` (None: a new sheet) at
+    /// the same place.
+    pub fn move_table_to_sheet(&mut self, id: u64, to: Option<usize>, cx: &mut Context<Self>) {
+        let mut d = self.drawing.clone();
+        let Some(i) = d.sheets[self.sheet].tables.iter().position(|t| t.id == id) else { return };
+        let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
+        let mut t = d.sheets[self.sheet].tables.remove(i);
+        t.id = d.sheets[to].next_table_id();
+        d.sheets[to].tables.push(t);
+        let name = d.sheets[to].name.clone();
+        self.selection.clear();
+        self.commit("Move to sheet", d, cx);
+        self.switch_sheet(to, cx);
+        self.status = Some(format!("Moved to {name}").into());
+        cx.notify();
     }
 
     /// Double-click a custom table cell: edit its text (help: "double-click

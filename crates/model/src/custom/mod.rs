@@ -16,12 +16,12 @@
 
 pub mod host;
 mod provider;
-mod reference;
+pub(crate) mod reference;
 pub mod run;
 pub mod studio;
 pub mod table;
 
-pub use provider::{CustomFeatureProvider, DocumentScripts};
+pub use provider::{CustomFeatureProvider, DocumentScripts, external_tab, set_external_tab_loader};
 pub use run::evaluate;
 pub use noshape_featurescript::lexer::symbol_occurrences;
 pub use studio::{CompiledStudio, CustomFeatureDef, Diagnostic, ParamDecl, Severity, compile, lookup};

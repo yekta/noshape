@@ -45,6 +45,27 @@ pub struct CodeGutterMetrics {
 
 impl gpui::Global for CodeGutterMetrics {}
 
+/// NOSHAPE PATCH: the gutter marker of a line's most severe diagnostic (Ace's
+/// error / warning icon, 2 px into the gutter cell, centred on the line).
+/// Code editors draw none unless the app sets this global.
+#[derive(Clone)]
+pub struct GutterMarkerRenderer(pub std::rc::Rc<dyn Fn(DiagnosticSeverity, &gpui::App) -> gpui::AnyElement>);
+
+impl gpui::Global for GutterMarkerRenderer {}
+
+/// NOSHAPE PATCH: when on, inputs open no diagnostic popover; the app reads
+/// `hovered_diagnostic()` and draws its own tooltip (Onshape's Ace tooltip).
+static APP_DIAGNOSTIC_HOVER: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// NOSHAPE PATCH: see [`APP_DIAGNOSTIC_HOVER`].
+pub fn set_app_diagnostic_hover(on: bool) {
+    APP_DIAGNOSTIC_HOVER.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(crate) fn app_diagnostic_hover() -> bool {
+    APP_DIAGNOSTIC_HOVER.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 #[path = "editor/auto_close.rs"]
 mod auto_close;
 mod base;

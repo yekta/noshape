@@ -1056,6 +1056,25 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
         };
     }
     match &*kind {
+        // A part of another Part Studio (PartStudioData.partQuery): the
+        // bodies its feature made, told apart by their sketch edges.
+        "SWEPT_BODY" => {
+            let feature = op.first().map(|o| o.split('.').next().unwrap_or_default().to_string()).unwrap_or_default();
+            let wanted: Vec<u32> = query
+                .get("disambiguationData")
+                .as_array()
+                .iter()
+                .flat_map(|d| d.iter())
+                .flat_map(|d| d.get("originals").as_array().map(|o| o.iter().cloned().collect::<Vec<_>>()).unwrap_or_default())
+                .filter_map(|o| o.get("sketchEntityId").as_str().and_then(|s| s.parse().ok()))
+                .collect();
+            let made: Vec<usize> = q.st.ctx.bodies.iter().enumerate().filter(|(_, b)| b.id.feature.to_string() == feature).map(|(i, _)| i).collect();
+            let fits = |i: &usize| {
+                q.st.ctx.bodies[*i].faces.iter().any(|f| matches!(f.root(), crate::reference::TopoName::Face { role: crate::reference::Role::Side(crate::reference::Source::Sketch { entity, .. }), .. } if wanted.contains(entity)))
+            };
+            let picked: Vec<usize> = if made.len() > 1 && !wanted.is_empty() { made.iter().copied().filter(fits).collect() } else { made };
+            picked.into_iter().map(Ent::Body).collect()
+        }
         "SKETCH_ENTITY" => {
             let Some(s) = q.st.ctx.sketches.iter().position(|x| x.feature == marker) else { return Vec::new() };
             let name = query.get("sketchEntityId").as_str().unwrap_or_default();

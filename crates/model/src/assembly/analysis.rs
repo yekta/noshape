@@ -31,6 +31,36 @@ fn world_shape(o: &PartOccurrence) -> Option<k::Shape> {
     body.shape.transformed(&k::Transform::Matrix(o.transform)).ok()
 }
 
+/// One row of the Interference detection dialog: the two part occurrences
+/// and their overlap (volume, bounding box and mesh, world coordinates).
+#[derive(Clone, Debug)]
+pub struct InstanceInterference {
+    pub a: InstancePath,
+    pub b: InstancePath,
+    pub overlap: crate::interference::Interference,
+}
+
+/// Interference detection in an assembly (live assembly/735–736): overlaps
+/// between the solid parts of the top-level `instances` (parts of one rigid
+/// Part Studio instance are not checked against each other); standard
+/// content only with `include_standard`.
+pub fn instance_interferences(result: &AssemblyResult, instances: &[InstanceId], include_standard: bool) -> Vec<InstanceInterference> {
+    let occ: Vec<&PartOccurrence> = result
+        .occurrences
+        .iter()
+        .filter(|o| o.kind == BodyKind::Solid && instances.contains(&o.path[0]) && (include_standard || o.studio != super::standard::STANDARD_TAB))
+        .collect();
+    let shapes: Vec<(usize, k::Shape)> = occ.iter().enumerate().filter_map(|(i, o)| world_shape(o).map(|s| (i, s))).collect();
+    let kernel: Vec<k::Shape> = shapes.iter().map(|(_, s)| s.clone()).collect();
+    crate::interference::interferences(&kernel)
+        .into_iter()
+        .filter_map(|overlap| {
+            let (a, b) = (occ[shapes[overlap.a].0], occ[shapes[overlap.b].0]);
+            (a.path != b.path).then(|| InstanceInterference { a: a.path.clone(), b: b.path.clone(), overlap })
+        })
+        .collect()
+}
+
 fn boxes_overlap(a: (DVec3, DVec3), b: (DVec3, DVec3), tol: f64) -> bool {
     a.0.x <= b.1.x + tol && b.0.x <= a.1.x + tol && a.0.y <= b.1.y + tol && b.0.y <= a.1.y + tol && a.0.z <= b.1.z + tol && b.0.z <= a.1.z + tol
 }
@@ -574,10 +604,9 @@ pub fn remap_replaced(asm: &mut Assembly, ids: &[InstanceId], old: &AssemblyResu
 
 /// Measure tool in an assembly: entities picked on occurrences (instance
 /// path, face / edge / vertex), measured at their solved world positions —
-/// one entity: length, area, radius / diameter or position; two: minimum
-/// distance (with ΔX/ΔY/ΔZ) and angle; several edges or faces: totals.
+/// see [`crate::regen::measure::measure_shapes`].
 pub fn measure_entities(result: &AssemblyResult, picks: &[(InstancePath, Reference)]) -> Vec<(String, crate::regen::measure::Measurement)> {
-    use crate::regen::measure::{Measurement, resolve_shapes};
+    use crate::regen::measure::resolve_shapes;
     let shapes: Vec<Vec<k::Shape>> = picks
         .iter()
         .map(|(path, r)| {
@@ -587,57 +616,8 @@ pub fn measure_entities(result: &AssemblyResult, picks: &[(InstancePath, Referen
             resolve_shapes(&ctx, r).into_iter().filter_map(|s| s.transformed(&k::Transform::Matrix(o.transform)).ok()).collect()
         })
         .collect();
-    let mut out = Vec::new();
-    if picks.len() == 1 {
-        for s in &shapes[0] {
-            match s.shape_type() {
-                k::ShapeType::Edge => {
-                    if let Ok(l) = s.length() {
-                        out.push(("Length".into(), Measurement::Length(l)));
-                    }
-                    if let Ok(k::Curve::Circle { radius, .. }) = s.edge_curve() {
-                        out.push(("Radius".into(), Measurement::Radius(radius)));
-                        out.push(("Diameter".into(), Measurement::Diameter(radius * 2.0)));
-                    }
-                }
-                k::ShapeType::Face => {
-                    if let Ok(a) = s.area() {
-                        out.push(("Area".into(), Measurement::Area(a)));
-                    }
-                    if let Ok(k::Surface::Cylinder { radius, .. }) = s.face_surface() {
-                        out.push(("Radius".into(), Measurement::Radius(radius)));
-                        out.push(("Diameter".into(), Measurement::Diameter(radius * 2.0)));
-                    }
-                }
-                k::ShapeType::Vertex => {
-                    if let Ok(p) = s.vertex_point() {
-                        out.push(("Point".into(), Measurement::Point(p)));
-                    }
-                }
-                _ => {}
-            }
-        }
-        return out;
-    }
-    let flat: Vec<&k::Shape> = shapes.iter().flatten().collect();
-    if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == k::ShapeType::Edge) {
-        out.push(("Total length".into(), Measurement::Length(flat.iter().filter_map(|s| s.length().ok()).sum())));
-    }
-    if flat.len() >= 2 && flat.iter().all(|s| s.shape_type() == k::ShapeType::Face) {
-        out.push(("Total area".into(), Measurement::Area(flat.iter().filter_map(|s| s.area().ok()).sum())));
-    }
-    if picks.len() == 2
-        && let (Some(a), Some(b)) = (shapes[0].first(), shapes[1].first())
-    {
-        if let Ok(d) = k::distance(a, b) {
-            let v = d.point_b - d.point_a;
-            out.push(("Distance".into(), Measurement::Distance { distance: d.distance, a: d.point_a, b: d.point_b, dx: v.x.abs(), dy: v.y.abs(), dz: v.z.abs() }));
-        }
-        if let Ok(ang) = k::angle_between(a, b) {
-            out.push(("Angle".into(), Measurement::Angle(ang)));
-        }
-    }
-    out
+    // Onshape's measure rules, as in a Part Studio.
+    crate::regen::measure::measure_shapes(&shapes)
 }
 
 fn entity_on_body(b: &crate::regen::context::Body, r: &Reference) -> bool {

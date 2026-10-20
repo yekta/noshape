@@ -644,7 +644,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn sheet_style(&self) -> super::sheet::SheetStyle {
         let p = &self.drawing.props;
-        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch }
+        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45 }
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
@@ -1240,7 +1240,20 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         };
         let data = tables::table_data_with(drawing, t, geo, source, origin, info, &expand);
         let layout = tables::layout(t, &data);
+        let (l0, t0, f0) = (g.lines.len(), g.texts.len(), g.fills.len());
         tables::render(&mut g, t, &data, &layout, pick);
+        // Moved to a format layer: its color, locked with the format.
+        if !t.layer.is_drawing() {
+            let span = LayerSpan { lines: l0..g.lines.len(), texts: t0..g.texts.len(), fills: f0..g.fills.len(), layer: t.layer };
+            if let Some(rgb) = t.layer.color(&drawing.props) {
+                g.colors.push(super::sheet::ColorSpan { lines: span.lines.clone(), texts: span.texts.clone(), fills: span.fills.clone(), rgb });
+            }
+            if drawing.props.formats_locked {
+                g.lines[span.lines.clone()].iter_mut().for_each(|l| l.pick = 0);
+                g.texts[span.texts.clone()].iter_mut().for_each(|x| x.pick = 0);
+            }
+            g.layers.push(span);
+        }
         if let (TableKind::Hole { flip_x, flip_y, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
             let os = pl.to_sheet(o);
             // The tag axis: X and Y arrows in the table's directions.

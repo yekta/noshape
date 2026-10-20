@@ -138,7 +138,13 @@ pub struct InstanceNode {
     /// Subassembly detected as rigid: zero degrees of freedom and exactly
     /// one fixed instance (Onshape shows the rigid assembly icon).
     pub rigid: bool,
+    /// An Assembly of another document: its name there and its content
+    /// (configured, sources pinned to the same version).
+    pub linked: Option<LinkedAssembly>,
 }
+
+/// An Assembly of another document: (its tab name, its content).
+pub type LinkedAssembly = (String, Arc<Assembly>);
 
 #[derive(Clone, Debug)]
 pub struct MateStatus {
@@ -516,7 +522,7 @@ impl Prepared {
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut rels = Vec::new();
         let mut rel_ids = Vec::new();
-        for r in self.relations.iter().filter(|_| only_mate.is_none()) {
+        for r in &self.relations {
             let (Some(&ia), Some(&ib)) = (mate_index.get(&r.a), mate_index.get(&r.b)) else { continue };
             let (base_a, base_b) = match r.base {
                 Some([x, y]) => (x, y),
@@ -524,6 +530,13 @@ impl Prepared {
             };
             rels.push(SolverRelation { kind: r.kind, mate_a: ia, mate_b: ib, ratio: r.ratio, reverse: r.reverse, base_a, base_b, value_a: r.values.0, value_b: r.values.1 });
             rel_ids.push(r.id);
+        }
+        // Relations count towards the degrees of freedom but are not solved
+        // while a mate is being defined.
+        let all_rels = rels.clone();
+        if only_mate.is_some() {
+            rels.clear();
+            rel_ids.clear();
         }
         // Unconstrained bodies follow a drag by pure translation (no solve).
         // The mates handed to the solver (all of them unless `only_mate`; the
@@ -572,7 +585,16 @@ impl Prepared {
                 drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
             }
         }
-        let r = solver::solve(&mut bodies, &active, &rels, &drags);
+        let mut r = solver::solve(&mut bodies, &active, &rels, &drags);
+        // Degrees of freedom of the whole assembly with the mate being
+        // defined (the instance list), not of the one-mate preview solve:
+        // every mate and relation, nothing held, at the previewed poses.
+        if only_mate.is_some() {
+            let mut all: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: self.fixed[i] }).collect();
+            let full = solver::solve(&mut all, &mates, &all_rels, &[]);
+            r.dof = full.dof;
+            r.body_dof = full.body_dof;
+        }
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let mut out = Solved { converged: r.converged, dof: r.dof, ..Default::default() };
         for (id, _) in &self.instances {
@@ -848,14 +870,23 @@ struct StudioCacheEntry {
 /// Cache key of a mirrored part: (tab, configuration, body, plane bits).
 type MirrorKey = (TabId, String, BodyId, [u64; 6]);
 
+/// Where a subassembly's evaluation goes: its node, the leaves, the
+/// prepared solve and the flexible subassemblies of the parent.
+type SubassemblyOut<'a> = (&'a mut InstanceNode, &'a mut Vec<LeafInstance>, &'a mut Prepared, &'a mut Vec<(InstanceId, Assembly, HashMap<InstanceId, Frame>)>);
+
 /// A regenerated external Part Studio: (its tab in the pinned document, result).
 pub type ExternalStudio = (TabId, Arc<RegenResult>);
 
 /// Resolves Part Studios of other documents (version-pinned snapshots) for
 /// [`InstanceSource::External`] instances. Implemented by the app.
 pub trait ExternalStudios: Send + Sync {
-    /// The pinned document and the Part Studio tab a key refers to.
+    /// The pinned document and the Part Studio (or Assembly) tab a key refers to.
     fn studio(&self, key: &str) -> Option<(Arc<Document>, TabId)>;
+    /// The key of another tab of the same pinned document (the Part Studios
+    /// and subassemblies an inserted Assembly of that document uses).
+    fn sibling(&self, _key: &str, _tab: TabId) -> Option<String> {
+        None
+    }
 }
 
 /// Evaluates assemblies; keeps Part Studio regenerations cached across calls.
@@ -868,6 +899,9 @@ pub struct AssemblyEvaluator {
     /// Regenerated external Part Studios by (key, configuration); pinned
     /// snapshots never change.
     external_studios: HashMap<(String, String), Option<ExternalStudio>>,
+    /// Assemblies of other documents by (key, configuration), configured and
+    /// with their sources re-pointed at the same pinned version.
+    external_assemblies: HashMap<(String, String), Option<LinkedAssembly>>,
     /// Generated standard content parts (never change).
     standard: HashMap<super::standard::StandardSpec, Result<Arc<RegenResult>, String>>,
     /// Finest meshes of bodies drawn with "Use best available tessellation",
@@ -1586,6 +1620,39 @@ impl AssemblyEvaluator {
         r
     }
 
+    /// An Assembly of another document (a key whose tab is an Assembly) in
+    /// a configuration, its instances re-pointed at the same pinned version
+    /// of that document, so it evaluates like a subassembly of this one.
+    /// `None` when the key is not an Assembly or cannot be read.
+    pub fn external_assembly(&mut self, key: &str, config: &ConfigValues) -> Option<LinkedAssembly> {
+        let ck = (key.to_string(), serde_json::to_string(config).unwrap_or_default());
+        if let Some(r) = self.external_assemblies.get(&ck) {
+            return r.clone();
+        }
+        let provider = self.external.clone()?;
+        let r = provider.studio(key).and_then(|(doc, tab)| {
+            let t = doc.tab(tab)?;
+            let TabContent::Assembly(a) = &t.content else { return None };
+            let mut sub = if a.has_configured() { a.configured(config) } else { (**a).clone() };
+            for i in &mut sub.instances {
+                let sibling = |t: TabId| provider.sibling(key, t).unwrap_or_default();
+                i.source = match std::mem::replace(&mut i.source, InstanceSource::PartStudio { studio: tab, config: ConfigValues::default() }) {
+                    InstanceSource::Part { studio, body, config } => InstanceSource::External { key: sibling(studio), body: Some(body), config },
+                    InstanceSource::PartStudio { studio, config } => InstanceSource::External { key: sibling(studio), body: None, config },
+                    InstanceSource::Assembly { assembly, config } => InstanceSource::External { key: sibling(assembly), body: None, config },
+                    // Mirrored parts and sketches of the other document's Part
+                    // Studios have no external form yet: they read as missing.
+                    InstanceSource::MirroredPart { studio, body, config, .. } => InstanceSource::External { key: format!("{}#mirrored", sibling(studio)), body: Some(body), config },
+                    InstanceSource::Sketch { studio, sketch, config } => InstanceSource::External { key: format!("{}#sketch", sibling(studio)), body: Some(sketch_body_id(sketch)), config },
+                    other => other,
+                };
+            }
+            Some((t.name.clone(), Arc::new(sub)))
+        });
+        self.external_assemblies.insert(ck, r.clone());
+        r
+    }
+
     /// Mirrored version of one part of a regenerated studio (cached).
     fn mirrored_studio(&mut self, tab: TabId, config: &ConfigValues, body: &BodyId, src: &Arc<RegenResult>, point: DVec3, normal: DVec3) -> Option<Arc<RegenResult>> {
         let bits = [point.x.to_bits(), point.y.to_bits(), point.z.to_bits(), normal.x.to_bits(), normal.y.to_bits(), normal.z.to_bits()];
@@ -1728,6 +1795,71 @@ impl AssemblyEvaluator {
 
     /// Flatten an assembly into leaves (relative to their top-level
     /// instance), list nodes and the prepared solver problem.
+    /// A subassembly instance (`sub` already in the instance's configuration):
+    /// its leaves, nodes and, when flexible, its parts as bodies of this solve.
+    /// `visit`: the subassembly's identity for the circular-reference check.
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_subassembly(&mut self, doc: &Document, inst: &super::Instance, sub: &Assembly, visit: u64, suppressed: bool, visited: &mut Vec<u64>, out: SubassemblyOut) {
+        let (node, leaves, prepared, flex_subs) = out;
+        if visited.contains(&visit) || visited.len() > 16 {
+            node.error = Some("Circular assembly reference".into());
+            return;
+        }
+        visited.push(visit);
+        let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
+        visited.pop();
+        // Positions of the subassembly's instances: its named position
+        // (Lock/follow position to), else solved from the positions
+        // stored in this assembly for them.
+        let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
+        let solved = match &inst.lock {
+            super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
+                Some(np) => sub_prep.solve_named_position(np),
+                None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+            },
+            _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+        };
+        // Flexible (Onshape's default): its mates join this assembly's
+        // solve. Subassemblies with patterns, relations, tangent mates or
+        // nested flexible subassemblies stay rigid.
+        let flexible = inst.lock.is_flexible()
+            && !suppressed
+            && sub.patterns.is_empty()
+            && sub.relations.iter().all(|r| r.suppressed)
+            && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
+            && sub_prep.flexible.is_empty();
+        node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
+        let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
+        if flexible {
+            prepared.flexible.insert(inst.id);
+            flex_subs.push((inst.id, sub.clone(), solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect()));
+        }
+        for mut l in sub_leaves {
+            let top = place.get(&l.path[0]).copied().unwrap_or(DMat4::IDENTITY);
+            if flexible {
+                l.flex = Some((l.path[0], l.inner));
+            }
+            l.inner = top * l.inner;
+            let mut path = vec![inst.id];
+            path.extend(l.path.iter().copied());
+            l.path = path;
+            l.hidden |= inst.hidden;
+            if !suppressed {
+                leaves.push(l);
+            }
+        }
+        node.children = sub_nodes
+            .into_iter()
+            .map(|mut n| {
+                prefix_paths(&mut n, inst.id);
+                n
+            })
+            .collect();
+        if !sub_prep.failed_mates.is_empty() {
+            node.error = Some("Subassembly contains mate error".into());
+        }
+    }
+
     fn prepare_inner(&mut self, doc: &Document, asm: &Assembly, visited: &mut Vec<u64>) -> (Vec<LeafInstance>, Vec<InstanceNode>, Prepared) {
         // Dynamic suppression: instances whose "Unsuppressed if" is false.
         let dynamic;
@@ -1767,6 +1899,11 @@ impl AssemblyEvaluator {
                 error: None,
                 children: Vec::new(),
                 rigid: false,
+                linked: None,
+            };
+            let ext_sub = match &inst.source {
+                InstanceSource::External { key, body: None, config } => self.external_assembly(key, config),
+                _ => None,
             };
             match &inst.source {
                 InstanceSource::Part { studio, body, config } => {
@@ -1821,6 +1958,16 @@ impl AssemblyEvaluator {
                         }
                         None => node.error = Some("Part Studio was deleted".into()),
                     }
+                }
+                InstanceSource::External { key, body: None, .. } if ext_sub.is_some() => {
+                    // An Assembly of another document: a subassembly pinned to
+                    // that document's version.
+                    node.kind = NodeKind::Assembly;
+                    let visit = hash_of(key) | (1 << 63);
+                    if let Some((_, sub)) = &ext_sub {
+                        self.prepare_subassembly(doc, inst, sub, visit, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs));
+                    }
+                    node.linked = ext_sub.clone();
                 }
                 InstanceSource::External { key, body, config } => {
                     node.kind = if body.is_some() { NodeKind::Part } else { NodeKind::PartStudio };
@@ -1930,62 +2077,7 @@ impl AssemblyEvaluator {
                     };
                     match sub {
                         None => node.error = Some("Assembly was deleted".into()),
-                        Some(_) if visited.contains(&assembly.0) || visited.len() > 16 => node.error = Some("Circular assembly reference".into()),
-                        Some(sub) => {
-                            visited.push(assembly.0);
-                            let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
-                            visited.pop();
-                            // Positions of the subassembly's instances: its named position
-                            // (Lock/follow position to), else solved from the positions
-                            // stored in this assembly for them.
-                            let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
-                            let solved = match &inst.lock {
-                                super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
-                                    Some(np) => sub_prep.solve_named_position(np),
-                                    None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
-                                },
-                                _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
-                            };
-                            // Flexible (Onshape's default): its mates join this assembly's
-                            // solve. Subassemblies with patterns, relations, tangent mates or
-                            // nested flexible subassemblies stay rigid.
-                            let flexible = inst.lock.is_flexible()
-                                && !suppressed
-                                && sub.patterns.is_empty()
-                                && sub.relations.iter().all(|r| r.suppressed)
-                                && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
-                                && sub_prep.flexible.is_empty();
-                            node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
-                            let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
-                            if flexible {
-                                prepared.flexible.insert(inst.id);
-                                flex_subs.push((inst.id, sub.clone(), solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect()));
-                            }
-                            for mut l in sub_leaves {
-                                let top = place.get(&l.path[0]).copied().unwrap_or(DMat4::IDENTITY);
-                                if flexible {
-                                    l.flex = Some((l.path[0], l.inner));
-                                }
-                                l.inner = top * l.inner;
-                                let mut path = vec![inst.id];
-                                path.extend(l.path.iter().copied());
-                                l.path = path;
-                                l.hidden |= inst.hidden;
-                                if !suppressed {
-                                    leaves.push(l);
-                                }
-                            }
-                            node.children = sub_nodes
-                                .into_iter()
-                                .map(|mut n| {
-                                    prefix_paths(&mut n, inst.id);
-                                    n
-                                })
-                                .collect();
-                            if !sub_prep.failed_mates.is_empty() {
-                                node.error = Some("Subassembly contains mate error".into());
-                            }
-                        }
+                        Some(sub) => self.prepare_subassembly(doc, inst, sub, assembly.0, suppressed, visited, (&mut node, &mut leaves, &mut prepared, &mut flex_subs)),
                     }
                 }
             }

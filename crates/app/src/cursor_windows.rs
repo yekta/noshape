@@ -1,9 +1,11 @@
-//! Windows backend of the selection-count cursor (see cursor.rs): an icon
-//! cursor from the image, and a window subclass that answers WM_SETCURSOR
-//! with it while it is active (GPUI sets its own cursor on every
+//! Windows backend of the graphics-area cursors (see cursor.rs): an icon
+//! cursor from the image (Onshape's Windows art), or the system cursor for a
+//! CSS standard name (move `IDC_SIZEALL`, no-drop `IDC_NO`; zoom-in has
+//! none, Chrome draws it, so do we), and a window subclass that answers
+//! WM_SETCURSOR with it while it is active (GPUI sets its own cursor on every
 //! WM_SETCURSOR).
 
-use super::CursorImage;
+use super::{AppCursor, CursorImage};
 use raw_window_handle::RawWindowHandle;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -11,13 +13,13 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateBitmap, CreateDIBSection, DIB_RGB_COLORS, DeleteObject};
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
-use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, HCURSOR, HTCLIENT, ICONINFO, IDC_ARROW, LoadCursorW, SetCursor, WM_SETCURSOR};
+use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, HCURSOR, HTCLIENT, ICONINFO, IDC_ARROW, IDC_NO, IDC_SIZEALL, LoadCursorW, SetCursor, WM_SETCURSOR};
 
 /// The active count cursor (an HCURSOR), 0 when GPUI's cursor applies.
 static ACTIVE: AtomicIsize = AtomicIsize::new(0);
 
 thread_local! {
-    static CURSORS: RefCell<HashMap<(usize, u32), isize>> = RefCell::new(HashMap::new());
+    static CURSORS: RefCell<HashMap<(AppCursor, u32), isize>> = RefCell::new(HashMap::new());
     static SUBCLASSED: RefCell<HashSet<isize>> = RefCell::new(HashSet::new());
 }
 
@@ -55,7 +57,7 @@ fn make(img: &CursorImage) -> Option<isize> {
         // 32-bpp icon colors: straight-alpha BGRA.
         std::ptr::copy_nonoverlapping(img.bgra.as_ptr(), bits as *mut u8, img.bgra.len());
         let mask = CreateBitmap(side, side, 1, 1, None);
-        let icon = ICONINFO { fIcon: false.into(), xHotspot: img.hot, yHotspot: img.hot, hbmMask: mask, hbmColor: color };
+        let icon = ICONINFO { fIcon: false.into(), xHotspot: img.hot.0, yHotspot: img.hot.1, hbmMask: mask, hbmColor: color };
         let cursor = CreateIconIndirect(&icon).ok();
         let _ = DeleteObject(color.into());
         let _ = DeleteObject(mask.into());
@@ -63,7 +65,7 @@ fn make(img: &CursorImage) -> Option<isize> {
     }
 }
 
-pub fn set(raw: RawWindowHandle, scale: u32, count: Option<usize>, image: &mut dyn FnMut(usize) -> Option<CursorImage>) -> bool {
+pub fn set(raw: RawWindowHandle, scale: u32, cursor: Option<AppCursor>, image: &mut dyn FnMut(AppCursor, bool) -> Option<CursorImage>) -> bool {
     let RawWindowHandle::Win32(h) = raw else { return false };
     let hwnd = HWND(h.hwnd.get() as *mut core::ffi::c_void);
     let installed = SUBCLASSED.with(|s| {
@@ -73,7 +75,7 @@ pub fn set(raw: RawWindowHandle, scale: u32, count: Option<usize>, image: &mut d
     if !installed {
         return false;
     }
-    match count {
+    match cursor {
         None => {
             ACTIVE.store(0, Ordering::Relaxed);
             if let Ok(arrow) = unsafe { LoadCursorW(None, IDC_ARROW) } {
@@ -81,14 +83,22 @@ pub fn set(raw: RawWindowHandle, scale: u32, count: Option<usize>, image: &mut d
             }
             true
         }
-        Some(n) => {
-            let Some(cur) = CURSORS.with(|c| {
-                let mut c = c.borrow_mut();
-                if let Some(cur) = c.get(&(n, scale)) {
+        Some(c) => {
+            let Some(cur) = CURSORS.with(|m| {
+                let mut m = m.borrow_mut();
+                if let Some(cur) = m.get(&(c, scale)) {
                     return Some(*cur);
                 }
-                let cur = image(n).and_then(|img| make(&img))?;
-                c.insert((n, scale), cur);
+                let system = match c {
+                    AppCursor::Move => Some(IDC_SIZEALL),
+                    AppCursor::NoDrop => Some(IDC_NO),
+                    _ => None,
+                };
+                let cur = match system {
+                    Some(id) => unsafe { LoadCursorW(None, id) }.ok().map(|h| h.0 as isize)?,
+                    None => image(c, true).and_then(|img| make(&img))?,
+                };
+                m.insert((c, scale), cur);
                 Some(cur)
             }) else {
                 return false;

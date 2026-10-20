@@ -21,4 +21,13 @@ pub trait DerivedProvider: Send + Sync + std::fmt::Debug {
     fn file(&self, _key: &str) -> Option<crate::file_tab::FileTab> {
         None
     }
+    /// The source Part Studio's configuration inputs (PartStudioData).
+    fn configuration(&self, _tab: &str) -> Option<crate::configuration::Configuration> {
+        None
+    }
+    /// The type of a feature of the source Part Studio (`extrude`, …), for
+    /// FeatureScript part queries (`<feature>.opExtrude`).
+    fn feature_type(&self, _tab: &str, _feature: crate::reference::FeatureId) -> Option<String> {
+        None
+    }
 }

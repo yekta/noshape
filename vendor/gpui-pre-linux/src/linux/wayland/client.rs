@@ -836,6 +836,16 @@ impl WaylandClientState {
             self.cursor.set_custom(&wl_pointer, serial, &custom);
             return;
         }
+        if let Some(css) = crate::custom_cursor::current_named() {
+            match (&self.cursor_shape_device, super::css_to_shape(css)) {
+                (Some(device), Some(shape)) => device.set_shape(serial, shape),
+                _ => {
+                    let scale = window.primary_output_scale();
+                    self.cursor.set_icon(&wl_pointer, serial, super::css_icon_names(css), scale);
+                }
+            }
+            return;
+        }
         let Some(style) = self.cursor_style else { return };
         if let Some(cursor_shape_device) = &self.cursor_shape_device {
             cursor_shape_device.set_shape(serial, to_shape(style));
@@ -867,7 +877,7 @@ impl WaylandClientState {
             return;
         }
         // NOSHAPE PATCH: an application image cursor replaces the style cursor.
-        if crate::custom_cursor::current().is_some() {
+        if crate::custom_cursor::active() {
             self.apply_cursor();
             return;
         }
@@ -1417,7 +1427,7 @@ impl WaylandConnection {
 
         let serial = state.serial_tracker.get(SerialKind::MouseEnter);
         // NOSHAPE PATCH: an application image cursor replaces the style cursor.
-        if crate::custom_cursor::current().is_some() {
+        if crate::custom_cursor::active() {
             state.apply_cursor();
         } else if let Some(cursor_shape_device) = &state.cursor_shape_device {
             cursor_shape_device.set_shape(serial.as_raw(), to_shape(style));
@@ -2520,6 +2530,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     // NOSHAPE PATCH: an application image cursor replaces the style cursor.
                     if let Some(custom) = crate::custom_cursor::current() {
                         state.cursor.set_custom(wl_pointer, serial, &custom);
+                    } else if crate::custom_cursor::current_named().is_some() {
+                        state.apply_cursor();
                     } else if let Some(style) = state.cursor_style {
                         if let Some(cursor_shape_device) = &state.cursor_shape_device {
                             cursor_shape_device.set_shape(serial, to_shape(style));

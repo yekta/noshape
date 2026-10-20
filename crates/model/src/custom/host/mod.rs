@@ -13,7 +13,7 @@
 //! custom feature, and `qCreatedBy(id + "extrude1")` finds the marker.
 
 mod builtin;
-mod convert;
+pub(crate) mod convert;
 mod evaluate;
 mod ops;
 mod pattern;

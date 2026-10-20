@@ -8,6 +8,7 @@
 use crate::drawing_tools::{auto_orientation, dim_offset, intersect};
 use crate::drawing_view::*;
 use noshape_model::drawing::*;
+use noshape_model::drawing::views;
 
 fn sub(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     [a[0] - b[0], a[1] - b[1]]
@@ -24,6 +25,31 @@ fn norm(a: [f64; 2]) -> [f64; 2] {
 }
 
 type Refs = Vec<(u8, Option<PointRef>)>;
+
+impl DrawingEditor {
+    /// Two picked parallel lines that are the silhouette of one cylinder in
+    /// the view (a circle seen edge-on, centered between them, diameter =
+    /// their distance): Onshape gives the dimension an automatic ⌀ (help
+    /// drawing_-_dimension; also in section views).
+    pub fn cylinder_silhouettes(&self, picks: &[Pick]) -> bool {
+        let [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, .. }] = picks else { return false };
+        if a1.view != a2.view {
+            return false;
+        }
+        let u = norm(sub(b1.p, a1.p));
+        let side = |p: [f64; 2]| (p[0] - a1.p[0]) * u[1] - (p[1] - a1.p[1]) * u[0];
+        let d = side(a2.p);
+        if d.abs() < 1e-12 {
+            return false;
+        }
+        let Some(g) = self.geoms.get(&a1.view) else { return false };
+        let tol = d.abs() * 1e-3;
+        g.model_edges.iter().any(|me| match me.geom {
+            views::EdgeGeom::Circle { center, radius, face_on: false, .. } => (2.0 * radius - d.abs()).abs() < tol && (side(center) - d / 2.0).abs() < tol,
+            _ => false,
+        })
+    }
+}
 
 /// Same picked entity (same view and geometry).
 fn same(a: &Pick, b: &Pick) -> bool {
@@ -101,7 +127,7 @@ impl DrawingEditor {
             _ => None,
         };
         let refs = if vref.is_some() { vec![(0, vref), (1, pa.r.clone()), (2, pb.r.clone())] } else { vec![] };
-        Some((AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius }, refs))
+        Some((AnnotationKind::AngularDimension { view: a1.view, vertex: v, a: pa.p, b: pb.p, radius, three_point: false }, refs))
     }
 
     /// A linear dimension from `a` to `b`, oriented by the cursor (or

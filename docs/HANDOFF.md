@@ -80,7 +80,7 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | Agent | Motile id | Account / model | Display, target | Handoff |
 |---|---|---|---|---|
 | ui: Part Studio chrome, dialogs, viewport | 3f25493a-a7a1-4328-848b-ae8f86537929 | Ngyekta / Opus 5.5 | :101, target-shared | `docs/handoff/theme-layout.md` |
-| ui2: sketch/assembly/drawing/start-window/document visuals | c8d8bebc-f75d-4b7b-9547-80ff610dcf0f | Unbind / Opus 5.5 | :105, target-shared | `docs/handoff/theme-studios.md` |
+| ui2: sketch/assembly/drawing/start-window/document visuals | 73f8d178-6349-40d3-8581-fdad4d67f77d | Stablecog / Opus 5.5 | :105, target-shared | `docs/handoff/theme-studios.md` |
 | nav: view navigation (FINISHED; only real-hardware touch checks remain, see docs/handoff/navigation.md) | 98da8819-1a7a-4be9-a814-e167275fcc08 | Motile / Opus 5.5 | :109, target-shared | `docs/handoff/navigation.md`, `docs/parity/navigation.md` |
 | icons: redrew 21 icons copied from Onshape + added no_onshape_assets guard test (FINISHED) | ddea0979-7067-4399-9ade-2a18dbe32300 | Yekta / Opus 5.5 | - | report to lead |
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
@@ -88,11 +88,12 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | skb: assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-shared | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
 | asb: drawing behaviour | 330203cf-d732-49b9-b81c-cf46fabfc5d6 | Motile / Opus 5.5 | :104, target-shared | `docs/handoff/drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
-| kern: kernel robustness + export writers | 72f8887f-353c-4fcf-85cf-344f7aff59d1 | Unbind / Opus 5.5 | :106, target-shared | `docs/handoff/kernel-robustness.md` |
+| kern: kernel robustness + import/export | 1d8d27a8-3e1e-408a-9059-12bf7ecef977 | Yekta / Opus 5.5 | :106, target-shared | `docs/handoff/kernel-robustness.md` |
 | fs: FeatureScript language + std library (resumed 08:20; first: green tests + model clippy) | 80461700-2f11-4bd2-afd0-170152385f77 | Ngyekta / Opus 5.5 | :108, target-shared | `docs/handoff/featurescript.md` |
 
 Use Opus 5.5 for all agents (user, 2026-10-18; not Fable). Unbind and Codex hit session limits on 2026-10-18; their agents were moved.
 Motile bug: an agent in "waiting_for_usage_limit" ignores stop_agent; send it a message (that wakes it), then stop_agent while it shows "running".
+Unbind's login was revoked on 2026-10-20; don't use it until the user re-authenticates.
 Accounts: "Ngyekta" (Claude) hit its weekly limit (resets 2026-10-19 04:00 UTC); the "Yekta" account's login expired.
 Integration: `/tmp/lead/integrate.sh "msg"` snapshots the tree, builds/tests/clippies it in /root/noshape-lead and commits that exact tree (the shared tree rarely compiles at any instant).
 
