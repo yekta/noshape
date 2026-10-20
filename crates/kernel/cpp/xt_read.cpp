@@ -1524,7 +1524,7 @@ struct Builder
       Geom2dAPI_Interpolate in(pts, par, false, 1e-12);
       in.Perform();
       if (in.IsDone())
-        return in.Curve();
+        return occ::handle<Geom2d_Curve>(in.Curve());
     }
     catch (const Standard_Failure&)
     {
