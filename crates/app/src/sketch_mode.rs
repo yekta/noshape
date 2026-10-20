@@ -313,6 +313,10 @@ pub enum PatternHandle {
 pub struct DimEdit {
     pub constraint: ConstraintId,
     pub text: String,
+    /// The box of a dimension the Dimension tool just created (applying it
+    /// clears the selection, Onshape `cleanUpAfterCommit`), not of an
+    /// existing one being edited.
+    pub created: bool,
 }
 
 /// One value box of an on-the-fly dimension (shown right after an entity
@@ -943,7 +947,13 @@ impl SketchEditor {
 
     /// Cancel the in-progress operation (Esc). Returns true if something was cancelled.
     pub fn cancel(&mut self) -> bool {
-        if self.dim_edit.take().is_some() {
+        if let Some(d) = self.dim_edit.take() {
+            // Onshape resets the selection when the Dimension tool commits a
+            // new dimension, so dismissing its box leaves nothing selected.
+            if d.created {
+                self.selection.clear();
+                self.selected_constraints.clear();
+            }
             return true;
         }
         if self.editing_text.take().is_some() {
@@ -1731,7 +1741,7 @@ impl SketchEditor {
     /// Open the value box of a dimension (the Onshape dimension context dialog).
     fn open_value_box(&mut self, data: &SketchData, cid: ConstraintId) {
         let Some(text) = dimension_edit_text(data, cid, &UnitPrefs::default()) else { return };
-        self.dim_edit = Some(DimEdit { constraint: cid, text });
+        self.dim_edit = Some(DimEdit { constraint: cid, text, created: true });
     }
 
     /// Trim tool: trim the curve under `p` (click, or each curve a drag crosses).
@@ -4219,7 +4229,12 @@ impl SketchEditor {
         }
         // Related entities (constraint/dimension tool picks, mirror axis, entities
         // of the selected/hovered constraint): Onshape's yellow highlight.
-        let related = self.picked(Some(data));
+        // (The Dimension tool's picks show selected instead, live sketch/12.)
+        let mut related = self.picked(Some(data));
+        if self.tool == Tool::Dimension {
+            let picks = self.tool_picks();
+            related.retain(|e| !picks.contains(e));
+        }
         for e in &related {
             if is_point(&data.sketch, *e) {
                 if let Some(p) = data.sketch.point(*e) {
@@ -4337,6 +4352,12 @@ impl SketchEditor {
 
     /// Entities highlighted as related (picks, mirror axis, entities of the
     /// selected / hovered constraints).
+    /// Entities the active tool has picked so far (e.g. the Dimension
+    /// tool's first entity).
+    pub fn tool_picks(&self) -> Vec<EntityId> {
+        self.picks.iter().map(|p| p.0).collect()
+    }
+
     pub fn picked(&self, data: Option<&SketchData>) -> Vec<EntityId> {
         let mut v: Vec<EntityId> = self.picks.iter().map(|p| p.0).collect();
         v.extend(self.mirror_axis);
@@ -6341,6 +6362,27 @@ mod tests {
         let c = d.sketch.curve(l).unwrap();
         assert!((c.length() - 0.03).abs() < 1e-9);
         assert!(c.end_point().x < c.start_point().x, "negative length flips the line");
+    }
+
+    #[test]
+    fn a_new_dimension_leaves_nothing_selected() {
+        // Onshape: the Dimension tool's commit resets the selection list
+        // (bundle `cleanUpAfterCommit`; live sketch/15).
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let l = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        ed.pointer_move(&mut d, v(0.02, 0.015), false, false);
+        click(&mut ed, &mut d, v(0.02, 0.015));
+        let cid = ed.dim_edit.as_ref().expect("value box").constraint;
+        assert!(ed.dim_edit.as_ref().unwrap().created);
+        ed.selection = vec![l];
+        assert!(ed.cancel());
+        assert!(ed.selection.is_empty() && ed.selected_constraints.is_empty());
+        // Editing an existing dimension keeps the selection.
+        ed.selected_constraints = vec![cid];
+        ed.dim_edit = Some(DimEdit { constraint: cid, text: "20 mm".into(), created: false });
+        assert!(ed.cancel());
+        assert_eq!(ed.selected_constraints, vec![cid]);
     }
 
     #[test]

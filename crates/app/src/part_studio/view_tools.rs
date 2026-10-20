@@ -148,7 +148,7 @@ impl PartStudioView {
     /// (focused: 1 px `#3e94ff`), then on `#f5f5f5` the results (198 px,
     /// 34 px rows, selected `#b2ddf6`) beside the selected tool's icon, name
     /// and description, and a `#eeeeee` footer.
-    pub(super) fn render_palette(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (st, _) = self.palette.as_ref()?;
         let st = st.clone();
         let pal = p();
@@ -247,12 +247,13 @@ impl PartStudioView {
         });
         let nothing = items.is_empty();
         let highlight = !self.ui.palette_no_highlight;
-        Some(
-            div()
+        // Live (menus/tool-search-*): 10 px under the toolbar at the window's
+        // right edge, drawn over the panels.
+        let top = self.ui.palette_top.clone();
+        let probe = top.clone();
+        let anchor = point(window.viewport_size().width, top.get() + px(10.));
+        let popover = div()
                 .id("tool-search")
-                .absolute()
-                .top(px(10.))
-                .right(px(0.))
                 .w(px(600.))
                 .occlude()
                 .bg(gpui_kit::rgb(0xf5f5f5))
@@ -320,7 +321,15 @@ impl PartStudioView {
                             cx.notify();
                         })))
                         .child(div().size(px(14.)).ml(px(6.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
-                )
+                );
+        Some(
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_0()
+                .child(canvas(move |b, _, _| probe.set(b.origin.y), |_, _, _, _| {}).size_0())
+                .child(deferred(anchored().anchor(Anchor::TopRight).position(anchor).child(popover)).with_priority(1))
                 .into_any_element(),
         )
     }

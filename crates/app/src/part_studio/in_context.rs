@@ -168,7 +168,7 @@ impl PartStudioView {
                 }
             }
         }
-        if let Some((b, fi)) = self.hover.as_ref().filter(|r| !selection.contains(r)).and_then(|r| face(r)) {
+        if let Some((b, fi)) = self.hover.as_ref().filter(|r| !selection.contains(r)).and_then(&face) {
             outline_face(b, fi, crate::theme::rgb8(crate::theme::viewport::PREHIGHLIGHT), &mut lines);
         }
         if let Some(f) = self.ui.context_arrow_hover.and_then(|id| self.studio(cx)?.features.iter().find(|f| f.id == id)) {

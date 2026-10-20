@@ -160,6 +160,7 @@ impl DrawingEditor {
             .child(self.tool_btn("dr-revtable", "revision-table", "Revision table", matches!(t, Tool::Table { kind: TableTool::Revision, .. }), || Tool::Table { kind: TableTool::Revision, view: None, origin: None }, cx))
             .child(self.tool_btn("dr-cutlist", "cut-list", "Cut list table", matches!(t, Tool::Table { kind: TableTool::CutList, .. }), || Tool::Table { kind: TableTool::CutList, view: None, origin: None }, cx))
             .child(self.tool_btn("dr-holetable", "hole-table", "Hole table", matches!(t, Tool::Table { kind: TableTool::Hole, .. }), || Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx))
+            .child(self.tool_btn("dr-customtable", "featurescript-table", "Custom table", matches!(t, Tool::Table { kind: TableTool::Custom, .. }), || Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx))
             .child(sep())
             .child(self.tool_btn("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }, cx))
             .child(self.tool_btn("dr-ecline", "centerline-edge", "Edge to edge centerline", matches!(t, Tool::EdgeCenterline { .. }), || Tool::EdgeCenterline { first: None }, cx))
@@ -273,7 +274,7 @@ impl DrawingEditor {
                 let title = if edit.is_some() { "Edit note" } else { "Note" };
                 (title, self.note_panel_rows(cx))
             }
-            Panel::Dimension { .. } | Panel::Gdt { .. } | Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } | Panel::NewTable { .. } => self.extra_panel_rows(cx)?,
+            Panel::Dimension { .. } | Panel::Datum { .. } | Panel::SurfaceFinish { .. } | Panel::Cell { .. } | Panel::SheetName { .. } | Panel::Rotation { .. } | Panel::NewTable { .. } => self.extra_panel_rows(cx)?,
             Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. } => self.more_panel_rows(cx)?,
             Panel::BomCell { .. } => ("BOM cell", self.bom_cell_rows(cx)),
             Panel::TitleBlock { inputs } => (

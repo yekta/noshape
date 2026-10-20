@@ -109,7 +109,17 @@ thread_local! {
 
 /// Restart the printed numbers (at the start of each feature run).
 pub fn reset_shown_numbers() {
-    SHOWN.with(|c| c.set((0, 0)));
+    set_shown_counters((0, 0));
+}
+
+/// The next printed numbers (builtin, box) on this thread, to continue
+/// them on the thread that runs the feature.
+pub fn shown_counters() -> (u64, u64) {
+    SHOWN.with(|c| c.get())
+}
+
+pub fn set_shown_counters(next: (u64, u64)) {
+    SHOWN.with(|c| c.set(next));
 }
 
 fn make_serial(boxed: bool) -> u64 {
@@ -192,6 +202,9 @@ pub enum Func {
     Closure { def: Arc<crate::ir::CompiledFn>, captures: Vec<Value> },
     /// A top-level function (overload set) used as a value.
     Overloads(Arc<crate::ir::OverloadSet>),
+    /// A runtime builtin called with `bound` before the arguments (e.g.
+    /// `PartStudioData.buildFunction`).
+    Native { name: Arc<str>, f: crate::interp::NativeFn, bound: Vec<Value> },
 }
 
 impl std::fmt::Debug for Func {
@@ -199,6 +212,7 @@ impl std::fmt::Debug for Func {
         match self {
             Func::Closure { def, .. } => write!(f, "Closure({}:{})", def.module, def.pos),
             Func::Overloads(s) => write!(f, "Overloads({})", s.name),
+            Func::Native { name, .. } => write!(f, "Native({name})"),
         }
     }
 }
@@ -208,12 +222,14 @@ impl Func {
         match self {
             Func::Closure { def, .. } => Arc::as_ptr(def) as *const u8 as usize,
             Func::Overloads(s) => Arc::as_ptr(s) as *const u8 as usize,
+            Func::Native { f, .. } => *f as usize,
         }
     }
     fn captures(&self) -> &[Value] {
         match self {
             Func::Closure { captures, .. } => captures,
             Func::Overloads(_) => &[],
+            Func::Native { bound, .. } => bound,
         }
     }
 }
@@ -233,7 +249,8 @@ pub enum Value {
     Enum(Tag, u32),
     Array(Arc<Vec<Value>>, Tag),
     Map(Arc<Map>, Tag),
-    Box(Shared<BoxCell>),
+    /// A box; std tags some (`new box(...) as Instantiator`).
+    Box(Shared<BoxCell>, Tag),
     Builtin(Arc<dyn Builtin>, Tag),
     Function(Shared<Func>),
 }
@@ -300,7 +317,7 @@ impl Value {
         Value::Map(Arc::new(m), Tag::NONE)
     }
     pub fn new_box(v: Value) -> Value {
-        Value::Box(Shared::new(BoxCell { serial: next_box_serial(), value: Mutex::new(v) }))
+        Value::Box(Shared::new(BoxCell { serial: next_box_serial(), value: Mutex::new(v) }), Tag::NONE)
     }
     /// A map from string keys.
     pub fn map_from<'a>(entries: impl IntoIterator<Item = (&'a str, Value)>) -> Value {
@@ -329,7 +346,7 @@ impl Value {
 
     pub fn tag(&self) -> Tag {
         match self {
-            Value::Bool(_, t) | Value::Number(_, t) | Value::Str(_, t) | Value::Array(_, t) | Value::Map(_, t) | Value::Builtin(_, t) | Value::Enum(t, _) | Value::TaggedUndefined(t) => *t,
+            Value::Bool(_, t) | Value::Number(_, t) | Value::Str(_, t) | Value::Array(_, t) | Value::Map(_, t) | Value::Box(_, t) | Value::Builtin(_, t) | Value::Enum(t, _) | Value::TaggedUndefined(t) => *t,
             _ => Tag::NONE,
         }
     }
@@ -345,6 +362,7 @@ impl Value {
             Value::Array(a, _) => Value::Array(a, tag),
             Value::Map(m, _) => Value::Map(m, tag),
             Value::Builtin(b, _) => Value::Builtin(b, tag),
+            Value::Box(b, _) => Value::Box(b, tag),
             Value::Undefined | Value::TaggedUndefined(_) => {
                 if tag.is_none() { Value::Undefined } else { Value::TaggedUndefined(tag) }
             }
@@ -457,7 +475,7 @@ impl Ord for Value {
                 // As arrays of [key, value] arrays sorted by key: by size first.
                 a.len().cmp(&b.len()).then_with(|| a.iter().cmp(b.iter()))
             }
-            (Value::Box(a), Value::Box(b)) => a.serial.cmp(&b.serial),
+            (Value::Box(a, _), Value::Box(b, _)) => a.serial.cmp(&b.serial),
             (Value::Builtin(a, _), Value::Builtin(b, _)) => a.serial().cmp(&b.serial()),
             (Value::Function(a), Value::Function(b)) => {
                 if Shared::ptr_eq(a, b) {
@@ -579,7 +597,7 @@ fn write_display(out: &mut String, v: &Value, top: bool) {
         }
         // Live: "Box: 0", "Context : BuiltIn: 0", "<function 6>" (numbered
         // per feature run, see `shown_number`).
-        Value::Box(b) => {
+        Value::Box(b, _) => {
             let _ = write!(out, "Box: {}", shown_number(b.serial));
         }
         Value::Builtin(b, t) => {
@@ -592,6 +610,7 @@ fn write_display(out: &mut String, v: &Value, top: bool) {
             let line = match &**f {
                 Func::Closure { def, .. } => def.pos.line,
                 Func::Overloads(s) => s.fns.first().map(|d| d.pos.line).unwrap_or(0),
+                Func::Native { .. } => 0,
             };
             let _ = write!(out, "<function {line}>");
         }

@@ -945,6 +945,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         vertex_refs: body.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
         bounds,
         composite: None,
+        is_mesh: false,
     };
     ctx.bodies = vec![Arc::new(body)];
     let mut display = studio.display.clone();

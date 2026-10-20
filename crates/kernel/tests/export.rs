@@ -100,6 +100,61 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// ACIS import: our own .sat of every test part back with its volume, and
+/// Onshape's SAT exports (outside the repo; skipped when absent).
+#[test]
+fn acis_import() {
+    let dir = std::env::temp_dir().join(format!("noshape-satin-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, s) in xt_parts() {
+        let want = volume_properties(&s).unwrap().mass;
+        let path = dir.join(format!("{}.sat", name.replace(' ', "-")));
+        write_acis(&path, std::slice::from_ref(&s), LengthUnit::Meter).unwrap();
+        let back = read_acis_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(back.len(), 1, "{name}");
+        assert!(back[0].shape.is_valid(), "{name}: invalid");
+        let v = volume_properties(&back[0].shape).unwrap().mass;
+        assert!((v - want).abs() < 5e-6 * want, "{name}: {v} vs {want}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    let samples = std::path::Path::new("/root/onshape-research/live/samples");
+    for (file, name, exact) in [("onshape-cone.sat", "Part 1", 120.0 * std::f64::consts::PI), ("g26-revolved-spline.sat", "revolved spline", 1726.080764)] {
+        if !samples.join(file).exists() {
+            continue;
+        }
+        let parts = read_acis_parts(&samples.join(file), LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
+        let v = volume_properties(&parts[0].shape).unwrap().mass * 1e9;
+        assert!(parts[0].shape.is_valid() && (v - exact).abs() < 1e-3, "{file}: {v} vs {exact}");
+        assert_eq!(parts[0].name.as_deref(), Some(name), "{file}");
+    }
+}
+
+/// JT import: our own JT of every test part back through its XT segment,
+/// and a JT 10.5 assembly (XZ-compressed segments) from NX when present.
+#[test]
+fn jt_import() {
+    let dir = std::env::temp_dir().join(format!("noshape-jtin-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, s) in xt_parts() {
+        let want = volume_properties(&s).unwrap().mass;
+        let path = dir.join(format!("{}.jt", name.replace(' ', "-")));
+        write_jt(&path, &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let back = read_jt_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(back.len(), 1, "{name}");
+        let v = volume_properties(&back[0].shape).unwrap().mass;
+        assert!(back[0].shape.is_valid() && (v - want).abs() < 5e-6 * want, "{name}: {v} vs {want}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    let nist = std::path::Path::new("/root/kern-native-samples/jt/nist_mtc_crada_assembly_NX.jt");
+    if nist.exists() {
+        let parts = read_jt_parts(nist, LengthUnit::Meter).unwrap();
+        assert_eq!(parts.len(), 7);
+        let polycarb = parts.iter().find(|p| p.shape.count(ShapeType::Face) == 35).expect("the polycarbonate window");
+        let v = volume_properties(&polycarb.shape).unwrap().mass * 1e9;
+        assert!((v - 17025.66823867636).abs() < 1e-3, "polycarb {v}"); // = Onshape's import of the NX part (G38)
+    }
+}
+
 /// Sample files for checking in Onshape (live capture): every test part as
 /// .x_t, .x_b, .sat, .pvz, .jt, .3dm (and OCCT's .brep) in $NOSHAPE_XT_SAMPLES (default /tmp/noshape-xt-samples),
 /// with their volumes in volumes.txt (mm³).
@@ -309,30 +364,103 @@ fn pvz_import() {
     for (name, s) in xt_parts() {
         let path = dir.join(format!("{}.pvz", name.replace(' ', "-")));
         write_pvz(&path, &[ExportShape { shape: s.clone(), name: Some(name.into()), color: None }], LengthUnit::Meter).unwrap();
-        let back = read_pvz(&path, LengthUnit::Meter, 0).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let back = read_pvz(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(back.count(ShapeType::Solid), 1, "{name}: not a closed mesh");
+        assert!(back.is_mesh() && back.is_valid(), "{name}");
+        assert_eq!(back.count(ShapeType::Edge), 0, "{name}: a mesh body has no edges");
         let (v, want) = (volume_properties(&back).unwrap().mass, volume_properties(&s).unwrap().mass);
         assert!((v - want).abs() < 5e-3 * want, "{name}: {v} vs {want}");
     }
     let _ = std::fs::remove_dir_all(&dir);
     let samples = std::path::Path::new("/root/onshape-research/live/samples");
     let mm3 = |s: &Shape| volume_properties(s).unwrap().mass * 1e9;
-    if let Ok(s) = read_pvz(&samples.join("pvz-fillet.pvz"), LengthUnit::Meter, 20_000) {
+    if let Ok(s) = read_pvz(&samples.join("pvz-fillet.pvz"), LengthUnit::Meter) {
         assert_eq!(s.count(ShapeType::Solid), 1);
         assert!((mm3(&s) - 7484.089596687392).abs() < 1e-6, "{}", mm3(&s));
     }
-    if let Ok(s) = read_pvz(&samples.join("pvz-shapes.pvz"), LengthUnit::Meter, 20_000) {
-        // Cone, Loft, Torus, Cylinder; the loft is a shell.
+    if let Ok(s) = read_pvz(&samples.join("pvz-shapes.pvz"), LengthUnit::Meter) {
+        // Cone, Loft, Torus, Cylinder; the loft is 2 open pieces (Onshape G27:
+        // a closed composite of 2 surfaces).
         let solids: Vec<f64> = s.solids().iter().map(mm3).collect();
         assert_eq!(solids.len(), 3, "{solids:?}");
         for want in [1569.176626930149, 1770.239206699627, 9407.77811303131] {
             assert!(solids.iter().any(|v| (v - want).abs() < 1e-5), "{want} not in {solids:?}");
         }
-        assert_eq!(s.count(ShapeType::Shell), 4);
+        assert_eq!(s.count(ShapeType::Shell), 5);
     }
-    if let Ok(s) = read_pvz(&samples.join("pvz-rot-asm.pvz"), LengthUnit::Meter, 20_000) {
+    if let Ok(s) = read_pvz(&samples.join("pvz-rot-asm.pvz"), LengthUnit::Meter) {
         // Second instance: 90° about z, then +50 mm x.
-        let b = s.solids()[1].bounding_box(true).unwrap();
-        assert!((b.min - DVec3::new(0.03, 0.0, 0.0)).length() < 1e-9 && (b.max - DVec3::new(0.05, 0.04, 0.01)).length() < 1e-9, "{b:?}");
+        let b = s.solids()[1].bounding_box(false).unwrap();
+        assert!((b.min - DVec3::new(0.03, 0.0, 0.0)).length() < 1e-6 && (b.max - DVec3::new(0.05, 0.04, 0.01)).length() < 1e-6, "{b:?}");
+    }
+}
+
+/// Parasolid files written by Onshape (Parasolid 38.1, embedded schemas;
+/// samples outside the repo, skipped when absent): the G24 corner-blend parts
+/// import as one solid of 18 faces whose rolling-ball corners (BLENDED_EDGE)
+/// give the exact volume of that geometry (kernel/tests/blend.rs).
+#[test]
+fn parasolid_from_onshape() {
+    let samples = std::path::Path::new("/root/onshape-research/live/samples");
+    for (file, exact) in [("g25-b.x_t", 7583.000811), ("g25-f1r4.x_t", 7545.834615), ("g25-a.x_t", 7094.796033)] {
+        if !samples.join(file).exists() {
+            continue;
+        }
+        let parts = read_parasolid_parts(&samples.join(file), LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
+        assert_eq!(parts.len(), 1, "{file}");
+        let s = &parts[0].shape;
+        assert!(s.is_valid(), "{file}: invalid");
+        assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, 18), "{file}");
+        let v = volume_properties(s).unwrap().mass * 1e9;
+        assert!((v - exact).abs() < 1e-3, "{file}: {v} vs {exact}");
+        assert_eq!(parts[0].name.as_deref(), Some("Part 1"), "{file}");
+    }
+    // The same parts exported at every Parasolid version 25.0-38.1 (no embedded
+    // schema: each version's own layouts, live G36).
+    let mut n = 0;
+    for e in std::fs::read_dir(samples).into_iter().flatten().flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        let exact = if name.starts_with("g36-g24b-v") { 7583.000811 } else if name.starts_with("g36-pvzfillet-v") { 7495.362698 } else { continue };
+        let parts = read_parasolid_parts(&e.path(), LengthUnit::Meter).unwrap_or_else(|err| panic!("{name}: {err}"));
+        let v = volume_properties(&parts[0].shape).unwrap().mass * 1e9;
+        assert!(parts[0].shape.is_valid() && (v - exact).abs() < 1e-3, "{name}: {v} vs {exact}");
+        n += 1;
+    }
+    assert!(n == 0 || n == 50, "{n} G36 files");
+    // Onshape's cone (r 6 mm, apex 10 mm up): the axis points the way it widens.
+    if samples.join("onshape-cone.x_t").exists() {
+        let parts = read_parasolid_parts(&samples.join("onshape-cone.x_t"), LengthUnit::Meter).unwrap();
+        let v = volume_properties(&parts[0].shape).unwrap().mass * 1e9;
+        assert!(parts[0].shape.is_valid() && (v - 120.0 * std::f64::consts::PI).abs() < 1e-6, "cone: {v}");
+    }
+}
+
+#[test]
+fn native_cad_parts() {
+    // Native part files (outside the repo; skipped when absent) against
+    // Onshape's import of the same file (live G38) or another independent
+    // reference. Tolerances: Onshape's mass properties of procedural/spline
+    // faces are approximate (±0.03 here).
+    let dir = std::path::Path::new("/root/kern-native-samples");
+    for (file, faces, want, tol) in [
+        ("sldprt/psas_Bell_Crank.SLDPRT", 27, 2050.83652761612, 0.05),       // Onshape (2 blend faces)
+        ("se_par/ktane_Hull_ModuleHolder_Long.par", 14, 76000.0, 1e-4),     // a 76 cm³ block
+        ("nx_prt/nist_d2mi_827-9999-905.prt", 9, 272.2753042096831, 1e-4),   // Onshape = its STEP
+        ("nx_prt/nist_mtc_nx_NIST_mtc_crada_polycarb.prt", 35, 17025.66823867636, 1e-3), // Onshape
+        // Threaded: 16-turn helical faces (seamed by hand, integrated by volume_props' own rule).
+        ("sldprt/nist_mtc_91274A118_COATED_ALLOY_STEEL_SOCKET_HEAD_CAP_SCREW.SLDPRT", 25, 254.4037797834923, 0.03), // Onshape
+        ("ipt/respira_M3_washer_9mm.ipt", 6, 50.0172966, 1e-4), // Inventor (ShapeManager); π(4.5²−1.6²)·0.9 ≈ 50.02
+    ] {
+        let path = dir.join(file);
+        if !path.exists() {
+            continue;
+        }
+        let parts = read_native_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
+        assert_eq!(parts.len(), 1, "{file}");
+        let s = &parts[0].shape;
+        assert!(s.is_valid(), "{file}: invalid");
+        assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, faces), "{file}");
+        let v = volume_properties(s).unwrap().mass * 1e9;
+        assert!((v - want).abs() < tol, "{file}: {v} vs {want}");
     }
 }

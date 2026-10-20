@@ -12,6 +12,12 @@
 > Menus (`PopupMenuItem::icon`) still use monochrome masks, so keep icons mask-safe:
 > the silhouette must still read when every color becomes one tint.
 
+> **Never copy Onshape's files or path data** (the repo is public). Look at Onshape's icon, then draw
+> your own geometry on the grid below. `cargo test -p noshape --test no_onshape_assets` fails, naming the
+> file, if any SVG in the workspace contains path data from Onshape's icons or any asset file is a copy of
+> an Onshape file. It compares against hashes only (`crates/app/tests/onshape_path_hashes.txt`). The list
+> is regenerated outside the repo with `/root/icon-guard/make.sh`.
+
 24x24 SVG icons for noshape, in Onshape's style (docs/ONSHAPE_UI_SPEC.md section 6).
 
 Usage: `assets/icons/<name>.svg`.

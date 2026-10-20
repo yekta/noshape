@@ -181,6 +181,15 @@ impl DocStudios {
 }
 
 impl DerivedProvider for DocStudios {
+    fn file(&self, key: &str) -> Option<noshape_model::file_tab::FileTab> {
+        let r = ExternalRef::parse(key)?;
+        let doc = external_snapshot(&r.path, r.microversion).ok()?;
+        match &doc.tabs.iter().find(|t| t.id.to_string() == r.tab)?.content {
+            noshape_model::document::TabContent::File(f) => Some(f.clone()),
+            _ => None,
+        }
+    }
+
     fn context(&self, tab: &str) -> Option<Arc<Context>> {
         if let Some(r) = ExternalRef::parse(tab) {
             return external_context(&r);
@@ -198,6 +207,33 @@ impl DerivedProvider for DocStudios {
         let mut reg = self.cache.lock().remove(tab).unwrap_or_default();
         let r = reg.regenerate(&studio, &studio.configuration.defaults(), &self.doc.settings.units, &opts);
         self.cache.lock().insert(tab.to_string(), reg);
+        self.active.lock().remove(tab);
+        Some(r.context)
+    }
+
+    fn context_configured(&self, tab: &str, values: &noshape_model::configuration::ConfigValues) -> Option<Arc<Context>> {
+        if values.is_empty() || tab.starts_with("ext:") {
+            return self.context(tab);
+        }
+        // Cached per configuration like the default one.
+        let key = format!("{tab}#{}", serde_json::to_string(&values.0).unwrap_or_default());
+        let studio = self.studio(tab)?.clone();
+        if !self.active.lock().insert(tab.to_string()) {
+            return None; // circular reference
+        }
+        let opts = RegenOptions {
+            document_variables: self.doc.tabs.iter().find(|t| t.id.to_string() == tab).map(|t| noshape_model::variables::element_variables(&self.doc, t.id)).unwrap_or_default(),
+            derived: Some(Arc::new(DocStudios { doc: self.doc.clone(), cache: self.cache.clone(), active: self.active.clone() })),
+            custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&self.doc)),
+            ..Default::default()
+        };
+        let mut config = studio.configuration.defaults();
+        for (k, v) in &values.0 {
+            config.0.insert(k.clone(), v.clone());
+        }
+        let mut reg = self.cache.lock().remove(&key).unwrap_or_default();
+        let r = reg.regenerate(&studio, &config, &self.doc.settings.units, &opts);
+        self.cache.lock().insert(key, reg);
         self.active.lock().remove(tab);
         Some(r.context)
     }

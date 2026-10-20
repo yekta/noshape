@@ -346,13 +346,11 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
     let spec = match ev.enum_("chamferType") {
-        "TWO_OFFSETS" => {
-            let (a, b) = (ev.length("width1")?, ev.length("width2")?);
-            if ev.bool("oppositeDirection") { k::ChamferSpec::TwoDistances(b, a) } else { k::ChamferSpec::TwoDistances(a, b) }
-        }
+        "TWO_OFFSETS" => k::ChamferSpec::TwoDistances(ev.length("width1")?, ev.length("width2")?),
         "OFFSET_ANGLE" => k::ChamferSpec::DistanceAngle(ev.length("width")?, ev.angle("angle")?),
         _ => k::ChamferSpec::Equal(ev.length("width")?),
     };
+    let overrides: BTreeSet<(usize, usize)> = ev.resolve_edges(ev.query("directionOverrides")).into_iter().collect();
     let groups = by_body(ev.resolve_edges(refs));
     if groups.is_empty() {
         return err("Selected edges no longer exist");
@@ -372,12 +370,120 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         }
         let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res = k::chamfer_checked(&body.shape, &shapes, spec, &[]).map_err(chamfer_failed)?;
+        let reference = if matches!(spec, k::ChamferSpec::Equal(_)) {
+            Vec::new()
+        } else {
+            let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
+            distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?
+        };
+        let res = k::chamfer_checked(&body.shape, &shapes, spec, &reference).map_err(chamfer_failed)?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         ev.replace_body(bi, res.shape, face_names);
     }
     Ok(())
+}
+
+/// Onshape's entity order of faces (its deterministic ids, live G37): faces of
+/// earlier features first; within a feature that sweeps profiles, the side of
+/// the first profile segment, the start cap, the end cap, then the other sides
+/// in profile order (G30's block drawn (0,0)→(40,0)→(40,20)→(0,20): front,
+/// bottom, top, right, back, left). Other faces follow in name order.
+fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
+    let crate::reference::TopoName::Face { feature, role } = face.root() else { return (usize::MAX, 4, face.clone()) };
+    let position = ev.features.iter().position(|f| f.id == *feature).unwrap_or(usize::MAX);
+    let first_side = || {
+        body.faces
+            .iter()
+            .filter_map(|n| match n.root() {
+                crate::reference::TopoName::Face { feature: f, role: Role::Side(src) } if f == feature => Some(src),
+                _ => None,
+            })
+            .min()
+    };
+    let class = match role {
+        Role::Side(src) if first_side() == Some(src) => 0,
+        Role::CapStart(_) => 1,
+        Role::CapEnd(_) => 2,
+        Role::Side(_) => 3,
+        _ => 4,
+    };
+    (position, class, face.clone())
+}
+
+/// The face each edge's Distance 1 (or the distance of Distance and angle) is
+/// measured on, as Onshape picks it (live G30/G37): the edge's first face in
+/// Onshape's entity order; along a chain of connected edges the chain's first
+/// edge decides and the others keep to the same side of it; a direction
+/// override flips its whole chain, Opposite direction every edge.
+fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize], overrides: &BTreeSet<usize>, opposite: bool) -> FResult<Vec<k::Shape>> {
+    let adjacency = body.shape.edge_faces()?;
+    let faces: Vec<[usize; 2]> = edges
+        .iter()
+        .filter_map(|&e| match adjacency.get(e).map(|f| f.as_slice()) {
+            Some(&[a, b]) if a != b => Some([a as usize, b as usize]),
+            _ => None,
+        })
+        .collect();
+    if faces.len() != edges.len() {
+        // A sheet's boundary edges: the kernel's default.
+        return Ok(Vec::new());
+    }
+    let key = |f: usize| face_order(ev, body, &body.faces[f]);
+    let ends: Vec<[glam::DVec3; 2]> = edges
+        .iter()
+        .map(|&e| body.shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).map(|i| [i.start, i.end]))
+        .collect::<Result<_, _>>()?;
+    let touch = |i: usize, j: usize| ends[i].iter().any(|p| ends[j].iter().any(|q| p.distance(*q) < 1e-7));
+    let first = |i: usize| if key(faces[i][0]) <= key(faces[i][1]) { 0 } else { 1 };
+    let mut side: Vec<Option<usize>> = vec![None; edges.len()];
+    let mut order: Vec<usize> = (0..edges.len()).collect();
+    // Edges in Onshape's order, approximated by their faces' order.
+    order.sort_by_cached_key(|&i| {
+        let (a, b) = (key(faces[i][0]), key(faces[i][1]));
+        if a <= b { (a, b) } else { (b, a) }
+    });
+    for &start in &order {
+        if side[start].is_some() {
+            continue;
+        }
+        side[start] = Some(first(start));
+        let mut chain = vec![start];
+        let mut stack = vec![start];
+        while let Some(i) = stack.pop() {
+            let mine = faces[i][side[i].unwrap_or(0)];
+            for j in 0..edges.len() {
+                if side[j].is_some() || !touch(i, j) {
+                    continue;
+                }
+                // Through the face the two edges share: the same side.
+                let shared = faces[i].iter().find(|f| faces[j].contains(f));
+                side[j] = Some(match shared {
+                    Some(&s) => {
+                        let on_shared = mine == s;
+                        let at = faces[j].iter().position(|&f| f == s).unwrap_or(0);
+                        if on_shared { at } else { 1 - at }
+                    }
+                    None => first(j),
+                });
+                chain.push(j);
+                stack.push(j);
+            }
+        }
+        let flips = chain.iter().filter(|&&i| overrides.contains(&edges[i])).count();
+        if flips % 2 == 1 {
+            for &i in &chain {
+                side[i] = side[i].map(|s| 1 - s);
+            }
+        }
+    }
+    (0..edges.len())
+        .map(|i| {
+            let s = side[i].unwrap_or(0);
+            let s = if opposite { 1 - s } else { s };
+            Ok(body.shape.sub_shape(ShapeType::Face, faces[i][s])?)
+        })
+        .collect()
 }
 
 pub fn shell(ev: &mut EvalCtx) -> FResult<()> {

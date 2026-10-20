@@ -155,7 +155,7 @@ impl Sheet {
             t.id = id;
             match &mut t.kind {
                 TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => *view = remap(*view),
-                TableKind::General { .. } | TableKind::Revision { .. } => {}
+                TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Custom { .. } => {}
             }
             t.position = [t.position[0] + d[0], t.position[1] + d[1]];
             self.tables.push(t);

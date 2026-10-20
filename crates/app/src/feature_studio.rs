@@ -280,6 +280,9 @@ pub struct FeatureStudioView {
     nav: Vec<Position>,
     nav_at: usize,
     focus: FocusHandle,
+    /// The toolbar's Import panel and the button's bounds (it hangs under it).
+    import_panel: Option<(Entity<crate::fs_import::ImportPanel>, Subscription)>,
+    import_anchor: BoundsCell,
     _subs: Vec<Subscription>,
 }
 
@@ -323,7 +326,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -349,6 +352,32 @@ impl FeatureStudioView {
             self.editor.update(cx, |e, cx| e.set_value(src.clone(), window, cx));
         }
         self.recompile(src, cx);
+    }
+
+    /// Import: open or close the panel (live document/81).
+    fn toggle_import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.import_panel.take().is_some() {
+            cx.notify();
+            return;
+        }
+        let panel = cx.new(|cx| crate::fs_import::ImportPanel::new(self.doc.clone(), self.tab, window, cx));
+        let sub = cx.subscribe_in(&panel, window, |this: &mut Self, _, ev: &crate::fs_import::ImportEvent, window, cx| match ev {
+            crate::fs_import::ImportEvent::Insert(line) => {
+                if this.read_only(cx) {
+                    return;
+                }
+                let src = this.editor.read(cx).value().to_string();
+                let new = crate::fs_import::append_import(&src, line);
+                this.editor.update(cx, |e, cx| e.set_value(new, window, cx));
+                this.schedule_save(window, cx);
+            }
+            crate::fs_import::ImportEvent::Close => {
+                this.import_panel = None;
+                cx.notify();
+            }
+        });
+        self.import_panel = Some((panel, sub));
+        cx.notify();
     }
 
     fn schedule_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -795,7 +824,15 @@ impl Render for FeatureStudioView {
         }
         toolbar = toolbar
             .child(crate::ui::tool_separator())
-            .child(cell("fs-import".into()).w(px(32.)).opacity(0.4).tooltip(crate::ui::tooltip("Import")).child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text)))
+            .child(
+                cell("fs-import".into())
+                    .w(px(32.))
+                    .when(self.import_panel.is_some(), |d| d.bg(pal.border))
+                    .tooltip(crate::ui::tooltip("Import"))
+                    .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
+                    .child(probe(&self.import_anchor))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
+            )
             .child(
                 cell("fs-format".into())
                     .w(px(32.))
@@ -912,6 +949,10 @@ impl Render for FeatureStudioView {
                     })),
             )
             .children(outline)
+            .children(self.import_panel.as_ref().map(|(panel, _)| {
+                let b = self.import_anchor.get();
+                deferred(anchored().position(point(b.left(), b.bottom() + px(2.))).child(panel.clone())).with_priority(1).into_any_element()
+            }))
     }
 }
 

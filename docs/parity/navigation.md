@@ -32,7 +32,7 @@ Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing
 |---|---|---|---|
 | 1.1 | Right-drag: 3D rotate, free (about the camera's own up/right axes, not a turntable) | help table; `onDrag` ROTATE | 🔧 (was a world-Z turntable) |
 | 1.2 | Rotation speed: 3 full turns per viewport diagonal | `ROTATION_CYCLES_PER_SCREEN` | 🔧 (was π·1.2 per height) |
-| 1.3 | Rotate centre: the geometry under the cursor; else the model centre when it fits the view; else the cursor ray at the model's depth | `getRotateCenterForCanvasLocation` | 🔧 (fallback was the camera target; Onshape's middle step, the average depth of visible geometry, is approximated by the model centre) |
+| 1.3 | Rotate centre: the geometry under the cursor; else the average of ~2000 visible-depth samples (planes excluded, ≥ 4 hits); else the same with the planes' depth (only planes visible); else the model centre when it fits the view; else the cursor ray at the model's depth | `getRotateCenterForCanvasLocation`, `getRotateCenterBasedOnWindowDepths({includePlanes})`, `DepthSamplingPass` | 🔧 (render worker draws two ~2000 px sample passes, without and with plane depth, true depth without the pick bias, read back off the UI thread at the press) |
 | 1.4 | Rotation inertia: speed averaged per step, continues if released within 50 ms, decays ×0.77 per 60 Hz frame (time based), stops under 1 px/step | `performStopRotationAnimation` | 🔧 |
 | 1.5 | Alt+right-drag: constrained rotate (horizontal = about world Z, vertical = pitch); first animates to the nearest floor-down view (125 ms, 250 ms if over 45°) | help (Windows column); `AXIS_ROTATE` | 🔧 |
 | 1.6 | Ctrl+right-drag: 2D pan | help table | ✅ |
@@ -66,7 +66,7 @@ Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing
 | 2.6 | Windows precision touchpad: two-finger scroll zooms (100 px = one notch, ×3) | Chrome DirectManipulation wheel | 🔧 |
 | 2.7 | Pinch zooms about the pinch centre; the model scales exactly with the fingers (pinch in/out of the same distance returns to the same zoom) | help (Windows pinch); `pinchZoom` (zoom by 1/ratio about the centre) | 🔧 (pinch was ignored) — macOS magnify, Windows DirectManipulation, X11 XI2.4 and Wayland gestures all deliver `PinchEvent` |
 | 2.8 | Linux touchpads: two-finger scroll zooms (X11 smooth scroll in notches, Wayland pixels at 45 px per notch), pinch as 2.7 | Chrome on Linux | 🔧 |
-| 2.9 | macOS one-finger Ctrl+click is a right click | macOS | ⏳ gpui turns Ctrl+left into a plain right button, so a one-finger Ctrl+click-drag rotates (Chrome reports it as a left button with Ctrl, which does not navigate); two-finger Ctrl+click (2.3) is unaffected |
+| 2.9 | macOS one-finger Ctrl+click: a click opens the context menu, a drag does nothing (Chrome reports a left button with Ctrl, which never navigates) | Chrome on macOS | 🔧 (vendor/gpui-pre-macos marks the converted press) |
 
 ## 3. Keyboard
 
@@ -75,7 +75,7 @@ Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing
 | 3.1 | Arrow keys rotate 15° about the camera's up (←/→) or right (↑/↓) axis through the camera target; ← from Front brings the Right face in, ↑ the Bottom (= dragging that way) | help; `rotateInDirection`; live navigation/75–80 | 🔧 (was about world Z, opposite sense) |
 | 3.2 | Shift+arrows 90°, Ctrl+arrows 5° | help | ✅ angles / 🔧 axes |
 | 3.3 | Each step animates linearly over 250 ms | `animateRotation`, `CAMERA_SHORT_ANIMATION_TIME_MS` | 🔧 (was 500 ms, eased) |
-| 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation` (concurrent, unnamed) | 🔧 (each repeat restarted one animation). Live CDP hold turned only ~105°/1.2 s; re-measure with real X autorepeat requested |
+| 3.4 | Holding an arrow rotates continuously: every key repeat starts another step that runs alongside the earlier ones (they add up) | help; `setAllowRepeat` for ROTATE_*, `startAnimation`; live navigation/910–921: a 1 s hold (X repeat 660 ms / 25 Hz, 11 keydowns) turns 165° | 🔧 verified: noshape turns 165° for the same hold |
 | 3.5 | Ctrl+Shift+arrows pan: the model moves 150 px toward the arrow (measured at the scene centre), 250 ms smootherstep; ignored while the camera animates | help; `animatePan`, `animateTo` | 🔧 (Part Studio: 500 ms; Assembly: missing) |
 | 3.6 | Z zooms out ×1.75, Shift+Z in ×1.75, about the view centre, 250 ms, clamped to the zoom limits | help; `animateZoom`, `adjustCameraToValidZoom` | 🔧 (was ×1.25 instant) |
 | 3.7 | All of 3.1–3.6 work in Assemblies too | `getIsInPartStudio() \|\| getIsInAssembly()` | 🔧 (Assembly had none) |
@@ -86,7 +86,9 @@ Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 4.1 | Click a face: plane view; a corner: trimetric/isometric view | help | ✅ |
+| 4.1 | Click a face: plane view; a corner/edge: that view — each zoomed to fit at the new orientation | help; `animateToStandardView` → `animateToFrameWithZoomFit` | 🔧 (kept the zoom) |
+| 4.4 | Shift+1–7 standard views zoom to fit too | `handleFrontView` … | 🔧 |
+| 4.5 | Zoom to fit (F, double middle click) frames the visible planes as well as parts and sketches (the model node's bounds), their box's projected corners padded ×1.05 | `getFitBounds`, `zoomToFit`, `CAMERA_ZOOM_TO_FIT_PADDING` | 🔧 (parts only, ×1.12: the part looked ~1.39× bigger than in Onshape) |
 | 4.2 | Click the ◀ ▶ ▲ ▼ arrows: rotate 15° (Shift 90°, Ctrl 5°), same animation as the keys | help | 🔧 (axes/animation as 3.1–3.4) |
 | 4.3 | Curved arrows: roll 15° about the line of sight | `rotateInDirection("clockwise")` | 🔧 (animation) |
 
@@ -118,11 +120,22 @@ Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing
 
 ## 7. Touchscreen (iOS, Android and browser table)
 
+Raw touches reach the viewport through vendored gpui crates: core
+(`vendor/gpui-pre`: touches go to `on_mouse_event::<TouchEvent>` listeners,
+which can claim them), Windows (`vendor/gpui-pre-windows`: `WM_POINTER*` for
+touch and pen), X11 (`vendor/gpui-pre-linux`: XInput 2.2 touch events) and
+Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
+
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 7.1 | One-finger tap selects, double-tap clears the selection | help | ❌ (gpui's desktop platforms deliver no touch events; Windows synthesizes mouse input) |
-| 7.2 | One-finger drag: 3D rotate (2 turns per diagonal) | help; `POINTER_ROTATION_CYCLES_PER_SCREEN` | ❌ |
-| 7.3 | Two-finger tap: context menu; two-finger long press: box select | help | ❌ |
-| 7.4 | Two-finger pinch zooms, two-finger drag pans, two-finger rotate rolls the view about the centre | help; `PINCH_ZOOM`, `PAN`, `ROTATE` gestures | ❌ |
-| 7.5 | View cube tap opens the view list (mobile apps) | help | ❌ (mobile only) |
-| 7.6 | 3D Rotate Lock button (mobile apps) | help | ❌ (mobile only) |
+| 7.1 | One-finger tap selects; double tap clears the selection / edits the feature under it (a double click) | help; `onTap` | 🔧 |
+| 7.2 | One-finger drag: 3D rotate (2 turns per diagonal, 2 px slop), inertia on release; on a tool's draggable geometry it drags it | help; `POINTER_ROTATION_CYCLES_PER_SCREEN`, single-pointer drag | 🔧 |
+| 7.3 | Two-finger tap: context menu | help | 🔧 |
+| 7.4 | Two-finger long press (750 ms, fingers within 10 px): box selection between the fingers (window), blocks other gestures | help; `TWO_POINTER_DELAYED_DRAG` | 🔧 |
+| 7.5 | Two-finger drag pans (skipped when the fingers move very differently) | help; pan recognizer | 🔧 |
+| 7.6 | Pinch zooms by the finger ratio about their centre (centre still within 15 px, turn under 10°) | help; pinch recognizer | 🔧 |
+| 7.7 | Two-finger rotate rolls the view about the fingers' centre | help; `rotateAboutCanvasPoint` | 🔧 |
+| 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | 🔧 |
+| 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | 🔧 (only touches starting on the viewport's own topmost hitbox are claimed) |
+| 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
+| 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |

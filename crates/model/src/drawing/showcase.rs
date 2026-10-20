@@ -58,8 +58,8 @@ pub fn showcase_document() -> Document {
             s.annotations.push(Annotation { id, kind, position, ..Default::default() });
             id += 1;
         };
-        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2], nodes: Vec::new() }] }, [24.0, 262.0]);
-        add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![] }, [24.0, 112.0]);
+        add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2], nodes: Vec::new() }], extra: Default::default() }, [24.0, 262.0]);
+        add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![], extra: Default::default() }, [24.0, 112.0]);
         add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into() }, [150.0, 126.0]);
         add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into() }, [175.0, 200.0]);
         add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into() }, [95.0, 156.2]);
@@ -154,7 +154,7 @@ pub fn showcase_document() -> Document {
         add(s, AnnotationKind::ForeshortenedRadial { view: ViewId(5), center: [0.038, 0.018], radius: 0.0048, angle: -0.8, jog: [0.028, -0.012] }, [0.0; 2]);
         add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A1".into(), area: DatumTargetArea::Point }, [28.0, 190.0]);
         add(s, AnnotationKind::DatumTarget { view: ViewId(2), anchor: [0.03, -0.02], label: "A2".into(), area: DatumTargetArea::Circle { diameter: 0.008 } }, [150.0, 100.0]);
-        add(s, AnnotationKind::Gdt { anchor: [30.0, 270.0], frame: vec!["⟂".into(), "0.02".into(), "A".into()], leaders: vec![Leader { view: Some(ViewId(1)), point: [-0.05, 0.006], nodes: Vec::new() }] }, [30.0, 270.0]);
+        add(s, AnnotationKind::Gdt { anchor: [30.0, 270.0], frame: vec!["⟂".into(), "0.02".into(), "A".into()], leaders: vec![Leader { view: Some(ViewId(1)), point: [-0.05, 0.006], nodes: Vec::new() }], extra: Default::default() }, [30.0, 270.0]);
         let mut t = Table::new(1, TableKind::General {
             cells: vec![
                 vec!["PROPERTY".into(), "".into(), "VALUE".into()],

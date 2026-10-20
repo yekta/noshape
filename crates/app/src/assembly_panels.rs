@@ -49,6 +49,10 @@ pub(crate) enum RenameTarget {
     Explode(usize),
 }
 
+/// Where a feature dialog's preview slider rests (as the Part Studio's: from
+/// there to the right end the feature shows fully, to the left it fades).
+pub(super) const PREVIEW_REST: f32 = 0.7;
+
 pub(crate) struct McSession {
     pub id: MateId,
     pub editing: bool,
@@ -77,6 +81,10 @@ pub(crate) struct McSession {
     pub implicit: bool,
     /// Move checked (the X/Y/Z translation and rotation apply).
     pub moving: bool,
+    /// Preview slider (0 before the connector, 1 after; rests at
+    /// [`PREVIEW_REST`]) and its track bounds.
+    pub preview: f32,
+    preview_track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// Origin type and Rotation axis selects.
     origin_sel: Entity<crate::os_select::OsSelect>,
     axis_sel: Entity<crate::os_select::OsSelect>,
@@ -241,7 +249,10 @@ impl AssemblyView {
                     m.implicit = true;
                     m.name = "Mate connector".into();
                     m.on = Some(on);
-                    m.active = false;
+                    // Live 578: the Origin entity field is active (blue), so a
+                    // pick replaces the entity.
+                    m.active = true;
+                    m.slot = 0;
                     m.flip = c.flip;
                     m.reorient = c.rotate_quarters;
                     if let Some(mv) = c.moved.as_deref() {
@@ -338,6 +349,8 @@ impl AssemblyView {
             extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
             implicit: false,
             moving,
+            preview: PREVIEW_REST,
+            preview_track: Default::default(),
             origin_sel,
             axis_sel,
             _subs: subs,
@@ -567,8 +580,11 @@ impl AssemblyView {
                         cx.notify();
                     })))
                     .child(div().flex_1())
-                    .child(div().mr(px(4.)).child(super::props::help_dot())),
-            );
+                    // Live: the standalone dialog's `?` sits on the preview
+                    // slider row (dom/dialog-mate-connector.txt).
+                    .when(implicit, |d| d.child(div().mr(px(4.)).child(super::props::help_dot()))),
+            )
+            .when(!implicit, |d| d.child(self.render_mc_preview_slider(cx)));
         let title = if implicit { "Mate connector".to_string() } else { s.name.clone() };
         let ok = s.on.is_some();
         let header = h_flex()
@@ -630,6 +646,65 @@ impl AssemblyView {
             .text_color(pal.text)
             .child(header)
             .child(body)
+            .into_any_element()
+    }
+
+    /// The connector dialog's preview slider (a feature dialog's: 112 px,
+    /// 2 px `#777` track, 11 px white handle ringed `#888`) and `?`.
+    fn render_mc_preview_slider(&self, cx: &mut Context<Self>) -> AnyElement {
+        const W: f32 = 112.;
+        const HANDLE: f32 = 11.;
+        let Some(s) = &self.mc else { return div().into_any_element() };
+        let (value, track) = (s.preview, s.preview_track.clone());
+        let probe = track.clone();
+        let set = move |this: &mut Self, x: Pixels, cx: &mut Context<Self>| {
+            let b = track.get();
+            let v = (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
+            if let Some(m) = this.mc.as_mut().filter(|m| (m.preview - v).abs() > f32::EPSILON) {
+                m.preview = v;
+                this.refresh_scene(false, cx);
+                cx.notify();
+            }
+        };
+        let set2 = set.clone();
+        h_flex()
+            .h(px(22.))
+            .pl(px(7.))
+            .pr(px(4.))
+            .child(
+                div()
+                    .id("mcd-preview")
+                    .relative()
+                    .w(px(W))
+                    .h(px(HANDLE + 2.))
+                    .flex_none()
+                    .cursor_pointer()
+                    .child(div().absolute().left_0().right_0().top(px((HANDLE + 2.) * 0.5 - 1.)).h(px(2.)).bg(rgb(0x777777)))
+                    .child(
+                        div()
+                            .absolute()
+                            .top(px(1.))
+                            .left(px(value * W - HANDLE * 0.5))
+                            .size(px(HANDLE))
+                            .rounded_full()
+                            .bg(rgb(0xffffff))
+                            .border_1()
+                            .border_color(rgb(0x888888))
+                            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(1.5), spread_radius: px(0.), inset: false }]),
+                    )
+                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                        cx.stop_propagation();
+                        set(this, e.position.x, cx);
+                    }))
+                    .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
+                        if e.pressed_button == Some(MouseButton::Left) {
+                            set2(this, e.position.x, cx);
+                        }
+                    })),
+            )
+            .child(div().flex_1())
+            .child(super::props::help_dot())
             .into_any_element()
     }
 
@@ -1624,13 +1699,18 @@ impl AssemblyView {
         let inputs = s.inputs.clone();
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
         let mut body = v_flex().p_3().gap_2().child(div().text_xs().text_color(pal.text_muted).child(format!("Configuration of {name}")));
-        for inp in &inputs {
+        // Visibility conditions: hidden inputs and options don't show.
+        let (shown, effective) = noshape_model::configuration::Configuration { inputs: inputs.clone(), configured: Vec::new() }.visibility(&s.values);
+        for (inp, vis) in inputs.iter().zip(&shown) {
+            if !vis.visible {
+                continue;
+            }
             let id = inp.id.clone();
             match &inp.kind {
-                ConfigInputKind::List { options, default } => {
-                    let cur = s.values.0.get(&inp.id).cloned().unwrap_or_else(|| default.clone());
+                ConfigInputKind::List { options, .. } => {
+                    let cur = effective.0.get(&inp.id).cloned().unwrap_or_default();
                     let mut seg = h_flex().gap_1().flex_wrap();
-                    for o in options {
+                    for o in options.iter().filter(|o| vis.options.contains(&o.id)) {
                         let (oid, id2) = (o.id.clone(), id.clone());
                         seg = seg.child(Button::new(SharedString::from(format!("cfg-{}-{}", inp.id, o.id))).label(o.name.clone()).xsmall().ghost().selected(cur == o.id).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if let Some(s) = &mut this.config_panel {
@@ -1641,8 +1721,8 @@ impl AssemblyView {
                     }
                     body = body.child(section(&inp.name)).child(seg);
                 }
-                ConfigInputKind::Checkbox { default } => {
-                    let cur = s.values.0.get(&inp.id).map(|v| v == "true").unwrap_or(*default);
+                ConfigInputKind::Checkbox { .. } => {
+                    let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
                     body = body.child(Checkbox::new(SharedString::from(format!("cfg-{}", inp.id))).label(inp.name.clone()).checked(cur).on_click(cx.listener(move |this, v: &bool, _, cx| {
                         if let Some(s) = &mut this.config_panel {
                             s.values.0.insert(id.clone(), v.to_string());
@@ -2459,7 +2539,18 @@ impl AssemblyView {
 
     /// Back to the document filters (home) or one level up (‹).
     fn other_docs_back(&mut self, home: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // ‹ in a folder of Owned by me goes up one folder.
+        if !home
+            && self.ui.insert_other_doc.is_none()
+            && let Some(dir) = self.ui.insert_other_dir.take()
+        {
+            let root = docs_root();
+            self.ui.insert_other_dir = dir.parent().map(canon_dir).filter(|p| *p != root && p.starts_with(&root));
+            cx.notify();
+            return;
+        }
         if home || self.ui.insert_other_doc.take().is_none() {
+            self.ui.insert_other_dir = None;
             self.ui.insert_other_cat = None;
             self.ui.insert_other_query = None;
             self.ui.insert_other_doc = None;
@@ -2467,19 +2558,18 @@ impl AssemblyView {
                 st.update(cx, |s, cx| s.set_value("", window, cx));
             }
         }
-        self.sync_other_placeholder(window, cx);
+        self.sync_other_placeholder(cx);
         cx.notify();
     }
 
     /// The search box reads 'Search in "<category>"' inside a category.
-    fn sync_other_placeholder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn sync_other_placeholder(&mut self, cx: &mut Context<Self>) {
         let ph = match self.ui.insert_other_cat {
             Some(c) if self.ui.insert_other_query.is_none() => format!("Search in \"{}\"", OTHER_SOURCES[c].0),
             _ => "Search or paste URL".to_string(),
         };
-        if let Some(st) = &self.ui.insert_url {
-            st.update(cx, |s, cx| s.set_placeholder(ph, window, cx));
-        }
+        self.ui.insert_url_ph = ph.into();
+        cx.notify();
     }
 
     /// Expand a Part Studio of the opened document: its parts (background).
@@ -2522,8 +2612,9 @@ impl AssemblyView {
         let mut col = v_flex().flex_none();
         let searching = self.ui.insert_other_query.is_some();
         let has_text = self.ui.insert_url.as_ref().is_some_and(|s| !s.read(cx).value().trim().is_empty());
-        let header_btn = |id: &'static str, icon: &'static str, tip: &'static str| {
-            div().id(id).size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).cursor_pointer().hover(|d| d.bg(rgb(0xeaeaea))).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph(icon, 20., blue))
+        let header_btn = |id: &'static str, icon: &'static str, tip: SharedString| {
+            // Live 611: dark `#333` home and ‹ (back) glyphs.
+            div().id(id).size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).cursor_pointer().hover(|d| d.bg(rgb(0xeaeaea))).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph(icon, if icon == "ui-chevron-left" { 16. } else { 20. }, rgb(0x333333)))
         };
         // The opened document: home · ‹ · name / ⑂ version, Create version…,
         // Version graph; Part Studios | Assemblies; search; tree.
@@ -2554,8 +2645,8 @@ impl AssemblyView {
                     .gap(px(3.))
                     .border_b_1()
                     .border_color(rgb(0xeeeeee))
-                    .child(header_btn("ins-other-home", "home", "Go to document filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
-                    .child(header_btn("ins-other-back", "chevron-left", "").tooltip(crate::ui::tooltip(back_tip)).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(false, w, cx))))
+                    .child(header_btn("ins-other-home", "home", "Go to document filters".into()).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
+                    .child(header_btn("ins-other-back", "ui-chevron-left", back_tip.into()).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(false, w, cx))))
                     .child(
                         v_flex()
                             .flex_1()
@@ -2760,7 +2851,9 @@ impl AssemblyView {
                         .rounded_l(px(3.))
                         .border_1()
                         .border_color(rgb(0xcccccc))
-                        .children(self.ui.insert_url.as_ref().map(|st| Input::new(st).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.)))),
+                        .relative()
+                        .children(self.ui.insert_url.as_ref().map(|st| Input::new(st).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.))))
+                        .when(!has_text, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child(self.ui.insert_url_ph.clone()))),
                 )
                 .child(
                     div()
@@ -2776,10 +2869,10 @@ impl AssemblyView {
                         .border_color(if has_text { rgb(0x90cef1) } else { rgb(0xeaeaea) })
                         .cursor_pointer()
                         .child(crate::ui::glyph("search", 20., if has_text { blue } else { rgb(0xcccccc) }))
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             let text = this.ui.insert_url.as_ref().map(|s| s.read(cx).value().trim().to_string()).unwrap_or_default();
                             this.search_other_documents(text, cx);
-                            this.sync_other_placeholder(window, cx);
+                            this.sync_other_placeholder(cx);
                         })),
                 ),
         );
@@ -2799,10 +2892,10 @@ impl AssemblyView {
                         .hover(|d| d.bg(pal.panel_hover))
                         .child(crate::assets::icon(&icon_path(icon), 20., cx))
                         .child(div().truncate().child(label.to_string()))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.ensure_other_docs(cx);
                             this.ui.insert_other_cat = Some(i);
-                            this.sync_other_placeholder(window, cx);
+                            this.sync_other_placeholder(cx);
                             cx.notify();
                         })),
                 );
@@ -2818,9 +2911,12 @@ impl AssemblyView {
                     .gap(px(3.))
                     .border_b_1()
                     .border_color(rgb(0xeeeeee))
-                    .child(header_btn("ins-other-home", "home", "Go to document filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
-                    .child(header_btn("ins-other-back", "chevron-left", "Filters").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
-                    .child(div().pl(px(3.)).text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(OTHER_SOURCES[c].0)),
+                    .child(header_btn("ins-other-home", "home", "Go to document filters".into()).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(true, w, cx))))
+                    .child(header_btn("ins-other-back", "ui-chevron-left", "Filters".into()).on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.other_docs_back(false, w, cx))))
+                    .child(div().pl(px(3.)).text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match (&self.ui.insert_other_dir, c) {
+                        (Some(dir), 0) => dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+                        _ => OTHER_SOURCES[c].0.to_string(),
+                    })),
             );
         }
         let me = self.doc.read(cx).session.path.clone();
@@ -2837,23 +2933,41 @@ impl AssemblyView {
             (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(q.as_str())),
             _ => docs.sort_by_key(|d| std::cmp::Reverse(d.modified)),
         }
-        // Owned by me lists the folders first (folder outline + bold name).
-        if cat == Some(0) {
-            let mut dirs: Vec<std::path::PathBuf> = docs.iter().map(|d| d.folder().to_path_buf()).collect();
-            dirs.sort();
-            dirs.dedup();
-            if dirs.len() > 1 {
-                for (i, dir) in dirs.iter().enumerate() {
-                    let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                    col = col.child(
-                        h_flex()
-                            .id(SharedString::from(format!("ins-other-dir-{i}")))
-                            .h(px(51.))
-                            .pl(px(2.))
-                            .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., rgb(0x666666))))
-                            .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name)),
-                    );
+        // Owned by me (live 611): the folders first (folder outline + bold
+        // name; a click opens one), then the documents at that level.
+        if cat == Some(0) && q.is_none() {
+            let root = docs_root();
+            let outside: Vec<std::path::PathBuf> = crate::files::watched_folders().into_iter().map(|f| canon_dir(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect();
+            let here = self.ui.insert_other_dir.clone();
+            let dirs: Vec<std::path::PathBuf> = match &here {
+                Some(dir) => crate::start_window::subfolders(dir),
+                None => crate::start_window::subfolders(&root).into_iter().chain(outside.iter().cloned()).collect(),
+            };
+            docs.retain(|d| {
+                let f = canon_dir(d.folder());
+                match &here {
+                    Some(dir) => f == *dir,
+                    // The top level: documents in the documents folder itself,
+                    // and those outside every listed folder.
+                    None => f == root || (!f.starts_with(&root) && !outside.iter().any(|o| f.starts_with(o))),
                 }
+            });
+            for (i, dir) in dirs.into_iter().enumerate() {
+                let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                col = col.child(
+                    h_flex()
+                        .id(SharedString::from(format!("ins-other-dir-{i}")))
+                        .h(px(51.))
+                        .pl(px(2.))
+                        .cursor_pointer()
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., rgb(0x999999))))
+                        .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_other_dir = Some(dir.clone());
+                            cx.notify();
+                        })),
+                );
             }
         }
         if docs.is_empty() && !loading {
@@ -2959,4 +3073,13 @@ impl AssemblyView {
             .detach();
         }
     }
+}
+
+/// The documents folder (canonical): the top of Owned by me.
+fn docs_root() -> std::path::PathBuf {
+    canon_dir(&crate::files::documents_dir())
+}
+
+fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {
+    p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
 }

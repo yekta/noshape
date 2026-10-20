@@ -81,7 +81,8 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 |---|---|---|---|---|
 | ui: Part Studio chrome, dialogs, viewport | 3f25493a-a7a1-4328-848b-ae8f86537929 | Ngyekta / Opus 5.5 | :101, target-shared | `docs/handoff/theme-layout.md` |
 | ui2: sketch/assembly/drawing/start-window/document visuals | c8d8bebc-f75d-4b7b-9547-80ff610dcf0f | Unbind / Opus 5.5 | :105, target-shared | `docs/handoff/theme-studios.md` |
-| nav: view navigation (trackpad pinch/scroll/rotate/pan, mouse, keyboard, touch, Mouse Controls prefs) | 98da8819-1a7a-4be9-a814-e167275fcc08 | Motile / Opus 5.5 | :109, target-shared | `docs/handoff/navigation.md`, `docs/parity/navigation.md` |
+| nav: view navigation (FINISHED; only real-hardware touch checks remain, see docs/handoff/navigation.md) | 98da8819-1a7a-4be9-a814-e167275fcc08 | Motile / Opus 5.5 | :109, target-shared | `docs/handoff/navigation.md`, `docs/parity/navigation.md` |
+| icons: redrew 21 icons copied from Onshape + added no_onshape_assets guard test (FINISHED) | ddea0979-7067-4399-9ade-2a18dbe32300 | Yekta / Opus 5.5 | - | report to lead |
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
 | psb: Part Studio behaviour (+ release workflow, materials) | 76bd77b6-fcaf-41ed-a850-3e55a5059984 | Yekta / Opus 5.5 | :102, target-shared | `docs/handoff/part-studio-behaviour.md` |
 | skb: assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-shared | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |

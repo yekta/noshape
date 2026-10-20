@@ -51,7 +51,9 @@ impl FileTab {
 
     pub fn kind(&self) -> FileKind {
         match self.ext().as_str() {
-            "step" | "stp" | "iges" | "igs" | "brep" | "stl" | "obj" | "pvz" => FileKind::Cad,
+            "step" | "stp" | "iges" | "igs" | "brep" | "stl" | "obj" | "pvz" | "x_t" | "x_b" | "xmt_txt" | "xmt_bin" | "3dm" | "sldprt" | "par" | "psm" | "prt" | "ipt" | "sat" | "sab" | "3mf" | "gltf" | "glb" | "jt" => {
+                FileKind::Cad
+            }
             "dxf" | "dwg" => FileKind::Drawing2d,
             "dwt" => FileKind::Template,
             "png" | "jpg" | "jpeg" | "gif" | "bmp" | "tif" | "tiff" | "svg" => FileKind::Image,

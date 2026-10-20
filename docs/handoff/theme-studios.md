@@ -5,75 +5,76 @@ drawing, start window / documents page, Variable Studio, versions panel, tab man
 toasts. The Part Studio chrome and theme.rs belong to agent "ui" (docs/handoff/theme-layout.md).
 Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side-by-side shots (ours | Onshape) in /tmp/ui2-shots/.
 
-## State (2026-10-19 17:30 UTC) — pixel pass done for every non-Part-Studio screen (third ui2 of the day)
+## State (2026-10-19 17:45 UTC) — summary for the lead (third ui2 of the day)
 
-Taken over at 13:40. Queue items 0 (Learning Center → README) and 2 (clippy) were already done. Pixel pass
-(queue 1) done so far, all in the tree, **not all verified in the app yet** (the shared tree kept failing in
-other agents' files: mouse_prefs, config_panel, assembly_behaviors:2821, release_dialog `Corner`):
-- **Create Drawing dialog** (drawing_create.rs, asb's; visual only): hangs 11 px under the window top
-  (live drawing/01), underlined active page/standard tabs, `#555` other tab, 14 px list, bold selected row,
-  Owner column shows "…" (too narrow, as live), unselected option tile white with `#ccc` outline,
-  os_ui OK / gray Cancel.
-- **Sheet zones** (model drawing/sheet.rs, asb's file, self-contained): ISO is numbered from the right and
-  lettered from the bottom like ANSI (live drawing/156), A3 = 6x4 zones (A4 4x3, A2 8x6, A1 12x8, A0 16x12
-  guessed, capture requested), ISO labels 7 mm.
-- **Assembly** (assembly_view/behaviors/panels): filter row = the Part Studio's (30 px box, italic
-  "Filter by name", + the ≡ list button, inert until live says what it does), "Instances (n)" row 30 px,
-  top row without caret column (icon x 47, name x 66), Origin row = Part Studio's (dot icon), instance rows
-  +2 px, list-collapse toggle at the viewport's left edge (`ui.list_collapsed`), bottom-right evaluation
-  tools (Measure → toggle_measure, Analysis → run_interference, Mass properties: no action yet).
-- **Versions and history** (history_panel.rs): search box ▾ opens Onshape's filter panel (Tab, Tab types,
-  Modified by, Date modified, Reset/Search; `HistoryFilter`, tab changes from store diffs `tab/<id>`);
-  the two toggles are now Onshape's Hide merges / Hide automatic versions (on by default; our old
-  graph / show-all-changes toggles are gone); legend 14 px, rows 33 px apart, last row 82 px above the hint
-  bar (where Onshape's cloud Upgrade sits); footer ? icon `help-faint.svg`.
-- **Tab manager** (tab_manager.rs): header search toggle, sort ▾ (Tab order / Name A→Z / Z→A / Type),
-  filter-row toggle, list view / detailed view, footer preview toggle + ?; selected row name bold.
-- **Feature Studio**: snippet buttons use Onshape's icons (fs-snip-*.svg), pale Commit = 50 % (#8aa8d7),
-  editor 13 px / 16 px lines, no top padding, Monitor box sized to its text.
-- **Tab menus** (workspace.rs): open upward from the tab's left edge with the bottom on the tab bar (live
-  menus/rmb-tab-*); ⊗ Delete icon; Part Studio menu has no Release… / Create Drawing… (live); Assembly has
-  "Create Drawing of <tab>…" (icon) in its own group after Copy to clipboard.
-- **Documents page**: advanced search (new start_search.rs + start_window wiring: ▾ in the search box,
-  360 px panel, Type multiselect, Name, Description, Part number, State, Revision, Add criteria, Results
-  from; content criteria read off the UI thread into `DocFacts`); right strip Properties (Name *,
-  Description, Category, Library label, ↶↷, Apply; `lib::set_doc_properties`, meta `library_label`) and
-  Document notes (read-only, "No notes available") panels; italic search placeholder.
-- Sketch region fill alpha 0.32 (live rgb(221,226,230) with our linear blending).
-- Verified in the app (15:45 build): advanced search (panel + Name / Type searches), Properties and
-  Document notes panels, Details spacing, assembly list + list toggle + eval tools, tab manager (sort,
-  list view), versions panel + its filter panel, Create Drawing dialog, tab menus. Export modal and the
-  "+" menu already matched live. Later edits (sort menu as live's compact list, history icons
-  hide-merges / hide-auto-versions / compare / calendar, Feature Studio editor clipped 8 px up,
-  props spacing) wait for the next build.
-- 16:02 build verified too: tab manager sort menu (live's compact 19 px list), history icons, Feature
-  Studio editor (first line now at live's y; the gutter stays 10 px wider than Ace's 42 px because the
-  kit's fold hitbox is a hard 18 px constant in gpui-base — needs a kit patch, lead's call), Details panel
-  spacing, ISO zones on the demo drawing.
-- 17:14 build (green, no warnings) verified: toasts centred on the window instead of the graphics area
-  (live document/01: centre x 959; Part Studio toast in ui's part_studio/mod.rs, surgical; assembly /
-  config / named-position toasts; final-toast.png), sketch region alpha 0.34.
-- Clippy: nothing from my files. `clippy -D warnings` currently stops in others' code:
-  render/renderer.rs:201 (type_complexity), model document.rs:30 and drawing/mod.rs:471.
-- Next (when resumed): live answers in REQUESTS.md (assembly ≡ button, tab manager tooltips / ?, ISO
-  A4/A2/A1/A0 zones); Feature Studio gutter (kit patch); documents page advanced search "Results from"
-  Versions/All only searches the latest workspace state; the Details panel's "Document labels" chevron
-  doesn't collapse yet.
-- Final shots (ours | live) in /tmp/ui2-shots/: final-documents.png, final-documents-advanced-search.png,
-  final-documents-properties.png, final-documents-notes.png, final-sketch.png, final-assembly.png,
-  final-drawing.png, final-create-drawing.png, final-variable-studio.png, final-versions.png,
-  final-tab-manager.png, final-tab-manager-sort.png, final-feature-studio.png, final-export-dialog.png,
-  final-menus-tab.png.
-- Surgical fix in asb's drawing_callout.rs: `Selectable as _` import (the tree had been broken there for
-  17 min).
-- Requests for other agents (I can't message them; lead please forward):
-  - asb: Onshape's ISO templates use the ANSI-style title block (live drawing/156: UNLESS OTHERWISE
-    SPECIFIED… MILLIMETERS, NAME | SIGNATURE | DATE, FIRST ANGLE PROJECTION, Onshape logo cell, SIZE "A3",
-    SHEET "1 of 1"); ours draws an ISO 7200 block (LEGAL OWNER, DOCUMENT TYPE…). Drawing tab menu needs
-    "Change to version…" (live menus/rmb-tab-drawing; give me a fn and I wire the row).
-  - skb: assembly Analysis tools ▾ menu and Mass properties for the new bottom-right buttons
-    (`asm-eval-analysis`, `asm-eval-mass` in assembly_view.rs `render_evaluation_tools`).
-  - ui: the list toggle sits at y 563, live 554 (Part Studio and assembly).
+**Finished (all built and checked in the app, 17:14 build green, no warnings; clippy: nothing from my files):**
+- Queue 0: empty-state "Learning Center." opens https://github.com/yekta/noshape#readme. Queue 2: clippy
+  `sort_by_key` (material_library_view.rs) and `BoundsCell` alias (feature_studio.rs).
+- Documents page: advanced search (new `start_search.rs`; ▾ in the search box, 360 px panel: Type
+  multiselect, Name, Description, Part number, State, Revision, Add criteria, Results from; content
+  criteria read off the UI thread into `DocFacts`); right strip Properties (Name *, Description,
+  Category, Library label, ↶↷, Apply; `lib::set_doc_properties`, store meta `library_label`) and
+  Document notes (read-only, "No notes available"); Details spacing as live 24; italic search placeholder.
+- Assembly: filter row like the Part Studio's (+ ≡ list button), rows / Origin row / header at live
+  metrics, list-collapse toggle at the viewport edge (`ui.list_collapsed`), bottom-right Measure /
+  Analysis / Mass properties buttons.
+- Drawing: Create Drawing dialog as live drawing/01 (drawing_create.rs, visual only); ISO sheet zones
+  numbered from the right / lettered from the bottom, A3 6x4, 7 mm labels (model drawing/sheet.rs).
+- Versions and history: search ▾ filter panel (Tab, Tab types, Modified by, Date modified, Reset/Search;
+  tab changes from store diffs), Onshape's Hide merges / Hide automatic versions toggles (old non-Onshape
+  toggles removed), legend + icons as live.
+- Tab manager: search toggle, sort menu (live's compact list), filter-row toggle, list / detailed views,
+  footer preview toggle + ?, bold selected row.
+- Feature Studio: Onshape snippet icons (fs-snip-*.svg), pale Commit at 50 %, editor 13/16 px with the
+  first line under the toolbar, Monitor box sized to text.
+- Tab menus open upward from the tab's left edge (live menus/rmb-tab-*), ⊗ Delete icon, Part Studio menu
+  without Release… / Create Drawing…, Assembly "Create Drawing of …" in Onshape's place.
+- Toasts centred on the window (Part Studio, assembly, config, named positions). Sketch region alpha 0.34.
+- Variable Studio, Export modal, "+" menu already matched (shots only).
+- Shots (ours | live) in /tmp/ui2-shots/final-*.png: documents, documents-advanced-search,
+  documents-properties, documents-notes, sketch, assembly, drawing, create-drawing, variable-studio,
+  versions, tab-manager, tab-manager-sort, feature-studio, export-dialog, menus-tab, toast.
+
+**Round 2 (19:00–21:45, lead's follow-up; all built green and checked in the app):**
+- Live answers applied: tab manager header per dom/panel-tab-manager-header (search toggle has no
+  tooltip; "Sort tabs" / "Filter tabs" toggles with the #eaeaea + inset-shadow active look, blue funnel,
+  36 px pitch; bare 20 px List view / Detail view pair, inactive at 0.2; 20 px ×; header with #d7d7d7
+  top/bottom rules), sort menu 120 px with 22 px rows, list-view rows 30 px with a 2 px bar, footer
+  "Toggle preview" (#666, faded when off). History toggles use the same active look. Documents page:
+  the selected row shows Send to trash / Labels icons at its right end (live documents/112; share is
+  cloud). Variable Studio inserted tables were already as live (editable, ⋯ menu).
+- Import modal (import_dialog.rs) as live document/77: blank page + ↓ arrow + pale 36 px tab icons,
+  tiles 12 px under the header, checkbox rows 34 px apart. final-import-modal.png.
+- Clippy (lead): fixed tab_manager.rs:663 (useless conversion), history_panel.rs:247 (`BoundsCell`
+  alias), and session.rs:117 (`contains`, not mine but one line). App crate clippy now only shows
+  numbering_prefs.rs:240 and config_visibility.rs:299 (others' in-progress files).
+- **viewport.rs (nav's), surgical:** the new touch code called `window.insert_hitbox` in the canvas
+  paint closure, which panics ("only during request_layout, or prepaint") — every document window
+  crashed at start. The hitbox is now inserted in prepaint and passed to paint.
+- New windows: none of my files call `gpui_kit::open_window` (start_window uses os_menu::open_window).
+- Shots refreshed: final-tab-manager.png, final-versions.png, final-import-modal.png.
+
+**Left / known differences:**
+- Feature Studio gutter 10 px wider than Ace's 42 px: gpui-base hard-codes an 18 px fold hitbox (kit
+  patch needed; lead's call).
+- Assembly ≡ button inert; tab manager ? button inert; ISO A4/A2/A1/A0 zone counts guessed — all waiting
+  for live answers (REQUESTS.md).
+- Advanced search "Results from: Versions / All" searches only the latest state; Details "Document labels"
+  chevron doesn't collapse.
+
+**Cross-area edits (surgical):** ui's part_studio/mod.rs (toast centring); asb's drawing_create.rs,
+model drawing/sheet.rs, drawing_callout.rs (`Selectable as _` import that broke the tree); skb's
+assembly_view / assembly_behaviors / assembly_panels / assembly_config / assembly_positions.
+No Cargo.lock changes. Nothing half done.
+
+**Requests for other agents (please forward):**
+- asb: ISO templates use the ANSI-style title block in Onshape (live drawing/156); ours draws an ISO 7200
+  block. Drawing tab menu needs "Change to version…" (give me a fn, I wire the row).
+- skb: behaviour for the assembly Analysis tools / Mass properties buttons (`asm-eval-analysis`,
+  `asm-eval-mass`).
+- ui: list toggle at y 563, live 554.
+- Clippy `-D warnings` currently fails in others' code: render/renderer.rs:201, model document.rs:30,
+  drawing/mod.rs:471.
 
 ## State (2026-10-19 12:40 UTC)
 
@@ -415,8 +416,7 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
 ### Feature Studio, second pass (19 Oct, live document/70–75 now captured)
 - One toolbar row as live: undo/redo | New feature | Feature parameters, Query, Evaluate, Math, Sketch,
   Operation functions (letter + ≡ + ▾, 50 px; items from dom/feature-studio-toolbar-menus.txt; each
-  inserts our script API's equivalent, items without one are disabled) | Import (disabled: Rhai has no
-  imports), Format Feature Studio (re-indent) | Commit ▾ (pale while clean) | Search tools… | right:
+  inserts FeatureScript) | Import (the Import panel, fs_import.rs; see "Round 3"), Format Feature Studio (re-indent) | Commit ▾ (pale while clean) | Search tools… | right:
   Monitor <studio> ▾ (Monitor / Profile per Part Studio and Variable Studio; Profile disabled), Module
   outline ▾ (shows the current symbol; "0 symbols / No top-level symbols found"), ←▾ →▾, "Line n , Column m".
   Strings #036a07, comments Ace green. Co-complete (Onshape Labs AI) left out. The search pane stays on
@@ -437,7 +437,7 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
   `import(…)` #318495 (Ace's variable.language), comments Ace green, identifiers plain. Outline: `export const
   x = defineFeature(function(a is A, …))` → "x(a, …)", `function f(…)`, `predicate p(…)`.
 - **Where fs plugs in** (crates/app/src/feature_studio.rs):
-  - `pub fn studio_notices(tab, src) -> Vec<Notice>` is the single compile hook (today it maps Rhai's
+  - `pub fn studio_notices(tab, src) -> Vec<Notice>` is the single compile hook (it maps the FeatureScript compiler's; formerly Rhai's
     `noshape_model::custom::compile` diagnostics). Replace its body with the FeatureScript parser/checker:
     `Notice { line, column (1-based), message, error }`. It feeds the editor squiggles + hover message
     (`FeatureStudioView::recompile`, on every save) and the FeatureScript notices panel / navbar `{!}`
@@ -577,14 +577,8 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
   after cleaning (incremental removed, stale test binaries deleted, /tmp/ui2 trimmed to ~280 MB).
 
 - **Needs your decision (truly blocked):**
-  1. *Feature Studio language.* Onshape's Feature Studio is FeatureScript (new studio: `FeatureScript 3095;
-     import(path : "onshape/std/common.fs", …)`, snippet menus qEverything/opExtrude/skLineSegment…,
-     notices with FeatureScript parse errors). Ours runs Rhai (crates/model custom/). The UI now matches
-     the capture (one toolbar row, New feature, six snippet menus, Import, Format, Commit pale when clean,
-     Search tools, Monitor ▾, Module outline ▾, ←▾ →▾, "Line n , Column m"); snippets insert our API's
-     equivalent and the items with no equivalent (all Sketch functions, array/reference parameters, a few
-     queries/math) are disabled. Identical behaviour needs a FeatureScript implementation — a large model
-     project, not a UI change. Co-complete (Onshape Labs AI) is left out as cloud.
+  1. *Feature Studio language* — RESOLVED: Rhai is removed; FeatureScript (agent fs, crates/featurescript) is
+     the only custom-feature language. The Feature Studio UI matches live (see the Feature Studio sections).
   2. *Export formats.* Onshape: PARASOLID (default), ACIS, STEP, IGES, PVZ, JT, RHINO, GLTF, GLB, OBJ, 3MF,
      STL (+ URDF for assemblies). Parasolid, ACIS, JT, PVZ and Rhino need proprietary kernels/SDKs; we can
      write STEP, IGES, STL, OBJ now and I'm adding GLTF, GLB, 3MF, URDF. STEP version/units/preprocessing

@@ -113,6 +113,35 @@ impl FsNoticesPanel {
         }
     }
 
+    /// A Monitor entry: the notice, then its stack rows (`line:col`, place).
+    fn monitor_item(&self, id: String, e: noshape_model::custom::run::MonitorEntry, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let mut item = v_flex()
+            .id(SharedString::from(id))
+            .cursor_pointer()
+            .hover(|d| d.bg(rgb(0xf5f5f5)))
+            .child(
+                h_flex()
+                    .h(px(22.))
+                    .child(div().w(px(38.)).flex_none().pl(px(23.)).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 10., pal.text)))
+                    .child(div().w(px(28.)).flex_none().pl(px(5.)).child(crate::assets::icon(notice_icon(e.severity == Severity::Error, e.severity == Severity::Info), 16., cx)))
+                    .child(div().flex_1().min_w_0().truncate().px(px(5.)).text_size(px(14.)).text_color(pal.text).child(e.message.clone())),
+            );
+        for (pos, place) in e.rows {
+            item = item.child(
+                h_flex()
+                    .h(px(22.))
+                    .pl(px(66.))
+                    .child(div().min_w(px(45.)).flex_none().px(px(5.)).text_size(px(14.)).text_color(rgb(0x888888)).child(pos))
+                    .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(place)),
+            );
+        }
+        if let Some((t, line, col)) = e.at {
+            item = item.on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Goto(t, line, col))));
+        }
+        item.into_any_element()
+    }
+
     fn header(&self, id: TabId, icon: &'static str, name: String, gray: bool, monitor: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let open = !self.collapsed.contains(&id);
@@ -196,6 +225,22 @@ impl Render for FsNoticesPanel {
             let head = self.header(tab, "feature-studio", name.clone(), false, false, cx);
             sections.push(v_flex().border_b_1().border_color(rgb(0xeaeaea)).child(head).child(body).into_any_element());
         }
+        // Custom tables that threw (live 652): "<table> (<Part Studio>)"
+        // with the error, its stack and the table's println output.
+        for (studio, g) in crate::custom_tables::notice_groups(self.doc.entity_id(), cx) {
+            let key = TabId(studio.0 | 1 << 62);
+            let head = self.header(key, "featurescript-table", g.title.clone(), false, false, cx);
+            let mut body = v_flex();
+            if !self.collapsed.contains(&key) {
+                for (i, e) in g.entries.into_iter().filter(|e| q.is_empty() || e.message.to_lowercase().contains(&q)).enumerate() {
+                    body = body.child(self.monitor_item(format!("fst-{studio}-{i}"), e, cx));
+                }
+                if !g.output.is_empty() {
+                    body = body.child(v_flex().border_t_1().border_color(rgb(0xeaeaea)).pl(px(24.)).pr(px(8.)).py(px(8.)).font_family("monospace").text_size(px(13.33)).children(g.output.lines().map(|l| div().whitespace_nowrap().text_color(pal.text).child(l.to_string())).collect::<Vec<_>>()));
+                }
+            }
+            sections.push(v_flex().border_b_1().border_color(rgb(0xeaeaea)).child(head).child(body).into_any_element());
+        }
         let studios: Vec<(TabId, String, bool)> = self.doc.read(cx).session.doc.ordered_tabs().iter().filter_map(|t| match t.content {
             TabContent::PartStudio(_) => Some((t.id, t.name.clone(), true)),
             TabContent::VariableStudio(_) => Some((t.id, t.name.clone(), false)),
@@ -212,30 +257,7 @@ impl Render for FsNoticesPanel {
             let entries: Vec<_> = entries.into_iter().filter(|e| q.is_empty() || e.message.to_lowercase().contains(&q)).collect();
             let mut body = v_flex();
             for (i, e) in entries.into_iter().enumerate() {
-                let mut item = v_flex()
-                    .id(SharedString::from(format!("fsm-{tab}-{i}")))
-                    .cursor_pointer()
-                    .hover(|d| d.bg(rgb(0xf5f5f5)))
-                    .child(
-                        h_flex()
-                            .h(px(22.))
-                            .child(div().w(px(38.)).flex_none().pl(px(23.)).child(os::glyph(os::GLYPH_CHEVRON_DOWN, 10., pal.text)))
-                            .child(div().w(px(28.)).flex_none().pl(px(5.)).child(crate::assets::icon(notice_icon(e.severity == Severity::Error, e.severity == Severity::Info), 16., cx)))
-                            .child(div().flex_1().min_w_0().truncate().px(px(5.)).text_size(px(14.)).text_color(pal.text).child(e.message.clone())),
-                    );
-                for (pos, place) in e.rows {
-                    item = item.child(
-                        h_flex()
-                            .h(px(22.))
-                            .pl(px(66.))
-                            .child(div().min_w(px(45.)).flex_none().px(px(5.)).text_size(px(14.)).text_color(rgb(0x888888)).child(pos))
-                            .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(place)),
-                    );
-                }
-                if let Some((t, line, col)) = e.at {
-                    item = item.on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Goto(t, line, col))));
-                }
-                body = body.child(item);
+                body = body.child(self.monitor_item(format!("fsm-{tab}-{i}"), e, cx));
             }
             let result = open.then(|| {
                 let text = self.results.get(&tab).cloned().unwrap_or_else(|| "Result: Regeneration complete".into());

@@ -104,11 +104,6 @@ pub fn is_document_open(path: &Path, cx: &App) -> bool {
     cx.try_global::<OpenDocs>().is_some_and(|o| o.0.contains_key(&canonical(path)))
 }
 
-/// The window showing the document at `path`, if it is open.
-pub fn document_window(path: &Path, cx: &App) -> Option<AnyWindowHandle> {
-    cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(path)).copied())
-}
-
 /// App-level window lifecycle: keeps the open-document registry current and
 /// shows the start window when the last document window closes. Quits when
 /// the start window is the last window closed (macOS keeps running and
@@ -160,6 +155,23 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         session::Session::create(&path, create_with.unwrap_or_default())?
     };
     add_recent(&path);
+    let (handle, _) = open_session_window(session, gpu, cx)?;
+    if cx.has_global::<OpenDocs>() {
+        cx.global_mut::<OpenDocs>().0.insert(canonical(&path), handle);
+    }
+    Ok(())
+}
+
+/// A document at a version in a window of its own, read-only (Onshape opens
+/// a version in a new browser tab): another window on the same file, not the
+/// document's registered one. Returns the window and its workspace.
+pub fn open_version_window(path: PathBuf, version: noshape_store::MicroversionId, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
+    let mut session = session::Session::open(&path)?;
+    session.view_microversion(Some(version))?;
+    open_session_window(session, gpu, cx)
+}
+
+fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),
         window_min_size: Some(size(px(900.), px(560.))),
@@ -168,7 +180,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
-    let (handle, _) = crate::os_menu::open_window(options, cx, move |window, cx| {
+    let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
         window.set_window_title(&format!("{} — noshape", session.name()));
         let doc = cx.new(|_| doc_model::DocModel::new(session));
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
@@ -182,10 +194,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
         });
         ws
     })?;
-    if cx.has_global::<OpenDocs>() {
-        cx.global_mut::<OpenDocs>().0.insert(canonical(&path), handle);
-    }
-    Ok(())
+    Ok((handle, ws))
 }
 
 /// Ask for a document to open and open it: the native dialog when available,

@@ -726,7 +726,7 @@ impl<'a> EvalCtx<'a> {
         Ok(split_solids(&res.shape, &face_names))
     }
 
-    fn add_new_bodies(&mut self, t: NamedShape, kind: BodyKind, base_index: u32) -> FResult<()> {
+    pub(crate) fn add_new_bodies(&mut self, t: NamedShape, kind: BodyKind, base_index: u32) -> FResult<()> {
         let pieces = if kind == BodyKind::Solid && t.shape.count(ShapeType::Solid) > 1 { split_solids(&t.shape, &t.names.faces) } else { vec![t] };
         for (j, p) in pieces.into_iter().enumerate() {
             let name = self.ctx.alloc_part_name(kind);

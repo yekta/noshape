@@ -202,10 +202,12 @@ impl Camera {
             return;
         }
         self.target = r * ((x0 + x1) * 0.5) + u * ((y0 + y1) * 0.5) + f * ((z0 + z1) * 0.5);
-        let half = ((y1 - y0) * 0.5).max((x1 - x0) * 0.5 / aspect.max(1e-6)).max(1e-6) * 1.12;
+        // Onshape's `zoomToFit`: the projected extent padded by
+        // `CAMERA_ZOOM_TO_FIT_PADDING` (1.05).
+        let half = ((y1 - y0) * 0.5).max((x1 - x0) * 0.5 / aspect.max(1e-6)).max(1e-6) * 1.05;
         self.distance = half / (self.fov_y * 0.5).tan();
         if self.projection == Projection::Perspective {
-            self.distance += (z1 - z0) * 0.5;
+            self.distance += (z1 - z0) * 0.5 * 1.05;
         }
     }
 
@@ -320,12 +322,12 @@ mod tests {
         let (lo, hi) = (DVec3::new(0.0, 0.0, 0.0), DVec3::new(0.1, 0.01, 0.02));
         c.fit_box(lo, hi, 2.0);
         let vp = DVec2::new(800.0, 400.0);
-        // Centered and filling the width with a margin.
+        // Centered and filling the width with Onshape's 1.05 padding.
         let a = c.project(DVec3::new(0.0, 0.0, 0.01), vp, 1.0).unwrap();
         let b = c.project(DVec3::new(0.1, 0.0, 0.01), vp, 1.0).unwrap();
         assert!((a.x + b.x - 800.0).abs() < 1e-6 && (a.y - 200.0).abs() < 1e-6, "{a} {b}");
         let fill = (b.x - a.x) / 800.0;
-        assert!(fill > 0.85 && fill < 0.95, "fill {fill}");
+        assert!((fill - 1.0 / 1.05).abs() < 1e-9, "fill {fill}");
         // Much tighter than the bounding sphere.
         let mut s = c;
         s.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.5, 2.0);

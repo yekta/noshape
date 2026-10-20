@@ -15,6 +15,14 @@ actions!(
         ClearSelection,
         Accept,
         AcceptAndRepeat,
+        // Tab / Shift+Tab in a feature dialog (Onshape's order; leaving it
+        // past either end) and the navbar target of Tab past its end.
+        DialogTab,
+        DialogTabPrev,
+        FocusNavbar,
+        // Shift+Tab with the focus on the Part Studio itself (Onshape's
+        // <body>): it stays there.
+        StudioTabPrev,
         Cancel,
         RenameSelected,
         SearchTools,
@@ -167,6 +175,9 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("escape", Cancel, Some("CreateDrawing")),
         // Esc while typing in a dialog field still cancels the dialog (Onshape).
         KeyBinding::new("escape", Cancel, Some("FeatureDialog > Input")),
+        KeyBinding::new("tab", DialogTab, Some("FeatureDialog")),
+        KeyBinding::new("shift-tab", DialogTabPrev, Some("FeatureDialog")),
+        KeyBinding::new("shift-tab", StudioTabPrev, Some("PartStudio")),
         KeyBinding::new("shift-n", RenameSelected, doc),
         KeyBinding::new("alt-c", SearchTools, doc_mod),
         KeyBinding::new("s", ShortcutToolbar, doc),

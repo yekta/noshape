@@ -350,20 +350,7 @@ impl TabManager {
                             }
                             continue;
                         }
-                        let scene = if *assembly {
-                            let Some(TabContent::Assembly(a)) = doc.tab(*tab).map(|t| &t.content) else { continue };
-                            let result = evaluator.lock().evaluate(&doc, a, &Default::default(), None);
-                            crate::assembly_scene::build(&result, &Default::default(), &mut Default::default(), gpu.uploader()).scene
-                        } else {
-                            let Some(result) = evaluator.lock().studio(&doc, *tab, &Default::default()) else { continue };
-                            let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
-                            crate::scene_builder::build(&result.display, &opts, &mut Default::default(), gpu.uploader()).scene
-                        };
-                        let Some((lo, hi)) = scene.bounds() else { continue };
-                        let (w, h) = crate::gpu::THUMBNAIL_SIZE;
-                        let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
-                        let Ok(png) = gpu.render_thumbnail(std::sync::Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
-                        if let Some(img) = decode(&png) {
+                        if let Some(img) = tab_thumbnail(&doc, *tab, *assembly, &evaluator, &gpu).await {
                             out.push((*tab, img));
                         }
                     }
@@ -418,15 +405,15 @@ impl Render for TabManager {
                 let view = cx.entity();
                 let compact = self.compact;
                 // Live document/41: the selected row's name is bold; 45: list
-                // view rows are one line (25.5 px), icon + name.
+                // view rows are one line (30 px), icon + name.
                 Some(h_flex()
                     .id(SharedString::from(format!("tm-{id}")))
                     .relative()
-                    .h(px(if compact { 25.5 } else { 54. }))
+                    .h(px(if compact { 30. } else { 54. }))
                     .flex_none()
                     .pl(px(if compact { 16. } else { 22. } + depth as f32 * 20.))
                     .cursor_pointer()
-                    .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).child(div().absolute().left_0().top_0().bottom_0().w(px(6.)).bg(pal.accent)))
+                    .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).child(div().absolute().left_0().top_0().bottom_0().w(px(if compact { 2. } else { 6. })).bg(pal.accent)))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.panel_hover)))
                     .when(compact, |d| d.gap(px(6.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(name.clone())))
                     .when(!compact, |d| {
@@ -527,10 +514,14 @@ impl Render for TabManager {
                     .h(px(37.))
                     .flex_none()
                     .pl(px(5.))
+                    .border_t_1()
+                    .border_b_1()
+                    .border_color(rgb(0xd7d7d7))
                     .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Tabs"))
-                    // Live document/41: search, sort ▾, filter | list, detailed | × (centers
-                    // 246, 284, 319, 352, 376, 405 px into the panel).
-                    .child(crate::ui::icon_button("tm-search", "search", 30., self.show_search, cx).mr(px(8.)).tooltip("Search tabs").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live dom/panel-tab-manager-header: 30x30 search / Sort tabs / Filter tabs
+                    // 6 px apart, then the bare 20 px List view / Detail view pair (inactive at
+                    // 0.2), then the 20 px ×, 5 px from the edge.
+                    .child(tm_toggle("tm-search", "search", self.show_search, cx).mr(px(6.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_search = !this.show_search;
                         cx.notify();
                     })))
@@ -538,26 +529,26 @@ impl Render for TabManager {
                         let probe = self.sort_anchor.clone();
                         div()
                             .relative()
-                            .mr(px(5.))
-                            .child(crate::ui::icon_button("tm-sort", "tm-sort", 30., false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip("Sort").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .mr(px(6.))
+                            .child(tm_toggle("tm-sort", "tm-sort", false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip(crate::ui::tooltip("Sort tabs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.sort_open = !this.sort_open;
                                 cx.notify();
                             })))
                             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     })
-                    .child(crate::ui::icon_button("tm-filter", "filter", 30., self.show_filters, cx).mr(px(6.)).tooltip("Filter by tab type").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(tm_toggle("tm-filter", "tm-filter", self.show_filters, cx).mr(px(9.)).tooltip(crate::ui::tooltip("Filter tabs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_filters = !this.show_filters;
                         cx.notify();
                     })))
-                    .child(div().when(!self.compact, |d| d.opacity(0.4)).child(crate::ui::icon_button("tm-list", "tm-list", 24., false, cx).tooltip("List view").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("tm-list").cursor_pointer().mr(px(3.)).when(!self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("List view")).child(crate::assets::icon("tm-list", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.compact = true;
                         cx.notify();
-                    }))))
-                    .child(div().mr(px(2.)).when(self.compact, |d| d.opacity(0.4)).child(crate::ui::icon_button("tm-detailed", "tm-detailed", 24., false, cx).tooltip("Detailed view").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    })))
+                    .child(div().id("tm-detailed").cursor_pointer().mr(px(9.)).when(self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("Detail view")).child(crate::assets::icon("tm-detailed", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.compact = false;
                         cx.notify();
-                    }))))
-                    .child(crate::ui::icon_button("tm-close", "close", 30., false, cx).tooltip("Close").on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TabManagerEvent::Close)))),
+                    })))
+                    .child(div().id("tm-close").cursor_pointer().mr(px(5.)).child(crate::assets::icon("close", 20., cx)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TabManagerEvent::Close)))),
             )
             // Live document/30: the search box 6 px under the header, the filter row
             // 40 px, rows from y 154.
@@ -615,7 +606,7 @@ impl Render for TabManager {
                     .child("to open")
                     .child(div().flex_1())
                     // Live document/41, 46: the preview toggle and help.
-                    .child(crate::ui::icon_button("tm-preview", "tm-preview", 22., self.show_preview, cx).tooltip(if self.show_preview { "Hide preview" } else { "Show preview" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("tm-preview").cursor_pointer().mr(px(4.)).when(!self.show_preview, |d| d.opacity(0.3)).tooltip(crate::ui::tooltip("Toggle preview")).child(crate::assets::icon("tm-preview", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_preview = !this.show_preview;
                         cx.notify();
                     })))
@@ -625,15 +616,16 @@ impl Render for TabManager {
 }
 
 impl TabManager {
-    /// The sort menu (live document/42): 119 px under the sort button,
-    /// 19 px rows of 12 px `#555` text, the current order bold on `#b2ddf6`.
+    /// The sort menu (live document/42, behaviours "Tab manager header icons"):
+    /// 120 px under the sort button, 22 px rows of 12 px `#555` text, the
+    /// current order bold on `#b2ddf6`.
     fn render_sort_menu(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let b = self.sort_anchor.get();
         let mut list = v_flex()
             .id("tm-sort-menu")
             .occlude()
-            .w(px(119.))
+            .w(px(120.))
             .py(px(1.))
             .bg(pal.panel)
             .border_1()
@@ -649,13 +641,13 @@ impl TabManager {
             list = list.child(
                 div()
                     .id(SharedString::from(format!("tm-sort-{}", s.label())))
-                    .h(px(19.))
+                    .h(px(22.))
                     .px(px(16.))
                     .flex()
                     .items_center()
                     .text_size(px(12.))
                     .cursor_pointer()
-                    .text_color(if cur { pal.text } else { rgb(0x555555).into() })
+                    .text_color(if cur { pal.text } else { rgb(0x555555) })
                     .when(cur, |d| d.bg(rgb(0xb2ddf6)).font_weight(FontWeight::BOLD))
                     .when(!cur, |d| d.hover(|d| d.bg(pal.row_hover)))
                     .child(s.label())
@@ -668,6 +660,49 @@ impl TabManager {
         }
         deferred(anchored().position(point(b.left(), b.bottom() + px(1.))).child(list)).with_priority(1).into_any_element()
     }
+}
+
+/// A tab manager header toggle (live): 30x30, radius 3; on = `#eaeaea` with
+/// an inset 0 1 1 shadow.
+fn tm_toggle(id: &'static str, icon: &'static str, on: bool, cx: &App) -> Stateful<Div> {
+    div()
+        .id(id)
+        .size(px(30.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(3.))
+        .cursor_pointer()
+        .when(on, |d| d.bg(rgb(0xeaeaea)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]))
+        .when(!on, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+        .child(crate::assets::icon(icon, 20., cx))
+}
+
+/// A Part Studio's (or Assembly's) shaded picture at the thumbnail size, as
+/// the Tab manager and the Feature Studio Import panel show them. Runs the
+/// evaluation; call it off the UI thread.
+pub(crate) async fn tab_thumbnail(
+    doc: &noshape_model::Document,
+    tab: TabId,
+    assembly: bool,
+    evaluator: &parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>,
+    gpu: &crate::gpu::Gpu,
+) -> Option<std::sync::Arc<RenderImage>> {
+    let scene = if assembly {
+        let Some(TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { return None };
+        let result = evaluator.lock().evaluate(doc, a, &Default::default(), None);
+        crate::assembly_scene::build(&result, &Default::default(), &mut Default::default(), gpu.uploader()).scene
+    } else {
+        let result = evaluator.lock().studio(doc, tab, &Default::default())?;
+        let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
+        crate::scene_builder::build(&result.display, &opts, &mut Default::default(), gpu.uploader()).scene
+    };
+    let (lo, hi) = scene.bounds()?;
+    let (w, h) = crate::gpu::THUMBNAIL_SIZE;
+    let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
+    let png = gpu.render_thumbnail(std::sync::Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style()).await.ok()?;
+    decode(&png)
 }
 
 /// PNG -> GPUI image (BGRA); the white background becomes transparent so the

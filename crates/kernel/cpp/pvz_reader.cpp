@@ -71,7 +71,12 @@ struct Inflater
       code |= bits(1);
       const int count = h.count[l];
       if (code - count < first)
-        return h.symbol[index + (code - first)];
+      {
+        const int k = index + (code - first);
+        if (k < 0 || k >= 320)
+          bad("bad Huffman code");
+        return h.symbol[k];
+      }
       index += count;
       first += count;
       first <<= 1;
@@ -80,11 +85,22 @@ struct Inflater
     bad("bad Huffman code");
   }
 
-  static void construct(Huffman& h, const short* length, int n)
+  // As puff.c: the number of unused codes (negative when over-subscribed).
+  static int construct(Huffman& h, const short* length, int n)
   {
     std::memset(h.count, 0, sizeof h.count);
     for (int s = 0; s < n; ++s)
       h.count[length[s]]++;
+    if (h.count[0] == n)
+      return 0;
+    int left = 1;
+    for (int l = 1; l < 16; ++l)
+    {
+      left <<= 1;
+      left -= h.count[l];
+      if (left < 0)
+        return left;
+    }
     short offs[16];
     offs[1] = 0;
     for (int l = 1; l < 15; ++l)
@@ -92,7 +108,7 @@ struct Inflater
     for (int s = 0; s < n; ++s)
       if (length[s] != 0)
         h.symbol[offs[length[s]]++] = (short)s;
-    h.count[0] = 0;
+    return left;
   }
 
   void codes(const Huffman& lencode, const Huffman& distcode)
@@ -161,7 +177,8 @@ struct Inflater
     for (int i = 0; i < ncode; ++i)
       lengths[order[i]] = (short)bits(3);
     Huffman lencode, distcode;
-    construct(lencode, lengths, 19);
+    if (construct(lencode, lengths, 19) != 0)
+      bad("bad code lengths code");
     for (int i = 0; i < nlen + ndist;)
     {
       int sym = decode(lencode);
@@ -188,8 +205,15 @@ struct Inflater
           lengths[i++] = len;
       }
     }
-    construct(lencode, lengths, nlen);
-    construct(distcode, lengths + nlen, ndist);
+    if (lengths[256] == 0)
+      bad("no end-of-block code");
+    // Incomplete codes are allowed only for a single code of length 1.
+    int left = construct(lencode, lengths, nlen);
+    if (left < 0 || (left > 0 && nlen != lencode.count[0] + lencode.count[1]))
+      bad("bad literal/length code");
+    left = construct(distcode, lengths + nlen, ndist);
+    if (left < 0 || (left > 0 && ndist != distcode.count[0] + distcode.count[1]))
+      bad("bad distance code");
     codes(lencode, distcode);
   }
 
@@ -496,6 +520,11 @@ void ol_mesh(const std::string& ol, MeshInstance& m)
 }
 
 } // namespace
+
+std::map<std::string, std::string> zip_members(const std::string& zip)
+{
+  return unzip(zip);
+}
 
 std::string inflate_raw(const unsigned char* in, size_t len)
 {

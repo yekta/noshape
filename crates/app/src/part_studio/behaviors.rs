@@ -50,6 +50,9 @@ pub struct SelectOther {
     pub at: DVec2,
 }
 
+/// Consumed dialog picks: (picks, accent picks, before-model, lines).
+pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>);
+
 /// View state for the behaviors above.
 pub struct UiState {
     /// Edit in context: the assembly shown around the part.
@@ -97,11 +100,16 @@ pub struct UiState {
     /// The open Graphics preferences dialog.
     pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
     pub palette_no_highlight: bool,
+    /// Tool search: the viewport's top in window coordinates (the popover
+    /// hangs from the window's right edge, over any right panel, as live).
+    pub palette_top: std::rc::Rc<std::cell::Cell<Pixels>>,
     /// When the tool search last closed (a click on its toggle closes it
     /// through the outside click; the click itself must not reopen it).
     pub palette_closed: Option<std::time::Instant>,
     /// Variable hovered in the variable table.
     pub var_hover: Option<String>,
+    /// Custom tables panel (selected table, its result, the hovered row).
+    pub ct: super::custom_tables::CtState,
     /// Variable Studio tables shown in the Variable table panel.
     pub var_tables: std::collections::HashMap<noshape_model::document::TabId, Entity<crate::variable_studio::VariableStudioView>>,
     /// Section view planes (Shift+X).
@@ -189,7 +197,7 @@ pub struct UiState {
     pub list_menu: Option<FeatureId>,
     /// Dialog picks the preview consumed (a fillet's edges), drawn from the
     /// model before the feature: (picks, accent picks, before-model, lines).
-    pub consumed_lines: Option<(Vec<Reference>, Vec<Reference>, usize, Option<noshape_render::Instance>)>,
+    pub consumed_lines: Option<ConsumedLines>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
     /// Entity of the hovered dialog selection row.
@@ -274,8 +282,10 @@ impl UiState {
             appearance_sketches: false,
             graphics_dialog: None,
             palette_no_highlight: false,
+            palette_top: std::rc::Rc::new(std::cell::Cell::new(px(76.))),
             palette_closed: None,
             var_hover: None,
+            ct: Default::default(),
             var_tables: Default::default(),
             section: Vec::new(),
             section_dialog: None,
@@ -464,6 +474,14 @@ impl PartStudioView {
         }
         if self.ui.var_hover.is_some() {
             return self.variable_users(cx).into_iter().flat_map(|f| self.feature_geometry(f)).collect();
+        }
+        // A custom table row pre-highlights its entities; a part by its
+        // edges only, faces keep their color (live 635).
+        if let Some(refs) = &self.ui.ct.hover {
+            return refs.iter().flat_map(|r| match r {
+                Reference::Body(b) => self.body_geometry(b).into_iter().filter(|r| matches!(r, Reference::Edge(_))).collect(),
+                r => vec![r.clone()],
+            }).collect();
         }
         if let Some(r) = &self.ui.menu_target {
             return vec![r.clone()];
@@ -1992,6 +2010,23 @@ impl PartStudioView {
             }
             sk.curves.iter().flat_map(|c| c.points.iter()).for_each(|q| add(p3(*q)));
             sk.points.iter().for_each(|q| add(p3(q.position)));
+        }
+        acc
+    }
+
+    /// What zoom to fit and the standard views frame: Onshape's `getFitBounds`
+    /// = the model node's bounds, which hold the visible planes (default
+    /// planes included) as well as parts and sketches.
+    pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        let mut acc = self.fit_bounds();
+        if self.opts.show_planes {
+            for pl in self.display.planes.iter().filter(|p| !p.hidden) {
+                let f = &pl.frame;
+                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+                    let q = f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height);
+                    acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
+                }
+            }
         }
         acc
     }

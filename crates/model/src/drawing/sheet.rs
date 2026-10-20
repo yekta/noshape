@@ -574,36 +574,123 @@ impl SheetGeometry {
                     self.text([cx + 1.5, cy + 1.2], 3.0, value_of(k, v), Anchor::BottomLeft);
                 }
             }
-            style => {
-                let Some([x0, y0, x1, y1]) = title_block_rect(sheet) else { return };
-                self.rect(x0, y0, x1, y1, LineStyle::Border);
-                for &(key, cx, cy, cw, ch) in title_cells(style) {
-                    let (x, y) = (x0 + cx, y0 + cy);
-                    self.rect(x, y, x + cw, y + ch, LineStyle::Thin);
-                    if key == PROJECTION_CELL {
-                        self.projection_symbol([x + cw / 2.0, y + ch / 2.0], projection);
-                        continue;
-                    }
-                    self.text([x + 1.2, y + ch - 2.6], 1.8, key.to_uppercase(), Anchor::BottomLeft);
-                    let v = sheet.title_field(key).unwrap_or("");
-                    let value = value_of(key, v);
-                    let lines: Vec<&str> = value.lines().collect();
-                    if lines.len() > 1 {
-                        let th = 2.0;
-                        for (i, l) in lines.iter().enumerate() {
-                            self.text([x + 1.2, y + ch - 6.2 - i as f64 * th * 1.4], th, l.to_string(), Anchor::BottomLeft);
-                        }
-                        continue;
-                    }
-                    let mut th = ((ch - 3.6) * 0.8).clamp(2.0, 5.0);
-                    let tw = font::text_width(&value, th);
-                    if tw > cw - 2.4 && tw > 0.0 {
-                        th = (th * (cw - 2.4) / tw).max(1.2);
-                    }
-                    self.text([x + 1.2, y + 1.0], th, value, Anchor::BottomLeft);
-                }
-            }
+            style => self.onshape_title_block(sheet, style == TitleBlockStyle::Iso, projection, &value_of),
         }
+    }
+
+    /// Onshape's title block (the ANSI and ISO templates share the layout,
+    /// live drawing/156 and 189): the tolerance notes, DO NOT SCALE DRAWING,
+    /// BREAK ALL SHARP EDGES AND REMOVE BURRS and the projection angle at the
+    /// left; NAME (SIGNATURE on ISO) / DATE rows DRAWN, CHECKED, APPROVED, then
+    /// MATERIAL / FINISH; the logo row, TITLE, SIZE / DWG NO. / REV. and
+    /// SCALE / WEIGHT / SHEET at the right. Cell edges are fractions of the
+    /// block measured on the live templates.
+    fn onshape_title_block(&mut self, sheet: &Sheet, iso: bool, projection: Projection, value_of: &dyn Fn(&str, &str) -> String) {
+        let Some([x0, y0, x1, y1]) = title_block_rect(sheet) else { return };
+        let (bw, bh) = (x1 - x0, y1 - y0);
+        let px = |u: f64| x0 + u * bw;
+        let py = |v: f64| y0 + v * bh;
+        // Column / row fractions (ANSI, ISO).
+        let pick = |a: f64, i: f64| if iso { i } else { a };
+        let left = pick(0.1976, 0.1885);
+        let mid = pick(0.4940, 0.5179);
+        let cols: Vec<f64> = if iso { vec![0.1885, 0.2705, 0.3644, 0.4590, 0.5179] } else { vec![0.1976, 0.2971, 0.4201, 0.4940] };
+        let rows: [f64; 7] = if iso { [1.0, 0.882, 0.761, 0.640, 0.519, 0.398, 0.277] } else { [1.0, 0.878, 0.759, 0.640, 0.518, 0.399, 0.2805] };
+        let left_rows = if iso { [1.0, 0.5, 0.379, 0.245, 0.166, 0.0] } else { [1.0, 0.5305, 0.4146, 0.2835, 0.2012, 0.0] };
+        let split = pick(0.3462, 0.3525);
+        let right_rows = if iso { [1.0, 0.748, 0.325, 0.127, 0.0] } else { [1.0, 0.747, 0.326, 0.134, 0.0] };
+        let size_cols = if iso { [0.576, 0.9516] } else { [0.5543, 0.9706] };
+        let scale_cols = if iso { [0.620, 0.8346] } else { [0.6033, 0.8258] };
+        let k = bh / 38.2;
+        let (lab, val) = (1.25 * k, 2.2 * k);
+        // Frame and grid.
+        self.rect(x0, y0, x1, y1, LineStyle::Border);
+        self.line([px(left), y0], [px(left), y1], LineStyle::Thin);
+        self.line([px(mid), y0], [px(mid), y1], LineStyle::Thin);
+        for v in &left_rows[1..left_rows.len() - 1] {
+            self.line([x0, py(*v)], [px(left), py(*v)], LineStyle::Thin);
+        }
+        for v in &rows[1..] {
+            self.line([px(left), py(*v)], [px(mid), py(*v)], LineStyle::Thin);
+        }
+        for c in &cols[1..cols.len() - 1] {
+            self.line([px(*c), py(rows[6])], [px(*c), y1], LineStyle::Thin);
+        }
+        self.line([px(split), y0], [px(split), py(rows[6])], LineStyle::Thin);
+        for v in &right_rows[1..right_rows.len() - 1] {
+            self.line([px(mid), py(*v)], [x1, py(*v)], LineStyle::Thin);
+        }
+        for c in size_cols {
+            self.line([px(c), py(right_rows[3])], [px(c), py(right_rows[2])], LineStyle::Thin);
+        }
+        for c in scale_cols {
+            self.line([px(c), y0], [px(c), py(right_rows[3])], LineStyle::Thin);
+        }
+        let label = |g: &mut Self, u: f64, v: f64, t: &str| g.text([px(u) + 0.8 * k, py(v) - 0.6 * k - lab], lab, t.to_string(), Anchor::BottomLeft);
+        // Left: tolerance notes, standard notes, projection.
+        let top = left_rows[0];
+        label(self, 0.0, top, "UNLESS OTHERWISE SPECIFIED,");
+        let units = sheet.title_field("Units").filter(|u| !u.is_empty()).unwrap_or(if iso { "MILLIMETERS" } else { "INCHES" });
+        label(self, 0.0, top - 0.055, &format!("DIMENSIONS ARE IN {units}"));
+        if iso {
+            self.text([px(0.11), py(0.80)], lab, "ANGULAR = ± °".to_string(), Anchor::BottomLeft);
+        } else {
+            for (i, t) in [".XX = ±.0-", ".XXX = ±.00-", ".XXXX = ±.000-"].iter().enumerate() {
+                self.text([x0 + 1.0 * k, py(0.81 - i as f64 * 0.05)], lab, t.to_string(), Anchor::BottomLeft);
+            }
+            self.text([px(0.1), py(0.79)], lab, "ANGULAR = ± °".to_string(), Anchor::BottomLeft);
+            self.text([px(0.1), py(0.74)], lab, "FRACTIONAL = ±".to_string(), Anchor::BottomLeft);
+        }
+        self.text([x0 + 0.8 * k, py(left_rows[1] + 0.09)], lab, "SURFACE FINISH".to_string(), Anchor::BottomLeft);
+        let sf = [px(0.098), py(left_rows[1] + 0.12)];
+        self.lines.push(Polyline2 { points: vec![[sf[0], sf[1]], [sf[0] + 0.8 * k, sf[1] - 1.6 * k], [sf[0] + 2.4 * k, sf[1] + 1.6 * k], [sf[0] + 5.0 * k, sf[1] + 1.6 * k]], style: LineStyle::Thin, closed: false, pick: 0 });
+        let centred = |g: &mut Self, v0: f64, v1: f64, h: f64, t: &str| g.text([px(left / 2.0), (py(v0) + py(v1)) / 2.0], h, t.to_string(), Anchor::Center);
+        centred(self, left_rows[1], left_rows[2], 1.8 * k, "DO NOT SCALE DRAWING");
+        self.text([px(left / 2.0), py(left_rows[2]) - 1.4 * k], lab, "BREAK ALL SHARP EDGES AND".to_string(), Anchor::Center);
+        self.text([px(left / 2.0), py(left_rows[3]) + 1.4 * k], lab, "REMOVE BURRS".to_string(), Anchor::Center);
+        centred(self, left_rows[3], left_rows[4], lab, if projection == Projection::FirstAngle { "FIRST ANGLE PROJECTION" } else { "THIRD ANGLE PROJECTION" });
+        self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection);
+        // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED.
+        let heads: &[&str] = if iso { &["NAME", "SIGNATURE", "DATE"] } else { &["NAME", "DATE"] };
+        for (i, h) in heads.iter().enumerate() {
+            label(self, cols[i + 1], rows[0], h);
+        }
+        let fields: [(&str, &str, &str); 3] = [("DRAWN", "Drawn by", "Drawn date"), ("CHECKED", "Checked by", "Checked date"), ("APPROVED", "Approved by", "Approved date")];
+        let value_in = |g: &mut Self, u0: f64, u1: f64, v0: f64, v1: f64, key: &str, h: f64| {
+            let v = value_of(key, sheet.title_field(key).unwrap_or(""));
+            if !v.is_empty() {
+                g.text([(px(u0) + px(u1)) / 2.0, (py(v0) + py(v1)) / 2.0], h, v, Anchor::Center);
+            }
+        };
+        for (r, (l, name, date)) in fields.iter().enumerate() {
+            label(self, cols[0], rows[r + 1], l);
+            value_in(self, cols[1], cols[2], rows[r + 2], rows[r + 1], name, lab);
+            let dc = cols.len() - 2;
+            value_in(self, cols[dc], cols[dc + 1], rows[r + 2], rows[r + 1], date, lab);
+        }
+        label(self, cols[0], rows[6], "MATERIAL");
+        label(self, split, rows[6], "FINISH");
+        value_in(self, cols[0], split, 0.0, rows[6] - 0.08, "Material", val * 0.8);
+        value_in(self, split, mid, 0.0, rows[6] - 0.08, "Finish", val * 0.8);
+        // Right: the logo row, TITLE, SIZE / DWG NO. / REV., SCALE / WEIGHT / SHEET.
+        if iso {
+            self.text([px((mid + 1.0) / 2.0), (py(right_rows[0]) + py(right_rows[1])) / 2.0], 3.5 * k, "noshape".to_string(), Anchor::Center);
+        }
+        label(self, mid, right_rows[1], "TITLE");
+        value_in(self, mid, 1.0, right_rows[2], right_rows[1], "Title", val);
+        label(self, mid, right_rows[2], "SIZE");
+        label(self, size_cols[0], right_rows[2], "DWG NO.");
+        label(self, size_cols[1], right_rows[2], "REV.");
+        let size = value_of("Size", sheet.title_field("Size").unwrap_or(""));
+        self.text([(px(mid) + px(size_cols[0])) / 2.0, (py(right_rows[3]) + py(right_rows[2])) / 2.0 - 0.6 * k], val * 1.4, size, Anchor::Center);
+        value_in(self, size_cols[0], size_cols[1], right_rows[3], right_rows[2] - 0.05, "Part number", val);
+        value_in(self, size_cols[1], 1.0, right_rows[3], right_rows[2] - 0.05, "Revision", val);
+        label(self, mid, right_rows[3], "SCALE");
+        label(self, scale_cols[0], right_rows[3], "WEIGHT");
+        label(self, scale_cols[1], right_rows[3], "SHEET");
+        value_in(self, mid + 0.03, scale_cols[0], 0.0, right_rows[3] - 0.03, "Scale", val);
+        value_in(self, scale_cols[0], scale_cols[1], 0.0, right_rows[3] - 0.03, "Weight", val);
+        value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", val);
     }
 
     /// First / third angle projection symbol (a truncated cone) centered at `c`.
@@ -933,30 +1020,78 @@ impl SheetGeometry {
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], [p[0] + 3.0, p[1] + 5.0]], style: LineStyle::Thin, closed: false, pick });
                     self.texts.push(Text2 { pos: [p[0] + 6.5, p[1] + 10.8], height: 2.5, text: env.expand(value), angle: 0.0, anchor: Anchor::BottomLeft, pick });
                 }
-                AnnotationKind::Gdt { anchor, frame, leaders } => {
-                    let mut x = anchor[0];
-                    let y = anchor[1];
-                    // The frame scales with the annotation text height.
+                AnnotationKind::Gdt { anchor, frame, leaders, extra } => {
+                    // The frame scales with the annotation text height; rows
+                    // stack downward from the anchor row (live drawing/212–215).
                     let k = ah / 3.5;
-                    let h = 3.0 * k;
-                    for cell in frame {
-                        let w = (font::text_width(cell, h) + 3.0 * k).max(7.0 * k);
-                        self.lines.push(Polyline2 { points: vec![[x, y], [x + w, y], [x + w, y + 7.0 * k], [x, y + 7.0 * k]], style: LineStyle::Thin, closed: true, pick });
-                        self.texts.push(Text2 { pos: [x + w / 2.0, y + 3.5 * k], height: h, text: cell.clone(), angle: 0.0, anchor: Anchor::Center, pick });
-                        x += w;
+                    let (h, rh) = (3.0 * k, 7.0 * k);
+                    let (x0, y) = (anchor[0], anchor[1]);
+                    let cell_w = |c: &str| (font::text_width(c, h) + 3.0 * k).max(7.0 * k);
+                    let rows: Vec<&Vec<String>> = std::iter::once(frame).chain(extra.rows.iter()).collect();
+                    let sym_w = rows.iter().filter_map(|r| r.first()).filter(|c| c.as_str() != "Composite").map(|c| cell_w(c)).fold(7.0 * k, f64::max);
+                    let mut right = x0;
+                    let mut sym_top = 0usize;
+                    for (ri, row) in rows.iter().enumerate() {
+                        let yb = y - ri as f64 * rh;
+                        // A Composite row shares the symbol cell of the row(s) above.
+                        let composite = ri > 0 && row.first().is_some_and(|c| c == "Composite" || c.is_empty());
+                        if !composite {
+                            sym_top = ri;
+                        }
+                        let span = rows[sym_top..].iter().skip(1).take_while(|r| r.first().is_some_and(|c| c == "Composite" || c.is_empty())).count();
+                        if !composite {
+                            let yl = yb - span as f64 * rh;
+                            self.lines.push(Polyline2 { points: vec![[x0, yl], [x0 + sym_w, yl], [x0 + sym_w, yb + rh], [x0, yb + rh]], style: LineStyle::Thin, closed: true, pick });
+                            if let Some(sym) = row.first() {
+                                self.texts.push(Text2 { pos: [x0 + sym_w / 2.0, (yl + yb + rh) / 2.0], height: h, text: sym.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                            }
+                        }
+                        let mut x = x0 + sym_w;
+                        for cell in row.iter().skip(1).filter(|c| !c.is_empty()) {
+                            let w = cell_w(cell);
+                            self.lines.push(Polyline2 { points: vec![[x, yb], [x + w, yb], [x + w, yb + rh], [x, yb + rh]], style: LineStyle::Thin, closed: true, pick });
+                            self.texts.push(Text2 { pos: [x + w / 2.0, yb + rh / 2.0], height: h, text: cell.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                            x += w;
+                        }
+                        right = right.max(x);
+                        // Prefix left of the frame, suffix right of its row.
+                        if let Some(p) = extra.prefix.get(ri).filter(|p| !p.is_empty()) {
+                            self.texts.push(Text2 { pos: [x0 - 1.0 * k - font::text_width(p, h), yb + rh / 2.0 - h / 2.0], height: h, text: p.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                        }
+                        if let Some(sfx) = extra.suffix.get(ri).filter(|p| !p.is_empty()) {
+                            self.texts.push(Text2 { pos: [x + 1.0 * k, yb + rh / 2.0 - h / 2.0], height: h, text: sfx.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                        }
                     }
-                    // Leaders leave the nearer short side through a shoulder.
-                    let (x0, x1, ym) = (anchor[0], x, y + 3.5 * k);
+                    let bottom = y - (rows.len() as f64 - 1.0) * rh;
+                    // Upper text above, lower text below, left-aligned.
+                    if !extra.upper.is_empty() {
+                        self.texts.push(Text2 { pos: [x0, y + rh + 1.0 * k], height: h, text: extra.upper.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    }
+                    if !extra.lower.is_empty() {
+                        self.texts.push(Text2 { pos: [x0, bottom - 1.0 * k - h], height: h, text: extra.lower.clone(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
+                    }
+                    // Leaders leave the nearer short side of the first row through
+                    // a shoulder; All around / All over add a circle (two) there.
+                    let (x1, ym) = (right, y + rh / 2.0);
                     for l in leaders {
                         let t = match l.view {
                             Some(v) => env.to_sheet(v, l.point),
                             None => l.point,
                         };
-                        let right = t[0] > (x0 + x1) / 2.0;
-                        let start = if right { [x1, ym] } else { [x0, ym] };
-                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
+                        let to_right = t[0] > (x0 + x1) / 2.0;
+                        let start = if to_right { [x1, ym] } else { [x0, ym] };
+                        let sh = [start[0] + if to_right { 4.0 } else { -4.0 }, ym];
                         self.lines.push(Polyline2 { points: vec![start, sh, t], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - sh[0], t[1] - sh[1]], 3.0);
+                        let circle = |r: f64| (0..=24).map(|i| i as f64 / 24.0 * std::f64::consts::TAU).map(|a| [sh[0] + r * a.cos(), sh[1] + r * a.sin()]).collect::<Vec<_>>();
+                        match extra.leader {
+                            super::GdtLeader::Leader => {}
+                            super::GdtLeader::AllAround => self.lines.push(Polyline2 { points: circle(1.2), style: LineStyle::Thin, closed: true, pick }),
+                            super::GdtLeader::AllOver => {
+                                self.lines.push(Polyline2 { points: circle(1.2), style: LineStyle::Thin, closed: true, pick });
+                                self.lines.push(Polyline2 { points: circle(0.8), style: LineStyle::Thin, closed: true, pick });
+                            }
+                        }
                     }
                 }
                 AnnotationKind::Datum { anchor, label } => {
@@ -1014,32 +1149,26 @@ impl SheetGeometry {
                     let dist = lu * cosang;
                     let other = lu * (1.0 - cosang * cosang).max(0.0).sqrt();
                     let ang = cosang.acos();
-                    // Drawing properties › Dimensions › Chamfer: style and content
-                    // for 45° chamfers and the others, and their precisions.
+                    // Drawing properties › Dimensions › Chamfer content and
+                    // precisions (the style is chosen when placing: Dimensions
+                    // style places two leg dimensions instead).
                     let c = env.chamfer_style();
                     let is45 = (ang.to_degrees() - 45.0).abs() < 0.05;
-                    let (as_dim, content) = if is45 { (c.dim45, c.content45) } else { (c.dim, if c.content == super::ChamferContent::CLength { super::ChamferContent::LengthXAngle } else { c.content }) };
+                    let content = if is45 { c.content45 } else { c.content };
                     let mut la = a.clone();
                     if c.length_precision.is_some() {
                         la.format.precision = c.length_precision;
                     }
                     let len = |m: f64| env.text(&la, m, false, "").main;
-                    let deg = format!("{}°", super::format::format_number(ang.to_degrees(), c.angle_precision.or(a.format.precision), 0));
+                    let deg = format!("{}°", super::format::format_number(ang.to_degrees(), c.angle_precision.or(Some(1)), 1));
                     let mut t = env.text(a, dist, false, "");
                     t.main = match content {
-                        super::ChamferContent::AngleXLength => format!("{deg} × {}", len(dist)),
-                        super::ChamferContent::LengthXAngle => format!("{} × {deg}", len(dist)),
-                        super::ChamferContent::LengthXLength => format!("{} × {}", len(dist), len(other)),
-                        super::ChamferContent::CLength => format!("C{}", len(dist)),
+                        super::ChamferContent::AngleXLength => format!("{deg} X {}", len(dist)),
+                        super::ChamferContent::LengthXAngle => format!("{} X {deg}", len(dist)),
+                        super::ChamferContent::LengthXLength => format!("{} X {}", len(dist), len(other)),
+                        super::ChamferContent::CLength if is45 => format!("C{}", len(dist)),
+                        super::ChamferContent::CLength => format!("{} X {deg}", len(dist)),
                     };
-                    if as_dim {
-                        // Dimension style: an aligned dimension of the chamfer edge.
-                        let n = [-(pb[1] - pa[1]), pb[0] - pa[0]];
-                        let ln = (n[0] * n[0] + n[1] * n[1]).sqrt().max(1e-12);
-                        let off = ((a.position[0] - pa[0]) * n[0] + (a.position[1] - pa[1]) * n[1]) / ln;
-                        self.linear_dimension_text(pa, pb, off, DimOrientation::Aligned, &t, pick);
-                        continue;
-                    }
                     let e = a.position;
                     let left = e[0] < m[0];
                     let wtxt = self.dim_label_width(&t, dh);
@@ -1721,55 +1850,6 @@ pub fn ordinate_text_positions(along: &[f64], gap: f64) -> Vec<f64> {
     out
 }
 
-/// Marker key of the projection symbol cell in title block layouts.
-pub const PROJECTION_CELL: &str = "<projection>";
-
-/// Cells (field key, x, y, width, height in mm from the block's lower-left
-/// corner) of the fixed title block layouts.
-pub fn title_cells(style: TitleBlockStyle) -> &'static [(&'static str, f64, f64, f64, f64)] {
-    match style {
-        TitleBlockStyle::Iso => &[
-            ("Legal owner", 0.0, 18.0, 60.0, 18.0),
-            (PROJECTION_CELL, 0.0, 9.0, 25.0, 9.0),
-            ("Scale", 25.0, 9.0, 35.0, 9.0),
-            ("Material", 0.0, 0.0, 60.0, 9.0),
-            ("Document type", 60.0, 27.0, 60.0, 9.0),
-            ("Document status", 60.0, 18.0, 30.0, 9.0),
-            ("Date", 90.0, 18.0, 30.0, 9.0),
-            ("Drawn by", 60.0, 9.0, 60.0, 9.0),
-            ("Approved by", 60.0, 0.0, 60.0, 9.0),
-            ("Title", 120.0, 18.0, 60.0, 18.0),
-            ("Supplementary title", 120.0, 9.0, 60.0, 9.0),
-            ("Part number", 120.0, 0.0, 30.0, 9.0),
-            ("Revision", 150.0, 0.0, 12.0, 9.0),
-            ("Sheet", 162.0, 0.0, 18.0, 9.0),
-        ],
-        TitleBlockStyle::Ansi => &[
-            ("Tolerances", 0.0, 14.0, 70.0, 26.0),
-            ("Material", 0.0, 7.0, 70.0, 7.0),
-            ("Finish", 0.0, 0.0, 70.0, 7.0),
-            ("Drawn by", 70.0, 30.0, 40.0, 10.0),
-            ("Drawn date", 110.0, 30.0, 30.0, 10.0),
-            ("Checked by", 70.0, 20.0, 40.0, 10.0),
-            ("Checked date", 110.0, 20.0, 30.0, 10.0),
-            ("Eng approval", 70.0, 10.0, 40.0, 10.0),
-            ("Eng date", 110.0, 10.0, 30.0, 10.0),
-            ("Mfg approval", 70.0, 0.0, 40.0, 10.0),
-            ("Mfg date", 110.0, 0.0, 30.0, 10.0),
-            ("Company", 140.0, 28.0, 110.0, 12.0),
-            ("Title", 140.0, 14.0, 110.0, 14.0),
-            ("Size", 140.0, 7.0, 14.0, 7.0),
-            ("CAGE code", 154.0, 7.0, 26.0, 7.0),
-            ("Part number", 180.0, 7.0, 56.0, 7.0),
-            ("Revision", 236.0, 7.0, 14.0, 7.0),
-            ("Scale", 140.0, 0.0, 40.0, 7.0),
-            ("Weight", 180.0, 0.0, 35.0, 7.0),
-            ("Sheet", 215.0, 0.0, 35.0, 7.0),
-        ],
-        TitleBlockStyle::Simple | TitleBlockStyle::None => &[],
-    }
-}
-
 /// Sheet rectangle [x0, y0, x1, y1] (mm) of a sheet's title block.
 pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
     let (w, _) = sheet.size.size_mm();
@@ -1777,8 +1857,9 @@ pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
     let (bw, bh) = match sheet.title_style {
         TitleBlockStyle::None => return None,
         TitleBlockStyle::Simple => (180.0, 8.0 * ((sheet.title_block.fields.len() as f64) / 2.0).ceil()),
-        TitleBlockStyle::Iso => (180.0, 36.0),
-        TitleBlockStyle::Ansi => (250.0, 40.0),
+        // Onshape's template block (live drawing/156: ISO A3, 189: ANSI A).
+        TitleBlockStyle::Iso => (216.3, 50.6),
+        TitleBlockStyle::Ansi => (154.4, 38.2),
     };
     Some([w - m - bw, m, w - m, m + bh])
 }

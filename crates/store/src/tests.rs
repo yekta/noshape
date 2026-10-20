@@ -692,6 +692,10 @@ fn versions() {
     assert_eq!(info.description, "Initial");
     assert_eq!(info.microversion, root);
     assert_eq!(info.author, local_user_name());
+    doc.update_version(v1, "First", "Renamed").unwrap();
+    let info = doc.version(v1).unwrap();
+    assert_eq!((info.name.as_str(), info.description.as_str(), info.microversion), ("First", "Renamed", root));
+    assert!(matches!(doc.update_version(v1, " ", ""), Err(StoreError::EmptyName)));
     assert!(matches!(
         doc.create_version(mv, "", ""),
         Err(StoreError::EmptyName)

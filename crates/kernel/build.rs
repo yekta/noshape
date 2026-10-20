@@ -75,6 +75,14 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/pvz_writer.cpp",
     "cpp/pvz_reader.cpp",
     "cpp/vertex_blend.cpp",
+    "cpp/mesh_body.cpp",
+    "cpp/xt_read.cpp",
+    "cpp/rhino_read.cpp",
+    "cpp/native.cpp",
+    "cpp/sat_read.cpp",
+    "cpp/mesh_formats.cpp",
+    "cpp/jt_read.cpp",
+    "cpp/xz_read.cpp",
 ];
 
 /// openNURBS static libraries (scripts/build-opennurbs.sh), dependents first.
@@ -95,6 +103,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/jt_writer.hpp");
     println!("cargo:rerun-if-changed=cpp/pvz_writer.hpp");
     println!("cargo:rerun-if-changed=cpp/pvz_reader.hpp");
+    println!("cargo:rerun-if-changed=cpp/xt_schema.inc");
     for s in BRIDGE_SOURCES {
         println!("cargo:rerun-if-changed={s}");
     }

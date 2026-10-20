@@ -60,17 +60,72 @@ Done since the blockers:
   regen) used the fallback provider, which had no file tabs, and overwrote the Monitor output with `{}`.
   The fallback (`provider.rs Latest`) now serves the latest document's file tabs, and file changes are part
   of custom features' regen version.
-  **Still open:** 70×40 thumbnails of Part Studios/parts in the panel (shows the Part Studio / part icon;
-  assembly_thumbs.rs has the renderer but it's AssemblyView-only); "Other documents" tab is empty; Create
-  version… / Version graph buttons do nothing; search placeholder not italic; `PartStudioData` value is
-  still `{}` (needs buildFunction = instantiate the other studio, partQuery); `BuiltIn: n` serials are
-  global (live starts at 1 per regeneration: ours print 15…).
+  **Round 2 (19 Oct evening):** italic search placeholder (overlay, like the feature-list filter);
+  70×40 Part Studio / part pictures in the panel (`fs_reference::render_thumbnails`, each other Part
+  Studio regenerated and rendered offscreen at 140×80 when a PartStudioData dialog opens);
+  `PartStudioData` value: `buildFunction` (a `Func::Native` "buildPartStudio" bound to the tab: a new
+  Context holding the Part Studio's final state via the Derived provider, which runs on the feature's
+  thread through `host::set_derived`), `partQuery` (transient ids `tab:body` registered in the built
+  context), `configuration` / `configurationData` `{}`; `instantiate` / `addInstance` work
+  (`part_studio_reference_instantiates_parts`). Printed object numbers restart per feature run, boxes and
+  builtins counted separately, Context = `BuiltIn: 0` (value.rs `shown_number`; serials keep identity).
+  **Round 3 (live dom/fs-refpanel2-*, part-studio/600–629):** Other documents tab (filter + "Search or
+  paste URL" + 🔍, filters Recent / Owned by me / Recently opened / Created by me / Shared with me / Public,
+  documents with picture, name and latest version, grey when they have nothing of the kind; opening one
+  shows it at its latest version, never its workspace); Version graph (legend, Main / versions / Start on
+  a blue line; Main selectable only in this document); the blue "N changes since the last version. /
+  Create a version in <doc>." box; Create version… (this document: history_panel::open_create_version;
+  another: opens its window); picking a file closes the panel (a Part Studio's stays open for parts);
+  field tooltip "Table: fsrefs.csv"; switching to Other documents clears the field (✕ restores).
+  Values from other documents / versions are `ext:<microversion>|<tab>|<path>` (`#part` after the tab),
+  read through `DerivedProvider::file` (new default method; app's DocStudios implements it) and
+  `DocStudios::context`. "No CSV files available." etc. per kind.
+  **Still open:** the Create version modal is the app's (title "Create version from…", no "Publish custom
+  features and tables" row — history_panel owner); PartStudioData `configuration` of configured studios;
+  partQuery prints as transient queries (Onshape: ORIGINAL_DEPENDENCY queries).
 
 **Rhai:** it is already gone in the working tree — the previous "fs" deleted `custom/{api,compile,eval,schema}.rs`
 and dropped `rhai` from Cargo.toml before I took over; the FeatureScript path replaced it everywhere
 (FeatureStudio content, demo, standard content, app hooks). Restoring Rhai side by side would mean bringing
 those files back from git HEAD and re-adding a language switch; I did not do that. **Lead: decide** whether
 FeatureScript replacing Rhai now is acceptable (tests were 8/8 at the previous agent's last run).
+
+## Std features routed to built-in evaluators
+
+When a custom feature calls a std feature whose std operation we don't provide but whose dialog is
+identical to our built-in schema (pinned list), the std constant is replaced by a native
+(`interp::override_global`, host/builtin.rs `STD_FEATURES`: bodyDraft, constrainedSurface, fitSpline,
+isocline, projectCurves, wrap) that runs the built-in evaluator with the definition as parameters;
+failures carry the built-in's message (`CUSTOM_ERROR`). Also new: `@constructPaths`,
+`@approximateSpline` (OCCT interpolation, start/end derivatives), `opFaceBlend` (builtin adapter with
+field renames `flipSide1Normal`→`flipSide1`…). All pinned in tests/fs/ops_harness.fs.
+
+## Custom tables (`defineTable`) — API for asb (drawings) and the Part Studio Custom tables panel
+
+- Compiling a Feature Studio also collects its custom tables: `CompiledStudio::tables` (`CustomTableDef`:
+  `name` = exported constant, `display_name` = "Table Type Name", `description`, `params`).
+  `DocumentScripts::from_document(doc).studios()` lists them per studio.
+- Run one: `noshape_model::custom::table::evaluate_table(&*scripts, &studio_tab.to_string(), name,
+  &regen_result.context, &units)` → `TableResult { tables: Result<Vec<CustomTable>, String>, output, notices }`.
+  `CustomTable { title, title_suffix, columns: [TableColumn { id, name, alignment }], rows: [TableRow {
+  cells: [(column id, TableCell { text, error, info })], entities: [Reference] }], entities }`.
+  Cell text: strings as is, numbers / lengths / angles in the document units (`format_quantity`),
+  `valueWithUnitsAndPrecision` with its precision, `templateString` `#key`s filled in. Pinned by
+  `custom_tables_evaluate`.
+- Live (behaviours.md "Custom tables (defineTable)", dom/fs-tables-*): cells "0.333", "40 mm",
+  "25.4000 mm" (precision keeps zeros), "30 deg", "1290.32 mm²", "1500000000 mm³", missing → "Not set"
+  (`TableRow::text`), error cells "?" pink with tooltip, info cells "0 ⓘ"; TableArray shows only non-empty
+  tables (filtered in the model); a table without a precondition is only warned about ("Nonconforming
+  table function 'x': Missing precondition") and not offered; importing geometry.fs in a studio that
+  defines tables warns ("Importing geometry.fs when defining tables will likely hurt performance; …").
+  All pinned in `custom_tables_evaluate`. Panel look, selector groups ("My custom tables" from versions /
+  "Workspace custom tables"), Add custom tables popup are in that capture for whoever builds the panel.
+  When a table throws, the panel shows `table::TABLE_ERRORS` and the notices pane a group
+  "<table> (<Part Studio>)" with error, stack and println — `TableResult` carries notices/output; the
+  group needs a caller (no panel yet). Table parameters are collected; tables run with `{}` for now.
+- asb built the callers (20 Oct): Part Studio panel app/part_studio/custom_tables.rs, drawing custom tables
+  (`TableKind::Custom`, app/drawing_custom_table.rs), the notices group via `custom::run::notice_entries`
+  (factored out of `monitor`) and app/custom_tables.rs `set_notices`; see docs/handoff/drawing-behaviour.md.
 
 ## Design
 
@@ -270,4 +325,7 @@ schema. 44 of 65 are identical (pinned in the test). Built-in deviations found (
 - Maps iterate in key order (Onshape's total order), enum keys by ordinal.
 
 ## From the lead (2026-10-19)
+- Embedding the std library unmodified is fine (MIT: per-file headers + the LICENSE tab captured live);
+  `crates/featurescript/std/LICENSE` must stay next to the sources. The README has no third-party
+  notices section; if one is added, list the FeatureScript Standard Library (MIT, PTC) there.
 - Drawing custom tables (docs/parity/drawing.md TB25/TB26) need FeatureScript table support (`defineTable`, as in Onshape). Add it after the core plan; asb hooks the drawing side.

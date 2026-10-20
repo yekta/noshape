@@ -78,6 +78,17 @@ pub struct Notice {
 
 static HOST_NATIVES: LazyLock<RwLock<HashMap<&'static str, NativeFn>>> = LazyLock::new(Default::default);
 
+/// Values the host substitutes for top-level constants, by (module path,
+/// name): std features the host evaluates itself.
+type Overrides = HashMap<(Arc<str>, Arc<str>), Value>;
+static GLOBAL_OVERRIDES: LazyLock<RwLock<Overrides>> = LazyLock::new(Default::default);
+
+/// Make constant `name` of `module` (e.g. "onshape/std/wrap.fs") evaluate
+/// to `value` instead of its initializer. Must happen before it is first read.
+pub fn override_global(module: &str, name: &str, value: Value) {
+    GLOBAL_OVERRIDES.write().insert((module.into(), name.into()), value);
+}
+
 /// Register runtime builtins provided by the host (modeling operations).
 /// Must happen before modules using them are compiled.
 pub fn register_natives(list: &[(&'static str, NativeFn)]) {
@@ -85,6 +96,12 @@ pub fn register_natives(list: &[(&'static str, NativeFn)]) {
     for (n, f) in list {
         m.insert(n, *f);
     }
+}
+
+/// A function value calling the native `name` with `bound` first.
+pub fn native_function(name: &str, bound: Vec<Value>) -> Option<Value> {
+    let f = native(name)?;
+    Some(Value::Function(Shared::new(Func::Native { name: name.into(), f, bound })))
 }
 
 pub fn native(name: &str) -> Option<NativeFn> {
@@ -259,6 +276,10 @@ impl Interp {
         if INITIALIZING.with(|i| i.borrow().contains(&key)) {
             return Err(self.error(format!("Constant {} is defined in terms of itself", cell.name)));
         }
+        if let Some(v) = GLOBAL_OVERRIDES.read().get(&(cell.module.clone(), cell.name.clone())).cloned() {
+            let _ = cell.value.set(Ok(v.clone()));
+            return Ok(v);
+        }
         let Some((ex, frame)) = cell.init.get() else {
             return Err(self.error(format!("Constant {} is not initialized", cell.name)));
         };
@@ -300,6 +321,14 @@ impl Interp {
                 Func::Overloads(set) => {
                     let set = set.clone();
                     self.call_set(&set, args)
+                }
+                Func::Native { name, f, bound } => {
+                    let (f, mut all) = (*f, bound.clone());
+                    all.extend(args);
+                    let saved = std::mem::replace(&mut self.native_name, name.clone());
+                    let r = f(self, all);
+                    self.native_name = saved;
+                    r
                 }
             },
             other => Err(self.error(format!("Called value must be function, value is {}", other.error_type()))),
@@ -717,7 +746,7 @@ impl Interp {
                 other => Err(self.error(format!("Attempt to dereference non-container {}", crate::value::to_display_quoted(other)))),
             },
             AccVal::Box => match target {
-                Value::Box(b) => {
+                Value::Box(b, _) => {
                     let cell = b.clone();
                     let mut inner = std::mem::take(&mut *cell.value.lock());
                     let r = self.store(&mut inner, rest, leaf);
@@ -883,7 +912,7 @@ impl Interp {
                 }
             }
             ExK::BoxGet(b, safe) => match self.eval(b)? {
-                Value::Box(bx) => Ok(bx.value.lock().clone()),
+                Value::Box(bx, _) => Ok(bx.value.lock().clone()),
                 Value::Undefined if *safe => Ok(Value::Undefined),
                 other => {
                     self.pos = e.pos;
@@ -963,7 +992,8 @@ impl Interp {
                     };
                 }
                 match v.std_type() {
-                    StdType::Box | StdType::Function => Err(self.error(format!("Cannot convert a value of type {} to {}", v.type_description(), info.name))),
+                    // std tags boxes (`new box(...) as Instantiator`).
+                    StdType::Function => Err(self.error(format!("Cannot convert a value of type {} to {}", v.type_description(), info.name))),
                     _ => Ok(v.with_tag(tag)),
                 }
             }

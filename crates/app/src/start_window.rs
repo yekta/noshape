@@ -283,6 +283,8 @@ pub struct StartView {
     adv_anchor: Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// The Properties panel's fields (for the selected document).
     props: Option<PropsEdit>,
+    /// The Details panel's "Document labels" section is expanded.
+    details_labels_open: bool,
     facts: std::collections::HashMap<PathBuf, (i64, crate::start_search::DocFacts)>,
     facts_task: Option<Task<()>>,
     scan_task: Option<Task<()>>,
@@ -387,6 +389,7 @@ impl StartView {
             adv_query: None,
             adv_anchor: Rc::default(),
             props: None,
+            details_labels_open: true,
             facts: Default::default(),
             facts_task: None,
             scan_task: None,
@@ -1434,8 +1437,24 @@ impl StartView {
                         .py(px(6.))
                         .border_t_1()
                         .border_color(rgb(0xcccccc))
-                        .child(h_flex().gap(px(6.)).line_height(px(21.)).text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(os::glyph(os::GLYPH_EXPANDED, 10., pal.text)).child("Document labels"))
-                        .child(div().mt(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), &e.path, &self.label_search, &self.labels, cx))),
+                        // Live documents/24: the ⌄ / › collapses the section.
+                        .child(
+                            h_flex()
+                                .id("details-labels-toggle")
+                                .gap(px(6.))
+                                .cursor_pointer()
+                                .line_height(px(21.))
+                                .text_size(px(14.67))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(pal.text)
+                                .child(os::glyph(if self.details_labels_open { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text))
+                                .child("Document labels")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.details_labels_open = !this.details_labels_open;
+                                    cx.notify();
+                                })),
+                        )
+                        .when(self.details_labels_open, |d| d.child(div().mt(px(14.)).rounded(px(2.)).border_1().border_color(rgb(0xcccccc)).child(Self::label_checklist(&cx.entity(), &e.path, &self.label_search, &self.labels, cx)))),
                 )
                 .child(section("Created by", vec![who(&d.created_by), lib::format_onshape_time(d.created)]))
                 .child(section("Last modified by", vec![who(&d.modified_by), lib::format_onshape_time(d.modified)]))
@@ -2583,6 +2602,26 @@ impl StartView {
                             })
                             .into_any_element()
                     }))
+                    // Live documents/112: the selected row shows its quick actions at the
+                    // right end (share is cloud-only): Send to trash, Labels.
+                    .when(selected && !d.trashed, |r| {
+                        let (d3, d4) = (d.clone(), d.clone());
+                        let icon = |id: &'static str, glyph: &'static [u8], tip: &'static str| div().id(id).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
+                        r.child(div().flex_1()).child(
+                            h_flex()
+                                .flex_none()
+                                .gap(px(8.))
+                                .pr(px(13.))
+                                .child(icon("row-trash", os::GLYPH_TRASH, "Send to trash").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    this.trash(d3.clone(), window, cx);
+                                })))
+                                .child(icon("row-labels", os::GLYPH_LABEL, "Labels").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    this.labels_dialog(d4.clone(), window, cx);
+                                }))),
+                        )
+                    })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.select(&p1, cx)))
                     .os_context_menu(move |menu, _, _| Self::doc_menu(v2.clone(), d2.clone(), menu))
@@ -2623,6 +2662,9 @@ impl StartView {
             "Loading documents…".into_any_element()
         } else if searching {
             format!("No documents match \"{}\".", self.query.trim()).into_any_element()
+        } else if self.adv_query.is_some() {
+            // An advanced search with no results (exact Onshape wording requested).
+            "No documents match your search.".into_any_element()
         } else {
             match &self.source {
                 // Live documents/91: the Create / Learning Center line.

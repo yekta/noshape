@@ -14,6 +14,7 @@ use noshape_model::drawing::{Table, TableCorner, TableKind};
 fn same_list(a: &TableKind, b: &TableKind) -> bool {
     match (a, b) {
         (TableKind::Bom { view: x, .. }, TableKind::Bom { view: y, .. }) | (TableKind::CutList { view: x, .. }, TableKind::CutList { view: y, .. }) => x == y,
+        (TableKind::Custom { .. }, TableKind::Custom { .. }) => noshape_model::drawing::tables::CustomTableKey::of(a) == noshape_model::drawing::tables::CustomTableKey::of(b),
         _ => false,
     }
 }
@@ -108,13 +109,15 @@ impl DrawingEditor {
         // Data rows shown (the header is one displayed row).
         let shown = l.ys.len().saturating_sub(1 + l.title as usize + 1);
         let [a, b] = t.rows.unwrap_or([0, shown]);
-        let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. });
+        let header_bottom = matches!(t.kind, TableKind::Bom { bottom_to_top: true, .. } | TableKind::CutList { bottom_to_top: true, .. } | TableKind::Custom { bottom_to_top: true, .. });
+        // Live custom-tables-14: "Split custom table below".
+        let split_label = if matches!(t.kind, TableKind::Custom { .. }) { "Split custom table below" } else { "Split table below" };
         if let Some((r, _)) = cell {
             let data_r = if header_bottom { r } else { r.wrapping_sub(1) };
             if data_r < shown && data_r + 1 < shown {
                 let split = a + data_r + 1;
                 let width = l.xs.last().copied().unwrap_or(0.0) - l.xs.first().copied().unwrap_or(0.0);
-                out.push(MenuEntry::item("Split table below", move |t, _, cx| {
+                out.push(MenuEntry::item(split_label, move |t, _, cx| {
                     let Some(orig) = t.current_sheet().table(id).cloned() else { return };
                     let nid = t.current_sheet().next_table_id();
                     let mut second = orig.clone();

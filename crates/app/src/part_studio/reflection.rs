@@ -30,7 +30,7 @@ impl EnvImageRef {
     }
 
     /// Cache key of the decoded image.
-    fn key(&self) -> String {
+    pub(crate) fn key(&self) -> String {
         match self {
             EnvImageRef::Library(n) => format!("lib:{n}"),
             EnvImageRef::Encoded { name, bytes } => format!("img:{name}:{}:{:p}", bytes.len(), bytes.as_ptr()),
@@ -38,7 +38,7 @@ impl EnvImageRef {
     }
 
     /// Decoded sRGB RGBA8 (width, height, pixels).
-    fn decode(&self) -> Option<(u32, u32, Vec<u8>)> {
+    pub(crate) fn decode(&self) -> Option<(u32, u32, Vec<u8>)> {
         match self {
             EnvImageRef::Library(n) => environment_maps::generate(n).map(|i| (i.width, i.height, i.rgba)),
             EnvImageRef::Encoded { bytes, .. } => {

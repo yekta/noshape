@@ -918,3 +918,105 @@ fn loft_like_onshape() {
         assert!((v - want).abs() < 0.03, "{name}: {v} vs {want}");
     }
 }
+
+/// Chamfer "Two distances": the face Distance 1 is measured on, as Onshape
+/// picks it (live G30, rule from G37's entity order): the edge's first face in
+/// Onshape's order (front, bottom, top, right, back, left for this block), the
+/// chain's first edge deciding along connected edges, an override flipping its
+/// chain. Checked by the planar faces' areas (where the 1 mm and 3 mm legs
+/// fall) and Onshape's volumes.
+#[test]
+fn chamfer_distance_one_face_matches_onshape() {
+    let mut base = T::new();
+    base.block(40.0, 20.0, 10.0);
+    // Planar face areas (mm²) of the result, by where their centroid lies.
+    let areas = |r: &RegenResult| -> [f64; 5] {
+        let mut out = [0.0; 5];
+        for f in r.context.bodies[0].shape.faces() {
+            let c = f.centroid().unwrap() * 1e3;
+            let a = f.area().unwrap() / 1e-6;
+            let near = |x: f64, v: f64| (x - v).abs() < 1e-6;
+            for (k, on) in [near(c.z, 10.0), near(c.y, 0.0), near(c.y, 20.0), near(c.x, 0.0), near(c.x, 40.0)].into_iter().enumerate() {
+                if on {
+                    out[k] += a;
+                }
+            }
+        }
+        out // top, front, back, left, right
+    };
+    let top_edge = |y: Option<f64>, x: Option<f64>| {
+        move |i: &noshape_kernel::EdgeInfo| {
+            let m = (i.start + i.end) * 0.5e3;
+            (m.z - 10.0).abs() < 1e-6 && y.is_none_or(|y| (m.y - y).abs() < 1e-6) && x.is_none_or(|x| (m.x - x).abs() < 1e-6)
+        }
+    };
+    let vertical_at = |x: f64, y: f64| {
+        move |i: &noshape_kernel::EdgeInfo| {
+            let m = (i.start + i.end) * 0.5e3;
+            vertical(i) && (m.x - x).abs() < 1e-6 && (m.y - y).abs() < 1e-6
+        }
+    };
+    let run = |edges: Vec<Reference>, overrides: Vec<Reference>, opposite: bool| -> (f64, [f64; 5]) {
+        let mut t = base.fork();
+        let f = t.add(
+            "chamfer",
+            &[
+                ("entities", q(edges)),
+                ("chamferType", en("TWO_OFFSETS")),
+                ("width1", e("1 mm")),
+                ("width2", e("3 mm")),
+                ("tangentPropagation", ParamValue::Bool(false)),
+                ("oppositeDirection", ParamValue::Bool(opposite)),
+                ("directionOverrides", q(overrides)),
+            ],
+        );
+        let (st, msg, v) = status(&mut t, f);
+        assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+        (v, areas(&t.ok(f)))
+    };
+    let mut t = base.fork();
+    let front = t.edges_where(top_edge(Some(0.0), None));
+    let back = t.edges_where(top_edge(Some(20.0), None));
+    let left = t.edges_where(top_edge(None, Some(0.0)));
+    let all_top = t.edges_where(top_edge(None, None));
+    let v00 = t.edges_where(vertical_at(0.0, 0.0));
+    let v4020 = t.edges_where(vertical_at(40.0, 20.0));
+    let close = |a: [f64; 5], want: &[(usize, f64)], what: &str| {
+        for &(k, w) in want {
+            assert!((a[k] - w).abs() < 1e-6, "{what}: face {k} area {} vs {w}", a[k]);
+        }
+    };
+    // (a) top front edge: 1 mm on the front face.
+    close(run(front.clone(), vec![], false).1, &[(0, 680.0), (1, 360.0)], "(a)");
+    // (b), (c): 1 mm on the top face.
+    close(run(back.clone(), vec![], false).1, &[(0, 760.0), (2, 280.0)], "(b)");
+    close(run(left, vec![], false).1, &[(0, 780.0), (3, 140.0)], "(c)");
+    // (d) vertical edge at (0,0): front face; (e) at (40,20): right face.
+    close(run(v00, vec![], false).1, &[(1, 390.0), (3, 170.0)], "(d)");
+    close(run(v4020, vec![], false).1, &[(4, 190.0), (2, 370.0)], "(e)");
+    // (f) the four top edges: the side faces (the front edge decides);
+    // (g) overriding the front edge flips the whole loop onto the top.
+    let (v, a) = run(all_top.clone(), vec![], false);
+    assert!((v - 7832.000000000001).abs() < 1e-6, "(f) {v}");
+    close(a, &[(0, 34.0 * 14.0)], "(f)");
+    let (v, a) = run(all_top, front.clone(), false);
+    assert!((v - 7824.000000000002).abs() < 1e-6, "(g) {v}");
+    close(a, &[(0, 38.0 * 18.0)], "(g)");
+    // (f2)/(g2): separate edges keep their own sides.
+    let both = [front.clone(), back].concat();
+    close(run(both.clone(), vec![], false).1, &[(0, 40.0 * 16.0)], "(f2)");
+    close(run(both, front.clone(), false).1, &[(0, 40.0 * 18.0)], "(g2)");
+    // (h) = (a) + Opposite direction: 1 mm on the top face.
+    close(run(front, vec![], true).1, &[(0, 760.0), (1, 280.0)], "(h)");
+    // (i) the rim of a Ø10 through hole: 1 mm on the top face.
+    let mut t = base.fork();
+    t.holes(&[((20.0, 10.0), 5.0)]);
+    let rim = t.edges_where(|i| matches!(i.curve, noshape_kernel::Curve::Circle { .. }) && (i.start.z * 1e3 - 10.0).abs() < 1e-6);
+    let f = t.add(
+        "chamfer",
+        &[("entities", q(rim)), ("chamferType", en("TWO_OFFSETS")), ("width1", e("1 mm")), ("width2", e("3 mm")), ("tangentPropagation", ParamValue::Bool(false))],
+    );
+    let (st, msg, v) = status(&mut t, f);
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!((v - 7164.336354145117).abs() < 1e-6, "(i) {v}");
+}

@@ -42,12 +42,14 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
             // Our drawing of Onshape's tile pictures: a file, an arrow, then
             // the Part Studio (and Assembly) tab icons in a box.
             let picture = v_flex()
-                .h(px(150.))
+                .h(px(149.))
+                .pt(px(10.))
                 .items_center()
-                .justify_center()
-                .gap(px(4.))
-                .child(os::glyph(os::GLYPH_DOCUMENT, 52., rgb(0x777777)))
-                .child(os::glyph(os::GLYPH_CARET, 14., rgb(0x777777)))
+                .gap(px(5.))
+                // Live document/77: a blank 48x58 page with a folded corner, a ↓ arrow,
+                // then pale tab icons.
+                .child(crate::assets::icon("import-doc", 58., cx))
+                .child(crate::assets::icon("import-arrow", 18., cx))
                 .child(
                     h_flex()
                         .gap(px(4.))
@@ -56,8 +58,8 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                         .border_color(rgb(0xcccccc))
                         .rounded(px(3.))
                         .bg(rgb(0xffffff))
-                        .child(crate::assets::icon("part-studio", 30., cx))
-                        .when(both, |d| d.child(crate::assets::icon("assembly", 30., cx))),
+                        .child(div().opacity(0.45).child(crate::assets::icon("part-studio", 36., cx)))
+                        .when(both, |d| d.child(div().opacity(0.45).child(crate::assets::icon("assembly", 36., cx)))),
                 );
             v_flex()
                 .id(id)
@@ -120,13 +122,16 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
         let (doc, paths, ch, opened) = (doc.clone(), paths.clone(), choice.clone(), opened.clone());
         os::modal(dialog, "Import to Onshape", 400.)
             .child(
+                // Live document/77: the tiles 12 px under the header.
                 os::modal_body()
+                    .pt(px(4.))
                     .gap(px(8.))
                     .child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone())))
-                    .child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone()))
+                    // Live document/77: the checkbox rows are 34 px apart.
+                    .child(v_flex().gap(px(13.)).child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone()))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
                     .child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone()))
-                    .child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone())),
+                    .child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))),
             )
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
@@ -197,3 +202,4 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     });
     first
 }
+

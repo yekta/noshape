@@ -277,7 +277,13 @@ impl Shape {
         Shape::from_res(ffi::make_compound(&l)).unwrap_or_else(|_| Shape::null())
     }
 
-    /// BRepCheck_Analyzer validity.
+    /// A mesh body (or holds one): faces with a triangulation and no surface,
+    /// edges or vertices, as Onshape's mesh parts (imported STL, OBJ, PVZ, …).
+    pub fn is_mesh(&self) -> bool {
+        ffi::is_mesh(self.raw())
+    }
+
+    /// BRepCheck_Analyzer validity (mesh faces: a triangulation with triangles).
     pub fn is_valid(&self) -> bool {
         ffi::is_valid(self.raw()).unwrap_or(false)
     }

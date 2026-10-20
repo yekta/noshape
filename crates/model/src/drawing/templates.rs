@@ -29,13 +29,9 @@ pub fn template_by_name(name: &str) -> Option<DrawingTemplate> {
     standard_templates().into_iter().find(|t| t.name == name)
 }
 
-/// Tolerance block text of ANSI title blocks.
-pub fn ansi_tolerances(inches: bool) -> &'static str {
-    if inches {
-        "UNLESS OTHERWISE SPECIFIED:\nDIMENSIONS ARE IN INCHES\nTOLERANCES:\nFRACTIONAL ±1/32\nANGULAR ±0.5°\nTWO PLACE DECIMAL ±.01\nTHREE PLACE DECIMAL ±.005"
-    } else {
-        "UNLESS OTHERWISE SPECIFIED:\nDIMENSIONS ARE IN MILLIMETERS\nTOLERANCES:\nLINEAR ±0.1\nANGULAR ±0.5°"
-    }
+/// The title block's units note ("DIMENSIONS ARE IN …").
+pub fn units_note(inches: bool) -> &'static str {
+    if inches { "INCHES" } else { "MILLIMETERS" }
 }
 
 /// Title block fields of a style with default values (property fields
@@ -43,42 +39,25 @@ pub fn ansi_tolerances(inches: bool) -> &'static str {
 pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, String)> {
     let f: Vec<(&str, &str)> = match style {
         TitleBlockStyle::Simple => vec![("Title", ""), ("Drawn by", ""), ("Date", ""), ("Part number", ""), ("Revision", ""), ("Material", ""), ("Scale", ""), ("Sheet", "")],
-        TitleBlockStyle::Iso => vec![
-            ("Legal owner", ""),
-            ("Title", "{part.name}"),
-            ("Supplementary title", "{model.name}"),
-            ("Document type", "Part drawing"),
-            ("Document status", "Released"),
-            ("Date", "{date}"),
-            ("Drawn by", ""),
-            ("Approved by", ""),
-            ("Material", "{part.material}"),
-            ("Scale", ""),
-            ("Part number", "{part.number}"),
-            ("Revision", "A"),
-            ("Sheet", "{sheet.number}/{sheet.count}"),
-        ],
-        TitleBlockStyle::Ansi => vec![
-            ("Company", ""),
-            ("Title", "{part.name}"),
-            ("Size", ""),
-            ("CAGE code", ""),
-            ("Part number", "{part.number}"),
-            ("Revision", "A"),
-            ("Scale", ""),
-            ("Weight", ""),
-            ("Sheet", "{sheet.number} OF {sheet.count}"),
+        // Onshape's ANSI and ISO templates share one block (sheet.rs
+        // `onshape_title_block`); the tolerance notes are fixed text.
+        TitleBlockStyle::Iso | TitleBlockStyle::Ansi => vec![
             ("Drawn by", ""),
             ("Drawn date", "{date}"),
             ("Checked by", ""),
             ("Checked date", ""),
-            ("Eng approval", ""),
-            ("Eng date", ""),
-            ("Mfg approval", ""),
-            ("Mfg date", ""),
-            ("Tolerances", ansi_tolerances(inches)),
+            ("Approved by", ""),
+            ("Approved date", ""),
             ("Material", "{part.material}"),
             ("Finish", ""),
+            ("Title", "{part.name}"),
+            ("Size", ""),
+            ("Part number", "{part.number}"),
+            ("Revision", "-"),
+            ("Scale", ""),
+            ("Weight", ""),
+            ("Sheet", "{sheet.number} of {sheet.count}"),
+            ("Units", units_note(inches)),
         ],
         TitleBlockStyle::None => vec![],
     };
@@ -112,10 +91,8 @@ pub fn apply_template(drawing: &mut Drawing, sheet: usize, t: &DrawingTemplate) 
     drawing.projection = t.projection;
     drawing.sheets[sheet].size = t.size;
     set_title_style(drawing, sheet, t.style);
-    // The tolerance note follows the units.
-    if let Some((_, v)) = drawing.sheets[sheet].title_block.fields.iter_mut().find(|(k, _)| k == "Tolerances")
-        && (v == ansi_tolerances(true) || v == ansi_tolerances(false))
-    {
-        *v = ansi_tolerances(t.inches).to_string();
+    // The units note follows the template.
+    if let Some((_, v)) = drawing.sheets[sheet].title_block.fields.iter_mut().find(|(k, _)| k == "Units") {
+        *v = units_note(t.inches).to_string();
     }
 }

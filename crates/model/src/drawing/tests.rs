@@ -348,12 +348,12 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::OrdinateDimension { view: ViewId(2), origin: [-0.05, -0.03], point: [0.038, 0.018], horizontal: true }, [148.0, 260.0]);
     add(sheet, AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.002, 0.002], d: [0.01, 0.002] }, [150.0, 180.0]);
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
-    add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![] }, [40.0, 40.0]);
+    add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into() }, [60.0, 112.0]);
     add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
-    for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 × 45°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
+    for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 X 45.0°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
     // Symbol texts are exported as strokes (no unsupported glyphs).
@@ -817,7 +817,7 @@ fn gdt_leaders_and_datum_targets() {
     let s = &mut drawing.sheets[0];
     let id = s.next_annotation_id();
     let target = [0.05, 0.0];
-    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new() }] }, position: [200.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new() }], extra: Default::default() }, position: [200.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [60.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A2".into(), area: DatumTargetArea::Point }, position: [50.0, 262.0], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -905,7 +905,7 @@ fn templates_and_title_blocks() {
     assert_eq!(s.title_field("Title"), Some("Plate"));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
-    for want in ["LEGAL OWNER", "DOCUMENT TYPE", "P-001", "Plate", "1:1", "Part drawing"] {
+    for want in ["P-001", "Plate", "1:1", "NAME", "SIGNATURE", "DRAWN", "FIRST ANGLE PROJECTION", "DIMENSIONS ARE IN MILLIMETERS"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
     let rect = sheet::title_block_rect(&drawing.sheets[0]).unwrap();
@@ -917,7 +917,8 @@ fn templates_and_title_blocks() {
     assert_eq!(drawing.sheets[0].size, SheetSize::AnsiB);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
-    for want in ["TOLERANCES", "DIMENSIONS ARE IN INCHES", "B", "DRAWN BY", "P-001", "3.937"] {
+    for want in ["DIMENSIONS ARE IN INCHES", "THIRD ANGLE PROJECTION", "B", "DRAWN", "P-001", "3.937"] {
+        assert!(!t.iter().any(|x| x == "SIGNATURE"), "ANSI has no signature column");
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
     assert_eq!(built.geometry.width, SheetSize::AnsiB.size_mm().0);
@@ -925,7 +926,7 @@ fn templates_and_title_blocks() {
     let i = drawing.add_sheet(0);
     templates::set_title_style(&mut drawing, i, TitleBlockStyle::None);
     let built = render_sheet(&drawing, i, &sources, &cache, false).unwrap();
-    assert!(!texts(&built).iter().any(|x| x == "TOLERANCES"));
+    assert!(!texts(&built).iter().any(|x| x == "DO NOT SCALE DRAWING"));
     assert_eq!(drawing.sheets[0].title_style, TitleBlockStyle::Ansi);
 }
 
@@ -1343,9 +1344,90 @@ fn chamfer_dimension_style_and_content() {
     };
     // A 45° chamfer of 2 mm legs (edge a-b, adjacent edge c-d).
     let k = AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.0, 0.0], d: [0.01, 0.0] };
-    assert!(texts(&drawing, k.clone()).iter().any(|t| t.contains("× 45°")), "{:?}", texts(&drawing, k.clone()));
+    assert!(texts(&drawing, k.clone()).iter().any(|t| t.contains(" X 45.0°")), "{:?}", texts(&drawing, k.clone()));
     d2.props.chamfer_45_content = ChamferContent::CLength;
     assert!(texts(&d2, k.clone()).iter().any(|t| t.starts_with('C')));
     d2.props.chamfer_45_content = ChamferContent::AngleXLength;
-    assert!(texts(&d2, k).iter().any(|t| t.starts_with("45° ×")));
+    assert!(texts(&d2, k).iter().any(|t| t.starts_with("45.0° X")));
+}
+
+#[test]
+fn composite_gdt_frame_with_texts() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let extra = GdtExtra { upper: "UPPER TEXT".into(), lower: "LOWER TEXT".into(), prefix: vec!["4X".into()], suffix: vec!["SFX".into()], rows: vec![vec!["Composite".into(), "0.1".into(), "A".into()]], leader: GdtLeader::Leader };
+    let kind = AnnotationKind::Gdt { anchor: [100.0, 100.0], frame: vec!["⌖".into(), "0.5".into(), "A".into(), "B".into(), "C".into()], leaders: vec![], extra: Box::new(extra) };
+    let s = Sheet { annotations: vec![Annotation { id: 1, kind, position: [100.0, 100.0], ..Default::default() }], ..Default::default() };
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &env);
+    let pos = |t: &str| g.texts.iter().find(|x| x.text == t).map(|x| x.pos).unwrap_or_else(|| panic!("{t} missing"));
+    // One symbol cell for both rows: the symbol sits between them.
+    assert_eq!(g.texts.iter().filter(|t| t.text == "⌖").count(), 1);
+    assert!(!g.texts.iter().any(|t| t.text == "Composite"));
+    let (sym, r1, r2) = (pos("⌖"), pos("0.5"), pos("0.1"));
+    assert!(sym[1] < r1[1] && sym[1] > r2[1], "symbol spans both rows");
+    // Row 2 starts under row 1; prefix left, suffix right, texts above / below.
+    assert!((r1[0] - r2[0]).abs() < 1.0 || r2[0] <= r1[0] + 1.0);
+    assert!(pos("4X")[0] < 100.0 && pos("SFX")[0] > pos("C")[0]);
+    assert!(pos("UPPER TEXT")[1] > r1[1] && pos("LOWER TEXT")[1] < r2[1]);
+}
+
+#[test]
+fn custom_tables_tabulate_a_whole_part_studio() {
+    // Onshape's Custom table: a Feature Studio's defineTable run on a Part
+    // Studio the drawing need not show.
+    let (mut doc, mut drawing) = demo();
+    let src = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+annotation { "Table Type Name" : "Part faces" }
+export const partFaces = defineTable(function(context is Context, definition is map) returns Table
+    precondition
+    {
+    }
+    {
+        const columns = [tableColumnDefinition("name", "Part"), tableColumnDefinition("faces", "Faces", TableTextAlignment.RIGHT), tableColumnDefinition("note", "Note")];
+        var rows = [];
+        for (var body in evaluateQuery(context, qAllModifiableSolidBodies()))
+            rows = append(rows, tableRow({ "name" : getProperty(context, { "entity" : body, "propertyType" : PropertyType.NAME }), "faces" : size(evaluateQuery(context, qOwnedByBody(body, EntityType.FACE))) }, body));
+        return table("Faces", columns, rows);
+    });
+"#;
+    let fs = doc.add_tab("Tables", TabContent::FeatureStudio(crate::custom::FeatureStudio::new(src)));
+    let studio = studio_tab(&doc);
+    drawing.sheets[0].views.clear();
+    drawing.sheets[0].tables.clear();
+    let kind = TableKind::Custom { studio, version: None, fs, name: "partFaces".into(), fs_version: None, bottom_to_top: false, overrides: Vec::new() };
+    drawing.sheets[0].tables.push(Table::new(1, kind, [400.0, 280.0]));
+    assert_eq!(drawing.sheets[0].tables[0].type_name(), "Custom table");
+    // The studio is a source although no view shows it.
+    assert_eq!(views::referenced_sources(&drawing), vec![SourceKey::studio(studio)]);
+    let sources = regenerate_sources(&doc, &drawing);
+    let custom = tables::evaluate_custom_tables(&doc, &drawing, &sources, &|_| None);
+    let key = tables::CustomTableKey::of(&drawing.sheets[0].tables[0].kind).unwrap();
+    let result = custom.get(&key).expect("evaluated");
+    let t = match &**result {
+        Ok(tables) => &tables[0],
+        Err(e) => panic!("table runs: {e}"),
+    };
+    assert!(!t.rows.is_empty());
+    let info = SheetInfo { custom_tables: custom.clone(), ..Default::default() };
+    let data = tables::table_data_with(&drawing, &drawing.sheets[0].tables[0], None, None, None, &info, &|s| s.to_string());
+    // The column names are the bold header; no title row; missing values "Not set".
+    assert_eq!(data.header.as_deref(), Some(&["Part".to_string(), "Faces".into(), "Note".into()][..]));
+    assert!(data.title.is_none() && data.header_bold);
+    assert_eq!(data.rows.len(), t.rows.len());
+    assert_eq!(data.rows[0][2], "Not set");
+    assert_eq!(data.col_align, vec![CellAlign::Left, CellAlign::Right, CellAlign::Left]);
+    let built = render_sheet_with(&drawing, 0, &sources, &ViewCache::default(), false, &info).unwrap();
+    let txt = texts(&built);
+    assert!(txt.iter().any(|s| s == "Faces") && txt.iter().any(|s| s == &data.rows[0][0]), "{txt:?}");
+    // Bottom to top: reversed, header last; an edited cell keeps its text.
+    if let TableKind::Custom { bottom_to_top, overrides, .. } = &mut drawing.sheets[0].tables[0].kind {
+        *bottom_to_top = true;
+        overrides.push((0, 2, "edited".into()));
+    }
+    let d2 = tables::table_data_with(&drawing, &drawing.sheets[0].tables[0], None, None, None, &info, &|s| s.to_string());
+    assert!(d2.header_bottom);
+    assert_eq!(d2.rows.last().map(|r| &r[0]), data.rows.first().map(|r| &r[0]));
+    assert_eq!((d2.rows[0][2].as_str(), d2.overridden.as_slice()), ("edited", &[(0, 2)][..]));
 }

@@ -10,6 +10,8 @@ mod triad;
 mod material_data;
 mod material_panel;
 mod config_panel;
+mod custom_tables;
+mod input_propagation;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
@@ -18,8 +20,8 @@ mod section;
 mod sketch;
 pub(crate) mod shortcut_cmds;
 mod analysis_tools;
-mod environment_maps;
-mod reflection;
+pub(crate) mod environment_maps;
+pub(crate) mod reflection;
 mod thickness;
 mod flatten_tool;
 mod draft_tool;
@@ -46,6 +48,7 @@ use gpui_kit::component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
+use crate::ui::TipExt as _;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
 use noshape_model::document::TabId;
 use noshape_model::features::{self, FeatureType};
@@ -564,6 +567,12 @@ impl PartStudioView {
         if geometry_changed && self.ui.thickness.as_ref().is_some_and(|t| !t.parts.is_empty()) {
             self.recompute_thickness(cx);
         }
+        // Interference detection doesn't: its Refresh row appears (live psb 10-19 i).
+        if geometry_changed
+            && let Some(t) = self.ui.analysis_tool.as_mut().filter(|t| t.kind == analysis_tools::ToolKind::Interference && t.result.is_some())
+        {
+            t.stale = true;
+        }
         // Right-drag rotates about the geometry under the cursor.
         let disp = self.display.clone();
         let pivot: Arc<dyn Fn(glam::DVec3, glam::DVec3) -> Option<glam::DVec3> + Send + Sync> = Arc::new(move |o, d| {
@@ -670,7 +679,7 @@ impl PartStudioView {
         let hovered = self.highlighted_hover(cx);
         // A manipulator handle under the cursor hides the geometry hover.
         let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some();
-        let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
+        let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
         // Live (sketch/08-09): while a drawing tool is active, regions under
         // the cursor don't light up.
         let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws());
@@ -739,7 +748,7 @@ impl PartStudioView {
                 }
             }
         }
-        let (fit_bounds, fit_inset) = (self.fit_bounds(), self.fit_inset_left());
+        let (fit_bounds, fit_inset) = (self.zoom_fit_bounds(), self.fit_inset_left());
         // The selection-count cursor: sketch entities while sketching,
         // otherwise the Part Studio selection (not a dialog's picks).
         let count = match (&self.sketch, &self.edit) {
@@ -1101,11 +1110,29 @@ impl PartStudioView {
         let doc = self.doc.read(cx).session.doc.clone();
         let name = self.doc.read(cx).name();
         let sources = crate::fs_reference::sources(&doc, &self.tab.to_string(), |id| provider.context(id).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default());
+        let studios: Vec<TabId> = doc.tabs.iter().filter(|t| t.id != self.tab && matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
+        let wants_pictures = dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { kind: noshape_model::params::ReferenceKind::PartStudio }));
+        let (path, except, gpu_for_dialog) = (self.doc.read(cx).session.path.clone(), self.tab.to_string(), self.gpu.clone());
         dialog.update(cx, |d, cx| {
             d.ref_sources = sources;
             d.ref_document_name = name;
+            d.ref_document_path = Some(path);
+            d.ref_except = except;
+            d.ref_gpu = Some(gpu_for_dialog);
             cx.notify();
         });
+        // Pictures of the other Part Studios and their parts, in the background.
+        if wants_pictures && !studios.is_empty() {
+            let (gpu, dialog) = (self.gpu.clone(), dialog.downgrade());
+            cx.spawn(async move |_, cx| {
+                let pictures = cx.background_spawn(crate::fs_reference::render_thumbnails(gpu, doc, studios, |t| t.to_string())).await;
+                let _ = dialog.update(cx, |d, cx| {
+                    d.ref_thumbs = pictures.into_iter().collect();
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
     }
 
     /// A reference parameter's "Import…": the file becomes a tab (Onshape
@@ -1140,7 +1167,11 @@ impl PartStudioView {
                 .map(|(id, name)| {
                     use noshape_model::regen::derived::DerivedProvider as _;
                     let parts = provider.context(&id).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
-                    crate::feature_dialog::DerivedSource { tab: id, name, parts }
+                    let configuration = doc.tabs.iter().find(|t| t.id.to_string() == id).and_then(|t| match &t.content {
+                        noshape_model::document::TabContent::PartStudio(ps) => Some(ps.configuration.clone()),
+                        _ => None,
+                    }).unwrap_or_default();
+                    crate::feature_dialog::DerivedSource { tab: id, name, parts, configuration }
                 })
                 .collect();
             dialog.update(cx, |d, _| d.derived_sources = sources);
@@ -1158,8 +1189,18 @@ impl PartStudioView {
             DialogEvent::Accept { repeat } => this.accept_edit(*repeat, window, cx),
             DialogEvent::Cancel => this.cancel_edit(window, cx),
             DialogEvent::QueryFocused => this.refresh_scene(false, cx),
+            // Live (psb 10-19 h): Tab past the dialog's last control goes to
+            // the navbar; Shift+Tab before its first one to <body> (here the
+            // Part Studio itself, so shortcuts keep working).
+            DialogEvent::LeaveFocus { forward: true } => window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx),
+            DialogEvent::LeaveFocus { forward: false } => window.focus(&this.focus, cx),
             DialogEvent::CreateSelection(field) => this.open_create_selection_for_field(field.clone(), cx),
             DialogEvent::ImportReference { param, file } => this.import_reference_file(param.clone(), file.clone(), cx),
+            // Create version…: this document's dialog, or another document opened in its window.
+            DialogEvent::CreateVersion(None) => crate::history_panel::open_create_version_in(this.doc.clone(), window, cx),
+            DialogEvent::CreateVersion(Some(path)) => {
+                let _ = crate::files::open_document_window(path.clone(), None, this.gpu.clone(), cx);
+            }
             DialogEvent::PreviewOpacity(v) => {
                 this.ui.preview_opacity = *v;
                 this.schedule_preview_before(window, cx);
@@ -1770,7 +1811,13 @@ impl PartStudioView {
             let name = self.default_name(&r, cx);
             let renaming = self.ui.dg_renaming.as_ref().filter(|(x, ..)| *x == r).map(|(_, st, _)| st.clone());
             dg_rows.push(
-                crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected)
+                // Live (part-studio/16): the hover band spans the list (x 40
+                // to 239); the indent is inside the row.
+                crate::ui::with_side_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
+                    .mr(px(5.))
+                    .pl(px(23.))
+                    // Live: the eye's center 19 px from the row's end.
+                    .pr(px(11.))
                     .group("dg-row")
                     // Onshape: hidden default geometry is listed in gray.
                     .when(hidden, |d| d.text_color(pal.text_faint))
@@ -1870,6 +1917,7 @@ impl PartStudioView {
             let open = !self.ui.default_geometry_collapsed;
             rows.push(
                 crate::ui::tree_row("dg-folder", false)
+                    .mr(px(5.))
                     .child(crate::ui::caret(open))
                     .child("Default geometry")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -1882,11 +1930,10 @@ impl PartStudioView {
                 rows.push(
                     v_flex()
                         .relative()
-                        .pl(px(18.))
-                        // Live: the line ends in a 9 px tick.
+                        .children(dg_rows)
+                        // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
-                        .children(dg_rows)
                         .into_any_element(),
                 );
             }
@@ -1957,7 +2004,12 @@ impl PartStudioView {
             })
             .filter(|(key, _, rows, _)| *key == "Parts" || !rows.is_empty())
             .collect();
-        let errors = studio.features.iter().filter(|f| self.display.feature_state(f.id).is_some_and(|s| s.status == FeatureStatus::Error)).count();
+        let failed = |id: noshape_model::FeatureId| self.display.feature_state(id).is_some_and(|s| s.status == FeatureStatus::Error);
+        // The open dialog counts when it can't regenerate (a new feature
+        // isn't in the list yet).
+        let errors = studio.features.iter().filter(|f| failed(f.id)).count()
+            + usize::from(self.edit_invalid(cx) && !editing_id.is_some_and(|id| studio.features.iter().any(|f| f.id == id && failed(f.id))));
+        let dialog_open = self.edit.is_some();
         let filter_input = self.ui.filter.as_ref().map(|(st, _)| st.clone());
         let config_box = self.render_config_box(cx);
         let contexts_section = self.render_contexts_section(cx);
@@ -2021,39 +2073,51 @@ impl PartStudioView {
                     .flex_none()
                     .pl(px(4.))
                     .pr(px(10.))
-                    .child(div().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(format!("Features ({})", studio.features.len() + 4)))
-                    .child(div().flex_1())
+                    // Live (part-studio/94, 570): with failed features a red
+                    // icon comes first (click: show only them) and the title
+                    // truncates to "Features …".
                     .when(errors > 0, |d| {
-                        // Onshape: the error icon shows the count; clicking it filters to errors.
                         d.child(
                             div()
                                 .id("feature-errors")
-                                .px_1p5()
-                                .rounded_sm()
-                                .text_xs()
-                                .text_color(pal.error)
+                                .size(px(20.))
+                                .mr(px(8.))
+                                .flex_none()
                                 .cursor_pointer()
-                                .hover(|d| d.bg(pal.panel_hover))
-                                .child(format!("⚠ {errors}"))
-                                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" })).build(window, cx))
+                                .child(crate::assets::icon("regen-error", 20., cx))
+                                .tip(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" }), crate::ui::TipSide::Right)
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                     let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors" };
                                     this.set_filter(next, window, cx);
                                 })),
                         )
                     })
+                    // (Chrome keeps the space before the ellipsis.)
+                    .child(div().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(if errors > 0 { "Features …".to_string() } else { format!("Features ({})", studio.features.len() + 4) }))
+                    .child(div().flex_1())
                     .child(
+                        // Live (570): new folder and pause are disabled while a
+                        // feature dialog is open.
                         header_btn("new-folder-btn", "new-folder", false, cx)
+                            .when(dialog_open, |d| d.opacity(0.4).cursor_default())
                             .tooltip(crate::ui::tooltip("Add folder"))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if this.edit.is_some() {
+                                    return;
+                                }
                                 let ids = this.selected_features.clone();
                                 this.add_to_new_folder(ids, cx)
                             })),
                     )
                     .child(
                         header_btn("pause-regen-btn", "pause-regen", self.ui.regen_paused.is_some(), cx)
+                            .when(dialog_open, |d| d.opacity(0.4).cursor_default())
                             .tooltip(crate::ui::tooltip("Pause regeneration"))
-                            .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_pause_regen(w, cx))),
+                            .on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
+                                if this.edit.is_none() {
+                                    this.toggle_pause_regen(w, cx)
+                                }
+                            })),
                     )
                     .child(
                         header_btn("regen-times-btn", "regen-timer", self.ui.show_regen_times, cx)
@@ -2184,6 +2248,8 @@ impl PartStudioView {
         let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::release_dialog::release_log(self.doc.read(cx)).revisions(pn).is_empty());
         let part_icon = match b.kind {
             _ if b.composite.is_some() => "composite-part",
+            // Onshape's svg-icon-part-mesh (live G27).
+            _ if b.is_mesh => "part-mesh",
             noshape_model::display::BodyKind::Surface => "surface-body",
             noshape_model::display::BodyKind::Wire => "wire-body",
             _ => "part",
@@ -2367,6 +2433,7 @@ impl PartStudioView {
         let collapsed = fd.collapsed;
         let _ = pal;
         let row = crate::ui::tree_row(SharedString::from(format!("folder-{id}")), false)
+            .mr(px(5.))
             .child(crate::ui::caret(!collapsed))
             .child(crate::ui::tree_icon("folder", false, cx))
             .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
@@ -2406,6 +2473,12 @@ impl PartStudioView {
         .into_any_element()
     }
 
+    /// The open feature dialog can't regenerate (live: its row turns red and
+    /// the Features header shows the error icon until it can).
+    fn edit_invalid(&self, cx: &App) -> bool {
+        self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status.as_ref().map(|s| s.0), Some(FeatureStatus::Error)))
+    }
+
     fn render_editing_placeholder(&self, cx: &App) -> AnyElement {
         let pal = p();
         // Live: a new Hole's row reads "Ø 6.35 mm ↧ 12 mm" while it is drawn.
@@ -2423,8 +2496,10 @@ impl PartStudioView {
             .unwrap_or_default();
         let icon = self.edit.as_ref().map(|e| feature_icon(&e.dialog.read(cx).feature.type_id)).unwrap_or_else(|| icon_path("part"));
         crate::ui::tree_row("editing-placeholder", true)
+            .mr(px(5.))
             .bg(pal.accent_soft)
             .font_weight(FontWeight::SEMIBOLD)
+            .when(self.edit_invalid(cx), |d| d.text_color(pal.text_invalid))
             .child(crate::ui::tree_icon(&icon, false, cx))
             .child(div().flex_1().truncate().child(name))
             .into_any_element()
@@ -2447,7 +2522,7 @@ impl PartStudioView {
             .items_center()
             .cursor(CursorStyle::ResizeUpDown)
             .group("rollback")
-            .tooltip(crate::ui::tooltip("Rollback bar"))
+            .tip("Rollback bar", crate::ui::TipSide::Below)
             .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
             .on_drag(RollbackDrag, |_, grab, _, cx| cx.new(|_| RollbackDragPill(grab)))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
@@ -2474,7 +2549,7 @@ impl PartStudioView {
             })
         };
         let state = self.display.feature_state(f.id);
-        let status = state.map(|s| s.status).unwrap_or(FeatureStatus::Ok);
+        let status = if editing && self.edit_invalid(cx) { FeatureStatus::Error } else { state.map(|s| s.status).unwrap_or(FeatureStatus::Ok) };
         let selected = self.selected_features.contains(&f.id);
         // Onshape (§3.4): rolled back = italic #ccc, suppressed = #999 struck
         // through, error = #aa252d; everything else (sketches included) #333.
@@ -2495,11 +2570,12 @@ impl PartStudioView {
         let underdefined = !rolled_back && state.is_some_and(|s| s.underdefined);
         let id = f.id;
         let msg = state.and_then(|s| s.message.clone());
-        // Onshape: hovering a selected row shows what it depends on ("Extrude 1 <- Sketch 1").
-        let msg = msg.or_else(|| {
-            let studio = self.studio(cx).filter(|_| selected)?;
-            let parents: Vec<String> = noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect();
-            (!parents.is_empty()).then(|| format!("{} <- {}", f.name, parents.join(", ")))
+        // Onshape (live part-studio/16, 90, 95): hovering a row shows its
+        // error, else what it depends on ("Extrude 1 <- Sketch 1"), else its
+        // name, in a box beside the row.
+        let msg = msg.unwrap_or_else(|| {
+            let parents: Vec<String> = self.studio(cx).map(|studio| noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect()).unwrap_or_default();
+            if parents.is_empty() { name.clone() } else { format!("{} <- {}", f.name, parents.join(", ")) }
         });
         let manually_suppressed = f.suppressed;
         let hidden = f.hidden;
@@ -2512,6 +2588,8 @@ impl PartStudioView {
         let is_sketch = self.display.sketches.iter().any(|s| s.feature == id);
         let has_plane = is_sketch || self.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(id));
         let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
+            .mr(px(5.))
+            .pr(px(11.))
             .when(self.ui.list_menu == Some(id) && !(selected || editing), |d| d.bg(pal.row_hover))
             .group("feature-row")
             .relative()
@@ -2581,7 +2659,7 @@ impl PartStudioView {
                         })),
                 )
             })
-            .when_some(msg, |d, m| d.tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(window, cx)))
+
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a feature highlights its geometry (Onshape).
                 let new = if *h { Some(id) } else { None };
@@ -2624,6 +2702,7 @@ impl PartStudioView {
             .on_drag(FeatureDrag { id, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
             .drag_over::<FeatureDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
+        let row = crate::ui::with_side_tooltip(row, msg);
         let view = cx.entity();
         let is_last = self.studio(cx).is_some_and(|s| i + 1 >= s.features.len());
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
@@ -2879,7 +2958,8 @@ impl PartStudioView {
             .border_color(pal.border_strong)
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("treelist", 20., cx))
+            // Live (part-studio/00): the glyph sits 2.5 px right of center.
+            .child(div().ml(px(5.)).child(crate::assets::icon("treelist", 20., cx)))
             .tooltip(crate::ui::tooltip(if collapsed { "Show the Features and parts list" } else { "Collapse the Features and parts list" }))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.ui.list_collapsed = !this.ui.list_collapsed;
@@ -3092,12 +3172,15 @@ impl Render for PartStudioView {
         }
         let right = self.render_right_panel(window, cx);
         let mut overlay = self.render_viewport_overlay(cx);
-        overlay.push(div().absolute().top_0().bottom_0().right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
+        // Live (part-studio/00, 77): the strip is centered 8 px above the
+        // viewport's middle (4 or 5 buttons alike).
+        overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
         // Under everything else, so a feature dialog covers them (live: the
         // dialog hides sketch names and the list toggle).
         let labels = self.render_sketch_labels(window, cx);
         overlay.splice(0..0, labels);
-        overlay.insert(0, div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element());
+        // Live: centered 8 px above the viewport's middle, like the right strip.
+        overlay.insert(0, div().absolute().top_0().bottom(px(16.)).left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element());
         overlay.extend(self.render_measure_panel(cx));
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
@@ -3105,7 +3188,7 @@ impl Render for PartStudioView {
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx));
         overlay.extend(self.render_section_value(cx));
-        overlay.extend(self.render_palette(cx));
+        overlay.extend(self.render_palette(window, cx));
         overlay.extend(self.render_shortcut_sheet(cx));
         overlay.extend(self.render_isolate_panel(cx));
         overlay.extend(self.render_appearance_editor(cx));
@@ -3142,6 +3225,13 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(Self::on_delete))
+            // Shift+Tab on <body> stays there (live psb 10-19 h); elsewhere in
+            // the Part Studio it moves back as usual.
+            .on_action(cx.listener(|this, _: &crate::actions::StudioTabPrev, window, cx| {
+                if !this.focus.is_focused(window) {
+                    window.focus_prev(cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
                 if this.sketch.is_none() {
                     this.copy_selected_features(cx);

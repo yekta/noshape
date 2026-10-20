@@ -20,6 +20,7 @@ mod pattern;
 pub mod query;
 mod sketch;
 mod status;
+pub(crate) use status::quantity_of;
 
 pub use convert::*;
 pub use query::{Ent, entity_type_of};
@@ -193,6 +194,13 @@ impl CtxState {
         id
     }
 
+    /// Give an entity a transient id chosen by the host (queries made
+    /// before the context existed, e.g. `PartStudioData.partQuery`).
+    pub fn name_transient(&mut self, id: Arc<str>, r: Reference) {
+        self.transient_of.entry(r.clone()).or_insert_with(|| id.clone());
+        self.transient_ids.insert(id, r);
+    }
+
     pub fn transient_ref(&self, id: &str) -> Option<&Reference> {
         self.transient_ids.get(id)
     }
@@ -331,6 +339,20 @@ pub fn rename_created(ctx: &mut Context, marker: FeatureId, feature: FeatureId) 
 
 // ---------------------------------------------------------------- natives
 
+thread_local! {
+    /// Other Part Studios of the document for the feature running on this
+    /// thread (`PartStudioData.buildFunction`).
+    static DERIVED: std::cell::RefCell<Option<Arc<dyn crate::regen::derived::DerivedProvider>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub fn set_derived(d: Option<Arc<dyn crate::regen::derived::DerivedProvider>>) {
+    DERIVED.with(|c| *c.borrow_mut() = d);
+}
+
+pub fn derived() -> Option<Arc<dyn crate::regen::derived::DerivedProvider>> {
+    DERIVED.with(|c| c.borrow().clone())
+}
+
 static REGISTER: Once = Once::new();
 
 /// Register every modeling native with the FeatureScript runtime (once,
@@ -345,7 +367,9 @@ pub fn register() {
         all.extend_from_slice(sketch::NATIVES);
         all.extend_from_slice(pattern::NATIVES);
         all.extend_from_slice(builtin::NATIVES);
+        all.extend_from_slice(super::reference::NATIVES);
         noshape_featurescript::interp::register_natives(&all);
+
     });
 }
 
@@ -411,7 +435,7 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             st.status.insert(id.to_vec(), status::status_map("ERROR", &code, Some(&msg)));
             drop(st);
             log::debug!("FeatureScript operation {} failed: {msg}", id.join("."));
-            Err(raise_error(i, &code, None))
+            Err(raise_error(i, &code, (code == "CUSTOM_ERROR").then_some(msg.as_str())))
         }
     }
 }

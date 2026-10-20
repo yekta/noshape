@@ -7,11 +7,13 @@ mod assembly_mate_dialog;
 mod assembly_scene;
 mod assembly_view;
 mod assets;
+mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
 mod tool_synonyms;
 mod release_prefs;
 mod release_thumbs;
+mod custom_tables;
 mod derived;
 mod doc_dialogs;
 mod doc_model;
@@ -41,8 +43,10 @@ mod drawing_cells;
 mod drawing_refs;
 mod drawing_color;
 mod drawing_callout;
+mod drawing_gdt;
 mod drawing_ruler;
 mod drawing_table_dlg;
+mod drawing_custom_table;
 mod drawing_weld;
 mod file_tab_view;
 mod drawing_props;
@@ -56,6 +60,7 @@ mod feature_dialog;
 mod feature_studio;
 mod fs_notices;
 mod fs_reference;
+mod fs_import;
 mod fs_search;
 mod import_dialog;
 mod material_library_view;
@@ -85,8 +90,10 @@ mod start_trash;
 mod shortcuts;
 mod start_window;
 mod tab_manager;
+mod tab_thumbs;
 mod theme;
 mod tool_text;
+mod touch;
 mod ui;
 mod var_complete;
 mod variable_import;
@@ -122,6 +129,14 @@ fn apply_theme(cx: &mut App) {
     Theme::change(ThemeMode::Light, None, cx);
     let pal = theme::p();
     let white: Hsla = gpui_kit::rgb(0xffffff).into();
+    // Live (sketch/13): text selected in a focused field is Chrome's
+    // `#3367d1` with white text; code editors keep `t.selection` below
+    // (patched gpui-base, vendor/gpui-base).
+    cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb(0x3367d1).into(), foreground: white });
+    // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit
+    // line counts, numbers 21 px in, a 14 px fold column, the code 4 px after it,
+    // the current line's cell #dcdcdc (patched gpui-base).
+    cx.set_global(gpui_kit::base::input::CodeGutterMetrics { min_digits: 1, number_inset: px(15.), right_margin: px(0.), fold_width: px(14.), text_gap: px(4.), active_background: Some(gpui_kit::rgb(0xdcdcdc).into()) });
     Theme::update(cx, |t| {
         t.font_family = UI_FONT.into();
         t.font_size = px(14.);
@@ -217,6 +232,8 @@ fn main() {
         graphics_prefs::init(cx);
         actions::bind_default_keys(cx);
         feature_studio::bind_keys(cx);
+        // Mouse controls (also hands "Use pen input as mouse" to the platform).
+        navigation::MouseControls::current();
         cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 
@@ -227,6 +244,8 @@ fn main() {
                 Some(noshape_model::drawing::showcase::showcase_document())
             } else if args.iter().any(|a| a == "--demo-fab") {
                 Some(noshape_model::demo_fab::fabrication_document())
+            } else if args.iter().any(|a| a == "--demo-tables") {
+                Some(noshape_model::demo_fab::custom_tables_document())
             } else if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
             files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
         } else {

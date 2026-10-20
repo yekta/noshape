@@ -236,13 +236,74 @@ pub fn write_pvz(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Resul
     ck(ffi::write_pvz(&l, &names, path_str(path)?))
 }
 
-/// Read a PTC Creo View .pvz file as Onshape imports it: meshes only, one
-/// body per part instance (placed), a solid where the mesh is closed, else a
-/// shell; planar triangle faces, coplanar neighbours merged in meshes of at
-/// most `merge_limit` triangles. Returned in `unit` (the file is in metres).
-pub fn read_pvz(path: &Path, unit: LengthUnit, merge_limit: u32) -> Result<Shape> {
-    let s = Shape::from_res(ffi::read_pvz(path_str(path)?, merge_limit))?;
+/// Read a PTC Creo View .pvz file as Onshape imports it: mesh bodies only
+/// ([`Shape::is_mesh`]), a compound per placed part instance holding its
+/// closed solid and/or open pieces (shells). Returned in `unit` (the file is
+/// in metres).
+pub fn read_pvz(path: &Path, unit: LengthUnit) -> Result<Shape> {
+    let s = Shape::from_res(ffi::read_pvz(path_str(path)?))?;
     scaled(&s, 1e3 / unit.mm_per_unit())
+}
+
+/// Read an STL or OBJ file as Onshape imports it: mesh bodies (a compound of
+/// a solid of the closed pieces and a shell per open piece). Coordinates are
+/// in `file_unit` (mesh files carry none); returned in meters.
+/// 3MF, glTF and GLB files carry their units: they come in millimetres, so
+/// pass [`LengthUnit::Millimeter`] for them.
+pub fn read_mesh_bodies(path: &Path, file_unit: LengthUnit) -> Result<Shape> {
+    let s = Shape::from_res(ffi::read_mesh_bodies(path_str(path)?))?;
+    scaled(&s, file_unit.mm_per_unit() * 1e-3)
+}
+
+/// Read a Parasolid transmit file (.x_t / .x_b, any version with an embedded
+/// schema, and schema 12006/13006 files) as Onshape imports it: every part
+/// (assembly instances placed) with its name and colour, in `unit`.
+pub fn read_parasolid_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_parasolid_parts(path_str(path)?))?, unit)
+}
+
+/// Read a Rhino .3dm file as Onshape imports it (openNURBS builds only):
+/// Breps as solids/surfaces, meshes as mesh bodies, curves as wires, blocks
+/// placed; each with its name and colour, in `unit`.
+pub fn read_rhino_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_rhino_parts_ffi(path_str(path)?))?, unit)
+}
+
+/// Read an ACIS .sat / .sab file (any version, and ShapeManager files) as
+/// Onshape imports it: every body with its name and colour, in `unit`.
+/// Analytic geometry exactly; spline surfaces and curves from the B-spline
+/// data the file stores with them.
+pub fn read_acis_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_sat_parts_ffi(path_str(path)?))?, unit)
+}
+
+/// Read a JT file through its exact geometry, the XT B-rep segments (JT 8–10;
+/// zlib or LZMA/XZ compressed): every part with its name, in `unit`. Files
+/// with tessellation only fail; parts come unplaced.
+pub fn read_jt_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_jt_parts_ffi(path_str(path)?))?, unit)
+}
+
+/// Read a native CAD part file as Onshape's translators do, from the exact
+/// geometry it embeds: SolidWorks .sldprt (2009 and later), Solid Edge
+/// .par/.psm and NX .prt (Parasolid), Inventor .ipt (ShapeManager); every
+/// part with its name and colour, in `unit`.
+pub fn read_native_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_native_parts_ffi(path_str(path)?))?, unit)
+}
+
+/// Shapes in metres with names and colours, in `unit`.
+fn imported(r: ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    let f = 1e3 / unit.mm_per_unit();
+    list_to_vec(&r.shapes)
+        .into_iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
+            let color = (r.has_color.get(i).copied().unwrap_or(false)).then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color })
+        })
+        .collect()
 }
 
 /// Read a Parasolid transmit file written by [`write_parasolid`] (schema

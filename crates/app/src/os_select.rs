@@ -68,6 +68,9 @@ pub struct OsSelect {
     highlight: usize,
     /// Where keyboard focus was before opening, to give it back on close.
     return_focus: Option<FocusHandle>,
+    /// The closed field as a Tab stop (Onshape's off-screen
+    /// `os-select-focusser`), created by [`OsSelect::focus_handle`].
+    focus: Option<FocusHandle>,
     /// The field's and the open list's painted bounds (the list matches the
     /// field's width; presses inside the list don't close it).
     bounds: Rc<Cell<Bounds<Pixels>>>,
@@ -81,7 +84,7 @@ impl EventEmitter<OsSelectEvent> for OsSelect {}
 
 impl OsSelect {
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, bounds: Default::default(), list_bounds: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
@@ -93,6 +96,13 @@ impl OsSelect {
     pub fn set_items(&mut self, items: Vec<(SharedString, SharedString)>, current: impl Into<SharedString>) {
         self.items = items;
         self.current = current.into();
+    }
+
+    /// The select's Tab stop (made on first use). Onshape's focusser: Enter,
+    /// Space, ↑ or ↓ open the list, a typed character opens it searching for
+    /// that character, and closing the list gives the focus back to it.
+    pub fn focus_handle(&mut self, cx: &mut Context<Self>) -> FocusHandle {
+        self.focus.get_or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
     }
 
     pub fn is_open(&self) -> bool {
@@ -144,7 +154,9 @@ impl OsSelect {
         }
         self._subs.clear();
         self.query.clear();
-        if let Some(f) = self.return_focus.take() {
+        // Onshape (osSelect:close): the focus goes back to the focusser.
+        let back = self.return_focus.take();
+        if let Some(f) = self.focus.clone().or(back) {
             window.focus(&f, cx);
         }
         cx.notify();
@@ -164,11 +176,41 @@ impl OsSelect {
         }
     }
 
-    fn render_closed(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_closed(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let label = self.items.iter().find(|(id, _)| *id == self.current).map(|(_, l)| l.clone()).unwrap_or_default();
-        h_flex()
-            .id(self.id.clone())
+        let focused = self.focus.as_ref().is_some_and(|f| f.is_focused(window));
+        let mut el = h_flex().id(self.id.clone());
+        if let Some(f) = &self.focus {
+            el = el
+                .track_focus(f)
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    let k = &ev.keystroke;
+                    let plain = !k.modifiers.control && !k.modifiers.alt && !k.modifiers.platform;
+                    match k.key.as_str() {
+                        "space" | "down" | "up" => this.open(window, cx),
+                        // Typing opens the list with that text (focusser keyup).
+                        _ if plain && k.key_char.as_ref().is_some_and(|c| c.chars().count() == 1 && !c.chars().all(char::is_whitespace)) => {
+                            let c = k.key_char.clone().unwrap_or_default();
+                            this.open(window, cx);
+                            if let Some(st) = this.search.clone() {
+                                st.update(cx, |s, cx| s.set_value(c.clone(), window, cx));
+                            }
+                            this.query = c;
+                        }
+                        _ => return,
+                    }
+                    cx.stop_propagation();
+                }))
+                // Enter opens it too (enterActivate), before the dialog's Accept.
+                .capture_action(cx.listener(|this, _: &crate::actions::Accept, window, cx| {
+                    if this.focus.as_ref().is_some_and(|f| f.is_focused(window)) {
+                        cx.stop_propagation();
+                        this.open(window, cx);
+                    }
+                }));
+        }
+        el
             .w_full()
             .h(px(self.height))
             // Live (dialogs/chamfer-01): the value and caret sit 1 px below
@@ -183,6 +225,9 @@ impl OsSelect {
             .cursor_pointer()
             .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(pal.text).truncate().child(label))
             .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+            // Focused (bootstrap .btn-default-focus inside os-enum-parameter):
+            // the soft blue glow, no outline.
+            .when(focused, |d| d.shadow(vec![BoxShadow { color: hsla(207. / 360., 0.74, 0.66, 0.6), offset: point(px(0.), px(0.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }]))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open(window, cx)))
             .into_any_element()
     }
@@ -247,11 +292,11 @@ impl OsSelect {
 }
 
 impl Render for OsSelect {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let probe = self.bounds.clone();
         let accent = gpui_kit::rgb(0x1651b0);
         let field = match &self.search {
-            None => self.render_closed(cx),
+            None => self.render_closed(window, cx),
             Some(st) => v_flex()
                 .w_full()
                 .child(
@@ -310,7 +355,7 @@ impl Render for OsSelect {
                 this.scroll.scroll_to_item(this.highlight);
                 cx.notify();
             }))
-            // Tab leaves the select (live: the dropdowns aren't tab stops).
+            // Tab leaves the open list.
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                 if this.is_open() && ev.keystroke.key == "tab" {
                     this.close(window, cx);

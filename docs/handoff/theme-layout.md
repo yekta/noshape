@@ -348,8 +348,8 @@ shared tree.
   final-configurations-box.png.
 - **Right strip**: 5 buttons like live (Appearance, Configuration, Custom tables, Inspection
   table, Variable table); Custom tables and Model definitions panels show Onshape's empty states
-  (own illustrations); the actual custom tables (FeatureScript) and inspection tools are not
-  implemented.
+  (own illustrations); custom tables (FeatureScript) are implemented by asb
+  (part_studio/custom_tables.rs); inspection tools are not implemented.
 - Item 9: region hover is a light-orange boundary only (selected: amber fill + amber boundary;
   `scene_builder::region_outline`); "regenerating…" removed from the Features header.
 
@@ -591,8 +591,8 @@ shared tree.
   both sides (live dom/dialog-variable, dialog-thicken: label x = dialog x, field = label end).
   Verify Extrude/Thicken against live after the next build (the old note said "no right padding").
 - For the lead / psb: the left Configurations box button is "Modify visibility conditions" in live
-  (tooltip and action); ours opens the Configurations panel. Enter in the Variable dialog's Value
-  field didn't close the dialog in my test.
+  (tooltip and action); ours opens the Configurations panel. (The Variable dialog "Enter doesn't close" note
+  is withdrawn: I pressed Enter once, which applies the value; the second Enter commits, as designed.)
 - Feature dialog value rows, verified: Variable (Name/Value/Description) and Extrude Depth (label 31,
   field 68-170, ± at 176.5) now land on live's x positions; the tolerance toggle has 4 px after it
   (live 5 px gap before the right column). Rows are still 1-2 px lower than live (open).
@@ -629,11 +629,65 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   final-sketch-dimension.png (ours left: placing, box, applied). Open: live highlights the measured
   edge while placing; live 15 shows the applied dimension unselected while skb keeps it selected
   (their sketch/148 evidence); the value in the box isn't shown selected/right-aligned like live.
+- Clippy (lead): `os_menu::OpenMenu` alias for the host tuple; offscreen.rs depth-sample test uses
+  `Range::contains`. renderer.rs's "very complex type" at :201 was already gone when I got to it (its
+  author changed the depth readback). Remaining app warnings (19 Oct 18:30) are other agents':
+  history_panel.rs, numbering_prefs.rs, part_studio/behaviors.rs:192 (`consumed_lines`, psb),
+  part_studio/in_context.rs, session.rs, tab_manager.rs.
 - Tools: /tmp/ui-tools/build.sh (shared build + copy to /tmp/ui/noshape), start.sh [file|--demo]
   (starts on :101 and resizes the window to 1919x1079 like the live shots), x.sh <name> [xdotool…]
   (screenshot to /tmp/ui/<name>.png). Icon scratch work in /tmp/ui/icon.
 - Note: the demo document's toolbar is collapsed at 1919 px because its custom features don't fit
   (Onshape collapses the same way); compare toolbars on a new document.
+
+## Round 10 (2026-10-19 evening, lead's follow-ups)
+
+- **Dialog rows = live**: Variable dialog underlines at live's 188-189 / 215 / 241, Extrude at 194 /
+  225 / 253 (empty query field 26 px with its border; non-tolerance value rows 26 px via a 4 px field
+  top padding; tolerance rows keep 5). The focused field's 2 px blue underline grows upward (1 px
+  border + 1 px inset line) like live's inset shadow.
+- **Dimension tool**: the measured entity shows selected (amber) while the dimension is placed, not
+  the yellow "related" glow (`SketchEditor::tool_picks`, sketch.rs `sketch_overlay`). The value box's
+  text *is* selected; it didn't show on Xvfb because GPUI paints input selections only in active
+  windows (start.sh now gives the window X focus). Selection colors: see the gpui-base patch below.
+- **Hidden-line pass** (renderer.rs): hidden-only lines/points are drawn right after the meshes, so
+  only faces hide them; overlays on top of the same curves (hover outlines, accents, dimension
+  lines) no longer turn underconstrained curves `#4040ff`.
+- **Edge-on planes** (theme `PLANE_OUTLINE` `#4191c8` at `PLANE_OUTLINE_ALPHA` 0.6, linear blend):
+  one edge reads like live on white and on the plane fill, the two edges of a plane seen edge-on add
+  up to (121,167,209) vs live (121,161,204).
+- **Input selection = Chrome's** (lead/skb): vendored, patched **gpui-base 0.7.3** (vendor/gpui-base,
+  `[patch.crates-io]`, Cargo.lock drops its registry source/checksum): new global
+  `gpui_base::input::PlainSelectionColors { background, foreground }`; for single-line, unmasked,
+  non-code inputs with a visible selection the element fills it with `background` and recolors the
+  selected text runs with `foreground` (`plain_selection_colors`, `recolor_runs`, prepaint field
+  `plain_selection`; every change marked NOSHAPE PATCH in src/input/mod.rs and
+  src/input/base/element.rs). main.rs sets `#3367d1` / white; code editors keep `t.selection`.
+  When gpui-base is upgraded, re-apply those hunks.
+- **Onshape tooltips placed like live** (ui.rs `TipSide`, `PlacedTooltip`, `with_tip`, `.tip()` via
+  `TipExt`): feature-list rows and Default geometry rows (beside the row: error, else
+  "Extrude 1 <- Sketch 1", else the name; was only on selected rows), left rail (right of the
+  button; "Versions and history" without the shortcut), right strip and camera menu button (left),
+  Measure / Analysis tools / "Display mass and section properties" (above), rollback bar (under,
+  centered). Feature-list rows span x 40-239 like live (5 px right margin; Default geometry indent
+  moved into the rows; eye 19 px from the row end). Right strip centered 8 px above the viewport
+  middle (live 488 for 4 buttons).
+- **Tab hover card** (tab_thumbs.rs, new): an inactive Part Studio / Assembly / Drawing tab shows a
+  314 x 184 card above it with the element's picture (rendered off screen per content hash,
+  `TabThumbs` owned by the Workspace), notch at the tab, Onshape's gray cube for an empty Assembly
+  (`tab-card-empty-assembly.svg`). An empty Part Studio stays blank until the requested capture
+  (REQUESTS.md). (tab_manager.rs, ui2's, keeps its own thumbnails; both could share `TabThumbs`.)
+  final-hover-tooltips.png (ours left, live right: row, tab card, rail, strip, rollback, camera,
+  measure).
+
+- **Feature-list collapse toggle** (lead/ui2): centered 8 px above the viewport middle like the right
+  strip (glyph rows 547-562 = live); `treelist.svg` redrawn from live's pixels (chevron, 2 px gray
+  bar, four 1 px lines), glyph 2.5 px right of the box center. The assembly uses the same icon.
+- **Feature dialog open** (live 570, 94): an invalid open dialog makes its row red (new-feature
+  placeholder too) and counts as an error; the Features header shows Onshape's red circle with a
+  down arrow (`regen-error.svg`, click: show only errors, tooltip beside it) before the title, which
+  truncates to "Features …"; Add folder and Pause regeneration are grayed and inert while a dialog is
+  open. `os_checkbox` boxes 8 px from the row top like live (were 7). final-fillet-new.png.
 
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 

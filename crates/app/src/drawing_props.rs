@@ -185,6 +185,13 @@ impl DrawingEditor {
                 }
             }
         }
+        // Live (drawing context menu): "Insert custom table of Part Studio 1…".
+        if let Some(root) = views::root_view(sheet, id).and_then(|r| sheet.view(r))
+            && let ViewKind::Base { source, .. } = &root.kind
+            && let Some(t) = self.doc.read(cx).session.doc.tab(*source).filter(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_)))
+        {
+            out.push(MenuEntry::item(format!("Insert custom table of {}…", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx)));
+        }
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("View properties…", move |t, w, cx| t.open_view_props(id, w, cx)));
         out.push(MenuEntry::Submenu(

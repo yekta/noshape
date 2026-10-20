@@ -303,3 +303,38 @@ migrating the drawing menus to `os_menu` (`fill_os_menu`): keep edits surgical, 
 - Threads: `ViewGeometry.threads` (end-on tapped holes), `views::thread_major_diameter`, `DrawingView.hide_threads`.
 - Chamfer dimensions: `DrawingProps.chamfer_*`, `ChamferContent`, `sheet::ChamferStyle` via `AnnotationEnv::chamfer_style`.
 - New pinned views copy the part's pin (V8). Build helper: /tmp/asb/bin/buildloop.sh retries the shared build.
+- Clippy (large_enum_variant, blocking main): `AnnotationKind::Weld { spec: Box<WeldSpec> }` and
+  `DrawingProps.view_tab: Box<ViewTabProps>` (keeps `Drawing` under the TabContent threshold; boxing
+  `TabContent::Drawing` instead made PartStudio the outlier). My app files are clippy-clean (`-D warnings`).
+
+## Custom tables TB25/TB26 + Part Studio Custom tables panel (20 Oct; on fs's `custom::table`)
+- Model (`model/drawing/tables.rs`): `TableKind::Custom { studio, version, fs, name, fs_version, bottom_to_top,
+  overrides }` (whole Part Studio, no view; `fs_version` = an opaque key, the app uses `derived::ExternalRef` keys
+  "ext:<mv>|<fs tab>|<path>" for tables added from a version). `CustomTableKey::of(kind)`, `custom_table_keys`,
+  `CustomTables` map in `SheetInfo.custom_tables`; `table_data_with(.., info, ..)` resolves custom tables (use it
+  instead of `table_data` wherever a SheetInfo exists). `evaluate_custom(doc, fs, name, from_version, ctx)`
+  (workspace: DocumentScripts; version: `OneStudio` compiled alone), `evaluate_custom_tables` (headless).
+  `referenced_sources` includes the custom tables' Part Studios. `TableData.col_align / header_bold` (custom
+  tables: bold header, body cells aligned like the columns, Left by default; table cell formats still win).
+  Test `custom_tables_tabulate_a_whole_part_studio`.
+- App shared (`app/custom_tables.rs`): `TableRef`, "My custom tables" in config_dir/custom_tables.json
+  (`my_tables`, `add_my_table`), `workspace_tables`, `version_tables`, `source_document`, `evaluate`, badges
+  ("Fs"), `table_list` (grouped dropdown), notices groups (`set_notices` / `notice_groups`, rendered by
+  fs_notices.rs; model `custom::run::notice_entries`).
+- Part Studio panel (`app/part_studio/custom_tables.rs`, hooks in config_panel.rs / behaviors.rs / mod.rs,
+  `UiState.ct`): selector + ⋯ Switch to <FS>, sections with ⋯ Copy table (TSV), grid per live DOM (140 px
+  columns, 34/35 px rows, #eaeaea header, #f5f5f5 cells, error #f9ebec + tooltip, ⓘ info), row hover = the part's
+  edges (live 635), TABLE_ERRORS + notices group when a table throws, footer Add custom tables → 300 px flyout
+  (Current document at a version / version graph / blue "N changes" box / FS › table tree; Other documents:
+  categories, local documents under Owned by me / Recently opened / Created by me).
+- Drawing (`app/drawing_custom_table.rs`, `DrawingEditor.custom_tables`): toolbar Custom table (after Hole table),
+  view menu "Insert custom table of <Part Studio>…", dialog Add / Part Studio ▾, Insert / table ▾ with the pickers
+  "Select a Part Studio" and "Select a custom table" (+ Done), Order, fixed corner; click places. Right-click:
+  Custom table properties…, Split custom table below, Switch to Custom tables : <PS>, Switch to <FS> / Open Feature
+  Studio in linked document. Properties (also double-click a corner): Document, Workspace, Custom table and Feature
+  Studio links, version line, Sheet, Order, fixed corner, ✓ / ✕. Double-click a body cell edits it (`overrides`).
+  Evaluated in the background per (source hash, FS source hash) in `ensure_custom_tables` (called by `refresh`).
+- `--demo-tables`: demo drawing document + the live "fs tables" Feature Studio (FS sizes, FS two tables).
+- Open: live request filed (REQUESTS.md asb 00:00) for the drawing table look (title row? error cell, TableArray,
+  a thrown table), the Select a Part Studio dialog and the right-click menu of a workspace table. The shared table
+  context menu (Format cell / Merge / Fixed corner …) is not Onshape's custom table menu (help custom-tables-14).

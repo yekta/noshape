@@ -123,6 +123,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
             bounds,
             composite: b.composite.clone(),
+            is_mesh: b.shape.is_mesh(),
         });
     }
     meshes.retain(|k, _| used.contains(k));

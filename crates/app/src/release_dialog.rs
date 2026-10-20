@@ -360,10 +360,10 @@ impl AddItemsDialog {
                     }))),
             );
         }
-        for input in &cfg.inputs {
-            if let Some((other, allowed)) = &input.visible_when
-                && !values.0.get(other).is_some_and(|v| allowed.contains(v))
-            {
+        // Hidden inputs (visibility conditions) aren't offered.
+        let shown = cfg.visibility(&values).0;
+        for (input, vis) in cfg.inputs.iter().zip(&shown) {
+            if !vis.visible {
                 continue;
             }
             let id = input.id.clone();
@@ -1658,7 +1658,8 @@ impl Render for ReleaseDialog {
                                     this.toggle_workflow(window, cx);
                                 })),
                         ),
-                ))))
+                // Above the modal (the kit draws dialogs at popup priority 100).
+                )).with_priority(101)))
             });
         // Type icons toggle a filter; Clear removes it.
         let filter_row = self.filter_open.then(|| {
@@ -1847,14 +1848,12 @@ impl Render for ReleaseDialog {
                         .child({
                             let item = row.item.clone();
                             let me = cx.entity();
-                            // A row from another document's version: its
-                            // document, at that version, in its window. A
-                            // version of this document isn't reachable from
-                            // here (the buttons stay inert).
-                            let inert = item.document.as_ref().is_some_and(|l| l.path.is_empty());
-                            boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).when(inert, |d| d.opacity(0.4).cursor_default()).on_click(move |_, window, cx| {
+                            // A row from a version (another document's or this
+                            // one's): that version, in a window of its own.
+                            let doc_path = self.doc.read(cx).session.path.clone();
+                            boxed(SharedString::from(format!("rel-props-{i}")), "properties", "Edit properties", cx).on_click(move |_, window, cx| {
                                 if item.document.is_some() {
-                                    add_source::run_linked(&item, add_source::LinkedAction::Properties, cx);
+                                    add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Properties, cx);
                                     return;
                                 }
                                 let me = me.clone();
@@ -1869,10 +1868,10 @@ impl Render for ReleaseDialog {
                         })
                         .child({
                             let item = row.item.clone();
-                            let inert = item.document.as_ref().is_some_and(|l| l.path.is_empty());
-                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export", cx).when(inert, |d| d.opacity(0.4).cursor_default()).on_click(move |_, window, cx| {
+                            let doc_path = self.doc.read(cx).session.path.clone();
+                            boxed(SharedString::from(format!("rel-export-{i}")), "export", "Export", cx).on_click(move |_, window, cx| {
                                 if item.document.is_some() {
-                                    add_source::run_linked(&item, add_source::LinkedAction::Export, cx);
+                                    add_source::run_linked(&item, &doc_path, add_source::LinkedAction::Export, cx);
                                 } else {
                                     crate::workspace::request_export(item.tab, item.part.iter().cloned().collect(), window, cx)
                                 }

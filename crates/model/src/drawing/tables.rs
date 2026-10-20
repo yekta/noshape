@@ -7,7 +7,13 @@
 use super::font;
 use super::format::{default_digits, format_number, length_units};
 use super::sheet::{Anchor, LineStyle, Polyline2, SheetGeometry, Text2};
-use super::views::{SourceModel, ViewGeometry};
+use super::views::{SourceKey, SourceModel, Sources, ViewGeometry};
+use crate::custom::table::{CustomTable, TableResult, evaluate_table};
+use crate::custom::{CustomFeatureProvider, DocumentScripts};
+use crate::document::{Document, TabContent, TabId};
+use crate::regen::context::Context;
+use std::collections::HashMap;
+use std::sync::Arc;
 use super::{CellAlign, DimFormat, Drawing, Table, TableCorner, TableKind};
 
 /// Resolved table content.
@@ -26,11 +32,24 @@ pub struct TableData {
     /// Overridden cells (row in `rows`, column): a black triangle at the
     /// cell's bottom left.
     pub overridden: Vec<(usize, usize)>,
+    /// Alignment of the body cells per column, where the table's own cell
+    /// formats don't say (custom tables: their columns' alignment).
+    pub col_align: Vec<CellAlign>,
+    /// The header cells are bold (custom tables).
+    pub header_bold: bool,
 }
 
 impl TableData {
     pub fn columns(&self) -> usize {
         self.header.iter().chain(self.rows.iter()).map(|r| r.len()).max().unwrap_or(0).max(1)
+    }
+    /// Format of a cell the table's cell formats don't cover.
+    pub fn default_format(&self, row: usize, col: usize, rows: usize) -> super::CellFormat {
+        let header = self.header.is_some() && if self.header_bottom { row + 1 == rows } else { row == 0 };
+        if header {
+            return super::CellFormat { bold: self.header_bold, ..Default::default() };
+        }
+        super::CellFormat { align: self.col_align.get(col).copied().unwrap_or_default(), ..Default::default() }
     }
     /// Every row in display order (header first, no title).
     pub fn all_rows(&self) -> Vec<&Vec<String>> {
@@ -111,7 +130,7 @@ fn revision_data(kind: &TableKind, revisions: &[RevisionRow]) -> TableData {
         })
         .collect();
     let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
-    TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
+    TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
 
 /// Label of a revision callout: the revision, "*" while pending; None
@@ -133,7 +152,7 @@ pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev:
 
 /// The pointer table "See sheet 1" shows on the other sheets.
 pub fn see_sheet_data(drawing: &Drawing, home: usize) -> TableData {
-    TableData { title: Some("REVISION HISTORY".into()), header: None, rows: vec![vec![format!("SEE SHEET {}", home + 1)]], pending: Vec::new(), padding: padding(drawing), header_bottom: false, overridden: Vec::new() }
+    TableData { title: Some("REVISION HISTORY".into()), header: None, rows: vec![vec![format!("SEE SHEET {}", home + 1)]], pending: Vec::new(), padding: padding(drawing), header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
 
 fn padding(drawing: &Drawing) -> [f64; 2] {
@@ -205,11 +224,11 @@ fn tag_letters(i: usize) -> String {
 pub const BOM_HEADER: [&str; 4] = ["Item", "Quantity", "Part number", "Description"];
 
 pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, revisions: &[RevisionRow], expand: &dyn Fn(&str) -> String) -> TableData {
-    let mut data = match &table.kind {
+    let data = match &table.kind {
         TableKind::General { cells, title, header } => {
             let mut rows: Vec<Vec<String>> = cells.iter().map(|r| r.iter().map(|c| expand(c)).collect()).collect();
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
         }
         TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
@@ -248,7 +267,7 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                     }
                 }
             }
-            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden }
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden, ..Default::default() }
         }
         TableKind::Hole { precision, origin: stored, flip_x, flip_y, .. } => {
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
@@ -262,9 +281,11 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
                 .into_iter()
                 .map(|h| vec![h.tag, num(h.x * sx), num(h.y * sy), format!("Ø{}", num(h.diameter))])
                 .collect();
-            TableData { title: Some("HOLE TABLE".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new() }
+            TableData { title: Some("HOLE TABLE".into()), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
         }
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
+        // Resolved by [`table_data_with`] from the evaluated tables.
+        TableKind::Custom { .. } => TableData::default(),
         TableKind::CutList { bottom_to_top, .. } => {
             // Onshape's cut list table (help cutlist-table-indrawing): Item,
             // Qty, Description, Length ("675.444 mm"), Angle 1 / 2 ("45 deg").
@@ -282,9 +303,22 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
             if *bottom_to_top {
                 rows.reverse();
             }
-            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new() }
+            TableData { title: None, header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), ..Default::default() }
         }
     };
+    finish(drawing, table, data)
+}
+
+/// [`table_data`] with the document-level data of `info` (custom tables).
+pub fn table_data_with(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeometry>, source: Option<&SourceModel>, origin: Option<[f64; 2]>, info: &super::build::SheetInfo, expand: &dyn Fn(&str) -> String) -> TableData {
+    match CustomTableKey::of(&table.kind) {
+        Some(key) => finish(drawing, table, custom_data(&table.kind, info.custom_tables.get(&key).map(|r| r.as_ref()))),
+        None => table_data(drawing, table, view_geo, source, origin, &info.revisions, expand),
+    }
+}
+
+/// A split table's part of the rows, and the drawing's cell padding.
+fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
     // A split table shows its part of the rows.
     if let Some([a, b]) = table.rows {
         let n = data.rows.len();
@@ -293,6 +327,120 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
     }
     data.padding = padding(drawing);
     data
+}
+
+// ------------------------------------------------------------ custom tables
+
+/// What a custom table shows: table `name` of Feature Studio `fs` (at
+/// `fs_version`) run on the Part Studio `source`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CustomTableKey {
+    pub source: SourceKey,
+    pub fs: TabId,
+    pub fs_version: Option<String>,
+    pub name: String,
+}
+
+impl CustomTableKey {
+    pub fn of(kind: &TableKind) -> Option<Self> {
+        let TableKind::Custom { studio, version, fs, name, fs_version, .. } = kind else { return None };
+        Some(Self { source: SourceKey { version: version.clone(), ..SourceKey::studio(*studio) }, fs: *fs, fs_version: fs_version.clone(), name: name.clone() })
+    }
+}
+
+/// Evaluated custom tables (the tables of a `TableArray`, or the error).
+pub type CustomTables = HashMap<CustomTableKey, Arc<Result<Vec<CustomTable>, String>>>;
+
+/// Every custom table a drawing shows.
+pub fn custom_table_keys(drawing: &Drawing) -> Vec<CustomTableKey> {
+    let mut out: Vec<CustomTableKey> = Vec::new();
+    for k in drawing.sheets.iter().flat_map(|s| &s.tables).filter_map(|t| CustomTableKey::of(&t.kind)) {
+        if !out.contains(&k) {
+            out.push(k);
+        }
+    }
+    out
+}
+
+/// Run custom table `name` of Feature Studio `fs` on a Part Studio's
+/// regenerated `context`. `doc`: the document the Feature Studio comes from
+/// (the workspace, or the document at a version when `from_version`).
+pub fn evaluate_custom(doc: &Document, fs: TabId, name: &str, from_version: bool, context: &Context) -> TableResult {
+    let units = doc.settings.units;
+    let tab = fs.to_string();
+    if !from_version {
+        // The workspace's own tables: compiled with the document's other studios.
+        return evaluate_table(&*DocumentScripts::from_document(doc), &tab, name, context, &units);
+    }
+    let studio = match doc.tab(fs).map(|t| &t.content) {
+        Some(TabContent::FeatureStudio(f)) => Some((tab.clone(), crate::custom::compile(fs, &f.source))),
+        _ => None,
+    };
+    evaluate_table(&OneStudio(studio), &tab, name, context, &units)
+}
+
+/// A Feature Studio from a version, on its own.
+#[derive(Debug)]
+struct OneStudio(Option<(String, Arc<crate::custom::CompiledStudio>)>);
+
+impl CustomFeatureProvider for OneStudio {
+    fn studio(&self, tab: &str) -> Option<Arc<crate::custom::CompiledStudio>> {
+        self.0.as_ref().filter(|(t, _)| t == tab).map(|(_, c)| c.clone())
+    }
+}
+
+/// Evaluate every custom table of a drawing whose source is in `sources`
+/// (headless helper; the app evaluates in the background). `versions`
+/// gives the document at a version id.
+pub fn evaluate_custom_tables(doc: &Document, drawing: &Drawing, sources: &Sources, versions: &dyn Fn(&str) -> Option<Document>) -> CustomTables {
+    let mut out = CustomTables::new();
+    for key in custom_table_keys(drawing) {
+        let Some(src) = sources.get(&key.source) else { continue };
+        let at = key.fs_version.as_deref().map(versions);
+        let d = match &at {
+            Some(Some(d)) => d,
+            Some(None) => continue,
+            None => doc,
+        };
+        let r = evaluate_custom(d, key.fs, &key.name, key.fs_version.is_some(), &src.context);
+        out.insert(key, Arc::new(r.tables));
+    }
+    out
+}
+
+/// Content of a custom table: the column names as the (bold) header, a row
+/// per table row (missing values "Not set", errors their text), the
+/// columns' alignment; the first table of a `TableArray`.
+fn custom_data(kind: &TableKind, result: Option<&Result<Vec<CustomTable>, String>>) -> TableData {
+    let TableKind::Custom { bottom_to_top, overrides, .. } = kind else { return TableData::default() };
+    let table = match result {
+        Some(Ok(tables)) => tables.first(),
+        Some(Err(e)) => return TableData { rows: vec![vec![e.clone()]], ..Default::default() },
+        None => None,
+    };
+    let Some(t) = table else { return TableData { header: Some(vec![String::new()]), header_bold: true, ..Default::default() } };
+    let header = Some(t.columns.iter().map(|c| c.name.clone()).collect());
+    let col_align = t
+        .columns
+        .iter()
+        .map(|c| match c.alignment.as_deref() {
+            Some("RIGHT") => CellAlign::Right,
+            Some("CENTER") => CellAlign::Center,
+            _ => CellAlign::Left,
+        })
+        .collect();
+    let mut rows: Vec<Vec<String>> = t.rows.iter().map(|r| t.columns.iter().map(|c| r.text(&c.id).to_string()).collect()).collect();
+    if *bottom_to_top {
+        rows.reverse();
+    }
+    let mut overridden = Vec::new();
+    for (r, c, v) in overrides {
+        if let Some(cell) = rows.get_mut(*r).and_then(|row| row.get_mut(*c)) {
+            *cell = v.clone();
+            overridden.push((*r, *c));
+        }
+    }
+    TableData { header, rows, header_bottom: *bottom_to_top, overridden, col_align, header_bold: true, ..Default::default() }
 }
 
 /// Table cell grid on the sheet.
@@ -498,7 +646,7 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
             };
             let (xa, xb) = (l.xs[ci], l.xs[(ci + cols_n).min(ncols)]);
             let (ya, yb) = (l.ys[row0 + ri], l.ys[(row0 + ri + rows_n).min(l.ys.len() - 1)]);
-            let fmt = table.cell_format(ri, ci);
+            let fmt = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, nrows));
             let h = cell_height(table, ri, ci);
             let lines: Vec<&str> = c.lines().collect();
             let n = lines.len().max(1) as f64;

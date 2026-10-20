@@ -69,3 +69,22 @@ gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
 # so the viewport can treat it as Chrome on macOS does. Only the lines marked
 # "NOSHAPE PATCH" in src/window.rs and src/gpui_macos.rs differ from 0.3.9.
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
+# NOSHAPE PATCH (agent nav): gpui core routes raw multi-touch to elements:
+# `TouchEvent` is a mouse event for `Window::on_mouse_event`, and a listener
+# that calls `prevent_default` on a touch's Started event claims the touch
+# from the portable recognizer (src/window.rs `dispatch_touch_event`,
+# src/interactive.rs). Examples and tests of the published crate are left out.
+gpui-pre = { path = "vendor/gpui-pre" }
+# NOSHAPE PATCH (agent nav): gpui's Windows platform turns touch-screen (and
+# pen) pointer messages into raw touches instead of emulated mouse input
+# (src/events.rs `handle_pointer_msg`, src/gpui_windows.rs `set_pen_as_mouse`).
+gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
+# NOSHAPE PATCH (agent ui): gpui-base's text input paints a plain input's
+# selection like the browser (Chrome `#3367d1`, white selected text) when the
+# app sets `input::PlainSelectionColors`; code editors keep the theme color.
+# NOSHAPE PATCH (agent ui2): code editors take their gutter metrics (minimum
+# digits, number inset, margin, fold column) from `input::CodeGutterMetrics`
+# when the app sets it (Feature Studio = Ace's 42 px gutter).
+# Only the lines marked "NOSHAPE PATCH" in src/input/mod.rs and
+# src/input/base/element.rs differ from 0.7.3.
+gpui-base = { path = "vendor/gpui-base" }

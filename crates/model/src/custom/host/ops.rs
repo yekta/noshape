@@ -20,6 +20,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
+    ("opConstrainedSurface", op_constrained_surface),
+    ("opWrap", op_wrap),
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
     ("opBoolean", op_boolean),
@@ -1098,26 +1100,178 @@ fn op_move_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// Bring the bodies of another context into this one.
+/// `opMergeContexts`: the bodies of `contextFrom` join this context; the
+/// result is, for each query of `trackThroughMerge` (evaluated in
+/// `contextFrom`), the transient ids of its entities after the merge.
 fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
-    let mut others = Vec::new();
-    if let Some(arr) = def.get("contextsFrom").as_array() {
-        for c in arr.iter() {
-            if let Some(o) = c.builtin::<FsContext>() {
-                others.push(o.state.lock().ctx.clone());
-            }
+    let from = def.get("contextFrom").clone();
+    let Some(other) = from.builtin::<FsContext>() else {
+        return Err(raise_error(i, "REGEN_ERROR", None));
+    };
+    let mut tracked: Vec<Vec<Reference>> = Vec::new();
+    for q in def.get("trackThroughMerge").as_array().iter().flat_map(|v| v.iter()) {
+        tracked.push(evaluate_refs(i, other, q)?);
+    }
+    let source = other.state.lock().ctx.clone();
+    let (marker, moved) = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let mut moved: Vec<(BodyId, u32)> = Vec::new();
+        for b in &source.bodies {
+            let index = ev.ctx.bodies.len() as u32;
+            moved.push((b.id.clone(), index));
+            push_body(ev, BodyId { feature: ev.feature, index }, b.kind, b.shape.clone(), b.faces.clone());
+        }
+        ev.ctx.sketches.extend(source.sketches.iter().cloned());
+        Ok((ev.feature, moved))
+    })?;
+    let mut st = cx.state.lock();
+    let feature = st.feature;
+    let out: Vec<Value> = tracked
+        .into_iter()
+        .map(|refs| {
+            let ids = refs
+                .into_iter()
+                .map(|r| {
+                    let r = match &r {
+                        Reference::Body(old) => match moved.iter().find(|(o, _)| o == old) {
+                            Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, feature)),
+                            None => r,
+                        },
+                        _ => r,
+                    };
+                    Value::str(st.transient(&r))
+                })
+                .collect();
+            Value::array(ids)
+        })
+        .collect();
+    Ok(Value::array(out))
+}
+
+/// `opConstrainedSurface`: a surface through `points` (each `{ point,
+/// normal? }`), within `tolerance` (default 1e-6 m), smoothed on request.
+fn op_constrained_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let mut points: Vec<DVec3> = Vec::new();
+    let mut normals: Vec<(usize, DVec3)> = Vec::new();
+    for item in def.get("points").as_array().iter().flat_map(|v| v.iter()) {
+        let Some(p) = vec3_of(item.get("point")) else { continue };
+        points.push(p);
+        if let Some(n) = vec3_of(item.get("normal")).filter(|n| n.length() > 0.) {
+            normals.push((points.len() - 1, n.normalize()));
         }
     }
+    let tolerance = def_length_opt(&def, "tolerance").unwrap_or(1e-6).max(1e-9);
+    let smooth = def_bool(&def, "smooth", false);
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
-        for o in others {
-            for b in o.bodies {
-                let faces = b.faces.clone();
-                let id = BodyId { feature: ev.feature, index: ev.ctx.bodies.len() as u32 };
-                push_body(ev, id, b.kind, b.shape.clone(), faces);
-            }
-            ev.ctx.sketches.extend(o.sketches);
+        if points.len() < 3 {
+            return err("Select at least three points (vertices) to fit a surface");
         }
-        Ok(())
+        let opts = k::SurfaceFitOptions { tolerance, interpolate: true, smooth };
+        let fit = k::fit_surface(&points, &normals, &opts).map_err(|e| FeatureError::new(format!("The surface could not be fitted: {e}")))?;
+        let name: Name = Arc::new(TopoName::face(ev.feature, Role::New(0)));
+        ev.apply_operation(vec![NamedShape::new(fit.face, vec![name])], "NEW", None, BodyKind::Surface)
+    })?;
+    Ok(Value::Undefined)
+}
+
+/// A std `WrapSurface`: `face`, `plane`, `cylinder` or `cone`, with
+/// `anchorPoint` and `anchorDirection`.
+struct WrapSurface {
+    face: Vec<Reference>,
+    surface: Option<k::Developable>,
+    anchor: DVec3,
+    direction: DVec3,
+}
+
+fn wrap_surface(i: &mut Interp, cx: &FsContext, v: &Value) -> R<WrapSurface> {
+    let anchor = vec3_of(v.get("anchorPoint")).unwrap_or(DVec3::ZERO);
+    let direction = vec3_of(v.get("anchorDirection")).unwrap_or(DVec3::X);
+    let mut out = WrapSurface { face: Vec::new(), surface: None, anchor, direction };
+    if !v.get("face").is_undefined() {
+        out.face = evaluate_refs(i, cx, v.get("face"))?;
+    } else if let Some(p) = plane_of(v.get("plane")) {
+        out.surface = Some(k::Developable::Plane { origin: p.origin, x_dir: p.x, normal: p.normal });
+    } else if let Some((origin, x, z)) = coord_system_of(v.get("cylinder").get("coordSystem")) {
+        let radius = length_of(v.get("cylinder").get("radius")).unwrap_or(0.0);
+        out.surface = Some(k::Developable::Cylinder { origin, axis: z, x_dir: x, radius });
+    } else if let Some((origin, x, z)) = coord_system_of(v.get("cone").get("coordSystem")) {
+        let half_angle = angle_of(v.get("cone").get("halfAngle")).unwrap_or(0.0);
+        out.surface = Some(k::Developable::Cone { origin, axis: z, x_dir: x, radius: 0.0, half_angle });
+    }
+    Ok(out)
+}
+
+/// Unit flat-space direction of a 3D direction at flat point `f`.
+fn wrap_flat_dir(d: &k::Developable, f: glam::DVec2, ref_angle: f64, v: DVec3) -> glam::DVec2 {
+    let (ax, ay, _) = d.flat_axes(f, ref_angle);
+    glam::DVec2::new(v.dot(ax), v.dot(ay)).normalize_or_zero()
+}
+
+/// `opWrap`: `entities` (faces on `source`) wrapped or unwrapped onto
+/// `destination`, the anchor points and directions matched; `wrapType`
+/// SIMPLE (new surface), TRIM (trimmed to the destination face) or IMPRINT
+/// (edges imprinted on it).
+fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let entities = evaluate_refs(i, &cx, def.get("entities"))?;
+    let src = wrap_surface(i, &cx, def.get("source"))?;
+    let dst = wrap_surface(i, &cx, def.get("destination"))?;
+    let wrap_type = def_enum(&def, "wrapType").map(|s| s.to_string()).unwrap_or_else(|| "SIMPLE".into());
+    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let faces: Vec<Shape> = ev.resolve_faces(&entities).into_iter().map(|(b, f)| ev.face_shape(b, f)).collect::<FResult<_>>()?;
+        if faces.is_empty() {
+            return err("Select faces to wrap");
+        }
+        let developable = |w: &WrapSurface, ev: &EvalCtx| -> FResult<(k::Developable, Option<(usize, usize)>)> {
+            if let Some(d) = w.surface {
+                return Ok((d, None));
+            }
+            let (bi, fi) = *ev.resolve_faces(&w.face).first().ok_or_else(|| FeatureError::new("The wrap surface no longer exists"))?;
+            let d = k::Developable::of_face(&ev.face_shape(bi, fi)?).map_err(|_| FeatureError::new("The wrap surfaces must be planes, cylinders or cones"))?;
+            Ok((d, Some((bi, fi))))
+        };
+        let (s, _) = developable(&src, ev)?;
+        let (d, dst_face) = developable(&dst, ev)?;
+        let unwrap = !matches!(s, k::Developable::Plane { .. });
+        let src_ref = if unwrap { s.angle_of(src.anchor, 0.0) } else { 0.0 };
+        let dst_ref = if unwrap { 0.0 } else { d.angle_of(dst.anchor, 0.0) };
+        let f_src = if unwrap { s.project(src.anchor, src_ref) } else { s.flat(src.anchor, src_ref) };
+        let f_dst = d.project(dst.anchor, dst_ref);
+        let d_src = wrap_flat_dir(&s, f_src, src_ref, src.direction);
+        let d_dst = wrap_flat_dir(&d, f_dst, dst_ref, dst.direction);
+        if d_src.length() < 0.5 || d_dst.length() < 0.5 {
+            return err("The wrap anchor directions are invalid");
+        }
+        let placement = k::Placement2d::align(f_src, d_src, f_dst, d_dst, false);
+        let res = k::wrap_faces(&faces, &s, src_ref, &d, dst_ref, &placement, 1e-7).map_err(|e| FeatureError::new(format!("Wrap failed: {e}")))?;
+        let names: Vec<Name> = (0..res.shape.faces().len()).map(|n| Arc::new(TopoName::face(ev.feature, Role::New(n as u32)))).collect();
+        let mut wrapped = NamedShape::new(res.shape.clone(), names);
+        match wrap_type.as_str() {
+            "IMPRINT" => {
+                let Some((bi, _)) = dst_face else { return err("IMPRINT needs a destination face") };
+                let body = ev.ctx.bodies[bi].clone();
+                let edges: Vec<Shape> = res.shape.faces().iter().flat_map(|f| f.edges()).collect();
+                let imp = k::imprint(&body.shape, &edges).map_err(|e| FeatureError::new(format!("The wrapped edges could not split the destination: {e}")))?;
+                let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &imp.history, &imp.shape, &BTreeMap::new(), None);
+                ev.replace_body(bi, imp.shape, names);
+                Ok(())
+            }
+            t => {
+                if t == "TRIM"
+                    && let Some((bi, fi)) = dst_face
+                {
+                    let target = ev.face_shape(bi, fi)?;
+                    if let Ok(c) = k::common(&wrapped.shape, &target)
+                        && c.shape.count(ShapeType::Face) > 0
+                    {
+                        let names = ev.name_result(&[&wrapped.names, &ShapeNames::default()], &c.history, &c.shape, &BTreeMap::new(), None);
+                        wrapped = NamedShape::new(c.shape, names);
+                    }
+                }
+                ev.apply_operation(vec![wrapped], "NEW", None, BodyKind::Surface)
+            }
+        }
     })?;
     Ok(Value::Undefined)
 }

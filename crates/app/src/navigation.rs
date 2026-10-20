@@ -593,12 +593,21 @@ impl MouseControls {
         }
         let c: Self = std::fs::read_to_string(mouse_controls_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
         *MOUSE_CONTROLS.write().unwrap_or_else(|e| e.into_inner()) = Some(c);
+        c.apply_to_platform();
         c
+    }
+
+    /// "Use pen input as mouse": the Windows platform turns pen contacts into
+    /// touches unless it is set (vendor/gpui-pre-windows).
+    fn apply_to_platform(self) {
+        #[cfg(target_os = "windows")]
+        gpui_windows::set_pen_as_mouse(self.pen_as_mouse);
     }
 
     /// "Save mouse controls".
     pub fn save(self) {
         *MOUSE_CONTROLS.write().unwrap_or_else(|e| e.into_inner()) = Some(self);
+        self.apply_to_platform();
         if let Ok(t) = serde_json::to_string_pretty(&self) {
             let _ = std::fs::write(mouse_controls_path(), t);
         }

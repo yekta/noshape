@@ -163,11 +163,14 @@ impl PartStudioView {
     /// The Export modal for `bodies` (all visible parts when empty).
     pub fn open_part_export(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
+        // Live (dom/dialog-export-parasolid.txt): a part's file is
+        // "<studio> - <part>"; the tab's is the studio's name.
         let base = match bodies.as_slice() {
-            [b] => self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into()),
+            [b] => format!("{} - {}", self.studio_name(cx), self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into())),
             _ => self.studio_name(cx),
         };
-        open_export_modal(base, false, Rc::new(move |s, name, window, cx| {
+        let parts_only = !bodies.is_empty();
+        open_export_modal_with(base, false, parts_only, Rc::new(move |s, name, window, cx| {
             let bodies = bodies.clone();
             view.update(cx, |this, cx| this.run_part_export(s, name, bodies, window, cx));
         }), window, cx);
@@ -302,6 +305,14 @@ fn set_asm_format(s: &mut ExportSettings, i: usize) {
 
 /// Onshape's Export modal (Part Studio or, with `assembly`, Assembly list).
 pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &mut Window, cx: &mut App) {
+    open_export_modal_with(base, assembly, false, run, window, cx);
+}
+
+/// [`open_export_modal`]; `parts_only`: exporting parts (a parts-list row,
+/// a release row), which has no "Export unique parts as individual files"
+/// or "Include hidden instances in export" (live dom/dialog-export-jt.txt
+/// vs -jt-tab.txt).
+pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
     let st = Rc::new(RefCell::new(ExportSettings::default()));
     window.open_dialog(cx, move |dialog, _, cx| {
@@ -369,10 +380,12 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
             PartFormat::Acis | PartFormat::Jt => {}
         }
         rows.push(sel("ex-options", "Options", &OPTIONS, 0, false, |_, _| {}));
-        if f != PartFormat::Urdf {
-            rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
+        if !parts_only {
+            if f != PartFormat::Urdf {
+                rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
+            }
+            rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
         }
-        rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
         let mut body = crate::os_ui::modal_body()
             .pt(px(BODY_PT))
             .pb(px(22.))

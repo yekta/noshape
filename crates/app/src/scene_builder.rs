@@ -402,9 +402,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 2.0, 0);
             // Onshape: CONSTRUCTION_PLANE_AMBIENT_COLOR at CONSTRUCTION_PLANE_OPACITY, outline at 35%.
             let fill = theme::lin(theme::viewport::PLANE_FILL);
-            let outline = theme::lin(theme::viewport::PLANE_OUTLINE_ON_WHITE);
+            let outline = theme::lin(theme::viewport::PLANE_OUTLINE);
             scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
-            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], 1.0]).ignore_clip().layer(5));
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], theme::viewport::PLANE_OUTLINE_ALPHA]).ignore_clip().layer(5));
         }
     }
 

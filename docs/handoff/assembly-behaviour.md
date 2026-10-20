@@ -358,3 +358,76 @@ State: run 5's edits were complete (no half-done code found); everything below b
   "T10 assembly.noshape" (Assembly 1 with one instance of the source's Part Studio pinned at V1) there; open the
   assembly document to check T10 / LA34 (fixture made in /tmp/skb/t10).
 * REQUESTS.md: skb (10-19 in-context look, no dialog open).
+* Mate dialog pixel pass (live dom/assembly-revolute-dialog-both.txt): 220 px, 29 px header, 194 px type select
+  (14 px, 6 px in), query box rows with Onshape's `mate-connector-qlv-item` (15 px) and a 16.67 px "×", the
+  reorder-items icon (op 0.5, "Reorder items"), bottom row icons `flip-direction-opposite`, `realign-mate-dialog`,
+  `play-dialog` ("Animate mate degree of freedom"), no gaps between the 27 px checkbox rows.
+  Icons copied from /root/onshape-research/ui-ref/icons-svg (Onshape's own): play-dialog, mate-connector-qlv-item,
+  reorder-items-button new; flip-direction-opposite and realign-mate-dialog REPLACED (they were hand-drawn; the
+  feature dialog uses them too — lead: cross-area asset change).
+* Mate connector dialog rebuilt (`render_mc_panel`, live dom/dialog-mate-connector.txt,
+  assembly-mate-chip-connector-dialog.txt; std `mateConnector` fields without owner entity): OsSelect Origin type,
+  Origin entity query box naming the entity ("Face of Part 1 <1>"; "Origin"), Between entity, ☐ Realign (Primary /
+  Secondary axis entity), ☐ Move (X/Y/Z translation, "Rotate about X/Y/Z" OsSelect, Rotation angle), flip /
+  reorient icons + `?`; implicit: close button only and the field active; from a mate chip it docks right of the
+  mate dialog (1 px gap). Model: `AsmMateConnector.move_off`, `ConnectorMove.off` (Move unchecked keeps the values,
+  eval ignores them).
+* Mate values as Onshape's angular dimension (live 305z): `value_arc()` (assembly_behaviors.rs) = arc in frame_a's XY
+  from +X counter-clockwise through the value, arrowheads at both ends pointing out, text centred on the arc at half
+  the sweep, laid in the plane along X (flipped to stay readable), the arc broken around it (`assembly_scene::ValueArc`);
+  ▶ preview shows whole degrees. `render_value_text` paints the glyphs and a double-click hit box.
+* Lead: the clippy warning in part_studio/in_context.rs (redundant closure, my hover outline) is fixed; the other
+  app-crate clippy warnings are in history_panel, numbering_prefs, os_select, session, tab_manager (not mine).
+* Double-clicking the in-plane mate value can't be exercised under Xvfb/llvmpipe: gpui's X11 backend stamps clicks
+  with `Instant::now()` at processing time (vendor/gpui-pre-linux/src/linux/x11/client.rs:1284, 400 ms window), and
+  each click's software-rendered frame delays the second one past it (debug print showed click_count 1 twice; the mate
+  row's double-click-to-edit fails the same way). The code path is the old one plus a 40 ms deferred focus. Debug
+  prints removed.
+* State at the end of run 6: tree compiles with no warnings in my files (`cargo check -p noshape`), model `assembly::`
+  60/60, app `sketch_mode` + `t10_fixture` 51/51. Integrated in 2352909 except the last edits (mate dialog spacing,
+  MC panel, value arc/label, dimension selection, LA41, Reference manager 0-documents line, R3 hover).
+* Next: lengths of mate values as in-plane linear dimensions (only the rotation is done; live capture of a slider
+  value would help), the Mate connector dialog's preview slider (standalone dialog only, dom/dialog-mate-connector.txt),
+  L17 / N13 / I13 / LA39 GUI checks, live answer for REQUESTS "skb (10-19 in-context look, no dialog open)".
+
+### skb run 7 (2026-10-19 night)
+* Icons: the copied Onshape SVGs are gone (icons agent redrew most; guard test `crates/app/tests/no_onshape_assets.rs`
+  passes). New icons drawn here (original geometry, 20-unit grid): `remove-circle` (folder Delete ⊗), `cfg-last-viewed`,
+  `cfg-reset-default` (Insert configured-row menu), `ui-chevron-left`. Never copy from /root/onshape-research/ui-ref.
+* Mate values (R11) as Onshape draws them (bundle `calculateMateValues` / `calculateDimensionDisplayData` /
+  `calculateAxisAngleDimensionDisplayData`): first connector measured in the second's frame (`onshape_mate_values`;
+  typed values mapped back with `solver_values_for`, test `typed_mate_values_round_trip_through_the_solver_convention`);
+  angular radius 80 px fixed on first display (`AsmUi.value_radius`); translations as in-plane linear dimensions
+  (`assembly_scene::ValueLine`). `VALUE_ARC_SCALE` removed.
+* Mate connector dialog: standalone preview slider (feature-dialog look, rest 0.7, fades the connector glyph:
+  `McSession.preview`, `h.connectors` 4th field = opacity).
+* Bottom-right tools (lead via ui2), new `assembly_mass.rs`: Show analysis tools = the assembly tool list (Curve/surface
+  analysis…, Interference detection…, Zebra stripes…, Reflection analysis…); Interference and Zebra stripes work
+  (`AsmSceneOptions.zebra / hide_edges`, needs `rebuild_scene`), Curve/surface and Reflection still to port from
+  part_studio/analysis_tools.rs + reflection.rs. Display mass and section properties = 440 px dialog; model
+  `analysis::assembly_mass_properties` (test `assembly_mass_properties_combine_parts_where_they_sit`). Note for psb:
+  `regen::measure::mass_properties` sums the bodies' inertia about their own centres (no parallel-axis term).
+* L17: "Add selection to folder…" opens the live "Folder name" dialog (536), default "New folder" (the
+  "(2)" in live notes is the member count the row shows; `Assembly::next_folder_name`); folder menu always offers it; Delete uses ⊗.
+* I13: configured row ▾ menu right-aligned under the caret with new icons; List inputs are `OsSelect` (live 595).
+* LA39: Owned by me navigates folders (top = documents folder's subfolders + watched outside folders, then that
+  level's documents; ‹ goes up, home to the categories); placeholder italic; header glyphs #333.
+* Double-click under Xvfb still doesn't register (also with `--delay 80`): gpui stamps clicks at processing time and
+  llvmpipe frames are slower than the 400 ms window. Logic covered by the conversion unit test.
+* REQUESTS: skb (10-19 assembly analysis + mass).
+
+### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
+
+* Evaluation: `AsmConfiguration::value_of` → `inputs_only().value_of` → `Configuration::effective`, so
+  `apply_configuration` / `configured` already honour the conditions (a hidden input takes its default; a
+  hidden chosen option takes the default or the first shown option). Test
+  `configuration::visibility_tests::assembly_configuration_respects_visibility`.
+* UI: three loops now go through `Configuration::visibility(values)` and skip hidden inputs and options,
+  reading the effective values: the left Configurations box (assembly_config.rs, after the header `split`),
+  the Insert dialog's configured-row inputs (`render_insert_config`, assembly_behaviors.rs) and the
+  instance's Change configuration panel (`render_config_panel`, assembly_panels.rs). The stored
+  values are left as chosen (Onshape keeps them; evaluation applies the conditions).
+* Analysis tools now complete in the menu: Reflection analysis (`assembly_reflection.rs`, reuses
+  `part_studio::reflection::{EnvImageRef, ReflectionSettings}` and `part_studio::environment_maps` — those two modules
+  and `EnvImageRef::{key, decode}` were made pub(crate): lead, cross-area visibility change in psb's files) and
+  Curve/surface analysis (`assembly_curvature.rs`). Opening one closes the other view tools.

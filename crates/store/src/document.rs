@@ -1125,6 +1125,16 @@ impl Document {
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Change a version's name and description (Versions and history ›
+    /// Properties…); its microversion stays.
+    pub fn update_version(&mut self, id: VersionId, name: &str, description: &str) -> Result<()> {
+        self.writable()?;
+        let name = check_name(name)?;
+        self.version(id)?;
+        self.conn.execute("UPDATE versions SET name = ?2, description = ?3 WHERE id = ?1", params![id, name, description])?;
+        Ok(())
+    }
+
     pub fn version(&self, id: VersionId) -> Result<VersionInfo> {
         self.conn
             .prepare_cached(&format!(

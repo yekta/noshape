@@ -64,11 +64,29 @@ pub struct Query {
     pub revision: String,
     /// Added criteria: (criterion, text; "true" for flags).
     pub extra: Vec<(&'static str, String)>,
+    /// Results from: workspaces (their current state), versions, or both;
+    /// `all_versions`: every version rather than only the latest.
+    pub from: ResultsFrom,
+    pub all_versions: bool,
+}
+
+/// The "Results from" choice.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub enum ResultsFrom {
+    #[default]
+    Workspaces,
+    Versions,
+    All,
 }
 
 impl Query {
     /// Does the query need what's inside the documents?
     pub fn needs_facts(&self) -> bool {
+        self.has_content_criteria() || self.from == ResultsFrom::Versions
+    }
+
+    /// Criteria on what a document holds (its tabs and parts).
+    fn has_content_criteria(&self) -> bool {
         self.types.iter().any(|t| !matches!(*t, "Document" | "Folder")) || !self.part_number.is_empty() || self.state.is_some() || !self.revision.is_empty() || self.extra.iter().any(|(c, _)| *c != "Creator" && *c != "Library label")
     }
 
@@ -78,20 +96,37 @@ impl Query {
     }
 }
 
-/// What a document holds, for the content criteria.
+/// What a document holds in one state (a workspace or a version).
 #[derive(Clone, Default, Debug)]
-pub struct DocFacts {
+pub struct StateFacts {
     /// Type names of its tabs (as [`TYPES`]), plus "Part" when it has parts.
     pub kinds: Vec<&'static str>,
     pub parts: Vec<noshape_model::partstudio::PartProperties>,
 }
 
+/// A document's states: every workspace's current state, and its versions
+/// oldest first.
+#[derive(Clone, Default, Debug)]
+pub struct DocFacts {
+    pub workspaces: Vec<StateFacts>,
+    pub versions: Vec<StateFacts>,
+    /// A version was published ("Publish custom features and tables").
+    pub published: bool,
+}
+
 /// Read a document's facts (blocking; call off the UI thread).
 pub fn facts(path: &Path) -> Option<DocFacts> {
     let store = noshape_store::Document::open_read_only(path).ok()?;
-    let head = store.head(store.default_branch().ok()?).ok()?;
-    let doc = noshape_model::document::Document::from_blobs(&store.read_all(head).ok()?).ok()?;
-    let mut f = DocFacts::default();
+    let read = |mv| store.read_all(mv).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| state_facts(&d));
+    let workspaces = store.list_branches().ok()?.iter().filter(|b| !b.deleted).filter_map(|b| read(b.head)).collect();
+    let list = store.list_versions().ok()?;
+    let published = list.iter().any(|v| store.get_meta(&format!("{}{}", crate::history_panel::PUBLISHED_FS_KEY, v.id)).ok().flatten().is_some());
+    let versions = list.iter().filter_map(|v| read(v.microversion)).collect();
+    Some(DocFacts { workspaces, versions, published })
+}
+
+fn state_facts(doc: &noshape_model::document::Document) -> StateFacts {
+    let mut f = StateFacts::default();
     for t in &doc.tabs {
         let k = match &t.content {
             TabContent::PartStudio(ps) => {
@@ -110,7 +145,7 @@ pub fn facts(path: &Path) -> Option<DocFacts> {
         };
         f.kinds.push(k);
     }
-    Some(f)
+    f
 }
 
 fn contains(hay: &str, needle: &str) -> bool {
@@ -123,14 +158,36 @@ pub fn matches(q: &Query, name: &str, description: &str, owner: &str, labels: &[
     if q.folders_only() || !contains(name, &q.name) || !contains(description, &q.description) {
         return false;
     }
-    let kinds: Vec<&str> = q.types.iter().copied().filter(|t| !matches!(*t, "Document" | "Folder")).collect();
-    let needs = q.needs_facts();
-    let f = match facts {
-        Some(f) => Some(f),
-        None if needs => return false,
-        None => None,
+    let doc_level = q.extra.iter().all(|(c, v)| match *c {
+        "Creator" => contains(owner, v),
+        "Library label" => labels.iter().any(|l| contains(l, v)),
+        _ => true,
+    });
+    if !doc_level {
+        return false;
+    }
+    if !q.needs_facts() {
+        return true;
+    }
+    let Some(facts) = facts else { return false };
+    // The states searched (Results from): workspaces, the latest or every
+    // version, or both; one of them must match the content criteria.
+    let versions: &[StateFacts] = if q.all_versions { &facts.versions } else { facts.versions.last().map(std::slice::from_ref).unwrap_or(&[]) };
+    let states: Vec<&StateFacts> = match q.from {
+        ResultsFrom::Workspaces => facts.workspaces.iter().collect(),
+        ResultsFrom::Versions => versions.iter().collect(),
+        ResultsFrom::All => facts.workspaces.iter().chain(versions).collect(),
     };
-    if !kinds.is_empty() && !f.is_some_and(|f| kinds.iter().any(|k| f.kinds.contains(k))) {
+    if q.extra.iter().any(|(c, _)| *c == "Published FeatureScript") && !facts.published {
+        return false;
+    }
+    states.into_iter().any(|f| state_matches(q, f))
+}
+
+/// Does one state of a document match the content criteria?
+fn state_matches(q: &Query, f: &StateFacts) -> bool {
+    let kinds: Vec<&str> = q.types.iter().copied().filter(|t| !matches!(*t, "Document" | "Folder")).collect();
+    if !kinds.is_empty() && !kinds.iter().any(|k| f.kinds.contains(k)) {
         return false;
     }
     // Part criteria: one part must match them all.
@@ -159,16 +216,11 @@ pub fn matches(q: &Query, name: &str, description: &str, owner: &str, labels: &[
                     }
                 })
         };
-        if !f.is_some_and(|f| f.parts.iter().any(part_ok)) {
+        if !f.parts.iter().any(part_ok) {
             return false;
         }
     }
-    q.extra.iter().all(|(c, v)| match *c {
-        "Creator" => contains(owner, v),
-        "Library label" => labels.iter().any(|l| contains(l, v)),
-        "Published FeatureScript" => f.is_some_and(|f| f.kinds.contains(&"Feature Studio")),
-        _ => true,
-    })
+    !q.extra.iter().any(|(c, _)| *c == "Published FeatureScript") || f.kinds.contains(&"Feature Studio")
 }
 
 /// Events to the documents page.
@@ -221,6 +273,8 @@ impl AdvancedSearch {
             state: self.state,
             revision: v(&self.revision),
             extra: self.extra.iter().filter_map(|(c, st, on)| if is_flag(c) { on.then(|| (*c, "true".to_string())) } else { Some((*c, v(st))).filter(|e| !e.1.is_empty()) }).collect(),
+            from: [ResultsFrom::Workspaces, ResultsFrom::Versions, ResultsFrom::All][self.results_from.min(2)],
+            all_versions: self.results_at == 1,
         }
     }
 

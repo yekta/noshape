@@ -73,6 +73,34 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       ft.reversed                                = f.Orientation() == TopAbs_REVERSED;
       if (tri.IsNull())
         continue;
+      if (is_mesh_face(f))
+      {
+        // A mesh body's face: drawn faceted (a normal per triangle), like Onshape's mesh parts.
+        occ::handle<Poly_Triangulation> flat = new Poly_Triangulation(3 * tri->NbTriangles(), tri->NbTriangles(), false);
+        flat->AddNormals();
+        for (int k = 1; k <= tri->NbTriangles(); ++k)
+        {
+          int a, b, c;
+          tri->Triangle(k).Get(a, b, c);
+          const gp_Pnt pa = tri->Node(a), pb = tri->Node(b), pc = tri->Node(c);
+          gp_Vec       n  = gp_Vec(pa, pb).Crossed(gp_Vec(pa, pc));
+          if (n.Magnitude() > 0)
+            n.Normalize();
+          for (int j = 0; j < 3; ++j)
+          {
+            flat->SetNode(3 * k - 2 + j, j == 0 ? pa : j == 1 ? pb : pc);
+            flat->SetNormal(3 * k - 2 + j, gp_Dir(n.Magnitude() > 0 ? n : gp_Vec(0, 0, 1)));
+          }
+          flat->SetTriangle(k, Poly_Triangle(3 * k - 2, 3 * k - 1, 3 * k));
+        }
+        ft.tri      = flat;
+        ft.identity = loc.IsIdentity();
+        if (!ft.identity)
+          ft.trsf = loc.Transformation();
+        m->nodes += flat->NbNodes();
+        m->indices += 3 * (size_t)flat->NbTriangles();
+        continue;
+      }
       if (!tri->HasNormals())
         BRepLib_ToolTriangulatedShape::ComputeNormals(f, tri);
       ft.tri      = tri;

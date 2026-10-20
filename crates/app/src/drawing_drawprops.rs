@@ -393,19 +393,19 @@ impl DrawingEditor {
                 .child(row("Geometry gap", field(3)))
                 .child(row("Extension past line", field(4)));
             // Chamfer: 45 degree style / content, the others', precisions.
-            let style_items = |cur: bool, set: fn(&mut DrawingProps, bool), dim_first: bool| -> Vec<(String, bool, Act)> {
-                let opts = if dim_first { [("Dimension", true), ("Note", false)] } else { [("Note", false), ("Dimension", true)] };
+            let style_items = |cur: bool, set: fn(&mut DrawingProps, bool)| -> Vec<(String, bool, Act)> {
+                let opts = [("Note", false), ("Dimensions", true)];
                 opts.iter().map(|&(n, v)| (n.to_string(), cur == v, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
             };
             let content_items = |cur: ChamferContent, set: fn(&mut DrawingProps, ChamferContent), with_c: bool| -> Vec<(String, bool, Act)> {
-                ChamferContent::ALL.iter().filter(|c| with_c || **c != ChamferContent::CLength).map(|&c| (c.name().to_string(), cur == c, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, c)) as Act)).collect()
+                ChamferContent::ALL.iter().filter(|c| with_c || matches!(c, ChamferContent::LengthXAngle | ChamferContent::LengthXLength)).map(|&c| (c.name().to_string(), cur == c, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, c)) as Act)).collect()
             };
-            let style_name = |d: bool| if d { "Dimension".to_string() } else { "Note".to_string() };
+            let style_name = |d: bool| if d { "Dimensions".to_string() } else { "Note".to_string() };
             body = body
-                .child(section("Chamfer"))
-                .child(row("45 degree style", select("dp-ch45s", style_name(props.chamfer_45_dimension), style_items(props.chamfer_45_dimension, |p, v| p.chamfer_45_dimension = v, false))))
+                .child(section("Chamfer dimensions"))
+                .child(row("45 degree style", select("dp-ch45s", style_name(props.chamfer_45_dimension), style_items(props.chamfer_45_dimension, |p, v| p.chamfer_45_dimension = v))))
                 .child(row("45 degree content", select("dp-ch45c", props.chamfer_45_content.name().into(), content_items(props.chamfer_45_content, |p, v| p.chamfer_45_content = v, true))))
-                .child(row("Non 45 degree style", select("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v, true))))
+                .child(row("Non 45 degree style", select("dp-chs", style_name(props.chamfer_dimension), style_items(props.chamfer_dimension, |p, v| p.chamfer_dimension = v))))
                 .child(row("Non 45 degree content", select("dp-chc", props.chamfer_content.name().into(), content_items(props.chamfer_content, |p, v| p.chamfer_content = v, false))))
                 .child(row("Length precision", select("dp-chlp", shown(props.chamfer_length_precision, default_digits(units)), precision_items(props.chamfer_length_precision, 6, |p, v| p.chamfer_length_precision = v))))
                 .child(row("Angle precision", select("dp-chap", shown(props.chamfer_angle_precision, 0), precision_items(props.chamfer_angle_precision, 4, |p, v| p.chamfer_angle_precision = v))));

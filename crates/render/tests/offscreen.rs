@@ -115,7 +115,7 @@ fn visible_depth_samples_land_on_the_geometry() {
     // About 2000 samples (a 52x39 viewport for 400x300); the box covers a fraction of them.
     assert_eq!((buf.frame_width, buf.frame_height), noshape_render::renderer::depth_sample_size(400, 300, 2000));
     let total = (buf.frame_width * buf.frame_height) as usize;
-    assert!(total >= 2000 && total < 2200, "{total}");
+    assert!((2000..2200).contains(&total), "{total}");
     assert!(buf.samples.len() >= 4 && buf.samples.len() < total, "{} samples", buf.samples.len());
     assert!(buf.samples.iter().all(|s| s.id != 0 && s.depth > 0.0 && s.depth <= 1.0));
     // The average sample, unprojected with the pick pass's matrix, lies in the box.
@@ -126,6 +126,46 @@ fn visible_depth_samples_land_on_the_geometry() {
     let w = buf.view_proj.unwrap().inverse() * ndc;
     let p = w.truncate() / w.w;
     assert!(p.x > 0.003 && p.x < 0.017 && p.y.abs() < 0.007 && p.z.abs() < 0.007, "{p:?}");
+}
+
+#[test]
+fn plane_depth_counts_only_in_the_with_planes_samples() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    // Only a translucent, unlit datum plane (the Top plane, z = 0.004).
+    let plane = r.upload_mesh(&primitives::quad_mesh([0.0, 0.0, 0.004], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.01, 1));
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(plane)).with_color([0.6, 0.7, 0.9, 0.3]).unlit());
+    let scene = std::sync::Arc::new(scene);
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.02, 4.0 / 3.0);
+    let req = FrameRequest { scene, camera: cam, width: 400, height: 300, device_pixel_ratio: 1.0, style: Style::default(), invalidate_pick: true };
+    r.submit_frame(7, 1, req).unwrap();
+    r.submit_picks(7, &[(31, PickRect::depth_samples(2000))]);
+    let mut got = None;
+    while r.has_pending() {
+        r.wait_oldest();
+        for c in r.collect() {
+            if let Completed::Pick { token: 31, result, .. } = c {
+                got = Some(result.unwrap());
+            }
+        }
+    }
+    let buf = got.expect("sample query answered");
+    assert!(buf.samples.is_empty(), "planes write no depth in the first pass");
+    assert!(buf.samples_with_planes.len() >= 4);
+    let n = buf.samples_with_planes.len() as f32;
+    let (x, y, z) = buf.samples_with_planes.iter().fold((0.0, 0.0, 0.0), |a, s| (a.0 + s.x / n, a.1 + s.y / n, a.2 + s.depth / n));
+    let (fw, fh) = (buf.frame_width as f32, buf.frame_height as f32);
+    let w = buf.view_proj.unwrap().inverse() * glam::Vec4::new(x / fw * 2.0 - 1.0, 1.0 - y / fh * 2.0, z, 1.0);
+    let p = w.truncate() / w.w;
+    // On the plane, near its centre.
+    assert!((p.z - 0.004).abs() < 1e-4 && p.x.abs() < 0.002 && p.y.abs() < 0.002, "{p:?}");
 }
 
 /// A fan-triangulated disk (triangulation differs from the box face's).

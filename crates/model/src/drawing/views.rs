@@ -209,6 +209,12 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
             }
         }
     }
+    // Custom tables tabulate a Part Studio the views need not show.
+    for k in super::tables::custom_table_keys(drawing) {
+        if !out.contains(&k.source) {
+            out.push(k.source);
+        }
+    }
     out
 }
 

@@ -155,6 +155,9 @@ pub struct OsMenu {
     /// Onshape's Bootstrap dropdowns (the "+" add-element menu): 14 px `#555`
     /// text 43 px in, 27 px rows, 20 px icons 20 px in, radius 5.25, `#d7d7d7`.
     dropdown: bool,
+    /// The camera and render options menu (live dom/menu-camera-render):
+    /// 222 px rows of 22 px, 12 px `#555` text 27 px in, 16 px icons 6 px in.
+    camera: bool,
     /// One-shot Esc handler: the first Esc runs it and the menu stays open
     /// (a sketch tool's menu: Esc exits the tool), the next one dismisses.
     on_escape: Option<EscapeHandler>,
@@ -174,7 +177,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, on_escape: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, camera: false, on_escape: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -195,6 +198,12 @@ impl OsMenu {
     /// Drawing toolbar dropdown style.
     pub fn toolbar_list(mut self) -> Self {
         self.toolbar = true;
+        self
+    }
+
+    /// The camera and render options menu's style.
+    pub fn camera(mut self) -> Self {
+        self.camera = true;
         self
     }
 
@@ -363,6 +372,8 @@ impl Render for OsMenu {
             (27., 20., 20., if any_icon || any_check { 43. } else { 20. }, 14.)
         } else if native {
             (27., 6., 18., 10., 14.)
+        } else if self.camera {
+            (ROW_H, 6., ICON, 27., 12.)
         } else if self.select.is_some() {
             // Selects with icons (assembly mate type) put the text after the icon.
             (26., 6., 18., if any_icon { 30. } else { 10. }, 14.)
@@ -375,6 +386,7 @@ impl Render for OsMenu {
             (ROW_H, ICON_X, ICON, if any_icon || any_check { TEXT_X } else { 17. }, TEXT)
         };
         let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
+        let camera = self.camera;
         let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
@@ -424,7 +436,7 @@ impl Render for OsMenu {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
                     OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
-                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
+                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1e63d0 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
@@ -502,6 +514,7 @@ impl Render for OsMenu {
             }))
             .when(!plain_menu, |d| d.p(px(1.)))
             .when(plain_menu, |d| d.min_w(px(120.)))
+            .when(camera, |d| d.w(px(224.)))
             .bg(gpui_kit::rgb(0xffffff))
             .border_1()
             .border_color(gpui_kit::rgb(if dropdown { 0xd7d7d7 } else { 0xcccccc }))
@@ -520,7 +533,11 @@ impl Render for OsMenu {
 /// The open right-click menu and the window it belongs to (see
 /// [`render_host`]); one menu is open at a time, app-wide.
 #[derive(Default)]
-struct OsMenuHost(Option<(WindowId, Point<Pixels>, Anchor, Entity<OsMenu>, Subscription)>);
+struct OsMenuHost(Option<OpenMenu>);
+
+/// An open menu: its window, position and anchor corner, and the dismiss
+/// subscription.
+type OpenMenu = (WindowId, Point<Pixels>, Anchor, Entity<OsMenu>, Subscription);
 
 impl Global for OsMenuHost {}
 

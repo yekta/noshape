@@ -485,11 +485,7 @@ impl PartStudioView {
     pub(super) fn cube_click(&mut self, cell: CubeCell, cx: &mut Context<Self>) {
         self.push_camera_history(cx);
         let rot = cell.rotation();
-        self.viewport.update(cx, |vp, cx| {
-            let mut to = vp.camera;
-            to.rotation = rot;
-            vp.animate_to(to, cx);
-        });
+        self.viewport.update(cx, |vp, cx| vp.animate_to_rotation_fit(rot, cx));
     }
 
     /// Roll the view about the line of sight (cube arc arrows).
@@ -539,21 +535,21 @@ impl PartStudioView {
         // Onshape: the view-mode cube icon with a ▾ under the cube.
         let pal = p();
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
-        Button::new("camera-menu")
+        let button = Button::new("camera-menu")
             .custom(variant)
             .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-caret-down", 9., pal.text)))
             .w(px(44.))
             .h(px(28.))
             .p_0()
             .rounded(px(3.))
-            .tooltip("Camera and render options")
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 // Opens under the button, right-aligned with it (live: 222 px,
                 // Onshape's context-menu style). The button's bottom-right
                 // corner, from the widget's painted origin.
-                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(158.))).unwrap_or_default();
+                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(154.))).unwrap_or_default();
                 let view = view.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
+                m = m.camera();
                 // Onshape (live, dom/menu-camera-render.txt): views | named and
                 // previous views | zoom | projection, sketch orientation |
                 // display, hidden edges, tangent edges (each a ✓ submenu
@@ -636,6 +632,8 @@ impl PartStudioView {
                     let v = view.clone();
                     move |_, w, cx| v.update(cx, |this, cx| this.toggle_high_quality(w, cx))
                 }));
+                // Live (dom/menu-camera-render): its own group.
+                m = m.separator();
                 m = m.item(crate::os_menu::OsMenuItem::new("Highlight boundary edges").checked(boundary).on_click({
                     let v = view.clone();
                     move |_, w, cx| {
@@ -647,11 +645,12 @@ impl PartStudioView {
                     }
                 }));
                 m = m.separator();
-                m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))))
+                m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))).icon_name("menu-section-view"))
                 });
                 crate::os_menu::open_anchored(at, Anchor::TopRight, menu, window, cx);
-            }))
-            .into_any_element()
+            }));
+        // Live (part-studio/21): the tooltip sits left of the button.
+        crate::ui::with_tip(div().id("camera-menu-tip").child(button), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
     }
 }
 

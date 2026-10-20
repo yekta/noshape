@@ -94,6 +94,11 @@ pub struct AsmSceneOptions {
     /// Dimmed (transparent) instances stay pickable (Isolate › Select
     /// transparent geometry, Alt held).
     pub pick_dimmed: bool,
+    /// Zebra stripes on the shaded parts, and whether edges are hidden.
+    pub zebra: Option<noshape_render::Zebra>,
+    /// Reflection analysis environment on the shaded parts.
+    pub reflection: Option<noshape_render::Reflection>,
+    pub hide_edges: bool,
 }
 
 fn to_mat4(m: &DMat4) -> Mat4 {
@@ -149,7 +154,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         // region fill under thin gray curves (live assembly/123).
         let sketch = o.kind == BodyKind::Wire;
         if !sketch || !o.mesh.indices.is_empty() {
-            let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base);
+            let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch));
             // Sketch regions are pickable faces (live 601).
             if dimmed && !opts.pick_dimmed {
                 inst = inst.unpickable();
@@ -158,7 +163,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         }
         if !dimmed {
             let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
-            scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
+            if !opts.hide_edges || sketch {
+                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
+            }
             scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).with_transform(t).pick_base(vert_base).pick_only().layer(2));
             if sketch {
                 // The sketch's points as small gray dots.
@@ -220,7 +227,9 @@ pub struct Highlights {
     /// Pickable assembly origin triad (size) and whether it is hovered/selected.
     pub origin: Option<(f64, bool)>,
     /// Pickable assembly mate connector triads: (frame, size, highlighted).
-    pub connectors: Vec<(Frame, f64, bool)>,
+    /// Assembly mate connectors: frame, size, highlighted, opacity (the
+    /// connector dialog's preview slider fades the edited one).
+    pub connectors: Vec<(Frame, f64, bool, f32)>,
     /// Mate glyph lines (between connector origins).
     pub mate_lines: Vec<(DVec3, DVec3, bool)>,
     /// Pickable mate indicators: (connector frame, half size, highlighted,
@@ -232,6 +241,23 @@ pub struct Highlights {
     pub trails: Vec<(DVec3, DVec3)>,
     /// Selected mate's rotation value (live 305z, 575).
     pub value_arcs: Vec<ValueArc>,
+    /// Selected mate's translation values.
+    pub value_lines: Vec<ValueLine>,
+    /// Curve/surface analysis combs (world coordinates).
+    pub analysis_lines: Option<LineData>,
+}
+
+/// A mate's translation value as a linear dimension: a dashed blue line from
+/// `a` to `b` with an arrowhead at each end pointing out (heads `head` long,
+/// in the plane of `up`), broken around the value text over `gap` (start and
+/// end as fractions of the line).
+#[derive(Clone, Copy, Debug)]
+pub struct ValueLine {
+    pub a: DVec3,
+    pub b: DVec3,
+    pub up: DVec3,
+    pub gap: Option<(f64, f64)>,
+    pub head: f64,
 }
 
 /// A mate's rotation value as Onshape's angular dimension (live 305z): a
@@ -402,6 +428,30 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             }
         }
     }
+    for l in &h.value_lines {
+        let blue = [26, 53, 184, 255];
+        let at = |t: f64| l.a + (l.b - l.a) * t;
+        let pieces = match l.gap {
+            Some((g0, g1)) => vec![(0.0, g0.max(0.0)), (g1.min(1.0), 1.0)],
+            None => vec![(0.0, 1.0)],
+        };
+        for (t0, t1) in pieces.into_iter().filter(|(t0, t1)| t1 > t0) {
+            lines.segments.push(LineSegment { a: at(t0).as_vec3().into(), b: at(t1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+        }
+        let dir = (l.b - l.a).normalize_or_zero();
+        if dir != DVec3::ZERO {
+            let side = l.up.normalize_or_zero();
+            for (tip, out) in [(l.a, -dir), (l.b, dir)] {
+                for s in [1.0, -1.0] {
+                    let base = tip - out * l.head + side * (s * l.head * 0.4);
+                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                }
+            }
+        }
+    }
+    if let Some(extra) = &h.analysis_lines {
+        lines.segments.extend(extra.segments.iter().cloned());
+    }
     for (a, b) in &h.trails {
         lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
     }
@@ -422,10 +472,17 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         op.points.push(PointSprite { position: [0.0; 3], color: if hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         scene.set_state(id, 0);
     }
-    for (i, (f, size, hl)) in h.connectors.iter().enumerate() {
+    for (i, (f, size, hl, opacity)) in h.connectors.iter().enumerate() {
         let id = overlay_id(built, OverlayPick::Connector(i));
+        let first = ol.segments.len();
         push_triad(&mut ol, f, *size, 2.0, id, *hl);
-        op.points.push(PointSprite { position: f.origin.as_vec3().into(), color: if *hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        let alpha = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+        for seg in &mut ol.segments[first..] {
+            seg.color[3] = alpha;
+        }
+        let mut dot = if *hl { HANDLE_HL } else { DARK };
+        dot[3] = alpha;
+        op.points.push(PointSprite { position: f.origin.as_vec3().into(), color: dot, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         scene.set_state(id, 0);
     }
     // Onshape's mate glyph (assembly/41-43): a small square lying in the

@@ -190,3 +190,85 @@ fn json_value(j: &serde_json::Value) -> Value {
         }
     }
 }
+
+/// Natives of reference parameters.
+pub(super) const NATIVES: &[(&str, noshape_featurescript::interp::NativeFn)] = &[("buildPartStudio", build_part_studio)];
+
+/// A stored Part Studio value split into the studio key and the picked
+/// part: `tab#part`, or `ext:<microversion>|<tab>#<part>|<path>` for another
+/// document or a version.
+pub fn split_part(value: &str) -> (String, Option<String>) {
+    if let Some(rest) = value.strip_prefix("ext:") {
+        let mut it = rest.splitn(3, '|');
+        if let (Some(mv), Some(tab), Some(path)) = (it.next(), it.next(), it.next()) {
+            let (tab, part) = match tab.split_once('#') {
+                Some((t, p)) => (t, Some(p.to_string())),
+                None => (tab, None),
+            };
+            return (format!("ext:{mv}|{tab}|{path}"), part);
+        }
+    }
+    match value.split_once('#') {
+        Some((t, p)) => (t.to_string(), Some(p.to_string())),
+        None => (value.to_string(), None),
+    }
+}
+
+/// Transient id under which a part of a referenced Part Studio is known in
+/// the context its `buildFunction` returns.
+fn part_transient(tab: &str, body: &crate::reference::BodyId) -> Arc<str> {
+    format!("{tab}:{body}").into()
+}
+
+/// The parts a `PartStudioData` value stands for: the picked part, or every
+/// solid of the Part Studio.
+fn picked_parts(ctx: &crate::regen::context::Context, part: Option<&str>) -> Vec<crate::reference::BodyId> {
+    ctx.bodies
+        .iter()
+        .filter(|b| match part {
+            Some(p) => b.id.to_string() == p,
+            None => matches!(b.kind, crate::display::BodyKind::Solid),
+        })
+        .map(|b| b.id.clone())
+        .collect()
+}
+
+/// `PartStudioData` for `value` (`tab` or `tab#part`): `buildFunction`
+/// (rebuilds the Part Studio as a new Context), `configuration`,
+/// `configurationData` and `partQuery`. `{}` when unset.
+pub fn part_studio_value(value: &str, derived: Option<&dyn crate::regen::derived::DerivedProvider>) -> Value {
+    let tag = super::host::std_tag("tabReferences.fs", "PartStudioData");
+    let (key, part) = split_part(value);
+    let tab = key.as_str();
+    let Some(ctx) = (!tab.is_empty()).then(|| derived.and_then(|d| d.context(tab))).flatten() else {
+        return Value::map(Map::new()).with_tag(tag);
+    };
+    let ids: Vec<Value> = picked_parts(&ctx, part.as_deref()).iter().map(|b| super::host::query::transient_query(part_transient(tab, b))).collect();
+    let union = super::host::std_enum("query.fs", "QueryType", "UNION").unwrap_or_else(|| Value::str("UNION"));
+    let part_query = Value::map_from([("queryType", union), ("subqueries", Value::array(ids))]).with_tag(super::host::std_tag("query.fs", "Query"));
+    let mut m = Map::new();
+    if let Some(f) = noshape_featurescript::interp::native_function("buildPartStudio", vec![Value::str(tab)]) {
+        m.insert(Value::str("buildFunction"), f);
+    }
+    m.insert(Value::str("configuration"), Value::map(Map::new()));
+    m.insert(Value::str("configurationData"), Value::map(Map::new()));
+    m.insert(Value::str("partQuery"), part_query);
+    Value::map(m).with_tag(tag)
+}
+
+/// `buildFunction(configuration)`: a new Context holding the referenced
+/// Part Studio's final state.
+fn build_part_studio(i: &mut noshape_featurescript::interp::Interp, a: Vec<Value>) -> noshape_featurescript::interp::R<Value> {
+    let tab = a.first().and_then(|v| v.as_str()).unwrap_or_default();
+    let Some(ctx) = super::host::derived().and_then(|d| d.context(&tab)) else {
+        return Err(i.error("The referenced Part Studio is not available"));
+    };
+    let c = super::host::FsContext::new((*ctx).clone(), crate::reference::FeatureId(0), String::new(), Default::default(), Default::default(), None);
+    {
+        let mut st = c.state.lock();
+        for b in &ctx.bodies {
+            st.name_transient(part_transient(&tab, &b.id), crate::reference::Reference::Body(b.id.clone()));
+        }
+    }
+    Ok(c.value())
+}

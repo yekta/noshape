@@ -83,18 +83,75 @@ zooms on Linux; drawing Z/Shift+Z ×2 about the centre, Ctrl+Shift+arrows
 Open: the live CDP held-arrow test gave 105°/1.2 s while the client code
 adds every repeat; re-measure with real X autorepeat requested.
 
+## Round 2 (2026-10-19, lead decisions)
+
+* **Rotate centre by visible depth** (`getRotateCenterBasedOnWindowDepths`):
+  `PickRect::depth_samples(n)` makes the render worker draw a tiny pick pass
+  (viewport shrunk to ~n px, Onshape's `DepthSamplingPass`) into its own
+  Depth32Float + R32Uint textures and read them back whole (depth textures
+  cannot be partially copied); `PickBuffer::samples` + `view_proj` come
+  back. The pick pipelines now use `PICK_DEPTH_FORMAT` (Depth32Float, no
+  stencil). The viewport asks at a navigation press when nothing is under
+  the cursor (`request_depth_pivot`) and swaps the centre in when it lands
+  (`pivot_awaits_depth`). `navigation::depth_average_pivot` averages; GPU
+  test `visible_depth_samples_land_on_the_geometry` (render/tests/offscreen.rs).
+  The sample query renders two passes (`DrawMode::depth_samples`, pipeline
+  `mesh_sample`: true depth, no pick bias; faces and points, no lines, as
+  Onshape's pass): without plane depth (`PickBuffer::samples`) and with the
+  datum planes writing depth (`samples_with_planes`, Onshape's
+  `includePlanes` pass). The viewport uses the second only when the first
+  has under 4 hits (only planes visible). GPU test
+  `plane_depth_counts_only_in_the_with_planes_samples`.
+* **macOS Ctrl+click** (vendor/gpui-pre-macos): `last_right_press_was_ctrl_click()`
+  marks the platform's Ctrl+left→right conversion; the viewport keeps the
+  click (context menu) and makes the drag do nothing.
+* **Fit**: `Camera::fit_box` pads 1.05 (`CAMERA_ZOOM_TO_FIT_PADDING`);
+  Part Studio `zoom_fit_bounds()` adds the visible planes (Onshape's model
+  node bounds); standard views and view cube clicks fit at the new
+  orientation (`Viewport::animate_to_rotation_fit`). Check: Onshape's
+  trimetric fit shows the three default planes over 0.80 of the graphics
+  height (live navigation/70), which is exactly cube-box corners ×1.05.
+* **Touchscreen** (vendored gpui):
+  - `vendor/gpui-pre` (core): `impl MouseEvent for TouchEvent`; in
+    `Window::dispatch_touch_event` raw touches go to mouse listeners first,
+    a `prevent_default` on Started claims the touch from the portable
+    recognizer; `Window::topmost_hitbox_at`.
+  - `vendor/gpui-pre-windows`: `WM_POINTER*` for PT_TOUCH (and PT_PEN unless
+    `set_pen_as_mouse`) → `PlatformInput::Touch`, handled so Windows does not
+    emulate the mouse.
+  - `vendor/gpui-pre-linux`: X11 XInput 2.2 TouchBegin/Update/End (mask set
+    when the server has 2.2, `XINPUT_TOUCH`), Wayland `wl_touch`.
+  - `touch.rs`: Onshape's recognizers (taps, single drag, pan, roll, pinch,
+    two-finger long-press box) with unit tests; `Viewport::on_touch` claims
+    touches whose start is on its canvas hitbox and runs `touch_actions`.
+  - Every vendored change is marked `NOSHAPE PATCH`; Cargo.toml
+    `[patch.crates-io]` lists them. Examples/tests of gpui-pre are omitted.
+  - Cross checks: the Windows and macOS crates type-check for
+    x86_64-pc-windows-msvc / aarch64-apple-darwin from scratch copies
+    (`/tmp/nav/winchk`, `/tmp/nav/macchk`; macOS needs a placeholder
+    `stitched_shaders.metal`, Windows `--no-default-features` without llvm-rc).
+
 ## Next
 
-1. Verify in the app (xdotool right-drag, wheel, Alt-drag, arrows, Z) and
-   compare with live screenshots.
-2. Touchscreen (checklist §7): gpui's Windows/Linux/macOS backends emit no
-   `TouchEvent`; needs WM_POINTER handling in a vendored
-   `gpui-pre-windows` (like `vendor/gpui-pre-linux`) and an element-level
-   touch listener. Lead decision needed before vendoring.
-3. Pivot fallback: Onshape averages visible depth samples before using the
-   model centre; we skip that step (no depth readback).
+1. Touch on real hardware: nothing here can produce touches (Xvfb has no
+   touch device). Unit tests cover the recognizer; the platform paths
+   compile (Linux natively, Windows/macOS cross). First test on a Windows
+   touch laptop / Linux touchscreen: tap-select, one-finger rotate, pinch,
+   two-finger pan/roll, two-finger tap menu, long-press box, and that taps on
+   the view cube and dialogs still click.
+2. Linux pen as touch ("Use pen input as mouse" off): X11/Wayland tablets
+   arrive as pointer devices; needs device-type detection in
+   vendor/gpui-pre-linux.
+3. Assembly fit bounds use the scene bounds (no default planes there).
+
+Cross-check cache: /root/target-shared/cross (scratch copies of the
+vendored crates go in /tmp; see "Round 2").
 
 ## Gotchas
+
+* GPUI hitboxes may only be inserted during **prepaint** (inserting one in
+  paint crashed every document window; ui2 fixed the touch hitbox: canvas
+  prepaint returns it, paint registers the `TouchEvent` listener with its id).
 
 * macOS gpui turns Ctrl+left-click into a plain right button (control
   cleared), so we cannot tell it from a real right click.

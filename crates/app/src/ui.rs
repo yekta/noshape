@@ -188,6 +188,94 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
     }
 }
 
+/// Where an Onshape tooltip sits relative to its element (live
+/// part-studio/16-22, 95): beside list rows and left-rail buttons (Right),
+/// left of the right strip and the camera menu button (Left), over the
+/// viewport's bottom-right tools (Above), under the rollback bar (Below).
+#[derive(Clone, Copy, PartialEq)]
+pub enum TipSide {
+    Right,
+    Left,
+    Above,
+    Below,
+}
+
+/// An Onshape tooltip placed against its element: a 26 px `#d0dbe5` box with
+/// 12 px / 500 text and 4 px padding, 2-3 px from the element (centered on
+/// it across that side).
+pub struct PlacedTooltip {
+    text: SharedString,
+    side: TipSide,
+    /// The element's bounds.
+    anchor: Bounds<Pixels>,
+}
+
+/// Room for a centered tooltip whose width isn't known before layout.
+const TIP_STRIP_W: f32 = 600.;
+
+impl Render for PlacedTooltip {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
+        let a = self.anchor;
+        let h = px(26.);
+        let content = div()
+            .font_family(cx.theme().font_family.clone())
+            .text_size(px(12.))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(pal.text)
+            .h(h)
+            .px(px(4.))
+            .flex()
+            .items_center()
+            .bg(pal.tooltip)
+            .shadow(shadow)
+            .whitespace_nowrap()
+            .child(self.text.clone());
+        let mid_y = a.center().y - h * 0.5;
+        let strip = div().w(px(TIP_STRIP_W)).flex();
+        let (at, el) = match self.side {
+            TipSide::Right => (point(a.right() + px(3.), mid_y), content.into_any_element()),
+            TipSide::Left => (point(a.left() - px(2. + TIP_STRIP_W), mid_y), strip.justify_end().child(content).into_any_element()),
+            TipSide::Above => (point(a.center().x - px(TIP_STRIP_W * 0.5), a.top() - px(4.) - h), strip.justify_center().child(content).into_any_element()),
+            TipSide::Below => (point(a.center().x - px(TIP_STRIP_W * 0.5), a.bottom() + px(8.)), strip.justify_center().child(content).into_any_element()),
+        };
+        // Only the beside-the-element box snaps into the window: snapping a
+        // centering strip would move the box off its element.
+        let snap = self.side == TipSide::Right;
+        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).when(snap, |a| a.snap_to_window()).child(el)))
+    }
+}
+
+/// Gives `el` an Onshape tooltip showing `text` on `side` (see [`PlacedTooltip`]).
+pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
+    let text: SharedString = text.into();
+    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let a2 = anchor.clone();
+    el.relative()
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .tooltip(move |_, cx| {
+            let (text, anchor) = (text.clone(), anchor.get());
+            cx.new(|_| PlacedTooltip { text, side, anchor }).into()
+        })
+}
+
+/// `.tip(text, side)`: [`with_tip`] in builder chains.
+pub trait TipExt {
+    fn tip(self, text: impl Into<SharedString>, side: TipSide) -> Self;
+}
+
+impl TipExt for Stateful<Div> {
+    fn tip(self, text: impl Into<SharedString>, side: TipSide) -> Self {
+        with_tip(self, text, side)
+    }
+}
+
+/// A list row's tooltip, beside the row (live part-studio/16, 95).
+pub fn with_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
+    with_tip(row, text, TipSide::Right)
+}
+
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):
 /// panel headers, the viewport's quick tools. `on` draws the toggled fill.
 pub fn icon_button(id: impl Into<ElementId>, icon: &str, size: f32, on: bool, cx: &App) -> Button {
@@ -393,6 +481,9 @@ pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedStri
         .child(
             div()
                 .size(px(12.))
+                // Live (dom/dialog-fillet): the box is 8 px from the row's
+                // top (centering alone puts it at 7.5, drawn at 7).
+                .mt(px(1.))
                 .flex_none()
                 .flex()
                 .items_center()

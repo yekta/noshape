@@ -35,6 +35,9 @@ enum RowKind {
     Change,
 }
 
+/// A popup anchor: a field's bounds from the last paint.
+type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
+
 /// The search ▾ panel's "Modified by" choices.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum ModifiedBy {
@@ -83,6 +86,23 @@ fn filter_kind(c: &TabContent) -> &'static str {
         TabContent::File(_) => "file",
         TabContent::VariableStudio(_) | TabContent::MaterialLibrary(_) => "",
     }
+}
+
+/// The toggles under "Search history" (live documents/118–119): 30x30,
+/// radius 3; on = `#eaeaea` with an inset 0 1 1 shadow, off = clear.
+fn filter_toggle(id: &'static str, icon: &'static str, on: bool, cx: &App) -> Stateful<Div> {
+    div()
+        .id(id)
+        .size(px(30.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(3.))
+        .cursor_pointer()
+        .when(on, |d| d.bg(rgb(0xeaeaea)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]))
+        .when(!on, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+        .child(crate::assets::icon(icon, 20., cx))
 }
 
 /// Is `author` the local user (Preferences name, OS full name or login)?
@@ -227,12 +247,12 @@ impl HistoryPanel {
         let edit = self.filter_edit.clone();
         let label = |t: &'static str| div().w(px(100.)).flex_none().pt(px(12.)).pl(px(4.)).text_size(px(11.)).text_color(rgb(0x666666)).child(t);
         // Select lists hang under their field (bounds recorded on paint).
-        let (tab_anchor, by_anchor): (Rc<std::cell::Cell<Bounds<Pixels>>>, Rc<std::cell::Cell<Bounds<Pixels>>>) = Default::default();
-        let under = |a: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+        let (tab_anchor, by_anchor): (BoundsCell, BoundsCell) = Default::default();
+        let under = |a: &BoundsCell| {
             let b = a.get();
             point(b.left(), b.bottom())
         };
-        let select = |id: &'static str, text: String, anchor: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+        let select = |id: &'static str, text: String, anchor: &BoundsCell| {
             let probe = anchor.clone();
             h_flex()
                 .id(id)
@@ -568,8 +588,30 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
 /// A dialog's create action (true when it ran and the dialog may close).
 type CreateFn = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 
-/// Onshape's "Create version from <workspace>" dialog.
+/// Store meta key marking a version as published FeatureScript ("Publish
+/// custom features and tables"; advanced search › Published FeatureScript).
+pub const PUBLISHED_FS_KEY: &str = "published_featurescript:";
+
+/// Onshape's "Create version from **<workspace>**" dialog (Versions and
+/// history, the rail button, Ctrl+Alt+V; live document/20).
 pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
+    create_version_dialog(doc, false, window, cx)
+}
+
+/// The same dialog opened from inside a tab (Feature Studio reference panel,
+/// "Create a version in …" links): "Create version in **<document>** Main"
+/// (live dom/fs-refpanel2-create-version-current.txt).
+pub fn open_create_version_in(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
+    create_version_dialog(doc, true, window, cx)
+}
+
+fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, window: &mut Window, cx: &mut App) {
+    let doc_name = doc.read(cx).name();
+    // Live: the publish row shows when the document has a Feature Studio.
+    let has_fs = doc.read(cx).session.doc.tabs.iter().any(|t| matches!(t.content, TabContent::FeatureStudio(_)));
+    let publish = Rc::new(std::cell::Cell::new(false));
+    // "Create version and edit properties": open the new version's Properties.
+    let edit_after = Rc::new(std::cell::Cell::new(false));
     let (branch, n) = {
         let s = &doc.read(cx).session;
         let g = s.store.graph().ok();
@@ -579,9 +621,9 @@ pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut 
     let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("V{n}")));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
     let create: CreateFn = {
-        let (doc, name, desc) = (doc.clone(), name.clone(), desc.clone());
+        let (doc, name, desc, publish, edit_after) = (doc.clone(), name.clone(), desc.clone(), publish.clone(), edit_after.clone());
         let done = std::cell::Cell::new(false);
-        Rc::new(move |_, cx| {
+        Rc::new(move |window, cx| {
             let n = name.read(cx).value().trim().to_string();
             if n.is_empty() {
                 return false;
@@ -591,11 +633,23 @@ pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut 
                 return true;
             }
             let d = desc.read(cx).value().to_string();
-            let r = doc.update(cx, |doc, _| doc.session.create_version(&n, &d));
-            doc.update(cx, |doc, cx| match r {
+            let publish = publish.get();
+            let r = doc.update(cx, |doc, _| {
+                let v = doc.session.create_version(&n, &d)?;
+                if publish {
+                    doc.session.store.set_meta(&format!("{PUBLISHED_FS_KEY}{v}"), Some(b"1"))?;
+                }
+                anyhow::Ok(v)
+            });
+            let edit = edit_after.get();
+            doc.update(cx, |doc, cx| match &r {
                 Ok(_) => doc.reloaded(cx),
                 Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
             });
+            if let (Ok(v), true) = (r, edit) {
+                let doc = doc.clone();
+                window.defer(cx, move |window, cx| open_version_properties(doc, v, window, cx));
+            }
             true
         })
     };
@@ -614,10 +668,23 @@ pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut 
     let focus = name.clone();
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
+        let title = if in_document { version_dialog_title_in(&doc_name, &branch) } else { version_dialog_title("Create version from", &branch) };
+        let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, "", 950.)
-            .title(version_dialog_title("Create version from", &branch))
+            .title(title)
             .child(version_dialog_body(&name, &desc, None))
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Create"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .when(has_fs, |d| d.child(publish_row(publish.clone())))
+            .footer(
+                os::modal_footer()
+                    .child(os::modal_ok(os::primary_button("ok", "Create")))
+                    .child(os::cancel_button("create-edit", "Create version and edit properties", cx).on_click(move |_, window, cx| {
+                        edit_after.set(true);
+                        if create2(window, cx) {
+                            window.close_dialog(cx);
+                        }
+                    }))
+                    .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
+            )
             .on_ok(move |_, window, cx| create(window, cx))
     });
     window.defer(cx, move |window, cx| {
@@ -702,6 +769,98 @@ fn version_dialog_title(lead: &str, name: &str) -> AnyElement {
         .child(div().flex_1())
         .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
         .into_any_element()
+}
+
+/// "Create version in **noshape mm test** Main": gray 18 px lead-in, the
+/// document 500, the workspace 16 px gray.
+fn version_dialog_title_in(doc_name: &str, workspace: &str) -> AnyElement {
+    let pal = p();
+    h_flex()
+        .w(px(948.))
+        .h(px(48.))
+        .pl(px(10.))
+        .pr(px(12.))
+        .gap(px(6.))
+        .border_b_1()
+        .border_color(rgb(os::MODAL_DIVIDER))
+        .child(div().text_size(px(18.)).text_color(pal.text_muted).child("Create version in"))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(doc_name.to_string()))
+        .child(div().text_size(px(16.)).text_color(pal.text_muted).child(workspace.to_string()))
+        .child(div().flex_1())
+        .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
+        .into_any_element()
+}
+
+/// "☐ Publish custom features and tables  *Allow searches…*  ?" (live dom
+/// fs-refpanel2-create-version-current: 10 px padding, `#eaeaea` rule
+/// above, bold label, italic hint, help icon at the right).
+fn publish_row(on: Rc<std::cell::Cell<bool>>) -> AnyElement {
+    let pal = p();
+    let checked = on.get();
+    h_flex()
+        .id("publish-fs")
+        .w_full()
+        .p(px(10.))
+        .gap(px(8.))
+        .border_t_1()
+        .border_color(rgb(0xeaeaea))
+        .cursor_pointer()
+        .child(os::checkbox("publish-fs-box", "", checked))
+        .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Publish custom features and tables"))
+        .child(div().flex_1().text_size(px(14.)).italic().text_color(pal.text).child("Allow searches for published FeatureScript to find custom features and tables defined in this version"))
+        .child(div().id("publish-fs-help").size(px(16.)).flex_none().tooltip(crate::ui::tooltip("Published custom features and tables can be found with the advanced search's Published FeatureScript criterion")).child(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("help-faint")).size(px(16.))))
+        .on_click(move |_, window, _| {
+            on.set(!on.get());
+            window.refresh();
+        })
+        .into_any_element()
+}
+
+/// Version row › Properties… (and "Create version and edit properties"):
+/// the version's name and description.
+pub fn open_version_properties(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
+    let Ok(info) = doc.read(cx).session.store.version(id) else { return };
+    let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(info.name.clone()));
+    let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description").default_value(info.description.clone()));
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let (doc, name2, desc2) = (doc.clone(), name.clone(), desc.clone());
+        os::modal(dialog, "", 950.)
+            .title(version_dialog_title("Properties", &info.name))
+            .child(version_dialog_body(&name, &desc, None))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                let (n, d) = (name2.read(cx).value().to_string(), desc2.read(cx).value().to_string());
+                let r = doc.update(cx, |doc, _| doc.session.store.update_version(id, &n, &d));
+                doc.update(cx, |doc, cx| match r {
+                    Ok(()) => doc.reloaded(cx),
+                    Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
+                });
+                true
+            })
+    });
+}
+
+/// Version row › Publish FeatureScript…: publish (or unpublish) the
+/// version's custom features and tables.
+fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
+    let key = format!("{PUBLISHED_FS_KEY}{id}");
+    let on = Rc::new(std::cell::Cell::new(doc.read(cx).session.store.get_meta(&key).ok().flatten().is_some()));
+    let name = doc.read(cx).session.store.version(id).map(|v| v.name).unwrap_or_default();
+    window.open_dialog(cx, move |dialog, _, cx| {
+        let (doc, key, on2) = (doc.clone(), key.clone(), on.clone());
+        os::modal(dialog, "", 950.)
+            .title(version_dialog_title("Publish FeatureScript", &name))
+            .child(publish_row(on.clone()))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                let v: Option<&[u8]> = if on2.get() { Some(b"1") } else { None };
+                let r = doc.update(cx, |doc, _| doc.session.store.set_meta(&key, v));
+                if let Err(e) = r {
+                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                }
+                true
+            })
+    });
 }
 
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>) -> AnyElement {
@@ -978,12 +1137,17 @@ impl Render for HistoryPanel {
                     )
                     .child(v_flex().pl(px(3.)).flex_1().min_w_0().child(div().truncate().child(r.author.clone())).child(div().truncate().child(history_time(r.time))))
             };
+            let version_id = if r.kind == RowKind::Version { graph.versions.iter().find(|x| x.microversion == mv && x.name == r.name).map(|x| x.id) } else { None };
             let row = row.on_click(open).os_context_menu(move |m, window, cx| {
-                // Releases ▸ <name> [Released] (opens Review Release).
-                let m = if row_packages.is_empty() {
-                    m
-                } else {
-                    let (pk, dr) = (row_packages.clone(), d.clone());
+                // Live menus/rmb-version-v1: Open, Branch to create workspace…,
+                // Compare, Restore to <ws>…, Properties…, Releases ▸, Publish
+                // FeatureScript… (browser tab / copy link are cloud-only).
+                let (dr0, row_packages) = (d.clone(), row_packages.clone());
+                let releases = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                    if row_packages.is_empty() {
+                        return m;
+                    }
+                    let (pk, dr) = (row_packages.clone(), dr0.clone());
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
                         for p in pk.clone() {
                             let dr = dr.clone();
@@ -994,6 +1158,7 @@ impl Render for HistoryPanel {
                     })
                 };
                 let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v.clone());
+                let (d5, d6) = (d.clone(), d.clone());
                 let (name1, name2, cur1) = (name.clone(), name.clone(), cur.clone());
                 let d1 = d.clone();
                 match kind {
@@ -1005,11 +1170,20 @@ impl Render for HistoryPanel {
                             m
                         }
                     }
-                    _ => m
-                        .item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))))
-                        .item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx)))
-                        .item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
-                        .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx)))),
+                    _ => {
+                        let m = m
+                            .item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))))
+                            .item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx)))
+                            .item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
+                            .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx))));
+                        match version_id {
+                            Some(id) => {
+                                let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| open_version_properties(d5.clone(), id, window, cx)));
+                                releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
+                            }
+                            None => releases(m, window, cx),
+                        }
+                    }
                 }
             });
             list.push(row.into_any_element());
@@ -1095,11 +1269,11 @@ impl Render for HistoryPanel {
                     .pt(px(6.))
                     .gap(px(6.))
                     .flex_none()
-                    .child(crate::ui::icon_button("hist-merges", "hide-merges", 30., self.hide_merges, cx).tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).tooltip(crate::ui::tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_merges = !this.hide_merges;
                         cx.notify();
                     })))
-                    .child(crate::ui::icon_button("hist-auto", "hide-auto-versions", 30., self.hide_auto_versions, cx).tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" }).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).tooltip(crate::ui::tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_auto_versions = !this.hide_auto_versions;
                         cx.notify();
                     }))),

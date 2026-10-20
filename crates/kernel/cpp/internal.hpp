@@ -21,9 +21,12 @@
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
+#include <gp_Trsf.hxx>
+#include <gp_GTrsf.hxx>
 
 #include <array>
 #include <functional>
+#include <string>
 #include <sstream>
 
 namespace noshape {
@@ -126,8 +129,63 @@ double working_scale();
 // history null) when there are none or the result wouldn't be valid.
 TopoDS_Shape exact_vertex_blends(const TopoDS_Shape& s, occ::handle<BRepTools_History>& history);
 
+// Mesh import (mesh_io.cpp): nodes closer than `weld` merged (0: STL's grid
+// merge), degenerate triangles dropped, T-junctions split (weld > 0); `pts`
+// the merged nodes, `tris` renumbered.
+void mesh_weld(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>>& tris, double weld, std::vector<gp_Pnt>& pts);
+
+// Mesh bodies (mesh_body.cpp): faces with a triangulation and no surface.
+bool is_mesh_face(const TopoDS_Face& f);
+bool has_mesh_faces(const TopoDS_Shape& s);
+bool mesh_valid(const TopoDS_Shape& s);
+TopoDS_Shape transform_mesh(const TopoDS_Shape& s, const gp_Trsf& t, BRepTools_History& h);
+TopoDS_Shape gtransform_mesh(const TopoDS_Shape& s, const gp_GTrsf& g, BRepTools_History& h);
+// One mesh face per connected piece of the welded triangles, and whether
+// the piece is closed (every edge used equally often each way).
+struct MeshPiece
+{
+  TopoDS_Face face;
+  bool        closed = false;
+};
+std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>> tris, double weld);
+// A body per closed group / open piece: closed pieces in one solid (a shell
+// each), each open piece a shell; returned as a compound of them.
+TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces);
+// 3MF / glTF / GLB triangles of every placed object, in millimetres
+// (mesh_formats.cpp); false for other files.
+bool read_mesh_format(const std::string& path, std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>>& tris);
+
+// Parasolid import (xt_read.cpp): every part of a transmit file (assembly
+// instances placed), metres, with its SDL/TYSA name and colour.
+struct XtPart
+{
+  TopoDS_Shape          shape;
+  std::string           name;
+  std::array<double, 3> colour{0, 0, 0};
+  bool                  has_colour = false;
+};
+std::vector<XtPart> read_xt_parts(const std::string& path);
+// The same from a transmit file's bytes (or a bare binary stream "PS\0\0…").
+std::vector<XtPart> read_xt_data(std::string data);
+// Pcurves, tolerances, seams and apexes for an imported body (xt_read.cpp),
+// shared by the Parasolid and ACIS readers.
+TopoDS_Shape heal_import(TopoDS_Shape shape, double tol);
+// ACIS import (sat_read.cpp): every body of a .sat/.sab file (or a
+// ShapeManager stream), metres, with its name and colour.
+std::vector<XtPart> read_sat_parts(const std::string& path);
+std::vector<XtPart> read_sat_data(std::string data);
+// JT import (jt_read.cpp): the parts of its XT B-rep segments (unplaced).
+std::vector<XtPart> read_jt_parts(const std::string& path);
+// Native CAD import (native.cpp): the Parasolid geometry a SolidWorks (OLE2),
+// Solid Edge or NX part file embeds, read as above.
+std::vector<XtPart> read_native_parts(const std::string& path);
+// Rhino import (rhino_read.cpp, openNURBS): every object, placed, metres.
+std::vector<XtPart> read_rhino_parts(const std::string& path);
+
 // Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
 GProp_GProps volume_props(const TopoDS_Shape& s);
+// Area properties likewise (faces wrapping a periodic surface more than once).
+GProp_GProps surface_props(const TopoDS_Shape& s);
 
 // B-rep exchange writers (xt.cpp): a shape with elementary surfaces where it
 // can, B-splines for swept/offset ones (revolved ones too unless `keep_spun`)

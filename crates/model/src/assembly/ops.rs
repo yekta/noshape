@@ -543,7 +543,14 @@ impl Assembly {
         self.folders.iter().find(|f| f.features.contains(&id))
     }
 
-    /// New folder ("Folder N") around instances or mate features (taken out
+    /// A new folder's name: always "New folder" (live assembly/536; the list
+    /// shows the member count after it, "New folder (2)").
+    pub fn next_folder_name(&self) -> String {
+        "New folder".to_string()
+    }
+
+    /// New folder ("New folder", live assembly/536–537) around instances or
+    /// mate features (taken out
     /// of the folders they were in). Returns its id.
     pub fn add_folder(&mut self, instances: &[InstanceId], features: &[MateId]) -> MateId {
         for f in &mut self.folders {
@@ -551,7 +558,7 @@ impl Assembly {
             f.features.retain(|i| !features.contains(i));
         }
         let id = MateId(self.next_id());
-        let name = self.next_feature_name("Folder");
+        let name = self.next_folder_name();
         // Members keep the list order.
         let inst: Vec<InstanceId> = self.instances.iter().map(|i| i.id).filter(|i| instances.contains(i)).collect();
         self.folders.push(super::ListFolder { id, name, instances: inst, features: features.to_vec(), unsuppressed_if: None });

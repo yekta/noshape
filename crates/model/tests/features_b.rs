@@ -441,6 +441,41 @@ fn import_foreign_brep_file_and_missing_data() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Mesh imports (Onshape G22/G27): STL and PVZ parts are mesh parts (one
+/// face, no edges); a PVZ part whose mesh doesn't close (Onshape's loft
+/// sample) becomes a closed composite of its 2 open pieces.
+#[test]
+fn import_foreign_mesh_parts() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-mesh-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    let bx = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.02, 0.03).unwrap();
+    noshape_kernel::write_stl(&bx, &path, 1e-4, noshape_kernel::StlFormat::Binary).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let b = &r.context.bodies[0];
+    assert!(b.shape.is_mesh() && b.kind == BodyKind::Solid && b.faces.len() == 1 && b.edges.is_empty());
+    assert!(near(b.shape.volume().unwrap(), 6e-6, 1e-11));
+    assert!(r.display.bodies[0].is_mesh);
+    let _ = std::fs::remove_dir_all(dir);
+    let Ok(shapes) = noshape_kernel::read_pvz(std::path::Path::new("/root/onshape-research/live/samples/pvz-shapes.pvz"), noshape_kernel::LengthUnit::Meter) else { return };
+    let brep = String::from_utf8(shapes.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    // Parts (3) + Composite parts (1) "Composite part 1 (closed) (2 surfaces)".
+    let parts: Vec<_> = r.display.bodies.iter().filter(|b| b.composite.is_none()).collect();
+    assert_eq!(parts.len(), 3, "{:?}", r.display.bodies.iter().map(|b| &b.name).collect::<Vec<_>>());
+    assert!(parts.iter().all(|b| b.is_mesh && b.kind == BodyKind::Solid));
+    let comp = r.display.bodies.iter().find(|b| b.composite.is_some()).expect("composite");
+    let info = comp.composite.as_ref().unwrap();
+    assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
+}
+
 #[test]
 fn reference_misc_point_composite_query() {
     let mut s = block();

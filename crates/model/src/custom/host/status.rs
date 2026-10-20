@@ -268,7 +268,7 @@ fn get_last_active_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 // ---------------------------------------------------------------- variables
 
 /// A FeatureScript value as a variable quantity (lengths, angles, numbers).
-fn quantity_of(v: &Value) -> Option<Quantity> {
+pub(crate) fn quantity_of(v: &Value) -> Option<Quantity> {
     match v {
         Value::Number(n, _) => Some(Quantity::new(*n, Dim::UNITLESS)),
         Value::Map(..) => {

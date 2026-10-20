@@ -48,7 +48,14 @@ static SurfaceInfo empty_surface()
 
 SurfaceInfo surface_info(const OcShape& fs)
 {
-  const TopoDS_Face&  f = as_face(fs.shape, "shape");
+  const TopoDS_Face& f = as_face(fs.shape, "shape");
+  if (is_mesh_face(f))
+  {
+    // A mesh face: no surface (Onshape's OTHER).
+    SurfaceInfo m = empty_surface();
+    m.reversed    = f.Orientation() == TopAbs_REVERSED;
+    return m;
+  }
   BRepAdaptor_Surface s(f, true);
   SurfaceInfo         i = empty_surface();
   i.reversed            = f.Orientation() == TopAbs_REVERSED;
@@ -462,9 +469,7 @@ PropsF props_volume(const OcShape& s)
 PropsF props_surface(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  GProp_GProps g;
-  BRepGProp::SurfaceProperties(s.shape, g, 1e-7, true);
-  return to_props(g);
+  return to_props(surface_props(s.shape));
 }
 
 PropsF props_linear(const OcShape& s)

@@ -11,7 +11,6 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::base::FocusTrapElement as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
@@ -41,6 +40,11 @@ pub enum DialogEvent {
     CreateSelection(String),
     /// A reference parameter's "Import…": add the file as a tab and pick it.
     ImportReference { param: String, file: std::path::PathBuf },
+    /// A reference panel's Create version…: this document (`None`) or another one.
+    CreateVersion(Option<std::path::PathBuf>),
+    /// Tab past the last control (`forward`) or Shift+Tab before the first
+    /// one: the focus leaves the dialog (live: to the navbar / to <body>).
+    LeaveFocus { forward: bool },
 }
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
@@ -51,6 +55,8 @@ pub struct DerivedSource {
     pub tab: String,
     pub name: String,
     pub parts: Vec<(noshape_model::BodyId, String)>,
+    /// A configured source's configuration (its inputs show in the dialog).
+    pub configuration: noshape_model::configuration::Configuration,
 }
 
 pub struct FeatureDialog {
@@ -86,6 +92,14 @@ pub struct FeatureDialog {
     pub(crate) ref_picker: Option<crate::fs_reference::RefPicker>,
     /// The document name its "Current document" tab shows.
     pub ref_document_name: String,
+    /// Pictures of Part Studios and parts in that panel (`tab`, `tab#part`).
+    pub ref_thumbs: HashMap<String, Arc<RenderImage>>,
+    /// This document's file (its versions) and the Part Studio being edited
+    /// (not offered as a reference).
+    pub ref_document_path: Option<std::path::PathBuf>,
+    pub ref_except: String,
+    /// Renders the panel's Part Studio pictures.
+    pub ref_gpu: Option<crate::gpu::Gpu>,
     /// Preview the end of the history instead of rolling to this feature.
     pub show_final: bool,
     /// "Other document…" chooser: the document, the selected version index.
@@ -208,6 +222,10 @@ impl FeatureDialog {
             ref_sources: Vec::new(),
             ref_picker: None,
             ref_document_name: String::new(),
+            ref_thumbs: HashMap::new(),
+            ref_document_path: None,
+            ref_except: String::new(),
+            ref_gpu: None,
             show_final: false,
             ext_pick: None,
             ext_info: None,
@@ -349,6 +367,13 @@ impl FeatureDialog {
         let mut first: Option<(&'static str, String)> = None;
         for s in self.ty.params.iter().filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN)) {
             match &s.kind {
+                // Live (psb 10-19 h): a dialog opens with the focus on its
+                // first selection list.
+                ParamKind::Query { .. } if first.is_none() => {
+                    let h = self.tab_stop(&format!("q:{}", s.id), cx);
+                    window.focus(&h, cx);
+                    return true;
+                }
                 ParamKind::Query { .. } => return false,
                 ParamKind::Text { .. } if first.is_none() => first = Some((s.id, params.text(s.id).to_string())),
                 ParamKind::Num(_) if first.is_none() => first = Some((s.id, params.expr(s.id).map(|e| e.text.clone()).unwrap_or_default())),
@@ -661,7 +686,12 @@ impl FeatureDialog {
         let sel = match self.selects.get(key) {
             Some(s) => s.clone(),
             None => {
-                let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("sel-{key}"))));
+                // Selects are Tab stops (live psb 10-19 h: the End type focusser).
+                let s = cx.new(|cx| {
+                    let mut s = crate::os_select::OsSelect::new(SharedString::from(format!("sel-{key}")));
+                    s.focus_handle(cx);
+                    s
+                });
                 let k = key.to_string();
                 let sub = cx.subscribe(&s, move |this, _, ev: &crate::os_select::OsSelectEvent, cx| {
                     let crate::os_select::OsSelectEvent::Picked(id) = ev;
@@ -1100,10 +1130,10 @@ impl FeatureDialog {
     }
 
     /// A Tab stop for a dialog control. Onshape's Tab order (live
-    /// behaviours.md, Extrude "Keyboard"): Depth → tolerance (±) button →
-    /// Direction → Starting offset → Symmetric → Draft → Second end position
-    /// → `?` help; Shift+Tab from Depth reaches the flip button; selects and
-    /// the ✓ / ✕ are skipped. Stops follow the render (DOM) order.
+    /// behaviours.md "Keyboard, full Tab cycle"): faces list (focused on
+    /// open) → End type select → flip → Depth → tolerance (±) → the
+    /// checkboxes → Merge scope list → `?` help, then out of the dialog;
+    /// the tab rows and ✓ / ✕ are skipped. Stops follow the paint (DOM) order.
     fn tab_stop(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
         self.tab_stops.entry(key.to_string()).or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
     }
@@ -1163,20 +1193,28 @@ impl FeatureDialog {
                     (false, false) => "flip-direction",
                     (false, true) => "flip-direction-opposite",
                 };
-                Button::new(SharedString::from(format!("flip-{fpath}")))
-                    .custom(dialog_icon_variant(cx, false))
-                    .child(crate::assets::icon(icon, 20., cx))
+                // A Tab stop like Onshape's `os-param-icon-button` (Space /
+                // Enter press it; focused: the 2 px blue bottom line).
+                let focus = self.tab_stop(&format!("flip:{fpath}"), cx);
+                let (p1, p2) = (fpath.clone(), fpath.clone());
+                let toggle = move |this: &mut Self, path: &str, cx: &mut Context<Self>| {
+                    let cur = matches!(this.get_value(path), Some(ParamValue::Bool(true)));
+                    this.set_value(path, ParamValue::Bool(!cur), cx);
+                };
+                let el = div()
+                    .id(SharedString::from(format!("flip-{fpath}")))
                     .w(px(26.))
                     .h(px(26.))
-                    .p_0()
-                    .rounded(px(0.))
+                    .flex()
                     .flex_none()
-                    .tooltip(f.label)
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        let cur = matches!(this.get_value(&fpath), Some(ParamValue::Bool(true)));
-                        this.set_value(&fpath, ParamValue::Bool(!cur), cx);
-                    }))
-                    .into_any_element()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .hover(|d| d.bg(p().panel_hover))
+                    .child(crate::assets::icon(icon, 20., cx))
+                    .tooltip(crate::ui::tooltip(f.label))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, &p1, cx)));
+                Self::tab_stop_element(el, &focus, Focus::Underline, move |this, _, cx| toggle(this, &p2, cx), cx).into_any_element()
             })
             .collect();
 
@@ -1469,7 +1507,9 @@ impl FeatureDialog {
                     })
                     // Live: the value's baseline 1 px under the label's, the
                     // underline on the row's bottom line.
-                    .child(div().flex_1().min_w_0().pt(px(5.)).child(e))
+                    // (Rows are 26 px like live: tolerance rows are set by
+                    // their 26 px expander, the others by the field.)
+                    .child(div().flex_1().min_w_0().pt(px(if tolerant { 5. } else { 4. })).child(e))
                     .children(tol_btn)
                     // The first column is 194 px; flips sit in the 26 px right one.
                     .when(flips.is_empty(), |d| d.pr(px(26.)))
@@ -1612,13 +1652,25 @@ impl FeatureDialog {
                 let error = if active || cs_open { None } else { self.field_error(s.id) };
                 let caption = div()
                     .px(px(6.))
-                    .when(empty, |d| d.pt(px(7.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33)).text_color(gpui_kit::rgb(0x555555)))
+                    // Live (dom/dialog-extrude-new): the empty field is 26 px
+                    // with its border (label 24 px).
+                    .when(empty, |d| d.pt(px(7.)).pb(px(4.)).text_size(px(12.)).line_height(px(13.)).text_color(gpui_kit::rgb(0x555555)))
                     .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted))
                     .truncate()
                     .child(s.label);
                 // Live (dom/dialog-fillet.txt): fields are 3 px in from the dialog
                 // edges with 5 px above (`os-param-requires-margin`); the row
                 // after the last field also starts 5 px below it (render_params).
+                // Live (psb 10-19 h): selection lists are Tab stops, and
+                // focusing one makes it the active field (it stays active when
+                // the focus moves on).
+                let q_focus = self.tab_stop(&format!("q:{path}"), cx);
+                if q_focus.is_focused(window) && self.active_query.as_deref() != Some(path) {
+                    self.active_query = Some(path.to_string());
+                    cx.emit(DialogEvent::QueryFocused);
+                    cx.notify();
+                }
+                let q_focus2 = q_focus.clone();
                 h_flex()
                     .w_full()
                     .items_start()
@@ -1627,9 +1679,10 @@ impl FeatureDialog {
                     .child(
                         div()
                             .id(SharedString::from(format!("q-{path}")))
+                            .track_focus(&q_focus)
                             .flex_1()
                             .min_w_0()
-                            .min_h(px(27.))
+                            .min_h(px(26.))
                             .max_h(px(160.))
                             .overflow_y_scroll()
                             .rounded(px(2.))
@@ -1644,7 +1697,7 @@ impl FeatureDialog {
                             .children(chips)
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 this.active_query = Some(path_s.clone());
-                                window.focus(&this.focus, cx);
+                                window.focus(&q_focus2, cx);
                                 cx.emit(DialogEvent::QueryFocused);
                                 cx.notify();
                             })),
@@ -1980,6 +2033,8 @@ impl FeatureDialog {
                         m = m.item(gpui_kit::component::menu::PopupMenuItem::new(s.name.clone()).on_click(move |_, _, cx| {
                             v.update(cx, |this, cx| {
                                 this.feature.params.set("parts", ParamValue::Query(Vec::new()));
+                                // A new source starts in its default configuration.
+                                this.feature.params.0.retain(|k, _| !k.starts_with(noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX));
                                 this.set_value("partStudio", ParamValue::Text(tab.clone()), cx);
                             })
                         }));
@@ -2052,15 +2107,61 @@ impl FeatureDialog {
                 .into_any_element()
         });
         let chooser = self.render_ext_chooser(cx);
+        // A configured source: its inputs (lists and checkboxes; hidden ones
+        // per its visibility conditions), like the Insert dialog's expanded
+        // configured Part Studio ("Size ▾ Default").
+        let config_rows = self.render_derived_configuration(&sources, &current, cx);
         v_flex()
             .gap_1p5()
             .w_full()
             .child(div().text_xs().text_color(pal.text_muted).child("Part Studio"))
             .child(picker)
+            .children(config_rows)
             .children(chooser)
             .children(update)
             .children(checks)
             .into_any_element()
+    }
+
+    fn render_derived_configuration(&mut self, sources: &[DerivedSource], current: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        use noshape_model::configuration::ConfigInputKind;
+        use noshape_model::regen::features::importing::{DERIVED_CONFIG_PREFIX, derived_configuration};
+        let pal = p();
+        let Some(cfg) = sources.iter().find(|s| s.tab == current).map(|s| s.configuration.clone()).filter(|c| !c.inputs.is_empty()) else { return Vec::new() };
+        let chosen = derived_configuration(&self.feature.params);
+        let (vis, eff) = cfg.visibility(&chosen);
+        let mut rows = Vec::new();
+        for (input, v) in cfg.inputs.iter().zip(&vis) {
+            if !v.visible {
+                continue;
+            }
+            let key = format!("{DERIVED_CONFIG_PREFIX}{}", input.id);
+            let value = eff.0.get(&input.id).cloned().unwrap_or_default();
+            let control: AnyElement = match &input.kind {
+                ConfigInputKind::List { options, .. } => {
+                    let items = options.iter().filter(|o| v.options.contains(&o.id)).map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
+                    let k = key.clone();
+                    self.os_select(&key, items, &value, move |this, id, cx| this.set_value(&k, ParamValue::Text(id.to_string()), cx), cx).into_any_element()
+                }
+                ConfigInputKind::Checkbox { .. } => {
+                    let on = value == "true";
+                    let k = key.clone();
+                    crate::ui::os_checkbox(SharedString::from(format!("dcfg-{}", input.id)), "", on)
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&k, ParamValue::Text((!on).to_string()), cx)))
+                        .into_any_element()
+                }
+                _ => continue,
+            };
+            rows.push(
+                h_flex()
+                    .w_full()
+                    .gap(px(6.))
+                    .child(div().w(px(80.)).flex_none().truncate().text_size(px(12.)).text_color(pal.text_muted).child(input.name.clone()))
+                    .child(div().flex_1().min_w_0().child(control))
+                    .into_any_element(),
+            );
+        }
+        rows
     }
 
     /// Load the label, parts and update status of an external source in the background.
@@ -2222,7 +2323,9 @@ impl FeatureDialog {
                         .when(err.is_some(), |d| d.bg(pal.error_fill))
                         .hover(|d| d.border_color(pal.accent))
                         // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
-                        .when(focused && err.is_none(), |d| d.border_b_2().mb(px(-1.)).border_color(pal.accent))
+                        // (A 1 px border plus a 1 px inset line above it, so
+                        // the underline thickens upward like live's inset shadow.)
+                        .when(focused && err.is_none(), |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))
                         // The input stays in the tree (so clicks and Tab can
                         // focus it); unfocused, the converted value covers it.
                         .relative()
@@ -2385,6 +2488,20 @@ impl Render for FeatureDialog {
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(DialogEvent::Accept { repeat: false })))
+            // Tab / Shift+Tab walk the controls in paint (DOM) order; past
+            // either end the focus leaves the dialog (live psb 10-19 h).
+            .on_action(cx.listener(|this, _: &crate::actions::DialogTab, window, cx| {
+                window.focus_next(cx);
+                if !this.focus.contains_focused(window, cx) {
+                    cx.emit(DialogEvent::LeaveFocus { forward: true });
+                }
+            }))
+            .on_action(cx.listener(|this, _: &crate::actions::DialogTabPrev, window, cx| {
+                window.focus_prev(cx);
+                if !this.focus.contains_focused(window, cx) {
+                    cx.emit(DialogEvent::LeaveFocus { forward: false });
+                }
+            }))
             .on_action(cx.listener(|_, _: &crate::actions::AcceptAndRepeat, _, cx| cx.emit(DialogEvent::Accept { repeat: true })))
             // A: flip the primary axis of a mate connector being edited.
             .on_action(cx.listener(|this, _: &crate::actions::FlipPrimaryAxis, _, cx| {
@@ -2575,10 +2692,7 @@ impl Render for FeatureDialog {
                 };
                 d.child(div().p(px(4.)).child(crate::ui::alert(kind).text_size(px(12.)).child(div().flex_1().min_w_0().whitespace_normal().child(msg))))
             })
-            // Tab / Shift+Tab move between the dialog's fields and stay in the
-            // dialog (Onshape), instead of going on to the toolbar or view cube.
             .children(ref_panel)
-            .focus_trap("feature-dialog-fields", &self.focus)
     }
 }
 

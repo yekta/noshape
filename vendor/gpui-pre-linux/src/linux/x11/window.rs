@@ -730,6 +730,10 @@ impl X11WindowState {
                         | xinput::XIEventMask::from(1u32 << xinput::GESTURE_PINCH_UPDATE_EVENT)
                         | xinput::XIEventMask::from(1u32 << xinput::GESTURE_PINCH_END_EVENT);
             }
+            // NOSHAPE PATCH: touch screens (XInput 2.2).
+            if super::client::XINPUT_TOUCH.load(std::sync::atomic::Ordering::Relaxed) {
+                xi_event_mask |= xinput::XIEventMask::TOUCH_BEGIN | xinput::XIEventMask::TOUCH_UPDATE | xinput::XIEventMask::TOUCH_END;
+            }
             check_reply(
                 || "X11 XiSelectEvents failed.",
                 xcb.xinput_xi_select_events(

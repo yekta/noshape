@@ -108,7 +108,7 @@ impl DrawingEditor {
             {
                 *parent = sel_view
             }
-            Tool::Table { kind: TableTool::Bom | TableTool::Hole | TableTool::CutList, view, .. } if view.is_none() => *view = sel_view,
+            Tool::Table { kind: TableTool::Bom | TableTool::Hole | TableTool::CutList | TableTool::Custom, view, .. } if view.is_none() => *view = sel_view,
             _ => {}
         }
         self.overlay = Overlay::default();
@@ -138,6 +138,22 @@ impl DrawingEditor {
         }
         if self.weld_dlg.is_some() {
             self.close_weld_dlg(false, cx);
+            return;
+        }
+        if self.gdt_dlg.is_some() {
+            self.close_gdt_dlg(false, cx);
+            return;
+        }
+        if self.custom_tables.dlg.as_ref().is_some_and(|d| d.picker.is_some()) {
+            if let Some(d) = &mut self.custom_tables.dlg {
+                d.picker = None;
+            }
+            cx.notify();
+            return;
+        }
+        if self.custom_tables.dlg.as_ref().is_some_and(|d| d.table.is_some()) {
+            self.custom_tables.dlg = None;
+            cx.notify();
             return;
         }
         if self.stack_dlg.take().is_some() {
@@ -278,11 +294,11 @@ impl DrawingEditor {
             Tool::Ordinate { horizontal: None, .. } => "Move up/down (x values) or sideways (y values) and click to place the zero",
             Tool::Ordinate { .. } => "Select points to dimension (Esc to finish)",
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => "Click to place the table (top-right corner)",
-            Tool::Table { kind: TableTool::Bom | TableTool::CutList, .. } => "Click to place the table",
+            Tool::Table { kind: TableTool::Bom | TableTool::CutList | TableTool::Custom, .. } => "Click to place the table",
             Tool::Table { view: None, .. } => "Select the view the table is for",
             Tool::Table { kind: TableTool::Hole, origin: None, .. } => "Select the origin (a vertex or circle center)",
             Tool::Table { .. } => "Click to place the table (top-right corner)",
-            Tool::Gdt => "Click to place the feature control frame",
+            Tool::Gdt => "Click to place the geometric tolerance",
             Tool::Datum { anchor: None } => "Click the edge or point the datum is attached to",
             Tool::Datum { .. } => "Click to place the datum box",
             Tool::SurfaceFinish => "Click the edge the symbol sits on",
@@ -808,7 +824,7 @@ impl DrawingEditor {
         if matches!(self.tool, Tool::Detail { .. }) && self.detail_click(cx) {
             return;
         }
-        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) {
+        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.gdt_click(cx) {
             return;
         }
         if self.extra_tool_click(window, cx) {
@@ -932,7 +948,9 @@ impl DrawingEditor {
                 // pick) instead of placing; on a picked edge it deselects it.
                 let more = kind == DimTool::Linear && picks.len() == 1 && self.smart_takes(c, &picks[0]);
                 if !more && let Some(a) = self.pending_annotation() {
-                    self.edit_sheet(kind.name(), cx, |s| s.annotations.push(a));
+                    // Chamfer, Dimensions style: the two legs as linear dimensions.
+                    let anns = self.chamfer_as_dimensions(&a).unwrap_or_else(|| vec![a]);
+                    self.edit_sheet(kind.name(), cx, |s| s.annotations.extend(anns));
                     self.tool = Tool::Dimension { kind, picks: vec![] };
                 } else {
                     match kind {
@@ -1327,6 +1345,7 @@ impl DrawingEditor {
     /// A table tool waiting for the placing click.
     pub fn placing_table(&self) -> bool {
         match &self.tool {
+            Tool::Table { kind: TableTool::Custom, .. } => self.custom_dlg_placing(),
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => true,
             Tool::Table { kind: TableTool::Hole, view: Some(_), origin, .. } => origin.is_some(),
             Tool::Table { view: Some(_), .. } => true,
@@ -1498,7 +1517,9 @@ impl DrawingEditor {
             cx.stop_propagation();
             return;
         }
-        if k.modifiers.control || k.modifiers.platform || k.modifiers.alt || self.panel.is_some() {
+        // Typing in a dialog's text box (focus inside the editor, not on it)
+        // never triggers drawing shortcuts.
+        if k.modifiers.control || k.modifiers.platform || k.modifiers.alt || self.panel.is_some() || (self.focus.contains_focused(window, cx) && !self.focus.is_focused(window)) {
             return;
         }
         // Shift+Q: midpoints and quad points on / off for the current dimension command.
@@ -1732,8 +1753,11 @@ impl DrawingEditor {
                 }
             }
             Some(PickTarget::Table(id)) => {
-                // On a divider: fit it to the text; in a cell: edit the cell.
-                if !self.fit_table_divider(id, cx) {
+                // On a divider: fit it to the text; in a cell: edit the cell;
+                // a custom table's fixed corner: its properties (help).
+                if self.custom_corner_at(id) {
+                    self.open_custom_props(id, cx);
+                } else if !self.fit_table_divider(id, cx) {
                     self.open_cell_panel(id, window, cx)
                 }
             }
@@ -1885,7 +1909,7 @@ impl DrawingEditor {
                     t.edit_sheet("Delete annotation", cx, |s| s.annotations.retain(|x| x.id != id));
                 }));
             }
-            Some(Sel::Table(id)) => out.extend(self.table_entries(id)),
+            Some(Sel::Table(id)) => out.extend(self.table_entries(id, cx)),
             Some(Sel::Sketch(id)) => out.extend(self.sketch_entries(id)),
             Some(Sel::Image(id)) => out.extend(self.image_entries(id)),
             Some(Sel::Hatch(id)) => {
@@ -1958,3 +1982,37 @@ impl DrawingEditor {
             .collect()
     }
 }
+
+impl DrawingEditor {
+    /// A chamfer dimension under Dimensions style (Drawing properties ›
+    /// Dimensions › Chamfer, 45° or not): its two legs as aligned linear
+    /// dimensions (live drawing/255–259); None for Note style.
+    fn chamfer_as_dimensions(&self, a: &Annotation) -> Option<Vec<Annotation>> {
+        let AnnotationKind::ChamferDimension { view, a: pa, b: pb, c: pc, d: pd } = a.kind else { return None };
+        let u = [pb[0] - pa[0], pb[1] - pa[1]];
+        let w = [pd[0] - pc[0], pd[1] - pc[1]];
+        let (lu, lw) = (len(u), len(w));
+        if lu < 1e-12 || lw < 1e-12 {
+            return None;
+        }
+        let wn = [w[0] / lw, w[1] / lw];
+        let along = u[0] * wn[0] + u[1] * wn[1];
+        let ang = (along.abs() / lu).min(1.0).acos().to_degrees();
+        let p = &self.drawing.props;
+        let as_dims = if (ang - 45.0).abs() < 0.05 { p.chamfer_45_dimension } else { p.chamfer_dimension };
+        if !as_dims {
+            return None;
+        }
+        let corner = [pa[0] + wn[0] * along, pa[1] + wn[1] * along];
+        let id = a.id;
+        let leg = |k: u64, x: [f64; 2], y: [f64; 2], slot: Option<(u8, u8)>| {
+            let refs: Vec<AnnotationRef> = match slot {
+                Some((from, to)) => a.refs.iter().filter(|r| r.slot == from).map(|r| AnnotationRef { slot: to, point: r.point.clone() }).collect(),
+                None => Vec::new(),
+            };
+            Annotation { id: id + k, kind: AnnotationKind::LinearDimension { view, a: x, b: y, offset: 6.0, orientation: DimOrientation::Aligned, override_text: None }, position: a.position, refs, ..Default::default() }
+        };
+        Some(vec![leg(0, pa, corner, Some((0, 0))), leg(1, corner, pb, Some((1, 1)))])
+    }
+}
+

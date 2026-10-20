@@ -185,7 +185,7 @@ impl DrawingEditor {
         let mut out = vec![MenuEntry::item("Revision table properties…", move |t, w, cx| t.open_revision_props(id, w, cx))];
         let Some(t) = self.drawing.sheets[self.sheet].table(id) else { return out };
         // The revision of the row under the cursor (row 0 is the header).
-        let data = noshape_model::drawing::tables::table_data(&self.drawing, t, None, None, None, &self.info.revisions, &|s| s.to_string());
+        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
         let row_rev = cell.and_then(|(r, _)| r.checked_sub(1)).and_then(|r| data.rows.get(r)).map(|r| r[0].trim_end_matches('*').to_string());
         let rev = row_rev.clone().unwrap_or_else(|| self.latest_revision());
         out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: rev.clone() }, cx)));
@@ -213,7 +213,7 @@ impl DrawingEditor {
     /// a column header (row 0) or a revision's description (its row).
     pub fn open_revision_cell(&mut self, t: &Table, window: &mut Window, cx: &mut Context<Self>) {
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(t.id)).cloned() else { return };
-        let data = noshape_model::drawing::tables::table_data(&self.drawing, t, None, None, None, &self.info.revisions, &|s| s.to_string());
+        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
         let in_title = l.title && self.cursor[1] <= l.ys[0] && self.cursor[1] >= l.ys[1];
         let (row, col, text) = match (in_title, l.cell_at(self.cursor)) {
             (true, _) => (usize::MAX, 0, data.title.clone().unwrap_or_default()),
@@ -230,7 +230,7 @@ impl DrawingEditor {
     pub fn apply_revision_cell(&mut self, table: u64, row: usize, col: usize, text: String, cx: &mut Context<Self>) {
         // The row's revision (descriptions are kept per revision).
         let rev = self.drawing.sheets[self.sheet].table(table).and_then(|t| {
-            let data = noshape_model::drawing::tables::table_data(&self.drawing, t, None, None, None, &self.info.revisions, &|s| s.to_string());
+            let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
             data.rows.get(row.wrapping_sub(1)).map(|r| r[0].trim_end_matches('*').to_string())
         });
         self.edit_table(table, "Edit revision table", cx, |t| {

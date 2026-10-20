@@ -60,38 +60,30 @@ pub(super) enum LinkedAction {
     Export,
 }
 
-/// Edit properties / Export of an item from another document's version: that
-/// document opens in its window at the version (read-only, as Onshape opens
-/// the item's own document) and the action runs there. Returns false for a
-/// version of the releasing document (not reachable from its open dialog).
-pub(super) fn run_linked(item: &ReleaseItem, action: LinkedAction, cx: &mut App) -> bool {
-    let Some(l) = item.document.as_ref().filter(|l| !l.path.is_empty()) else { return false };
+/// Edit properties / Export of an item from a version (another document's,
+/// or the releasing document's own): the document opens at that version in a
+/// window of its own, read-only (Onshape opens a version in a new tab), and
+/// the action runs there. `this_doc` is the releasing document's file.
+pub(super) fn run_linked(item: &ReleaseItem, this_doc: &std::path::Path, action: LinkedAction, cx: &mut App) -> bool {
+    let Some(l) = item.document.as_ref() else { return false };
     let Ok(mv) = l.version.parse::<noshape_store::MicroversionId>() else { return false };
-    let path = PathBuf::from(&l.path);
+    let path = if l.path.is_empty() { this_doc.to_path_buf() } else { PathBuf::from(&l.path) };
     let Some(gpu) = cx.try_global::<crate::gpu::GpuGlobal>().map(|g| g.0.clone()) else { return false };
-    if crate::files::open_document_window(path.clone(), None, gpu, cx).is_err() {
-        return false;
-    }
-    let Some(handle) = crate::files::document_window(&path, cx) else { return false };
+    let Ok((handle, ws)) = crate::files::open_version_window(path, mv, gpu, cx) else { return false };
     let mut local = item.clone();
     local.document = None;
-    let _ = handle.update(cx, move |_, window, cx| {
-        let ws = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<crate::workspace::Workspace>().ok());
-        let Some(ws) = ws else { return };
-        let d = ws.read(cx).doc.clone();
-        d.update(cx, |doc, cx| match doc.session.view_microversion(Some(mv)) {
-            Ok(()) => doc.reloaded(cx),
-            Err(e) => cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))),
-        });
-        // After the window has built its tab views (a new window has none
-        // until it has drawn).
-        window.on_next_frame(move |window, _| {
-            window.on_next_frame(move |window, cx| match action {
-                LinkedAction::Export => crate::workspace::request_export(local.tab, local.part.iter().cloned().collect(), window, cx),
+    // Once the new window has built its tab views and regenerated.
+    cx.spawn(async move |cx| {
+        cx.background_executor().timer(std::time::Duration::from_millis(800)).await;
+        let _ = handle.update(cx, move |_, window, cx| {
+            let d = ws.read(cx).doc.clone();
+            match action {
+                LinkedAction::Export => ws.update(cx, |w, cx| w.export_item(local.tab, local.part.iter().cloned().collect(), window, cx)),
                 LinkedAction::Properties => super::open_item_properties(d, local, |_, _, _| {}, window, cx),
-            })
+            }
         });
-    });
+    })
+    .detach();
     true
 }
 
@@ -437,7 +429,9 @@ impl AddItemsDialog {
                     let _ = crate::files::open_document_window(path, None, gpu, cx);
                 }
             }
-            None => window.dispatch_action(Box::new(crate::actions::CreateVersion), cx),
+            // Called directly: an action dispatched from the dialog layer
+            // doesn't reach the Workspace.
+            None => crate::history_panel::open_create_version(self.doc.clone(), window, cx),
         }
     }
 

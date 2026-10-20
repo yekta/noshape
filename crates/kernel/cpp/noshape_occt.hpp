@@ -314,12 +314,19 @@ std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
 void                     write_iges(const OcShapeList& shapes, rust::Str path);
 void                     write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary);
 std::unique_ptr<OcShape> read_parasolid(rust::Str path);
+StepImport               read_parasolid_parts(rust::Str path);
+StepImport               read_rhino_parts_ffi(rust::Str path);
+StepImport               read_native_parts_ffi(rust::Str path);
+StepImport               read_sat_parts_ffi(rust::Str path);
+StepImport               read_jt_parts_ffi(rust::Str path);
 void                     write_acis(const OcShapeList& shapes, rust::Str path);
 void     write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path, uint32_t version);
 uint32_t rhino_valid_breps(rust::Str path);
 void     write_jt(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
 void     write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Str path);
-std::unique_ptr<OcShape> read_pvz(rust::Str path, uint32_t merge_limit);
+std::unique_ptr<OcShape> read_pvz(rust::Str path);
+std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path);
+bool                     is_mesh(const OcShape& s);
 
 // ---- HLR (hlr.cpp)
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,

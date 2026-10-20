@@ -27,7 +27,7 @@
 // Senses: an edge runs along its curve; the face normal is the outward normal
 // (solid) or the OCCT face normal (sheet), and face->sense says whether it
 // agrees with the XT surface's natural normal (computed from the XT
-// definition: a cone's points toward its axis). Fins follow the OCCT edge
+// definition: a cone's points away from its axis). Fins follow the OCCT edge
 // orientation in the face, which keeps the face on their left.
 
 #include "internal.hpp"
@@ -592,11 +592,13 @@ struct BodyWriter
     }
     if (auto c = occ::down_cast<Geom_ConicalSurface>(s))
     {
-      // XT: R = P - v A + (X cos u + Y sin u)(r + v tan a), Y = A x X, A toward the apex.
+      // XT: R = P + v A + (X cos u + Y sin u)(r + v tan a), Y = A x X, A the
+      // way the cone widens (as Onshape and NX write cones; the XT
+      // reference's formula has the opposite sign).
       const gp_Ax3 a     = c->Position();
       const double alpha = c->SemiAngle();
       const gp_XYZ z     = a.Direction().XYZ();
-      const gp_XYZ A     = alpha > 0 ? z.Reversed() : z;
+      const gp_XYZ A     = alpha > 0 ? z : z.Reversed();
       const gp_XYZ X     = a.XDirection().XYZ();
       // XT u turns about A; OCCT's about Z (or -Z when indirect).
       const bool same_turn = (A.Dot(a.XDirection().XYZ().Crossed(a.YDirection().XYZ())) > 0);
@@ -612,7 +614,7 @@ struct BodyWriter
         gp_Vec radial = r - gp_Vec(A) * r.Dot(gp_Vec(A));
         if (radial.Magnitude() > 0)
           radial.Normalize();
-        return -radial - gp_Vec(A) * t;
+        return radial - gp_Vec(A) * t;
       };
       return xs;
     }
@@ -849,8 +851,11 @@ struct BodyWriter
     return idx;
   }
 
-  // Trimmed SP-curve of a tolerant edge's fin: the OCCT pcurve on the face's XT surface.
-  int fin_curve(int fin_node, const TopoDS_Edge& e, int face)
+  // Trimmed SP-curve of a tolerant edge's fin: the OCCT pcurve on the face's
+  // XT surface, run along the fin (Parasolid's convention, as NX writes
+  // them): on a negative fin, a B-curve of negative sense trimmed from its
+  // end back to its start.
+  int fin_curve(int fin_node, const TopoDS_Edge& e, int face, bool positive)
   {
     const TopoDS_Face& F = TopoDS::Face(faces(face + 1));
     double             f, l;
@@ -881,14 +886,14 @@ struct BodyWriter
     const int bc = w.b_curve(0, p, rat ? 3 : 2, rat, b->Degree(), b->NbPoles(), b->Knots(), b->Multiplicities(), false);
     const int sp = w.alloc();
     Node&     n  = add(137, sp);
-    Writer::geom_head(n, w.next_id++, body, '+');
+    Writer::geom_head(n, w.next_id++, body, positive ? '+' : '-');
     n.fields.insert(n.fields.end(), {fp(xs.index), fp(bc), fp(0), ff_null()});
     chain_curve.push_back(sp);
     depend(xs.index, sp);
     TopLoc_Location           loc;
     occ::handle<Geom_Surface> surf = BRep_Tool::Surface(F, loc);
     auto at = [&](double t) { return surf->Value(pc->Value(t).X(), pc->Value(t).Y()).Transformed(loc.Transformation()); };
-    return trimmed(fin_node, sp, at(f), at(l), f, l);
+    return positive ? trimmed(fin_node, sp, at(f), at(l), f, l) : trimmed(fin_node, sp, at(l), at(f), l, f);
   }
 
   // The point on both faces' surfaces in the plane through x0 normal to t
@@ -1295,7 +1300,7 @@ struct BodyWriter
       {
         for (int k : edge_fins[i])
           if (!fins[k].dummy)
-            fins[k].curve = fin_curve(fins[k].index, e, fins[k].face);
+            fins[k].curve = fin_curve(fins[k].index, e, fins[k].face, fins[k].positive);
         continue;
       }
       double                  f, l;
@@ -1613,609 +1618,58 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary)
 
 // ---------------------------------------------------------------- reader
 //
-// Reads the transmit files written above (schema 12006, the node types this
-// writer uses) back into OCCT: for round-trip checks, and Parasolid import
-// of such files. Orientation comes from the file alone: face senses and fin
-// directions are not repaired, so a wrong one shows as an invalid solid.
-
-namespace {
-
-// Field types per node type (schema 12006, the nodes written above).
-const std::map<int, std::string>& schema()
-{
-  static const std::map<int, std::string> s = {
-    {12, "dppppppffpppupuuppppppp"}, {13, "dpppppppp"}, {14, "dpfpppppcppppp"}, {15, "dpppp"},
-    {16, "dpfppppppp"}, {17, "pppppppppc"}, {18, "dpppppfp"}, {19, "dpppppc"},
-    {29, "dppppv"}, {30, "dpppppcvv"}, {31, "dpppppcvvvf"}, {32, "dpppppcvvvff"},
-    {45, "F"}, {50, "dpppppcvvv"}, {51, "dpppppcvvfv"}, {52, "dpppppcvvfffv"},
-    {53, "dpppppcvfvv"}, {54, "dpppppcvvffv"}, {68, "dpppppcpvvvvffvf"}, {74, "dpP"}, {124, "dpppppcpp"},
-    {126, "llnnddUUddlllunppppp"}, {127, "N"}, {128, "F"}, {133, "dpppppcpvvff"},
-    {134, "dpppppcpp"}, {136, "ndndullluppp"}, {137, "dpppppcpppf"}, {141, "pppp"},
-  };
-  return s;
-}
-
-struct PNode
-{
-  int                type = 0;
-  std::vector<Field> f;
-};
-
-struct Reader
-{
-  std::string           data;
-  size_t                at = 0;
-  bool                  binary = false;
-  std::map<int, PNode>  nodes;
-
-  // ---- text
-  std::string text; // records joined, trailing spaces removed
-  size_t      t = 0;
-
-  long long tint()
-  {
-    size_t e = text.find(' ', t);
-    if (e == std::string::npos)
-      fail_invalid("parasolid: truncated file");
-    long long v = std::stoll(text.substr(t, e - t));
-    t           = e + 1;
-    return v;
-  }
-  Field tfield(char ty)
-  {
-    Field f{ty};
-    if (text[t] == '?' && ty != 'c' && ty != 'l')
-    {
-      ++t;
-      f.null = true;
-      return f;
-    }
-    switch (ty)
-    {
-      case 'c':
-        f.i = text[t++];
-        break;
-      case 'l':
-        f.i = text[t++] == 'T';
-        break;
-      case 'f':
-      case 'v':
-        for (int k = 0; k < (ty == 'v' ? 3 : 1); ++k)
-        {
-          size_t e = text.find(' ', t);
-          f.x[k]   = std::strtod(text.substr(t, e - t).c_str(), nullptr);
-          t        = e + 1;
-        }
-        break;
-      default:
-        f.i = tint();
-    }
-    return f;
-  }
-
-  // ---- binary (big-endian)
-  int b8() { return (unsigned char)data.at(at++); }
-  int b16()
-  {
-    int v = (b8() << 8) | b8();
-    return (int16_t)v;
-  }
-  long long b32()
-  {
-    uint32_t v = 0;
-    for (int k = 0; k < 4; ++k)
-      v = (v << 8) | (uint32_t)b8();
-    return (int32_t)v;
-  }
-  double b64()
-  {
-    uint64_t v = 0;
-    for (int k = 0; k < 8; ++k)
-      v = (v << 8) | (uint64_t)b8();
-    double d;
-    std::memcpy(&d, &v, 8);
-    return d;
-  }
-  long long bptr()
-  {
-    int q = 0, r = b16();
-    if (r < 0)
-    {
-      q = b16();
-      r = -r;
-    }
-    return (long long)q * 32767 + r - 1;
-  }
-  Field bfield(char ty)
-  {
-    Field f{ty};
-    switch (ty)
-    {
-      case 'd':
-        f.i = b32();
-        break;
-      case 'p':
-        f.i = bptr();
-        break;
-      case 'n':
-        f.i = b16();
-        break;
-      case 'u':
-      case 'c':
-      case 'l':
-        f.i = b8();
-        break;
-      case 'f':
-        f.x[0] = b64();
-        f.null = f.x[0] == -3.14158e13;
-        break;
-      case 'v':
-        for (int k = 0; k < 3; ++k)
-          f.x[k] = b64();
-        f.null = f.x[0] == -3.14158e13;
-        break;
-    }
-    return f;
-  }
-
-  void parse()
-  {
-    const size_t h = data.find("**END_OF_HEADER");
-    if (h == std::string::npos)
-      fail_invalid("parasolid: no header");
-    at = data.find('\n', h);
-    if (at == std::string::npos)
-      fail_invalid("parasolid: truncated file");
-    ++at;
-    binary = data.compare(at, 4, std::string("PS\0\0", 4)) == 0;
-    auto field = [&](char ty) { return binary ? bfield(ty) : tfield(ty); };
-    if (binary)
-    {
-      at += 4;
-      at += b16();
-      at += b32();
-      b32();
-    }
-    else
-    {
-      std::istringstream in(data.substr(at));
-      std::string        line;
-      while (std::getline(in, line))
-      {
-        while (!line.empty() && (line.back() == ' ' || line.back() == '\r'))
-          line.pop_back();
-        text += line;
-      }
-      text += ' ';
-      if (text[t++] != 'T')
-        fail_invalid("parasolid: not a transmit file");
-      t += tint();
-      t += tint();
-      tint();
-    }
-    for (;;)
-    {
-      const int type = binary ? b16() : (int)tint();
-      if (type == 1)
-        break;
-      auto it = schema().find(type);
-      if (it == schema().end())
-        fail_unsupported("parasolid: node type " + std::to_string(type) + " is not supported");
-      const std::string& spec = it->second;
-      const bool variable = std::any_of(spec.begin(), spec.end(), [](char c) { return c == 'F' || c == 'N' || c == 'P'; });
-      long long  count    = 0;
-      if (variable)
-        count = binary ? b32() : tint();
-      const int index = (int)(binary ? bptr() : tint());
-      PNode     n;
-      n.type = type;
-      for (char c : spec)
-      {
-        if (c == 'F' || c == 'N' || c == 'P')
-        {
-          const char ty = c == 'F' ? 'f' : c == 'N' ? 'n' : 'p';
-          for (long long k = 0; k < count; ++k)
-            n.f.push_back(field(ty));
-        }
-        else
-          n.f.push_back(field(c == 'U' ? 'u' : c));
-      }
-      nodes[index] = std::move(n);
-    }
-  }
-
-  const PNode& at_index(long long i)
-  {
-    auto it = nodes.find((int)i);
-    if (it == nodes.end())
-      fail_invalid("parasolid: dangling pointer " + std::to_string(i));
-    return it->second;
-  }
-};
-
-gp_Pnt P(const Field& f)
-{
-  return gp_Pnt(f.x[0], f.x[1], f.x[2]);
-}
-gp_Dir D(const Field& f)
-{
-  return gp_Dir(f.x[0], f.x[1], f.x[2]);
-}
-
-struct Builder
-{
-  Reader&                                   r;
-  std::map<int, occ::handle<Geom_Surface>>  surf;
-  std::map<int, double>                     cone_cos; // cones: OCCT (u, v) = (-u, v / cos a)
-  std::map<int, TopoDS_Vertex>              verts;
-  std::map<int, TopoDS_Edge>                edges;
-  BRep_Builder                              B;
-
-  explicit Builder(Reader& r_) : r(r_) {}
-
-  void nurbs(const PNode& n, int skip, std::vector<double>& poles, std::vector<double>& knots, std::vector<int>& mults)
-  {
-    (void)skip;
-    const PNode& pv = r.at_index(n.f[n.f.size() - 3].i);
-    const PNode& km = r.at_index(n.f[n.f.size() - 2].i);
-    const PNode& ks = r.at_index(n.f[n.f.size() - 1].i);
-    for (auto& x : pv.f)
-      poles.push_back(x.x[0]);
-    for (auto& x : km.f)
-      mults.push_back((int)x.i);
-    for (auto& x : ks.f)
-      knots.push_back(x.x[0]);
-  }
-
-  static NCollection_Array1<double> arr(const std::vector<double>& v)
-  {
-    NCollection_Array1<double> a(1, (int)v.size());
-    for (size_t i = 0; i < v.size(); ++i)
-      a((int)i + 1) = v[i];
-    return a;
-  }
-  static NCollection_Array1<int> arr(const std::vector<int>& v)
-  {
-    NCollection_Array1<int> a(1, (int)v.size());
-    for (size_t i = 0; i < v.size(); ++i)
-      a((int)i + 1) = v[i];
-    return a;
-  }
-
-  occ::handle<Geom_Surface> surface(int idx)
-  {
-    if (surf.count(idx))
-      return surf[idx];
-    const PNode&              n = r.at_index(idx);
-    const auto&               f = n.f;
-    occ::handle<Geom_Surface> s;
-    switch (n.type)
-    {
-      case 50:
-        s = new Geom_Plane(gp_Ax3(P(f[7]), D(f[8]), D(f[9])));
-        break;
-      case 51:
-        s = new Geom_CylindricalSurface(gp_Ax3(P(f[7]), D(f[8]), D(f[10])), f[9].x[0]);
-        break;
-      case 52:
-      {
-        const double a = std::atan2(f[10].x[0], f[11].x[0]);
-        s              = new Geom_ConicalSurface(gp_Ax3(P(f[7]), D(f[8]).Reversed(), D(f[12])), a, f[9].x[0]);
-        cone_cos[idx]  = std::cos(a);
-        break;
-      }
-      case 53:
-        s = new Geom_SphericalSurface(gp_Ax3(P(f[7]), D(f[9]), D(f[10])), f[8].x[0]);
-        break;
-      case 54:
-        s = new Geom_ToroidalSurface(gp_Ax3(P(f[7]), D(f[8]), D(f[11])), f[9].x[0], f[10].x[0]);
-        break;
-      case 68:
-        s = new Geom_SurfaceOfRevolution(curve((int)f[7].i), gp_Ax1(P(f[8]), D(f[9])));
-        break;
-      case 124:
-      {
-        const PNode& ns = r.at_index(f[7].i);
-        const auto&  g  = ns.f;
-        const int    du = (int)g[2].i, dv = (int)g[3].i, nu = (int)g[4].i, nv = (int)g[5].i, dim = (int)g[14].i;
-        const bool   rat = g[10].i;
-        const PNode& pv  = r.at_index(g[15].i);
-        NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
-        NCollection_Array2<double> w(1, nu, 1, nv);
-        for (int i = 0; i < nu; ++i)
-          for (int j = 0; j < nv; ++j)
-          {
-            const double* q  = &pv.f[(size_t)((i * nv + j) * dim)].x[0];
-            const double  wt = rat ? pv.f[(size_t)((i * nv + j) * dim + 3)].x[0] : 1.0;
-            poles(i + 1, j + 1) = gp_Pnt(pv.f[(size_t)((i * nv + j) * dim)].x[0] / wt, pv.f[(size_t)((i * nv + j) * dim + 1)].x[0] / wt,
-                                         pv.f[(size_t)((i * nv + j) * dim + 2)].x[0] / wt);
-            w(i + 1, j + 1) = wt;
-            (void)q;
-          }
-        auto ints = [&](long long i) {
-          std::vector<int> v;
-          for (auto& x : r.at_index(i).f)
-            v.push_back((int)x.i);
-          return v;
-        };
-        auto reals = [&](long long i) {
-          std::vector<double> v;
-          for (auto& x : r.at_index(i).f)
-            v.push_back(x.x[0]);
-          return v;
-        };
-        s = rat ? new Geom_BSplineSurface(poles, w, arr(reals(g[18].i)), arr(reals(g[19].i)), arr(ints(g[16].i)), arr(ints(g[17].i)), du, dv)
-                : new Geom_BSplineSurface(poles, arr(reals(g[18].i)), arr(reals(g[19].i)), arr(ints(g[16].i)), arr(ints(g[17].i)), du, dv);
-        break;
-      }
-      default:
-        fail_unsupported("parasolid: surface type " + std::to_string(n.type));
-    }
-    return surf[idx] = s;
-  }
-
-  // XT natural normal agrees with OCCT's except for cones and spun surfaces
-  // (u and v swapped).
-  bool natural_flipped(int idx) { return r.at_index(idx).type == 52 || r.at_index(idx).type == 68; }
-
-  // B_CURVE (3D or 2D) as poles, weights, knots.
-  void b_curve(int idx, int& degree, int& dim, bool& rat, std::vector<double>& p, std::vector<double>& knots, std::vector<int>& mults)
-  {
-    const PNode& b  = r.at_index(idx);
-    const PNode& nc = r.at_index(b.f[7].i);
-    degree          = (int)nc.f[0].i;
-    dim             = (int)nc.f[2].i;
-    rat             = nc.f[7].i;
-    for (auto& x : r.at_index(nc.f[9].i).f)
-      p.push_back(x.x[0]);
-    for (auto& x : r.at_index(nc.f[10].i).f)
-      mults.push_back((int)x.i);
-    for (auto& x : r.at_index(nc.f[11].i).f)
-      knots.push_back(x.x[0]);
-  }
-
-  occ::handle<Geom_Curve> curve(int idx)
-  {
-    const PNode& n = r.at_index(idx);
-    const auto&  f = n.f;
-    switch (n.type)
-    {
-      case 30:
-        return new Geom_Line(P(f[7]), D(f[8]));
-      case 31:
-        return new Geom_Circle(gp_Ax2(P(f[7]), D(f[8]), D(f[9])), f[10].x[0]);
-      case 32:
-        return new Geom_Ellipse(gp_Ax2(P(f[7]), D(f[8]), D(f[9])), f[10].x[0], f[11].x[0]);
-      case 134:
-      {
-        int                 deg, dim;
-        bool                rat;
-        std::vector<double> p, k;
-        std::vector<int>    m;
-        b_curve(idx, deg, dim, rat, p, k, m);
-        const int                  np = (int)p.size() / dim;
-        NCollection_Array1<gp_Pnt> poles(1, np);
-        NCollection_Array1<double> w(1, np);
-        for (int i = 0; i < np; ++i)
-        {
-          const double wt = rat ? p[(size_t)(i * dim + 3)] : 1.0;
-          poles(i + 1)    = gp_Pnt(p[(size_t)(i * dim)] / wt, p[(size_t)(i * dim + 1)] / wt, p[(size_t)(i * dim + 2)] / wt);
-          w(i + 1)        = wt;
-        }
-        if (rat)
-          return new Geom_BSplineCurve(poles, w, arr(k), arr(m), deg);
-        return new Geom_BSplineCurve(poles, arr(k), arr(m), deg);
-      }
-      default:
-        fail_unsupported("parasolid: curve type " + std::to_string(n.type));
-    }
-  }
-
-  occ::handle<Geom2d_Curve> curve2d(int idx, int surface)
-  {
-    int                 deg, dim;
-    bool                rat;
-    std::vector<double> p, k;
-    std::vector<int>    m;
-    b_curve(idx, deg, dim, rat, p, k, m);
-    const int                    np = (int)p.size() / dim;
-    NCollection_Array1<gp_Pnt2d> poles(1, np);
-    NCollection_Array1<double>   w(1, np);
-    const double                 cc = cone_cos.count(surface) ? cone_cos[surface] : 0;
-    const bool                   swap = r.at_index(surface).type == 68;
-    for (int i = 0; i < np; ++i)
-    {
-      const double wt = rat ? p[(size_t)(i * dim + 2)] : 1.0;
-      double       u = p[(size_t)(i * dim)] / wt, v = p[(size_t)(i * dim + 1)] / wt;
-      if (cc)
-        u = -u, v = v / cc;
-      if (swap)
-        std::swap(u, v);
-      poles(i + 1) = gp_Pnt2d(u, v);
-      w(i + 1)     = wt;
-    }
-    if (rat)
-      return new Geom2d_BSplineCurve(poles, w, arr(k), arr(m), deg);
-    return new Geom2d_BSplineCurve(poles, arr(k), arr(m), deg);
-  }
-
-  TopoDS_Vertex vertex(long long idx)
-  {
-    if (verts.count((int)idx))
-      return verts[(int)idx];
-    const PNode&  v = r.at_index(idx);
-    TopoDS_Vertex V;
-    B.MakeVertex(V, P(r.at_index(v.f[5].i).f[5]), v.f[6].null ? 1e-7 : std::max(1e-7, v.f[6].x[0]));
-    return verts[(int)idx] = V;
-  }
-
-  static double param_on(const occ::handle<Geom_Curve>& c, const gp_Pnt& p)
-  {
-    GeomAPI_ProjectPointOnCurve pr(p, c);
-    if (pr.NbPoints() == 0)
-      fail_op("parasolid: a vertex is off its edge's curve");
-    return pr.LowerDistanceParameter();
-  }
-
-  TopoDS_Edge edge(long long idx)
-  {
-    if (edges.count((int)idx))
-      return edges[(int)idx];
-    const PNode&  e   = r.at_index(idx);
-    const PNode&  fin = r.at_index(e.f[3].i);
-    const PNode&  oth = r.at_index(fin.f[5].i);
-    TopoDS_Vertex v1  = vertex(oth.f[4].i), v2 = vertex(fin.f[4].i);
-    const double  tol = e.f[2].null ? 1e-7 : std::max(1e-7, e.f[2].x[0]);
-    TopoDS_Edge   E;
-    if (e.f[6].i)
-    {
-      const PNode&            cn = r.at_index(e.f[6].i);
-      occ::handle<Geom_Curve> c;
-      double                  t1, t2;
-      if (cn.type == 133)
-      {
-        c  = curve((int)cn.f[7].i);
-        t1 = cn.f[10].x[0];
-        t2 = cn.f[11].x[0];
-      }
-      else
-      {
-        c  = curve((int)e.f[6].i);
-        t1 = param_on(c, BRep_Tool::Pnt(v1));
-        t2 = param_on(c, BRep_Tool::Pnt(v2));
-        if (c->IsPeriodic())
-        {
-          while (t2 <= t1 + 1e-12)
-            t2 += c->Period();
-        }
-      }
-      B.MakeEdge(E, c, tol);
-      B.Range(E, t1, t2);
-    }
-    else
-    {
-      // Tolerant: the fins' SP-curves.
-      B.MakeEdge(E);
-      B.UpdateEdge(E, tol);
-      double t1 = 0, t2 = 0;
-      for (long long fi : {e.f[3].i, fin.f[5].i})
-      {
-        const PNode& x = r.at_index(fi);
-        if (!x.f[7].i)
-          continue;
-        const PNode& tr = r.at_index(x.f[7].i);
-        const PNode& sp = r.at_index(tr.f[7].i);
-        const int    s  = (int)sp.f[7].i;
-        B.UpdateEdge(E, curve2d((int)sp.f[8].i, s), surface(s), TopLoc_Location(), tol);
-        t1 = tr.f[10].x[0];
-        t2 = tr.f[11].x[0];
-      }
-      B.Range(E, t1, t2);
-      BRepLib::BuildCurve3d(E, tol);
-    }
-    v1.Orientation(TopAbs_FORWARD);
-    v2.Orientation(TopAbs_REVERSED);
-    B.Add(E, v1);
-    B.Add(E, v2);
-    return edges[(int)idx] = E;
-  }
-
-  TopoDS_Face face(long long idx)
-  {
-    const PNode&              n  = r.at_index(idx);
-    const int                 si = (int)n.f[7].i;
-    occ::handle<Geom_Surface> s  = surface(si);
-    // XT face normal = natural normal, reversed when exactly one sense is '-'.
-    const bool xt_reversed = (n.f[8].i == '-') != (r.at_index(si).f[6].i == '-');
-    const bool flip        = xt_reversed != natural_flipped(si);
-    TopoDS_Face F;
-    B.MakeFace(F, s, 1e-7);
-    for (long long l = n.f[5].i; l; l = r.at_index(l).f[4].i)
-    {
-      if (r.at_index(r.at_index(l).f[2].i).f[6].i == 0)
-        continue; // an isolated loop (a cone's apex): OCCT has its degenerate edge added by the fix below
-      TopoDS_Wire W;
-      B.MakeWire(W);
-      const long long first = r.at_index(l).f[2].i;
-      long long       fi    = first;
-      do
-      {
-        const PNode& fin = r.at_index(fi);
-        TopoDS_Edge  E   = edge(fin.f[6].i);
-        const bool   pos = (fin.f[9].i == '+') != flip;
-        E.Orientation(pos ? TopAbs_FORWARD : TopAbs_REVERSED);
-        B.Add(W, E);
-        fi = fin.f[2].i;
-      } while (fi != first);
-      B.Add(F, W);
-    }
-    if (flip)
-      F.Reverse();
-    return F;
-  }
-};
-
-} // namespace
+// Reading Parasolid files (any version): xt_read.cpp.
 
 std::unique_ptr<OcShape> read_parasolid(rust::Str path)
 {
-  std::ifstream in(std::string(path), std::ios::binary);
-  if (!in)
-    fail_invalid("cannot read " + std::string(path));
-  Reader r;
-  r.data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-  r.parse();
-  Builder         b(r);
-  std::vector<long long> bodies;
-  const PNode&    root = r.at_index(1);
-  if (root.type == 12)
-    bodies.push_back(1);
-  else if (root.type == 74)
-    for (size_t k = 2; k < root.f.size(); ++k)
-      bodies.push_back(root.f[k].i);
+  BRep_Builder    b;
   TopoDS_Compound out;
-  b.B.MakeCompound(out);
-  occ::handle<ShapeBuild_ReShape> ctx = new ShapeBuild_ReShape;
-  for (long long bi : bodies)
+  b.MakeCompound(out);
+  for (const XtPart& p : read_xt_parts(std::string(path)))
+    b.Add(out, p.shape);
+  return wrap(out);
+}
+
+namespace {
+StepImport import_of(const std::vector<XtPart>& parts)
+{
+  StepImport out;
+  out.shapes = std::make_unique<OcShapeList>();
+  for (const XtPart& p : parts)
   {
-    const PNode& body  = r.at_index(bi);
-    const bool   solid = body.f[14].i == 1;
-    TopoDS_Compound part;
-    b.B.MakeCompound(part);
-    for (long long reg = body.f[20].i; reg; reg = r.at_index(reg).f[3].i)
-    {
-      const PNode& R = r.at_index(reg);
-      if (solid && R.f[6].i != 'S')
-        continue;
-      TopoDS_Solid so;
-      b.B.MakeSolid(so);
-      for (long long sh = R.f[5].i; sh; sh = r.at_index(sh).f[3].i)
-      {
-        TopoDS_Shell shell;
-        b.B.MakeShell(shell);
-        for (long long fi = r.at_index(sh).f[4].i; fi; fi = r.at_index(fi).f[3].i)
-          b.B.Add(shell, b.face(fi));
-        if (solid)
-          b.B.Add(so, shell);
-        else
-          b.B.Add(part, shell);
-      }
-      if (solid)
-        b.B.Add(part, so);
-    }
-    b.B.Add(out, part);
+    out.shapes->items.push_back(p.shape);
+    out.names.push_back(rust::String(p.name));
+    for (double c : p.colour)
+      out.colors.push_back((float)c);
+    out.has_color.push_back(p.has_colour);
   }
-  // Missing pcurves and the seams OCCT wants on periodic faces; never orientation.
-  for (TopExp_Explorer ef(out, TopAbs_FACE); ef.More(); ef.Next())
-  {
-    ShapeFix_Face fix(TopoDS::Face(ef.Current()));
-    fix.SetContext(ctx);
-    fix.FixOrientationMode() = 0;
-    fix.Perform();
-  }
-  TopoDS_Shape res = ctx->Apply(out);
-  BRepLib::SameParameter(res, 1e-7, true);
-  return std::make_unique<OcShape>(res);
+  return out;
+}
+} // namespace
+
+StepImport read_parasolid_parts(rust::Str path)
+{
+  return import_of(read_xt_parts(std::string(path)));
+}
+
+StepImport read_rhino_parts_ffi(rust::Str path)
+{
+  return import_of(read_rhino_parts(std::string(path)));
+}
+
+StepImport read_native_parts_ffi(rust::Str path)
+{
+  return import_of(read_native_parts(std::string(path)));
+}
+
+StepImport read_sat_parts_ffi(rust::Str path)
+{
+  return import_of(read_sat_parts(std::string(path)));
+}
+
+StepImport read_jt_parts_ffi(rust::Str path)
+{
+  return import_of(read_jt_parts(std::string(path)));
 }
 
 } // namespace noshape

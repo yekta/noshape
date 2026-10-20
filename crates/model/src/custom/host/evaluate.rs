@@ -10,6 +10,8 @@ use noshape_kernel::ShapeType;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("clusterBodies", cluster_bodies),
+    ("constructPaths", construct_paths),
+    ("approximateSpline", approximate_spline),
     ("evApproximateBSplineCurve", ev_approximate_bspline_curve),
     ("evVertexPoint", ev_vertex_point),
     ("evLine", ev_line),
@@ -831,4 +833,96 @@ fn cluster_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     Ok(Value::array(clusters.into_iter().map(|cl| Value::array(cl.into_iter().map(|k| Value::num(k as f64)).collect())).collect()))
+}
+
+/// `@constructPaths`: the edges chained end to end into [Path]s (std
+/// path.fs), each starting from the first unused edge in query order;
+/// `flipped` marks edges traversed backwards.
+fn construct_paths(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    const TOL: f64 = 1e-8;
+    let cx = context_arg(i, &a)?;
+    let edges = field(&a, "edges");
+    let segs: Vec<(crate::reference::Reference, DVec3, DVec3, bool)> = with_ents(i, &cx, &edges, |_, q, ents| {
+        Ok(ents
+            .iter()
+            .filter(|e| matches!(e, Ent::Edge(..)))
+            .filter_map(|e| {
+                let info = q.shape(e)?.edge_info().ok()?;
+                Some((q.to_ref(e), info.start, info.end, info.closed))
+            })
+            .collect())
+    })?;
+    let near = |p: DVec3, q: DVec3| p.distance(q) <= TOL;
+    let ends = |k: usize, flipped: bool| if flipped { (segs[k].2, segs[k].1) } else { (segs[k].1, segs[k].2) };
+    let mut used = vec![false; segs.len()];
+    let mut paths = Vec::new();
+    for first in 0..segs.len() {
+        if used[first] {
+            continue;
+        }
+        used[first] = true;
+        let mut chain = std::collections::VecDeque::from([(first, false)]);
+        // Forward from the chain's end, then backward from its start.
+        while let Some(next) = (0..segs.len()).filter(|k| !used[*k]).find_map(|k| {
+            let end = ends(chain.back()?.0, chain.back()?.1).1;
+            if near(segs[k].1, end) {
+                Some((k, false))
+            } else if near(segs[k].2, end) {
+                Some((k, true))
+            } else {
+                None
+            }
+        }) {
+            used[next.0] = true;
+            chain.push_back(next);
+        }
+        while let Some(prev) = (0..segs.len()).filter(|k| !used[*k]).find_map(|k| {
+            let start = ends(chain.front()?.0, chain.front()?.1).0;
+            if near(segs[k].2, start) {
+                Some((k, false))
+            } else if near(segs[k].1, start) {
+                Some((k, true))
+            } else {
+                None
+            }
+        }) {
+            used[prev.0] = true;
+            chain.push_front(prev);
+        }
+        let (front, back) = (chain[0], chain[chain.len() - 1]);
+        let closed = if chain.len() == 1 { segs[front.0].3 || near(segs[front.0].1, segs[front.0].2) } else { near(ends(front.0, front.1).0, ends(back.0, back.1).1) };
+        let refs: Vec<crate::reference::Reference> = chain.iter().map(|(k, _)| segs[*k].0.clone()).collect();
+        let path = Value::map_from([
+            ("edges", super::query::transient_queries(&cx, &refs)),
+            ("flipped", Value::array(chain.iter().map(|(_, f)| Value::bool(*f)).collect())),
+            ("closed", Value::bool(closed)),
+        ]);
+        paths.push(path.with_tag(std_tag("path.fs", "Path")));
+    }
+    Ok(Value::array(paths))
+}
+
+/// `@approximateSpline`: a B-spline through each target's positions (with
+/// its start/end derivatives when both are given). Interpolation meets any
+/// tolerance; Onshape may return fewer control points.
+fn approximate_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let def = a.get(1).cloned().unwrap_or_default();
+    let periodic = def.get("isPeriodic").as_bool().unwrap_or(false);
+    let mut out = Vec::new();
+    for t in def.get("targets").as_array().iter().flat_map(|v| v.iter()) {
+        let mut pts: Vec<DVec3> = t.get("positions").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
+        if periodic && pts.len() > 2 && pts[0].distance(pts[pts.len() - 1]) < 1e-9 {
+            pts.pop();
+        }
+        let tangents: Vec<DVec3> = match (vec3_of(t.get("startDerivative")), vec3_of(t.get("endDerivative"))) {
+            (Some(s), Some(e)) if !periodic => vec![s, e],
+            _ => Vec::new(),
+        };
+        let curve = k::make_interpolated_spline(&pts, &tangents, periodic).ok().and_then(|s| s.edges().first()?.edge_bspline().ok());
+        match curve {
+            Some(c) => out.push(bspline_value(&c)),
+            None => return Err(raise_error(i, "BAD_BSPLINECURVE_DEFINITION", None)),
+        }
+    }
+    Ok(Value::array(out))
 }

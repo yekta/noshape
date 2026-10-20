@@ -314,6 +314,14 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
     if idx.is_empty() {
         return err("Select parts, surfaces or curves to group");
     }
+    let closed = ev.bool("closed");
+    make_composite(ev, &idx, closed, 0)
+}
+
+/// The composite part of bodies `idx` (also made by imports: an open mesh
+/// becomes a closed composite of its pieces, Onshape G27), body `index` of
+/// the feature.
+pub(crate) fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32) -> FResult<()> {
     let members: Vec<Arc<Body>> = idx.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
     let compound = Shape::compound(&members.iter().map(|b| b.shape.clone()).collect::<Vec<_>>());
     let nf = compound.count(ShapeType::Face);
@@ -347,7 +355,7 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         members[0].kind
     };
-    let id = BodyId { feature: ev.feature, index: 0 };
+    let id = BodyId { feature: ev.feature, index };
     let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
     // A new part: the next colour of the rotation (live part-studio/472:
     // after Part 1 light blue and Part 2 gray, the closed composite is dark
@@ -361,7 +369,6 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
     // composite is listed; graphically they are still there); an open
     // composite leaves them as separate parts "in addition to being part of
     // the composite part" (live: "Composite test" keeps Part 1 and Part 2).
-    let closed = ev.bool("closed");
     body.composite = Some(crate::display::CompositeInfo { members: ids.clone(), closed });
     if closed {
         let pos = idx[0];

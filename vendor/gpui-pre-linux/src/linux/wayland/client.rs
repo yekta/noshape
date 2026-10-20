@@ -34,6 +34,8 @@ use wayland_client::protocol::wl_pointer::AxisSource;
 use wayland_client::protocol::{
     wl_data_device, wl_data_device_manager, wl_data_offer, wl_data_source, wl_output, wl_region,
 };
+// NOSHAPE PATCH: touch screens.
+use wayland_client::protocol::wl_touch;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, delegate_noop,
     protocol::{
@@ -358,6 +360,9 @@ pub(crate) struct WaylandClientState {
     pub compositor_gpu: Option<CompositorGpuHint>,
     wl_seat: wl_seat::WlSeat, // TODO: Multi seat support
     wl_pointer: Option<wl_pointer::WlPointer>,
+    /// NOSHAPE PATCH: the seat's touch device and the window each touch began on.
+    wl_touch: Option<wl_touch::WlTouch>,
+    touch_windows: HashMap<i32, (WaylandWindowStatePtr, Point<Pixels>)>,
     pinch_gesture: Option<zwp_pointer_gesture_pinch_v1::ZwpPointerGesturePinchV1>,
     pinch_scale: f32,
     wl_keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -1090,6 +1095,8 @@ impl WaylandConnection {
             compositor_gpu,
             wl_seat: seat,
             wl_pointer: None,
+            wl_touch: None,
+            touch_windows: HashMap::default(),
             wl_keyboard: None,
             pinch_gesture: None,
             pinch_scale: 1.0,
@@ -2075,6 +2082,65 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandClientStatePtr {
 
                 state.wl_pointer = Some(pointer);
             }
+            // NOSHAPE PATCH: touch screens as raw touches.
+            if capabilities.contains(wl_seat::Capability::Touch) {
+                if state.wl_touch.is_none() {
+                    state.wl_touch = Some(seat.get_touch(qh, ()));
+                }
+            } else if let Some(touch) = state.wl_touch.take() {
+                touch.release();
+            }
+        }
+    }
+}
+
+/// NOSHAPE PATCH: `wl_touch` contacts become `PlatformInput::Touch` events
+/// for the window the contact began on (surface-local logical positions).
+impl Dispatch<wl_touch::WlTouch, ()> for WaylandClientStatePtr {
+    fn event(
+        this: &mut Self,
+        _: &wl_touch::WlTouch,
+        event: wl_touch::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        let client = this.get_client();
+        let mut state = client.borrow_mut();
+        let touch = |id: i32, phase: TouchPhase, position: Point<Pixels>| {
+            PlatformInput::Touch(gpui::TouchEvent { id: gpui::TouchId(id as u32 as u64), phase, position, predicted_position: None, force: None })
+        };
+        let mut inputs: Vec<(WaylandWindowStatePtr, PlatformInput)> = Vec::new();
+        match event {
+            wl_touch::Event::Down { surface, id, x, y, .. } => {
+                if let Some(window) = get_window(&mut state, &surface.id()) {
+                    let position = point(px(x as f32), px(y as f32));
+                    state.touch_windows.insert(id, (window.clone(), position));
+                    inputs.push((window, touch(id, TouchPhase::Started, position)));
+                }
+            }
+            wl_touch::Event::Motion { id, x, y, .. } => {
+                if let Some((window, last)) = state.touch_windows.get_mut(&id) {
+                    *last = point(px(x as f32), px(y as f32));
+                    inputs.push((window.clone(), touch(id, TouchPhase::Moved, *last)));
+                }
+            }
+            wl_touch::Event::Up { id, .. } => {
+                // `up` has no position: the touch ends where it last was.
+                if let Some((window, last)) = state.touch_windows.remove(&id) {
+                    inputs.push((window, touch(id, TouchPhase::Ended, last)));
+                }
+            }
+            wl_touch::Event::Cancel => {
+                for (id, (window, last)) in state.touch_windows.drain() {
+                    inputs.push((window, touch(id, TouchPhase::Cancelled, last)));
+                }
+            }
+            _ => {}
+        }
+        drop(state);
+        for (window, input) in inputs {
+            window.handle_input(input);
         }
     }
 }

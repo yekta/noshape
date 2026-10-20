@@ -1404,7 +1404,7 @@ pub fn with_ents<T>(i: &mut Interp, cx: &FsContext, query: &Value, f: impl FnOnc
     f(i, &q, ents)
 }
 
-fn transient_query(id: Arc<str>) -> Value {
+pub fn transient_query(id: Arc<str>) -> Value {
     let qt = std_enum("query.fs", "QueryType", "TRANSIENT").unwrap_or_else(|| Value::str("TRANSIENT"));
     let mut m = Map::new();
     m.insert(Value::str("queryType"), qt);

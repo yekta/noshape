@@ -8,6 +8,17 @@ use std::sync::Arc;
 pub trait DerivedProvider: Send + Sync + std::fmt::Debug {
     /// Regenerated final context of the source Part Studio.
     fn context(&self, tab: &str) -> Option<Arc<Context>>;
+    /// The source regenerated in a configuration (a configured Part
+    /// Studio's Derived feature); unset inputs take their defaults.
+    fn context_configured(&self, tab: &str, values: &crate::configuration::ConfigValues) -> Option<Arc<Context>> {
+        let _ = values;
+        self.context(tab)
+    }
     /// A hash that changes whenever the source's result may change.
     fn version(&self, tab: &str) -> u64;
+    /// A file tab of another document or version (`ext:` keys), for
+    /// FeatureScript reference parameters.
+    fn file(&self, _key: &str) -> Option<crate::file_tab::FileTab> {
+        None
+    }
 }

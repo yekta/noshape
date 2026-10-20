@@ -120,8 +120,6 @@ struct RelationSession {
 mod panels;
 pub(crate) use panels::*;
 
-/// Radius of the selected mate's value circle, in triad sizes.
-const VALUE_ARC_SCALE: f64 = 0.9;
 
 /// Key in `expanded` that marks the "Mate features" folder as collapsed.
 const MATE_FEATURES_COLLAPSED: InstanceId = InstanceId(u64::MAX);
@@ -143,6 +141,12 @@ mod search;
 mod positions;
 #[path = "assembly_bom.rs"]
 mod bom_panel;
+#[path = "assembly_mass.rs"]
+mod mass;
+#[path = "assembly_reflection.rs"]
+mod reflection;
+#[path = "assembly_curvature.rs"]
+mod curvature;
 #[path = "assembly_config.rs"]
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
@@ -640,6 +644,16 @@ impl AssemblyView {
 
     fn scene_options(&self) -> AsmSceneOptions {
         let mut o = AsmSceneOptions { isolate: self.isolate.clone(), ..Default::default() };
+        if let Some(z) = self.active_zebra() {
+            o.zebra = Some(noshape_render::Zebra { stripes: z.stripes, flip: z.flip });
+            o.hide_edges = !z.show_edges;
+        }
+        // Reflection analysis: edges follow Show edges from the moment the
+        // dialog opens (live analysis/10), the environment once chosen.
+        if let Some(s) = self.active_reflection() {
+            o.hide_edges = !s.show_edges;
+            o.reflection = self.scene_reflection();
+        }
         if let Some(t) = &self.ui.transparent {
             o.ghost_tops.extend(t.iter().copied());
         }
@@ -714,8 +728,11 @@ impl AssemblyView {
         };
         // A selected mate with a rotation shows its value arc (live 305z);
         // so does the mate dialog's Animate preview (live 575).
-        if let Some((arc, ..)) = self.value_arc(cx) {
-            h.value_arcs.push(arc);
+        for d in self.value_dims(cx) {
+            match d.shape {
+                behaviors::ValueShape::Arc(arc) => h.value_arcs.push(arc),
+                behaviors::ValueShape::Line(line) => h.value_lines.push(line),
+            }
         }
         // Mate highlight (list hover / selection): instances accent + both connector triads.
         for mid in [self.selected_mate, self.list_hover_mate].into_iter().flatten() {
@@ -742,6 +759,10 @@ impl AssemblyView {
         if let Some(m) = &self.ui.measure {
             h.selected_entities = m.clone();
         }
+        if let Some(d) = &self.ui.curve_dialog {
+            h.selected_entities.extend(d.picks.iter().cloned());
+        }
+        h.analysis_lines = self.curve_surface_lines();
         // Group dialog: its instances are shown selected.
         if let Some((_, ids)) = &self.ui.group {
             h.selected_tops = ids.clone();
@@ -786,7 +807,10 @@ impl AssemblyView {
                 {
                     let i = overlay_connectors.len();
                     let hl = hovered_overlay == Some(OverlayPick::Connector(i)) || editing_mc == Some(c.id) || self.selected_mate == Some(c.id);
-                    h.connectors.push((f, size * 0.9, hl));
+                    // The connector dialog's preview slider fades the edited one
+                    // (as Onshape's feature preview slider, resting at 0.7).
+                    let opacity = self.mc.as_ref().filter(|m| m.id == c.id).map_or(1.0, |m| (m.preview / panels::PREVIEW_REST).min(1.0));
+                    h.connectors.push((f, size * 0.9, hl, opacity));
                     overlay_connectors.push(c.id);
                 }
             }
@@ -880,8 +904,8 @@ impl AssemblyView {
         if let Some((s, _)) = h.origin {
             sig.push(s);
         }
-        for (f, s, _) in &h.connectors {
-            sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z, *s]);
+        for (f, s, _, o) in &h.connectors {
+            sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z, *s, f64::from(*o)]);
         }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
@@ -1707,8 +1731,10 @@ impl AssemblyView {
             .gap(px(5.))
             .bg(crate::theme::with_alpha(pal.panel, 0.75))
             .child(btn("asm-eval-measure", "measure", self.ui.measure.is_some(), cx).tooltip("Show measure details ([)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx))))
-            .child(btn("asm-eval-analysis", "analysis-tools", self.panel == Some(SidePanel::Interference), cx).tooltip("Show analysis tools").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.run_interference(cx))))
-            .child(btn("asm-eval-mass", "mass-properties", false, cx).tooltip("Mass properties"))
+            // Live: Show analysis tools opens the tool list; Display mass and
+            // section properties toggles the Mass properties dialog.
+            .child(btn("asm-eval-analysis", "analysis-tools", false, cx).tooltip("Show analysis tools").on_click(cx.listener(|this, ev: &ClickEvent, window, cx| this.open_analysis_menu(ev.position(), window, cx))))
+            .child(btn("asm-eval-mass", "mass-properties", self.ui.mass.is_some(), cx).tooltip("Display mass and section properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_mass(cx))))
             .into_any_element()
     }
 
@@ -1799,7 +1825,7 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none();
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.curve_dialog.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
@@ -2023,6 +2049,11 @@ impl AssemblyView {
                     // Measure tool: clicked entities are measured.
                     if let Some(t) = self.pick(*pick) {
                         self.measure_pick(t, cx);
+                    }
+                } else if self.ui.curve_dialog.is_some() {
+                    // Curve/surface analysis: clicked edges and faces are analyzed.
+                    if let Some(t) = self.pick(*pick) {
+                        self.curve_pick(t, cx);
                     }
                 } else if self.ui.group.is_some() {
                     // Group dialog: clicking an instance adds or removes it.
@@ -3309,7 +3340,7 @@ impl AssemblyView {
                     .border_b_1()
                     .border_color(pal.border)
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string()))
-                    .child(Button::new(id).ghost().child(crate::ui::glyph("close", 14., pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)),
+                    .child(Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(18.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)),
             )
             .child(body)
     }
@@ -3462,7 +3493,7 @@ impl AssemblyView {
                             .bg(gpui_kit::white())
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Cancel"))
-                            .child(crate::ui::glyph("close", 14., pal.cancel))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mate(window, cx))),
                     ),
             )
@@ -3547,7 +3578,7 @@ impl AssemblyView {
                         )
                         .child(square("ins-create-version", "version", "Create version…", cx).on_click({
                             let doc = self.doc.clone();
-                            move |_, w, cx| crate::history_panel::open_create_version(doc.clone(), w, cx)
+                            move |_, w, cx| crate::history_panel::open_create_version_in(doc.clone(), w, cx)
                         }))
                         .child(square("ins-version-graph", "version-graph", "Version graph", cx).on_click(|_, w, cx| w.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
                 )
@@ -3788,7 +3819,7 @@ impl AssemblyView {
                             .child(crate::ui::glyph("check", 18., gpui_kit::white()))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
-                    .child(Button::new("insert-close").ghost().child(crate::ui::glyph("close", 14., pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)))),
+                    .child(Button::new("insert-close").ghost().child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)))),
             )
             .child(head)
             .child(body)
@@ -4047,6 +4078,30 @@ impl AssemblyView {
             left = left.child(self.render_anim_panel(cx));
             any_left = true;
         }
+        if let Some(d) = self.render_folder_name(cx) {
+            left = left.child(d);
+            any_left = true;
+        }
+        if let Some(c) = self.render_curve_dialog(cx) {
+            left = left.child(c);
+            any_left = true;
+        }
+        if let Some(r) = self.render_reflection_dialog(cx) {
+            left = left.child(r);
+            any_left = true;
+        }
+        if let Some(z) = self.render_zebra_dialog(cx) {
+            left = left.child(z);
+            any_left = true;
+        }
+        if self.ui.mass.is_some() {
+            let mut els = self.render_mass_dialog(cx).into_iter();
+            if let Some(dialog) = els.next() {
+                left = left.child(dialog);
+                any_left = true;
+            }
+            out.extend(els);
+        }
         if self.mc.is_some() && !mc_beside {
             left = left.child(self.render_mc_panel(cx));
             any_left = true;
@@ -4217,11 +4272,7 @@ impl AssemblyView {
             rotation: |this: &Self, cx| this.viewport.read(cx).camera.rotation,
             click: |this, cell, cx| {
                 let rot = cell.rotation();
-                this.viewport.update(cx, |vp, cx| {
-                    let mut to = vp.camera;
-                    to.rotation = rot;
-                    vp.animate_to(to, cx);
-                });
+                this.viewport.update(cx, |vp, cx| vp.animate_to_rotation_fit(rot, cx));
             },
             rotate: |this, dx, dy, cx| this.rotate_by(dx, dy, cx),
             roll: |this, deg, cx| {
@@ -4396,6 +4447,17 @@ impl Render for AssemblyView {
                     this.toggle_snap(window, cx);
                 } else if this.mc.is_some() {
                     this.close_mc(window, cx);
+                } else if this.ui.folder_name.is_some() {
+                    this.close_folder_name(false, window, cx);
+                } else if this.ui.curve_dialog.is_some() {
+                    this.close_curve_surface(cx);
+                } else if this.ui.reflection_dialog.is_some() {
+                    this.close_reflection(false, cx);
+                } else if this.ui.zebra_dialog.is_some() {
+                    this.close_zebra(false, cx);
+                } else if this.ui.mass.is_some() {
+                    this.ui.mass = None;
+                    cx.notify();
                 } else if this.pattern.is_some() {
                     this.pattern = None;
                     cx.notify();

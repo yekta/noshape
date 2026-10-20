@@ -253,6 +253,92 @@ surface vanishing faces; STEP preprocessing; chamfer two-distance face rule + di
 conditions/guides/path; rib draft; body draft; face blend asymmetric/conic/curvature and non-adjacent faces), then
 sheet metal gaps (closed corners, side-face joins, loft into existing), slab-shell speed: profiled 19 Oct on an idle machine: `bench_kernel_ops` full regen 1.2 s (22 hole extrudes 0.56 s, shell 0.44 s, fillet 0.07 s); the 3–5 s seen earlier was machine load. Flat profile (BRepMesh, Gauss integration, malloc), no single hotspot; `perf` is installed (/usr/bin/perf; use `--call-graph dwarf`, frame pointers are off).
 
+### Round 6 (2026-10-19 night): import readers, mesh bodies, native CAD, chamfer rule
+- **Parasolid reader rewritten** (`cpp/xt_read.cpp`, the old reader in xt.cpp removed; `read_xt_parts(path)` /
+  `read_xt_data(bytes)`; Rust `read_parasolid_parts`): text and binary, embedded schemas (Copy/Delete/Insert/Append
+  edits against base SCH_13006), files without one (layouts per version 25.0–38.1, `version_schemas()`), bare
+  partition streams ("PS\0\0…"), NX's '+' before the binary magic. Surfaces 50–54, 56 (rolling ball), 59, 60, 67,
+  68, 124 (periodic knots handled); curves 30–32, 38 (chart + limits refined onto both surfaces), 133, 134, 137;
+  assemblies (instances placed), SDL/TYSA names and colours. Schema tables generated: `/root/kern-scratch/xt/
+  gen_schema.py` (base + reference corrections) **then** `gen_versions.py` (from versions.json, made by infer4.py
+  from the G36 files) — run in that order, both rewrite `cpp/xt_schema.inc`.
+  Found against real files, all fixed in the reader **and our writer**:
+  - **Cone axis**: Parasolid's cone axis points the way the cone *widens* (Onshape's cone sample: apex at +10 mm,
+    axis −z; NX chamfers agree; D2MI pin = its STEP to 1e-6). The XT reference's formula has the sign the other
+    way; reader and writer both followed it, so round trips passed while our exported cones were wrong in
+    Onshape. Now R = P + vA + (X cos u + Y sin u)(r + v tan a), Y = A × X; OCCT `gp_Ax3(P, A, X)`.
+  - **SP-curves run along their fin** (NX's tolerant edges: the '−' fin's SP-curve runs v2→v1); trimmed curves
+    take the direction from the *basis* curve's sense (parm_2 < parm_1 when '−'). Writer: a negative fin's
+    SP-curve is written with sense '−', trimmed end→start.
+  - Knot arrays padded with null knots (trimmed to n_knots), periodic B-curves (XT unclamped form → OCCT
+    periodic), helix forms (163 HELIX_SU_FORM, 184), FIELD_NAMES (99), KEY (102) added to the base schema.
+  - Blend surfaces: GeomFill_Pipe was 0.3 mm (and on cliff-edge blends up to 2 cm) off; now `tube()` = exact
+    rational circle sections in a rotation-minimizing frame, rows interpolated along the spine (exact at stations
+    r/16 apart). Intersection spines are marched past their chart (a blend on a blend reaches past it).
+  - Healing: one edge/face that BRepLib::SameParameter or ShapeFix_Shape throws on no longer leaves the whole body
+    unhealed (falls back to edge-by-edge / face-by-face).
+  Corpus (harness `/root/kern-scratch/xth`, `make xt; ./xt files`; diag.cpp = BRepCheck histogram): all 50 G36 +
+  G25 + Onshape cone exact; SolidWorks 2009–2015+ x_t/x_b; 75/75 valid. **Not yet:** Parasolid V9/V11 (pre-V14
+  schemas: the 4 Unigraphics `nist_ug_*` files), cliff-edge blends ('E', fluxpad_102: 7 faces still bad, G38 will
+  give Onshape's volume), blends other than constant-radius rolling balls.
+- **Native CAD import** (`cpp/native.cpp`, Rust `read_native_parts`), the exact geometry the files embed, as
+  Onshape's translators read them: **SolidWorks** .sldprt (OLE2 through 2014: `Contents/Config-N-Partition`;
+  2015+: own section container — marker 14 00 06 00 08 00, checksum, sizes, nibble-swapped names, raw deflate; a
+  section counts only if it inflates to its size; Config-0 else the first configuration), **Solid Edge** .par/.psm
+  (`PARASOLID/STREAM0.P_B`), **NX** .prt (OLE `UG_PART/UG_PART` and SPLMSSTR files: text header, optional '+',
+  zlib). Samples /root/kern-native-samples (public NIST/GitHub files): 20/20 SolidWorks parts (19 valid), 6/6 Solid
+  Edge, 12/12 modern NX valid; NX/SW assemblies (`.prt` without bodies, `.sldasm`) report "no geometry" for now.
+  Kernel test `export.rs::native_cad_parts` (skipped when the samples are absent). Deflate (`pvz_reader.cpp`)
+  hardened against garbage input (puff's over-subscribed/incomplete code checks; was an out-of-bounds read).
+  **Inventor** .ipt (OLE): the body is ShapeManager binary ("ASM BinaryFile4", an ACIS SAB fork) in the segment
+  whose meta stream `RSeStorage/M<id>` names "PmBRepSegment"; its data stream `RSeStorage/B<id>` = header + zlib. Read
+  by the ACIS reader: 10/10 samples valid (respira_back also holds a 50 L 10-face construction body — which bodies
+  Onshape keeps is unverified). Pending: CATIA/Creo feasibility report, assembly imports, app wiring
+  of the native extensions (sldprt/par/psm/prt/x_t/x_b/3dm in IMPORT_EXTS / read_foreign / importing.rs).
+- **ACIS reader** (`cpp/sat_read.cpp`, Rust `read_acis_parts`, app .sat/.sab): text and binary (SAB tags; ASM
+  variant), SAT 5.0–2x.0 record layouts per version (prefix fields as the InventorLoader reference reads them:
+  ENTITY = attrib [+ id from 7.0]; topology/geometry + 1 field from 7.0, + 1 more from 11.0 except ASM), records
+  placed by their "-n" numbers, counted strings ("n text" before 7.0, "@n text"), subtype refs ("{ ref n }", numbered
+  in file order). Analytic surfaces exactly — cone: radius r + t·sine/cosine along the axis, normal outward when
+  cosine > 0 (flipped by the cone's own sense), sphere/torus inward when the radius is negative; splines from the
+  stored B-spline (exactsur; a procedural surface's approximation is the last surface-shaped B-spline at its level);
+  intcurves from their 3D B-spline, or for "parcur summary" from the 2D curve on its spline/plane surface; a
+  procedural face saved without data (vertexblendsur) is filled from its edges. pcurves are not read (healing projects
+  them, `heal_import`, shared with the XT reader). Names (ATTRIB_XACIS_NAME / ATTRIB_XSTEP_PRODUCT_ID), rgb colours.
+  Results: all 12 of our SAT exports back with exact volumes (test `export.rs::acis_import`), Onshape's cone exact and
+  revolved spline 1726.08063, Cubit B3 (ACIS 24, 274 faces) valid, Abaqus hull sheet imports (1 face's loop
+  orientation off). Onshape's G25-b SAT gives 7585.98 vs its XT's 7583.00: Techsoft's export put the corner-blend
+  vertices 0.03 mm off as tolerant vertices (tolerance 0.042 mm) — we keep the file's vertices.
+  Gotcha met: `gp_XYZ(num(), num(), num())` — argument evaluation order is unspecified (GCC: right to left).
+- **Mesh bodies (G27, end to end)**: kernel mesh body = a face with a triangulation and no surface
+  (`mesh_body.cpp`: is_mesh_face, transforms, validity, volume/area from the triangles); STL/OBJ/PVZ readers make
+  them (`read_mesh_bodies`, `read_pvz`); model `is_mesh` on display bodies, open pieces → a closed composite as
+  Onshape's "Composite part 1"; edits refused like Onshape. **For psb/ui (surgical changes, please keep):**
+  `app/src/part_studio/mod.rs` parts list uses `assets/icons/part-mesh.svg` (Onshape's svg-icon-part-mesh) for mesh
+  parts; render shades mesh faces flat (per-triangle normals, `mesh.cpp`). Still to do from G35/G35-retry: triangle
+  edge lines at all zooms, Section view cap with triangle lines, split/transform of mesh parts → MIXED bodies.
+- **Chamfer "Two distances" face rule (G30 + G37)**: Onshape measures Distance 1 on the edge's face that comes first
+  in its entity order (G37's BTI/DetId attributes: front 0, bottom 1, top 2, right 3, back 4, left 5 for the G30
+  block = per feature: first profile segment's side, start cap, end cap, other sides; earlier features first); along
+  connected edges the chain's first edge decides and the side carries over shared faces; an override flips its
+  chain; Opposite direction flips all. Model `detail.rs::distance_one_faces` → kernel reference faces. Test
+  `kernel_robustness.rs::chamfer_distance_one_face_matches_onshape` (all G30 cases a–i). Distance-and-angle uses the
+  same face (unverified).
+- **G38 (Onshape's native imports) — how Onshape does it, to match in the model/app:** single SW/SE/NX parts give a
+  Part Studio named after the file stem with the part named **"Part 1"**; the uploaded file stays as a blob tab; wire
+  bodies come in as extra parts **"Curve 1…n"** (bodyType wire; the McMaster SLDPRT has one, NX polycarb eight — our
+  readers drop wires so far); colours come from the file (SW (229,234,237), SE (129,136,140), NX (204,204,204) /
+  (51,102,204)… — our native reads have none yet: they are not in the partitions). An assembly imports only as a flat
+  zip named like the root assembly with the parts under the names it references (it references them by file name:
+  the SLDASM holds `…\Shaft.SLDPRT`, `…\Canard_Shaft_Plate.SLDPRT`) → Assembly tab + "<name> parts" Part Studio +
+  BOM tab, parts "<component>-1". Volumes vs ours: NX polycarb and D2MI identical (17025.66823867636, 272.2753042);
+  Bell Crank 2050.8365 vs our 2050.8071 (2 procedural faces); **Solid Edge bracket 19378.847 vs our 19377.869** (12
+  analytic faces both, area 9223.415 vs 9223.35 — ours differs, cause open), **McMaster screw 25 faces 254.404 vs our 41
+  faces 261.616** (open), fluxpad_102 255.769 (ours invalid; Onshape types: 9 TORUS, 4 OTHER). UG hub imported ~0.9 m
+  across (units question). Follow-ups filed: **G38b** (Onshape's XT of those imports to diff; UI import dialog:
+  configuration choice, file units), **G34d** (Make joint on one sheet-metal part via Convert).
+- **Live requests**: G33c retry pending; G35-retry and G37 answered (G37 applied above); G34c superseded by G34d.
+
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,
 shell.rs), `noshape-model` (kernel_robustness.rs 14/14), `noshape` app (`cargo check` clean). Nothing half-done;

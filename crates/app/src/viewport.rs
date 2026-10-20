@@ -51,6 +51,16 @@ enum Drag {
     Tool,
 }
 
+/// What a one-finger touch drag drives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TouchDrag {
+    None,
+    /// 3D rotate (Onshape's single-pointer manipulation).
+    Rotate,
+    /// A tool's left drag (sketch entities, manipulators), like the mouse.
+    Tool,
+}
+
 /// What a pending pick query is for.
 #[derive(Clone, Debug)]
 enum PickPurpose {
@@ -156,6 +166,14 @@ pub struct Viewport {
     /// platform (Chrome reports it as a left click with Ctrl, which never
     /// navigates: clicking still opens the context menu, dragging does nothing).
     ctrl_click_press: bool,
+    /// Touchscreen: Onshape's gesture recognizer (device pixels), the
+    /// touches this viewport claimed, the clock its times count from, a
+    /// pending timer tick, and what a one-finger drag drives.
+    touch: crate::touch::TouchRecognizer,
+    touch_ids: std::collections::HashSet<u64>,
+    touch_epoch: Instant,
+    touch_tick_scheduled: bool,
+    touch_drag: TouchDrag,
     /// Rotation speed, last rotate step time, and the post-release inertia
     /// with the time of its last step.
     rotation_speed: RotationSpeed,
@@ -308,6 +326,11 @@ impl Viewport {
             depth_pivot_asked: None,
             pivot_awaits_depth: false,
             ctrl_click_press: false,
+            touch: Default::default(),
+            touch_ids: Default::default(),
+            touch_epoch: Instant::now(),
+            touch_tick_scheduled: false,
+            touch_drag: TouchDrag::None,
             rotation_speed: RotationSpeed::default(),
             last_rotation: None,
             inertia: None,
@@ -442,10 +465,20 @@ impl Viewport {
         self.camera_changed(cx);
     }
 
-    /// Animate to a standard view (keeps target, fits nothing).
+    /// Animate to a standard view, zoomed to fit at that orientation
+    /// (Onshape's `animateToStandardView` → `animateToFrameWithZoomFit`).
     pub fn animate_to_view(&mut self, view: StandardView, cx: &mut Context<Self>) {
+        self.animate_to_rotation_fit(Camera::rotation_for(view), cx);
+    }
+
+    /// Animate to an orientation zoomed to fit (view cube faces, corners and
+    /// edges are standard views too).
+    pub fn animate_to_rotation_fit(&mut self, rotation: glam::DQuat, cx: &mut Context<Self>) {
         let mut to = self.camera;
-        to.set_view(view);
+        to.rotation = rotation;
+        if let Some((lo, hi)) = self.fit_bounds.or_else(|| self.scene.bounds().map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3()))) {
+            fit_camera_to_box(&mut to, lo, hi, self.size(), self.fit_inset_left);
+        }
         self.animate_to(to, cx);
     }
 
@@ -619,7 +652,11 @@ impl Viewport {
             }
             PickPurpose::DepthPivot => {
                 let frame = buf.as_ref().map(|b| (b.frame_width, b.frame_height)).unwrap_or_default();
-                let pivot = buf.as_ref().and_then(|b| nav::depth_average_pivot(&b.samples, frame, b.view_proj?));
+                // Without planes first, then with their depth (only planes visible).
+                let pivot = buf.as_ref().and_then(|b| {
+                    let view_proj = b.view_proj?;
+                    nav::depth_average_pivot(&b.samples, frame, view_proj).or_else(|| nav::depth_average_pivot(&b.samples_with_planes, frame, view_proj))
+                });
                 if self.depth_pivot_asked == Some(epoch) {
                     self.depth_pivot_asked = None;
                 }
@@ -1065,45 +1102,61 @@ impl Viewport {
         }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
         match drag {
-            Drag::Pending(MouseButton::Left) => match self.pick_at(p) {
-                Some(pick) => cx.emit(ViewportEvent::Click { pick, position: p, modifiers: e.modifiers }),
-                None => {
-                    let (x, y) = self.device_px(p);
-                    self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::Click { position: p, modifiers: e.modifiers });
-                }
-            },
-            Drag::Pending(MouseButton::Right) => match self.pick_at(p) {
-                Some(pick) => cx.emit(ViewportEvent::ContextMenu { pick, position: e.position }),
-                None => {
-                    let (x, y) = self.device_px(p);
-                    self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::ContextMenu { position: p, window_position: e.position });
-                }
-            },
+            Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
+            Drag::Pending(MouseButton::Right) => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
                 if let Some((a, b)) = self.box_rect.take() {
-                    if std::mem::take(&mut self.zoom_window) {
-                        self.zoom_to_box(a, b, cx);
-                        cx.notify();
-                        return;
-                    }
                     let crossing = b.x < a.x;
-                    // Crossing selection only needs the box; window selection
-                    // also needs what is outside it.
-                    let rect = if crossing {
-                        let s = self.scale as f64;
-                        let (x0, y0) = ((a.x.min(b.x) * s).floor() as i32, (a.y.min(b.y) * s).floor() as i32);
-                        let (x1, y1) = ((a.x.max(b.x) * s).ceil() as i32, (a.y.max(b.y) * s).ceil() as i32);
-                        PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1, depth_samples: 0 }
-                    } else {
-                        self.whole_frame_rect()
-                    };
-                    self.request_pick(rect, PickPurpose::Box { a, b, crossing, modifiers: e.modifiers });
+                    self.finish_box(a, b, crossing, e.modifiers, cx);
                 }
             }
             Drag::Tool => cx.emit(ViewportEvent::ToolUp { position: p, modifiers: e.modifiers }),
             _ => {}
         }
         cx.notify();
+    }
+
+    /// A click (left button, or a one-finger tap) at a viewport point.
+    fn click_at(&mut self, p: DVec2, modifiers: Modifiers, cx: &mut Context<Self>) {
+        match self.pick_at(p) {
+            Some(pick) => cx.emit(ViewportEvent::Click { pick, position: p, modifiers }),
+            None => {
+                let (x, y) = self.device_px(p);
+                self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::Click { position: p, modifiers });
+            }
+        }
+    }
+
+    /// The context menu (right click, or a two-finger tap) at a viewport point.
+    fn context_menu_at(&mut self, p: DVec2, window_position: Point<Pixels>, cx: &mut Context<Self>) {
+        match self.pick_at(p) {
+            Some(pick) => cx.emit(ViewportEvent::ContextMenu { pick, position: window_position }),
+            None => {
+                let (x, y) = self.device_px(p);
+                self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::ContextMenu { position: p, window_position });
+            }
+        }
+    }
+
+    /// A finished box (left drag, or a two-finger long press): zoom to it in
+    /// zoom-window mode, else select (window or crossing).
+    fn finish_box(&mut self, a: DVec2, b: DVec2, crossing: bool, modifiers: Modifiers, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.zoom_window) {
+            self.zoom_to_box(a, b, cx);
+            cx.notify();
+            return;
+        }
+        // Crossing selection only needs the box; window selection also needs
+        // what is outside it.
+        let rect = if crossing {
+            let s = self.scale as f64;
+            let (x0, y0) = ((a.x.min(b.x) * s).floor() as i32, (a.y.min(b.y) * s).floor() as i32);
+            let (x1, y1) = ((a.x.max(b.x) * s).ceil() as i32, (a.y.max(b.y) * s).ceil() as i32);
+            PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1, depth_samples: 0 }
+        } else {
+            self.whole_frame_rect()
+        };
+        self.request_pick(rect, PickPurpose::Box { a, b, crossing, modifiers });
     }
 
     /// A button released outside the viewport: finish a drag that started in
@@ -1148,6 +1201,158 @@ impl Viewport {
             self.anim = None;
             self.camera_changed(cx);
         }
+    }
+
+    // ------------------------------------------------------------ touch
+
+    /// A raw touch (vendor/gpui-pre routes them here): fed to Onshape's
+    /// gesture recognizer (`touch.rs`) in device pixels.
+    fn on_touch(&mut self, e: &TouchEvent, hitbox: HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        let id = e.id.0;
+        let now = self.touch_epoch.elapsed();
+        let at = self.local(e.position) * self.scale as f64;
+        let actions = match e.phase {
+            TouchPhase::Started => {
+                if window.topmost_hitbox_at(e.position) != Some(hitbox) {
+                    return;
+                }
+                window.prevent_default();
+                self.touch_ids.insert(id);
+                self.anim = None;
+                self.inertia = None;
+                self.touch.down(id, at, now)
+            }
+            TouchPhase::Moved if self.touch_ids.contains(&id) => self.touch.moved(id, at, now),
+            TouchPhase::Ended | TouchPhase::Cancelled if self.touch_ids.remove(&id) => self.touch.up(id, now),
+            _ => return,
+        };
+        cx.stop_propagation();
+        self.touch_actions(actions, cx);
+        self.schedule_touch_tick(cx);
+    }
+
+    /// Run the recognizer's timers (tap report, two-finger long press).
+    fn schedule_touch_tick(&mut self, cx: &mut Context<Self>) {
+        if self.touch_tick_scheduled {
+            return;
+        }
+        let Some(deadline) = self.touch.next_deadline() else { return };
+        self.touch_tick_scheduled = true;
+        let wait = deadline.saturating_sub(self.touch_epoch.elapsed());
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(wait).await;
+            let _ = this.update(cx, |this: &mut Viewport, cx| {
+                this.touch_tick_scheduled = false;
+                let actions = this.touch.tick(this.touch_epoch.elapsed());
+                this.touch_actions(actions, cx);
+                this.schedule_touch_tick(cx);
+            });
+        })
+        .detach();
+    }
+
+    /// Onshape's `onPointerGesture`: gestures to camera moves and picks.
+    fn touch_actions(&mut self, actions: Vec<crate::touch::TouchAction>, cx: &mut Context<Self>) {
+        use crate::touch::TouchAction as A;
+        let s = (self.scale as f64).max(1e-6);
+        let size = self.size();
+        for action in actions {
+            // A two-finger box selection blocks every other gesture.
+            if self.touch.boxing() && !matches!(action, A::Box { .. } | A::BoxStart { .. } | A::BoxStop) {
+                continue;
+            }
+            match action {
+                A::DragStart { at } => {
+                    let p = at / s;
+                    self.press_pos = p;
+                    self.last_pos = p;
+                    if self.tool_captures_left || self.manipulator_at(p) {
+                        self.touch_drag = TouchDrag::Tool;
+                        self.drag = Drag::Tool;
+                        cx.emit(ViewportEvent::ToolDown { position: p, modifiers: Modifiers::default(), click_count: 1 });
+                    } else {
+                        self.touch_drag = TouchDrag::Rotate;
+                        self.drag = Drag::Nav;
+                        self.nav_mode = Mode::Rotate;
+                        self.orbit_pivot = Some(self.pivot_at(p));
+                        self.rotation_speed = RotationSpeed::default();
+                        self.last_rotation = Some(Instant::now());
+                    }
+                }
+                A::Drag { delta, at } => match self.touch_drag {
+                    TouchDrag::Tool => cx.emit(ViewportEvent::ToolDrag { position: at / s }),
+                    TouchDrag::Rotate => {
+                        let d = delta / s;
+                        let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
+                        nav::drag_rotate(&mut self.camera, d, size, pivot, true);
+                        self.rotation_speed.push(d);
+                        self.last_rotation = Some(Instant::now());
+                        self.camera_changed(cx);
+                    }
+                    TouchDrag::None => {}
+                },
+                A::DragStop => match std::mem::replace(&mut self.touch_drag, TouchDrag::None) {
+                    TouchDrag::Tool => {
+                        self.drag = Drag::None;
+                        cx.emit(ViewportEvent::ToolUp { position: self.last_pos, modifiers: Modifiers::default() });
+                    }
+                    TouchDrag::Rotate => self.end_nav(cx),
+                    TouchDrag::None => {}
+                },
+                A::PanStart { center } => {
+                    let p = center / s;
+                    let perspective = self.camera.projection == noshape_render::Projection::Perspective;
+                    self.orbit_pivot = perspective.then(|| self.pivot_at(p));
+                }
+                A::Pan { delta, .. } => {
+                    nav::pan(&mut self.camera, delta / s, size, self.orbit_pivot);
+                    self.camera_changed(cx);
+                }
+                A::Rotate { center, angle } => {
+                    // `rotateAboutCanvasPoint`: a roll about the line of sight
+                    // through the fingers' centre.
+                    let pivot = self.camera.unproject_on_target_plane(center / s, size);
+                    let forward = self.camera.forward();
+                    nav::rotate_about(&mut self.camera, forward, angle, pivot);
+                    self.camera_changed(cx);
+                }
+                A::Pinch { center, ratio } => {
+                    let bounds = self.zoom_bounds();
+                    if nav::zoom_at(&mut self.camera, Zoom::Pinch(ratio), center / s, size, bounds) {
+                        self.camera_changed(cx);
+                    }
+                }
+                A::BoxStart { a, b } | A::Box { a, b } => {
+                    // A window box (drawn left to right) whichever finger is left.
+                    let (a, b) = if a.x <= b.x { (a, b) } else { (b, a) };
+                    self.box_rect = Some((a / s, b / s));
+                    cx.notify();
+                }
+                A::BoxStop => {
+                    // Onshape's two-finger box always selects what lies inside.
+                    if let Some((a, b)) = self.box_rect.take() {
+                        self.finish_box(a, b, false, Modifiers::default(), cx);
+                    }
+                }
+                A::Tap { count, fingers, center } => {
+                    let p = center / s;
+                    match (fingers, count) {
+                        (1, 1) => self.click_at(p, Modifiers::default(), cx),
+                        // A double tap is a double click (two clicks in a row).
+                        (1, 2) => {
+                            self.click_at(p, Modifiers::default(), cx);
+                            self.click_at(p, Modifiers::default(), cx);
+                        }
+                        (2, 1) => {
+                            let window_position = point(px(p.x as f32), px(p.y as f32)) + self.bounds.origin;
+                            self.context_menu_at(p, window_position, cx);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        cx.notify();
     }
 
     // ------------------------------------------------------------ keyboard
@@ -1298,7 +1503,7 @@ impl Render for Viewport {
             .bg(crate::theme::p().app_bg)
             .child(
                 canvas(
-                    move |bounds, _window, cx| {
+                    move |bounds, window, cx| {
                         entity.update(cx, |this, cx| {
                             this.last_layout = Some(Instant::now());
                             if let Some(t) = this.presented_at.take() {
@@ -1310,8 +1515,22 @@ impl Render for Viewport {
                                 this.request_frame(cx);
                             }
                         });
+                        // Hitboxes can only be inserted during prepaint.
+                        window.insert_hitbox(bounds, HitboxBehavior::Normal)
                     },
-                    |_, _, _, _| {},
+                    {
+                        let entity = cx.entity();
+                        move |_, hitbox: Hitbox, window: &mut Window, _cx: &mut App| {
+                            // Touchscreen: raw touches that start on this
+                            // viewport (nothing in front of it) are claimed
+                            // from gpui's portable recognizer.
+                            window.on_mouse_event(move |e: &TouchEvent, phase, window, cx| {
+                                if phase == DispatchPhase::Bubble {
+                                    entity.update(cx, |this, cx| this.on_touch(e, hitbox.id, window, cx));
+                                }
+                            });
+                        }
+                    },
                 )
                 .absolute()
                 .size_full(),

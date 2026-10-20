@@ -41,6 +41,12 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
 - **Memory:** 30 GB RAM for everyone; earlyoom kills compilers when it runs out ("could not compile" with no
   error = killed). `~/.cargo/config.toml` sets a rustc wrapper (`~/.local/bin/rustc-throttle`) that lets at most 4
   compiles of noshape's big crates run at once machine-wide, so a build may wait a little for a slot. Don't bypass it.
+- **New windows** must open with `os_menu::open_window` (not `gpui_kit::open_window`), so the window draws its own
+  menus on top.
+- **No time-limited background waits/watchers** (they end your turn). Run builds and tests in the foreground.
+- **Never copy Onshape's files into the repo** (it's public): no SVG/PNG/font/CSS/JS from /root/onshape-research
+  (ui-ref, bundle-raw, live, env-maps, …). Use them only as reference: redraw icons, re-implement behaviour,
+  write our own data. Physical/engineering data (material values, ISO tables) is fine.
 - **Never use broad `pkill -f` patterns.** Kill only your own processes (`pkill -f "[t]arget-<you>/debug/noshape"`).
 - **Keep the shared tree compiling.** Make edits in small steps that build. If someone else's file breaks the
   build, wait a few minutes and retry instead of "fixing" their in-progress code. Stay in your area; if you need a

@@ -125,6 +125,14 @@ pub(crate) enum RenameRow {
     Feature(MateId),
 }
 
+/// Add selection to folder…'s "Folder name" dialog: the members and the name.
+pub(crate) struct FolderNameDialog {
+    instances: Vec<InstanceId>,
+    features: Vec<MateId>,
+    input: Entity<InputState>,
+    _sub: Subscription,
+}
+
 /// View state of the behaviours in this module.
 #[derive(Default)]
 pub(crate) struct AsmUi {
@@ -187,8 +195,12 @@ pub(crate) struct AsmUi {
     /// Insert › Other documents (live 71): the "Search or paste URL" box, the
     /// open category (0 Owned by me … 4 Public) and the scanned documents.
     pub insert_url: Option<Entity<InputState>>,
+    /// Its placeholder ('Search or paste URL' / 'Search in "<category>"').
+    pub insert_url_ph: SharedString,
     pub insert_url_sub: Option<Subscription>,
     pub insert_other_cat: Option<usize>,
+    /// Owned by me: the folder being browsed (None = the top level).
+    pub insert_other_dir: Option<std::path::PathBuf>,
     pub insert_other_docs: Option<Vec<crate::start_library::DocEntry>>,
     pub insert_other_query: Option<String>,
     /// Latest version name of each listed document.
@@ -253,6 +265,27 @@ pub(crate) struct AsmUi {
     pub cfg_props_tab: bool,
     /// Live mate value being typed (double-click a value label): mate, DOF.
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
+    /// Mass and section properties dialog.
+    pub mass: Option<super::mass::AsmMassUi>,
+    /// Insert dialog: configuration list selects per (Part Studio, input).
+    pub insert_cfg_selects: HashMap<(TabId, String), Entity<crate::os_select::OsSelect>>,
+    pub insert_cfg_subs: Vec<Subscription>,
+    /// The "Folder name" dialog of Add selection to folder….
+    pub folder_name: Option<FolderNameDialog>,
+    /// Zebra stripes: the open dialog, and the accepted settings shown after.
+    pub zebra_dialog: Option<super::mass::ZebraDialog>,
+    pub zebra: Option<super::mass::ZebraSettings>,
+    /// Reflection analysis: the open dialog, the accepted settings, the last
+    /// environment used, the uploaded environment and the picker preview.
+    pub reflection_dialog: Option<super::reflection::ReflectionDialog>,
+    /// Curve/surface analysis dialog.
+    pub curve_dialog: Option<super::curvature::CurveDialog>,
+    pub reflection: Option<crate::part_studio::reflection::ReflectionSettings>,
+    pub reflection_last: Option<crate::part_studio::reflection::ReflectionSettings>,
+    pub env_gpu: std::cell::RefCell<Option<(String, noshape_render::ImageHandle)>>,
+    pub env_preview: Option<(&'static str, Arc<RenderImage>)>,
+    /// The angular value's radius, fixed when first shown for a mate.
+    pub value_radius: std::cell::Cell<Option<(MateId, f64)>>,
     /// Insert dialog: configuration chosen per configured Part Studio.
     pub insert_config: HashMap<TabId, noshape_model::configuration::ConfigValues>,
     /// Display states dialog: open, name field, chosen state, renaming.
@@ -1074,18 +1107,114 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ folders
 
-    /// Add selection to folder: a new folder around the instances, named
-    /// inline right away.
+    /// Add selection to folder…: the "Folder name" dialog (live assembly/536:
+    /// 220 px, ✓ ✕, the name field "New folder" selected); ✓ creates the
+    /// folder around the instances.
     pub(super) fn folder_from_instances(&mut self, ids: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(fid) = self.edit("Add selection to folder", cx, |a| a.add_folder(&ids, &[])) else { return };
-        self.expanded.insert(vec![InstanceId(fid.0)]);
-        self.start_row_rename(RenameRow::Feature(fid), window, cx);
+        self.open_folder_name(ids, Vec::new(), window, cx);
     }
 
     pub(super) fn folder_from_features(&mut self, ids: Vec<MateId>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(fid) = self.edit("Add selection to folder", cx, |a| a.add_folder(&[], &ids)) else { return };
-        self.ui.expanded_mates.insert(fid);
-        self.start_row_rename(RenameRow::Feature(fid), window, cx);
+        self.open_folder_name(Vec::new(), ids, window, cx);
+    }
+
+    fn open_folder_name(&mut self, instances: Vec<InstanceId>, features: Vec<MateId>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(name) = self.assembly(cx).map(|a| a.next_folder_name()) else { return };
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let st = input.clone();
+        cx.spawn_in(window, async move |_, cx| {
+            cx.background_executor().timer(Duration::from_millis(40)).await;
+            let _ = st.update_in(cx, |s, window, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
+        })
+        .detach();
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
+            if let InputEvent::PressEnter { .. } = ev {
+                this.close_folder_name(true, window, cx);
+            }
+        });
+        self.ui.folder_name = Some(FolderNameDialog { instances, features, input, _sub: sub });
+        cx.notify();
+    }
+
+    pub(super) fn close_folder_name(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(d) = self.ui.folder_name.take() else { return };
+        window.focus(&self.focus, cx);
+        let name = d.input.read(cx).value().trim().to_string();
+        if !accept || name.is_empty() {
+            cx.notify();
+            return;
+        }
+        let (instances, features) = (d.instances, d.features);
+        let Some(fid) = self.edit("Add selection to folder", cx, |a| {
+            let id = a.add_folder(&instances, &features);
+            if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
+                f.name = name.clone();
+            }
+            id
+        }) else {
+            return;
+        };
+        if features.is_empty() {
+            self.expanded.insert(vec![InstanceId(fid.0)]);
+        } else {
+            self.ui.expanded_mates.insert(fid);
+        }
+        cx.notify();
+    }
+
+    pub(super) fn render_folder_name(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let d = self.ui.folder_name.as_ref()?;
+        let pal = p();
+        Some(
+            v_flex()
+                .id("folder-name-dialog")
+                .occlude()
+                .w(px(220.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .pl(px(6.))
+                        .bg(rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Folder name"))
+                        .child(
+                            div()
+                                .id("folder-name-ok")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(pal.accept)
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
+                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(true, window, cx))),
+                        )
+                        .child(
+                            div()
+                                .id("folder-name-cancel")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(false, window, cx))),
+                        ),
+                )
+                // Live: a 214 px white field with a 1 px `#1651b0` border, 3 px in.
+                .child(div().m(px(3.)).h(px(30.)).px(px(4.)).flex().items_center().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)).child(Input::new(&d.input).appearance(false).text_size(px(14.))))
+                .into_any_element(),
+        )
     }
 
     /// Folder row (instance list or Mate features list).
@@ -1281,19 +1410,11 @@ impl AssemblyView {
                 m.push(icon_item("Unfix all", "fix", move |t, _, cx| t.set_fixed(fixed.clone(), false, cx)));
             }
             m.push(MenuEntry::Sep);
-            let sel: Vec<InstanceId> = self.selected.iter().copied().filter(|s| !insts.contains(s)).collect();
-            if !sel.is_empty() {
-                m.push(item("Add selection to folder…", move |t, _, cx| {
-                    t.edit("Add selection to folder", cx, |a| {
-                        for x in &mut a.folders {
-                            x.instances.retain(|y| !sel.contains(y));
-                        }
-                        if let Some(x) = a.folders.iter_mut().find(|x| x.id == id) {
-                            x.instances.extend(sel.iter().copied());
-                        }
-                    });
-                }));
-            }
+            // Live 537: always offered; the Folder name dialog makes a new
+            // folder from the selection (the folder's own instances when the
+            // folder row itself is the selection).
+            let sel: Vec<InstanceId> = if self.selected.is_empty() { insts.clone() } else { self.selected.clone() };
+            m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_instances(sel.clone(), w, cx)));
             // Expand ▸ / Collapse ▸ (live assembly/537).
             let key = vec![InstanceId(id.0)];
             let k2 = key.clone();
@@ -1319,7 +1440,7 @@ impl AssemblyView {
             });
         }
         m.push(MenuEntry::Sep);
-        m.push(icon_item("Delete", "delete", move |t, _, cx| {
+        m.push(icon_item("Delete", "remove-circle", move |t, _, cx| {
             t.edit("Delete folder", cx, |a| a.delete_folder(id));
         }));
         m.push(item("Unpack folder", move |t, _, cx| {
@@ -1808,7 +1929,9 @@ impl AssemblyView {
             }
         }));
         self.ui.insert_search = Some(st);
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL"));
+        // The placeholder is drawn italic over the empty box (live 610).
+        let st = cx.new(|cx| InputState::new(window, cx));
+        self.ui.insert_url_ph = "Search or paste URL".into();
         self.ui.insert_url_sub = Some(cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if let InputEvent::PressEnter { .. } = ev {
                 let text = st.read(cx).value().trim().to_string();
@@ -2153,8 +2276,59 @@ impl AnimState {
 
 /// Full turns of the mate dialog's Animate preview (one degree per frame).
 const PREVIEW_TURNS: f64 = 2.0;
-/// Ascender of the mate value text (px; Onshape's 13.33 px dimension text).
-const VALUE_TEXT_ASC: f64 = 9.5;
+/// Ascender of the mate value text (px; Onshape dimension text is 16 px, behaviours "Entity colours").
+const VALUE_TEXT_ASC: f64 = 11.5;
+/// Onshape `PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`.
+const VALUE_ARC_RADIUS_PX: f64 = 80.0;
+
+/// One mate value shown as a dimension (see [`AssemblyView::value_dims`]).
+pub(super) struct ValueDim {
+    pub mate: MateId,
+    /// Value index as in `MateStatus::values` (0 rotation, 1..3 X/Y/Z).
+    pub ix: usize,
+    pub text: String,
+    /// Text centre and in-plane axes; ascender (world units).
+    pub center: DVec3,
+    pub x: DVec3,
+    pub y: DVec3,
+    pub asc: f64,
+    pub shape: ValueShape,
+}
+
+pub(super) enum ValueShape {
+    Arc(crate::assembly_scene::ValueArc),
+    Line(crate::assembly_scene::ValueLine),
+}
+
+/// A mate's values as Onshape shows them (bundle `calculateMateValues`): the
+/// first connector in the second's frame, `[rotation about Z, x, y, z]`.
+pub(super) fn onshape_mate_values(a: &noshape_model::assembly::solver::Frame, b: &noshape_model::assembly::solver::Frame) -> [f64; 4] {
+    let (bx, by, bz) = (b.rotation * DVec3::X, b.rotation * DVec3::Y, b.rotation * DVec3::Z);
+    let ax = a.rotation * DVec3::X;
+    let d = a.origin - b.origin;
+    [ax.dot(by).atan2(ax.dot(bx)), d.dot(bx), d.dot(by), d.dot(bz)]
+}
+
+/// Our solver values (`solver::mate_values`: the second connector in the
+/// first's frame) that put Onshape's value `ix` at `v`, the other shown
+/// values unchanged. Rotation: ours turns the other way; translations: the
+/// first connector's offset in the second's frame, expressed back in the
+/// first's (negated).
+pub(super) fn solver_values_for(a: &noshape_model::assembly::solver::Frame, b: &noshape_model::assembly::solver::Frame, ours: [f64; 4], ix: usize, v: f64) -> [f64; 4] {
+    let mut on = onshape_mate_values(a, b);
+    let mut out = ours;
+    if ix == 0 {
+        out[0] = ours[0] - (v - on[0]);
+        return out;
+    }
+    on[ix] = v;
+    let (bx, by, bz) = (b.rotation * DVec3::X, b.rotation * DVec3::Y, b.rotation * DVec3::Z);
+    let d = bx * on[1] + by * on[2] + bz * on[3];
+    for (k, axis) in [DVec3::X, DVec3::Y, DVec3::Z].into_iter().enumerate() {
+        out[k + 1] = -(a.rotation * axis).dot(d);
+    }
+    out
+}
 
 impl AssemblyView {
     fn anim_defaults(&self, m: &Mate, dof: usize, cx: &App) -> (String, String) {
@@ -2829,6 +3003,8 @@ impl AssemblyView {
             cx.notify();
         };
         let view = cx.entity();
+        let caret: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let probe = caret.clone();
         Some(
             h_flex()
                 .flex_none()
@@ -2859,6 +3035,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .id(SharedString::from(format!("inscfg-dd-{studio}")))
+                        .relative()
                         .w(px(20.))
                         .h_full()
                         .flex()
@@ -2867,19 +3044,22 @@ impl AssemblyView {
                         .cursor_pointer()
                         .hover(|d| d.bg(rgb(0xeaeaea)))
                         .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x000000)))
-                        .on_click(move |ev: &ClickEvent, window, cx| {
+                        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                        .on_click(move |_: &ClickEvent, window, cx| {
                             cx.stop_propagation();
                             let (v1, v2) = (view.clone(), view.clone());
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon(Icon::empty().path(icon_path("configuration"))).on_click(move |_, _, cx| v1.update(cx, |this, cx| set_last(this, cx))))
-                                    .item(crate::os_menu::OsMenuItem::new("Reset to default").icon(Icon::empty().path(icon_path("configuration"))).on_click(move |_, _, cx| {
+                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, _, cx| v1.update(cx, |this, cx| set_last(this, cx))))
+                                    .item(crate::os_menu::OsMenuItem::new("Reset to default").icon_name("cfg-reset-default").on_click(move |_, _, cx| {
                                         v2.update(cx, |this, cx| {
                                             this.ui.insert_config.remove(&studio);
                                             cx.notify();
                                         })
                                     }))
                             });
-                            crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
+                            // Live 594: the list hangs under the caret, right-aligned to it.
+                            let b = caret.get();
+                            crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
                         }),
                 )
                 .into_any_element(),
@@ -2899,37 +3079,47 @@ impl AssemblyView {
         let values = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
         let mut col = v_flex().py(px(2.)).gap(px(2.));
         let label = |name: String| div().w(px(44.)).flex_none().truncate().text_size(px(12.)).text_color(pal.text_muted).child(name);
-        for inp in &inputs {
+        // Visibility conditions: hidden inputs and options don't show.
+        let (shown, effective) = noshape_model::configuration::Configuration { inputs: inputs.clone(), configured: Vec::new() }.visibility(&values);
+        for (inp, vis) in inputs.iter().zip(&shown) {
+            if !vis.visible {
+                continue;
+            }
             let id = inp.id.clone();
             match &inp.kind {
-                ConfigInputKind::List { options, default } => {
-                    let cur = values.0.get(&inp.id).cloned().unwrap_or_else(|| default.clone());
-                    let cur_name = options.iter().find(|o| o.id == cur).map(|o| o.name.clone()).unwrap_or_default();
-                    let opts: Vec<(String, String)> = options.iter().map(|o| (o.id.clone(), o.name.clone())).collect();
-                    let view = cx.entity();
-                    let select = Button::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id))).label(cur_name).outline().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("inscfg-dd-{studio}-{}", inp.id)), true, move |mut m, _, _| {
-                        for (oid, name) in &opts {
-                            let (view, oid, id2) = (view.clone(), oid.clone(), id.clone());
-                            m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).checked(oid == cur).on_click(move |_, _, cx| {
-                                view.update(cx, |this, cx| {
-                                    this.ui.insert_config.entry(studio).or_default().0.insert(id2.clone(), oid.clone());
-                                    cx.notify();
-                                })
-                            }));
+                ConfigInputKind::List { options, .. } => {
+                    // Live 595: the feature-dialog select (underlined, the list
+                    // hanging under it with the current row in blue).
+                    let cur = effective.0.get(&inp.id).cloned().unwrap_or_default();
+                    let items: Vec<(SharedString, SharedString)> = options.iter().filter(|o| vis.options.contains(&o.id)).map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
+                    let key = (studio, inp.id.clone());
+                    let sel = match self.ui.insert_cfg_selects.get(&key) {
+                        Some(s) => s.clone(),
+                        None => {
+                            let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id))));
+                            let id2 = id.clone();
+                            let sub = cx.subscribe(&s, move |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                                let crate::os_select::OsSelectEvent::Picked(oid) = ev;
+                                this.ui.insert_config.entry(studio).or_default().0.insert(id2.clone(), oid.to_string());
+                                cx.notify();
+                            });
+                            self.ui.insert_cfg_subs.push(sub);
+                            self.ui.insert_cfg_selects.insert(key, s.clone());
+                            s
                         }
-                        m
-                    });
-                    col = col.child(h_flex().h(px(26.)).gap(px(6.)).child(label(inp.name.clone())).child(select));
+                    };
+                    sel.update(cx, |s, _| s.set_items(items, cur));
+                    col = col.child(h_flex().min_h(px(28.)).items_start().child(div().pl(px(5.)).pt(px(6.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(inp.name.clone())).child(div().id(SharedString::from(format!("inscfg-tt-{studio}-{}", id))).flex_1().min_w_0().tooltip(crate::ui::tooltip(inp.name.clone())).child(sel)));
                 }
-                ConfigInputKind::Checkbox { default } => {
-                    let cur = values.0.get(&inp.id).map(|v| v == "true").unwrap_or(*default);
+                ConfigInputKind::Checkbox { .. } => {
+                    let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
                     col = col.child(Checkbox::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id))).label(inp.name.clone()).checked(cur).on_click(cx.listener(move |this, v: &bool, _, cx| {
                         this.ui.insert_config.entry(studio).or_default().0.insert(id.clone(), v.to_string());
                         cx.notify();
                     })));
                 }
                 ConfigInputKind::Variable { default, .. } => {
-                    col = col.child(h_flex().h(px(26.)).gap(px(6.)).child(label(inp.name.clone())).child(div().text_size(px(12.)).text_color(pal.text).child(values.0.get(&inp.id).cloned().unwrap_or_else(|| default.text.clone()))));
+                    col = col.child(h_flex().h(px(26.)).gap(px(6.)).child(label(inp.name.clone())).child(div().text_size(px(12.)).text_color(pal.text).child(effective.0.get(&inp.id).cloned().unwrap_or_else(|| default.text.clone()))));
                 }
                 ConfigInputKind::Text { .. } => {}
             }
@@ -2953,81 +3143,123 @@ impl AssemblyView {
         self.selected_mate.and_then(|id| asm.mate(id)).filter(shown).map(|m| vec![m.id]).unwrap_or_default()
     }
 
-    /// Value labels of the selected mate: the rotation as "275.326°" beside
-    /// its dashed circle (live 305z: dark blue, 3 decimals, no box), the
-    /// translations as lengths; double-click one to type a value that moves
-    /// the parts (help: Mate values).
-    /// The rotation value arc: the selected mate's (live 305z) or the mate
-    /// dialog's ▶ preview (live 575, whole degrees). Returns the arc, the text
-    /// and its in-plane layout (centre, x / y axes, ascender; world units).
-    pub(super) fn value_arc(&self, cx: &App) -> Option<(crate::assembly_scene::ValueArc, String, [DVec3; 3], f64)> {
+    /// The selected mate's values (live 305z) or the mate dialog's ▶ preview
+    /// rotation (live 575, whole degrees), as Onshape's mate value dimensions
+    /// (bundle `calculateMateValues` / `calculateDimensionDisplayData`): the
+    /// first connector measured in the second's frame; the rotation is an
+    /// angular dimension around the moving connector (radius 80 px when first
+    /// shown, `PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`), translations are
+    /// linear dimensions X: origin → x, Y: (x, 0) → (x, y), Z: (x, y, 0) →
+    /// (x, y, z). Each value's text lies in its plane, centred on its line or
+    /// arc, which breaks around it.
+    pub(super) fn value_dims(&self, cx: &App) -> Vec<ValueDim> {
         let (id, preview) = match &self.anim {
             Some(a) if a.preview => (a.mate, true),
-            Some(_) => return None,
-            None if self.mate.is_some() => return None,
-            None => (self.selected_mate?, false),
+            Some(_) => return vec![],
+            None if self.mate.is_some() => return vec![],
+            None => match self.value_mates(cx).first() {
+                Some(id) => (*id, false),
+                None => return vec![],
+            },
         };
-        let ms = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive)?;
-        let t = self.assembly(cx)?.mate(id)?.mate_type;
-        if !noshape_model::assembly::eval::mate_dofs(t).iter().any(|(ix, _)| *ix == 0) {
-            return None;
-        }
-        let f = ms.frame_a.or(ms.frame_b)?;
-        let radius = self.triad_size() * super::VALUE_ARC_SCALE;
-        let sweep = ms.values[0].rem_euclid(std::f64::consts::TAU);
-        let text = if preview { format!("{:.0}°", sweep.to_degrees()) } else { format!("{:.3}°", sweep.to_degrees()) };
+        let Some(ms) = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive) else { return vec![] };
+        let Some(t) = self.assembly(cx).and_then(|a| a.mate(id)).map(|m| m.mate_type) else { return vec![] };
+        let (Some(a), Some(b)) = (ms.frame_a, ms.frame_b) else { return vec![] };
         let vp = self.viewport.read(cx);
         let size = vp.size();
-        let asc = VALUE_TEXT_ASC * vp.camera.world_per_pixel(size.y);
-        let width = noshape_sketch::text::layout_text(&text, noshape_sketch::text::DEFAULT_FONT, false, false).width * asc;
-        // The text lies in the plane along the connector's X axis (live
-        // 305z), turned so it never reads mirrored or upside down.
-        let (mut x, mut y) = (f.rotation * DVec3::X, f.rotation * DVec3::Y);
-        let mid = sweep * 0.5;
-        let center = f.origin + f.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0);
-        if let (Some(c), Some(px_), Some(py_)) = (vp.project(center), vp.project(center + x * radius), vp.project(center + y * radius)) {
-            let (sx, sy) = (px_ - c, py_ - c);
-            if sx.x * sy.y - sx.y * sy.x > 0.0 {
-                y = -y;
+        let wpp = vp.camera.world_per_pixel(size.y);
+        let asc = VALUE_TEXT_ASC * wpp;
+        let pad = 3.0 * wpp;
+        let units = self.units(cx);
+        let (bx, by, bz) = (b.rotation * DVec3::X, b.rotation * DVec3::Y, b.rotation * DVec3::Z);
+        let on = onshape_mate_values(&a, &b);
+        let width = |text: &str| noshape_sketch::text::layout_text(text, noshape_sketch::text::DEFAULT_FONT, false, false).width * asc;
+        // Text axes turned so it never reads mirrored or upside down.
+        let readable = |center: DVec3, mut x: DVec3, mut y: DVec3| {
+            if let (Some(c), Some(px_), Some(py_)) = (vp.project(center), vp.project(center + x * wpp * 40.0), vp.project(center + y * wpp * 40.0)) {
+                let (sx, sy) = (px_ - c, py_ - c);
+                if sx.x * sy.y - sx.y * sy.x > 0.0 {
+                    y = -y;
+                }
+                if sx.x < 0.0 {
+                    x = -x;
+                    y = -y;
+                }
             }
-            if sx.x < 0.0 {
-                x = -x;
-                y = -y;
+            (x, y)
+        };
+        let mut out = Vec::new();
+        for (ix, _) in noshape_model::assembly::eval::mate_dofs(t).iter().copied().filter(|(ix, _)| !preview || *ix == 0) {
+            if ix == 0 {
+                let radius = match self.ui.value_radius.get() {
+                    Some((m, r)) if m == id => r,
+                    _ => {
+                        let r = VALUE_ARC_RADIUS_PX * wpp;
+                        self.ui.value_radius.set(Some((id, r)));
+                        r
+                    }
+                };
+                let sweep = on[0].rem_euclid(std::f64::consts::TAU);
+                let text = if preview { format!("{:.0}°", sweep.to_degrees()) } else { format!("{:.3}°", sweep.to_degrees()) };
+                let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: b.rotation };
+                let mid = sweep * 0.5;
+                let center = a.origin + b.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0);
+                let (x, y) = readable(center, bx, by);
+                let (hw, hh) = (width(&text) * 0.5 + pad, asc * 0.65 + pad);
+                let (tx, ty) = (mid.sin().abs(), mid.cos().abs());
+                let along = (if tx > 1e-9 { hw / tx } else { f64::INFINITY }).min(if ty > 1e-9 { hh / ty } else { f64::INFINITY });
+                let gap = along.is_finite().then(|| (mid, along / radius));
+                out.push(ValueDim { mate: id, ix, text, center, x, y, asc, shape: ValueShape::Arc(crate::assembly_scene::ValueArc { frame, radius, sweep, gap }) });
+                continue;
             }
+            let (x, y, z) = (on[1], on[2], on[3]);
+            let p = |u: f64, v: f64, w: f64| b.origin + bx * u + by * v + bz * w;
+            let (from, to, dir, up) = match ix {
+                1 => (p(0.0, 0.0, 0.0), p(x, 0.0, 0.0), bx, by),
+                2 => (p(x, 0.0, 0.0), p(x, y, 0.0), by, bx),
+                _ => (p(x, y, 0.0), p(x, y, z), bz, bx),
+            };
+            let text = noshape_units::format_quantity(noshape_units::Quantity::meters(on[ix]), &units);
+            let center = (from + to) * 0.5;
+            let (tx, ty) = readable(center, dir, up);
+            let len = from.distance(to);
+            let gap = (len > 1e-12).then(|| {
+                let half = (width(&text) * 0.5 + pad) / len;
+                (0.5 - half, 0.5 + half)
+            });
+            out.push(ValueDim { mate: id, ix, text, center, x: tx, y: ty, asc, shape: ValueShape::Line(crate::assembly_scene::ValueLine { a: from, b: to, up, gap, head: 10.0 * wpp }) });
         }
-        // The arc breaks where it crosses the text box (3 px margin).
-        let pad = 3.0 * asc / VALUE_TEXT_ASC;
-        let (hw, hh) = (width * 0.5 + pad, asc * 0.65 + pad);
-        let (tx, ty) = (mid.sin().abs(), mid.cos().abs());
-        let along = (if tx > 1e-9 { hw / tx } else { f64::INFINITY }).min(if ty > 1e-9 { hh / ty } else { f64::INFINITY });
-        let gap = along.is_finite().then(|| (mid, along / radius));
-        let arc = crate::assembly_scene::ValueArc { frame: f, radius, sweep, gap };
-        Some((arc, text, [center, x, y], asc))
+        out
     }
 
-    /// The value text drawn in the arc's plane, plus a hit box over it for
+    /// Each value's text drawn in its plane, plus a hit box over it for
     /// double-click editing.
     fn render_value_text(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let Some((_, text, [center, x, y], asc)) = self.value_arc(cx) else { return vec![] };
-        let Some(id) = self.anim.as_ref().map(|a| a.mate).or(self.selected_mate) else { return vec![] };
-        let layout = noshape_sketch::text::layout_text(&text, noshape_sketch::text::DEFAULT_FONT, false, false);
-        let base = center - x * (layout.width * asc * 0.5) - y * (asc * 0.5);
+        let dims = self.value_dims(cx);
         let vp = self.viewport.read(cx);
         let mut polys: Vec<Vec<Point<Pixels>>> = Vec::new();
-        let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
-        for contour in layout.polylines(6) {
-            let mut poly = Vec::with_capacity(contour.len());
-            for q in contour {
-                let Some(s) = vp.project(base + x * (q.x * asc) + y * (q.y * asc)) else {
-                    poly.clear();
-                    break;
-                };
-                lo = lo.min(s);
-                hi = hi.max(s);
-                poly.push(point(px(s.x as f32), px(s.y as f32)));
+        let mut hits: Vec<(MateId, usize, DVec2, DVec2)> = Vec::new();
+        for d in &dims {
+            let layout = noshape_sketch::text::layout_text(&d.text, noshape_sketch::text::DEFAULT_FONT, false, false);
+            let base = d.center - d.x * (layout.width * d.asc * 0.5) - d.y * (d.asc * 0.5);
+            let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+            for contour in layout.polylines(6) {
+                let mut poly = Vec::with_capacity(contour.len());
+                for q in contour {
+                    let Some(s) = vp.project(base + d.x * (q.x * d.asc) + d.y * (q.y * d.asc)) else {
+                        poly.clear();
+                        break;
+                    };
+                    lo = lo.min(s);
+                    hi = hi.max(s);
+                    poly.push(point(px(s.x as f32), px(s.y as f32)));
+                }
+                if poly.len() >= 3 {
+                    polys.push(poly);
+                }
             }
-            if poly.len() >= 3 {
-                polys.push(poly);
+            if lo.x.is_finite() {
+                hits.push((d.mate, d.ix, lo, hi));
             }
         }
         if polys.is_empty() {
@@ -3059,80 +3291,46 @@ impl AssemblyView {
         if self.anim.is_some() {
             return out;
         }
-        let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == 0).map(|(_, _, st, _)| st.clone());
-        let hit = div().id("mv-rot").absolute().left(px(lo.x as f32 - 3.)).top(px(lo.y as f32 - 3.)).w(px((hi.x - lo.x) as f32 + 6.)).h(px((hi.y - lo.y) as f32 + 6.));
-        out.push(
-            match editing {
-                Some(st) => hit.child(div().w(px(80.)).bg(rgb(0xffffff)).child(Input::new(&st).xsmall())),
-                None => hit.cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
-                    if ev.click_count() >= 2 {
-                        this.start_value_edit(id, 0, window, cx);
-                    }
-                })),
-            }
-            .occlude()
-            .into_any_element(),
-        );
-        out
-    }
-
-    pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        // The rotation value is an in-plane angular dimension (also during
-        // the mate dialog's ▶ preview).
-        let mut out = self.render_value_text(cx);
-        let ids = self.value_mates(cx);
-        // Lengths: not while a mate dialog or the Animate dialog is open.
-        if ids.is_empty() || self.mate.is_some() || self.anim.is_some() {
-            return out;
-        }
-        let units = self.units(cx);
-        let vp = self.viewport.read(cx);
-        let size = vp.size();
-        for id in ids {
-            let Some(ms) = self.result.mates.iter().find(|m| m.id == id && m.ok && !m.inactive) else { continue };
-            let Some(t) = self.assembly(cx).and_then(|a| a.mate(id)).map(|m| m.mate_type) else { continue };
-            let Some(f) = ms.frame_b else { continue };
-            // Lengths stack beside the connector.
-            for (k, (ix, _)) in noshape_model::assembly::eval::mate_dofs(t).iter().enumerate().filter(|(_, (ix, _))| *ix != 0) {
-                let ix = *ix;
-                let v = ms.values[ix];
-                let Some(at) = vp.project(f.origin) else { continue };
-                if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
-                    continue;
-                }
-                let text = noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units);
-                let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == ix).map(|(_, _, st, _)| st.clone());
-                let (x, y) = (at.x as f32 + 12., at.y as f32 + 14. * k as f32);
-                let label = div()
-                    .id(SharedString::from(format!("mv-{}-{ix}", id.0)))
-                    .absolute()
-                    .left(px(x))
-                    .top(px(y))
-                    .text_size(px(13.))
-                    .text_color(rgb(0x1a35b8));
-                let label = match editing {
-                    Some(st) => label.child(div().w(px(80.)).bg(rgb(0xffffff)).child(Input::new(&st).xsmall())),
-                    None => label.child(text).cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+        for (id, ix, lo, hi) in hits {
+            let editing = self.ui.value_edit.as_ref().filter(|(m, d, ..)| *m == id && *d == ix).map(|(_, _, st, _)| st.clone());
+            let hit = div().id(SharedString::from(format!("mv-{}-{ix}", id.0))).absolute().left(px(lo.x as f32 - 3.)).top(px(lo.y as f32 - 3.)).w(px((hi.x - lo.x) as f32 + 6.)).h(px((hi.y - lo.y) as f32 + 6.));
+            out.push(
+                match editing {
+                    Some(st) => hit.child(div().w(px(80.)).bg(rgb(0xffffff)).child(Input::new(&st).xsmall())),
+                    None => hit.cursor_pointer().on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                         if ev.click_count() >= 2 {
                             this.start_value_edit(id, ix, window, cx);
                         }
                     })),
-                };
-                out.push(label.occlude().into_any_element());
-            }
+                }
+                .occlude()
+                .into_any_element(),
+            );
         }
         out
     }
 
+    pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        self.render_value_text(cx)
+    }
+
     fn start_value_edit(&mut self, id: MateId, ix: usize, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.units(cx);
-        let v = self.result.mates.iter().find(|m| m.id == id).map(|m| m.values[ix]).unwrap_or(0.0);
+        let v = self.result.mates.iter().find(|m| m.id == id).and_then(|m| Some(onshape_mate_values(&m.frame_a?, &m.frame_b?)[ix])).unwrap_or(0.0);
+        let v = if ix == 0 { v.rem_euclid(std::f64::consts::TAU) } else { v };
         let q = if ix == 0 { noshape_units::Quantity::radians(v) } else { noshape_units::Quantity::meters(v) };
         let st = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::format_quantity(q, &units)));
-        st.update(cx, |s, cx| {
-            s.focus(window, cx);
-            s.select_all(window, cx);
-        });
+        // Focus once the double-click is over (the viewport's mouse-up
+        // takes focus back otherwise and the blur closes the box).
+        let st2 = st.clone();
+        cx.spawn_in(window, async move |_, cx| {
+            cx.background_executor().timer(Duration::from_millis(40)).await;
+            let _ = st2.update_in(cx, |s, window, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
+        })
+        .detach();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::PressEnter { .. } => {
                 let text = st.read(cx).value().to_string();
@@ -3162,8 +3360,17 @@ impl AssemblyView {
                 return;
             }
         };
+        // The typed value is Onshape's (see `onshape_mate_values`); hold the
+        // matching solver values (all translations, so the others stay).
+        let Some(ms) = self.result.mates.iter().find(|m| m.id == id) else { return };
+        let (Some(fa), Some(fb)) = (ms.frame_a, ms.frame_b) else { return };
+        let target = solver_values_for(&fa, &fb, ms.values, ix, v);
+        let t = self.assembly(cx).and_then(|a| a.mate(id)).map(|m| m.mate_type);
+        let holds: Vec<(MateId, usize, f64)> = t
+            .map(|t| noshape_model::assembly::eval::mate_dofs(t).iter().map(|(k, _)| *k).filter(|k| (ix == 0) == (*k == 0)).map(|k| (id, k, target[k])).collect())
+            .unwrap_or_default();
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
-        let solved = self.result.prepared.solve(&SolveOptions { hold_values: vec![(id, ix, v)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
+        let solved = self.result.prepared.solve(&SolveOptions { hold_values: holds, start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() });
         let name = self.assembly(cx).and_then(|a| a.mate(id).map(|m| m.name.clone())).unwrap_or_default();
         self.apply_solved(solved, cx);
         self.edit(&format!("Move : {name}"), cx, |_| {});
@@ -3568,4 +3775,40 @@ fn iso_slider(id: &'static str, t: f32, tip: &'static str, cx: &mut Context<Asse
             }
         }))
         .into_any_element()
+}
+
+#[cfg(test)]
+mod value_tests {
+    use super::{onshape_mate_values, solver_values_for};
+    use glam::{DQuat, DVec3};
+    use noshape_model::assembly::solver::Frame;
+    use std::prelude::v1::test;
+
+    /// The second connector posed from our solver values relative to the
+    /// first (rotation about Z, then the translation in the first's frame).
+    fn second_from(a: &Frame, ours: [f64; 4]) -> Frame {
+        Frame { origin: a.origin + a.rotation * DVec3::new(ours[1], ours[2], ours[3]), rotation: a.rotation * DQuat::from_rotation_z(ours[0]) }
+    }
+
+    #[test]
+    fn typed_mate_values_round_trip_through_the_solver_convention() {
+        let a = Frame { origin: DVec3::new(0.01, -0.02, 0.03), rotation: DQuat::from_rotation_x(0.4) * DQuat::from_rotation_y(-0.7) };
+        let ours = [0.9, 0.004, -0.007, 0.012];
+        let b = second_from(&a, ours);
+        let on = onshape_mate_values(&a, &b);
+        // Onshape measures the first connector in the second's frame.
+        assert!((on[0] + ours[0]).abs() < 1e-12, "rotation reads the other way");
+        for (ix, v) in [(0, 2.0_f64), (1, 0.02), (2, -0.015), (3, 0.05)] {
+            let target = solver_values_for(&a, &b, ours, ix, v);
+            let got = onshape_mate_values(&a, &second_from(&a, target));
+            let want_rot = if ix == 0 { v } else { on[0] };
+            assert!((got[0] - want_rot).rem_euclid(std::f64::consts::TAU).min((want_rot - got[0]).rem_euclid(std::f64::consts::TAU)) < 1e-9, "ix {ix}: rotation {} vs {}", got[0], want_rot);
+            if ix != 0 {
+                for k in 1..4 {
+                    let want = if k == ix { v } else { on[k] };
+                    assert!((got[k] - want).abs() < 1e-9, "ix {ix}: value {k} {} vs {want}", got[k]);
+                }
+            }
+        }
+    }
 }

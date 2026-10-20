@@ -699,3 +699,58 @@ pub fn isolate_expansion(result: &AssemblyResult, asm: &Assembly, seeds: &[Insta
     }
     steps
 }
+
+/// Mass properties of an assembly's parts where they sit (Onshape's Mass
+/// properties tool in an assembly): the parts of the instances `tops` (every
+/// instance when empty), each part's volume properties moved by its
+/// occurrence transform, combined about the joint centre of mass. `density`
+/// gives a part's material density (kg/m³); `mass` is None when a part has
+/// none (Onshape: "One or more parts do not have a material defined"), and
+/// `without_material` lists those occurrences.
+pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], density: &dyn Fn(&PartOccurrence) -> Option<f64>) -> Option<AssemblyMass> {
+    struct Part {
+        mass: f64,
+        center: DVec3,
+        inertia: glam::DMat3,
+    }
+    let (mut volume, mut area) = (0.0, 0.0);
+    let mut parts = Vec::new();
+    let mut without_material = Vec::new();
+    for o in result.occurrences.iter().filter(|o| tops.is_empty() || tops.contains(&o.top())) {
+        if !matches!(o.kind, BodyKind::Solid) {
+            continue;
+        }
+        let Some(body) = o.context.bodies.iter().find(|b| b.id == o.body) else { continue };
+        let (Ok(p), Ok(s)) = (k::volume_properties(&body.shape), k::surface_properties(&body.shape)) else { continue };
+        let rho = density(o);
+        if rho.is_none() {
+            without_material.push(o.path.clone());
+        }
+        let r = glam::DMat3::from_mat4(o.transform);
+        volume += p.mass;
+        area += s.mass;
+        let rho = rho.unwrap_or(1.0);
+        parts.push(Part { mass: p.mass * rho, center: o.transform.transform_point3(p.center), inertia: r * (p.inertia * rho) * r.transpose() });
+    }
+    if parts.is_empty() {
+        return None;
+    }
+    let total: f64 = parts.iter().map(|p| p.mass).sum();
+    let center = if total > 0.0 { parts.iter().map(|p| p.center * p.mass).sum::<DVec3>() / total } else { DVec3::ZERO };
+    // Each part's inertia about the joint centre (parallel axis theorem).
+    let inertia = parts.iter().fold(glam::DMat3::ZERO, |acc, p| {
+        let d = p.center - center;
+        acc + p.inertia + (glam::DMat3::from_diagonal(DVec3::splat(d.length_squared())) - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z)) * p.mass
+    });
+    Some(AssemblyMass {
+        props: crate::regen::measure::MassProperties { volume, surface_area: area, density: None, mass: without_material.is_empty().then_some(total), center_of_mass: center, inertia },
+        without_material,
+    })
+}
+
+/// Result of [`assembly_mass_properties`].
+#[derive(Clone, Debug)]
+pub struct AssemblyMass {
+    pub props: crate::regen::measure::MassProperties,
+    pub without_material: Vec<InstancePath>,
+}

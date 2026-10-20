@@ -237,7 +237,7 @@ impl Render for NumberingPrefsView {
         for (r, label) in types.iter().enumerate() {
             let y = center(r);
             chart = chart
-                .child(div().absolute().left(px(10.)).top(px(y - 10.)).child(bold(*label)))
+                .child(div().absolute().left(px(10.)).top(px(y - 10.)).child(bold(label)))
                 .when_some(inp.prefixes.get(r), |d, st| d.child(div().absolute().left(px(x_prefix)).top(px(y - 17.)).child(chart_box(75.).child(Input::new(st).appearance(false).small()))))
                 .child(hline(x_prefix + 75.0, x_lbracket, y))
                 .child(hline(x_rbracket, x_preview, y))

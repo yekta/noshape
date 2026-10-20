@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <map>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -30,6 +31,9 @@ std::vector<MeshInstance> read_meshes(const std::string& bytes);
 
 // Raw deflate (RFC 1951) of `in`; throws std::runtime_error.
 std::string inflate_raw(const unsigned char* in, size_t len);
+
+// A zip archive's members by name, inflated; throws std::runtime_error.
+std::map<std::string, std::string> zip_members(const std::string& zip);
 
 } // namespace pvz
 } // namespace noshape

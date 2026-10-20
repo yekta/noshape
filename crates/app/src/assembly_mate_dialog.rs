@@ -644,13 +644,14 @@ impl Render for MateDialog {
                     ),
             )
             .child(
+                // Live (dom/assembly-revolute-dialog-both.txt): the select flush
+                // at the top-left (28 px row), each query box 3 px in and 5 px
+                // below, 5 px before the 27 px checkbox rows (no gaps).
                 v_flex()
-                    .px(px(3.))
-                    .pt(px(3.))
                     .pb(px(2.))
-                    .gap(px(4.))
-                    .child(type_field)
-                    .children(query_boxes)
+                    .child(div().h(px(28.)).child(type_field))
+                    .children(query_boxes.into_iter().map(|q| div().px(px(3.)).pt(px(5.)).child(q)))
+                    .child(div().h(px(5.)))
                     .when(t == MateType::Tangent, |d| {
                         d.child(os::checkbox("mate-tangent-prop", "Tangent propagation", self.tangent_propagation).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.tangent_propagation = !this.tangent_propagation;
@@ -664,7 +665,7 @@ impl Render for MateDialog {
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         }));
-                        d.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET, offset, cx)).child(offset_rows)
+                        d.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET, offset, cx)).when(self.use_offset, |d| d.child(offset_rows))
                     })
                     .when(!lkeys.is_empty(), |d| {
                         d.child(os::checkbox("mate-limits", "Limits", self.use_limits).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -672,13 +673,14 @@ impl Render for MateDialog {
                             cx.emit(MateDialogEvent::Changed);
                             cx.notify();
                         })))
-                        .child(limit_rows)
+                        .when(self.use_limits, |d| d.child(limit_rows))
                     })
                     // Onshape's bottom row: flip primary axis, reorient secondary
                     // axis, animate, Solve; the help ? at the right.
                     .child(
                         h_flex()
                             .h(px(30.))
+                            .px(px(3.))
                             .gap(px(4.))
                             .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", self.flip_primary).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
                             .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

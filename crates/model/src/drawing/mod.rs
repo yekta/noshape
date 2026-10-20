@@ -532,9 +532,13 @@ pub enum AnnotationKind {
     /// mm) and optional leaders to the toleranced geometry.
     Gdt {
         anchor: [f64; 2],
+        /// The first frame row: symbol, tolerance ("Ø0.1Ⓜ"), datums.
         frame: Vec<String>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         leaders: Vec<Leader>,
+        /// Upper / lower text, prefixes and suffixes, more frame rows.
+        #[serde(default, skip_serializing_if = "GdtExtra::is_default")]
+        extra: Box<GdtExtra>,
     },
     /// One ordinate value: distance of `point` from the group `origin`
     /// along x (`horizontal`) or y; the text sits at the annotation position.
@@ -790,6 +794,28 @@ pub enum TableKind {
         /// Revisions whose callouts are hidden (row › Hide revision callouts).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         hidden: Vec<String>,
+    },
+    /// A FeatureScript custom table (`defineTable`) run on a whole Part
+    /// Studio, which need not be shown in the drawing (Onshape's Custom
+    /// table). Rows resolved when the sheet is built, from
+    /// [`build::SheetInfo::custom_tables`].
+    Custom {
+        /// The Part Studio tabulated, and its pinned version (None: the workspace).
+        studio: TabId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+        /// The Feature Studio defining the table, the table's exported
+        /// constant, and the version it was added from (None: the
+        /// workspace's own table).
+        fs: TabId,
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fs_version: Option<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        bottom_to_top: bool,
+        /// Edited cells: (row, column, text).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        overrides: Vec<(usize, usize, String)>,
     },
 }
 
@@ -1059,12 +1085,13 @@ impl Table {
             TableKind::Hole { .. } => "Hole table",
             TableKind::Revision { .. } => "Revision table",
             TableKind::CutList { .. } => "Cut list table",
+            TableKind::Custom { .. } => "Custom table",
         }
     }
     pub fn view(&self) -> Option<ViewId> {
         match self.kind {
             TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => Some(view),
-            TableKind::General { .. } | TableKind::Revision { .. } => None,
+            TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Custom { .. } => None,
         }
     }
 }
@@ -1644,7 +1671,7 @@ pub struct DrawingProps {
     pub chamfer_45_content: ChamferContent,
     #[serde(default = "yes")]
     pub chamfer_dimension: bool,
-    #[serde(default)]
+    #[serde(default = "length_x_length")]
     pub chamfer_content: ChamferContent,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chamfer_length_precision: Option<u8>,
@@ -1766,6 +1793,10 @@ fn datum_size() -> f64 {
     3.0
 }
 
+fn length_x_length() -> ChamferContent {
+    ChamferContent::LengthXLength
+}
+
 /// What a chamfer dimension reads (Drawing properties › Dimensions ›
 /// Chamfer content).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -1801,6 +1832,39 @@ fn stack_gap() -> f64 {
 
 fn hole_indicator() -> String {
     "X".into()
+}
+
+/// A geometric tolerance's texts and extra frame rows (live dialog
+/// drawing/200–215): upper text above the frame, lower text below, each
+/// row's prefix (left of the frame) and suffix (right of its row), rows
+/// after the first (their symbol "Composite" shares the first row's symbol
+/// cell), and the leader end (Leader / All around / All over).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GdtExtra {
+    pub upper: String,
+    pub lower: String,
+    /// Per row (the first row's at 0).
+    pub prefix: Vec<String>,
+    pub suffix: Vec<String>,
+    /// Rows after the first: symbol (or "Composite"), tolerance, datums.
+    pub rows: Vec<Vec<String>>,
+    pub leader: GdtLeader,
+}
+
+impl GdtExtra {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// How a geometric tolerance's leader ends (the dialog's Leader menu).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GdtLeader {
+    #[default]
+    Leader,
+    AllAround,
+    AllOver,
 }
 
 /// Callout border shapes (the Callout dialog's Border shape).
@@ -2133,7 +2197,7 @@ impl Default for DrawingProps {
             chamfer_45_dimension: false,
             chamfer_45_content: ChamferContent::default(),
             chamfer_dimension: true,
-            chamfer_content: ChamferContent::default(),
+            chamfer_content: ChamferContent::LengthXLength,
             chamfer_length_precision: None,
             chamfer_angle_precision: None,
             flag_shape: flag_shape(),
@@ -2307,7 +2371,7 @@ impl Drawing {
             t.id = id;
             match &mut t.kind {
                 TableKind::Bom { view, .. } | TableKind::Hole { view, .. } | TableKind::CutList { view, .. } => *view = remap(*view),
-                TableKind::General { .. } | TableKind::Revision { .. } => {}
+                TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Custom { .. } => {}
             }
             tbls.push(t);
         }

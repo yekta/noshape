@@ -178,6 +178,8 @@ pub struct SheetInfo {
     /// The drawing's revisions, oldest first (revision tables; from
     /// [`tables::revision_rows`]).
     pub revisions: Vec<tables::RevisionRow>,
+    /// Evaluated custom tables (from [`tables::evaluate_custom_tables`]).
+    pub custom_tables: tables::CustomTables,
 }
 
 pub struct BuiltSheet {
@@ -1168,7 +1170,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Annotations with resolved references.
     let (resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
     let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
-    let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields, revisions: &info.revisions, used: &used };
+    // Note fields are matched only against annotation texts.
+    let used_notes = std::cell::RefCell::new(Vec::<String>::new());
+    let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields, revisions: &info.revisions, used: &used_notes };
     g.add_annotations(&resolved, &env);
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
@@ -1234,7 +1238,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             _ => None,
         };
-        let data = tables::table_data(drawing, t, geo, source, origin, &info.revisions, &expand);
+        let data = tables::table_data_with(drawing, t, geo, source, origin, info, &expand);
         let layout = tables::layout(t, &data);
         tables::render(&mut g, t, &data, &layout, pick);
         if let (TableKind::Hole { flip_x, flip_y, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
@@ -1281,11 +1285,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
 
     // Notes › property background: grey behind property fields (screen only).
     if !drawing.props.hide_property_background {
-        let used = used.into_inner();
-        // Only title block texts and annotation texts (not zone labels that
-        // happen to read like a value).
-        let candidate = |i: usize, t: &Text2| (i >= mark_t && i < end_t && in_tb(&t.pos)) || i >= mt;
-        g.field_backdrops = g.texts.iter().enumerate().filter(|(i, t)| candidate(*i, t) && !t.text.trim().is_empty() && used.iter().any(|u| u.trim() == t.text.trim())).map(|(_, t)| super::font::text_box(t).to_vec()).collect();
+        let (used, used_notes) = (used.into_inner(), used_notes.into_inner());
+        // Title block values against title block texts, note fields against
+        // annotation texts (not zone labels or datums that read like a value).
+        let hit = |list: &[String], t: &Text2| !t.text.trim().is_empty() && list.iter().any(|u| u.trim() == t.text.trim());
+        g.field_backdrops = g.texts.iter().enumerate().filter(|(i, t)| (*i >= mark_t && *i < end_t && in_tb(&t.pos) && hit(&used, t)) || (*i >= mt && hit(&used_notes, t))).map(|(_, t)| super::font::text_box(t).to_vec()).collect();
     }
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
 }

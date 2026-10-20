@@ -428,3 +428,10 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   For the lead / theme: the focused input's text selection is the global `t.selection` #b2ddf6 (main.rs) with dark
   text; live Chrome shows #3367d1 with white text in the dimension box (live 13, 141).
 * No tool active after picking the plane: verified (GUI n1, a click in empty space does nothing).
+* Lead question (applied dimension selected?): settled from the bundle. The sketch Dimension tool's commit ends in
+  `cleanUpAfterCommit()` → `selectionList.reset()` + preselection reset; the dimensioned entities are only
+  highlighted (`highlightDimensionEntities`, cleared with the edit box). So a NEW dimension leaves nothing selected
+  (live sketch/15); sketch/148's selected 30° isn't a fresh commit. `DimEdit.created` (true from `open_value_box`,
+  false when an existing label is clicked); `commit_dimension` (both the apply and the untouched-Enter paths) and
+  `SketchEditor::cancel` clear the selection only for created ones. Test `a_new_dimension_leaves_nothing_selected`;
+  GUI dm4. Row 14.42.

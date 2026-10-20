@@ -167,9 +167,13 @@ pub mod viewport {
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;
     /// Construction plane outline (`--os-construction-plane-outline-color`
-    /// `#1d60aa` at 35%) as it renders on white,
-    /// drawn opaque because the renderer blends in linear light.
-    pub const PLANE_OUTLINE_ON_WHITE: u32 = 0xaac3de;
+    /// `#1d60aa` at 35%, which the browser blends in sRGB). Our renderer
+    /// blends in linear light, so the fit is this color at
+    /// [`PLANE_OUTLINE_ALPHA`]: one edge reads `#aac3de` on the plane fill
+    /// like live, and the two edges of a plane seen edge-on (a sketch's
+    /// normal view) add up darker, `#79a1cc` live (sketch/03).
+    pub const PLANE_OUTLINE: u32 = 0x4191c8;
+    pub const PLANE_OUTLINE_ALPHA: f32 = 0.6;
     /// Construction plane label (`--os-construction-plane-text-color`).
     pub const PLANE_TEXT: u32 = 0x1651b0;
     /// Origin and point bodies (`--os-origin-color`).

@@ -104,6 +104,8 @@ pub struct BodyDisplay {
     pub bounds: Option<(DVec3, DVec3)>,
     /// A Composite part: its members and whether it is closed.
     pub composite: Option<CompositeInfo>,
+    /// A mesh part (imported STL, OBJ, PVZ, …): parts-list mesh icon, faceted.
+    pub is_mesh: bool,
 }
 
 /// A Composite part's members (Help PartStudio__composite_part). An open

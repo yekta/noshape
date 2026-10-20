@@ -5,6 +5,7 @@ use super::PartStudioView;
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
+use crate::ui::{TipExt as _, TipSide};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{h_flex, v_flex};
@@ -653,15 +654,16 @@ impl PartStudioView {
             .gap(px(5.))
             .bg(with_alpha(pal.panel, 0.75))
             .children(readout)
+            // Live (part-studio/22): the tooltips sit over the buttons.
             .child(
-                btn("eval-measure", "measure", measure_on, cx).tooltip("Show measure details ([)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                div().id("eval-measure-tip").child(btn("eval-measure", "measure", measure_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.measure_pinned = !this.ui.measure_pinned;
                     this.show_mass = false;
                     cx.notify();
-                })),
+                }))).tip("Show measure details ([)", TipSide::Above),
             )
             // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
-            .child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).tooltip("Show analysis tools").dropdown_menu(move |m, _, _| {
+            .child(div().id("eval-analysis-tip").child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).dropdown_menu(move |m, _, _| {
                 let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
                 let v11 = view.clone();
                 let v12 = view.clone();
@@ -682,9 +684,9 @@ impl PartStudioView {
                             .item(PopupMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
                     })
                     .item(PopupMenuItem::new("Flatten surfaces…").on_click(move |_, w, cx| v12.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Flatten, w, cx))))
-            }))
+            })).tip("Show analysis tools", TipSide::Above))
             .child(
-                btn("eval-mass", "mass-properties", mass_on, cx).tooltip("Mass properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                div().id("eval-mass-tip").child(btn("eval-mass", "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.show_mass = !this.show_mass;
                     this.ui.measure_pinned = false;
                     // Onshape: a yellow warning under the toolbar when a part
@@ -696,7 +698,7 @@ impl PartStudioView {
                         }
                     }
                     cx.notify();
-                })),
+                }))).tip("Display mass and section properties", TipSide::Above),
             )
             .into_any_element()
     }

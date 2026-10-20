@@ -1747,12 +1747,13 @@ fn folders_and_display_states() {
     };
     // Folder around instances 3 and 2 (members keep the list order).
     let fid = asm.add_folder(&[InstanceId(3), InstanceId(2)], &[]);
-    assert_eq!(asm.folders[0].name, "Folder 1");
+    assert_eq!(asm.folders[0].name, "New folder");
     assert_eq!(asm.folders[0].instances, vec![InstanceId(2), InstanceId(3)]);
     assert_eq!(asm.folder_of_instance(InstanceId(3)).map(|f| f.id), Some(fid));
     assert!(asm.next_id() > fid.0, "folder ids are taken");
     // Moving an instance into another folder takes it out of the first.
     let f2 = asm.add_folder(&[InstanceId(3)], &[]);
+    assert_eq!(asm.folders.iter().find(|f| f.id == f2).map(|f| f.name.as_str()), Some("New folder"));
     assert_eq!(asm.folders[0].instances, vec![InstanceId(2)]);
     assert!(asm.rename_folder(f2, "Fasteners"));
     // Mate folder; deleting the mate empties it.
@@ -2548,4 +2549,32 @@ fn inference_points_on_cones_spheres_arcs_and_vertices() {
     assert_eq!(pts.len(), 1);
     let z = pts[0].frame.z();
     assert!([DVec3::X, DVec3::Y, DVec3::Z].iter().any(|a| z.cross(*a).length() < 1e-6), "Z normal to one of the corner's faces: {z:?}");
+}
+
+#[test]
+fn assembly_mass_properties_combine_parts_where_they_sit() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let mut b = part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.1, 0.0, 0.0), true);
+    let q = DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2);
+    b.placement.rotation = [q.x, q.y, q.z, q.w];
+    let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), b], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m = super::analysis::assembly_mass_properties(&res, &[], &|_| Some(1000.0)).expect("parts");
+    let p = &m.props;
+    assert!((p.volume - 2.0 * 8e-6).abs() < 1e-12);
+    let mass = 0.008;
+    assert!((p.mass.unwrap() - 2.0 * mass).abs() < 1e-9);
+    assert!((p.center_of_mass - DVec3::new(0.055, 0.015, 0.005)).length() < 1e-9, "{:?}", p.center_of_mass);
+    let izz = 2.0 * (mass * (0.0016 + 0.0004) / 12.0 + mass * 0.00125);
+    let ixx = mass * 0.0005 / 12.0 + mass * 0.0017 / 12.0 + 2.0 * mass * 0.000025;
+    assert!((p.inertia.z_axis.z - izz).abs() < 1e-12, "Izz {}", p.inertia.z_axis.z);
+    assert!((p.inertia.x_axis.x - ixx).abs() < 1e-12, "Ixx {}", p.inertia.x_axis.x);
+    // One instance only, and a part without a material.
+    let one = super::analysis::assembly_mass_properties(&res, &[InstanceId(2)], &|_| Some(1000.0)).unwrap();
+    assert!((one.props.mass.unwrap() - mass).abs() < 1e-9);
+    let missing = super::analysis::assembly_mass_properties(&res, &[], &|o| (o.top() == InstanceId(1)).then_some(1000.0)).unwrap();
+    assert!(missing.props.mass.is_none());
+    assert_eq!(missing.without_material.len(), 1);
 }

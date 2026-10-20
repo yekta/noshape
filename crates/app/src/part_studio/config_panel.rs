@@ -8,6 +8,7 @@ use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
+use crate::ui::TipExt as _;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption, VariableKind};
 use noshape_model::params::ParamValue;
 use noshape_model::partstudio::PartStudio;
@@ -56,10 +57,46 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn edit_config(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut PartStudio)) {
+    pub(super) fn edit_config(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut PartStudio)) {
+        let mut repaired = Vec::new();
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, desc, cx, f);
+            doc.edit_studio(self.tab, desc, cx, |ps| {
+                f(ps);
+                // Help "Repairing visibility conditions": conditions naming
+                // deleted inputs or options are removed, with a warning.
+                repaired = ps.configuration.repair_visibility();
+            });
         });
+        if !repaired.is_empty() {
+            self.flash_info(format!("Visibility conditions for {} were updated", repaired.join(", ")), cx);
+        }
+    }
+
+    /// "Configuration visibility conditions" for every input (`input` None)
+    /// or one; Save stores the inputs' conditions.
+    pub(super) fn open_visibility_conditions(&mut self, input: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(cfg) = self.studio(cx).map(|s| s.configuration.clone()) else { return };
+        let view = cx.entity().downgrade();
+        let values = self.config_values.clone();
+        crate::config_visibility::open(
+            cfg,
+            values,
+            input,
+            move |edited, _, cx| {
+                let _ = view.update(cx, |this, cx| {
+                    this.edit_config("Edit visibility conditions", cx, |ps| {
+                        for i in &mut ps.configuration.inputs {
+                            if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
+                                i.visible_when = e.visible_when.clone();
+                            }
+                        }
+                    });
+                    this.config_dirty(cx);
+                });
+            },
+            window,
+            cx,
+        );
     }
 
     /// A text cell bound to a stable key; `commit` runs on Enter/blur.
@@ -192,9 +229,12 @@ impl PartStudioView {
                         .bg(gpui_kit::rgb(0xeeeeee))
                         .border_t_1()
                         .border_color(gpui_kit::rgb(0xcccccc))
-                        .child(div().flex_1().flex().justify_center().children((panel == RightPanel::Variables).then(|| self.variable_panel_footer(cx))).children(configured.then(|| self.render_add_config_input(cx))))
+                        .child(div().flex_1().flex().justify_center().children((panel == RightPanel::Variables).then(|| self.variable_panel_footer(cx))).children(if panel == RightPanel::CustomTables { self.custom_tables_footer(cx) } else { None }).children(configured.then(|| self.render_add_config_input(cx))))
                         .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
                 )
+                // Add custom tables flyout over the panel's top right (live 639).
+                .relative()
+                .children(self.render_add_tables(cx))
                 .into_any_element(),
         )
     }
@@ -384,6 +424,11 @@ impl PartStudioView {
                         let v = v.clone();
                         m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
                     }
+                    // Help config-paste-inputs: Paste inputs once something was copied.
+                    if !crate::config_visibility::copied_inputs().is_empty() {
+                        let v = v.clone();
+                        m = m.item(crate::os_menu::OsMenuItem::new("Paste inputs").icon_name("paste").on_click(move |_, _, cx| v.update(cx, |this, cx| this.paste_config_inputs(cx))));
+                    }
                     m
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
@@ -454,6 +499,7 @@ impl PartStudioView {
             }
         };
         let query = filter.read(cx).value().trim().to_lowercase();
+        let studio_inputs: Vec<String> = self.studio(cx).map(|s| s.configuration.inputs.iter().map(|i| i.id.clone()).collect()).unwrap_or_default();
         // Filter row: funnel, "Filter inputs", kind toggles, ⋯.
         // Live (183): window-style icons (dark frame with a header band).
         let kinds = [("cfg-filter-list", "List"), ("cfg-filter-checkbox", "Checkbox"), ("cfg-filter-variable", "Configuration variable")];
@@ -505,7 +551,32 @@ impl PartStudioView {
                         .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter inputs"))),
                 )
                 .child(toggles)
-                .child(div().id("cfg-panel-more").ml(px(6.)).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).os_context_menu(|m, _, _| m.item(crate::os_menu::OsMenuItem::new("Copy all inputs").disabled(true)))),
+                .child({
+                    // Help config-panel-context: Copy all inputs, Collapse /
+                    // Expand all inputs.
+                    let (v1, v2) = (cx.entity(), cx.entity());
+                    let all_folded = studio_inputs.iter().all(|id| self.ui.cfg_folded.contains(id));
+                    let ids = studio_inputs.clone();
+                    div().id("cfg-panel-more").ml(px(6.)).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                        let (v1, v2, ids) = (v1.clone(), v2.clone(), ids.clone());
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                            let (v1, v2, ids) = (v1.clone(), v2.clone(), ids.clone());
+                            m.item(crate::os_menu::OsMenuItem::new("Copy all inputs").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_config_inputs(None, cx))))
+                                .item(crate::os_menu::OsMenuItem::new(if all_folded { "Expand all inputs" } else { "Collapse all inputs" }).on_click(move |_, _, cx| {
+                                    let ids = ids.clone();
+                                    v2.update(cx, |this, cx| {
+                                        if all_folded {
+                                            this.ui.cfg_folded.clear();
+                                        } else {
+                                            this.ui.cfg_folded.extend(ids);
+                                        }
+                                        cx.notify();
+                                    })
+                                }))
+                        });
+                        crate::os_menu::open(e.position(), menu, window, cx);
+                    })
+                }),
         );
         for input in &cfg.inputs {
             let kind_ix = match input.kind {
@@ -592,8 +663,28 @@ impl PartStudioView {
                         })),
                 )
             })
+            // Help: an input with conditions shows the Visibility conditions
+            // icon; clicking it opens the dialog for that input.
+            .when(input.visible_when.is_some(), |d| {
+                let vid = iid.clone();
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("cfg-vis-{iid}")))
+                        .size(px(25.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .child(crate::assets::icon("configuration-visibiliity", 20., cx))
+                        .tooltip(crate::ui::tooltip("Modify visibility conditions"))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_visibility_conditions(Some(vid.clone()), window, cx))),
+                )
+            })
             .child({
-                let (v1, v2, rid, did) = (view.clone(), view.clone(), iid.clone(), iid.clone());
+                let (vm, mid) = (view.clone(), iid.clone());
+                let index = studio.configuration.inputs.iter().position(|i| i.id == iid).unwrap_or(0);
+                let count = studio.configuration.inputs.len();
+                let can_propagate = !self.propagation_candidates(&iid, cx).is_empty();
                 div()
                     .id(SharedString::from(format!("cfg-more-{iid}")))
                     .size(px(25.))
@@ -603,25 +694,45 @@ impl PartStudioView {
                     .cursor_pointer()
                     .child(crate::assets::icon("more", 20., cx))
                     .on_click(move |e: &ClickEvent, window, cx| {
-                        let (v1, v2, rid, did) = (v1.clone(), v2.clone(), rid.clone(), did.clone());
-                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                            let (v1, v2, rid, did) = (v1.clone(), v2.clone(), rid.clone(), did.clone());
-                            m.item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, _, cx| {
-                                v1.update(cx, |this, cx| {
-                                    this.ui.cfg_editing = Some(format!("in-name-{rid}"));
-                                    cx.notify();
-                                })
-                            }))
-                            .separator()
-                            .item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
-                                v2.update(cx, |this, cx| {
-                                    let id = did.clone();
-                                    this.edit_config("Delete configuration input", cx, |ps| {
-                                        ps.configuration.inputs.retain(|i| i.id != id);
-                                        ps.configuration.configured.retain(|c| c.input != id);
-                                    });
-                                })
-                            }))
+                        let (v, id) = (vm.clone(), mid.clone());
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                            // Live (Help input-prop-contextmenu, config-copy-table):
+                            // Copy table, Copy input, Move up / down, Rename,
+                            // Visibility conditions…, Input propagation…, Delete.
+                            let item = |label: &str, f: Box<dyn Fn(&mut Self, &mut Window, &mut Context<Self>)>| {
+                                let v = v.clone();
+                                crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| f(this, window, cx)))
+                            };
+                            let i1 = id.clone();
+                            m = m.item(item("Copy table", Box::new(move |this, _, cx| this.copy_config_table(&i1, cx))));
+                            let i2 = id.clone();
+                            m = m.item(item("Copy input", Box::new(move |this, _, cx| this.copy_config_inputs(Some(&i2), cx))));
+                            if index > 0 {
+                                let i3 = id.clone();
+                                m = m.item(item("Move up", Box::new(move |this, _, cx| this.move_config_input(&i3, -1, cx))));
+                            }
+                            if index + 1 < count {
+                                let i4 = id.clone();
+                                m = m.item(item("Move down", Box::new(move |this, _, cx| this.move_config_input(&i4, 1, cx))));
+                            }
+                            let i5 = id.clone();
+                            m = m.item(item("Rename", Box::new(move |this, _, cx| {
+                                this.ui.cfg_editing = Some(format!("in-name-{i5}"));
+                                cx.notify();
+                            })));
+                            let i6 = id.clone();
+                            m = m.item(item("Visibility conditions…", Box::new(move |this, window, cx| this.open_visibility_conditions(Some(i6.clone()), window, cx))));
+                            // Help: only when there are references to propagate to.
+                            let i7 = id.clone();
+                            m = m.item(item("Input propagation…", Box::new(move |this, window, cx| this.open_input_propagation(&i7, window, cx))).disabled(!can_propagate));
+                            let i8 = id.clone();
+                            m.separator().item(item("Delete", Box::new(move |this, _, cx| {
+                                let id = i8.clone();
+                                this.edit_config("Delete configuration input", cx, |ps| {
+                                    ps.configuration.inputs.retain(|i| i.id != id);
+                                    ps.configuration.configured.retain(|c| c.input != id);
+                                });
+                            })).icon_name("menu-delete"))
                         });
                         crate::os_menu::open(e.position(), menu, window, cx);
                     })
@@ -663,7 +774,14 @@ impl PartStudioView {
                 let mut hrow = h_flex().border_l_1().border_color(grid).child(head(NAME_W).child("Name"));
                 for (_, c) in &columns {
                     let fname = studio.feature(c.feature).map(|f| f.name.clone()).unwrap_or_else(|| "Deleted feature".into());
-                    let plabel = studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.label).unwrap_or(if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed" } else { "?" });
+                    let plabel = studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.label).unwrap_or(if c.param == noshape_model::configuration::SUPPRESSED_PARAM {
+                        "Suppressed"
+                    } else if c.param.starts_with(noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX) {
+                        // Input propagation (Help config-panel-with-inputpropagations).
+                        "Configuration"
+                    } else {
+                        "?"
+                    });
                     hrow = hrow.child(head(COL_W).flex_col().line_height(px(15.)).child(div().text_size(px(12.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).truncate().child(fname)).child(div().truncate().child(plabel)));
                 }
                 section = section.child(hrow);
@@ -815,6 +933,50 @@ impl PartStudioView {
     fn configured_value_cell(&mut self, ci: usize, c: &ConfiguredParam, key: &str, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let val = c.values.get(key).cloned();
         let kk = key.to_string();
+        // A propagated input: the Derived source's option, as a dropdown.
+        if let Some(src_input) = c.param.strip_prefix(noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX) {
+            let tab = self.studio(cx).and_then(|s| s.feature(c.feature)).map(|f| f.params.text("partStudio").to_string()).unwrap_or_default();
+            let options: Vec<(String, String)> = match self.source_input(&tab, src_input, cx).map(|i| i.kind) {
+                Some(ConfigInputKind::List { options, .. }) => options.into_iter().map(|o| (o.id, o.name)).collect(),
+                Some(ConfigInputKind::Checkbox { .. }) => vec![("true".into(), "true".into()), ("false".into(), "false".into())],
+                _ => Vec::new(),
+            };
+            let current = match &val {
+                Some(ParamValue::Text(t)) | Some(ParamValue::Enum(t)) => t.clone(),
+                _ => String::new(),
+            };
+            let label = options.iter().find(|(o, _)| *o == current).map(|(_, n)| n.clone()).unwrap_or(current);
+            let view = cx.entity();
+            let pal = p();
+            return h_flex()
+                .id(SharedString::from(format!("cpv-sel-{ci}-{key}")))
+                .flex_1()
+                .justify_between()
+                .cursor_pointer()
+                .child(div().truncate().child(label))
+                .child(crate::ui::glyph("ui-caret-down", 9., pal.text))
+                .on_click(move |e: &ClickEvent, window, cx| {
+                    let (v, kk, options) = (view.clone(), kk.clone(), options.clone());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        for (o, n) in &options {
+                            let (v, kk, o) = (v.clone(), kk.clone(), o.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).on_click(move |_, _, cx| {
+                                let (kk, o) = (kk.clone(), o.clone());
+                                v.update(cx, |this, cx| {
+                                    this.edit_config("Edit configured value", cx, |ps| {
+                                        if let Some(cp) = ps.configuration.configured.get_mut(ci) {
+                                            cp.values.insert(kk, ParamValue::Text(o));
+                                        }
+                                    });
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    crate::os_menu::open(e.position(), menu, window, cx);
+                })
+                .into_any_element();
+        }
         if let Some(ParamValue::Bool(b)) = val {
             return div()
                 .flex_1()
@@ -892,9 +1054,11 @@ impl PartStudioView {
                     .justify_center()
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::assets::icon("config-show", 20., cx))
-                    .tooltip(crate::ui::tooltip("Configurations"))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_panel(RightPanel::Configurations, window, cx))),
+                    // Live (dom/panel-configuration-left-box): "Modify
+                    // visibility conditions", the dialog for every input.
+                    .child(crate::assets::icon("configuration-visibiliity", 20., cx))
+                    .tooltip(crate::ui::tooltip("Modify visibility conditions"))
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_visibility_conditions(None, window, cx))),
             )
             .child(
                 div()
@@ -916,6 +1080,11 @@ impl PartStudioView {
                                 let v = v.clone();
                                 m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
                             }
+                            // Help config-paste-inputs: Paste inputs once something was copied.
+                            if !crate::config_visibility::copied_inputs().is_empty() {
+                                let v = v.clone();
+                                m = m.item(crate::os_menu::OsMenuItem::new("Paste inputs").icon_name("paste").on_click(move |_, _, cx| v.update(cx, |this, cx| this.paste_config_inputs(cx))));
+                            }
                             m
                         });
                         crate::os_menu::open(e.position(), menu, window, cx);
@@ -930,11 +1099,16 @@ impl PartStudioView {
             .border_b_1()
             .border_color(pal.border)
             .child(h_flex().h(px(30.)).justify_between().child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(split));
-        for input in &cfg.inputs {
-            let current = cfg.value_of(&self.config_values, &input.id).unwrap_or_default();
+        // Visibility conditions: hidden inputs and options don't show.
+        let (shown, effective) = cfg.visibility(&self.config_values);
+        for (input, vis) in cfg.inputs.iter().zip(&shown) {
+            if !vis.visible {
+                continue;
+            }
+            let current = effective.0.get(&input.id).cloned().unwrap_or_default();
             let control: AnyElement = match &input.kind {
                 ConfigInputKind::List { options, .. } => {
-                    let items = options.iter().map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
+                    let items = options.iter().filter(|o| vis.options.contains(&o.id)).map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
                     let sel = match self.ui.cfg_selects.get(&input.id) {
                         Some((s, _)) => s.clone(),
                         None => {
@@ -994,28 +1168,14 @@ impl PartStudioView {
     /// Custom tables (live part-studio/77): "Add custom tables" and the
     /// empty-state help.
     fn render_custom_tables(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
+        // With tables: the selector, sections and grids (custom_tables.rs).
+        if let Some(panel) = self.custom_tables_panel(cx) {
+            return panel;
+        }
         v_flex()
             .items_center()
             .pt(px(4.))
-            .child(
-                h_flex()
-                    .id("add-custom-tables")
-                    .h(px(28.))
-                    .px(px(8.))
-                    .gap(px(4.))
-                    .rounded(px(3.))
-                    .border_1()
-                    .border_color(gpui_kit::rgb(0xaaaaaa))
-                    .cursor_pointer()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::assets::icon("featurescript-table", 18., cx))
-                    .child(div().text_size(px(14.)).text_color(pal.text).child("Add custom tables"))
-                    .on_click(|e: &ClickEvent, window, cx| {
-                        let menu = crate::os_menu::OsMenu::build(window, cx, |m, _, _| m.item(crate::os_menu::OsMenuItem::new("No custom tables in this document").disabled(true)));
-                        crate::os_menu::open(e.position(), menu, window, cx);
-                    }),
-            )
+            .child(self.add_custom_tables_button(cx))
             .child(div().mt(px(95.)).child(self.panel_empty_state(
                 "custom-tables-illustration",
                 160.,
@@ -1100,6 +1260,11 @@ impl PartStudioView {
                         let v = v.clone();
                         m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
                     }
+                    // Help config-paste-inputs: Paste inputs once something was copied.
+                    if !crate::config_visibility::copied_inputs().is_empty() {
+                        let v = v.clone();
+                        m = m.item(crate::os_menu::OsMenuItem::new("Paste inputs").icon_name("paste").on_click(move |_, _, cx| v.update(cx, |this, cx| this.paste_config_inputs(cx))));
+                    }
                     m
                 });
                 crate::os_menu::open_anchored(e.position(), Anchor::BottomLeft, menu, window, cx);
@@ -1131,7 +1296,7 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn config_dirty(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn config_dirty(&mut self, cx: &mut Context<Self>) {
         self.needs_regen = true;
         cx.notify();
     }
@@ -1163,7 +1328,7 @@ impl PartStudioView {
                 .border_color(pal.border_strong)
                 .when(on, |d| d.border_r_0())
                 .child(crate::assets::icon(icon, 20., cx))
-                .tooltip(crate::ui::tooltip(tip))
+                .tip(tip, crate::ui::TipSide::Left)
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.toggle_panel(panel, w, cx)))
         };
         v_flex()

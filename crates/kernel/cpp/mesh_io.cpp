@@ -100,23 +100,19 @@ void split_t_junctions(const std::vector<gp_Pnt>& pts, std::vector<std::array<in
   }
 }
 
-// Shell (solid when closed) of planar triangle faces. `weld` > 0: nodes
-// closer than that are one vertex and T-junctions are split; 0: nodes on the
-// same 1e-7-of-the-size grid point are one vertex (STL / OBJ).
-TopoDS_Shape shape_from_triangles(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>> tris, uint32_t merge_limit, double weld)
+} // namespace
+
+void mesh_weld(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>>& tris, double weld, std::vector<gp_Pnt>& pts)
 {
   const int nn = (int)nodes.size();
   // Merge coincident nodes (STL repeats them per triangle).
   double scale = 0.0;
   for (const gp_Pnt& p : nodes)
     scale = std::max({scale, std::abs(p.X()), std::abs(p.Y()), std::abs(p.Z())});
-  const double tol = weld > 0 ? weld : std::max(scale, 1.0) * 1e-9;
   const double q = weld > 0 ? weld : std::max(scale, 1e-9) * 1e-7; // quantization step
   std::map<std::array<long long, 3>, int> by_pos;
   std::vector<int> remap(nn, 0);
-  std::vector<TopoDS_Vertex> verts;
-  std::vector<gp_Pnt>        vpts;
-  BRep_Builder b;
+  pts.clear();
   for (int i = 0; i < nn; ++i)
   {
     const gp_Pnt p = nodes[i];
@@ -127,7 +123,7 @@ TopoDS_Shape shape_from_triangles(const std::vector<gp_Pnt>& nodes, std::vector<
     {
       const std::array<long long, 3> k2 = {key[0] + n % 3 - 1, key[1] + n / 3 % 3 - 1, key[2] + n / 9 - 1};
       auto                           j  = by_pos.find(k2);
-      if (j != by_pos.end() && vpts[j->second].Distance(p) <= weld)
+      if (j != by_pos.end() && pts[j->second].Distance(p) <= weld)
         it = j;
     }
     if (it != by_pos.end())
@@ -135,19 +131,39 @@ TopoDS_Shape shape_from_triangles(const std::vector<gp_Pnt>& nodes, std::vector<
       remap[i] = it->second;
       continue;
     }
-    TopoDS_Vertex v;
-    b.MakeVertex(v, p, tol);
-    remap[i] = (int)verts.size();
+    remap[i] = (int)pts.size();
     by_pos.emplace(key, remap[i]);
-    verts.push_back(v);
-    vpts.push_back(p);
+    pts.push_back(p);
   }
   for (auto& t : tris)
     for (int& i : t)
       i = remap[i];
   tris.erase(std::remove_if(tris.begin(), tris.end(), [](const std::array<int, 3>& t) { return t[0] == t[1] || t[1] == t[2] || t[0] == t[2]; }), tris.end());
   if (weld > 0)
-    split_t_junctions(vpts, tris, weld);
+    split_t_junctions(pts, tris, weld);
+}
+
+namespace {
+
+// Shell (solid when closed) of planar triangle faces. `weld` > 0: nodes
+// closer than that are one vertex and T-junctions are split; 0: nodes on the
+// same 1e-7-of-the-size grid point are one vertex (STL / OBJ).
+TopoDS_Shape shape_from_triangles(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>> tris, uint32_t merge_limit, double weld)
+{
+  std::vector<gp_Pnt> vpts;
+  mesh_weld(nodes, tris, weld, vpts);
+  double scale = 0.0;
+  for (const gp_Pnt& p : vpts)
+    scale = std::max({scale, std::abs(p.X()), std::abs(p.Y()), std::abs(p.Z())});
+  const double tol = weld > 0 ? weld : std::max(scale, 1.0) * 1e-9;
+  BRep_Builder b;
+  std::vector<TopoDS_Vertex> verts;
+  for (const gp_Pnt& p : vpts)
+  {
+    TopoDS_Vertex v;
+    b.MakeVertex(v, p, tol);
+    verts.push_back(v);
+  }
   std::unordered_map<unsigned long long, TopoDS_Edge> edges;
   auto edge = [&](int a, int c) -> TopoDS_Edge {
     const int lo = std::min(a, c), hi = std::max(a, c);
@@ -235,9 +251,9 @@ TopoDS_Shape mesh_shape(const std::vector<gp_Pnt>& nodes, const std::vector<std:
   return shape_from_triangles(nodes, tris, merge_limit, weld);
 }
 
-std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit)
+namespace {
+occ::handle<Poly_Triangulation> read_triangulation(const std::string& p)
 {
-  const std::string p(path.data(), path.size());
   std::string lower = p;
   for (auto& ch : lower)
     ch = (char)std::tolower((unsigned char)ch);
@@ -248,7 +264,43 @@ std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit)
     tri = RWStl::ReadFile(p.c_str());
   if (tri.IsNull() || tri->NbTriangles() == 0)
     fail_io("could not read mesh file " + p);
-  return wrap(shape_from_triangulation(tri, merge_limit));
+  return tri;
+}
+} // namespace
+
+// STL / OBJ as Onshape imports them: mesh bodies (mesh_body.cpp), coordinates
+// as in the file; 3MF / glTF / GLB likewise, in millimetres.
+std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path)
+{
+  {
+    // 3MF / glTF: their own readers (millimetres).
+    std::vector<gp_Pnt>             nodes;
+    std::vector<std::array<int, 3>> tris;
+    if (read_mesh_format(std::string(path.data(), path.size()), nodes, tris))
+      return wrap(mesh_compound(mesh_bodies(nodes, std::move(tris), 0.0)));
+  }
+  const occ::handle<Poly_Triangulation> tri = read_triangulation(std::string(path.data(), path.size()));
+  std::vector<gp_Pnt>                   nodes;
+  for (int i = 1; i <= tri->NbNodes(); ++i)
+    nodes.push_back(tri->Node(i));
+  std::vector<std::array<int, 3>> tris;
+  for (int t = 1; t <= tri->NbTriangles(); ++t)
+  {
+    int a, b, c;
+    tri->Triangle(t).Get(a, b, c);
+    tris.push_back({a - 1, b - 1, c - 1});
+  }
+  return wrap(mesh_compound(mesh_bodies(nodes, std::move(tris), 0.0)));
+}
+
+bool is_mesh(const OcShape& s)
+{
+  return !s.shape.IsNull() && has_mesh_faces(s.shape);
+}
+
+std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit)
+{
+  return wrap(shape_from_triangulation(read_triangulation(std::string(path.data(), path.size())), merge_limit));
 }
 
 } // namespace noshape

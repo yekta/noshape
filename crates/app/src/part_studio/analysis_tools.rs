@@ -141,6 +141,12 @@ pub struct AnalysisTool {
     /// Connection: the G1, G2 and G3 tolerance fields; Zebra: stripe count.
     tolerance_inputs: Vec<Entity<InputState>>,
     _input_subs: Vec<Subscription>,
+    /// Interference detection: its top in the viewport, fixed when it opens
+    /// (live: a resize keeps the top and the right offset).
+    pub anchor_top: Option<f32>,
+    /// Interference detection: the model changed while it was open; the
+    /// Refresh row shows and the old result stays until it is clicked.
+    pub stale: bool,
 }
 
 /// Selections of each tool, kept for the next time it opens.
@@ -309,7 +315,9 @@ impl PartStudioView {
         if had_pre || matches!(kind, ToolKind::Draft | ToolKind::Flatten) {
             self.selection.clear();
         }
-        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs });
+        // Interference detection keeps the top it opened at (live psb 10-19 i).
+        let anchor_top = (kind == ToolKind::Interference).then(|| ((self.viewport.read(cx).size().y as f32) - 401.).max(0.));
+        self.ui.analysis_tool = Some(AnalysisTool { kind, selection, selection2, second_active, options, result: None, slider, _slider_sub: sub, tolerance_inputs, _input_subs: input_subs, anchor_top, stale: false });
         self.recompute_analysis_tool(cx);
         if kind.is_view_mode() {
             self.rebuild_scene(cx);
@@ -679,7 +687,7 @@ impl PartStudioView {
         let pal = p();
         let units = self.doc.read(cx).session.doc.settings.units;
         let labeler = self.labeler(cx);
-        let (kind, o) = (t.kind, t.options.clone());
+        let (kind, o, stale) = (t.kind, t.options.clone(), t.stale);
         let fmt_len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
         let check = |id: &'static str, label: &'static str, on: bool, set: fn(&mut ToolOptions, bool), cx: &mut Context<Self>| {
             gpui_kit::component::checkbox::Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
@@ -1017,12 +1025,15 @@ impl PartStudioView {
         if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
             body = body.child(h_flex().gap_2().text_size(px(12.)).text_color(pal.text_muted).child("Scale").child(div().flex_1().child(Slider::new(&t.slider))));
         }
-        // Live analysis/80–84: Interference detection opens at the lower right
-        // (x 1073, y 571 in the 1640 × 973 viewport: 347 px in from its right),
-        // the other analysis dialogs at the top left like feature dialogs.
+        // Live (psb 10-19 i): Interference detection's panel is a 600 × 80
+        // rect snapped to the viewport's right edge, left = W − 600, top =
+        // H − 401, the 220 px dialog at its top-left; a later resize keeps the
+        // right offset and the top. The other analysis dialogs open at the top
+        // left like feature dialogs.
         let (left, top) = if kind == ToolKind::Interference {
             let size = self.viewport.read(cx).size();
-            (((size.x as f32) - 347. - 220.).max(0.), 571f32.min((size.y as f32) - 180.).max(0.))
+            let top = t.anchor_top.unwrap_or(((size.y as f32) - 401.).max(0.));
+            (((size.x as f32) - 600.).max(0.), top)
         } else {
             (0., 0.)
         };
@@ -1078,7 +1089,37 @@ impl PartStudioView {
             .child(body)
             // The help row every analysis dialog ends with: 22 px, a 14 px
             // `?` 4 px in from the right (dialog-help-container).
-            .child(h_flex().h(px(22.)).pr(px(4.)).justify_end().child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xa0a0a0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
+            // Interference detection, model changed while open (live psb 10-19 i):
+            // a 26 px row with a 26 px ↻ button at the left ("Interference
+            // detection not accurate, instances have moved."); the old result
+            // stays until it is clicked.
+            .child(
+                h_flex()
+                    .h(px(if stale { 26. } else { 22. }))
+                    .pl(px(3.))
+                    .pr(px(4.))
+                    .when(stale, |d| {
+                        d.child(
+                            div()
+                                .id("at-refresh")
+                                .size(px(26.))
+                                .p(px(3.))
+                                .rounded(px(3.))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .child(crate::assets::icon("refresh", 20., cx))
+                                .tooltip(crate::ui::tooltip("Interference detection not accurate, instances have moved."))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(t) = &mut this.ui.analysis_tool {
+                                        t.stale = false;
+                                    }
+                                    this.recompute_analysis_tool(cx);
+                                })),
+                        )
+                    })
+                    .child(div().flex_1())
+                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xa0a0a0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+            )
             .into_any_element();
         let mut out = vec![dialog];
         // "Min: …" / "Max: …" beside the deviation lines; the scale slider

@@ -377,7 +377,8 @@ composite parts list layout (live "psb (10-19 g)" pending); everyday-modelling s
   `add_source::run_linked` opens that document in its window (`files::document_window`, new), views
   the version and runs the action two frames later (the new window's tab views exist by then). Rows
   from a version of the releasing document itself stay inert (can't switch this window's version
-  under the open dialog).
+  under the open dialog). **Superseded in pass 9:** every linked row opens its version in a window of
+  its own, so these work too.
 - **Tool search**: "Did you mean:" row has 24 px below it, "No items match your search" is 42 px
   (live tool-search-export / -material); the Assembly search (asb's `assembly_search.rs`, small
   change) got the same chips (`tool_synonyms::ASSEMBLY`) and the no-match line.
@@ -493,3 +494,47 @@ Still needed in regen, if it's yours:
 flags as `DrawMode { pick, section, outline }` (clippy too_many_arguments blocked integration). The
 outline pass is unchanged; pass `DrawMode { outline: true, .. }` when you add more modes. Please put
 new render flags into `DrawMode` rather than new arguments.
+
+## Pass 9 (19–20 Oct, lead's list after v0.3.0)
+
+- **Feature dialog keyboard = live "psb (10-19 h)"**: focus starts on the first selection list
+  (`focus_first_field`); selection lists are Tab stops (`q:<path>`) and focusing one makes it the
+  active field; selects are Tab stops (`OsSelect::focus_handle`, Onshape's `os-select-focusser`:
+  Enter / Space / ↑ / ↓ open it, a typed character opens it searching for that character, closing
+  gives the focus back; focused look = Bootstrap `.btn-default-focus` glow). The focus trap is gone:
+  Tab / Shift+Tab are `DialogTab` / `DialogTabPrev` (actions.rs, "FeatureDialog" context) =
+  `focus_next` / `focus_prev`, and leaving the dialog emits `DialogEvent::LeaveFocus`: forward →
+  `FocusNavbar` (workspace: the navbar logo is now a Tab stop with a focus ring; Enter opens the
+  documents page), backward → the Part Studio root (Onshape's <body>; `StudioTabPrev` keeps Shift+Tab
+  there). Order verified earlier: … → Depth → ± → checkboxes → ?.
+- **Interference detection = live "psb (10-19 i)"**: left = viewport W − 600, top = H − 401 (kept
+  while open: `AnalysisTool.anchor_top`); a model change while open shows the 26 px Refresh row (↻,
+  "Interference detection not accurate, instances have moved.", `AnalysisTool.stale`), the old
+  result stays until it is clicked.
+- **Release rows from a version of the releasing document**: Edit properties / Export work now.
+  `files::open_version_window(path, microversion)` opens a second, read-only window on the same file
+  at that version (not registered as the document's window); `add_source::run_linked` uses it for
+  every linked row (other documents too, so their own open windows aren't switched to history); it
+  gets the window's `Workspace` back and calls `export_item` (now pub(crate)) after 800 ms, since a
+  root-view lookup in a fresh window fails. Verified: Export opens over the version window.
+- **Visibility conditions** (ui's report: the box button is "Modify visibility conditions"):
+  model `configuration::{Visibility, Condition, ConditionTest, OptionRule, ShownOptions,
+  InputVisibility}` in `ConfigInput.visible_when` (same field name, so the many `visible_when: None`
+  literals elsewhere still compile; `de_visibility` loads the old `(input, values)` form);
+  `Configuration::visibility(values)` / `effective` (hidden input → default; hidden chosen option →
+  default or the first shown one; a list with no options showing is hidden; options without a rule
+  are hidden once rules exist) — `value_of` goes through it, so regen, store_edit and the release
+  dialog follow; `repair_visibility` (called from `edit_config`, info bubble "Visibility conditions
+  for X were updated"). Tests: `cargo test -p noshape-model --lib visibility_tests`.
+  Dialog `config_visibility.rs` (bundle templates visibilityConditionsDialog / Statement /
+  conditionBuilder + their CSS): title, ⋯ Expand/Collapse all inputs, the Inputs filter, ✕; the
+  always-visible row; per input "Show <input> When [input] [is|is between] [values]" with And rows,
+  Add condition, option rules "Show [options|range] … [When|Always] …", Add option rule, collapsed
+  summaries in Onshape's wording, the "Some options do not have an option rule…" warning; preview
+  with Show hidden inputs; ?, undo, redo, Save (valid + changed), Cancel. Opened from the Part
+  Studio box button, the input ⋯ › Visibility conditions…, the input's visibility icon, and asb's
+  assembly box button (small change in assembly_config.rs). The Part Studio box hides hidden inputs
+  and options. Not yet: the Insert dialogs and the assembly's own evaluation honouring the
+  conditions (asb), the panel's other ⋯ items (Copy table, Copy input, Input propagation…).
+- Clippy: `UiState.consumed_lines` now uses `ConsumedLines` (type_complexity).
+- Build fixes in others' files while they were stuck: `Selectable as _` import in drawing_gdt.rs.

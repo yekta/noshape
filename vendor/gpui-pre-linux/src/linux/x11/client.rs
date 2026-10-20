@@ -400,6 +400,11 @@ impl X11Connection {
         );
         let supports_xinput_gestures = xinput_version.major_version > 2
             || (xinput_version.major_version == 2 && xinput_version.minor_version >= 4);
+        // NOSHAPE PATCH: XInput 2.2 adds touch events (touch screens).
+        XINPUT_TOUCH.store(
+            xinput_version.major_version > 2 || (xinput_version.major_version == 2 && xinput_version.minor_version >= 2),
+            std::sync::atomic::Ordering::Relaxed,
+        );
         log::info!(
             "XInput version: {}.{}, gesture support: {}",
             xinput_version.major_version,
@@ -567,7 +572,28 @@ impl X11Connection {
 #[derive(Clone)]
 pub(crate) struct X11Client(pub(crate) Rc<RefCell<X11ClientState>>);
 
+/// NOSHAPE PATCH: the X server supports XInput 2.2 touch events.
+pub(crate) static XINPUT_TOUCH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 impl X11Client {
+    /// NOSHAPE PATCH: deliver an XInput touch event as `PlatformInput::Touch`.
+    fn handle_xinput_touch(&self, event_window: xproto::Window, detail: u32, event_x: xinput::Fp1616, event_y: xinput::Fp1616, phase: gpui::TouchPhase) -> Option<()> {
+        let window = self.get_window(event_window)?;
+        let scale_factor = self.0.borrow().scale_factor;
+        let position = point(
+            px(event_x as f32 / u16::MAX as f32 / scale_factor),
+            px(event_y as f32 / u16::MAX as f32 / scale_factor),
+        );
+        window.handle_input(PlatformInput::Touch(gpui::TouchEvent {
+            id: gpui::TouchId(detail as u64),
+            phase,
+            position,
+            predicted_position: None,
+            force: None,
+        }));
+        Some(())
+    }
+
     fn register_sources(
         &self,
         handle: &LoopHandle<'static, ()>,
@@ -1442,6 +1468,18 @@ impl X11Client {
                 if let Some(pointer) = state.pointer_device_states.get_mut(&event.sourceid) {
                     reset_pointer_device_scroll_positions(pointer);
                 }
+            }
+            // NOSHAPE PATCH: touch-screen contacts as raw touches (selected
+            // on the window when the server has XInput 2.2; the server then
+            // sends no emulated pointer events for them).
+            Event::XinputTouchBegin(event) => {
+                self.handle_xinput_touch(event.event, event.detail, event.event_x, event.event_y, gpui::TouchPhase::Started)?;
+            }
+            Event::XinputTouchUpdate(event) => {
+                self.handle_xinput_touch(event.event, event.detail, event.event_x, event.event_y, gpui::TouchPhase::Moved)?;
+            }
+            Event::XinputTouchEnd(event) => {
+                self.handle_xinput_touch(event.event, event.detail, event.event_x, event.event_y, gpui::TouchPhase::Ended)?;
             }
             Event::XinputGesturePinchBegin(event) => {
                 let window = self.get_window(event.event)?;

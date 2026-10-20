@@ -816,7 +816,6 @@ impl AssemblyView {
         }
         let border = rgb(0xaaaaaa);
         let view = cx.entity();
-        let open = self.panel == Some(SidePanel::Configurations);
         let split = h_flex()
             .rounded(px(3.))
             .border_1()
@@ -830,13 +829,34 @@ impl AssemblyView {
                     .items_center()
                     .justify_center()
                     .cursor_pointer()
-                    .when(open, |d| d.bg(pal.panel_active))
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::assets::icon("config-show", 20., cx))
+                    .child(crate::assets::icon("configuration-visibiliity", 20., cx))
                     .tooltip(crate::ui::tooltip("Modify visibility conditions"))
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.panel = if this.panel == Some(SidePanel::Configurations) { None } else { Some(SidePanel::Configurations) };
-                        cx.notify();
+                    // Live: the Configuration visibility conditions dialog for
+                    // every input (psb's config_visibility).
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        let cfg = noshape_model::configuration::Configuration { inputs: this.asm_configuration(cx).inputs, configured: Vec::new() };
+                        let values = this.ui.config_values.clone();
+                        let view = cx.entity().downgrade();
+                        crate::config_visibility::open(
+                            cfg,
+                            values,
+                            None,
+                            move |edited, window, cx| {
+                                let _ = view.update(cx, |this, cx| {
+                                    this.edit("Edit visibility conditions", cx, |a| {
+                                        for i in &mut a.configuration.inputs {
+                                            if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
+                                                i.visible_when = e.visible_when.clone();
+                                            }
+                                        }
+                                    });
+                                    this.schedule_eval(window, cx);
+                                });
+                            },
+                            window,
+                            cx,
+                        );
                     })),
             )
             .child(
@@ -862,11 +882,17 @@ impl AssemblyView {
             .border_b_1()
             .border_color(pal.border)
             .child(h_flex().h(px(30.)).justify_between().child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(split));
-        for input in &cfg.inputs {
-            let current = cfg.value_of(&self.ui.config_values, &input.id).unwrap_or_default();
+        // Visibility conditions: hidden inputs and options don't show.
+        let (shown, effective) = cfg.inputs_only().visibility(&self.ui.config_values);
+        for (input, vis) in cfg.inputs.iter().zip(&shown) {
+            if !vis.visible {
+                continue;
+            }
+            let current = effective.0.get(&input.id).cloned().unwrap_or_default();
             let iid = input.id.clone();
             let control: AnyElement = match &input.kind {
                 ConfigInputKind::List { options, .. } => {
+                    let options: Vec<_> = options.iter().filter(|o| vis.options.contains(&o.id)).collect();
                     let ix = options.iter().position(|o| o.id == current).unwrap_or(0);
                     let ids: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
                     let v = cx.entity();

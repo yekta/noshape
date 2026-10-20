@@ -114,7 +114,7 @@ impl Session {
     /// its data, or only document-level data (no tab).
     fn tab_scope(&self) -> Option<impl Fn(&[String]) -> bool + use<>> {
         let blob = Document::blob_name(self.active_tab?);
-        Some(move |names: &[String]| names.iter().any(|n| *n == blob) || names.iter().all(|n| !n.starts_with("tab/")))
+        Some(move |names: &[String]| names.contains(&blob) || names.iter().all(|n| !n.starts_with("tab/")))
     }
 
     pub fn can_undo(&self) -> bool {

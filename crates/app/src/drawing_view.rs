@@ -93,6 +93,8 @@ pub enum TableTool {
     Hole,
     Revision,
     CutList,
+    /// FeatureScript custom table of a Part Studio.
+    Custom,
 }
 
 /// A model edge (body and topological name), for associative references.
@@ -193,6 +195,7 @@ impl Tool {
             Tool::Table { kind: TableTool::Hole, .. } => "Hole table",
             Tool::Table { kind: TableTool::Revision, .. } => "Revision table",
             Tool::Table { kind: TableTool::CutList, .. } => "Cut list table",
+            Tool::Table { kind: TableTool::Custom, .. } => "Custom table",
             Tool::Gdt => "Geometric tolerance",
             Tool::Datum { .. } => "Datum",
             Tool::SurfaceFinish => "Surface finish",
@@ -261,7 +264,6 @@ pub enum Panel {
     Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
     /// Dimension properties (precision, units, tolerance, texts).
     Dimension { id: u64, angular: bool, units: Option<DimUnits>, show_units: bool, tol: usize, precision: Entity<InputState>, upper: Entity<InputState>, lower: Entity<InputState>, hole: Entity<InputState>, shaft: Entity<InputState>, prefix: Entity<InputState>, suffix: Entity<InputState>, text: Option<Entity<InputState>> },
-    Gdt { edit: Option<u64>, pos: [f64; 2], symbol: usize, diameter: bool, modifier: usize, tolerance: Entity<InputState>, datums: [Entity<InputState>; 3] },
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
     Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState> },
@@ -457,6 +459,10 @@ pub struct DrawingEditor {
     pub stack_dlg: Option<crate::drawing_callout::StackDlg>,
     /// BOM / cut list table dialog (drawing_table_dlg.rs).
     pub table_dlg: Option<crate::drawing_table_dlg::TableDlg>,
+    /// Geometric tolerance dialog (drawing_gdt.rs).
+    pub gdt_dlg: Option<crate::drawing_gdt::GdtDlg>,
+    /// Custom tables: the dialog and the evaluated tables.
+    pub custom_tables: crate::drawing_custom_table::CustomState,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
     pub detail_label: String,
@@ -593,6 +599,8 @@ impl DrawingEditor {
             callout_dlg: None,
             stack_dlg: None,
             table_dlg: None,
+            gdt_dlg: None,
+            custom_tables: Default::default(),
             note_leader: None,
             cell_sel: None,
             ref_manager: None,
@@ -640,7 +648,9 @@ impl DrawingEditor {
 
     fn update_info(&mut self, cx: &App) {
         let d = self.doc.read(cx);
-        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default(), revisions: crate::drawing_revision::revisions(d, self.tab) };
+        // Evaluated custom tables stay until they are re-evaluated.
+        let custom_tables = std::mem::take(&mut self.info.custom_tables);
+        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default(), revisions: crate::drawing_revision::revisions(d, self.tab), custom_tables };
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
@@ -795,6 +805,7 @@ impl DrawingEditor {
     /// Pick up cached view geometry, schedule missing computations and
     /// reassemble the sheet.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        self.ensure_custom_tables(cx);
         let d = self.display().clone();
         let si = self.sheet.min(d.sheets.len().saturating_sub(1));
         let Some(sheet) = d.sheets.get(si) else { return };
@@ -1299,6 +1310,8 @@ impl Render for DrawingEditor {
         self.sync_weld_dlg(window, cx);
         self.sync_callout_dlg(window, cx);
         self.sync_table_dlg();
+        self.sync_custom_dlg(cx);
+        self.sync_gdt_dlg(window, cx);
         // The label typed in the Auxiliary view dialog (pending_view has no cx).
         if let Some(d) = &self.aux_dlg {
             self.aux_letter = d.label.read(cx).value().trim().to_string();
@@ -1365,6 +1378,8 @@ impl Render for DrawingEditor {
             .children(self.render_callout_dlg(cx))
             .children(self.render_stack_dlg(cx))
             .children(self.render_table_dlg(cx))
+            .children(self.render_custom_dlg(cx))
+            .children(self.render_gdt_dlg(cx))
             .children(self.render_stack_banner(cx))
             .children(self.render_view_sketches(cx))
             .children(self.render_hide_parts(cx))

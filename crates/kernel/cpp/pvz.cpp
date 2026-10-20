@@ -334,11 +334,11 @@ void write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names,
     fail_op("writing " + std::string(path) + " failed");
 }
 
-// Onshape imports a PVZ as meshes only (live G22): each part instance's
-// tessellation, placed, nodes within Parasolid's precision (1e-8 m) welded;
-// a closed mesh is a solid, an open one (a loft whose faces' meshes leave
-// gaps) stays a shell. Metres.
-std::unique_ptr<OcShape> read_pvz(rust::Str path, uint32_t merge_limit)
+// Onshape imports a PVZ as meshes only (live G22, G27): each part instance's
+// tessellation, placed, nodes within Parasolid's precision (1e-8 m) welded,
+// as mesh bodies (mesh_body.cpp): a compound per instance of its closed
+// solid and open pieces (a loft whose faces' meshes leave gaps). Metres.
+std::unique_ptr<OcShape> read_pvz(rust::Str path)
 {
   const std::string p(path.data(), path.size());
   std::ifstream     in(p, std::ios::binary);
@@ -372,7 +372,7 @@ std::unique_ptr<OcShape> read_pvz(rust::Str path, uint32_t merge_limit)
       tris.push_back({(int)m.triangles[i], (int)m.triangles[i + 1], (int)m.triangles[i + 2]});
     if (tris.empty())
       continue;
-    b.Add(c, mesh_shape(nodes, tris, merge_limit, 1e-8));
+    b.Add(c, mesh_compound(mesh_bodies(nodes, tris, 1e-8)));
     ++n;
   }
   if (n == 0)

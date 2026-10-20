@@ -181,7 +181,13 @@ static gp_Trsf trsf_of(rust::Slice<const double> m)
 OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy)
 {
   require_non_null(s.shape, "shape");
-  gp_Trsf                  t = trsf_of(m);
+  gp_Trsf t = trsf_of(m);
+  if (has_mesh_faces(s.shape))
+  {
+    HHist              hist = new BRepTools_History();
+    const TopoDS_Shape r    = transform_mesh(s.shape, t, *hist);
+    return make_result({s.shape}, r, hist.get());
+  }
   BRepBuilderAPI_Transform tr(s.shape, t, copy);
   if (!tr.IsDone())
     fail_op("transform failed");
@@ -203,6 +209,12 @@ OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m)
     g.SetValue(r + 1, 4, m[r * 4 + 3]);
   }
   g.SetForm();
+  if (has_mesh_faces(s.shape))
+  {
+    HHist              hist = new BRepTools_History();
+    const TopoDS_Shape r    = gtransform_mesh(s.shape, g, *hist);
+    return make_result({s.shape}, r, hist.get());
+  }
   BRepBuilderAPI_GTransform tr(s.shape, g, true);
   if (!tr.IsDone())
     fail_op("general transform failed");

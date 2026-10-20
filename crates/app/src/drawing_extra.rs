@@ -42,27 +42,6 @@ fn norm(a: [f64; 2]) -> [f64; 2] {
     [a[0] / l, a[1] / l]
 }
 
-/// GD&T characteristic symbols (glyph, name).
-pub const GDT_SYMBOLS: &[(&str, &str)] = &[
-    ("⌖", "Position"),
-    ("⏤", "Straightness"),
-    ("▱", "Flatness"),
-    ("○", "Circularity"),
-    ("⌭", "Cylindricity"),
-    ("⌒", "Profile of a line"),
-    ("⌓", "Profile of a surface"),
-    ("∠", "Angularity"),
-    ("⟂", "Perpendicularity"),
-    ("∥", "Parallelism"),
-    ("◎", "Concentricity"),
-    ("⌯", "Symmetry"),
-    ("↗", "Circular runout"),
-    ("⌰", "Total runout"),
-];
-
-/// Material condition modifiers (glyph, name).
-pub const GDT_MODIFIERS: &[(&str, &str)] = &[("", "None"), ("Ⓜ", "Maximum material (MMC)"), ("Ⓛ", "Least material (LMC)"), ("Ⓢ", "Regardless of feature size"), ("Ⓟ", "Projected tolerance zone"), ("Ⓕ", "Free state"), ("Ⓣ", "Tangent plane")];
-
 const TOLERANCES: [&str; 8] = ["None", "Symmetrical", "Deviation", "Limits", "Basic", "MIN", "MAX", "Fit"];
 
 fn tol_index(t: &Tolerance) -> usize {
@@ -216,6 +195,30 @@ impl DrawingEditor {
         self.ensure_sources(false, cx);
     }
 
+    /// Drawing tab › Change to version…: every base view on every sheet shows
+    /// the document at that version (None: back to the workspace).
+    pub fn pin_drawing(&mut self, pin: Option<noshape_model::drawing::PinnedVersion>, cx: &mut Context<Self>) {
+        self.edit("Change to version", cx, |d| {
+            for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()).filter(|v| matches!(v.kind, ViewKind::Base { .. })) {
+                v.pinned = pin.clone();
+            }
+        });
+        self.ensure_sources(false, cx);
+    }
+
+    /// The versions menu of Change to version…: the workspace, then each
+    /// version (the current one checked).
+    pub fn version_menu(&self, cx: &App) -> Vec<MenuEntry> {
+        let cur = self.drawing.sheets.iter().flat_map(|s| &s.views).find_map(|v| v.pinned.clone());
+        let mut out = vec![MenuEntry::check("Main (workspace)", cur.is_none(), |t, _, cx| t.pin_drawing(None, cx))];
+        for v in self.doc.read(cx).session.store.list_versions().unwrap_or_default() {
+            let pin = noshape_model::drawing::PinnedVersion { id: v.id.to_string(), name: v.name.clone() };
+            let on = cur.as_ref().is_some_and(|c| c.id == pin.id);
+            out.push(MenuEntry::check(v.name, on, move |t, _, cx| t.pin_drawing(Some(pin.clone()), cx)));
+        }
+        out
+    }
+
     /// The reference row's menu: Pin view reference ▸ versions, or Unpin.
     fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
         let mut out = vec![MenuEntry::item("Reference manager…", |t, _, cx| t.open_ref_manager(cx))];
@@ -266,7 +269,7 @@ impl DrawingEditor {
                 MouseButton::Right,
                 cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
-                    let mut entries = vec![MenuEntry::Submenu("Properties".into(), this.table_entries(id).into_iter().filter(|x| !matches!(x, MenuEntry::Separator)).collect())];
+                    let mut entries = vec![MenuEntry::Submenu("Properties".into(), this.table_entries(id, cx).into_iter().filter(|x| !matches!(x, MenuEntry::Separator)).collect())];
                     if let Some(tab) = source {
                         entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
                     }
@@ -838,6 +841,11 @@ impl DrawingEditor {
                     overlay.points.push(s);
                 }
             }
+            Tool::Table { kind: TableTool::Custom, .. } => {
+                if self.custom_dlg_placing() {
+                    overlay.rect([self.cursor[0] - 90.0, self.cursor[1] - 20.0], self.cursor, true);
+                }
+            }
             Tool::Table { kind, view, .. } if matches!(kind, TableTool::General | TableTool::Revision | TableTool::Bom | TableTool::CutList) || view.is_some() => {
                 let w = if *kind == TableTool::General { 60.0 } else { 90.0 };
                 overlay.rect([self.cursor[0] - w, self.cursor[1] - 20.0], self.cursor, true);
@@ -967,6 +975,8 @@ impl DrawingEditor {
             Tool::Table { kind: TableTool::General, .. } => self.open_new_table_panel(c, window, cx),
             Tool::Table { kind: TableTool::Revision, .. } => self.place_revision_table(c, cx),
             Tool::RevisionCallout { revision } => self.place_revision_callout(revision, c, cx),
+            // Placed by the Custom table dialog.
+            Tool::Table { kind: TableTool::Custom, .. } => {}
             Tool::Table { kind, view: None, origin } => {
                 if let Some(v) = self.view_at(c) {
                     self.tool = Tool::Table { kind, view: Some(v), origin };
@@ -996,7 +1006,6 @@ impl DrawingEditor {
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Table(id)];
             }
-            Tool::Gdt => self.open_gdt_panel(None, c, &[], window, cx),
             Tool::Datum { anchor: None } => {
                 let p = self.snap_at(c).and_then(|s| self.pick_sheet(&s)).unwrap_or(c);
                 self.tool = Tool::Datum { anchor: Some(p) };
@@ -1033,9 +1042,11 @@ impl DrawingEditor {
             let d = sub(p, mid);
             [mid[0] + d[0] * co - d[1] * s, mid[1] + d[0] * s + d[1] * co]
         };
+        // Side squares at the text ends; free notes also rotate from a grip
+        // above the text (live drawing/234).
         let mut out = vec![(0, rot([b[0], mid[1]])), (1, rot([b[2], mid[1]]))];
         if style.leaders.is_empty() {
-            out.push((2, mid));
+            out.push((2, rot([mid[0], b[3] + 4.0])));
         }
         Some((*id, out))
     }
@@ -1115,7 +1126,7 @@ impl DrawingEditor {
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return false };
         let Some((col, row)) = self.table_divider_at(&l, self.cursor) else { return false };
         let Some(t) = self.current_sheet().table(id).cloned() else { return false };
-        let data = noshape_model::drawing::tables::table_data(&self.drawing, &t, None, None, None, &self.info.revisions, &|s| s.to_string());
+        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, &t, None, None, None, &self.info, &|s| s.to_string());
         let auto = noshape_model::drawing::tables::auto_widths(&t, &data);
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
         let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
@@ -1405,7 +1416,7 @@ impl DrawingEditor {
         out
     }
 
-    pub fn table_entries(&self, id: u64) -> Vec<MenuEntry> {
+    pub fn table_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         let sheet = &self.drawing.sheets[self.sheet];
         let Some(t) = sheet.table(id).cloned() else { return out };
@@ -1427,6 +1438,9 @@ impl DrawingEditor {
         }
         if let TableKind::Revision { .. } = t.kind {
             out.extend(self.revision_table_entries(id, cell));
+        }
+        if let TableKind::Custom { .. } = t.kind {
+            out.extend(self.custom_table_entries(id, cx));
         }
         out.extend(self.table_more_entries(&t, cell));
         if let TableKind::Hole { precision, .. } = t.kind {
@@ -1602,6 +1616,10 @@ impl DrawingEditor {
             self.open_bom_cell(&t, window, cx);
             return;
         }
+        if let TableKind::Custom { .. } = t.kind {
+            self.open_custom_cell(&t, window, cx);
+            return;
+        }
         let TableKind::General { cells, .. } = &t.kind else {
             self.status = Some(format!("{} content comes from the model", t.type_name()).into());
             cx.notify();
@@ -1611,24 +1629,6 @@ impl DrawingEditor {
         let text = cells.get(row).and_then(|r| r.get(col)).cloned().unwrap_or_default();
         let input = self.textarea(&text, 3, window, cx);
         self.panel = Some(Panel::Cell { table, row, col, input });
-        cx.notify();
-    }
-
-    fn open_gdt_panel(&mut self, edit: Option<u64>, pos: [f64; 2], frame: &[String], window: &mut Window, cx: &mut Context<Self>) {
-        let symbol = frame.first().and_then(|s| GDT_SYMBOLS.iter().position(|(g, _)| g == s)).unwrap_or(0);
-        let mut tol = frame.get(1).cloned().unwrap_or_else(|| "0.1".into());
-        let diameter = tol.starts_with('Ø') || tol.starts_with('⌀');
-        if diameter {
-            tol = tol.chars().skip(1).collect();
-        }
-        let modifier = GDT_MODIFIERS.iter().skip(1).position(|(g, _)| tol.ends_with(g)).map(|i| i + 1).unwrap_or(0);
-        if modifier > 0 {
-            tol = tol.trim_end_matches(GDT_MODIFIERS[modifier].0).to_string();
-        }
-        let tolerance = self.input(&tol, window, cx);
-        let datums = [0, 1, 2].map(|i| frame.get(i + 2).cloned().unwrap_or_default()).map(|d| self.input(&d, window, cx));
-        Self::focus_input(&tolerance, window, cx);
-        self.panel = Some(Panel::Gdt { edit, pos, symbol, diameter, modifier, tolerance, datums });
         cx.notify();
     }
 
@@ -1643,7 +1643,7 @@ impl DrawingEditor {
     pub fn open_annotation_panel(&mut self, a: &Annotation, window: &mut Window, cx: &mut Context<Self>) {
         let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|x| x.id == a.id).cloned() else { return };
         match &a.kind {
-            AnnotationKind::Gdt { anchor, frame, .. } => self.open_gdt_panel(Some(a.id), *anchor, frame, window, cx),
+            AnnotationKind::Gdt { .. } => self.open_gdt_edit(a.id, window, cx),
             AnnotationKind::SurfaceFinish { anchor, value } => self.open_surface_finish_panel(Some(a.id), *anchor, value, window, cx),
             AnnotationKind::Datum { anchor, label } => {
                 let input = self.input(label, window, cx);
@@ -1748,64 +1748,6 @@ impl DrawingEditor {
             ),
             Panel::SurfaceFinish { input, .. } => ("Surface finish", vec![Self::label_row("Roughness", Input::new(input).small().w(px(160.)).into_any_element())]),
             Panel::Datum { input, anchor, .. } => (if anchor[0].is_nan() { "Callout text (empty = BOM item)" } else { "Datum" }, vec![Self::label_row("Label", Input::new(input).small().w(px(120.)).into_any_element())]),
-            Panel::Gdt { symbol, diameter, modifier, tolerance, datums, .. } => {
-                let (symbol, diameter, modifier) = (*symbol, *diameter, *modifier);
-                let sym_entries: Vec<MenuEntry> = GDT_SYMBOLS
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (g, n))| {
-                        MenuEntry::check(format!("{g}  {n}"), i == symbol, move |t, _, cx| {
-                            if let Some(Panel::Gdt { symbol, .. }) = &mut t.panel {
-                                *symbol = i;
-                            }
-                            cx.notify();
-                        })
-                    })
-                    .collect();
-                let mod_entries: Vec<MenuEntry> = GDT_MODIFIERS
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (g, n))| {
-                        MenuEntry::check(format!("{g}  {n}"), i == modifier, move |t, _, cx| {
-                            if let Some(Panel::Gdt { modifier, .. }) = &mut t.panel {
-                                *modifier = i;
-                            }
-                            cx.notify();
-                        })
-                    })
-                    .collect();
-                let (e1, e2) = (ed.clone(), ed.clone());
-                (
-                    "Geometric tolerance",
-                    vec![
-                        Self::label_row(
-                            "Characteristic",
-                            Button::new("dr-gdt-sym").label(format!("{}  {}", GDT_SYMBOLS[symbol].0, GDT_SYMBOLS[symbol].1)).small().outline().dropdown_caret(true).os_dropdown_menu("dr-gdt-sym-dd", true, move |m, w, cx| fill_os_menu(m, &sym_entries, &e1, w, cx)).into_any_element(),
-                        ),
-                        Self::label_row(
-                            "Tolerance",
-                            h_flex()
-                                .gap_2()
-                                .child(Checkbox::new("dr-gdt-dia").label("Ø").checked(diameter).on_change(cx.listener(|this, v: &bool, _, cx| {
-                                    if let Some(Panel::Gdt { diameter, .. }) = &mut this.panel {
-                                        *diameter = *v;
-                                    }
-                                    cx.notify();
-                                })))
-                                .child(Input::new(tolerance).xsmall().w(px(80.)))
-                                .into_any_element(),
-                        ),
-                        Self::label_row(
-                            "Modifier",
-                            Button::new("dr-gdt-mod").label(if modifier == 0 { "None".to_string() } else { format!("{}  {}", GDT_MODIFIERS[modifier].0, GDT_MODIFIERS[modifier].1) }).small().outline().dropdown_caret(true).os_dropdown_menu("dr-gdt-mod-dd", true, move |m, w, cx| fill_os_menu(m, &mod_entries, &e2, w, cx)).into_any_element(),
-                        ),
-                        Self::label_row(
-                            "Datums",
-                            h_flex().gap_1().children(datums.iter().map(|d| Input::new(d).xsmall().w(px(44.)))).into_any_element(),
-                        ),
-                    ],
-                )
-            }
             Panel::Dimension { angular, units, show_units, tol, precision, upper, lower, hole, shaft, prefix, suffix, text, .. } => {
                 let (angular, units, show_units, tol) = (*angular, *units, *show_units, *tol);
                 let mut unit_entries = vec![MenuEntry::check("Drawing units", units.is_none(), |t, _, cx| {
@@ -1908,6 +1850,10 @@ impl DrawingEditor {
                 let text = input.read(cx).value().to_string();
                 self.apply_revision_cell(table, row, col, text, cx);
             }
+            Panel::Cell { table, row, col, input } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Custom { .. })) => {
+                let text = input.read(cx).value().to_string();
+                self.apply_custom_cell(table, row, col, text, cx);
+            }
             Panel::Cell { table, row, col, input } => {
                 let text = input.read(cx).value().to_string();
                 self.edit_table(table, "Edit cell", cx, |t| {
@@ -1964,29 +1910,6 @@ impl DrawingEditor {
                 let value = input.read(cx).value().to_string();
                 self.apply_bom_cell(table, item, col, value, over, cx);
             }
-            Panel::Gdt { edit, pos, symbol, diameter, modifier, tolerance, datums } => {
-                let tol = val(&tolerance, cx);
-                let mut frame = vec![GDT_SYMBOLS[symbol].0.to_string(), format!("{}{}{}", if diameter { "Ø" } else { "" }, tol.trim(), GDT_MODIFIERS[modifier].0)];
-                for d in &datums {
-                    let d = val(d, cx);
-                    if !d.trim().is_empty() {
-                        frame.push(d.trim().to_string());
-                    }
-                }
-                match edit {
-                    Some(id) => self.edit_sheet("Edit geometric tolerance", cx, |s| {
-                        if let Some(AnnotationKind::Gdt { frame: f, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
-                            *f = frame;
-                        }
-                    }),
-                    None => {
-                        let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: pos, frame, leaders: vec![] }, position: pos, ..Default::default() }));
-                        self.tool = Tool::Select;
-                        self.selection = vec![Sel::Annotation(id)];
-                    }
-                }
-            }
             Panel::Dimension { id, angular, units, show_units, tol, precision, upper, lower, hole, shaft, prefix, suffix, text } => {
                 let mut f = DimFormat { precision: val(&precision, cx).trim().parse::<u8>().ok().map(|p| p.min(8)), units, show_units, prefix: val(&prefix, cx), suffix: val(&suffix, cx), tolerance: Tolerance::None };
                 let u = format::length_units(&self.drawing, &f);
@@ -2027,5 +1950,6 @@ pub fn note_box(a: &Annotation) -> Option<([f64; 4], f64)> {
     Some((l.bbox, if style.leaders.is_empty() { style.angle } else { 0.0 }))
 }
 
-/// A note grip: 0 / 1 the left / right side, 2 the middle; its sheet point.
+/// A note grip: 0 / 1 the left / right side, 2 the rotate grip above the
+/// text; its sheet point.
 pub type NoteGrip = (u8, [f64; 2]);

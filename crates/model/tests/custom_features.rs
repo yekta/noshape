@@ -53,7 +53,8 @@ fn assert_ok(r: &RegenResult) {
     for s in &r.display.features {
         if s.status != FeatureStatus::Ok {
             let notices: Vec<String> = custom::run::outputs().values().flat_map(|o| o.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message))).collect();
-            panic!("feature failed: {:?}\nnotices:\n{}", s.message, notices.join("\n"));
+            let output: String = custom::run::outputs().values().map(|o| o.output.clone()).collect();
+            panic!("feature failed: {:?}\nnotices:\n{}\noutput:\n{output}", s.message, notices.join("\n"));
         }
     }
 }
@@ -908,4 +909,157 @@ export const fsRefs = defineFeature(function(context is Context, id is Id, defin
     assert_ok(&reg.regenerate(&ps, &ConfigValues::default(), &fx.units, &opts));
     let out = custom::run::output_of(fid).unwrap().output;
     assert_eq!(out, "[ [ 1 , 2 , a ] , [ 3.5 , 4 , b ] , [ x , y , z ] ]\n[ 16 , 8 , image/png , IMAGE ]\n{ a : [ 1 , 2 ] , b : c }\n{}\n[ BuiltIn: 1 , BuiltIn: 2 , BuiltIn: 3 , BuiltIn: 5 , BuiltIn: 12 ]\n", "{out}");
+}
+
+/// Other Part Studios for `PartStudioData` tests: one source studio.
+struct SourceStudio(std::sync::Arc<noshape_model::regen::context::Context>);
+
+impl std::fmt::Debug for SourceStudio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SourceStudio")
+    }
+}
+
+impl noshape_model::regen::derived::DerivedProvider for SourceStudio {
+    fn context(&self, _tab: &str) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {
+        Some(self.0.clone())
+    }
+    fn version(&self, _tab: &str) -> u64 {
+        1
+    }
+}
+
+#[test]
+fn part_studio_reference_instantiates_parts() {
+    let src = format!(
+        "{}{}",
+        studio(&format!("import(path : \"onshape/std/instantiator.fs\", version : \"3095.0\");\n{SHAPES}")),
+        r#"
+annotation { "Feature Type Name" : "Insert studio" }
+export const insertStudio = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Studio" }
+        definition.studio is PartStudioData;
+    }
+    {
+        println(size(evaluateQuery(definition.studio.buildFunction({}), definition.studio.partQuery)));
+        const instantiator = newInstantiator(id + "inst");
+        addInstance(instantiator, definition.studio, { "transform" : transform(vector(0.1, 0, 0) * meter) });
+        instantiate(context, instantiator);
+    });
+"#
+    );
+    let fx = Fixture::new(&src);
+    // The source: a 20 mm box and a pin.
+    let mut source = PartStudio::new();
+    let mut f = source.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
+    f.params.set("size", expr("20 mm"));
+    f.params.set("radius", expr("4 mm"));
+    f.params.set("fillet", expr("1 mm"));
+    source.features.push(f);
+    let src_ctx = fx.regen(&mut Regenerator::new(), &source);
+    assert_ok(&src_ctx);
+    let cube = src_ctx.context.bodies.iter().find(|b| b.faces.len() == 6).unwrap().id.clone();
+    let provider: std::sync::Arc<dyn noshape_model::regen::derived::DerivedProvider> = std::sync::Arc::new(SourceStudio(src_ctx.context.clone()));
+    for (value, parts) in [("aaaa".to_string(), 2), (format!("aaaa#{cube}"), 1)] {
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature(&fx.ty("insertStudio"), &fx.units).unwrap();
+        f.params.set("studio", ParamValue::Text(value.clone()));
+        let fid = f.id;
+        ps.features.push(f);
+        let opts = RegenOptions { derived: Some(provider.clone()), ..fx.opts() };
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+        assert_ok(&r);
+        assert_eq!(custom::run::output_of(fid).unwrap().output, format!("{parts}\n"), "{value}");
+        assert_eq!(r.context.bodies.len(), parts, "{value}");
+        // Moved 100 mm along x.
+        let bb = r.context.bodies.iter().find(|b| b.faces.len() == 6).unwrap().shape.bounding_box(false).unwrap();
+        assert!((bb.min.x - 0.1).abs() < 1e-6, "{value}: {bb:?}");
+    }
+}
+
+#[test]
+fn custom_tables_evaluate() {
+    let src = format!(
+        "{}{}",
+        studio(SHAPES),
+        r#"
+annotation { "Table Type Name" : "Part sizes" }
+export const partSizes = defineTable(function(context is Context, definition is map) returns Table
+    precondition
+    {
+    }
+    {
+        const columns = [tableColumnDefinition("name", "Part"), tableColumnDefinition("faces", "Faces", TableTextAlignment.RIGHT), tableColumnDefinition("x", "Width")];
+        var rows = [];
+        for (var body in evaluateQuery(context, qAllModifiableSolidBodies()))
+        {
+            const box = evBox3d(context, { "topology" : body });
+            const faces = size(evaluateQuery(context, qOwnedByBody(body, EntityType.FACE)));
+            rows = append(rows, tableRow({ "name" : templateString({ "template" : "Body #n", "n" : faces }), "faces" : faces, "x" : box.maxCorner[0] - box.minCorner[0] }, body));
+        }
+        rows = append(rows, tableRow({ "name" : tableCellError("?", "no body"), "faces" : tableCellWithInfo(0, "an info"), "x" : valueWithUnitsAndPrecision(25.4 * millimeter, 4) }));
+        rows = append(rows, tableRow({ "name" : "area", "x" : 2 * inch * inch, "faces" : 1 / 3 }));
+        rows = append(rows, tableRow({ "name" : "volume", "x" : 1.5 * meter ^ 3, "faces" : 30 * degree }));
+        return table("Sizes", columns, rows);
+    });
+
+annotation { "Table Type Name" : "Two" }
+export const two = defineTable(function(context is Context, definition is map) returns TableArray
+    precondition
+    {
+    }
+    {
+        return tableArray([table("First", [tableColumnDefinition("a", "A")], [tableRow({ "a" : "one" })]), table("Second", [tableColumnDefinition("b", "B")], [])]);
+    });
+
+annotation { "Table Type Name" : "Nonconforming" }
+export const bad = defineTable(function(context is Context, definition is map) returns TableArray
+    {
+        return tableArray([]);
+    });
+"#
+    );
+    let fx = Fixture::new(&src);
+    let scripts = DocumentScripts::from_document(&fx.doc);
+    let (_, _, compiled) = scripts.studios().next().unwrap();
+    // Live dom/fs-tables-*: a table without a precondition is only warned about.
+    assert_eq!(compiled.tables.iter().map(|t| t.display_name.as_str()).collect::<Vec<_>>(), ["Part sizes", "Two"]);
+    let notes: Vec<String> = compiled.diagnostics.iter().map(|d| d.message.clone()).collect();
+    assert_eq!(notes.first().map(|s| s.as_str()), Some("Importing geometry.fs when defining tables will likely hurt performance; consider importing table.fs and specific required modules instead."), "{notes:?}");
+    assert!(notes.iter().any(|n| n == "Nonconforming table function 'bad': Missing precondition"), "{notes:?}");
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
+    f.params.set("size", expr("20 mm"));
+    f.params.set("radius", expr("4 mm"));
+    f.params.set("fillet", expr("1 mm"));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let out = custom::table::evaluate_table(&*scripts, &fx.fs.to_string(), "partSizes", &r.context, &fx.units);
+    let tables = out.tables.expect("table runs");
+    assert_eq!(tables.len(), 1);
+    let t = &tables[0];
+    assert_eq!(t.title, "Sizes");
+    assert_eq!(t.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Part", "Faces", "Width"]);
+    assert_eq!(t.columns[1].alignment.as_deref(), Some("RIGHT"));
+    assert_eq!(t.rows.len(), 5);
+    let cube = t.rows.iter().find(|r| r.cell("faces").map(|c| c.text.as_str()) == Some("6")).expect("cube row");
+    assert_eq!(cube.cell("name").unwrap().text, "Body 6");
+    assert_eq!(cube.cell("x").unwrap().text, "20 mm");
+    assert_eq!(cube.entities.len(), 1);
+    let err_row = &t.rows[2];
+    let err = err_row.cell("name").unwrap();
+    assert_eq!((err.text.as_str(), err.error.as_deref()), ("?", Some("no body")));
+    let info = err_row.cell("faces").unwrap();
+    assert_eq!((info.text.as_str(), info.info.as_deref()), ("0", Some("an info")));
+    // Live cell texts: precision keeps its zeros, document units, superscripts.
+    assert_eq!(err_row.text("x"), "25.4000 mm");
+    assert_eq!((t.rows[3].text("x"), t.rows[3].text("faces")), ("1290.32 mm²", "0.333"));
+    assert_eq!((t.rows[4].text("x"), t.rows[4].text("faces")), ("1500000000 mm³", "30 deg"));
+    assert_eq!(t.rows[3].text("missing"), "Not set");
+    // A TableArray shows only its non-empty tables.
+    let two = custom::table::evaluate_table(&*scripts, &fx.fs.to_string(), "two", &r.context, &fx.units).tables.unwrap();
+    assert_eq!(two.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), ["First"]);
 }

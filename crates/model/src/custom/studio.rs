@@ -96,6 +96,26 @@ pub struct CustomFeatureDef {
     pub editing_logic: Option<String>,
 }
 
+/// A custom table declared by a Feature Studio.
+#[derive(Clone)]
+pub struct CustomTableDef {
+    /// The exported constant (`myTable`).
+    pub name: String,
+    /// "Table Type Name" (`My table`).
+    pub display_name: String,
+    /// "Table Type Description", if any.
+    pub description: String,
+    /// Parameters of its precondition (Onshape shows them above the table).
+    pub params: Vec<ParamDecl>,
+    pub cell: Arc<GlobalCell>,
+}
+
+impl std::fmt::Debug for CustomTableDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CustomTableDef").field("name", &self.name).field("display_name", &self.display_name).finish()
+    }
+}
+
 impl std::fmt::Debug for CustomFeatureDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CustomFeatureDef").field("name", &self.name).field("params", &self.params).finish()
@@ -107,6 +127,8 @@ pub struct CompiledStudio {
     pub tab: TabId,
     pub hash: u64,
     pub features: Vec<CustomFeatureDef>,
+    /// Custom tables (`"Table Type Name"` + `defineTable`).
+    pub tables: Vec<CustomTableDef>,
     pub diagnostics: Vec<Diagnostic>,
     pub module: Option<Arc<CompiledModule>>,
 }
@@ -123,6 +145,9 @@ impl CompiledStudio {
     }
     pub fn feature(&self, name: &str) -> Option<&CustomFeatureDef> {
         self.features.iter().find(|f| f.name == name)
+    }
+    pub fn table(&self, name: &str) -> Option<&CustomTableDef> {
+        self.tables.iter().find(|t| t.name == name)
     }
     pub fn first_error(&self) -> Option<&Diagnostic> {
         self.diagnostics.iter().find(|d| d.severity == Severity::Error)
@@ -169,7 +194,7 @@ pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64
 
 fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver) -> CompiledStudio {
     let path = module_path(tab);
-    let mut out = CompiledStudio { tab, hash, features: Vec::new(), diagnostics: Vec::new(), module: None };
+    let mut out = CompiledStudio { tab, hash, features: Vec::new(), tables: Vec::new(), diagnostics: Vec::new(), module: None };
     let diagnostic = |e: &noshape_featurescript::CompileError| Diagnostic {
         severity: match e.level {
             noshape_featurescript::Level::Error => Severity::Error,
@@ -196,8 +221,29 @@ fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver
         }
         let Some(item) = module.ast.items.iter().find(|it| matches!(&it.kind, TopKind::Const { name, .. } if *name == d.name)) else { continue };
         let Some(ann) = item.annotation.as_ref().map(|a| annot::eval(&module, a)) else { continue };
-        let Some(display) = ann.str("Feature Type Name").map(|s| s.to_string()) else { continue };
         let TopKind::Const { init, .. } = &item.kind else { continue };
+        if let Some(display) = ann.str("Table Type Name").map(|s| s.to_string()) {
+            let lambda = defined_lambda(init, "defineTable");
+            // Live: a table function without a precondition is only warned
+            // about, and is not offered anywhere.
+            let Some(p) = lambda.and_then(|f| f.precondition.as_ref()) else {
+                if let Some(f) = lambda {
+                    out.diagnostics.push(Diagnostic { severity: Severity::Warning, line: f.pos.line as usize, column: f.pos.col as usize, message: format!("Nonconforming table function '{}': Missing precondition", d.name), parse: false });
+                }
+                continue;
+            };
+            let mut params = Vec::new();
+            collect_params(&module, p, &mut params);
+            out.tables.push(CustomTableDef {
+                name: d.name.to_string(),
+                display_name: display,
+                description: ann.str("Table Type Description").unwrap_or("").to_string(),
+                params,
+                cell: cell.clone(),
+            });
+            continue;
+        }
+        let Some(display) = ann.str("Feature Type Name").map(|s| s.to_string()) else { continue };
         let precondition = feature_lambda(init).and_then(|f| f.precondition.as_ref());
         let mut params = Vec::new();
         if let Some(p) = precondition {
@@ -219,14 +265,38 @@ fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver
             editing_logic: ann.str("Editing Logic Function").map(|s| s.to_string()),
         });
     }
+    // Live: "Importing geometry.fs when defining tables will likely hurt
+    // performance; …" at the import, when the studio defines tables.
+    let defines_tables = module.ast.items.iter().any(|it| it.annotation.as_ref().is_some_and(|a| annot::eval(&module, a).str("Table Type Name").is_some()));
+    if defines_tables {
+        for it in &module.ast.items {
+            if let TopKind::Import { path, .. } = &it.kind
+                && path.as_str() == "onshape/std/geometry.fs"
+            {
+                // Imports come first in the file: so does their notice.
+                out.diagnostics.insert(0, Diagnostic {
+                    severity: Severity::Warning,
+                    line: it.pos.line as usize,
+                    column: it.pos.col as usize,
+                    message: "Importing geometry.fs when defining tables will likely hurt performance; consider importing table.fs and specific required modules instead.".into(),
+                    parse: false,
+                });
+            }
+        }
+    }
     out.module = Some(module);
     out
 }
 
 /// The lambda passed to `defineFeature(...)`.
 fn feature_lambda(e: &ast::Expr) -> Option<&ast::FnDef> {
+    defined_lambda(e, "defineFeature")
+}
+
+/// The lambda passed to `define(...)` (`defineFeature`, `defineTable`).
+fn defined_lambda<'a>(e: &'a ast::Expr, define: &str) -> Option<&'a ast::FnDef> {
     match &*e.kind {
-        ExprKind::Call(f, args) if matches!(&*f.kind, ExprKind::Ident(q) if &*q.name == "defineFeature") => match args.first().map(|a| &*a.kind) {
+        ExprKind::Call(f, args) if matches!(&*f.kind, ExprKind::Ident(q) if &*q.name == define) => match args.first().map(|a| &*a.kind) {
             Some(ExprKind::Lambda(def)) => Some(def),
             _ => None,
         },

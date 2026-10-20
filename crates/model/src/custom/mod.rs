@@ -19,6 +19,7 @@ mod provider;
 mod reference;
 pub mod run;
 pub mod studio;
+pub mod table;
 
 pub use provider::{CustomFeatureProvider, DocumentScripts};
 pub use run::evaluate;

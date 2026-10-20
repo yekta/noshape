@@ -37,10 +37,79 @@ pub struct ConfigInput {
     pub id: String,
     pub name: String,
     pub kind: ConfigInputKind,
-    /// Optional visibility condition: only shown when another (earlier)
-    /// input has one of these values.
+    /// Onshape's visibility conditions (Configuration visibility conditions
+    /// dialog): when the input shows and, for lists, which options do.
+    #[serde(default, deserialize_with = "de_visibility")]
+    pub visible_when: Option<Visibility>,
+}
+
+/// An input's visibility conditions. Only inputs above it (lists and
+/// checkboxes) can control it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Visibility {
+    /// "Show <input> When …" conditions, all of which must hold (AND);
+    /// empty: the input is always shown.
     #[serde(default)]
-    pub visible_when: Option<(String, Vec<String>)>,
+    pub conditions: Vec<Condition>,
+    /// List inputs: option rules. With none, every option shows; with some,
+    /// an option shows only when a rule covering it applies ("Some options
+    /// do not have an option rule. They will always be hidden.").
+    #[serde(default)]
+    pub option_rules: Vec<OptionRule>,
+}
+
+/// "When <input> is <values>" / "is between <a> and <b>".
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Condition {
+    pub input: String,
+    pub test: ConditionTest,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ConditionTest {
+    /// One of these list options, or "true" / "false" for a checkbox.
+    Is(Vec<String>),
+    /// A list option between these two (inclusive, in list order).
+    Between(String, String),
+}
+
+/// "Show <options | range> Always / When … And …".
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OptionRule {
+    pub show: ShownOptions,
+    pub always: bool,
+    #[serde(default)]
+    pub conditions: Vec<Condition>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ShownOptions {
+    /// A new rule before "options" or "range" is chosen.
+    Unset,
+    Options(Vec<String>),
+    Range(String, String),
+}
+
+/// Documents saved before the full model stored `(input, allowed values)`.
+fn de_visibility<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Visibility>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Any {
+        New(Visibility),
+        Legacy((String, Vec<String>)),
+    }
+    Ok(Option::<Any>::deserialize(d)?.map(|a| match a {
+        Any::New(v) => v,
+        Any::Legacy((input, values)) => Visibility { conditions: vec![Condition { input, test: ConditionTest::Is(values) }], option_rules: Vec::new() },
+    }))
+}
+
+/// What the configuration shows for the chosen values.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct InputVisibility {
+    pub visible: bool,
+    /// List inputs: the options that show (all of them without rules).
+    pub options: Vec<String>,
 }
 
 /// One configured feature parameter: its value for each list option or
@@ -111,12 +180,140 @@ impl Configuration {
         v
     }
 
-    /// Effective value string of an input (falls back to its default).
+    /// Effective value string of an input: its chosen value or default,
+    /// after the visibility conditions ([`Configuration::effective`]).
     pub fn value_of<'a>(&'a self, values: &'a ConfigValues, input: &str) -> Option<String> {
-        if let Some(v) = values.0.get(input) {
-            return Some(v.clone());
+        if self.inputs.iter().all(|i| i.visible_when.is_none()) {
+            if let Some(v) = values.0.get(input) {
+                return Some(v.clone());
+            }
+            return self.defaults().0.get(input).cloned();
         }
-        self.defaults().0.get(input).cloned()
+        self.effective(values).0.get(input).cloned()
+    }
+
+    /// Option ids of a list input, in order.
+    fn option_ids(&self, input: &str) -> Vec<String> {
+        match self.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
+            Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn condition_holds(&self, c: &Condition, values: &ConfigValues) -> bool {
+        let Some(v) = values.0.get(&c.input) else { return false };
+        match &c.test {
+            ConditionTest::Is(allowed) => allowed.contains(v),
+            ConditionTest::Between(a, b) => {
+                let ids = self.option_ids(&c.input);
+                let at = |x: &str| ids.iter().position(|o| o == x);
+                match (at(a), at(b), at(v)) {
+                    (Some(a), Some(b), Some(v)) => a.min(b) <= v && v <= a.max(b),
+                    _ => false,
+                }
+            }
+        }
+    }
+
+    /// Visibility of every input (in order) for the chosen values, with the
+    /// effective values: a hidden input takes its default; a list whose
+    /// chosen option doesn't show takes its default, or the first option
+    /// that shows; a list with no options showing is hidden (Help:
+    /// PartStudio__visibility_conditions).
+    pub fn visibility(&self, values: &ConfigValues) -> (Vec<InputVisibility>, ConfigValues) {
+        let defaults = self.defaults();
+        let mut eff = ConfigValues::default();
+        let mut out = Vec::with_capacity(self.inputs.len());
+        for i in &self.inputs {
+            let chosen = values.0.get(&i.id).or_else(|| defaults.0.get(&i.id)).cloned().unwrap_or_default();
+            let default = defaults.0.get(&i.id).cloned().unwrap_or_default();
+            let vis = i.visible_when.as_ref();
+            let mut visible = vis.is_none_or(|v| v.conditions.iter().all(|c| self.condition_holds(c, &eff)));
+            let mut options = self.option_ids(&i.id);
+            if let Some(v) = vis.filter(|v| !v.option_rules.is_empty()) {
+                let ids = options.clone();
+                options.retain(|o| {
+                    v.option_rules.iter().any(|r| {
+                        let covers = match &r.show {
+                            ShownOptions::Unset => false,
+                            ShownOptions::Options(list) => list.contains(o),
+                            ShownOptions::Range(a, b) => {
+                                let at = |x: &str| ids.iter().position(|y| y == x);
+                                match (at(a), at(b), at(o)) {
+                                    (Some(a), Some(b), Some(k)) => a.min(b) <= k && k <= a.max(b),
+                                    _ => false,
+                                }
+                            }
+                        };
+                        covers && (r.always || r.conditions.iter().all(|c| self.condition_holds(c, &eff)))
+                    })
+                });
+            }
+            if matches!(i.kind, ConfigInputKind::List { .. }) && options.is_empty() {
+                visible = false;
+            }
+            let value = if !visible {
+                default
+            } else if matches!(i.kind, ConfigInputKind::List { .. }) && !options.contains(&chosen) {
+                if options.contains(&default) { default } else { options.first().cloned().unwrap_or(default) }
+            } else {
+                chosen
+            };
+            eff.0.insert(i.id.clone(), value);
+            out.push(InputVisibility { visible, options });
+        }
+        (out, eff)
+    }
+
+    /// Values after the visibility conditions (see [`Configuration::visibility`]).
+    pub fn effective(&self, values: &ConfigValues) -> ConfigValues {
+        self.visibility(values).1
+    }
+
+    /// Visibility conditions are repaired (removed) when the inputs or
+    /// options they name are gone (Help: "Repairing visibility conditions").
+    /// Returns the names of the inputs whose conditions changed.
+    pub fn repair_visibility(&mut self) -> Vec<String> {
+        let ids: Vec<(String, Vec<String>, bool)> = self.inputs.iter().map(|i| (i.id.clone(), self.option_ids(&i.id), matches!(i.kind, ConfigInputKind::Checkbox { .. }))).collect();
+        let mut changed = Vec::new();
+        for (k, input) in self.inputs.iter_mut().enumerate() {
+            let Some(v) = &mut input.visible_when else { continue };
+            let before = v.clone();
+            // Controllers must exist above this input; tests keep known values.
+            let above = &ids[..k];
+            let fix = |c: &mut Condition| -> bool {
+                let Some((_, opts, checkbox)) = above.iter().find(|(id, ..)| *id == c.input) else { return false };
+                let known = |x: &String| if *checkbox { x == "true" || x == "false" } else { opts.contains(x) };
+                match &mut c.test {
+                    ConditionTest::Is(list) => {
+                        list.retain(known);
+                        !list.is_empty()
+                    }
+                    ConditionTest::Between(a, b) => known(a) && known(b),
+                }
+            };
+            v.conditions.retain_mut(|c| fix(c));
+            let own = &ids[k].1;
+            v.option_rules.retain_mut(|r| {
+                r.conditions.retain_mut(|c| fix(c));
+                let shows = match &mut r.show {
+                    ShownOptions::Unset => false,
+                    ShownOptions::Options(list) => {
+                        list.retain(|o| own.contains(o));
+                        !list.is_empty()
+                    }
+                    ShownOptions::Range(a, b) => own.contains(a) && own.contains(b),
+                };
+                shows && (r.always || !r.conditions.is_empty())
+            });
+            if *v != before {
+                changed.push(input.name.clone());
+            }
+            if v.conditions.is_empty() && v.option_rules.is_empty() {
+                input.visible_when = None;
+            }
+        }
+        changed
     }
 
     /// Apply configured parameters to a feature, returning effective params
@@ -230,5 +427,81 @@ mod describe_tests {
         assert_eq!(cfg.configured[0].values.get("b"), Some(&e("35 mm")));
         assert_eq!(cfg.configured[0].values.get("a"), Some(&e("12 mm")));
         assert_eq!(shown.params.get("depth"), Some(&e("12 mm")));
+    }
+}
+
+#[cfg(test)]
+mod visibility_tests {
+    use super::*;
+
+    fn list(id: &str, opts: &[&str], default: &str) -> ConfigInput {
+        ConfigInput { id: id.into(), name: id.into(), kind: ConfigInputKind::List { options: opts.iter().map(|o| ListOption { id: (*o).into(), name: (*o).into() }).collect(), default: default.into() }, visible_when: None }
+    }
+
+    fn values(pairs: &[(&str, &str)]) -> ConfigValues {
+        ConfigValues(pairs.iter().map(|(a, b)| ((*a).into(), (*b).into())).collect())
+    }
+
+    /// Help example: Width only shows for the Tall height; hidden, it takes
+    /// its default.
+    #[test]
+    fn input_condition_hides_and_defaults() {
+        let mut width = list("Width", &["Default", "Wide"], "Default");
+        width.visible_when = Some(Visibility { conditions: vec![Condition { input: "Height".into(), test: ConditionTest::Is(vec!["Tall".into()]) }], option_rules: Vec::new() });
+        let cfg = Configuration { inputs: vec![list("Height", &["Short", "Default", "Tall"], "Default"), width], configured: Vec::new() };
+        let (vis, eff) = cfg.visibility(&values(&[("Height", "Short"), ("Width", "Wide")]));
+        assert!(!vis[1].visible);
+        assert_eq!(eff.0["Width"], "Default");
+        let (vis, eff) = cfg.visibility(&values(&[("Height", "Tall"), ("Width", "Wide")]));
+        assert!(vis[1].visible);
+        assert_eq!(eff.0["Width"], "Wide");
+    }
+
+    /// Assemblies evaluate their own configuration through the same rules.
+    #[test]
+    fn assembly_configuration_respects_visibility() {
+        let mut width = list("Width", &["Default", "Wide"], "Default");
+        width.visible_when = Some(Visibility { conditions: vec![Condition { input: "Height".into(), test: ConditionTest::Is(vec!["Tall".into()]) }], option_rules: Vec::new() });
+        let asm = crate::assembly::config::AsmConfiguration { inputs: vec![list("Height", &["Short", "Default", "Tall"], "Default"), width], configured: Vec::new() };
+        assert_eq!(asm.value_of(&values(&[("Height", "Short"), ("Width", "Wide")]), "Width").as_deref(), Some("Default"));
+        assert_eq!(asm.value_of(&values(&[("Height", "Tall"), ("Width", "Wide")]), "Width").as_deref(), Some("Wide"));
+    }
+
+    /// Option rules: options without a rule are hidden; a range rule with a
+    /// condition; a chosen option that doesn't show falls back.
+    #[test]
+    fn option_rules_filter_options() {
+        let mut size = list("Size", &["A", "B", "C", "D"], "A");
+        size.visible_when = Some(Visibility {
+            conditions: Vec::new(),
+            option_rules: vec![
+                OptionRule { show: ShownOptions::Options(vec!["A".into()]), always: true, conditions: Vec::new() },
+                OptionRule { show: ShownOptions::Range("B".into(), "C".into()), always: false, conditions: vec![Condition { input: "Big".into(), test: ConditionTest::Is(vec!["true".into()]) }] },
+            ],
+        });
+        let big = ConfigInput { id: "Big".into(), name: "Big".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None };
+        let cfg = Configuration { inputs: vec![big, size], configured: Vec::new() };
+        let (vis, eff) = cfg.visibility(&values(&[("Big", "false"), ("Size", "C")]));
+        assert_eq!(vis[1].options, vec!["A".to_string()]);
+        assert_eq!(eff.0["Size"], "A");
+        let (vis, eff) = cfg.visibility(&values(&[("Big", "true"), ("Size", "C")]));
+        assert_eq!(vis[1].options, vec!["A".to_string(), "B".into(), "C".into()]);
+        assert_eq!(eff.0["Size"], "C");
+        assert_eq!(cfg.value_of(&values(&[("Big", "true"), ("Size", "D")]), "Size").as_deref(), Some("A"));
+    }
+
+    /// Deleting the controlling input removes the conditions; the legacy
+    /// `(input, values)` form still loads.
+    #[test]
+    fn repair_and_legacy() {
+        let mut width = list("Width", &["Default", "Wide"], "Default");
+        width.visible_when = Some(Visibility { conditions: vec![Condition { input: "Height".into(), test: ConditionTest::Is(vec!["Tall".into()]) }], option_rules: Vec::new() });
+        let mut cfg = Configuration { inputs: vec![list("Height", &["Tall"], "Tall"), width], configured: Vec::new() };
+        cfg.inputs.remove(0);
+        assert_eq!(cfg.repair_visibility(), vec!["Width".to_string()]);
+        assert!(cfg.inputs[0].visible_when.is_none());
+        let legacy = r#"{"id":"w","name":"W","kind":{"Checkbox":{"default":false}},"visible_when":["h",["Tall"]]}"#;
+        let i: ConfigInput = serde_json::from_str(legacy).expect("legacy");
+        assert_eq!(i.visible_when.map(|v| v.conditions.len()), Some(1));
     }
 }

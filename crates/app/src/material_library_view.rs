@@ -146,7 +146,7 @@ impl Render for MaterialLibraryView {
             .child("To edit this material library:")
             .child(v_flex().pl(px(12.)).child(bullet(div().child("Right click on the tab and click Export to download a CSV file, or download a sample.").into_any_element())).child(bullet(div().child("Edit the CSV file to add new or remove materials, then save your changes.").into_any_element())).child(bullet(div().child("Right click on this tab and click Update, then choose your saved CSV file.").into_any_element())).child(bullet(
                 h_flex()
-                    .child(link("ml-version", "Create a version").on_click(move |_, window, cx| crate::history_panel::open_create_version(doc.clone(), window, cx)))
+                    .child(link("ml-version", "Create a version").on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx)))
                     .child("\u{a0}of this document to make this material library available for use.")
                     .into_any_element(),
             )))

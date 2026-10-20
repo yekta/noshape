@@ -179,6 +179,9 @@ pub struct PickBuffer {
     /// `ids` is empty and the frame size is the sampling viewport's): every
     /// sample that hit geometry.
     pub samples: Vec<DepthSample>,
+    /// The same with the datum planes' depth (Onshape's second,
+    /// `includePlanes` pass, used when `samples` has too few hits).
+    pub samples_with_planes: Vec<DepthSample>,
     /// View-projection the samples were rendered with, to turn them back
     /// into world points.
     pub view_proj: Option<Mat4>,
@@ -555,10 +558,15 @@ struct DrawMode {
     pick: bool,
     section: bool,
     outline: bool,
+    /// The visible-depth sample pass (Onshape's `DepthSamplingPass`): faces
+    /// and points with true depth (no pick depth bias), no lines.
+    depth_samples: bool,
+    /// …with the datum planes' depth too (`includePlanes`).
+    planes_write_depth: bool,
 }
 
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
-    let DrawMode { pick, section, outline } = mode;
+    let DrawMode { pick, section, outline, depth_samples, planes_write_depth } = mode;
     let draw = |pass: &mut wgpu::RenderPass, list: &[usize], pipeline: &wgpu::RenderPipeline| {
         if list.is_empty() {
             return;
@@ -599,6 +607,15 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // geometry, transparent parts), so a face wins over a plane at the
         // same pixel (Onshape).
         let (flat, lit): (Vec<usize>, Vec<usize>) = lists.transparent.iter().partition(|&&i| instances[i].unlit);
+        if depth_samples {
+            if planes_write_depth {
+                draw(pass, &flat, &pipelines.mesh_sample);
+            }
+            draw(pass, &lists.opaque, &pipelines.mesh_sample);
+            draw(pass, &lists.pick_priority, &pipelines.mesh_sample);
+            draw(pass, &lists.points, &pipelines.point_pick);
+            return;
+        }
         draw(pass, &flat, &pipelines.mesh_pick_transparent);
         draw(pass, &lit, &pipelines.mesh_pick_transparent);
         draw(pass, &lists.opaque, &pipelines.mesh_pick);
@@ -636,10 +653,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.images_faded, &pipelines.image_blend);
         draw(pass, &lists.transparent, &pipelines.mesh_transparent);
         draw(pass, &lists.over_transparent, &pipelines.mesh_opaque);
-        draw(pass, &lists.lines, &pipelines.line);
-        draw(pass, &lists.points, &pipelines.point);
+        // Hidden-only geometry right after the meshes, so only faces count
+        // as hiding it (not hover outlines or overlays drawn over the same
+        // curves); the visible lines come after.
         draw(pass, &lists.lines_hidden, &pipelines.line_hidden);
         draw(pass, &lists.points_hidden, &pipelines.point_hidden);
+        draw(pass, &lists.lines, &pipelines.line);
+        draw(pass, &lists.points, &pipelines.point);
         // Outlined see-through parts, last (their depth would hide what
         // is behind them).
         if outline {
@@ -747,6 +767,8 @@ struct Pipelines {
     point_hidden: wgpu::RenderPipeline,
     mesh_pick: wgpu::RenderPipeline,
     mesh_pick_transparent: wgpu::RenderPipeline,
+    /// Visible-depth samples: pick ids with true depth (no bias).
+    mesh_sample: wgpu::RenderPipeline,
     mesh_pick_priority: wgpu::RenderPipeline,
     line_pick: wgpu::RenderPipeline,
     point_pick: wgpu::RenderPipeline,
@@ -1179,6 +1201,7 @@ impl Renderer {
             point_hidden: make(P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: none, samples: msaa }),
             mesh_pick: make(P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
             mesh_pick_transparent: make(P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }),
+            mesh_sample: make(P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
             mesh_pick_priority: make(P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: &mesh_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }),
             line_pick: make(P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: &line_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
             point_pick: make(P { label: "point-pick", vs: "vs_point", fs: "fs_point_pick", buffers: &point_buffers, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }),
@@ -1499,12 +1522,12 @@ impl Renderer {
             self.targets.get_mut(&target).expect("target").pick_valid = true;
         }
         // Visible-depth sampling queries render their own tiny pass.
-        let samples: Vec<(u64, SampleRead, wgpu::Texture, wgpu::Texture)> = queries
+        let samples: Vec<(u64, SampleRead, Vec<wgpu::Texture>)> = queries
             .iter()
             .filter(|(_, r)| r.depth_samples > 0)
             .map(|&(token, r)| {
-                let (read, ids, depth) = self.render_depth_samples(&mut encoder, &last, width, height, r.depth_samples, msaa);
-                (token, read, ids, depth)
+                let (read, textures) = self.render_depth_samples(&mut encoder, &last, width, height, r.depth_samples, msaa);
+                (token, read, textures)
             })
             .collect();
         // Lay the rectangles out in one readback buffer.
@@ -1516,7 +1539,7 @@ impl Renderer {
                 let padded_row = (sw * 4).div_ceil(256).max(1) * 256;
                 let read = samples.iter().find(|s| s.0 == token).map(|s| SampleRead { view_proj: s.1.view_proj });
                 regions.push(RegionRead { token, samples: read, x0: 0, y0: 0, width: sw, height: sh, frame_width: sw, frame_height: sh, offset: size, padded_row });
-                size += padded_row as u64 * sh as u64 * 2;
+                size += padded_row as u64 * sh as u64 * 4;
                 continue;
             }
             let (x0, y0, w, h) = rect.clip(width, height);
@@ -1528,7 +1551,7 @@ impl Renderer {
         }
         if size == 0 {
             for r in regions {
-                self.ready.push(Completed::Pick { target, token: r.token, result: Ok(PickBuffer { x0: r.x0, y0: r.y0, width: 0, height: 0, frame_width: width, frame_height: height, ids: Vec::new(), samples: Vec::new(), view_proj: None }) });
+                self.ready.push(Completed::Pick { target, token: r.token, result: Ok(PickBuffer { x0: r.x0, y0: r.y0, width: 0, height: 0, frame_width: width, frame_height: height, ids: Vec::new(), samples: Vec::new(), samples_with_planes: Vec::new(), view_proj: None }) });
             }
             // The pick pass (if any) still has to run so later queries can reuse it.
             self.queue.submit(Some(encoder.finish()));
@@ -1546,9 +1569,11 @@ impl Renderer {
         let tex = self.targets[&target].tex.as_ref().expect("textures");
         for r in regions.iter().filter(|r| r.width > 0 && r.height > 0) {
             if r.samples.is_some() {
-                let Some((_, _, ids, depth)) = samples.iter().find(|s| s.0 == r.token) else { continue };
-                let depth_at = r.offset + r.padded_row as u64 * r.height as u64;
-                for (texture, aspect, offset) in [(ids, wgpu::TextureAspect::All, r.offset), (depth, wgpu::TextureAspect::DepthOnly, depth_at)] {
+                let Some((_, _, textures)) = samples.iter().find(|s| s.0 == r.token) else { continue };
+                let block = r.padded_row as u64 * r.height as u64;
+                for (k, texture) in textures.iter().enumerate() {
+                    let aspect = if k % 2 == 0 { wgpu::TextureAspect::All } else { wgpu::TextureAspect::DepthOnly };
+                    let offset = r.offset + block * k as u64;
                     encoder.copy_texture_to_buffer(
                         wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect },
                         wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset, bytes_per_row: Some(r.padded_row), rows_per_image: Some(r.height) } },
@@ -1572,8 +1597,9 @@ impl Renderer {
 
     /// Onshape's `DepthSamplingPass`: the pick pass again, into a viewport
     /// shrunk to about `n` pixels (cheap), whose ids and depth are read back
-    /// whole. Returns the read description and the two textures to copy.
-    fn render_depth_samples(&mut self, encoder: &mut wgpu::CommandEncoder, last: &FrameState, width: u32, height: u32, n: u32, msaa: u32) -> (SampleRead, wgpu::Texture, wgpu::Texture) {
+    /// whole, twice (without and with plane depth). Returns the read
+    /// description and the textures to copy: ids, depth, ids, depth.
+    fn render_depth_samples(&mut self, encoder: &mut wgpu::CommandEncoder, last: &FrameState, width: u32, height: u32, n: u32, msaa: u32) -> (SampleRead, Vec<wgpu::Texture>) {
         let (sw, sh) = depth_sample_size(width, height, n);
         self.ensure_pipelines(msaa);
         self.upload_states(&last.scene.states);
@@ -1601,31 +1627,38 @@ impl Renderer {
                 view_formats: &[],
             })
         };
-        let ids = tex("depth-sample-ids", PICK_FORMAT);
-        let depth = tex("depth-sample-depth", PICK_DEPTH_FORMAT);
-        {
-            let (ids_view, depth_view) = (ids.create_view(&Default::default()), depth.create_view(&Default::default()));
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("depth-samples"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &ids_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &depth_view,
-                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Store }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_bind_group(0, self.bind_sample.as_ref().expect("bind groups"), &[]);
-            draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), DrawMode { pick: true, ..Default::default() });
+        // Without plane depth, then with it (Onshape retrieves the samples
+        // with `includePlanes` false, then true when too few hit).
+        let mut textures = Vec::with_capacity(4);
+        for planes_write_depth in [false, true] {
+            let ids = tex("depth-sample-ids", PICK_FORMAT);
+            let depth = tex("depth-sample-depth", PICK_DEPTH_FORMAT);
+            {
+                let (ids_view, depth_view) = (ids.create_view(&Default::default()), depth.create_view(&Default::default()));
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("depth-samples"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &ids_view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &depth_view,
+                        depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Store }),
+                        stencil_ops: None,
+                    }),
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_bind_group(0, self.bind_sample.as_ref().expect("bind groups"), &[]);
+                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), self.bind_inst.as_ref().expect("bind groups"), DrawMode { pick: true, depth_samples: true, planes_write_depth, ..Default::default() });
+            }
+            textures.push(ids);
+            textures.push(depth);
         }
-        (SampleRead { view_proj }, ids, depth)
+        (SampleRead { view_proj }, textures)
     }
 
     /// Block until the oldest outstanding read is ready (no-op if none).
@@ -1691,21 +1724,25 @@ impl Renderer {
                     let data = r.buffer.slice(..).get_mapped_range();
                     for g in regions {
                         if let Some(sr) = &g.samples {
-                            let mut samples = Vec::new();
-                            let depth_base = g.offset as usize + g.padded_row as usize * g.height as usize;
-                            for y in 0..g.height as usize {
-                                let ids_at = g.offset as usize + y * g.padded_row as usize;
-                                let depth_at = depth_base + y * g.padded_row as usize;
-                                let ids = bytemuck::cast_slice::<u8, u32>(&data[ids_at..ids_at + g.width as usize * 4]);
-                                let depths = bytemuck::cast_slice::<u8, f32>(&data[depth_at..depth_at + g.width as usize * 4]);
-                                for (x, (&id, &depth)) in ids.iter().zip(depths).enumerate() {
-                                    // Reverse-Z: cleared to 0 where nothing was drawn.
-                                    if depth > 0.0 {
-                                        samples.push(DepthSample { x: x as f32 + 0.5, y: y as f32 + 0.5, depth, id });
+                            let block = g.padded_row as usize * g.height as usize;
+                            let read = |first: usize| {
+                                let mut samples = Vec::new();
+                                for y in 0..g.height as usize {
+                                    let ids_at = g.offset as usize + block * first + y * g.padded_row as usize;
+                                    let depth_at = ids_at + block;
+                                    let ids = bytemuck::cast_slice::<u8, u32>(&data[ids_at..ids_at + g.width as usize * 4]);
+                                    let depths = bytemuck::cast_slice::<u8, f32>(&data[depth_at..depth_at + g.width as usize * 4]);
+                                    for (x, (&id, &depth)) in ids.iter().zip(depths).enumerate() {
+                                        // Reverse-Z: cleared to 0 where nothing was drawn.
+                                        if depth > 0.0 {
+                                            samples.push(DepthSample { x: x as f32 + 0.5, y: y as f32 + 0.5, depth, id });
+                                        }
                                     }
                                 }
-                            }
-                            let result = Ok(PickBuffer { x0: 0, y0: 0, width: 0, height: 0, frame_width: g.frame_width, frame_height: g.frame_height, ids: Vec::new(), samples, view_proj: Some(sr.view_proj) });
+                                samples
+                            };
+                            let (samples, samples_with_planes) = (read(0), read(2));
+                            let result = Ok(PickBuffer { x0: 0, y0: 0, width: 0, height: 0, frame_width: g.frame_width, frame_height: g.frame_height, ids: Vec::new(), samples, samples_with_planes, view_proj: Some(sr.view_proj) });
                             self.ready.push(Completed::Pick { target: r.target, token: g.token, result });
                             continue;
                         }
@@ -1714,7 +1751,7 @@ impl Renderer {
                             let start = g.offset as usize + y * g.padded_row as usize;
                             ids.extend_from_slice(bytemuck::cast_slice::<u8, u32>(&data[start..start + g.width as usize * 4]));
                         }
-                        let result = Ok(PickBuffer { x0: g.x0, y0: g.y0, width: g.width, height: g.height, frame_width: g.frame_width, frame_height: g.frame_height, ids, samples: Vec::new(), view_proj: None });
+                        let result = Ok(PickBuffer { x0: g.x0, y0: g.y0, width: g.width, height: g.height, frame_width: g.frame_width, frame_height: g.frame_height, ids, samples: Vec::new(), samples_with_planes: Vec::new(), view_proj: None });
                         self.ready.push(Completed::Pick { target: r.target, token: g.token, result });
                     }
                     drop(data);

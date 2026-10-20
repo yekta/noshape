@@ -1,5 +1,8 @@
 FeatureScript 3095;
 import(path : "onshape/std/geometry.fs", version : "3095.0");
+import(path : "onshape/std/splineUtils.fs", version : "3095.0");
+import(path : "onshape/std/path.fs", version : "3095.0");
+import(path : "onshape/std/fitSpline.fs", version : "3095.0");
 
 // Operations and evaluations called directly (tests/custom_features.rs
 // ops_and_evaluations_run_in_custom_features). Prints "name ok" or the problem.
@@ -174,6 +177,71 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                     "targets" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(5, 10, 1110) * mm) });
             const len = evLength(context, { "entities" : qCreatedBy(sub + "x", EntityType.EDGE) });
             check("opIntersectFaces", size(evaluateQuery(context, qCreatedBy(sub + "x", EntityType.EDGE))) > 0 || len > 0 * meter, len);
+        });
+        step(context, id, "paths", function(sub) {
+            opPolyline(context, sub + "open", { "points" : [vector(0, 0, 1200) * mm, vector(10, 0, 1200) * mm, vector(10, 10, 1200) * mm, vector(0, 10, 1200) * mm] });
+            opPolyline(context, sub + "loop", { "points" : [vector(0, 0, 1300) * mm, vector(5, 0, 1300) * mm, vector(5, 5, 1300) * mm, vector(0, 0, 1300) * mm] });
+            const paths = constructPaths(context, qUnion([qCreatedBy(sub + "open", EntityType.EDGE), qCreatedBy(sub + "loop", EntityType.EDGE)]), {});
+            check("constructPaths", size(paths) == 2 && size(paths[0].edges) == 3 && !paths[0].closed && size(paths[1].edges) == 3 && paths[1].closed, paths);
+        });
+        step(context, id, "faceblend", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 1400) * mm, "corner2" : vector(10, 10, 1410) * mm });
+            const before = evVolume(context, { "entities" : qCreatedBy(sub + "c", EntityType.BODY) });
+            opFaceBlend(context, sub + "b", { "side1" : qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(5, 5, 1410) * mm),
+                    "side2" : qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(10, 5, 1405) * mm), "radius" : 2 * mm });
+            const after = evVolume(context, { "entities" : qCreatedBy(sub + "c", EntityType.BODY) });
+            check("opFaceBlend", after < before && after > before * 0.99, [before, after]);
+        });
+        step(context, id, "approx", function(sub) {
+            const pts = [vector(0, 0, 0) * mm, vector(10, 5, 0) * mm, vector(20, 0, 0) * mm, vector(30, 5, 0) * mm];
+            const curves = approximateSpline(context, { "degree" : 3, "tolerance" : 1e-5 * meter, "isPeriodic" : false, "targets" : [approximationTarget({ "positions" : pts })] });
+            opCreateBSplineCurve(context, sub + "c", { "bSplineCurve" : curves[0] });
+            const edge = qCreatedBy(sub + "c", EntityType.EDGE);
+            const d = evDistance(context, { "side0" : edge, "side1" : vector(10, 5, 0) * mm }).distance;
+            check("approximateSpline", size(curves) == 1 && curves[0].degree == 3 && d < 1e-9 * meter, [curves[0].degree, d]);
+        });
+        step(context, id, "fitspline", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 1500) * mm, "corner2" : vector(10, 10, 1510) * mm });
+            const corner = function(p) { return qContainsPoint(qCreatedBy(sub + "c", EntityType.VERTEX), p); };
+            fitSpline(context, sub + "s", { "fitType" : FitSplineType.VERTICES,
+                    "vertices" : qUnion([corner(vector(0, 0, 1500) * mm), corner(vector(10, 10, 1500) * mm), corner(vector(10, 10, 1510) * mm)]) });
+            const len = evLength(context, { "entities" : qCreatedBy(sub + "s", EntityType.EDGE) });
+            check("fitSpline (built-in)", len > 24.1 * mm, len);
+        });
+        step(context, id, "csurf", function(sub) {
+            const pts = [vector(0, 0, 1600) * mm, vector(10, 0, 1600) * mm, vector(10, 10, 1600) * mm, vector(0, 10, 1600) * mm, vector(5, 5, 1600) * mm];
+            var points = [];
+            for (var p in pts)
+                points = append(points, { "point" : p });
+            opConstrainedSurface(context, sub + "s", { "points" : points });
+            const area = evArea(context, { "entities" : qCreatedBy(sub + "s", EntityType.BODY) });
+            check("opConstrainedSurface", area > 99 * mm ^ 2 && area < 101 * mm ^ 2, area);
+        });
+        step(context, id, "isocline", function(sub) {
+            opPoint(context, sub + "o", { "point" : vector(0, 0, 1700) * mm });
+            fSphere(context, sub + "sp", { "center" : qCreatedBy(sub + "o", EntityType.VERTEX), "radius" : 10 * mm });
+            opCreateIsocline(context, sub + "i", { "faces" : qCreatedBy(sub + "sp", EntityType.FACE), "direction" : vector(0, 0, 1), "angle" : 0 * degree });
+            const len = evLength(context, { "entities" : qCreatedBy(sub + "i", EntityType.EDGE) });
+            check("opCreateIsocline", abs(len - 2 * PI * 10 * mm) < 1e-2 * mm, len);
+        });
+        step(context, id, "drop", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 1800) * mm, "corner2" : vector(20, 20, 1810) * mm });
+            opPolyline(context, sub + "l", { "points" : [vector(5, 5, 1830) * mm, vector(15, 5, 1830) * mm] });
+            opDropCurve(context, sub + "d", { "tools" : qCreatedBy(sub + "l", EntityType.EDGE),
+                    "targets" : qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(10, 10, 1810) * mm),
+                    "projectionType" : ProjectionType.DIRECTION, "direction" : vector(0, 0, -1) });
+            const len = evLength(context, { "entities" : qCreatedBy(sub + "d", EntityType.EDGE) });
+            check("opDropCurve", abs(len - 10 * mm) < 1e-6 * mm, len);
+        });
+        step(context, id, "wrap", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 1900) * mm, "corner2" : vector(10, 10, 1901) * mm });
+            const top = qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(5, 5, 1901) * mm);
+            opWrap(context, sub + "w", { "wrapType" : WrapType.SIMPLE, "entities" : top,
+                    "source" : { "plane" : plane(vector(0, 0, 1901) * mm, vector(0, 0, 1), vector(1, 0, 0)), "anchorPoint" : vector(0, 0, 1901) * mm, "anchorDirection" : vector(1, 0, 0) },
+                    "destination" : { "cylinder" : cylinder(coordSystem(vector(0, 0, 2000) * mm, vector(0, 1, 0), vector(1, 0, 0)), 20 * mm),
+                            "anchorPoint" : vector(0, 0, 2020) * mm, "anchorDirection" : vector(1, 0, 0) } });
+            const area = evArea(context, { "entities" : qCreatedBy(sub + "w", EntityType.BODY) });
+            check("opWrap", abs(area - 100 * mm ^ 2) < 1e-6 * meter ^ 2, area);
         });
         println("done");
     });

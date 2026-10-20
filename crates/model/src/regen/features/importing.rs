@@ -11,6 +11,20 @@ use noshape_kernel::ShapeType;
 
 // TODO(app): Derived needs another Part Studio's regenerated context. The app
 // should resolve `partStudio` and hand the imported bodies to regeneration.
+/// Prefix of a Derived feature's source configuration parameters.
+pub const DERIVED_CONFIG_PREFIX: &str = "configuration:";
+
+/// A Derived feature's source configuration (`configuration:<id>` texts).
+pub fn derived_configuration(params: &crate::params::ParamValues) -> crate::configuration::ConfigValues {
+    let mut v = crate::configuration::ConfigValues::default();
+    for (k, p) in params.0.iter() {
+        if let (Some(id), crate::params::ParamValue::Text(t) | crate::params::ParamValue::Enum(t)) = (k.strip_prefix(DERIVED_CONFIG_PREFIX), p) {
+            v.0.insert(id.to_string(), t.clone());
+        }
+    }
+    v
+}
+
 pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     let tab = ev.params.text("partStudio").trim().to_string();
     if tab.is_empty() {
@@ -19,7 +33,12 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     let Some(provider) = ev.derived.clone() else {
         return err("Derived parts are not available in this context");
     };
-    let Some(src) = provider.context(&tab) else {
+    // A configured source: its configuration in `configuration:<input id>`
+    // parameters (the dialog's inputs, or propagated from this studio's own
+    // inputs by Input propagation).
+    let config = derived_configuration(ev.params);
+    let src = if config.is_empty() { provider.context(&tab) } else { provider.context_configured(&tab, &config) };
+    let Some(src) = src else {
         return err("The source Part Studio could not be regenerated (deleted, or a circular reference)");
     };
     // Selected source parts (BodyIds of the source studio); empty = all parts.
@@ -129,14 +148,30 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             "step" | "stp" => k::read_step(path, k::LengthUnit::Meter)?.into_iter().map(|s| s.shape).collect(),
             "iges" | "igs" => vec![k::read_iges(path, k::LengthUnit::Meter)?],
             "brep" | "brp" => vec![k::read_brep(path)?],
-            "pvz" => vec![k::read_pvz(path, k::LengthUnit::Meter, 20_000)?],
+            "pvz" => vec![k::read_pvz(path, k::LengthUnit::Meter)?],
             other => return err(format!("Unsupported import format .{other}")),
         }
     };
     let up = ev.bool("yAxisIsUp");
     let mut tools = Vec::new();
+    // Mesh imports (STL, OBJ, PVZ; Onshape G22/G27): per part, its closed
+    // pieces make a mesh part; the open pieces of a part whose mesh doesn't
+    // close become surfaces grouped in a closed composite part.
+    let mut open_groups: Vec<Vec<k::Shape>> = Vec::new();
     for s in shapes {
         let s = if up { s.transformed(&k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::X, angle: std::f64::consts::FRAC_PI_2 })? } else { s };
+        if s.is_mesh() {
+            let children = s.children();
+            let parts = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
+            for part in parts {
+                tools.extend(part.solids());
+                let open: Vec<k::Shape> = part.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
+                if !open.is_empty() {
+                    open_groups.push(open);
+                }
+            }
+            continue;
+        }
         // One body per solid, else per shell / face set.
         let parts = if s.count(ShapeType::Solid) > 0 { s.solids() } else if s.count(ShapeType::Shell) > 0 { s.shells() } else { vec![s] };
         for p in parts {
@@ -146,7 +181,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             tools.push(p);
         }
     }
-    if tools.is_empty() {
+    if tools.is_empty() && open_groups.is_empty() {
         return err("The imported file contains no parts or surfaces");
     }
     // "Join adjacent surfaces": sew the surface bodies along shared edges
@@ -161,15 +196,33 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             tools.extend(surfaces);
         }
     }
-    for p in tools {
-        let kind = if p.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
+    // Separate bodies even if they touch (imports are never merged), each
+    // with its own body index.
+    let mut next = 0u32;
+    let mut add = |ev: &mut EvalCtx, p: k::Shape, kind: BodyKind| -> FResult<()> {
         let names = new_face_names(ev, &p);
-        // Separate bodies even if they touch (imports are never merged).
         let before = ev.ctx.bodies.len();
-        ev.apply_operation(vec![NamedShape::new(p, names)], "NEW", None, kind)?;
+        ev.add_new_bodies(NamedShape::new(p, names), kind, next)?;
+        next += 1;
         if ev.ctx.bodies.len() == before {
             return Err(FeatureError::new("Import failed"));
         }
+        Ok(())
+    };
+    for p in tools {
+        let kind = if p.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
+        add(ev, p, kind)?;
+    }
+    for (gi, group) in open_groups.into_iter().enumerate() {
+        let before = ev.ctx.bodies.len();
+        for p in group {
+            add(ev, p, BodyKind::Surface)?;
+        }
+        let idx: Vec<usize> = (before..ev.ctx.bodies.len()).collect();
+        if idx.is_empty() {
+            return Err(FeatureError::new("Import failed"));
+        }
+        super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
     }
     Ok(())
 }

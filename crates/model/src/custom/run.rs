@@ -8,7 +8,7 @@
 
 use super::host::{self, FsContext, query::query_of_refs};
 use super::studio::{ParamDecl, ParamKindFs};
-use crate::params::{NumKind, ParamValue, ParamValues, fill_defaults};
+use crate::params::{NumKind, ParamValue, ParamValues, ReferenceKind, fill_defaults};
 use crate::reference::FeatureId;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
 use noshape_featurescript::interp::{Interp, Notice};
@@ -99,9 +99,17 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 }
                 Value::map(m).with_tag(host::std_tag("lookupTablePath.fs", "LookupTablePath"))
             }
+            ParamKindFs::Reference { kind: ReferenceKind::PartStudio } => super::reference::part_studio_value(values.text(&d.id), ev.derived.as_deref()),
             ParamKindFs::Reference { kind } => {
                 let tab = values.text(&d.id);
-                let file = if tab.is_empty() { None } else { provider.and_then(|p| p.file(tab)) };
+                // Other documents and versions: `ext:` keys, read through the Derived provider.
+                let file = if tab.is_empty() {
+                    None
+                } else if tab.starts_with("ext:") {
+                    ev.derived.as_ref().and_then(|d| d.file(tab))
+                } else {
+                    provider.and_then(|p| p.file(tab))
+                };
                 super::reference::reference_value(*kind, file.as_ref())
             }
             ParamKindFs::Anything => match values.get(&d.id) {
@@ -165,12 +173,16 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
     let feature_id = vec![Arc::<str>::from(ev.feature.to_string())];
     let ctx_value = cx.value();
     let cell = def.cell.clone();
+    let counters = noshape_featurescript::value::shown_counters();
+    let derived = ev.derived.clone();
 
     // Run on a thread with a large stack (FeatureScript recursion).
     let run = std::thread::scope(|s| {
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
             .spawn_scoped(s, || {
+                noshape_featurescript::value::set_shown_counters(counters);
+                host::set_derived(derived);
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + TIME_LIMIT));
                 let f = i.global(&cell);
@@ -224,6 +236,45 @@ pub struct MonitorEntry {
     pub rows: Vec<(String, String)>,
 }
 
+/// A runtime notice as a Monitor entry: the message, its stack rows
+/// (`line:col`, `module (function)`), innermost first, then `last` (the
+/// Part Studio and feature, no position).
+fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::interp::Notice, last: String) -> MonitorEntry {
+    use crate::document::TabId;
+    let module_tab = |m: &str| m.strip_prefix("tab:").and_then(|t| u64::from_str_radix(t, 16).ok()).map(TabId);
+    let module_name = |m: &str| match module_tab(m) {
+        Some(t) => doc.tab(t).map(|t| t.name.clone()).unwrap_or_else(|| m.to_string()),
+        None => m.to_string(),
+    };
+    let place = |module: &str, function: &str| if function.is_empty() { module_name(module) } else { format!("{} ({function})", module_name(module)) };
+    let mut rows = Vec::new();
+    let innermost = n.trace.last().map(|f| f.function.to_string()).unwrap_or_default();
+    rows.push((format!("{}:{}", n.pos.line, n.pos.col), place(&n.module, &innermost)));
+    // Call sites, innermost first; the host's call (no module) ends the stack.
+    for k in (0..n.trace.len()).rev() {
+        let fr = &n.trace[k];
+        if fr.module.is_empty() {
+            break;
+        }
+        let caller = if k > 0 { n.trace[k - 1].function.to_string() } else { String::new() };
+        rows.push((format!("{}:{}", fr.pos.line, fr.pos.col), place(&fr.module, &caller)));
+    }
+    rows.push((String::new(), last));
+    let at = module_tab(&n.module).map(|t| (t, n.pos.line as usize, n.pos.col as usize));
+    let severity = match n.kind {
+        noshape_featurescript::NoticeKind::Error => super::Severity::Error,
+        noshape_featurescript::NoticeKind::Warning => super::Severity::Warning,
+        noshape_featurescript::NoticeKind::Info => super::Severity::Info,
+    };
+    MonitorEntry { message: n.message.clone(), severity, at, rows }
+}
+
+/// The notices of a custom table run as Monitor entries, ending with
+/// `last` ("pvz 2parts (main)", live 652).
+pub fn notice_entries(doc: &crate::document::Document, notices: &[noshape_featurescript::interp::Notice], last: &str) -> Vec<MonitorEntry> {
+    notices.iter().map(|n| notice_entry(doc, n, last.to_string())).collect()
+}
+
 /// Monitor contents of a Part Studio: the compile warnings / infos of the
 /// Feature Studios its custom features come from (not parse warnings) and the
 /// features' runtime notices, ordered like Onshape's (live fs-errors3.txt):
@@ -239,7 +290,6 @@ pub fn monitor(doc: &crate::document::Document, part_studio: crate::document::Ta
         Some(t) => doc.tab(t).map(|t| t.name.clone()).unwrap_or_else(|| m.to_string()),
         None => m.to_string(),
     };
-    let place = |module: &str, function: &str| if function.is_empty() { module_name(module) } else { format!("{} ({function})", module_name(module)) };
     // (in the standard library, line, runtime) for the ordering.
     let mut entries: Vec<((bool, u32, bool), MonitorEntry)> = Vec::new();
     let mut text = String::new();
@@ -257,29 +307,8 @@ pub fn monitor(doc: &crate::document::Document, part_studio: crate::document::Ta
             }
         }
         let Some(out) = output_of(f.id) else { continue };
-        {
-            for n in out.notices.iter() {
-                let mut rows = Vec::new();
-                let innermost = n.trace.last().map(|f| f.function.to_string()).unwrap_or_default();
-                rows.push((format!("{}:{}", n.pos.line, n.pos.col), place(&n.module, &innermost)));
-                // Call sites, innermost first; the host's call (no module) ends the stack.
-                for k in (0..n.trace.len()).rev() {
-                    let fr = &n.trace[k];
-                    if fr.module.is_empty() {
-                        break;
-                    }
-                    let caller = if k > 0 { n.trace[k - 1].function.to_string() } else { String::new() };
-                    rows.push((format!("{}:{}", fr.pos.line, fr.pos.col), place(&fr.module, &caller)));
-                }
-                rows.push((String::new(), format!("{} ({})", tab.name, out.feature_name)));
-                let at = module_tab(&n.module).map(|t| (t, n.pos.line as usize, n.pos.col as usize));
-                let severity = match n.kind {
-                    noshape_featurescript::NoticeKind::Error => super::Severity::Error,
-                    noshape_featurescript::NoticeKind::Warning => super::Severity::Warning,
-                    noshape_featurescript::NoticeKind::Info => super::Severity::Info,
-                };
-                entries.push(((n.module.starts_with("onshape/std/"), n.pos.line, true), MonitorEntry { message: n.message.clone(), severity, at, rows }));
-            }
+        for n in out.notices.iter() {
+            entries.push(((n.module.starts_with("onshape/std/"), n.pos.line, true), notice_entry(doc, n, format!("{} ({})", tab.name, out.feature_name))));
         }
         text.push_str(&out.output);
     }

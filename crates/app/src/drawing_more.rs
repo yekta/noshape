@@ -467,8 +467,8 @@ impl DrawingEditor {
             AnnotationKind::Note { style, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !style.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leader", move |t, _, cx| {
-                        t.edit_sheet("Remove leader", cx, |s| {
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                        t.edit_sheet("Remove leaders", cx, |s| {
                             if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
                                 style.leaders.clear();
                             }
@@ -477,8 +477,8 @@ impl DrawingEditor {
                 }
                 // Explode: the note exports as polylines (a check item).
                 let on = style.explode;
-                out.push(MenuEntry::check("Explode", on, move |t, _, cx| {
-                    t.edit_sheet("Explode", cx, |s| {
+                out.push(MenuEntry::check("Explode note", on, move |t, _, cx| {
+                    t.edit_sheet("Explode note", cx, |s| {
                         if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
                             style.explode = !on;
                         }

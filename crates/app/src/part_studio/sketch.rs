@@ -688,7 +688,11 @@ impl PartStudioView {
         selection.extend(ed.selection.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         selection.extend(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() }));
         accent.clear();
-        accent.extend(ed.picked(data.as_ref()).iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
+        // Live (sketch/12): what the Dimension tool measures shows selected
+        // (amber) while the dimension is placed.
+        let tool_picks = if ed.tool == Tool::Dimension { ed.tool_picks() } else { Vec::new() };
+        selection.extend(tool_picks.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
+        accent.extend(ed.picked(data.as_ref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         let Some(data) = data else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
         let (lines, points) = ed.overlay(&data, &units);
@@ -1074,9 +1078,11 @@ impl PartStudioView {
         // rounded to 6 / 7 decimals).
         if self.sketch_data(cx).and_then(|data| crate::sketch_mode::dimension_edit_text(&data, cid, &units)).is_some_and(|shown| shown == text.trim()) {
             if let Some(ed) = &mut self.sketch {
-                ed.dim_edit = None;
-                ed.selection.clear();
-                ed.selected_constraints = vec![cid];
+                // A new dimension leaves nothing selected (see below).
+                if ed.dim_edit.take().is_some_and(|d| d.created) {
+                    ed.selection.clear();
+                    ed.selected_constraints.clear();
+                }
             }
             self.dim_input = None;
             window.focus(&self.focus, cx);
@@ -1104,12 +1110,19 @@ impl PartStudioView {
             return;
         }
         let res = self.with_sketch(cx, |ed, data| {
+            let created = ed.dim_edit.as_ref().is_some_and(|d| d.constraint == cid && d.created);
             let r = ed.apply_dimension(data, cid, text, &units, &vars);
             if r.is_ok() {
                 ed.dim_edit = None;
-                // Live Onshape: the just-applied dimension stays selected (tan box, sketch/148).
-                ed.selection.clear();
-                ed.selected_constraints = vec![cid];
+                // Onshape (bundle: the dimension tool's commit ends in
+                // `cleanUpAfterCommit`, which resets the selection list; the
+                // entity highlights go with the edit box; live sketch/15): a
+                // new dimension leaves nothing selected. Editing an existing
+                // one keeps the selection as it was.
+                if created {
+                    ed.selection.clear();
+                    ed.selected_constraints.clear();
+                }
             }
             r
         });
@@ -1144,7 +1157,7 @@ impl PartStudioView {
             })
             .unwrap_or_default();
         if let Some(ed) = &mut self.sketch {
-            ed.dim_edit = Some(crate::sketch_mode::DimEdit { constraint: cid, text });
+            ed.dim_edit = Some(crate::sketch_mode::DimEdit { constraint: cid, text, created: false });
             // The label is replaced by the input, so it never sees the hover end.
             ed.hover_constraint = None;
         }
@@ -2564,7 +2577,7 @@ impl PartStudioView {
                                         .justify_center()
                                         .rounded(px(3.))
                                         // Live dom/dimension-input-box.txt: `parameter-state-toggle`,
-                                        // the hole-tolerance-precision icon at opacity 0.5.
+                                        // the tolerance-precision icon (our redrawn `tolerance`) at opacity 0.5.
                                         .opacity(0.5)
                                         .when(allowed, |d| {
                                             d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Tolerance and precision")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -2576,7 +2589,7 @@ impl PartStudioView {
                                                 cx.notify();
                                             }))
                                         })
-                                        .child(crate::assets::icon("hole-tolerance-precision", 20., cx)),
+                                        .child(crate::assets::icon("tolerance", 20., cx)),
                                 )
                                 .child(div().flex_1())
                                 .child(
