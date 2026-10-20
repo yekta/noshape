@@ -437,6 +437,11 @@ pub struct DrawingView {
     /// without its parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_frame: Option<[[f64; 3]; 2]>,
+    /// Base views: the source's named view shown (View orientation › a
+    /// named view; `custom_frame` holds its camera). Listed grayed once the
+    /// named view is deleted from the source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_view: Option<String>,
     /// Tangent edges drawn as phantom lines (View properties › Tangent
     /// edges › Phantom); `show_tangent_edges` off = Hidden.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -457,6 +462,17 @@ pub struct DrawingView {
     pub simplification: Option<Simplification>,
 }
 
+/// Where a datum's triangle sits on another annotation: segment `seg` of
+/// the `line`-th polyline the annotation draws, at `t` along it (an
+/// extension line can be passed: t > 1).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DatumOn {
+    pub ann: u64,
+    pub line: u32,
+    pub seg: u32,
+    pub t: f64,
+}
+
 /// An auxiliary view's reference indicator: the arrow at `anchor` (parent
 /// view coordinates, on the picked edge) labelled `letter`; the view is
 /// labelled "VIEW <letter>".
@@ -466,6 +482,14 @@ pub struct AuxRef {
     pub letter: String,
     #[serde(default = "yes")]
     pub show: bool,
+    /// Distance (sheet mm) of the viewing-plane line from the edge toward
+    /// the view; dragged with the indicator's middle snap point.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<f64>,
+    /// How far (sheet mm) the line runs to either side of the anchor
+    /// (−edge, +edge); dragged with the elbow snap points.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ext: Option<[f64; 2]>,
 }
 
 /// Onshape's View simplification: geometry below a threshold is left out.
@@ -542,6 +566,7 @@ impl Default for DrawingView {
             cut_from_section: false,
             broken_out: Vec::new(),
             custom_frame: None,
+            named_view: None,
             tangent_phantom: false,
             name: None,
             scale_label: None,
@@ -667,8 +692,16 @@ pub enum AnnotationKind {
     /// `mid`); `offset` mm outside the arc.
     ArcLengthDimension { view: ViewId, center: [f64; 2], radius: f64, a: [f64; 2], b: [f64; 2], mid: [f64; 2], offset: f64 },
     /// Datum feature symbol: boxed `label` at the annotation position with a
-    /// leader ending in a filled triangle at `anchor` (sheet mm).
-    Datum { anchor: [f64; 2], label: String },
+    /// leader ending in a filled triangle at `anchor` (sheet mm). `on`: the
+    /// triangle sits on another annotation (a GD&T frame edge, a dimension
+    /// line, leader or extension line) and follows it; `anchor` is then
+    /// where it was when last edited and the box moves with the difference.
+    Datum {
+        anchor: [f64; 2],
+        label: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        on: Option<DatumOn>,
+    },
     /// Ordinate dimension group: one datum (`origin`) and the values of
     /// every point measured from it along x (`horizontal`) or y. The texts
     /// share one line through the annotation position; leaders jog when
@@ -1882,6 +1915,9 @@ pub struct Sheet {
     /// Border and zones (Custom template / Sheet properties).
     #[serde(default, skip_serializing_if = "SheetFormat::is_default")]
     pub format: SheetFormat,
+    /// Custom template › Language of the title block's labels.
+    #[serde(default, skip_serializing_if = "tb_lang::TitleLanguage::is_english_ref")]
+    pub title_language: tb_lang::TitleLanguage,
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2120,7 +2156,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default() }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default() }
     }
 }
 
@@ -3186,6 +3222,7 @@ pub mod painter;
 pub mod sheet;
 pub mod showcase;
 pub mod tables;
+pub mod tb_lang;
 pub mod templates;
 pub mod views;
 

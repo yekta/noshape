@@ -32,6 +32,64 @@ pub const LIST_ICON: f32 = 17.;
 /// Left panel default width (§3.4).
 pub const LEFT_PANEL_W: f32 = 206.;
 
+thread_local! {
+    static LEFT_W: std::cell::Cell<f32> = std::cell::Cell::new(
+        std::fs::read_to_string(crate::files::config_dir().join("left_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(LEFT_PANEL_W).max(LEFT_PANEL_W),
+    );
+}
+
+/// The Features / instance list's width. Onshape's splitter between it and
+/// the graphics (`div.os-splitter`, live dom/cursor-rows.json) widens it
+/// from the default; it never gets narrower, and the width persists.
+pub fn left_panel_w() -> f32 {
+    LEFT_W.with(|w| w.get())
+}
+
+/// Dragging the left panel's splitter.
+#[derive(Clone)]
+pub struct LeftSplitDrag;
+
+impl Render for LeftSplitDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// The splitter's hit zone: 9 px into the graphics from the panel's edge
+/// (live x 241-249 for a 241 px panel), `col-resize`. Place it at the left of
+/// the graphics area.
+pub fn left_splitter() -> Stateful<Div> {
+    div()
+        .id("left-splitter")
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .left_0()
+        .w(px(9.))
+        .occlude()
+        .cursor(CursorStyle::ResizeColumn)
+        .on_drag(LeftSplitDrag, |_, _, _, cx| cx.new(|_| LeftSplitDrag))
+}
+
+/// Follows a splitter drag over `e.bounds` (the panel and the graphics,
+/// starting at the panel's left edge): at least the default width, at most
+/// all but 160 px of the graphics (live max x 1760 of 1920). True when the
+/// width changed.
+pub fn drag_left_panel(e: &DragMoveEvent<LeftSplitDrag>) -> bool {
+    let max = (f32::from(e.bounds.size.width) - 160.).max(LEFT_PANEL_W);
+    let w = f32::from(e.event.position.x - e.bounds.left()).round().clamp(LEFT_PANEL_W, max);
+    if w == left_panel_w() {
+        return false;
+    }
+    LEFT_W.with(|c| c.set(w));
+    let p = crate::files::config_dir().join("left_panel_width.txt");
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(p, w.to_string());
+    true
+}
+
 /// Onshape's simple tooltip: blue-gray `#d0dbe5`, 12 px / 500, square corners (§4.7).
 /// Width in pixels of `text` in the window's font at `size` px (layout
 /// decisions Onshape's browser makes by measuring, such as wrapping).
@@ -299,6 +357,19 @@ impl TipExt for Stateful<Div> {
 /// A list row's tooltip, beside the row (live part-studio/16, 95).
 pub fn with_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
     with_tip(row, text, TipSide::Right)
+}
+
+/// [`with_side_tooltip`] whose text is worked out when the tooltip opens,
+/// not each time the row renders (a feature row's "Extrude 1 <- Sketch 1").
+pub fn with_lazy_side_tooltip(row: Stateful<Div>, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
+    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let a2 = anchor.clone();
+    row.relative()
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .tooltip(move |_, cx| {
+            let (text, anchor) = (text(cx), anchor.get());
+            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default() }).into()
+        })
 }
 
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):
@@ -650,7 +721,14 @@ pub fn hover_reveal<E: InteractiveElement + Styled>(el: E, group: impl Into<Shar
 #[derive(Clone)]
 pub struct PanelMove {
     key: &'static str,
-    last: std::rc::Rc<std::cell::Cell<Point<Pixels>>>,
+}
+
+thread_local! {
+    /// The pointer when a panel title was pressed, then at the last move.
+    /// One press at a time; kept out of the drag value, which is built
+    /// anew on every render (a render between the press and the drag
+    /// start would lose it).
+    static PANEL_LAST: std::cell::Cell<Point<Pixels>> = const { std::cell::Cell::new(Point { x: Pixels::ZERO, y: Pixels::ZERO }) };
 }
 
 struct PanelMoveGhost;
@@ -663,28 +741,36 @@ impl Render for PanelMoveGhost {
 
 /// A panel dialog's title as its drag area.
 pub fn panel_title(key: &'static str, title: Div) -> Stateful<Div> {
-    let last = std::rc::Rc::new(std::cell::Cell::new(Point::default()));
-    let press = last.clone();
     title
         .id(SharedString::from(format!("panel-title-{key}")))
         .cursor(CursorStyle::OpenHand)
-        .on_mouse_down(MouseButton::Left, move |e, _, _| press.set(e.position))
-        .on_drag(PanelMove { key, last }, |_, _, _, cx| cx.new(|_| PanelMoveGhost))
+        .on_mouse_down(MouseButton::Left, |e, _, _| PANEL_LAST.with(|l| l.set(e.position)))
+        .on_drag(PanelMove { key }, |_, _, _, cx| cx.new(|_| PanelMoveGhost))
 }
 
-/// How far each open panel dialog was moved from its place. A panel that
-/// closes forgets it (see [`PanelOffsets::retain`]).
+thread_local! {
+    /// Where each panel dialog was moved, by panel (shared by the Part
+    /// Studio and the assembly), kept across sessions.
+    static PANEL_OFFSETS: std::cell::RefCell<std::collections::HashMap<String, (f32, f32)>> = std::cell::RefCell::new(
+        std::fs::read_to_string(crate::files::config_dir().join("panel_positions.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
+    );
+}
+
+/// How far each panel dialog was moved from its place. Live remembers a
+/// panel's rect per panel id, for the user: the same in the Part Studio and
+/// the assembly, after closing and in later sessions (behaviours.md,
+/// Interference detection reopening at the remembered rect). Keys may carry
+/// a `ps-` / `asm-` prefix; the panel is the rest.
 #[derive(Default)]
-pub struct PanelOffsets(std::collections::HashMap<&'static str, Point<Pixels>>);
+pub struct PanelOffsets;
 
 impl PanelOffsets {
-    pub fn get(&self, key: &'static str) -> Point<Pixels> {
-        self.0.get(key).copied().unwrap_or_default()
+    fn panel(key: &str) -> &str {
+        key.strip_prefix("ps-").or_else(|| key.strip_prefix("asm-")).unwrap_or(key)
     }
 
-    /// Keeps the offsets of the panels still open.
-    pub fn retain(&mut self, open: impl Fn(&str) -> bool) {
-        self.0.retain(|k, _| open(k));
+    pub fn get(&self, key: &'static str) -> Point<Pixels> {
+        PANEL_OFFSETS.with(|m| m.borrow().get(Self::panel(key)).map(|(x, y)| point(px(*x), px(*y))).unwrap_or_default())
     }
 
     /// Follows a panel drag over `e.bounds` (the graphics area); the
@@ -693,10 +779,24 @@ impl PanelOffsets {
         let d = e.drag(cx);
         let b = e.bounds;
         let at = point(e.event.position.x.clamp(b.left(), b.right()), e.event.position.y.clamp(b.top(), b.bottom()));
-        let last = d.last.get();
+        let last = PANEL_LAST.with(|l| l.replace(e.event.position));
         let from = point(last.x.clamp(b.left(), b.right()), last.y.clamp(b.top(), b.bottom()));
-        d.last.set(e.event.position);
-        *self.0.entry(d.key).or_default() += at - from;
+        let delta = at - from;
+        if delta == Point::default() {
+            return;
+        }
+        PANEL_OFFSETS.with(|m| {
+            let mut m = m.borrow_mut();
+            let o = m.entry(Self::panel(d.key).to_string()).or_default();
+            *o = (o.0 + f32::from(delta.x), o.1 + f32::from(delta.y));
+            let p = crate::files::config_dir().join("panel_positions.json");
+            if let Some(dir) = p.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            if let Ok(t) = serde_json::to_string(&*m) {
+                let _ = std::fs::write(p, t);
+            }
+        });
     }
 }
 
@@ -715,4 +815,63 @@ pub fn nudged_panel(panel: impl IntoElement, offset: Point<Pixels>) -> AnyElemen
         return panel.into_any_element();
     }
     div().relative().left(offset.x).top(offset.y).child(panel).into_any_element()
+}
+
+/// The right panels' width (Configurations, BOM, Variables, ...: live 712 px).
+/// The splitter at their left edge (`div.os-splitter`, `col-resize`, a 4 px
+/// hit zone) narrows them to 235 px or widens them; the width persists.
+pub const RIGHT_PANEL_W: f32 = 712.;
+const RIGHT_PANEL_MIN: f32 = 235.;
+
+thread_local! {
+    static RIGHT_W: std::cell::Cell<f32> = std::cell::Cell::new(
+        std::fs::read_to_string(crate::files::config_dir().join("right_panel_width.txt")).ok().and_then(|t| t.trim().parse::<f32>().ok()).filter(|w| w.is_finite()).unwrap_or(RIGHT_PANEL_W).max(RIGHT_PANEL_MIN),
+    );
+}
+
+pub fn right_panel_w() -> f32 {
+    RIGHT_W.with(|w| w.get())
+}
+
+/// Dragging a right panel's splitter.
+#[derive(Clone)]
+pub struct RightSplitDrag;
+
+impl Render for RightSplitDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// `panel` with its splitter: a 4 px hit zone at its left edge (`panel`
+/// must be positioned). `inset` is what the panel draws left of its content
+/// width (a gutter, a border).
+pub fn right_resizable<E: InteractiveElement + ParentElement>(panel: E, inset: f32) -> E {
+    panel
+        .child(
+            div()
+                .id("right-splitter")
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .left_0()
+                .w(px(4.))
+                .occlude()
+                .cursor(CursorStyle::ResizeColumn)
+                .on_drag(RightSplitDrag, |_, _, _, cx| cx.new(|_| RightSplitDrag)),
+        )
+        .on_drag_move(move |e: &DragMoveEvent<RightSplitDrag>, window, _| {
+            // The panel keeps its right edge; its left edge follows the pointer.
+            let max = (f32::from(window.viewport_size().width) - 400.).max(RIGHT_PANEL_MIN);
+            let w = (f32::from(e.bounds.right() - e.event.position.x) - inset).round().clamp(RIGHT_PANEL_MIN, max);
+            if w != right_panel_w() {
+                RIGHT_W.with(|c| c.set(w));
+                let p = crate::files::config_dir().join("right_panel_width.txt");
+                if let Some(dir) = p.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                let _ = std::fs::write(p, w.to_string());
+                window.refresh();
+            }
+        })
 }

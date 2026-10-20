@@ -195,3 +195,16 @@ impl Drop for NativeTextureHandle {
         unsafe { (self.release)(self.ptr) }
     }
 }
+
+/// NOSHAPE PATCH (agent perf): one line of text rasterized exactly as GPUI
+/// paints it ([`crate::Window::rasterize_text_line`]): an alpha mask (one byte
+/// per pixel) and the device-pixel position of its top-left corner.
+#[derive(Clone, Debug)]
+pub struct TextMask {
+    /// Size of the mask in device pixels.
+    pub size: crate::Size<DevicePixels>,
+    /// Coverage, one byte per pixel, rows top to bottom.
+    pub alpha: Vec<u8>,
+    /// Device-pixel position of the mask's top-left corner.
+    pub origin: crate::Point<DevicePixels>,
+}

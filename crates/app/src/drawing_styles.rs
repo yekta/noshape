@@ -12,6 +12,7 @@ use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::sheet::{ArrowType, FONT_FAMILIES, TextFont};
@@ -156,8 +157,7 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    pub fn render_styles_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
+    pub fn render_styles_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sel = self.styled_selection();
         let hatch = self.selection.iter().find_map(|s| if let Sel::Hatch(id) = s { self.current_sheet().sketch.hatches.iter().find(|h| h.id == *id).cloned() } else { None });
         if sel.is_empty()
@@ -184,10 +184,12 @@ impl DrawingEditor {
         let first = sel[0].clone();
         let own = first.style.clone().map(|b| *b).unwrap_or_default();
         let ed = cx.entity();
-        // A select: label ▾ with (label, checked, edit) items.
-        let select = |id: &'static str, label: String, items: Vec<(String, bool, Edit)>| -> AnyElement {
+        let ink = gpui_kit::rgb(0x333333);
+        // Live 474 (dom/drawing-styles-*): label left, the control at 145 px; a
+        // select is underlined with a ▾; sizes are a number ▾ then the unit.
+        let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Edit)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().small().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).label(label).ghost().small().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_styles(f.clone(), cx))));
@@ -196,23 +198,25 @@ impl DrawingEditor {
             })
             .into_any_element()
         };
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).px(px(12.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child(label)).child(body).into_any_element();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).px(px(12.)).child(div().w(px(122.)).flex_none().text_size(px(13.33)).text_color(ink).child(label)).child(body).into_any_element();
         let st = |f: fn(&mut AnnStyle)| -> Edit {
             std::rc::Rc::new(move |a: &mut Annotation| f(a.style.get_or_insert_with(Default::default)))
         };
         let drawing = |s: String, inherited: bool| if inherited { format!("{s} (Drawing)") } else { s };
         let u = noshape_model::drawing::format::length_units(&self.drawing, &noshape_model::drawing::DimFormat::default());
-        let len = |mm: f64| format!("{} {}", noshape_model::drawing::format::format_number(mm / 1000.0 / u.meters(), Some(4), 4), u.symbol());
-        // Font.
+        let digits = if self.drawing.units_mm { 2 } else { 4 };
+        let num = |mm: f64| noshape_model::drawing::format::format_number(mm / 1000.0 / u.meters(), Some(digits), 4);
+        let unit = |e: AnyElement| h_flex().gap(px(10.)).child(e).child(div().text_size(px(13.33)).text_color(ink).child(u.symbol())).into_any_element();
+        // Font (plain value).
         let font_items: Vec<(String, bool, Edit)> = FONT_FAMILIES
             .iter()
             .map(|f| {
                 let fam = f.to_string();
-                (fam.clone(), own.font.as_ref().is_some_and(|x| x.family == fam), std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).font = Some(TextFont { family: fam.clone(), bold: false, italic: false })) as Edit)
+                (fam.clone(), own.font.as_ref().map_or(fam == "Noto Sans", |x| x.family == fam), std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).font = Some(TextFont { family: fam.clone(), bold: false, italic: false })) as Edit)
             })
             .collect();
-        let font_label = own.font.as_ref().map(|f| f.family.clone()).unwrap_or_else(|| drawing("Noto Sans".into(), true));
-        // Text height and arrowhead: inch / mm presets.
+        let font_label = own.font.as_ref().map(|f| f.family.clone()).unwrap_or_else(|| "Noto Sans".into());
+        // Text height and arrowhead: preset lists, the value shown plain.
         let (base_h, base_arrow) = if dims { (props.dim_text_height, props.dim_arrow) } else { (props.ann_text_height, props.ann_arrow) };
         let presets = |cur: Option<f64>, base: f64, set: fn(&mut AnnStyle, f64)| -> Vec<(String, bool, Edit)> {
             let mut v: Vec<f64> = [2.0, 2.5, 3.0, 3.05, 3.5, 4.0, 4.57, 5.0, 6.0, 7.0].to_vec();
@@ -228,44 +232,71 @@ impl DrawingEditor {
                     } else {
                         std::rc::Rc::new(move |a: &mut Annotation| set(a.style.get_or_insert_with(Default::default), h))
                     };
-                    (drawing(len(h), inherited), cur.map_or(inherited, |c| (c - h).abs() < 1e-6), f)
+                    (num(h), cur.map_or(inherited, |c| (c - h).abs() < 1e-6), f)
                 })
                 .collect()
         };
         let set_height: fn(&mut AnnStyle, f64) = |s, h| s.height = (!h.is_nan()).then_some(h);
         let set_arrow: fn(&mut AnnStyle, f64) = |s, h| s.arrow = (!h.is_nan()).then_some(h);
-        let set_gap: fn(&mut AnnStyle, f64) = |s, h| s.text_gap = (!h.is_nan()).then_some(h);
-        let h_label = own.height.map(len).unwrap_or_else(|| drawing(len(base_h), true));
-        let a_label = own.arrow.map(len).unwrap_or_else(|| drawing(len(base_arrow), true));
-        // Color presets.
-        let colors: Vec<(String, bool, Edit)> = crate::drawing_drawprops::COLORS
+        let h_label = num(own.height.unwrap_or(base_h));
+        let a_label = num(own.arrow.unwrap_or(base_arrow));
+        // Color: the swatch opens the color list.
+        let colors: Vec<MenuEntry> = crate::drawing_drawprops::COLORS
             .iter()
             .map(|(n, c)| {
                 let c = *c;
-                (n.to_string(), own.color == c, std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).color = c) as Edit)
+                MenuEntry::check(*n, own.color == c, move |t, _, cx| t.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).color = c), cx))
             })
             .collect();
-        let color_label = crate::drawing_drawprops::COLORS.iter().find(|x| x.1 == own.color).map(|x| x.0.to_string()).unwrap_or_else(|| "Custom".into());
-        // Arrow type (live: filled, open, open-thin, dot).
+        let c = own.color.unwrap_or([0, 0, 0]);
+        let swatch = {
+            let ed = ed.clone();
+            div()
+                .id("st-color")
+                .size(px(26.))
+                .bg(gpui_kit::rgb(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32))
+                .cursor_pointer()
+                .on_click(move |e, w, cx| open_tool_menu(&colors, &ed, e, w, cx))
+                .into_any_element()
+        };
+        // Arrowhead type: the arrow picker beside the size (live 477).
+        let base_type = if dims { props.dim_arrow_type } else { props.ann_arrow_type };
+        let cur_type = own.arrow_type.unwrap_or(base_type);
+        let glyph = |t: ArrowType| match t {
+            ArrowType::None => " ",
+            ArrowType::Filled => "◄",
+            ArrowType::Unfilled => "◁",
+            ArrowType::Open => "<",
+            ArrowType::Oblique => "/",
+            ArrowType::FilledDot => "•",
+        };
         let arrow_types: Vec<(String, bool, Edit)> = ArrowType::ALL
             .iter()
             .map(|t| {
                 let t = *t;
-                (t.name().to_string(), own.arrow_type == Some(t), std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).arrow_type = Some(t)) as Edit)
+                (format!("{}  {}", glyph(t), t.name()), cur_type == t, std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).arrow_type = Some(t)) as Edit)
             })
             .collect();
-        let base_type = if dims { props.dim_arrow_type } else { props.ann_arrow_type };
-        let type_label = own.arrow_type.map(|t| t.name().to_string()).unwrap_or_else(|| drawing(base_type.name().into(), true));
-        // Live 474: the rows start 14 px under the header.
-        let mut body = v_flex().pt(px(14.))
-            .child(row("Font", select("st-font", font_label, font_items)))
-            .child(row("Text height", select("st-height", h_label, presets(own.height, base_h, set_height))))
-            .child(row("Color", select("st-color", color_label, colors)))
-            .child(row("Arrowhead", h_flex().gap(px(4.)).child(select("st-arrow", a_label, presets(own.arrow, base_arrow, set_arrow))).into_any_element()))
-            .child(row("Arrowhead type", select("st-arrow-type", type_label, arrow_types)));
+        let arrow_picker = {
+            let ed = ed.clone();
+            Button::new("st-arrow-type").ghost().small().dropdown_caret(true).child(div().text_size(px(12.)).text_color(ink).child(format!("—{}", glyph(cur_type)))).os_dropdown_menu("st-arrow-type-dd", true, move |mut m, _, _| {
+                for (l, on, f) in &arrow_types {
+                    let (e, f) = (ed.clone(), f.clone());
+                    m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_styles(f.clone(), cx))));
+                }
+                m
+            })
+            .into_any_element()
+        };
+        let mut body = v_flex()
+            .pt(px(14.))
+            .child(row("Font", select("st-font", font_label, 220., font_items)))
+            .child(row("Text height", unit(select("st-height", h_label, 80., presets(own.height, base_h, set_height)))))
+            .child(row("Color", swatch))
+            .child(row("Arrowhead", h_flex().gap(px(10.)).child(unit(select("st-arrow", a_label, 80., presets(own.arrow, base_arrow, set_arrow)))).child(arrow_picker).into_any_element()));
         if dims {
-            // Text justification: Left, Center, Right, Auto ("(Drawing)" on
-            // the drawing's own value), Text alignment, Text gap.
+            // Text justification keeps "(Drawing)" on the inherited value
+            // (live 474: "Center (Drawing)"); alignment shows plain values.
             let justs: Vec<(String, bool, Edit)> = TextJustify::ALL
                 .iter()
                 .map(|j| {
@@ -282,27 +313,56 @@ impl DrawingEditor {
                 .map(|&(n, v)| {
                     let inherited = v == horiz_base;
                     let f: Edit = if inherited { st(|s| s.horizontal = None) } else { std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).horizontal = Some(v)) };
-                    (drawing(n.into(), inherited), own.horizontal.map_or(inherited, |x| x == v), f)
+                    (n.to_string(), own.horizontal.map_or(inherited, |x| x == v), f)
                 })
                 .collect();
-            let al = match own.horizontal {
-                Some(true) => "Horizontal".to_string(),
-                Some(false) => "Align with dimension line".to_string(),
-                None => drawing(if horiz_base { "Horizontal" } else { "Align with dimension line" }.into(), true),
+            let al = if own.horizontal.unwrap_or(horiz_base) { "Horizontal" } else { "Align with dimension line" }.to_string();
+            // Text gap: a spinbox (type a value, or step it).
+            let gap = own.text_gap.unwrap_or(props.dim_text_gap);
+            let gap_text = num(gap);
+            let fresh = !self.styles_gap.as_ref().is_some_and(|(id, _, _)| *id == first.id);
+            if fresh {
+                let stx = cx.new(|cx| InputState::new(window, cx).default_value(gap_text.clone()));
+                let meters = u.meters();
+                let sub = cx.subscribe(&stx, move |this: &mut Self, stx, ev: &InputEvent, cx| {
+                    if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                        return;
+                    }
+                    if let Ok(v) = stx.read(cx).value().trim().parse::<f64>() {
+                        let mm = (v * meters * 1000.0).max(0.0);
+                        this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).text_gap = Some(mm)), cx);
+                    }
+                });
+                self.styles_gap = Some((first.id, stx, sub));
+            }
+            let gap_input = self.styles_gap.as_ref().map(|g| g.1.clone());
+            let step = if self.drawing.units_mm { 0.25 } else { 0.254 };
+            let stepper = |id: &'static str, glyph: &'static str, d: f64, cx: &mut Context<Self>| {
+                div().id(id).h(px(11.)).w(px(14.)).flex().items_center().justify_center().cursor_pointer().text_size(px(8.)).text_color(ink).child(glyph).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let next = (gap + d).max(0.0);
+                    this.styles_gap = None;
+                    this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.style.get_or_insert_with(Default::default).text_gap = Some(next)), cx);
+                }))
             };
-            let gl = own.text_gap.map(len).unwrap_or_else(|| drawing(len(props.dim_text_gap), true));
+            let spin = h_flex()
+                .w(px(200.))
+                .h(px(26.))
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xdddddd))
+                .children(gap_input.map(|g| div().flex_1().child(Input::new(&g).appearance(false).small())))
+                .child(v_flex().child(stepper("st-gap-up", "▲", step, cx)).child(stepper("st-gap-down", "▼", -step, cx)));
             let broken = !first.unbroken;
             let radial = sel.iter().all(|a| matches!(a.kind, AnnotationKind::RadialDimension { diameter: true, .. }));
             let dim_line = matches!(first.kind, AnnotationKind::RadialDimension { dim_line: true, .. });
             body = body
-                .child(row("Text justification", select("st-just", jl, justs)))
-                .child(row("Text alignment", select("st-align", al, aligns)))
-                .child(row("Text gap", select("st-gap", gl, presets(own.text_gap, props.dim_text_gap, set_gap))))
+                .child(row("Text justification", select("st-just", jl, 220., justs)))
+                .child(row("Text alignment", select("st-align", al, 220., aligns)))
+                .child(row("Text gap", h_flex().gap(px(10.)).child(spin).child(div().text_size(px(13.33)).text_color(ink).child(u.symbol())).into_any_element()))
                 .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(Checkbox::new("st-break").label("Break dimension").checked(broken).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.unbroken = !v), cx);
                 }))))
-                .child(div().h(px(33.)).px(px(10.)).flex().items_center().opacity(if radial { 1.0 } else { 0.4 }).child(Checkbox::new("st-dimline").label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(Checkbox::new("st-dimline").label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     if !radial {
                         return;
                     }

@@ -98,6 +98,13 @@ struct Topo {
 }
 
 /// Evaluation state of one query.
+/// An entity's type and a few points on it (see [`CtxState::snapshots`]).
+#[derive(Clone, Debug)]
+pub struct Snapshot {
+    pub etype: EType,
+    pub points: Vec<DVec3>,
+}
+
 pub struct QueryCx<'a> {
     pub st: &'a CtxState,
     topo: RefCell<HashMap<usize, Arc<Topo>>>,
@@ -460,6 +467,55 @@ impl<'a> QueryCx<'a> {
                 }
             }
         }
+    }
+
+    /// Points on a face, edge or vertex (ends and middle of an edge, an
+    /// inner point of a face).
+    pub fn snapshot(&self, e: &Ent) -> Option<Snapshot> {
+        let etype = entity_type_of(e);
+        let shape = match e {
+            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) => self.shape(e)?,
+            _ => return None,
+        };
+        let points = match etype {
+            EType::Vertex => vec![shape.vertex_point().ok()?],
+            EType::Edge => {
+                let i = shape.edge_info().ok()?;
+                [0.0, 0.5, 1.0].iter().filter_map(|t| shape.point_at(i.first_param + (i.last_param - i.first_param) * t).ok()).collect()
+            }
+            _ => {
+                let [u0, u1, v0, v1] = shape.uv_bounds().ok()?;
+                let p = shape.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()?;
+                vec![shape.project_point(p).ok()?.point]
+            }
+        };
+        Some(Snapshot { etype, points })
+    }
+
+    /// Current entities a tracked entity became: those of its type lying on
+    /// its old points (renamed or merged), or on the old edge between its
+    /// ends (split pieces).
+    fn tracked(&self, snap: &Snapshot) -> Vec<Ent> {
+        const TOL: f64 = 1e-7;
+        let on = |e: &Ent, p: DVec3| self.shape(e).and_then(|s| k::make_vertex(p).ok().and_then(|v| k::distance(&v, &s).ok())).is_some_and(|d| d.distance < TOL);
+        self.all(Some(snap.etype))
+            .into_iter()
+            .filter(|e| {
+                if snap.points.iter().all(|p| on(e, *p)) {
+                    return true;
+                }
+                // A piece of a split straight edge: its middle on the old segment.
+                if snap.etype == EType::Edge && snap.points.len() == 3 {
+                    let (a, b) = (snap.points[0], snap.points[2]);
+                    let straight = ((snap.points[1] - a).cross(b - a)).length() < TOL * (b - a).length().max(1.0);
+                    if straight && let Some(m) = self.snapshot(e).and_then(|s| s.points.get(1).copied()) {
+                        let t = (m - a).dot(b - a) / (b - a).length_squared();
+                        return (0.0..=1.0).contains(&t) && (a + (b - a) * t).distance(m) < TOL;
+                    }
+                }
+                false
+            })
+            .collect()
     }
 
     /// Size used by qLargest / qSmallest: length, area or volume.
@@ -999,7 +1055,21 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         "TRACKING" => {
             let mut out = Vec::new();
             for key in ["subquery1", "subquery2"] {
-                out.extend(eval(i, q, query.get(key))?);
+                let items: Vec<Value> = match query.get(key) {
+                    Value::Array(a, _) => a.iter().cloned().collect(),
+                    Value::Undefined => Vec::new(),
+                    v => vec![v.clone()],
+                };
+                for item in items {
+                    let found = eval(i, q, &item)?;
+                    // Renamed by an operation since: follow its geometry.
+                    if found.is_empty()
+                        && let Some(snap) = item.get("transientId").as_str().and_then(|id| q.st.snapshots.get(&*id))
+                    {
+                        out.extend(q.tracked(snap));
+                    }
+                    out.extend(found);
+                }
             }
             uniq(out)
         }

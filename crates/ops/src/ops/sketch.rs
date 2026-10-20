@@ -548,7 +548,14 @@ fn value_text(v: &Value) -> Result<String, OpError> {
 /// Variables visible to a sketch's dimensions (Part Studio, Variable Studio
 /// and configuration variables at the sketch).
 fn variables_at(od: &mut OpenDoc, tab: TabId) -> Result<std::collections::BTreeMap<String, noshape_units::Quantity>, OpError> {
-    Ok(od.regenerate(tab, None)?.context.variables.clone())
+    // As regeneration layers them: Variable Studio and configuration
+    // variables, then the Part Studio's own.
+    let config = od.current_config(tab)?;
+    let units = od.doc().settings.units;
+    let mut vars = od.regen_options(tab).document_variables;
+    vars.extend(doc::studio(od.doc(), tab)?.configuration.variable_values(&config, &units));
+    vars.extend(od.regenerate(tab, None)?.context.variables.clone());
+    Ok(vars)
 }
 
 fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

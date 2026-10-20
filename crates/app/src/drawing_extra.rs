@@ -176,8 +176,11 @@ impl DrawingEditor {
     }
 
     fn open_sheet_menu(&mut self, i: usize, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        // Live: a right-click adds the row to the selection.
-        if !self.sheet_rows.contains(&i) {
+        // Live: a right-click adds the row to the selection (with the panel
+        // closed, a sheet chip's menu is that sheet's alone).
+        if !self.sheets_open {
+            self.sheet_rows = vec![i];
+        } else if !self.sheet_rows.contains(&i) {
             self.sheet_rows.push(i);
         }
         let entries = if self.sheet_rows.len() > 1 { self.sheet_multi_entries(self.sheet_rows.clone(), cx) } else { self.sheet_entries(i, cx) };
@@ -885,7 +888,7 @@ impl DrawingEditor {
                 if len(sub(c, *a)) < 3.0 {
                     return None;
                 }
-                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: self.datum_dialog_label() }, position: c, ..Default::default() })
+                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: self.datum_dialog_label(), on: self.datum_on }, position: c, ..Default::default() })
             }
             _ => None,
         }
@@ -981,7 +984,14 @@ impl DrawingEditor {
             Tool::Table { kind, view, .. } if matches!(kind, TableTool::Revision | TableTool::Bom | TableTool::CutList) || view.is_some() => {
                 overlay.rect([self.cursor[0] - 90.0, self.cursor[1] - 20.0], self.cursor, true);
             }
-            Tool::Datum { anchor: Some(a) } => overlay.lines.push((vec![*a, self.cursor], true)),
+            Tool::Datum { anchor: Some(a) } if self.datum_on.is_none() => overlay.lines.push((vec![*a, self.cursor], true)),
+            Tool::Datum { anchor: None } => {
+                if let Some((p, _)) = self.datum_attach_at(self.cursor) {
+                    let r = self.tol_mm(7.0);
+                    overlay.tinted.push((vec![[p[0] - r, p[1]], [p[0] + r, p[1]]], [0xdc, 0x28, 0x28, 255], 1.5));
+                    overlay.tinted.push((vec![[p[0], p[1] - r], [p[0], p[1] + r]], [0xdc, 0x28, 0x28, 255], 1.5));
+                }
+            }
             Tool::RevisionCallout { .. } => {
                 let (p, s) = (self.cursor, 8.0);
                 let y0 = p[1] - s * 0.866 / 3.0;
@@ -1147,7 +1157,11 @@ impl DrawingEditor {
                 self.selection = vec![Sel::Table(id)];
             }
             Tool::Datum { anchor: None } => {
-                let p = self.snap_at(c).and_then(|s| self.pick_sheet(&s)).unwrap_or(c);
+                // On a GD&T frame edge or a dimension's lines (the red
+                // crosshair), else on the geometry.
+                let on = self.datum_attach_at(c);
+                self.datum_on = on.map(|o| o.1);
+                let p = on.map(|o| o.0).or_else(|| self.snap_at(c).and_then(|s| self.pick_sheet(&s))).unwrap_or(c);
                 self.tool = Tool::Datum { anchor: Some(p) };
             }
             Tool::Datum { anchor: Some(_) } => {
@@ -1155,6 +1169,7 @@ impl DrawingEditor {
                     self.edit_sheet("Datum", cx, |s| s.annotations.push(a));
                     // Help datum: the tool stays active for more datums.
                     self.tool = Tool::Datum { anchor: None };
+                    self.datum_on = None;
                     self.datum_placed(window, cx);
                 }
             }
@@ -1201,6 +1216,12 @@ impl DrawingEditor {
     }
 
     pub fn extra_start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Option<Drag> {
+        // A snap point of a selected auxiliary view's reference indicator.
+        let aux = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some((*v, self.aux_grip_at(*v, start)?)) } else { None });
+        if let Some((view, grip)) = aux {
+            let orig = self.current_sheet().view(view)?.aux_ref.clone()?;
+            return Some(Drag::AuxIndicator { view, grip, orig });
+        }
         let target = self.built.as_ref()?.picks.get(pick? as usize)?.clone();
         let sheet = self.drawing.sheets.get(self.sheet)?;
         match target {
@@ -1240,6 +1261,11 @@ impl DrawingEditor {
                     return Some(Drag::MoveSectionPoint { view: v, index, orig: sheet.section_points(v)? });
                 }
                 Some(Drag::MoveSectionLine { view: v, start, orig: sheet.view(v)?.kind.clone() })
+            }
+            PickTarget::AuxIndicator(v) => {
+                self.selection = vec![Sel::View(v)];
+                let grip = self.aux_grip_at(v, start)?;
+                Some(Drag::AuxIndicator { view: v, grip, orig: sheet.view(v)?.aux_ref.clone()? })
             }
             PickTarget::DetailCircle(v) => {
                 self.selection = vec![Sel::View(v)];
@@ -1304,6 +1330,7 @@ impl DrawingEditor {
 
     pub fn extra_drag_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
         let c = self.cursor;
+        let aux = if let Drag::AuxIndicator { view, .. } = drag { self.aux_indicator_of(*view) } else { None };
         let mut dr = self.drawing.clone();
         let si = self.sheet;
         let Some(sheet) = dr.sheets.get_mut(si) else { return };
@@ -1400,6 +1427,10 @@ impl DrawingEditor {
                 if let Some(v) = sheet.view_mut(*view) {
                     v.kind = kind;
                 }
+            }
+            Drag::AuxIndicator { view, grip, orig } => {
+                let Some(ind) = aux else { return };
+                Self::drag_aux_grip(sheet, *view, *grip, orig, &ind, c);
             }
             Drag::MoveSectionPoint { view, index, orig } => {
                 let Some(parent) = sheet.parent_of(*view) else { return };
@@ -1783,13 +1814,43 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// A point on a GD&T frame or a dimension's lines under sheet point
+    /// `c` for the Datum tool to sit on.
+    pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], noshape_model::drawing::DatumOn)> {
+        let b = self.built.as_ref()?;
+        let tol = self.tol_mm(5.0);
+        let mut best: Option<(f64, [f64; 2], noshape_model::drawing::DatumOn)> = None;
+        let mut count: std::collections::HashMap<u64, u32> = Default::default();
+        for l in &b.geometry.lines {
+            let Some(PickTarget::Annotation(id)) = b.picks.get(l.pick as usize) else { continue };
+            let line = *count.entry(*id).and_modify(|n| *n += 1).or_insert(0);
+            let ok = self.current_sheet().annotations.iter().find(|a| a.id == *id).is_some_and(|a| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension());
+            if !ok {
+                continue;
+            }
+            let n = l.points.len();
+            for seg in 0..if l.closed && n > 2 { n } else { n.saturating_sub(1) } {
+                let (w0, w1) = (l.points[seg], l.points[(seg + 1) % n]);
+                let d = sub(w1, w0);
+                let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                let t = (((c[0] - w0[0]) * d[0] + (c[1] - w0[1]) * d[1]) / dd).clamp(0.0, 1.0);
+                let q = [w0[0] + d[0] * t, w0[1] + d[1] * t];
+                let dist = len(sub(c, q));
+                if dist < tol && best.as_ref().is_none_or(|b| dist < b.0) {
+                    best = Some((dist, q, noshape_model::drawing::DatumOn { ann: *id, line, seg: seg as u32, t }));
+                }
+            }
+        }
+        best.map(|(_, q, o)| (q, o))
+    }
+
     /// Properties / edit panel of an annotation.
     pub fn open_annotation_panel(&mut self, a: &Annotation, window: &mut Window, cx: &mut Context<Self>) {
         let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|x| x.id == a.id).cloned() else { return };
         match &a.kind {
             AnnotationKind::Gdt { .. } => self.open_gdt_edit(a.id, window, cx),
             AnnotationKind::SurfaceFinish { anchor, value, .. } => self.open_surface_finish_panel(Some(a.id), *anchor, value, window, cx),
-            AnnotationKind::Datum { anchor, label } => {
+            AnnotationKind::Datum { anchor, label, .. } => {
                 let input = self.input(label, window, cx);
                 Self::focus_input(&input, window, cx);
                 self.panel = Some(Panel::Datum { edit: Some(a.id), anchor: *anchor, input });

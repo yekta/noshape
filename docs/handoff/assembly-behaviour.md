@@ -509,22 +509,60 @@ State: run 5's edits were complete (no half-done code found); everything below b
     through `explode_view`), `accept_step_edit`, `cancel_step_edit`, `step_edit_pick`, `render_step_edit`); model
     `ExplodeStep::{name, lines, line_refs, display_name}`; tree, menus and clicks per live 805–826 (see G5).
   - Replace picker = the Insert panel in `picking_replacement` mode (see T5).
-  - **State at the lead's PAUSE (20 Oct, after the OOM reboot):** the GO code is in dc0da0a. Uncommitted
-    since then in assembly_panels.rs (mine, compile-checked before the reboot):
-    `step_edit_activate(k, cx)` replaces the `set_active` closure in `render_step_edit` (fixes E0500), the doc
-    comment moved back onto `render_step_edit`, and line 2871's `red.into()` → `red` (clippy
-    `useless_conversion`). The other hunks in that file (`insert_search_box` taking `&mut App`,
-    `crate::ui::input_with_placeholder` in the search / URL boxes) are another agent's placeholder sweep, not mine.
-    Not done yet: (1) clippy `-p noshape -D warnings` after the 2871 fix: stopped by the reboot / PAUSE, so the
-    app crate is unconfirmed warning-free (clippy on the model crate stops first on someone else's uncommitted
-    `display.rs:50` `chunks_exact_to_as_chunks`; I ran with that lint allowed to reach the app); (2) build
-    (bld.sh) and copy to /tmp/skb/noshape (gone with /tmp); (3) GUI checks on :103 of the three GO items:
-    mate alignment default (bottom → top stacks upright, rim → rim coincide), the Explode step dialog against
-    live 805 (drag opens it, Instances / Specify / Distance / Explode lines / line refs, live preview, ✕ removes a
-    new step, menus, rename, double click), the Replace picker (Insert panel in picking mode, the pick fills the
-    field, ✓ replaces). Xvfb :103 was restarted after the reboot (no app on it). Still open afterwards: the
-    replacement's in-place orange preview and red mates, the picker's four filters, name keeping on replace,
-    the Face tab and reference connector in the Mass dialog.
+  - GUI-verified after RESUME (20 Oct): mate alignment default (a part mated top corner → top corner keeps its
+    orientation, top faces level; connectors whose Z axes oppose stack as before), the Explode step dialog (drag
+    opens it, live preview, ✕ removes a new step, ✓ stores it, menu Edit… / Rename / Delete, rename, double
+    click opens it titled with the step's name, a typed Distance is stored), the Replace picker (the pick fills
+    the field and closes the picker, ✓ replaces and re-points the mates).
+  - Active exploded view row (ui2, live 819): blue medium-weight name and the 5 px bar, no selection fill; a
+    grey tree guide line under the chevron beside its steps.
+  - Standard content tab rebuilt from live 70 / 900–902 (ui2 18:10), `assembly_standard.rs`:
+    - Catalogue (`model/assembly/standard.rs`): live's names ("ANSI inch", "Bolts & screws", "Pins & studs"),
+      every picker alphabetical, the default = the first of each (`default_component`: ANSI inch › Bolts &
+      screws › Countersunk bolts › Countersunk bolt, #10-24, 0.25). ANSI sizes carry the thread ("1/4-20"),
+      ANSI lengths are live's 23 decimals (`INCH_LENGTHS`, bare numbers in inches, `Component::length_m`).
+      New ANSI Countersunk bolt (20 UNC/UNF sizes) with the Head slot option (`countersunkSlotted` script
+      feature, a slot instead of the socket). Spec fields `head_slot`, `material`, `finish` (`MATERIALS` 37,
+      `FINISHES` 7, live's lists); Thread length (2D + 1/4, never longer than the bolt) for components with
+      `thread_length`. `description()` = live's "Countersunk Bolt #10-24 x 0.25 Stainless Steel " (also the
+      BOM Description column). Old documents load through `SpecFile` (ANSI → ANSI inch, "1/4" → "1/4-20",
+      "1 1/4 in" → "1.25").
+    - Panel: hierarchy group 105 px and parameter group 114 px, each scrolling with live's thin always-visible
+      scrollbar (▲ thumb ▼, `std_scrollbar`); 12 px labels in a 90 px column; 181 / 146 px selects with a
+      #d7d7d7 underline (`std_select`); auto-size 26 px icon button (rich tooltip "Auto-size fastener");
+      Part number (read-only #eee, pencil 32×24 with live's tooltip; what it opens is asked live) and
+      Description; our own line drawing of the component (`paint_fastener`, end + side view, 242×105); the
+      141×34 group Insert | Insert closest to selection | Insert furthest from selection with live's rich
+      tooltips, the two stack buttons at 40 % until a planar face with holes is picked. No "Inserted: N" on
+      this tab (live 70).
+    - Picks: while the tab is shown, graphics clicks pre-select faces / edges (`StdPick`, drawn selected);
+      Insert fastens one part in each of their holes; closest puts it against the picked face (what was there
+      moves onto its top face), furthest at the outer end of the stack (under a bolt head). In the Replace
+      picker, Insert picks the component as the replacement.
+    - Icons (ours): `auto-size` redrawn as live's cylinder with a dimension, `stack-closest`,
+      `stack-furthest`, `edit-pencil`.
+    - Asked live (REQUESTS "skb (10-20 standard content…)"): the pencil's dialog, the inserted instance's
+      name, closest / furthest with an existing stack, the Edit standard content dialog, Head slot off, the
+      rows of nuts.
+  - Fixes: the right strip's tooltip stayed at the pointer after the pane docked (the strip now takes a new id
+    when it moves, `rail` / `rail-docked`); torus (fillet ring) and revolved faces offered their centroid with
+    Z sideways, now the centers of their circular edges round the axis (`inference_candidates`, test
+    `torus_face_inferences_lie_on_the_axis`); the view cube and canvas tools were drawn over the dialogs (the
+    replacement picker beside Replace instance reached it), now under them.
+  - Replace instance (live 840–843): the picked replacement is previewed in place before ✓ (`effective()`
+    applies it; `AsmUi::eval_requested` re-evaluates from `render`, which has the Window), mates that no
+    longer resolve go red; ✓ matches mate references against `ReplaceSession::before` (the result from
+    before the preview). Picker filters: live's Parts | Sketches | Surfaces | Flat patterns (our own
+    `flat-pattern` icon). An instance already named after the replacement keeps its name.
+  - Draggable panels (ui's request): Replace instance (its picker moves with it) and Interference detection
+    take ui's shared panel drag (`ui::panel_title` keys `asm-replace` / `asm-interference`, `nudged_panel`):
+    they follow the pointer with the grab cursor. Moved assembly panels now reopen where they were left (the
+    `panels.retain` that forgot closed ones is gone; live remembers each panel's rect). Open: live keeps the
+    rect across sessions and shares it with the Part Studio (same panelId); ours lasts for the open tab.
+  - Still open: the replaced instance's name when the replacement is named differently (asked live), the
+    Face tab and reference connector in the Mass dialog (asked live: REQUESTS "skb (10-20 assembly mass
+    dialog…)"), the Part number pencil (asked live), DIN / ISO / NAS / PEM / SAE classes beyond ours
+    (catalogue subset).
 
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 

@@ -119,7 +119,14 @@ pub struct GpuCache {
     /// Boundary (laminar) edges for "Highlight boundary edges": solid and
     /// dashed-on-top lines, keyed by mesh pointer (`None`: the body has none).
     boundary: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Option<BoundaryLines>)>,
+    /// Mesh parts' section-cap triangle lines, keyed by mesh pointer, for
+    /// the section planes they were cut with (normal xyz and offset bits).
+    caps: HashMap<usize, CapLines>,
 }
+
+/// A mesh part's section-cap lines: the mesh, the section planes (normal xyz
+/// and offset bits) and the uploaded lines (`None`: no cap).
+type CapLines = (std::sync::Weak<noshape_model::display::MeshBuffers>, Vec<[u64; 4]>, Option<LinesHandle>);
 
 /// Boundary edges: solid (visible) and dashed on top (hidden) lines.
 type BoundaryLines = (LinesHandle, LinesHandle);
@@ -219,7 +226,7 @@ pub struct BuiltScene {
 
 const EDGE_COLOR: u32 = theme::viewport::EDGE;
 /// Mesh parts' triangle lines (live G35, part-studio/551).
-const MESH_LINE_COLOR: u32 = 0x464646;
+pub const MESH_LINE_COLOR: u32 = 0x464646;
 
 /// Pick base of display-only bodies: beyond any scene's pick ids.
 const DISPLAY_ONLY_PICK_BASE: u32 = 1 << 30;
@@ -235,6 +242,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.caps.retain(|_, (w, _, _)| w.strong_count() > 0);
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         let key = Arc::as_ptr(&b.mesh) as usize;
         let cached = match cache.bodies.get(&key) {
@@ -246,6 +254,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
         };
         let display_only = opts.display_only.contains(&b.id);
+        // A mesh part cut by the section view: plain caps with triangle lines.
+        let mesh_cap = cached.mesh_lines.is_some() && !opts.section.is_empty() && !opts.section_skip.contains(&b.id);
         let first_instance = scene.instances.len();
         // Display-only bodies get pick ids past the highlight states (so no
         // state ever applies to them) and draw unpickable.
@@ -301,6 +311,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
             };
             let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
+            let mesh = if mesh_cap { mesh.plain_cap() } else { mesh };
             // Parts excluded from the section view are not cut.
             scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
         }
@@ -315,6 +326,30 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
             let l = Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().line_scale(opts.graphics.line_width).layer(1);
             scene.instances.push(if opts.section_skip.contains(&b.id) { l.ignore_clip() } else { l });
+        }
+        // Its section caps' triangle lines (live G35-retry, part-studio/673),
+        // on the caps: clipped to them already, so not by the planes.
+        if mesh_cap && opts.display_mode != DisplayMode::Shaded {
+            let planes: Vec<[u64; 4]> = opts.section.iter().map(|(n, d)| [n.x.to_bits(), n.y.to_bits(), n.z.to_bits(), d.to_bits()]).collect();
+            let lines = match cache.caps.get(&key).filter(|c| c.1 == planes) {
+                Some(c) => c.2.clone(),
+                None => {
+                    let cap = b.mesh.section_cap_lines(&opts.section);
+                    let l = (!cap.is_empty()).then(|| {
+                        let mut l = LineData::default();
+                        l.segments.reserve(cap.len() / 2);
+                        for s in cap.as_chunks::<2>().0 {
+                            l.push_polyline(s, [0, 0, 0, 255], 0, 1.0, 0);
+                        }
+                        up.upload_lines(&l)
+                    });
+                    cache.caps.insert(key, (Arc::downgrade(&b.mesh), planes, l.clone()));
+                    l
+                }
+            };
+            if let Some(l) = lines {
+                scene.instances.push(Instance::new(Drawable::Lines(l)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().ignore_clip().line_scale(opts.graphics.line_width).layer(1));
+            }
         }
         let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
         let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
@@ -789,7 +824,7 @@ fn laminar_edges(m: &noshape_model::display::MeshBuffers) -> Vec<bool> {
 /// The edges bounding a body face: those whose polyline points are all
 /// vertices of the face's triangles (the mesher shares edge points with the
 /// faces it bounds).
-pub(crate) fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
+pub fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
     let Some((body, fi)) = display.bodies.iter().filter(|b| !b.hidden).find_map(|b| b.face_refs.iter().position(|f| f == r).map(|i| (b, i))) else { return Vec::new() };
     let m = &body.mesh;
     let Some(&(first, count)) = m.face_ranges.get(fi) else { return Vec::new() };

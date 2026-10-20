@@ -648,7 +648,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, window: &mut 
             });
             if let (Ok(v), true) = (r, edit) {
                 let doc = doc.clone();
-                window.defer(cx, move |window, cx| open_version_properties(doc, v, window, cx));
+                window.defer(cx, move |window, cx| crate::version_properties::open(doc, crate::version_properties::Item::Version(v), window, cx));
             }
             true
         })
@@ -702,10 +702,12 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
     let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("B{n}")));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
     let open = Rc::new(std::cell::Cell::new(true));
+    // "Create workspace and edit properties": open the new workspace's Properties.
+    let edit_after = Rc::new(std::cell::Cell::new(false));
     let create: CreateFn = {
-        let (doc, name, open) = (doc.clone(), name.clone(), open.clone());
+        let (doc, name, desc, open, edit_after) = (doc.clone(), name.clone(), desc.clone(), open.clone(), edit_after.clone());
         let done = std::cell::Cell::new(false);
-        Rc::new(move |_, cx| {
+        Rc::new(move |window, cx| {
             let n = name.read(cx).value().trim().to_string();
             if n.is_empty() {
                 return false;
@@ -715,11 +717,22 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
                 return true;
             }
             let switch = open.get();
-            let r = doc.update(cx, |doc, _| if switch { doc.session.branch_from(from, &n).map(|_| ()) } else { doc.session.store.create_branch(from, &n).map(|_| ()).map_err(Into::into) });
-            doc.update(cx, |doc, cx| match r {
-                Ok(()) => doc.reloaded(cx),
+            let d = desc.read(cx).value().to_string();
+            let r = doc.update(cx, |doc, _| {
+                let b = if switch { doc.session.branch_from(from, &n)? } else { doc.session.store.create_branch(from, &n)? };
+                if !d.is_empty() {
+                    doc.session.store.set_meta(&format!("{}{b}", crate::version_properties::WORKSPACE_DESCRIPTION_KEY), Some(d.as_bytes()))?;
+                }
+                anyhow::Ok(b)
+            });
+            doc.update(cx, |doc, cx| match &r {
+                Ok(_) => doc.reloaded(cx),
                 Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
             });
+            if let (Ok(b), true) = (r, edit_after.get()) {
+                let doc = doc.clone();
+                window.defer(cx, move |window, cx| crate::version_properties::open(doc, crate::version_properties::Item::Workspace(b), window, cx));
+            }
             true
         })
     };
@@ -739,10 +752,21 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
         let open = open.clone();
+        let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, "", 950.)
             .title(version_dialog_title("Create workspace from", &from_name))
             .child(version_dialog_body(&name, &desc, Some(open)))
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Create"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .footer(
+                os::modal_footer()
+                    .child(os::modal_ok(os::primary_button("ok", "Create")))
+                    .child(os::cancel_button("create-edit", "Create workspace and edit properties", cx).on_click(move |_, window, cx| {
+                        edit_after.set(true);
+                        if create2(window, cx) {
+                            window.close_dialog(cx);
+                        }
+                    }))
+                    .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
+            )
             .on_ok(move |_, window, cx| create(window, cx))
     });
     window.defer(cx, move |window, cx| {
@@ -755,17 +779,21 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
 
 /// "Create version from **Main**": a gray 18 px lead-in, the name 500.
 fn version_dialog_title(lead: &str, name: &str) -> AnyElement {
+    version_dialog_title_w(lead, name, 950.)
+}
+
+fn version_dialog_title_w(lead: &str, name: &str, width: f32) -> AnyElement {
     let pal = p();
     h_flex()
-        .w(px(948.))
+        .w(px(width - 2.))
         .h(px(48.))
         .pl(px(10.))
         .pr(px(12.))
         .gap(px(6.))
         .border_b_1()
         .border_color(rgb(os::MODAL_DIVIDER))
-        .child(div().text_size(px(18.)).text_color(pal.text_muted).child(lead.to_string()))
-        .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name.to_string()))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child(lead.to_string()))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name.to_string()))
         .child(div().flex_1())
         .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
         .into_any_element()
@@ -783,9 +811,9 @@ fn version_dialog_title_in(doc_name: &str, workspace: &str) -> AnyElement {
         .gap(px(6.))
         .border_b_1()
         .border_color(rgb(os::MODAL_DIVIDER))
-        .child(div().text_size(px(18.)).text_color(pal.text_muted).child("Create version in"))
-        .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(doc_name.to_string()))
-        .child(div().text_size(px(16.)).text_color(pal.text_muted).child(workspace.to_string()))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child("Create version in"))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(doc_name.to_string()))
+        .child(div().text_size(px(16.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child(workspace.to_string()))
         .child(div().flex_1())
         .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
         .into_any_element()
@@ -816,45 +844,55 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-/// Version row › Properties… (and "Create version and edit properties"):
-/// the version's name and description.
-pub fn open_version_properties(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
-    let Ok(info) = doc.read(cx).session.store.version(id) else { return };
-    let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(info.name.clone()));
-    let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description").default_value(info.description.clone()));
-    window.open_dialog(cx, move |dialog, _, cx| {
-        let (doc, name2, desc2) = (doc.clone(), name.clone(), desc.clone());
-        os::modal(dialog, "", 950.)
-            .title(version_dialog_title("Properties", &info.name))
-            .child(version_dialog_body(&name, &desc, None))
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
-            .on_ok(move |_, _, cx| {
-                let (n, d) = (name2.read(cx).value().to_string(), desc2.read(cx).value().to_string());
-                let r = doc.update(cx, |doc, _| doc.session.store.update_version(id, &n, &d));
-                doc.update(cx, |doc, cx| match r {
-                    Ok(()) => doc.reloaded(cx),
-                    Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
-                });
-                true
-            })
-    });
-}
-
-/// Version row › Publish FeatureScript…: publish (or unpublish) the
-/// version's custom features and tables.
+/// Version row › Publish FeatureScript… (live document/74): "Publish
+/// custom features and tables at **V3**", the requirements with a green ✓
+/// or red ✗ each, and the Publish button enabled once all are met.
+/// ("Document is public" is a cloud sharing state and is not listed.)
 fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, window: &mut Window, cx: &mut App) {
     let key = format!("{PUBLISHED_FS_KEY}{id}");
-    let on = Rc::new(std::cell::Cell::new(doc.read(cx).session.store.get_meta(&key).ok().flatten().is_some()));
-    let name = doc.read(cx).session.store.version(id).map(|v| v.name).unwrap_or_default();
+    let Ok(info) = doc.read(cx).session.store.version(id) else { return };
+    let checks = doc.read(cx).session.store.read_all(info.microversion).ok().and_then(|b| noshape_model::document::Document::from_blobs(&b).ok()).map(|d| publish_checklist(&d)).unwrap_or_default();
+    // Compiling the version's studios replaced the current ones' cached results.
+    let _ = doc.read(cx).custom_features();
+    let ready = !checks.is_empty() && checks.iter().all(|(_, ok)| *ok);
     window.open_dialog(cx, move |dialog, _, cx| {
-        let (doc, key, on2) = (doc.clone(), key.clone(), on.clone());
-        os::modal(dialog, "", 950.)
-            .title(version_dialog_title("Publish FeatureScript", &name))
-            .child(publish_row(on.clone(), cx))
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Save"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+        let (doc, key) = (doc.clone(), key.clone());
+        let pal = p();
+        let rows = checks.iter().map(|(text, ok)| {
+            let mark = if *ok {
+                div().size(px(16.)).flex_none().text_color(rgb(0x009400)).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CHECK_BOLD).size(px(16.)))
+            } else {
+                div().size(px(16.)).flex_none().flex().items_center().justify_center().text_color(rgb(0xbd3039)).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CROSS_BOLD).size(px(10.)))
+            };
+            h_flex().h(px(22.)).gap(px(4.)).child(mark).child(div().child(*text))
+        });
+        os::modal(dialog, "", 598.)
+            .title(version_dialog_title_w("Publish custom features and tables at", &info.name, 598.))
+            .child(
+                v_flex()
+                    .px(px(15.))
+                    // The kit leaves 8 px under the title.
+                    .pt(px(4.))
+                    .pb(px(9.))
+                    .text_size(px(14.))
+                    .line_height(px(21.))
+                    .text_color(pal.text)
+                    .child(div().child("Allow searches for published FeatureScript to find custom features and tables defined in this version"))
+                    .child(v_flex().mt(px(9.)).pl(px(7.)).child(div().h(px(22.)).pl(px(3.)).font_weight(FontWeight::BOLD).child("Requirements to publish:")).children(rows)),
+            )
+            .footer(
+                os::modal_footer()
+                    .child(div().size(px(16.)).flex_none().child(crate::assets::icon("help-faint", 16., cx)))
+                    .child(div().flex_1())
+                    // Live's disabled primary is the blue at 40 % (162,185,223); `on_ok` ignores it.
+                    .child(os::modal_ok(div().when(!ready, |d| d.opacity(0.4)).child(os::primary_button("ok", "Publish custom features and tables"))))
+                    .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
+            )
             .on_ok(move |_, _, cx| {
-                let v: Option<&[u8]> = if on2.get() { Some(b"1") } else { None };
-                let r = doc.update(cx, |doc, _| doc.session.store.set_meta(&key, v));
+                if !ready {
+                    return false;
+                }
+                let r = doc.update(cx, |doc, _| doc.session.store.set_meta(&key, Some(b"1")));
                 if let Err(e) = r {
                     doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
                 }
@@ -863,12 +901,30 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
     });
 }
 
+/// The Publish FeatureScript requirements for a document (at a version),
+/// in Onshape's order.
+fn publish_checklist(doc: &noshape_model::document::Document) -> Vec<(&'static str, bool)> {
+    use noshape_model::custom::studio::Severity;
+    let scripts = noshape_model::custom::DocumentScripts::from_document(doc);
+    let studios: Vec<_> = scripts.studios().map(|(_, _, c)| c.clone()).collect();
+    let features: Vec<_> = studios.iter().flat_map(|c| c.features.iter()).collect();
+    let used = |type_id: &str| doc.tabs.iter().any(|t| matches!(&t.content, TabContent::PartStudio(ps) if ps.features.iter().any(|f| f.type_id == type_id)));
+    vec![
+        ("Document must define at least one custom feature or table", studios.iter().any(|c| !c.features.is_empty() || !c.tables.is_empty())),
+        ("Document contains a PDF", doc.tabs.iter().any(|t| matches!(&t.content, TabContent::File(f) if f.kind() == noshape_model::file_tab::FileKind::Pdf))),
+        ("Feature Studios contain no FeatureScript errors or warnings", studios.iter().all(|c| c.diagnostics.iter().all(|d| !matches!(d.severity, Severity::Error | Severity::Warning)))),
+        ("All custom features have descriptions", features.iter().all(|f| !f.description.trim().is_empty())),
+        ("All custom features are used in at least one Part Studio", features.iter().all(|f| used(&f.type_id))),
+        ("All Feature Studios are committed.", doc.tabs.iter().all(|t| !matches!(&t.content, TabContent::FeatureStudio(f) if f.has_uncommitted()))),
+    ]
+}
+
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
     os::modal_body()
         .gap(px(10.))
-        .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(Input::new(name).h(px(34.)).text_size(px(14.)))))
+        .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(Input::new(name), 34.).text_size(px(14.)))))
         .child(v_flex().gap(px(2.)).child(h_flex().gap(px(8.)).child(label("Description:")).child(div().text_size(px(14.)).child("(Maximum of 10000 characters)"))).child(Textarea::new(desc).h(px(96.)).text_size(px(14.))))
         .when_some(open, |d, open| {
             d.child(
@@ -975,7 +1031,7 @@ impl Render for HistoryPanel {
                 let pt = |x: f32, y: f32| point(o.x + px(x), o.y + px(y));
                 let color = |l: usize| rgb(LANES[l % LANES.len()]);
                 for &(l, a, b) in &segs {
-                    let mut pb = PathBuilder::stroke(px(3.));
+                    let mut pb = PathBuilder::stroke(px(4.));
                     pb.move_to(pt(lane_x(l), a));
                     pb.line_to(pt(lane_x(l), b));
                     if let Ok(path) = pb.build() {
@@ -985,7 +1041,7 @@ impl Render for HistoryPanel {
                 for &(l, parent, from_y, to_y) in &forks {
                     let (x0, x1) = (lane_x(l), lane_x(parent));
                     let mid = (to_y - 13.).max(from_y);
-                    let mut pb = PathBuilder::stroke(px(3.));
+                    let mut pb = PathBuilder::stroke(px(4.));
                     pb.move_to(pt(x0, from_y));
                     pb.line_to(pt(x0, (mid - 22.).max(from_y)));
                     pb.cubic_bezier_to(pt(x1, mid), pt(x0, mid - 8.), pt(x1, mid - 14.));
@@ -1019,12 +1075,13 @@ impl Render for HistoryPanel {
                     match kind {
                         RowKind::Workspace(_) => {
                             let mut f = PathBuilder::fill();
-                            f.add_polygon(&circle(c, 6.5), true);
+                            // Live 22: a 7 px ring, 3 px thick.
+                            f.add_polygon(&circle(c, 7.), true);
                             if let Ok(path) = f.build() {
                                 window.paint_path(path, color(l));
                             }
                             let mut f = PathBuilder::fill();
-                            f.add_polygon(&circle(c, 4.5), true);
+                            f.add_polygon(&circle(c, 4.), true);
                             if let Ok(path) = f.build() {
                                 window.paint_path(path, rgb(0xffffff));
                             }
@@ -1036,10 +1093,23 @@ impl Render for HistoryPanel {
                                 window.paint_path(path, color(l));
                             }
                         }
+                        // Live 22: Start is a filled dot with a stub down to a
+                        // 12 px bar 8 px below it.
                         RowKind::Start => {
+                            let mut f = PathBuilder::fill();
+                            f.add_polygon(&circle(c, 4.5), true);
+                            if let Ok(path) = f.build() {
+                                window.paint_path(path, color(l));
+                            }
+                            let mut pb = PathBuilder::stroke(px(4.));
+                            pb.move_to(c);
+                            pb.line_to(point(c.x, c.y + px(8.)));
+                            if let Ok(path) = pb.build() {
+                                window.paint_path(path, color(l));
+                            }
                             let mut pb = PathBuilder::stroke(px(2.5));
-                            pb.move_to(point(c.x - px(6.), c.y));
-                            pb.line_to(point(c.x + px(6.), c.y));
+                            pb.move_to(point(c.x - px(6.), c.y + px(8.)));
+                            pb.line_to(point(c.x + px(6.), c.y + px(8.)));
                             if let Ok(path) = pb.build() {
                                 window.paint_path(path, color(l));
                             }
@@ -1164,11 +1234,8 @@ impl Render for HistoryPanel {
                 match kind {
                     RowKind::Workspace(b) => {
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
-                        if b != current_branch {
-                            m.item(crate::os_menu::OsMenuItem::new(format!("Merge into {cur1}…")).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx))))
-                        } else {
-                            m
-                        }
+                        let m = if b != current_branch { m.item(crate::os_menu::OsMenuItem::new(format!("Merge into {cur1}…")).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx)))) } else { m };
+                        m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Workspace(b), window, cx)))
                     }
                     _ => {
                         let m = m
@@ -1178,7 +1245,7 @@ impl Render for HistoryPanel {
                             .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx))));
                         match version_id {
                             Some(id) => {
-                                let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| open_version_properties(d5.clone(), id, window, cx)));
+                                let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Version(id), window, cx)));
                                 releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
                             }
                             None => releases(m, window, cx),

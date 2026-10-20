@@ -183,6 +183,9 @@ pub(crate) struct ReplaceSession {
     pub all: bool,
     pub replacement: Option<(InstanceSource, String)>,
     pub picking: bool,
+    /// The result before the replacement was previewed (the old geometry
+    /// that ✓ matches mate references against).
+    pub before: Option<Arc<AssemblyResult>>,
 }
 
 fn section(label: &str) -> Div {
@@ -704,7 +707,7 @@ impl AssemblyView {
                         set(this, e.position.x, cx);
                     }))
                     .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                        if e.pressed_button == Some(MouseButton::Left) {
+                        if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
                             set2(this, e.position.x, cx);
                         }
                     })),
@@ -1565,7 +1568,7 @@ impl AssemblyView {
                 .text_color(blue)
                 .child("Exploded views"),
         );
-        let mut pane = v_flex().id("ex-pane").w(px(712.)).h_full().occlude().bg(rgb(0xffffff)).text_color(rgb(0x333333)).child(title);
+        let mut pane = crate::ui::right_resizable(v_flex().id("ex-pane").relative(), 0.).w(px(crate::ui::right_panel_w())).h_full().occlude().bg(rgb(0xffffff)).text_color(rgb(0x333333)).child(title);
         if views.is_empty() {
             // Zero state: the button, an illustration and the how-to.
             pane = pane.child(
@@ -1935,14 +1938,16 @@ impl AssemblyView {
     /// field is simply empty and active; live 833).
     pub(super) fn open_replace_with(&mut self, instances: Vec<InstanceId>, cx: &mut Context<Self>) {
         self.selected = instances.clone();
-        self.replace_panel = Some(ReplaceSession { instances, all: false, replacement: None, picking: false });
+        self.replace_panel = Some(ReplaceSession { instances, all: false, replacement: None, picking: false, before: None });
         self.update_capture(cx);
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
     pub(super) fn close_replace(&mut self, cx: &mut Context<Self>) {
-        if self.replace_panel.take().is_some() {
+        if let Some(s) = self.replace_panel.take() {
+            // The preview goes with the dialog.
+            self.ui.eval_requested |= s.replacement.is_some();
             self.selected.clear();
             self.update_capture(cx);
             self.refresh_scene(false, cx);
@@ -1960,6 +1965,7 @@ impl AssemblyView {
             None => s.instances.push(id),
         }
         self.selected = s.instances.clone();
+        self.ui.eval_requested |= s.replacement.is_some();
         self.refresh_scene(false, cx);
         cx.notify();
     }
@@ -1972,9 +1978,12 @@ impl AssemblyView {
     /// A picker item clicked: it becomes the replacement and the picker
     /// closes (live 842). False when the picker isn't open (an insert).
     pub(super) fn pick_replacement(&mut self, source: InstanceSource, name: String, cx: &mut Context<Self>) -> bool {
+        let current = self.result.clone();
         let Some(s) = self.replace_panel.as_mut().filter(|s| s.picking) else { return false };
+        s.before.get_or_insert(current);
         s.replacement = Some((source, name));
         s.picking = false;
+        self.ui.eval_requested = true;
         cx.notify();
         true
     }
@@ -1988,9 +1997,10 @@ impl AssemblyView {
             return;
         }
         let (ids, all) = (s.instances.clone(), s.all);
+        let before = s.before.clone().unwrap_or_else(|| self.result.clone());
         self.replace_panel = None;
         for id in ids {
-            self.replace_with_matching(id, all, source.clone(), base.clone(), cx);
+            self.replace_with_matching(id, all, source.clone(), base.clone(), before.clone(), cx);
         }
         self.selected.clear();
         self.update_capture(cx);
@@ -2070,7 +2080,7 @@ impl AssemblyView {
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if missing { red } else { pal.text }).child("Replace instance"))
+                    .child(crate::ui::panel_title("asm-replace", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if missing { red } else { pal.text }).child("Replace instance")))
                     .child(
                         div()
                             .id("rep-ok")
@@ -2103,6 +2113,7 @@ impl AssemblyView {
             .child(crate::os_ui::checkbox("rep-all", "Replace all instances", all).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.replace_panel {
                     s.all = !s.all;
+                    this.ui.eval_requested |= s.replacement.is_some();
                 }
                 cx.notify();
             })))
@@ -2909,8 +2920,7 @@ impl AssemblyView {
 
     /// Replace instances, then re-point mates whose geometry names do not
     /// exist on the replacement to geometrically matching faces / edges.
-    pub(super) fn replace_with_matching(&mut self, id: InstanceId, all: bool, source: InstanceSource, base: String, cx: &mut Context<Self>) {
-        let old = self.result.clone();
+    pub(super) fn replace_with_matching(&mut self, id: InstanceId, all: bool, source: InstanceSource, base: String, old: Arc<AssemblyResult>, cx: &mut Context<Self>) {
         let evaluator = self.evaluator.clone();
         let doc = self.doc.read(cx).session.doc.clone();
         let (studio, body, config) = match &source {

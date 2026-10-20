@@ -54,7 +54,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "edit",
             summary: "Change a feature's parameters or name (what Edit and accepting its dialog does)",
-            description: "Only the given parameters change. Configured parameters go to the active (default) configuration's value, as in the dialog.",
+            description: "Only the given parameters change. Configured parameters go to the active configuration's value (config_activate), as in the dialog.",
             fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("params", json!({ "type": "object" }), PARAMS_DOC), opt("name", s(), "New name.")],
             mutates: true,
             destructive: false,
@@ -260,7 +260,8 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = feature_arg(ps, a, "feature")?;
     let index = ps.index_of(id).expect("found");
     // The dialog edits the active configuration's values.
-    let config = ps.configuration.defaults();
+    let config = od.current_config(tab)?;
+    let ps = doc::studio(od.doc(), tab)?;
     let mut feature = ps.configuration.for_editing(&ps.features[index], &config);
     let ty = feature.feature_type().ok_or_else(|| OpError::invalid(format!("feature type `{}` is not available", feature.type_id)))?;
     if let Some(params) = a.object("params")? {
@@ -380,7 +381,7 @@ fn set_visibility(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let t = studio::visibility_targets(
         &targets,
         |f| r.display.bodies.iter().filter(|b| b.id.feature == f).map(|b| b.id.clone()).collect(),
-        |rf| crate::ops::query::body_of(&r.display, rf),
+        |rf| crate::studio::body_of(&r.display, rf),
     );
     if t.is_empty() {
         return Err(OpError::param("targets", "nothing to hide or show"));

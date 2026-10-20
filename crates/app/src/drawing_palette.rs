@@ -59,6 +59,8 @@ pub struct PaletteDlg {
     pub tol: &'static str,
     /// The value shown when the palette opened (unchanged: no override).
     value_text: String,
+    /// Where it opened (editor px); it stays there while the text changes.
+    at: Option<[f32; 2]>,
     pub orig: Annotation,
     pub cur: Annotation,
     _subs: Vec<Subscription>,
@@ -131,7 +133,7 @@ impl DrawingEditor {
             }));
         }
         let tol = tol_name(&a);
-        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, value_text, orig: a.clone(), cur: a, _subs: subs });
+        self.palette = Some(PaletteDlg { id, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, value_text, at: None, orig: a.clone(), cur: a, _subs: subs });
         self.tool = Tool::Select;
         cx.notify();
     }
@@ -236,7 +238,13 @@ impl DrawingEditor {
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
-        let at = self.palette_at(d.id);
+        let at = d.at.unwrap_or_else(|| self.palette_at(d.id));
+        if d.at.is_none()
+            && let Some(p) = &mut self.palette
+        {
+            p.at = Some(at);
+        }
+        let d = self.palette.as_ref()?;
         let hole = d.hole;
         let opts = d.cur.hole.as_deref().cloned().unwrap_or_default();
         let fmt = d.cur.format.clone();
@@ -258,7 +266,13 @@ impl DrawingEditor {
                 .border_color(if on { gpui_kit::rgba(0x52a8eccc) } else { gpui_kit::rgba(0xccccccff) })
                 .when(on, |e| e.shadow(vec![BoxShadow { color: hsla(206. / 360., 0.81, 0.62, 0.6), offset: point(px(0.), px(0.)), blur_radius: px(8.), spread_radius: px(0.), inset: false }]))
                 .rounded(px(4.))
-                .bg(gpui_kit::white()).flex().items_center().px(px(3.)).child(Input::new(st).text_size(px(14.)).appearance(false).xsmall());
+                .bg(gpui_kit::white())
+                .flex()
+                .items_center()
+                .px(px(3.))
+                // Live: the text fields are 14 px `#555` (dom/drawing-dimension-edit-dialog.txt).
+                .text_color(gpui_kit::rgb(0x555555))
+                .child(Input::new(st).text_size(px(14.)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall());
             match w {
                 Some(w) => b.w(px(w)),
                 None => b.w_full(),
@@ -550,6 +564,13 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-dim-palette")
+                // Esc in any of its fields puts the annotation back.
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        this.close_palette(false, cx);
+                        cx.stop_propagation();
+                    }
+                }))
                 .absolute()
                 .left(px(at[0]))
                 .top(px(at[1]))

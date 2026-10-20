@@ -3,6 +3,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod actions;
+mod std_source;
 mod assembly_mate_dialog;
 mod assembly_scene;
 mod assembly_view;
@@ -79,15 +80,19 @@ mod select_item;
 mod fs_import;
 mod fs_search;
 mod import_dialog;
+mod isolate_ui;
 mod material_library_view;
 mod files;
 mod gpu;
 mod graphics_prefs;
 mod graphics_prefs_dialog;
 mod history_panel;
+mod version_properties;
+mod units_prefs;
 mod doc_panels;
 mod cursor;
 mod mouse_prefs;
+mod drawing_prefs;
 mod navigation;
 mod os_menu;
 mod os_select;
@@ -109,6 +114,7 @@ mod tab_manager;
 mod tab_thumbs;
 mod theme;
 mod tool_text;
+mod toolbar_customize;
 mod touch;
 mod ui;
 mod var_complete;

@@ -13,3 +13,5 @@ pub use wgpu_context::*;
 ))]
 pub use wgpu_renderer::WgpuHeadlessRenderer;
 pub use wgpu_renderer::{GpuContext, WgpuRenderer, WgpuSurfaceConfig};
+// NOSHAPE PATCH (agent perf)
+pub use wgpu_renderer::text_shading;

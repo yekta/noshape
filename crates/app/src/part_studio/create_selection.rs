@@ -122,7 +122,7 @@ impl PartStudioView {
     /// with the field).
     pub(super) fn open_create_selection_for_field(&mut self, field: String, cx: &mut Context<Self>) {
         let origin = self.ui.dialog_pos.unwrap_or(point(px(0.), px(3.)));
-        let width = self.ui.dialog_size.map(|s| s.width).unwrap_or(px(220.));
+        let width = self.ui.dialog_width.unwrap_or(px(220.));
         self.open_create_selection(point(origin.x + width + px(4.), origin.y + px(97.)), CsTarget::Field(field), cx);
     }
 

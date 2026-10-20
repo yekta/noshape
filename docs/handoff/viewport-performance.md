@@ -205,3 +205,21 @@ sketch labels, shown dimensions, hole callouts, analysis-tool marks, manipulator
 (`view_cube`, `cube_shapes`, label/axis computation) into overlay builders, and to drop the plane-name
 `paint_paths` from `render_viewport_underlay`; their slices then stop observing the viewport for camera
 changes. I write the renderer part first (my files) and show crops before touching theirs.
+- **2026-10-20 21:40 (perf)** Gates per the lead (a–d) in perf.yml + analyze.py; perf.yml can build any ref
+  from source (`-f ref=…`; Windows builds in PowerShell). GPU time per frame from wgpu timestamp queries
+  (`r.gpu_ms`, "GPU per frame" in BENCH SUMMARY): works on Vulkan (lavapipe); **the macOS runners' paravirtual
+  Metal device has no timestamp queries**, so the GPU gate is skipped there.
+  macOS runner, release builds, GPUI phases per orbit frame: request_layout 0.24 ms, **prepaint 5.1 ms**,
+  paint 1.1 ms, present 0.3 ms. Runner fps is bimodal (15–16 or 27–28 fps, 2 or 4 refreshes per frame) in
+  the same build (v0.4.2 shows both; main built from source and perf-dev both ~16): not a usable gate.
+- **Item 4 (approved 20:00):** `crates/render/src/overlay.rs` (view cube geometry moved from view_cube.rs and
+  shared with its hit testing; per-frame build from the frame's camera; lyon tessellation like GPUI's
+  `PathBuilder`), `overlay_gpu.rs` + `overlay.wgsl` (4x MSAA UNORM layer, premultiplied gamma-space blending,
+  composited after AO; X/Y/Z masks from `Window::rasterize_text_line`, a gpui-pre patch mirroring
+  `paint_line`/`paint_glyph`, with GPUI's 4 x-sub-pixel variants and Linux text gamma from gpui-pre-wgpu
+  `text_shading()`). Behind `NOSHAPE_OVERLAY=wgpu` until the lead approves the crops; then camera moves
+  are present-only when the owner reports nothing else following the camera
+  (`Viewport::set_ui_follows_camera`; Part Studio: sketch, dialog, shown dims, analysis tool, section).
+  First crops (demo, Xvfb): plane names identical (0 px at 1x, 1 px at 2x); cube ≤0.84% of pixels differ
+  (sub-pixel widget offset + label placement), fixed by using GPUI's own widget position
+  (`CubeHooks::placed`) and GPUI's glyph quantization; re-measuring.

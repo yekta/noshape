@@ -474,3 +474,17 @@ Next: RIP joints, corners & bend reliefs (live probes), std Flange/Hem/Tab (thei
   the export line) — not done. (3) Sheet metal next steps (see Status above): RIP joints, corners / bend reliefs
   (need live probes), std Flange/Hem/Tab internals, flat ops, `ctx.sheet_metal` for std-made parts.
 - /tmp/fs-backup recreated (b<MMDDHHMM>) with my current files; plan text lives in this file (section above).
+
+## Resumed (20 Oct ~21:00)
+- Verified on :108: ctrl+click → definition (other → 9:10, helper → 4:10, as live 14:10), ctrl+[ back, ▾ back /
+  forward menus ("<tab>: Use - name" / "Symbol - name", most recent first). Added: the caret before a ctrl+click
+  is recorded first (live list order). New: ctrl+click on a std symbol → `crate::std_source` builds
+  <config>/std-3095/std.noshape (one Feature Studio per std module, version "3095.0") once and opens it at that
+  version in a new window on the module's tab at the export (evArea → evaluate.fs 152:17 as live); not yet tried
+  in the app.
+- Host: TRACKING queries follow entities renamed by operations (point snapshots per transient id, `CtxState::snapshots`,
+  `QueryCx::tracked`); evEdgeTangentLines with "face" orients directions around that face (face on the left).
+- std Flange (sm2 in sm_harness.fs) runs but is NOT live-equal yet: the joined sheet has the flange wall 44.25 wide
+  (std's internal-flange offset of one bend-relief width fires at both ends) and the joint becomes RIP instead of
+  BEND (the tracked bend edge doesn't map to the merged edge). Its assertion is left out (comment with live's
+  areas in custom_features.rs) until fixed. Live request "fs (21:10)" pending for rips/corners/reliefs/hem/tab.

@@ -107,3 +107,49 @@ EX10 (strikethrough only from DXF/DWG 2013), V39 (multi-view properties), V45 (r
 - asb's "For drw2" list in drawing-behaviour.md: D31–D38 palette (live drawing/15 for the look), A57 / A58, V68,
   V63, V23, D42 / A64, Units and precision Dual / Fit class, Table tool Rows focus, Detail scale, centermark arms,
   leaders, radial dim lines, ISO ordinate.
+
+## HANDED OFF (20 Oct ~17:30, account change) — exact state for the replacement
+Scripts now live in /root/drw2-scratch/bin (row.py edits checklist rows: `python3 row.py claim|set|show ID …`;
+start.sh <binary> [args] starts Xvfb :111 + the app; shot.sh name [crop]; x.sh <xdotool args>). Shots go to
+/root/drw2-scratch/shots. No app is running. A `cargo build -p noshape` (target-behave) may still be running in
+the background from my session; it is harmless (shared target dir) — just build again.
+**Don't build /root/noshape-drw2** (deleted; TEAM-RULES forbids private worktrees in shared target dirs. NOTE for
+the lead: before that rule I built /root/noshape-drw2 into /root/target-behave once, ~15:20, which may explain
+rlib-format errors there).
+
+**Integrated already (in HEAD via 1c4ba5d / later):** in-place note / table-cell editing code
+(app/drawing_inplace.rs + hooks), drawing fonts registered with GPUI (`noshape_sketch::text::font_files`), View
+properties rework, Sheet properties Size › Custom, Sheets panel, ordinate menu, Custom template lists.
+These compile (the lead's integration builds them) but A2 / K24 / TB1 / TB3 are **NOT yet checked in the app**.
+
+**In the working tree (mine, CR12 title-block language) — `cargo build -p noshape` succeeded at ~17:35 with no
+warnings; tests, clippy and the app check are still to do:**
+- new `crates/model/src/drawing/tb_lang.rs`: `TitleLanguage` (Onshape's 9 languages in list order, `name()`,
+  `strings()` = every title-block label from live behaviours.md "Custom template › Language: title-block texts per
+  language", per-language height factors, `sheet_field()` "{sheet.number} von {sheet.count}" …).
+- mod.rs: `pub mod tb_lang;`, `Sheet.title_language` (serde default English).
+- templates.rs: `DrawingTemplate.language`; `apply_template` sets the sheet language and the localized "1 of 1"
+  Sheet field.
+- sheet.rs `onshape_title_block`: all labels from `tr` (English layout unchanged; other languages wrap the long
+  notes in their cell with the new `pub fn wrap_text`); units word mapped (MILLIMETERS / INCHES → the language's).
+- app/drawing_create.rs: Language dropdown = `TitleLanguage::ALL`, `CustomTemplate::template` sets `t.language`.
+- tests.rs: `custom_template_language_translates_the_title_block`.
+Not captured yet (fallback English, needs a live request): third-angle projection label, inch word and
+FRACTIONAL for languages other than en / fr (only ANSI en + fr were captured).
+**Known limit:** no CJK font is bundled, so 繁體中文 / 简体中文 / 日本語 / 한국어 labels draw as the stroke font's
+fallback boxes — lead decision (font size; asb raised it earlier).
+
+**Next steps:**
+1. `free -g` (≥ 8 GB available), build, fix any compile errors in the CR12 files above, run
+   `cargo test -p noshape-model --lib drawing::` and `cargo clippy --locked --workspace --all-targets -- -D warnings`.
+2. In the app (`--demo-drawing-full`, Drawing 1 tab at the bottom): double-click the NOTES note → it is edited in
+   place (dashed box, ruler above, "Note" ✓ ✕ panel above it); type, click away commits, Esc discards. Table tool
+   (Note ▾ › Table) → place → ✓ → caret in cell (1,1): Tab right, Shift+Tab left, Enter = cell below, Alt+Enter new
+   line, Enter in the last cell ends (live behaviours.md "General table text entry"). Then mark A2, K24, TB1, TB3.
+3. "+" › Create Drawing › Custom template › Language Deutsch, ISO A3 → compare the title block with live
+   drawing/831-*-titleblock.png and 820-e; mark CR12.
+4. Remaining open rows: S8 (drag reorder of sheet rows), V39 (multi-view properties, help image
+   viewproperties-mult-01), V45 (View render mode), V55 / V56 (faulty parts, part intersections, offset cut lines),
+   V59 (connecting lines of patterned auto centermarks), EX10 (strikethrough only from DXF/DWG 2013), then asb's
+   "For drw2" list in drawing-behaviour.md (D31–D38 palette vs live drawing/15, A57 / A58, V68, V63, V23, D42 / A64,
+   …) and the rest of the 🔧 rows.

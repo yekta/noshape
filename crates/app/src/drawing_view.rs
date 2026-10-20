@@ -274,6 +274,9 @@ pub enum Drag {
     MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
     /// Move a detail view's circle in its parent.
     MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
+    /// Drag a snap point of an auxiliary view's reference indicator (0 / 1
+    /// an end, 2 the middle).
+    AuxIndicator { view: ViewId, grip: usize, orig: noshape_model::drawing::AuxRef },
     /// Move one point of a section view's cutting line.
     MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
     /// Drag annotation `0`'s inspection item onto another annotation.
@@ -383,6 +386,8 @@ pub struct DrawingEditor {
     pub(crate) gpu: Gpu,
     target_id: u64,
     pub focus: FocusHandle,
+    /// Cached parts of the editor (the toolbar): see `crate::cached_slice`.
+    slices: Option<DrSlices>,
 
     pub drawing: Drawing,
     pub preview: Option<Drawing>,
@@ -470,9 +475,6 @@ pub struct DrawingEditor {
     pub revision_dlg: Option<crate::drawing_revision::RevisionDlg>,
     /// Show/hide sketches dialog (drawing_view_sketches.rs).
     pub view_sketches: Option<crate::drawing_view_sketches::ViewSketchesDlg>,
-    /// Note editor › Insert property: the text format and date time format
-    /// (indices into `format::TEXT_FORMATS` / `DATE_FORMATS`).
-    pub note_field_fmt: (usize, usize),
     /// Documents at versions, for pinned view references.
     pub version_docs: HashMap<String, noshape_model::Document>,
     /// Color dialog (drawing_color.rs).
@@ -504,6 +506,8 @@ pub struct DrawingEditor {
     /// Sketch tools: endpoints hovered so far (SK8: the cursor aligns with
     /// them along red dotted inference lines).
     pub woken_points: Vec<[f64; 2]>,
+    /// Datum tool: the annotation line the datum's triangle was put on.
+    pub datum_on: Option<noshape_model::drawing::DatumOn>,
     /// Datum target tool: the letter of the set being placed (A1, A2…; a
     /// new run of the tool starts the next letter's set).
     pub datum_target_letter: Option<char>,
@@ -522,6 +526,8 @@ pub struct DrawingEditor {
     pub palette: Option<crate::drawing_palette::PaletteDlg>,
     /// The Datum dialog (Datum / Datum target tabs).
     pub datum_dlg: Option<crate::drawing_datum::DatumDlg>,
+    /// Styles panel › Text gap spinbox: (annotation, field, its subscription).
+    pub styles_gap: Option<(u64, Entity<InputState>, Subscription)>,
     pub table_tool: Option<crate::drawing_table_tool::TableToolDlg>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
@@ -606,6 +612,7 @@ impl DrawingEditor {
             gpu,
             target_id,
             focus: cx.focus_handle(),
+            slices: None,
             drawing,
             preview: None,
             sheet: 0,
@@ -673,6 +680,7 @@ impl DrawingEditor {
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
             woken_points: Vec::new(),
+            datum_on: None,
             datum_target_letter: None,
             menu_at: [0.0; 2],
             move_sheet: None,
@@ -684,6 +692,7 @@ impl DrawingEditor {
             replicate_dlg: None,
             palette: None,
             datum_dlg: None,
+            styles_gap: None,
             table_tool: None,
             note_leader: None,
             cell_sel: None,
@@ -691,7 +700,6 @@ impl DrawingEditor {
             color_dlg: None,
             version_docs: HashMap::new(),
             paste_table: None,
-            note_field_fmt: (4, 0),
             detail_label: String::new(),
             aux_dlg: None,
             aux_letter: String::new(),
@@ -738,7 +746,7 @@ impl DrawingEditor {
         let d = self.doc.read(cx);
         // Evaluated custom tables stay until they are re-evaluated.
         let custom_tables = std::mem::take(&mut self.info.custom_tables);
-        self.info = SheetInfo { doc_name: d.name().to_string(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default(), revisions: crate::drawing_revision::revisions(d, self.tab), custom_tables };
+        self.info = SheetInfo { doc_name: d.name().to_string(), user_name: noshape_store::local_user_name(), drawing_name: d.session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default(), revisions: crate::drawing_revision::revisions(d, self.tab), custom_tables };
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
@@ -1413,6 +1421,29 @@ impl DrawingEditor {
     }
 }
 
+/// The drawing editor's cached slices (see `crate::cached_slice`): a keystroke
+/// or a caret blink in a note re-renders the editor but reuses these.
+#[derive(Clone)]
+struct DrSlices {
+    toolbar: Entity<crate::cached_slice::Slice<DrawingEditor>>,
+}
+
+impl DrawingEditor {
+    fn slices(&mut self, cx: &mut Context<Self>) -> DrSlices {
+        if let Some(s) = &self.slices {
+            return s.clone();
+        }
+        use crate::cached_slice::Slice;
+        let me = cx.entity();
+        let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(window, cx), cx);
+        // Undo state comes from the document.
+        Slice::observing(&toolbar, &self.doc, cx);
+        let s = DrSlices { toolbar };
+        self.slices = Some(s.clone());
+        s
+    }
+}
+
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sync_section_dlg(window, cx);
@@ -1450,7 +1481,7 @@ impl Render for DrawingEditor {
         let pal = p();
         let entity = cx.entity();
         let image = self.image.clone();
-        let toolbar = self.render_toolbar(window, cx);
+        let slices = self.slices(cx);
         let status = self.render_status(cx);
         // The note edited in place hides its sheet text while its editor is open.
         let editing = match &self.panel {
@@ -1538,7 +1569,7 @@ impl Render for DrawingEditor {
             .children(self.render_inspection_dlg(cx))
             .children(self.render_hatch_dlg(cx))
             .children(self.render_sketch_glyphs(window, cx))
-            .children(self.render_right_panel(cx))
+            .children(self.render_right_panel(window, cx))
             .child(self.render_panel_strip(cx))
             .children(self.render_insert_view_panel(cx))
             .children(self.render_insert_chooser(cx))
@@ -1596,7 +1627,7 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.set_tool(Tool::Note, cx)))
             .on_action(cx.listener(|this, _: &TogglePlanes, _, cx| this.set_tool(Tool::Projected { parent: None }, cx)))
             .on_key_down(cx.listener(Self::on_key))
-            .child(toolbar)
+            .child(slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()))
             .child({
                 // The open Sheets panel pushes the canvas (live drawing/30);
                 // the closed one's sheet tabs float over it.

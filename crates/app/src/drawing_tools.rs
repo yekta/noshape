@@ -87,6 +87,11 @@ impl DrawingEditor {
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
         self.woken_centers.clear();
         self.woken_points.clear();
+        self.datum_on = None;
+        // Choosing a tool keeps the palette's changes (like a click away).
+        if self.palette.is_some() {
+            self.close_palette(true, cx);
+        }
         self.datum_target_letter = None;
         // Clicking the active tool's button again exits it.
         // Dimension tools exit only when the same kind is chosen again.
@@ -655,6 +660,11 @@ impl DrawingEditor {
                 // All views of a part use the same version: a pinned
                 // reference pins the new view too.
                 v.pinned = self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone());
+                // View orientation › a named view: its camera.
+                if let Some((name, frame)) = &self.insert.named {
+                    v.custom_frame = Some(*frame);
+                    v.named_view = Some(name.clone());
+                }
                 // A sketch view faces its sketch plane.
                 if let Some(f) = &self.insert.sketch {
                     v.sketch = Some(*f);
@@ -692,7 +702,7 @@ impl DrawingEditor {
                 // Auxiliary view dialog: label, Reverse, reference indicator.
                 if let Some(d) = &self.aux_dlg {
                     v.flip = d.reverse;
-                    v.aux_ref = d.anchor.map(|anchor| noshape_model::drawing::AuxRef { anchor, letter: self.aux_letter.clone(), show: d.show_ref });
+                    v.aux_ref = d.anchor.map(|anchor| noshape_model::drawing::AuxRef { anchor, letter: self.aux_letter.clone(), show: d.show_ref, offset: None, ext: None });
                 }
                 Some(v)
             }
@@ -1415,7 +1425,7 @@ impl DrawingEditor {
                 self.set_preview(Some(dr), cx);
             }
             Drag::SelectCells { .. } => self.update_preview(cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
@@ -1636,13 +1646,14 @@ impl DrawingEditor {
                 }
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } => {
                 let name = match drag {
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
                     Drag::ResizeTable { .. } => "Resize table",
                     Drag::MoveSectionLine { .. } => "Move cutting line",
                     Drag::MoveSectionPoint { .. } => "Edit cutting line",
+                    Drag::AuxIndicator { .. } => "Edit view reference indicator",
                     Drag::NoteGrip { grip: 2, .. } => "Rotate note",
                     Drag::NoteGrip { .. } => "Resize note",
                     _ => "Move detail circle",

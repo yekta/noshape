@@ -124,6 +124,11 @@ pub struct UiState {
     /// The "Variable input" / "Edit <name>" dialog of a configuration
     /// variable.
     pub var_input: Option<super::config_var_dialog::VarInputDialog>,
+    /// Inspection › Datum: its dialog and the symbol being placed.
+    pub datum_edit: Option<super::annotations_ui::DatumEdit>,
+    /// An annotation picked with its menu's Select.
+    pub annotation_selected: Option<u32>,
+    pub annotation_drag: Option<super::annotations_ui::AnnotationDrag>,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
@@ -150,6 +155,8 @@ pub struct UiState {
     pub material_panel: Option<super::material_panel::MaterialPanel>,
     /// Where panel dialogs were moved by their title.
     pub panels: crate::ui::PanelOffsets,
+    /// The Configurations block's height after its splitter was dragged.
+    pub cfg_box_h: Option<f32>,
     /// The Create selection dialog.
     pub create_selection: Option<super::create_selection::CreateSelection>,
     /// Where the last context menu opened (window coordinates).
@@ -177,11 +184,16 @@ pub struct UiState {
     pub measure_angle_unit: Option<noshape_units::AngleUnit>,
     /// Feature dialog position after the user moved it.
     pub dialog_pos: Option<Point<Pixels>>,
-    /// Feature dialog size after the user resized it.
-    pub dialog_size: Option<Size<Pixels>>,
+    /// Feature dialog width after the user resized it.
+    pub dialog_width: Option<Pixels>,
     /// Toolbar customization (removed tools, group order, S toolbar).
     pub toolbar: super::toolbar_prefs::ToolbarPrefs,
-    pub customizing_toolbar: bool,
+    /// Customize toolbar… while it is open.
+    pub tb_custom: Option<crate::toolbar_customize::Customize>,
+    /// The Isolate slider being dragged (pressed on it, button still down).
+    pub iso_slider_drag: Option<&'static str>,
+    /// Whether the toolbar fits, from the last layout.
+    pub tb_fit: super::ToolbarFit,
     /// Preview slider value and the model before the edited feature.
     pub preview_opacity: f32,
     pub preview_before: Option<Arc<StudioDisplay>>,
@@ -250,6 +262,9 @@ pub struct UiState {
     pub cfg_properties_tab: bool,
     pub cfg_only_kinds: [bool; 3],
     pub cfg_folded: std::collections::HashSet<String>,
+    /// While an input is dragged by its header: the section it would land
+    /// next to, and whether after it.
+    pub cfg_drop: Option<(String, bool)>,
     pub cfg_editing: Option<String>,
     /// The rename input still has to take the keyboard (once, when it opens).
     pub cfg_editing_focus: bool,
@@ -320,6 +335,9 @@ impl UiState {
             cp_focus: None,
             cp_grid: Vec::new(),
             var_input: None,
+            datum_edit: None,
+            annotation_selected: None,
+            annotation_drag: None,
             inspection_tool: None,
             inspection_more: false,
             ct: Default::default(),
@@ -335,6 +353,7 @@ impl UiState {
             create_selection: None,
             material_panel: None,
             panels: Default::default(),
+            cfg_box_h: None,
             menu_pos: Point::default(),
             regen_paused: None,
             force_regen: false,
@@ -350,9 +369,11 @@ impl UiState {
             measure_length_unit: None,
             measure_angle_unit: None,
             dialog_pos: None,
-            dialog_size: None,
+            dialog_width: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
-            customizing_toolbar: false,
+            tb_custom: None,
+            iso_slider_drag: None,
+            tb_fit: Default::default(),
             preview_opacity: 1.0,
             preview_before: None,
             before_context: None,
@@ -387,6 +408,7 @@ impl UiState {
             cfg_properties_tab: false,
             cfg_only_kinds: [false; 3],
             cfg_folded: Default::default(),
+            cfg_drop: None,
             cfg_editing: None,
             cfg_editing_focus: false,
             cfg_filter: None,
@@ -1652,7 +1674,7 @@ impl PartStudioView {
                     }
                 }
             }
-            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: 0.2, select_transparent: false, expand: 0 }),
+            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: crate::isolate_ui::ALPHA_MIN, select_transparent: false, expand: 0 }),
         }
         let d = self.display.clone();
         self.apply_display(d, window, cx);
@@ -1947,101 +1969,59 @@ impl PartStudioView {
         Some(PickTarget { reference: hit.reference, kind, anchor: None })
     }
 
+    /// Onshape's Isolate / Make transparent dialog (`isolate_ui`, live
+    /// cursors/641-_Isolate): here the Expand select is "Expand: distance"
+    /// (the nearest parts join).
     pub(super) fn render_isolate_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let iso = self.ui.isolate.as_ref()?;
-        let pal = p();
         let title = match iso.mode {
             IsolateMode::Isolate => "Isolate",
             IsolateMode::Transparent => "Make transparent",
         };
-        let opacity = iso.opacity;
-        let select_t = iso.select_transparent;
-        let expand = iso.expand;
-        let expand_step = |id: &'static str, label: &'static str, delta: isize, cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .px_1p5()
-                .rounded_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(label)
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                    let n = this.display.bodies.len();
-                    if let Some(iso) = &mut this.ui.isolate {
-                        iso.expand = (iso.expand as isize + delta).clamp(0, n as isize) as usize;
+        let n = self.display.bodies.len();
+        let dialog = crate::isolate_ui::dialog(
+            crate::isolate_ui::IsoDialog {
+                key: "ps-isolate",
+                title,
+                select_transparent: iso.select_transparent,
+                transparency: crate::isolate_ui::alpha_t(iso.opacity),
+                expand: if n == 0 { 0.0 } else { iso.expand as f32 / n as f32 },
+                expand_options: vec!["Expand: distance".to_string()],
+                expand_ix: 0,
+                expand_tip: "Expand isolate by distance",
+                drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
+                close: |v: &mut Self, window, cx| {
+                    v.exit_isolate(window, cx);
+                },
+                toggle_select: |v: &mut Self, _, cx| {
+                    if let Some(iso) = &mut v.ui.isolate {
+                        iso.select_transparent = !iso.select_transparent;
                     }
-                    let d = this.display.clone();
-                    this.apply_display(d, window, cx);
-                }))
-        };
-        let step = |id: &'static str, label: &'static str, delta: f32, cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .px_1p5()
-                .rounded_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(label)
-                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                    if let Some(iso) = &mut this.ui.isolate {
-                        iso.opacity = (iso.opacity + delta).clamp(0.0, 0.9);
+                    cx.notify();
+                },
+                set_transparency: std::rc::Rc::new(|v: &mut Self, f, window, cx| {
+                    if let Some(iso) = &mut v.ui.isolate {
+                        iso.opacity = crate::isolate_ui::t_alpha(f);
                     }
-                    let d = this.display.clone();
-                    this.apply_display(d, window, cx);
-                }))
-        };
-        Some(
-            h_flex()
-                .id("isolate-panel")
-                .occlude()
-                .absolute()
-                .top_3()
-                .left(px(340.))
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded_md()
-                .bg(with_alpha(pal.panel_raised, 0.95))
-                .border_1()
-                .border_color(pal.accent)
-                .text_xs()
-                .child(div().text_color(pal.accent_hover).child(title.to_uppercase()))
-                .child(div().text_color(pal.text_muted).child("Transparency"))
-                .child(step("iso-less", "−", -0.1, cx))
-                .child(div().w(px(32.)).text_center().child(format!("{:.0}%", (1.0 - opacity) * 100.0)))
-                .child(step("iso-more", "+", 0.1, cx))
-                .child(
-                    div()
-                        .id("iso-select-t")
-                        .px_1()
-                        .cursor_pointer()
-                        .text_color(if select_t { pal.accent } else { pal.text_muted })
-                        .child(if select_t { "☑ Select transparent geometry" } else { "☐ Select transparent geometry" })
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            if let Some(iso) = &mut this.ui.isolate {
-                                iso.select_transparent = !iso.select_transparent;
-                            }
-                            cx.notify();
-                        })),
-                )
-                .child(div().text_color(pal.text_muted).child("Expand"))
-                .child(expand_step("iso-exp-less", "−", -1, cx))
-                .child(div().w(px(16.)).text_center().child(expand.to_string()))
-                .child(expand_step("iso-exp-more", "+", 1, cx))
-                .child(
-                    div()
-                        .id("iso-exit")
-                        .px_1p5()
-                        .cursor_pointer()
-                        .text_color(pal.text_faint)
-                        .hover(|d| d.text_color(pal.error))
-                        .child("×")
-                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                            this.exit_isolate(window, cx);
-                        })),
-                )
-                .into_any_element(),
-        )
+                    let d = v.display.clone();
+                    v.apply_display(d, window, cx);
+                }),
+                set_expand: std::rc::Rc::new(move |v: &mut Self, f, window, cx| {
+                    let want = (f * n as f32).round() as usize;
+                    if let Some(iso) = &mut v.ui.isolate
+                        && iso.expand != want
+                    {
+                        iso.expand = want;
+                        let d = v.display.clone();
+                        v.apply_display(d, window, cx);
+                    }
+                }),
+                pick_expand: std::rc::Rc::new(|_, _, _| {}),
+            },
+            cx,
+        );
+        // Live: at the graphics area's top left, like the other panel dialogs.
+        Some(crate::ui::moved_panel(div().absolute().top(px(3.)).left_0().child(dialog), self.ui.panels.get("ps-isolate")))
     }
 
     // ------------------------------------------------------------ camera

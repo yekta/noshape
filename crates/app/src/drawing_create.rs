@@ -15,6 +15,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::create::DrawingSource;
+use noshape_model::drawing::tb_lang::TitleLanguage;
 use noshape_model::drawing::templates::DrawingTemplate;
 use noshape_model::drawing::{DimUnits, Projection, SheetFormat, SheetSize, TitleBlockStyle, ZoneStart};
 use parking_lot::Mutex;
@@ -159,8 +160,6 @@ const CUSTOM_UNITS: [(DimUnits, &str); 7] = [
     (DimUnits::Yard, "Yard"),
 ];
 
-/// Title block languages in Onshape's order (live; English preselected).
-const LANGUAGES: [&str; 9] = ["繁體中文", "Français", "English", "Deutsch", "简体中文", "日本語", "한국어", "Español", "Italiano"];
 
 /// Zone counts offered by Horizontal / Vertical zones: even numbers 0–20 (live).
 const ZONE_COUNTS: [u32; 11] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
@@ -223,6 +222,7 @@ impl CustomTemplate {
             t.units = Some(self.units);
         }
         t.decimal_comma = self.comma;
+        t.language = TitleLanguage::ALL.get(self.language).copied().unwrap_or_default();
         let zones = (self.zones != size.standard_zones()).then_some(self.zones);
         t.format = SheetFormat { border: self.border, zones, start: if self.top_left { ZoneStart::TopLeft } else { ZoneStart::BottomRight } };
         Some(t)
@@ -493,7 +493,7 @@ impl CreateDrawingDialog {
             .flex_none()
             .pr(px(6.))
             .child(row(133., "Standard", standards.into_any_element()))
-            .child(row(133., "Language", drop("cd-lang", LANGUAGES.iter().map(|s| s.to_string()).collect(), ct.language, |t, i| t.language = i).into_any_element()))
+            .child(row(133., "Language", drop("cd-lang", TitleLanguage::ALL.iter().map(|l| l.name().to_string()).collect(), ct.language, |t, i| t.language = i).into_any_element()))
             .child(row(133., "Size", drop("cd-size", sizes, ct.size, |t, i| t.set_size(i)).into_any_element()))
             .child(row(133., "Units", drop("cd-units", CUSTOM_UNITS.iter().map(|(_, n)| n.to_string()).collect(), units, |t, i| t.units = CUSTOM_UNITS[i].0).into_any_element()))
             .child(

@@ -35,6 +35,9 @@ pub fn fallback_provider() -> std::sync::Arc<dyn CustomFeatureProvider> {
 use crate::document::TabId;
 use serde::{Deserialize, Serialize};
 
+/// The embedded standard library (Ctrl+click on a std symbol opens its source).
+pub use noshape_featurescript::{STD_SOURCES, STD_VERSION};
+
 /// Content of a Feature Studio tab.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FeatureStudio {

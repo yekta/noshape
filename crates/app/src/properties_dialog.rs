@@ -285,7 +285,7 @@ impl MetaForm {
 }
 
 /// A bold 14 px label, with a red "*" for required fields.
-fn label(text: &'static str, required: bool) -> Div {
+pub(crate) fn label(text: &'static str, required: bool) -> Div {
     h_flex()
         .h(px(21.))
         .gap(px(3.))
@@ -297,7 +297,7 @@ fn label(text: &'static str, required: bool) -> Div {
 }
 
 /// A disabled-looking field (`#eee`, `#ccc` border) with an optional caret.
-fn gray_box(text: String, caret: bool) -> Div {
+pub(crate) fn gray_box(text: String, caret: bool) -> Div {
     h_flex()
         .h(px(34.))
         .w_full()
@@ -355,7 +355,7 @@ fn check_row(id: &'static str, text: &'static str, on: bool) -> Stateful<Div> {
 }
 
 /// A footer button: Apply / Save (`#1651b0`, 40 % until edited) or Close (`#d7d7d7`).
-fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
+pub(crate) fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
         .h(px(34.))
@@ -546,7 +546,7 @@ impl Render for MetaForm {
                     .border_color(rgb(0xcccccc))
                     .child(div().pl(px(4.)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).truncate().child(self.saved.name.clone())),
             )
-            .child(div().id("meta-scroll").h(px(381.)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form))
+            .child(div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form))
             .child(
                 h_flex()
                     .h(px(62.))
@@ -586,7 +586,7 @@ impl Render for MetaForm {
 }
 
 /// The 57 px Bootstrap modal header with a 24 px / 500 title.
-fn modal_header(title: &'static str, width: f32) -> Div {
+pub(crate) fn modal_header(title: &'static str, width: f32) -> Div {
     h_flex()
         .w(px(width - 2.))
         .h(px(57.))
@@ -596,7 +596,7 @@ fn modal_header(title: &'static str, width: f32) -> Div {
         .child(div().text_size(px(24.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(title))
 }
 
-fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static str, width: f32, top: f32) -> gpui_kit::component::dialog::Dialog {
+pub(crate) fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static str, width: f32, top: f32) -> gpui_kit::component::dialog::Dialog {
     dialog.w(px(width)).margin_top(px(top)).close_button(false).p_0().gap_0().rounded(px(6.)).border_color(rgb(0xdee2e6)).title(modal_header(title, width))
 }
 
@@ -604,7 +604,7 @@ fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static 
 pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
     let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
-    window.open_dialog(cx, move |dialog, _, _| bootstrap_modal(dialog, "Properties", 800., 15.).child(form.clone()));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
 }
 
 /// [`open_properties`] for a Part Studio part, with the release-create icon
@@ -622,7 +622,7 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
         f.configured = configured;
         f
     });
-    window.open_dialog(cx, move |dialog, _, _| bootstrap_modal(dialog, "Properties", 800., 15.).child(form.clone()));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
 }
 
 /// Instance properties…: a 600 px modal with the instance's name and its
@@ -680,3 +680,80 @@ pub fn open_instance_properties(instance: String, designator: String, on_save: i
     });
     window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
 }
+
+/// The Properties modal's least (and default) size; live `resizableModal`
+/// (`metadata-dialog`, resizeX + resizeY), kept across sessions as Onshape
+/// keeps it in localStorage.
+pub(crate) const PROPS_MIN: (f32, f32) = (800., 542.);
+
+thread_local! {
+    static PROPS_SIZE: std::cell::Cell<(f32, f32)> = std::cell::Cell::new(
+        std::fs::read_to_string(crate::files::config_dir().join("properties_modal_size.txt"))
+            .ok()
+            .and_then(|t| {
+                let (w, h) = t.trim().split_once(' ')?;
+                Some((w.parse::<f32>().ok()?.max(PROPS_MIN.0), h.parse::<f32>().ok()?.max(PROPS_MIN.1)))
+            })
+            .unwrap_or(PROPS_MIN),
+    );
+}
+
+pub(crate) fn props_size() -> (f32, f32) {
+    PROPS_SIZE.with(|s| s.get())
+}
+
+/// A drag of the modal's right edge (`x`), bottom edge (`y`) or corner.
+#[derive(Clone)]
+struct ModalResize {
+    x: bool,
+    y: bool,
+}
+
+impl Render for ModalResize {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// The modal's resize handles (live `.modal-resizable-ns` 5 px at the bottom,
+/// `.modal-resizable-ew` 5 px at the right, `.modal-resizeable-se` 10 px in
+/// the corner). The modal stays centred horizontally, so its width grows
+/// on both sides; its top stays.
+pub(crate) fn resizable_props(dialog: gpui_kit::component::dialog::Dialog) -> gpui_kit::component::dialog::Dialog {
+    let handle = |id: &'static str, x: bool, y: bool, cursor: CursorStyle| {
+        div().id(id).absolute().cursor(cursor).on_drag(ModalResize { x, y }, |d, _, _, cx| cx.new(|_| d.clone()))
+    };
+    dialog.child(
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .child(handle("props-resize-ew", true, false, CursorStyle::ResizeLeftRight).top_0().bottom_0().right_0().w(px(5.)))
+            .child(handle("props-resize-ns", false, true, CursorStyle::ResizeUpDown).left_0().right_0().bottom_0().h(px(5.)))
+            .child(handle("props-resize-se", true, true, CursorStyle::ResizeUpLeftDownRight).right_0().bottom_0().size(px(10.)))
+            .on_drag_move(|e: &DragMoveEvent<ModalResize>, window, cx| {
+                let d = e.drag(cx);
+                let (mut w, mut h) = props_size();
+                let view = window.viewport_size();
+                if d.x {
+                    w = (2. * f32::from(e.event.position.x - e.bounds.center().x)).round().clamp(PROPS_MIN.0, f32::from(view.width).max(PROPS_MIN.0));
+                }
+                if d.y {
+                    // The modal's top stays 15 px under the window's (the handles
+                    // sit in its body, under the header).
+                    h = (f32::from(e.event.position.y) - 15.).round().clamp(PROPS_MIN.1, (f32::from(view.height) - 15.).max(PROPS_MIN.1));
+                }
+                if (w, h) != props_size() {
+                    PROPS_SIZE.with(|s| s.set((w, h)));
+                    let p = crate::files::config_dir().join("properties_modal_size.txt");
+                    if let Some(dir) = p.parent() {
+                        let _ = std::fs::create_dir_all(dir);
+                    }
+                    let _ = std::fs::write(p, format!("{w} {h}"));
+                    window.refresh();
+                }
+            }),
+    )
+}
+

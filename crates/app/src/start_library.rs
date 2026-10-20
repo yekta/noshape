@@ -473,7 +473,8 @@ pub fn format_onshape_time(ms: i64) -> String {
     use chrono::{Datelike as _, Local, TimeZone as _};
     let Some(t) = Local.timestamp_millis_opt(ms).single() else { return "—".into() };
     let today = Local::now().date_naive();
-    let clock = t.format("%-I:%M %p").to_string();
+    // Preferences › Units › Time format.
+    let clock = if crate::units_prefs::time_24h() { t.format("%H:%M") } else { t.format("%-I:%M %p") }.to_string();
     match (today - t.date_naive()).num_days() {
         0 => format!("{clock} Today"),
         1 => format!("{clock} Yesterday"),

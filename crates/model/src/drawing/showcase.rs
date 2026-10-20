@@ -60,8 +60,8 @@ pub fn showcase_document() -> Document {
         };
         add(s, AnnotationKind::Gdt { anchor: [24.0, 262.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: [0.038 - 0.0048 * std::f64::consts::FRAC_1_SQRT_2, 0.018 + 0.0048 * std::f64::consts::FRAC_1_SQRT_2], nodes: Vec::new() }], extra: Default::default() }, [24.0, 262.0]);
         add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![], extra: Default::default() }, [24.0, 112.0]);
-        add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into() }, [150.0, 126.0]);
-        add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into() }, [175.0, 200.0]);
+        add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into(), on: None }, [150.0, 126.0]);
+        add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into(), on: None }, [175.0, 200.0]);
         add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into(), leaders: Vec::new() }, [95.0, 156.2]);
         // A grouped ordinate dimension along the bottom of the top view.
         let o = [-0.05, -0.03];

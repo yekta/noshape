@@ -2587,6 +2587,16 @@ fn create_surface(
     }
 }
 
+/// NOSHAPE PATCH (agent perf): the grayscale text shading of the newest
+/// renderer (gamma ratios, enhanced contrast), for applications that draw
+/// GPUI-rasterized text themselves (noshape's viewport overlays).
+static TEXT_SHADING: parking_lot::Mutex<Option<([f32; 4], f32)>> = parking_lot::Mutex::new(None);
+
+/// NOSHAPE PATCH (agent perf): see [`TEXT_SHADING`].
+pub fn text_shading() -> Option<([f32; 4], f32)> {
+    *TEXT_SHADING.lock()
+}
+
 struct RenderingParameters {
     path_sample_count: u32,
     gamma_ratios: [f32; 4],
@@ -2623,6 +2633,8 @@ impl RenderingParameters {
             .unwrap_or(0.5_f32)
             .max(0.0);
 
+        // NOSHAPE PATCH (agent perf): see `TEXT_SHADING`.
+        *TEXT_SHADING.lock() = Some((gamma_ratios, grayscale_enhanced_contrast));
         Self {
             path_sample_count,
             gamma_ratios,

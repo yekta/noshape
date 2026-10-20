@@ -458,10 +458,18 @@ impl Render for VariableStudioView {
                     }
                 })
             });
-            let desc = self.cell(format!("d{i}"), v.description.clone(), window, cx, move |this, val, cx| {
+            // Convert to expression (live 652–656, as the Part Studio table): the
+            // literal shows without its quotes; a failing expression is empty
+            // with "Error regenerating." as the tooltip.
+            let literal = noshape_model::variable_table::string_literal(&v.description).filter(|_| v.description_expr);
+            let desc_error = v.description_expr && literal.is_none() && !v.description.trim().is_empty() && noshape_units::evaluate(&v.description, &eval).is_err();
+            let desc_shown = if desc_error { String::new() } else { literal.map(str::to_string).unwrap_or_else(|| v.description.clone()) };
+            let desc_tip = if desc_error { Some("Error regenerating.".to_string()) } else { v.description_expr.then(|| v.description.clone()).filter(|d| !d.is_empty()) };
+            let (desc_text, desc_is_expr) = (v.description.clone(), v.description_expr);
+            let desc = self.cell(format!("d{i}"), desc_shown, window, cx, move |this, val, cx| {
                 this.edit("Edit variable description", cx, |s| {
                     if let Some(v) = s.variables.get_mut(i) {
-                        v.description = val;
+                        v.set_description(&val);
                     }
                 })
             });
@@ -528,63 +536,90 @@ impl Render for VariableStudioView {
                     .bg(rgb(0xffffff))
                     .text_size(px(14.))
                     .text_color(pal.text)
-                    .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&name))))
+                    // Name, Variable type and Value: the row menu. (Menus open in
+                    // the capture phase, so the Description cell's own menu
+                    // must not sit inside this one.)
                     .child(
-                        cell_div()
-                            .relative()
-                            .child({
-                                // The cell's painted bounds place the select list under it.
-                                let b = cell_bounds.clone();
-                                canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+                        h_flex()
+                            .flex_none()
+                            .os_context_menu_over_inputs({
+                                let view = menu_view.clone();
+                                move |m, _, _| row_menu(m, view.clone(), i, n)
                             })
-                            .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
+                            .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&name))))
                             .child(
-                            // A plain cell (a kit Button centres its label): text 7 px in, as live.
-                            div()
-                                .id(("vs-kind", i))
-                                .size_full()
-                                .flex()
-                                .items_center()
-                                .cursor_pointer()
-                                .pl(px(7.))
-                                .pt(px(2.))
-                                .child(div().text_size(px(14.)).text_color(pal.text).child(kind_label(kind)))
-                                .on_click(move |_, window, cx| {
-                                    let kinds = kinds.clone();
-                                    let b = cell_bounds.get();
-                                    // Onshape's select list (live, document/16).
-                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                                        m = m.select_list(COL_W);
-                                        // Onshape's types (behaviours.md, Variable Studio).
-                                        for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport] {
-                                            let v = kinds.clone();
-                                            m = m.item(crate::os_menu::OsMenuItem::new(kind_label(k)).checked(k == kind).on_click(move |_, window, cx| {
-                                                v.update(cx, |this, cx| {
-                                                    this.edit("Change variable type", cx, |s| {
-                                                        if let Some(var) = s.variables.get_mut(i) {
-                                                            var.kind = Some(k);
-                                                        }
-                                                    });
-                                                    // From import: its settings are in the Variable dialog.
-                                                    if k == VarKind::FromImport {
-                                                        crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
-                                                    }
-                                                })
-                                            }));
-                                        }
-                                        m
-                                    });
-                                    crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
-                                }),
-                        ),
+                                cell_div()
+                                    .relative()
+                                    .child({
+                                        // The cell's painted bounds place the select list under it.
+                                        let b = cell_bounds.clone();
+                                        canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+                                    })
+                                    .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
+                                    .child(
+                                    // A plain cell (a kit Button centres its label): text 7 px in, as live.
+                                    div()
+                                        .id(("vs-kind", i))
+                                        .size_full()
+                                        .flex()
+                                        .items_center()
+                                        .cursor_pointer()
+                                        .pl(px(7.))
+                                        .pt(px(2.))
+                                        .child(div().text_size(px(14.)).text_color(pal.text).child(kind_label(kind)))
+                                        .on_click(move |_, window, cx| {
+                                            let kinds = kinds.clone();
+                                            let b = cell_bounds.get();
+                                            // Onshape's select list (live, document/16).
+                                            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                                                m = m.select_list(COL_W);
+                                                // Onshape's types (behaviours.md, Variable Studio).
+                                                for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport] {
+                                                    let v = kinds.clone();
+                                                    m = m.item(crate::os_menu::OsMenuItem::new(kind_label(k)).checked(k == kind).on_click(move |_, window, cx| {
+                                                        v.update(cx, |this, cx| {
+                                                            this.edit("Change variable type", cx, |s| {
+                                                                if let Some(var) = s.variables.get_mut(i) {
+                                                                    var.kind = Some(k);
+                                                                }
+                                                            });
+                                                            // From import: its settings are in the Variable dialog.
+                                                            if k == VarKind::FromImport {
+                                                                crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
+                                                            }
+                                                        })
+                                                    }));
+                                                }
+                                                m
+                                            });
+                                            crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
+                                        }),
+                                ),
+                            )
+                            .child(value_cell),
                     )
-                    .child(value_cell)
-                    .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&desc))))
-                    .os_context_menu_over_inputs(move |m, _, _| {
-                        let (v1, v2, v3) = (menu_view.clone(), menu_view.clone(), menu_view.clone());
-                        let m = m.item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.delete_variable(i, cx))));
-                        let m = if i > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.move_variable(i, false, cx)))) } else { m };
-                        if i + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.move_variable(i, true, cx)))) } else { m }
+                    // The Description cell adds Copy | Convert to expression (or
+                    // text) to the row menu (live variable-studio/01–07).
+                    .child({
+                        let desc_view = menu_view.clone();
+                        div()
+                            .id(("vs-desc", i))
+                            .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&desc))))
+                            .when_some(desc_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
+                            .os_context_menu_over_inputs(move |m, _, _| {
+                                let (text, v) = (desc_text.clone(), desc_view.clone());
+                                row_menu(m, desc_view.clone(), i, n)
+                                    .item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
+                                    .item(crate::os_menu::OsMenuItem::new(if desc_is_expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
+                                        v.update(cx, |t, cx| {
+                                            t.edit("Edit variable description", cx, |s| {
+                                                if let Some(v) = s.variables.get_mut(i) {
+                                                    v.toggle_description_expr();
+                                                }
+                                            })
+                                        })
+                                    }))
+                            })
                     })
                     .into_any_element(),
             );
@@ -598,7 +633,7 @@ impl Render for VariableStudioView {
                 return;
             }
             this.inputs.remove("new");
-            this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), import: None }));
+            this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None }));
         });
         if std::mem::take(&mut self.focus_add_row) {
             // After this frame, once the new row's input is laid out.
@@ -652,6 +687,7 @@ impl Render for VariableStudioView {
                             .child(div().mt(px(3.)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_OVERFLOW, 20., pal.text)))
                             .on_click(move |e, window, cx| {
                                 let (more_view, host_menu) = (more_view.clone(), host_menu.clone());
+                                let has_inserted = !more_view.read(cx).inserted_views.is_empty();
                                 // Live document/15 (own: Copy table, Rename, Collapse all tables) and
                                 // part-studio/161, 165 (inserted: + Switch to, Move up/down, Edit
                                 // reference…, Remove reference). "Create task…" is cloud.
@@ -674,7 +710,10 @@ impl Render for VariableStudioView {
                                             .item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open(d4.clone(), target, window, cx)))
                                             .item(item("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, target, me, None, cx)))
                                     }
-                                    None => m.item(collapse),
+                                    // Own table: only with inserted tables to collapse
+                                    // (live document/15 vs 49).
+                                    None if has_inserted => m.item(collapse),
+                                    None => m,
                                 }
                             });
                                 crate::os_menu::open_anchored(point(e.position().x + px(12.), e.position().y + px(12.)), Anchor::TopRight, menu, window, cx);
@@ -725,4 +764,13 @@ impl Render for VariableStudioView {
             .child(footer)
             .into_any_element()
     }
+}
+
+/// A variable row's right-click menu: Delete, then Move up / Move down where
+/// the row has neighbours (live variable-studio/01–07).
+fn row_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioView>, i: usize, n: usize) -> crate::os_menu::OsMenu {
+    let (v1, v2, v3) = (view.clone(), view.clone(), view);
+    let m = m.item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.delete_variable(i, cx))));
+    let m = if i > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.move_variable(i, false, cx)))) } else { m };
+    if i + 1 < n { m.item(crate::os_menu::OsMenuItem::new("Move down").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.move_variable(i, true, cx)))) } else { m }
 }

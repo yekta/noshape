@@ -386,6 +386,8 @@ struct Textures {
     color_msaa: Option<wgpu::TextureView>,
     resolve: wgpu::Texture,
     resolve_view: wgpu::TextureView,
+    /// `resolve` as plain `Bgra8Unorm` (overlays composite in gamma space).
+    resolve_unorm: wgpu::TextureView,
     depth: wgpu::TextureView,
     /// The depth aspect alone (sampled by the ambient occlusion pass).
     depth_sample: wgpu::TextureView,
@@ -418,6 +420,9 @@ struct TargetState {
     /// [`Present::Texture`]: the textures of the current size; one is free
     /// when the ring holds the only reference.
     ring: Vec<Arc<PresentTexture>>,
+    /// Screen overlays drawn into every frame, and their layer.
+    overlay: Option<Arc<crate::overlay::Overlay>>,
+    overlay_layer: Option<crate::overlay_gpu::OverlayLayer>,
     /// Parameters of the newest submitted frame (for lazy pick rendering).
     last: Option<FrameState>,
     /// The pick texture matches `last`.
@@ -869,6 +874,9 @@ pub struct Renderer {
     frames_in_flight: usize,
     /// `NOSHAPE_PERF` on a device with timestamp queries: GPU time per frame.
     timer: Option<GpuTimer>,
+    /// Screen overlay pipelines, created with the first overlay.
+    overlay_gpu: Option<crate::overlay_gpu::OverlayGpu>,
+    text_shading: crate::overlay::TextShading,
 }
 
 /// GPU time of color frames (render and ambient occlusion passes), from
@@ -1182,6 +1190,8 @@ impl Renderer {
             stamp: 0,
             frames_in_flight,
             timer,
+            overlay_gpu: None,
+            text_shading: Default::default(),
         }
     }
 
@@ -1470,7 +1480,7 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | ((inst.plain_cap as u32) << 5) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
                     None => [inst.line_scale, 0.0, 0.0, 0.0],
@@ -1506,6 +1516,16 @@ impl Renderer {
         }
         ts.ring.retain(|t| t.width == width && t.height == height);
         ts
+    }
+
+    /// Draw `overlay` into every frame of `target` from now on (none: `None`).
+    pub fn set_overlay(&mut self, target: u64, overlay: Option<Arc<crate::overlay::Overlay>>) {
+        self.targets.entry(target).or_default().overlay = overlay.filter(|o| !o.is_empty());
+    }
+
+    /// How overlay text masks are shaded (the UI toolkit's text shading).
+    pub fn set_text_shading(&mut self, shading: crate::overlay::TextShading) {
+        self.text_shading = shading;
     }
 
     /// How `target`'s color frames are delivered from now on (default
@@ -1583,7 +1603,7 @@ impl Renderer {
         drop(t_prep);
 
         let t_encode = perf::scope("r.encode_submit");
-        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, ao, timer, .. } = self;
+        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, ao, timer, overlay_gpu, text_shading, .. } = self;
         let ao_on = ao_strength > 0.001 && ao.is_some();
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
@@ -1653,6 +1673,15 @@ impl Renderer {
             let timestamp_writes = timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, false, true));
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
+        }
+        if let Some(overlay) = ts.overlay.clone() {
+            let _t = perf::scope("r.overlay");
+            let view_proj = Mat4::from_cols_array_2d(&globals.view_proj).as_dmat4();
+            let logical = glam::DVec2::new(width as f64 / dpr as f64, height as f64 / dpr as f64);
+            let draw = overlay.build(&req.camera, &view_proj, logical, dpr);
+            let frame = present_texture.as_ref().map_or(&tex.resolve_unorm, |t| &t.view);
+            let target = crate::overlay_gpu::LayerTarget { layer: &mut ts.overlay_layer, frame, size: (width, height) };
+            overlay_gpu.get_or_insert_with(|| crate::overlay_gpu::OverlayGpu::new(device)).encode(device, queue, &mut encoder, target, &draw, *text_shading);
         }
         if let (Some(t), Some(i)) = (timer.as_ref(), timer_slot) {
             t.resolve(&mut encoder, i);
@@ -2085,8 +2114,18 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     };
     let att = wgpu::TextureUsages::RENDER_ATTACHMENT;
     let color_msaa = (msaa > 1).then(|| tex("color-msaa", COLOR_FORMAT, msaa, att).create_view(&Default::default()));
-    let resolve = tex("color", COLOR_FORMAT, 1, att | wgpu::TextureUsages::COPY_SRC);
+    let resolve = d.create_texture(&wgpu::TextureDescriptor {
+        label: Some("color"),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: att | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[PRESENT_FORMAT],
+    });
     let resolve_view = resolve.create_view(&Default::default());
+    let resolve_unorm = resolve.create_view(&wgpu::TextureViewDescriptor { format: Some(PRESENT_FORMAT), ..Default::default() });
     // Also sampled by the ambient occlusion pass.
     let depth_tex = tex("depth", depth_format(), msaa, att | wgpu::TextureUsages::TEXTURE_BINDING);
     let depth = depth_tex.create_view(&Default::default());
@@ -2095,7 +2134,7 @@ fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Text
     let pick_view = pick.create_view(&Default::default());
     let pick_depth = tex("pick-depth", PICK_DEPTH_FORMAT, 1, att).create_view(&Default::default());
     let padded_row = (width * 4).div_ceil(256) * 256;
-    Textures { width, height, msaa, color_msaa, resolve, resolve_view, depth, depth_sample, pick, pick_view, pick_depth, padded_row }
+    Textures { width, height, msaa, color_msaa, resolve, resolve_view, resolve_unorm, depth, depth_sample, pick, pick_view, pick_depth, padded_row }
 }
 
 const SRGB_STEPS: usize = 4096;

@@ -106,6 +106,19 @@ pub struct Viewport {
     /// texture of that size for that camera needs no re-render (overlays
     /// such as the view cube follow the camera), only a present.
     rendered: Option<(Camera, (u32, u32))>,
+    /// Screen overlays drawn into the frame ([`wgpu_overlays`]): the view
+    /// cube's hover cell (`None`: no cube), the plane names, the X/Y/Z masks
+    /// rasterized for a scale factor, and the overlay last sent.
+    cube: Option<Option<noshape_render::overlay::view_cube::CubeCell>>,
+    /// Where GPUI laid the view cube widget out (window coordinates).
+    cube_origin: Option<Point<Pixels>>,
+    plane_labels: Vec<noshape_render::overlay::WorldFill>,
+    axis_masks: Option<(f32, [noshape_render::overlay::AxisLabel; 3])>,
+    overlay_sent: Option<Arc<noshape_render::overlay::Overlay>>,
+    /// GPUI-drawn content of the owner follows the camera (sketch labels,
+    /// dimensions...), so a camera move re-renders the window; set by the
+    /// owner, true unless it says otherwise.
+    ui_follows_camera: bool,
     /// Newest pick-buffer rectangle read back (around the cursor or a box),
     /// valid while `pick_epoch` is unchanged.
     pick_cache: Option<Arc<PickBuffer>>,
@@ -321,6 +334,12 @@ impl Viewport {
             shown_texture: None,
             retired_textures: Vec::new(),
             rendered: None,
+            cube: None,
+            cube_origin: None,
+            plane_labels: Vec::new(),
+            axis_masks: None,
+            overlay_sent: None,
+            ui_follows_camera: true,
             pick_cache: None,
             pick_epoch: 0,
             next_pick_token: 1,
@@ -831,13 +850,123 @@ impl Viewport {
         // texture registered under `texture_id`), unless the camera moved
         // since the last render (camera-following overlays) or the texture
         // size changed.
-        let shown = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
+        // With the overlays in the frame and nothing else following the
+        // camera, a camera move needs no re-render either.
+        let camera = if wgpu_overlays() && !self.ui_follows_camera { self.rendered.map_or(self.camera, |r| r.0) } else { self.camera };
+        let shown = self.shown_texture.as_ref().map(|t| (camera, (t.width, t.height)));
         if self.image.is_none() && shown.is_some() && shown == self.rendered {
             noshape_render::perf::record_ms("v.present_only_count", 1.0);
             window.request_present();
         } else {
             cx.notify();
         }
+    }
+
+    /// The view cube in the frame ([`wgpu_overlays`]) with its hover cell, or
+    /// none.
+    pub fn set_view_cube(&mut self, cube: Option<Option<noshape_render::overlay::view_cube::CubeCell>>, cx: &mut Context<Self>) {
+        if self.cube != cube {
+            self.cube = cube;
+            self.sync_overlay(cx);
+        }
+    }
+
+    /// Where GPUI laid out the view cube widget (window coordinates): its
+    /// drawing in the frame goes exactly there.
+    pub fn set_view_cube_origin(&mut self, origin: Point<Pixels>, cx: &mut Context<Self>) {
+        if self.cube_origin != Some(origin) {
+            self.cube_origin = Some(origin);
+            self.sync_overlay(cx);
+        }
+    }
+
+    /// The plane names in the frame ([`wgpu_overlays`]): glyph contours in
+    /// world space with their colors.
+    pub fn set_plane_labels(&mut self, labels: Vec<noshape_render::overlay::WorldFill>, cx: &mut Context<Self>) {
+        if self.plane_labels != labels {
+            self.plane_labels = labels;
+            self.sync_overlay(cx);
+        }
+    }
+
+    /// Whether the owner draws content that follows the camera with GPUI
+    /// (then a camera move re-renders the window, else it is only presented).
+    pub fn set_ui_follows_camera(&mut self, follows: bool) {
+        self.ui_follows_camera = follows;
+    }
+
+    /// Send the overlay to the renderer if it changed, and redraw.
+    fn sync_overlay(&mut self, cx: &mut Context<Self>) {
+        use noshape_render::overlay::{CubeColors, Overlay, ViewCube};
+        // Onshape (tokens): faces and corners white, frames and arrows
+        // #cedbe5 at 60%, the hovered piece #90cef1 at 60%, black labels at
+        // 85%; axes #cd0000, #009400, #0000d0.
+        let rgb = |c: u32, a: f32| [((c >> 16) & 0xff) as f32 / 255.0, ((c >> 8) & 0xff) as f32 / 255.0, (c & 0xff) as f32 / 255.0, a];
+        let colors = CubeColors { face: rgb(0xffffff, 1.0), frame: rgb(0xcedbe5, 0.6), highlight: rgb(0x90cef1, 0.6), label: rgb(0x000000, 0.85), axes: [rgb(0xcd0000, 1.0), rgb(0x009400, 1.0), rgb(0x0000d0, 1.0)] };
+        // Where GPUI laid the widget out (Onshape: 15 px from the viewport's
+        // top-right corner), in frame pixels: the frame is drawn at the
+        // viewport's origin snapped like GPUI does (half toward zero).
+        let (o, sz, dpr) = (self.bounds.origin, self.bounds.size, self.scale);
+        let at = self.cube_origin.unwrap_or(point(o.x + sz.width - px(15. + noshape_render::overlay::view_cube::WIDGET_PX), o.y + px(15.)));
+        let snap = |v: f32| (v.abs() - 0.5).ceil().copysign(v);
+        let origin = [f32::from(at.x) * dpr - snap(f32::from(o.x) * dpr), f32::from(at.y) * dpr - snap(f32::from(o.y) * dpr)];
+        let view_cube = self.cube.map(|hover| ViewCube {
+            origin,
+            hover,
+            face_labels: cube_face_labels().clone(),
+            axis_labels: self.axis_masks.as_ref().map(|m| m.1.clone()),
+            colors,
+        });
+        let overlay = Overlay { world_fills: self.plane_labels.clone(), view_cube };
+        if self.overlay_sent.as_deref() == Some(&overlay) {
+            return;
+        }
+        let overlay = Arc::new(overlay);
+        self.overlay_sent = Some(overlay.clone());
+        self.gpu.set_overlay(self.target_id, Some(overlay));
+        self.request_redraw(cx);
+    }
+
+    /// The X/Y/Z labels rasterized by GPUI for this window's scale factor
+    /// (12 px Roboto Medium, 16 px line, centered in a 20 px box).
+    fn rasterize_axis_labels(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let scale = window.scale_factor();
+        if self.cube.is_none() || self.axis_masks.as_ref().is_some_and(|m| m.0 == scale) {
+            return;
+        }
+        let font = Font { weight: FontWeight::MEDIUM, ..font("Roboto") };
+        let label = |name: &'static str, rgb: u32| -> Option<noshape_render::overlay::AxisLabel> {
+            use noshape_render::overlay::{Mask, SUBPIXEL_VARIANTS_X};
+            let color: Hsla = gpui_kit::rgb(rgb).into();
+            let run = TextRun { len: name.len(), font: font.clone(), color, background_color: None, underline: None, strikethrough: None };
+            let line = window.text_system().shape_line(name.into(), px(12.), &[run], None);
+            let glyph_x = line.runs.first()?.glyphs.first()?.position.x;
+            // The glyph origin in the box: centered (flex), on the baseline of
+            // the 16 px line (`paint_line`).
+            let origin_x = (px(20.) - line.width) / 2. + glyph_x;
+            let baseline = (px(16.) - line.ascent - line.descent) / 2. + line.ascent;
+            // `round_half_toward_zero`, as `paint_glyph` rounds the glyph's y.
+            let by = f32::from(baseline) * scale;
+            let base_y = (by.abs() - 0.5).ceil().copysign(by);
+            // One mask per sub-pixel variant: rasterized with the glyph at
+            // device x = k / 4 (integer origin 0) and the box at y = 0.
+            let mut masks = Vec::new();
+            for k in 0..SUBPIXEL_VARIANTS_X {
+                let at = point(px(k as f32 / (SUBPIXEL_VARIANTS_X as f32 * scale)) - glyph_x, px(0.));
+                let m = window.rasterize_text_line(name.into(), font.clone(), px(12.), px(16.), color, at)?;
+                masks.push(Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [m.origin.x.0, m.origin.y.0 - base_y as i32] });
+            }
+            let c = Rgba::from(color);
+            Some(noshape_render::overlay::AxisLabel { masks: masks.try_into().ok()?, glyph: [f32::from(origin_x) * scale, f32::from(baseline) * scale], color: [c.r, c.g, c.b, c.a] })
+        };
+        if let (Some(x), Some(y), Some(z)) = (label("X", 0xcd0000), label("Y", 0x009400), label("Z", 0x0000d0)) {
+            self.axis_masks = Some((scale, [x, y, z]));
+        }
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+        if let Some((gamma_ratios, contrast)) = gpui_wgpu::text_shading() {
+            self.gpu.set_text_shading(noshape_render::overlay::TextShading { correct: true, grayscale_enhanced_contrast: contrast, gamma_ratios });
+        }
+        self.sync_overlay(cx);
     }
 
     /// Show a frame texture: register it for GPUI and keep the replaced one
@@ -1537,6 +1666,28 @@ fn box_ids(buf: &PickBuffer, a: DVec2, b: DVec2, s: f64, crossing: bool) -> Vec<
     v
 }
 
+/// `NOSHAPE_OVERLAY=wgpu`: the view cube and the plane names are drawn into
+/// the 3D frame (`noshape_render::overlay`) instead of by GPUI, so camera
+/// moves need no window layout or paint.
+pub fn wgpu_overlays() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_OVERLAY").is_ok_and(|v| v == "wgpu"))
+}
+
+/// The view cube's face labels: glyph contours in cube space (laid out once).
+fn cube_face_labels() -> &'static Vec<([i8; 3], noshape_render::overlay::Contours)> {
+    static LABELS: std::sync::OnceLock<Vec<([i8; 3], noshape_render::overlay::Contours)>> = std::sync::OnceLock::new();
+    LABELS.get_or_init(|| {
+        noshape_render::overlay::view_cube::FACES
+            .iter()
+            .map(|(n, name)| {
+                let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
+                (*n, Arc::new(noshape_render::overlay::view_cube::face_label(*n, layout.width, &layout.polylines(5))))
+            })
+            .collect()
+    })
+}
+
 impl Drop for Viewport {
     fn drop(&mut self) {
         self.gpu.unregister_target(self.target_id);
@@ -1607,6 +1758,9 @@ impl Render for Viewport {
         let image = self.image.clone();
         let texture_id = self.texture_id;
         self.rendered = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
+        if wgpu_overlays() {
+            self.rasterize_axis_labels(window, cx);
+        }
         noshape_render::perf::record_ms("v.render_count", 1.0);
         self.sync_cursor(window, cx);
         div()
@@ -1627,6 +1781,8 @@ impl Render for Viewport {
                                 this.bounds = bounds;
                                 this.pick_dirty = true;
                                 this.request_frame(cx);
+                                // The view cube is placed from the bounds.
+                                this.sync_overlay(cx);
                             }
                         });
                         // Hitboxes can only be inserted during prepaint.

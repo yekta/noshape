@@ -749,6 +749,9 @@ fn mesh_parts_split_transform_union() {
         s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(b)));
         let r = s.ok();
         let id = r.context.bodies[0].id.clone();
+        // Onshape's generated orange for a mesh part without a colour (live G35).
+        let c = r.context.part_appearance[&id];
+        assert!((c[0] - 0.939).abs() < 1e-3 && (c[1] - 0.242).abs() < 1e-3 && c[2] < 1e-3, "{c:?}");
         (s, id)
     };
     let mixed = |b: &noshape_model::regen::context::Body| {

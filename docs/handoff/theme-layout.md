@@ -822,6 +822,63 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
 - Tools: /root/ui-scratch/tools (a subagent once deleted that folder while cleaning up: tell subagents not
   to delete anything outside their own files).
 
+## Round 15 (2026-10-20 night, cursor rows, live input fonts, splitters)
+
+- **Cursor rows** (docs/parity/cursors.md, live behaviours.md "Remaining cursor rows"):
+  - `CursorStyle::Move` (all-scroll / fleur / size_all; macOS `_moveCursor`) and `Wait` added to vendored
+    gpui-pre and its platforms.
+  - Dimension box: a □□□ drag strip (`move`) moves the box (`ui.dim_box_offset`, reset per box).
+  - Viewport: while another element's drag runs over the graphics (a dialog title, the dimension strip),
+    the viewport drops hover, tool moves and its own cursor (`viewport.rs on_mouse_move`, `has_active_drag`).
+  - Feature dialog count cursor = picks in the dialog's params (`count_picks`). The snap-mate cursor
+    shows only while a snap target exists.
+  - Panel dialogs move by their title: `ui::panel_title(key, title)` makes the drag area (`grab`);
+    `ui::PanelOffsets` (`ui.panels` in both studios) holds the offsets, dropped when the panel closes;
+    `ui::moved_panel` / `ui::nudged_panel` place them.
+  - Feature dialog resize = the 3 px right edge, width only (`FeatureDialog::width`, `ui.dialog_width`),
+    as live; the corner grip is gone.
+  - Splitters:
+    - left panel: `ui::left_splitter` (9 px into the graphics, ≥ 206, persisted
+      config_dir/left_panel_width.txt; `ui::left_panel_w()` replaces `LEFT_PANEL_W` everywhere);
+    - right panels: `ui::right_resizable(panel, inset)` (4 px, ≥ 235, persisted right_panel_width.txt;
+      `ui::right_panel_w()` in the Part Studio panel, the assembly panes and `dock_w`);
+    - Configurations block: `cfg-box-splitter`, `ui.cfg_box_h`.
+  - Configurations panel: drag an input header to reorder (`CfgInputDrag`, a `#1651b0` pill, `grabbing`
+    through `set_window_cursor_style`, a drop line with an open circle; undo "Reorder configuration inputs").
+  - Properties modal: resizable (right / bottom / corner, ≥ 800×542, centred, persisted
+    properties_modal_size.txt).
+  - All of the above were checked in the app on :101.
+  - Gotcha: GPUI drag values are rebuilt on every render, so keep drag start state in a thread-local or
+    the view, not in an `Rc` made at render. The same goes for drag ghosts: GPUI lays them out at min-content
+    at pointer − grab offset, and a root margin is lost (pad a wrapper instead).
+  - Fixed: the assembly Isolate sliders followed any left drag that crossed them; now only a press that
+    started on the slider drags it (`ui.iso_slider_drag`). The other mouse-move sliders (feature dialog
+    Final, in-context, explode, graphics prefs) now ignore moves while another element is being dragged.
+- **Still open** (cursors.md):
+  - row 64: table column grips (asked live);
+  - row 67: Onshape's "Reorder items" mode for ordered query lists, which our direct `PickDrag` doesn't
+    match (asked live);
+  - row 69: the colour Mixer (asked live);
+  - the Variable table's inserted-table reorder (needs an order in `VariableStudioRefs`, which changes
+    variable precedence: model owner);
+  - the Part Studio Customize toolbar (still the old arrow mode, not the assembly's Tools panel);
+  - the Part Studio Isolate panel (an old strip, not Onshape's dialog);
+  - moving Replace instance and Interference detection.
+- **Input fonts from live** (dom/input-fonts.json; mapping /root/ui-scratch/input-fonts-apply.md):
+  - 40 sites applied: search insets 6, renames 13.33/14 with inset 4, `os-param-text` cells 13.33 inset 3,
+    titles 16/500, on-canvas value boxes (13.33, right-aligned, blue bottom line), and every drawing input's
+    text `#555`;
+  - per-input placeholder styles: `InputState::placeholder_style` (gpui-base patch) for the auxiliary
+    view, GD&T text and New-document labels search.
+  - Not done: drawing_palette.rs (another agent was editing it) — its `field` helper needs
+    `.text_color(rgb(0x555555)).text_center()`.
+  - 65 sites are still unknown.
+- **Menus**: `OsMenu::min_width / row_height / text_inset` per menu; documents Create menu = 150 px,
+  29.5 px rows, text 48 (live dom/documents-create-menu.txt).
+- **Name modal field**: Bootstrap form-control. At rest 1 px `#aaa`, radius 3, 34 px tall. Focused: 2 px
+  `#3e94ff` with no glow (the live crop shows none), text kept 11 px in. This is specific to that field, not
+  the shared focus style (the Details labels search is 1 px).
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting

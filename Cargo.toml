@@ -81,6 +81,9 @@ gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 # `Window::request_present` in src/window.rs, used by the 3D viewport), and
 # reports draw phase timings to the app's NOSHAPE_PERF (new src/draw_stats.rs,
 # hooks in `Window::draw_roots` / `present`).
+# NOSHAPE PATCH (agent qa4): shaped text lines are kept across frames
+# (`RecentLines` in src/text_system/line_layout.rs), so text drawn again after
+# a frame without it (a list row shown again after filtering) isn't reshaped.
 gpui-pre = { path = "vendor/gpui-pre" }
 # NOSHAPE PATCH (agent nav): gpui's Windows platform turns touch-screen (and
 # pen) pointer messages into raw touches instead of emulated mouse input
@@ -106,6 +109,8 @@ gpui-base = { path = "vendor/gpui-base" }
 # NOSHAPE PATCH (agent ui): `Button` shows the pointer when clickable and
 # `not-allowed` when disabled, like Onshape's buttons in Chrome (only the
 # lines marked "NOSHAPE PATCH" in src/button/button.rs differ from 0.7.3).
+# NOSHAPE PATCH (agent qa4): `Button` boxes its base control, content style and
+# loading icon, so building one doesn't memmove ~7 KB at every builder call.
 gpui-component = { path = "vendor/gpui-component" }
 # NOSHAPE PATCH (agent perf): gpui's wgpu renderer (Linux) shares its GPU
 # context with the app (`shared_context`, `wait_for_shared_context`, optional

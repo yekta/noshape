@@ -194,7 +194,7 @@ impl DrawingEditor {
                 let in_set = |x: &&Annotation| matches!(&x.kind, AnnotationKind::DatumTarget { label, .. } if label.starts_with(letter));
                 // Targets waiting in the Datum dialog count too.
                 let pending = self.datum_dlg.as_ref().map(|d| d.rows.iter().map(|r| &r.ann).filter(in_set).count()).unwrap_or(0);
-                let n = self.current_sheet().annotations.iter().filter(in_set).count() + pending + 1;
+                let n = self.drawing.sheets[self.sheet].annotations.iter().filter(in_set).count() + pending + 1;
                 Some(Annotation { id, kind: AnnotationKind::DatumTarget { view: a.view, anchor: a.p, label: format!("{letter}{n}"), area: DatumTargetArea::Point }, position: c, refs: refs(vec![(0, a.r.clone())]), ..Default::default() })
             }
             _ => None,
@@ -375,6 +375,7 @@ impl DrawingEditor {
         if let Some((_, grips)) = self.note_grips() {
             out.extend(grips.into_iter().map(|(_, p)| p));
         }
+        out.extend(self.aux_grips());
         out
     }
 

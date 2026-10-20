@@ -192,6 +192,10 @@ impl AssemblyView {
     /// follows the cursor and snaps to mate connectors (click places it).
     fn std_insert(&mut self, mode: Stack, cx: &mut Context<Self>) {
         let spec = self.std_spec();
+        // Replace instance's picker: the component becomes the replacement.
+        if self.pick_replacement(InstanceSource::Standard { spec: spec.clone() }, spec.part_name(), cx) {
+            return;
+        }
         let mut holes = std::mem::take(&mut self.ui.std.holes);
         for p in std::mem::take(&mut self.ui.std.picks) {
             // Closest / furthest: the holes of the picked planar faces.
@@ -374,7 +378,10 @@ impl AssemblyView {
         for ((id, name, cur, options), pick) in levels.into_iter().zip(pickers) {
             hierarchy = hierarchy.child(row(name, 26.5, Self::std_select(id, 181., cur, options, editing, pick, cx)));
         }
-        let mut body = v_flex().child(div().relative().child(hierarchy).children(Self::std_scrollbar("std-hier-sb", &self.ui.std.hier_scroll, 105., cx))).child(rule());
+        // Live: 106 px of rows in the 105 px group, so it scrolls a little
+        // and shows its scrollbar.
+        hierarchy = hierarchy.child(div().h(px(1.5)).flex_none());
+        let mut body = v_flex().child(div().relative().child(hierarchy).child(Self::std_scrollbar("std-hier-sb", &self.ui.std.hier_scroll, 105., cx))).child(rule());
         let Some(c) = standard::component(&spec) else { return body.into_any_element() };
         // Group 2 (114 px, scrolls): the component's parameters, 146 px selects.
         let mut params = v_flex().id("std-params").h(px(114.)).flex_none().overflow_y_scroll().track_scroll(&self.ui.std.param_scroll).on_scroll_wheel(cx.listener(|_, _: &ScrollWheelEvent, _, cx| cx.notify()));
@@ -417,7 +424,7 @@ impl AssemblyView {
         params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, false, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
         let finishes: Vec<String> = standard::FINISHES.iter().map(|s| s.to_string()).collect();
         params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, false, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));
-        body = body.child(div().relative().child(params).children(Self::std_scrollbar("std-param-sb", &self.ui.std.param_scroll, 114., cx))).child(div().mt(px(5.)).child(rule()));
+        body = body.child(div().relative().child(params).child(Self::std_scrollbar("std-param-sb", &self.ui.std.param_scroll, 114., cx))).child(div().mt(px(5.)).child(rule()));
         // Part number / Description: read-only, 161 px, #eee on a #ccc underline.
         let readonly = |text: String| div().w(px(161.)).h(px(26.)).flex_none().flex().items_center().px(px(2.)).bg(gpui_kit::rgb(0xeeeeee)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).overflow_hidden().whitespace_nowrap().child(text);
         let pencil = div()
@@ -452,17 +459,11 @@ impl AssemblyView {
     }
 
     /// Live's always-visible thin scrollbar at a group's right (x 535 of the
-    /// 300 px panel): ▲, a grey rounded thumb, ▼. None while nothing scrolls.
-    fn std_scrollbar(id: &'static str, handle: &ScrollHandle, h: f32, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let max = f32::from(handle.max_offset().y);
-        if max < 0.5 {
-            return None;
-        }
-        let offset = -f32::from(handle.offset().y);
-        let arrow = 11.0;
-        let track = h - 2.0 * arrow;
-        let thumb = (track * h / (h + max)).max(16.0);
-        let top = arrow + (track - thumb) * (offset / max).clamp(0.0, 1.0);
+    /// 300 px panel): ▲, a grey rounded thumb, ▼; nothing while the group
+    /// doesn't scroll. Painted from the handle after layout (this frame's
+    /// sizes), the arrows scroll a row.
+    fn std_scrollbar(id: &'static str, handle: &ScrollHandle, h: f32, cx: &mut Context<Self>) -> AnyElement {
+        const ARROW: f32 = 11.0;
         let step = |dy: f32, handle: ScrollHandle| {
             cx.listener(move |_, _: &ClickEvent, _, cx| {
                 let y = (f32::from(handle.offset().y) - dy).clamp(-f32::from(handle.max_offset().y), 0.0);
@@ -470,43 +471,55 @@ impl AssemblyView {
                 cx.notify();
             })
         };
-        let tri = |up: bool| {
-            canvas(
-                |_, _, _| (),
-                move |b, _, window, _| {
-                    let (x, y) = (b.origin.x, b.origin.y);
-                    let (a, c) = if up { (px(4.), px(0.)) } else { (px(0.), px(4.)) };
-                    let mut pb = PathBuilder::fill();
-                    pb.move_to(point(x, y + a));
-                    pb.line_to(point(x + px(7.), y + a));
-                    pb.line_to(point(x + px(3.5), y + c));
-                    pb.close();
-                    if let Ok(path) = pb.build() {
-                        window.paint_path(path, gpui_kit::rgb(0xa3a3a3));
-                    }
-                },
+        let paint = handle.clone();
+        div()
+            .id(id)
+            .absolute()
+            .top_0()
+            .right(px(5.))
+            .w(px(8.))
+            .h(px(h))
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |b, _, window, _| {
+                        let max = f32::from(paint.max_offset().y);
+                        if max < 0.5 {
+                            return;
+                        }
+                        let grey = gpui_kit::rgb(0xa3a3a3);
+                        let (x, y) = (b.origin.x, b.origin.y);
+                        let tri = |window: &mut Window, top: f32, up: bool| {
+                            let (a, c) = if up { (4.0, 0.0) } else { (0.0, 4.0) };
+                            let mut pb = PathBuilder::fill();
+                            pb.move_to(point(x + px(0.5), y + px(top + a)));
+                            pb.line_to(point(x + px(7.5), y + px(top + a)));
+                            pb.line_to(point(x + px(4.), y + px(top + c)));
+                            pb.close();
+                            if let Ok(path) = pb.build() {
+                                window.paint_path(path, grey);
+                            }
+                        };
+                        tri(window, 3.5, true);
+                        tri(window, h - 7.5, false);
+                        let track = h - 2.0 * ARROW;
+                        let thumb = (track * h / (h + max)).max(16.0);
+                        let offset = -f32::from(paint.offset().y);
+                        let top = ARROW + (track - thumb) * (offset / max).clamp(0.0, 1.0);
+                        window.paint_quad(fill(Bounds::new(point(x + px(1.), y + px(top)), size(px(6.), px(thumb))), gpui_kit::rgb(0xc1c1c1)).corner_radii(px(3.)));
+                    },
+                )
+                .size_full(),
             )
-            .w(px(7.))
-            .h(px(4.))
-        };
-        Some(
-            div()
-                .id(id)
-                .absolute()
-                .top_0()
-                .right(px(5.))
-                .w(px(8.))
-                .h(px(h))
-                .child(div().id("up").absolute().top_0().h(px(arrow)).w_full().flex().items_center().justify_center().child(tri(true)).on_click(step(-26.5, handle.clone())))
-                .child(div().absolute().top(px(top)).left(px(1.)).w(px(6.)).h(px(thumb)).rounded(px(3.)).bg(gpui_kit::rgb(0xc1c1c1)))
-                .child(div().id("down").absolute().bottom_0().h(px(arrow)).w_full().flex().items_center().justify_center().child(tri(false)).on_click(step(26.5, handle.clone())))
-                .into_any_element(),
-        )
+            .child(div().id("up").absolute().top_0().left_0().w_full().h(px(ARROW)).on_click(step(-26.5, handle.clone())))
+            .child(div().id("down").absolute().bottom_0().left_0().w_full().h(px(ARROW)).on_click(step(26.5, handle.clone())))
+            .into_any_element()
     }
 
     /// Live's Insert button group (141 x 34): Insert | closest | furthest.
     fn std_insert_buttons(&self, cx: &mut Context<Self>) -> AnyElement {
-        let stack_on = self.std_stack_enabled();
+        // The replacement picker has no selection to stack on.
+        let stack_on = self.std_stack_enabled() && !self.picking_replacement();
         let cell = |id: &'static str, w: f32| div().id(id).w(px(w)).h(px(34.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xaaaaaa));
         let insert = cell("std-insert", 59.)
             .rounded_l(px(5.25))

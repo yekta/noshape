@@ -186,8 +186,8 @@ impl PartStudioView {
         // Live (183): a 1 px `#d7d7d7` divider and a 5 px white resize
         // gutter left of the 712 px pane; `#ccc` line over gutter and pane.
         Some(
-            v_flex()
-                .w(px(718.))
+            crate::ui::right_resizable(v_flex().relative(), 6.)
+                .w(px(crate::ui::right_panel_w() + 6.))
                 .max_w(relative(0.5))
                 .h_full()
                 .flex_none()
@@ -843,7 +843,11 @@ impl PartStudioView {
             if (only.iter().any(|o| *o) && !only[kind_ix]) || (!query.is_empty() && !input.name.to_lowercase().contains(&query)) {
                 continue;
             }
-            col = col.child(self.render_config_input(&studio, input, grid, window, cx));
+            let section = self.render_config_input(&studio, input, grid, window, cx);
+            col = col.child(self.cfg_drop_target(&input.id, section, cx));
+        }
+        if !cx.has_active_drag() {
+            self.ui.cfg_drop = None;
         }
         col.into_any_element()
     }
@@ -899,6 +903,15 @@ impl PartStudioView {
         let configurable = matches!(input.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. });
         let view = cx.entity();
         let header = h_flex()
+            .id(SharedString::from(format!("cfg-head-{iid}")))
+            // Live (cursors/670): drag the header to reorder the inputs.
+            .on_drag(CfgInputDrag(iid.clone()), {
+                let name = SharedString::from(input.name.clone());
+                move |_, offset, _, cx| {
+                    let name = name.clone();
+                    cx.new(|_| CfgDragPill { name, offset })
+                }
+            })
             .h(px(35.))
             .flex_none()
             .px(px(6.))
@@ -1963,7 +1976,37 @@ impl PartStudioView {
                     }),
             );
         }
-        Some(col.into_any_element())
+        // Live (dom/cursor-rows.json): the line under the block is a
+        // `row-resize` splitter (≈8 px). Its least is the bare title row; it
+        // can grow past the inputs (blank space). Double-click does nothing.
+        let height = self.ui.cfg_box_h;
+        Some(
+            div()
+                .id("cfg-box")
+                .relative()
+                .flex_none()
+                .child(col.when_some(height, |c, h| c.h(px(h)).overflow_hidden()))
+                .child(
+                    div()
+                        .id("cfg-box-splitter")
+                        .absolute()
+                        .left_0()
+                        .right_0()
+                        .bottom(px(-4.))
+                        .h(px(8.))
+                        .cursor(CursorStyle::ResizeRow)
+                        .on_drag(CfgBoxDrag, |_, _, _, cx| cx.new(|_| CfgBoxDrag)),
+                )
+                .on_drag_move(cx.listener(|this, e: &DragMoveEvent<CfgBoxDrag>, window, cx| {
+                    let max = (f32::from(window.viewport_size().height - e.bounds.top()) - 100.).max(37.);
+                    let h = f32::from(e.event.position.y - e.bounds.top()).round().clamp(37., max);
+                    if this.ui.cfg_box_h != Some(h) {
+                        this.ui.cfg_box_h = Some(h);
+                        cx.notify();
+                    }
+                }))
+                .into_any_element(),
+        )
     }
 
     /// An empty panel's illustration and help text with its "Learn more"
@@ -2016,6 +2059,10 @@ impl PartStudioView {
     /// inspection tool row and the empty-state help.
     fn render_inspection(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let letters = self.studio(cx).map(|s| noshape_model::annotations::datum_letters(&s.annotations)).unwrap_or_default();
+        if !letters.is_empty() {
+            return self.render_inspection_filled(letters, cx);
+        }
         v_flex()
             .child(
                 h_flex()
@@ -2081,6 +2128,50 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// Model definitions with annotations (live psb/r-912–913): "Model
+    /// Part 1 ▾", the default tolerances field and ⋯; the tools; "⌄ Datums
+    /// (n/n)" with one cell per letter; "⌄ Characteristics (0/0)" with its
+    /// table header.
+    fn render_inspection_filled(&mut self, letters: Vec<String>, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let grid = gpui_kit::rgb(0xaaaaaa);
+        let part = self.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.name.clone()).unwrap_or_default();
+        let section = |title: &'static str, count: usize| {
+            h_flex()
+                .h(px(34.))
+                .px(px(6.))
+                .gap(px(4.))
+                .bg(gpui_kit::rgb(0xeaeaea))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
+                .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
+                .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(format!("({count}/{count})")))
+        };
+        let cell = |t: String, bold: bool| div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).when(bold, |d| d.font_weight(FontWeight::BOLD).bg(gpui_kit::rgb(0xeaeaea))).child(t);
+        let n = letters.len();
+        v_flex()
+            .mx(px(-5.))
+            .child(
+                h_flex()
+                    .h(px(36.))
+                    .px(px(12.))
+                    .gap(px(12.))
+                    .text_size(px(13.33))
+                    .child(div().text_color(pal.text).child("Model"))
+                    .child(h_flex().w(px(170.)).h(px(26.)).px(px(4.)).justify_between().border_b_1().border_color(grid).child(div().text_color(pal.text).child(part)).child(crate::ui::glyph("ui-caret-down", 8., gpui_kit::rgb(0x666666))))
+                    .child(div().flex_1())
+                    .child(div().id("insp-more").child(crate::assets::icon("more", 20., cx))),
+            )
+            .child(self.render_inspection_tools(cx))
+            .child(section("Datums", n))
+            .child(h_flex().border_l_1().border_color(grid).children(letters.into_iter().map(|l| cell(l, true))))
+            .child(div().h(px(8.)))
+            .child(section("Characteristics", 0))
+            .child(h_flex().border_l_1().border_color(grid).children(["Type", "Nominal value", "Tolerance", "Upper limit", "Lower limit"].map(|h| cell(h.to_string(), true))))
+            .into_any_element()
+    }
+
     /// The Inspection tools (live 591, 593): Datum, Dimension ▾ (Dimension,
     /// Fillet / Minimum / Maximum dimension), Geometric tolerance, Weld
     /// symbol | Set coincident, Set parallel, Set text alignment. A tool
@@ -2101,7 +2192,15 @@ impl PartStudioView {
                 .hover(|d| d.bg(pal.row_hover))
                 .child(crate::assets::icon(icon, 20., cx))
                 .tooltip(crate::ui::tooltip(tip))
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    // Datum opens its dialog (live psb/r-910).
+                    if id == "insp-datum" {
+                        if this.ui.datum_edit.is_some() { this.close_datum_tool(cx) } else { this.open_datum_tool(window, cx) }
+                        return;
+                    }
+                    if this.ui.datum_edit.is_some() {
+                        this.close_datum_tool(cx);
+                    }
                     this.ui.inspection_tool = if this.ui.inspection_tool == Some(id) { None } else { Some(id) };
                     cx.notify();
                 }))
@@ -2232,9 +2331,12 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let (_, effective) = cfg.visibility(&self.config_values);
         for input in cfg.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. })) {
-            let current = effective.0.get(&input.id).cloned().unwrap_or_default();
+            let key = format!("cfgbox-val-{}", input.id);
+            // An out-of-range value stays in the field (live 716).
+            let typed = self.panel_inputs.get(&key).map(|(st, _)| st.read(cx).value().to_string()).filter(|t| config_value_error(input, t, &units).is_some());
+            let current = typed.unwrap_or_else(|| effective.0.get(&input.id).cloned().unwrap_or_default());
             let i = input.clone();
-            self.cell_input(format!("cfgbox-val-{}", input.id), current, window, cx, move |this, v, cx| {
+            self.cell_input(key, current, window, cx, move |this, v, cx| {
                 // An invalid value stays in the field and isn't applied.
                 if config_value_error(&i, &v, &units).is_some() {
                     cx.notify();
@@ -2349,3 +2451,107 @@ fn config_value_error(input: &ConfigInput, text: &str, units: &noshape_units::Un
     let out = lo.is_some_and(|l| v < l) || hi.is_some_and(|h| v > h);
     out.then(|| format!("Enter a value between {} and {}. Current value is {}.", lo.map(fmt).unwrap_or_default(), hi.map(fmt).unwrap_or_default(), fmt(v)))
 }
+
+/// Dragging the splitter under the feature list's Configurations block.
+#[derive(Clone)]
+pub(super) struct CfgBoxDrag;
+
+impl Render for CfgBoxDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// An input of the Configurations panel dragged by its header.
+#[derive(Clone)]
+pub(super) struct CfgInputDrag(String);
+
+/// The drag image (live cursors/670): a `#1651b0` pill with the input's
+/// name in white bold; the pointer shows `grabbing` everywhere meanwhile.
+struct CfgDragPill {
+    name: SharedString,
+    /// Where the header was grabbed: the pill sits at the pointer instead.
+    offset: Point<Pixels>,
+}
+
+impl Render for CfgDragPill {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        // GPUI draws the drag view at the pointer less the grab offset, laid
+        // out at its least size (a root margin is lost): pad it back.
+        div()
+            .pl(self.offset.x)
+            .pt(self.offset.y)
+            .child(
+                div()
+                    .mt(px(-15.))
+                    .h(px(31.))
+                    .px(px(10.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(15.5))
+                    .bg(gpui_kit::rgb(0x1651b0))
+                    .text_size(px(14.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(gpui_kit::rgb(0xffffff))
+                    .child(self.name.clone()),
+            )
+            .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
+    }
+}
+
+/// The drop line (live cursors/670): 2 px `#1651b0`, starting at a 6 px open
+/// circle, across the panel in the gap between two sections.
+fn cfg_drop_line() -> Div {
+    let accent = gpui_kit::rgb(0x1651b0);
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .h(px(6.))
+        .child(div().absolute().left(px(5.)).right_0().top(px(2.)).h(px(2.)).bg(accent))
+        .child(div().absolute().left_0().top_0().size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xcad8ed)))
+}
+
+impl PartStudioView {
+    /// A Configurations panel section as a place to drop a dragged input:
+    /// below the inputs after the dragged one, above those before it.
+    fn cfg_drop_target(&mut self, id: &str, section: AnyElement, cx: &mut Context<Self>) -> AnyElement {
+        let line = self.ui.cfg_drop.as_ref().filter(|(t, _)| t == id).map(|(_, after)| *after);
+        let (over, dropped) = (id.to_string(), id.to_string());
+        div()
+            .id(SharedString::from(format!("cfg-sec-{id}")))
+            .relative()
+            .child(section)
+            // Sections are 10 px apart: the line is centred in the gap.
+            .when_some(line, |d, after| d.child(if after { cfg_drop_line().bottom(px(2.)) } else { cfg_drop_line().top(px(-8.)) }))
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<CfgInputDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let dragged = e.drag(cx).0.clone();
+                let Some(inputs) = this.studio(cx).map(|s| s.configuration.inputs.iter().map(|i| i.id.clone()).collect::<Vec<_>>()) else { return };
+                let (Some(from), Some(to)) = (inputs.iter().position(|i| *i == dragged), inputs.iter().position(|i| *i == over)) else { return };
+                let drop = (from != to).then(|| (over.clone(), to > from));
+                if this.ui.cfg_drop != drop {
+                    this.ui.cfg_drop = drop;
+                    cx.notify();
+                }
+            }))
+            .on_drop(cx.listener(move |this, d: &CfgInputDrag, _, cx| {
+                this.ui.cfg_drop = None;
+                let (from_id, to_id) = (d.0.clone(), dropped.clone());
+                this.edit_config("Reorder configuration inputs", cx, |ps| {
+                    let inputs = &mut ps.configuration.inputs;
+                    if let (Some(from), Some(to)) = (inputs.iter().position(|i| i.id == from_id), inputs.iter().position(|i| i.id == to_id))
+                        && from != to
+                    {
+                        let input = inputs.remove(from);
+                        inputs.insert(to, input);
+                    }
+                });
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+}
+

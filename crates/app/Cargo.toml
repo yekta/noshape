@@ -20,6 +20,7 @@ noshape-units.workspace = true
 noshape-sketch.workspace = true
 noshape-kernel.workspace = true
 noshape-ops.workspace = true
+noshape-scene.workspace = true
 gpui-kit.workspace = true
 anyhow.workspace = true
 glam.workspace = true

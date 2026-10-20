@@ -203,7 +203,7 @@ impl AssemblyView {
                         .bg(rgb(0xffffff))
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Interference detection"))
+                        .child(crate::ui::panel_title("asm-interference", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Interference detection")))
                         // Live: only ✕ (btn-close, 28 px, op .5).
                         .child(
                             div()

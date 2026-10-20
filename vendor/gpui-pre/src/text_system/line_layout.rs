@@ -458,11 +458,47 @@ impl WrappedLineLayout {
 pub(crate) struct LineLayoutCache {
     previous_frame: Mutex<FrameCache>,
     current_frame: RwLock<FrameCache>,
+    // NOSHAPE PATCH (agent qa4): shaped lines also outlive the frames they
+    // weren't drawn in (see `RecentLines`).
+    recent: Mutex<RecentLines>,
     platform_text_system: Arc<dyn PlatformTextSystem>,
     /// Advances when [`TextSystem::add_fonts`] successfully changes the font database.
     font_generation: Arc<AtomicUsize>,
     /// Records the generation represented by both frame caches.
     cached_font_generation: AtomicUsize,
+}
+
+// NOSHAPE PATCH (agent qa4): the per-frame caches keep a line only while it
+// is drawn every frame, so text that comes back (a list row shown again
+// after filtering, a label reverting) was shaped anew, ~0.3 ms a line with
+// cosmic-text. This keeps the platform's shaped lines across frames, about
+// the last `RECENT_LINES`..2x that many used (two generations: when the young
+// one fills it becomes the old one, and a hit in the old one moves to the
+// young one).
+const RECENT_LINES: usize = 4096;
+
+#[derive(Default)]
+struct RecentLines {
+    young: FxHashMap<Arc<CacheKey>, Arc<LineLayout>>,
+    old: FxHashMap<Arc<CacheKey>, Arc<LineLayout>>,
+}
+
+impl RecentLines {
+    fn get(&mut self, key: &dyn AsCacheKeyRef) -> Option<(Arc<CacheKey>, Arc<LineLayout>)> {
+        if let Some((key, layout)) = self.young.get_key_value(key) {
+            return Some((key.clone(), layout.clone()));
+        }
+        let (key, layout) = self.old.remove_entry(key)?;
+        self.insert(key.clone(), layout.clone());
+        Some((key, layout))
+    }
+
+    fn insert(&mut self, key: Arc<CacheKey>, layout: Arc<LineLayout>) {
+        if self.young.len() >= RECENT_LINES {
+            self.old = std::mem::take(&mut self.young);
+        }
+        self.young.insert(key, layout);
+    }
 }
 
 #[derive(Default)]
@@ -502,6 +538,7 @@ impl LineLayoutCache {
         Self {
             previous_frame: Mutex::default(),
             current_frame: RwLock::default(),
+            recent: Mutex::default(),
             platform_text_system,
             font_generation,
             cached_font_generation: AtomicUsize::new(cached_font_generation),
@@ -691,7 +728,9 @@ impl LineLayoutCache {
         }
 
         let mut current_frame = RwLockUpgradableReadGuard::upgrade(current_frame);
-        if let Some((key, layout)) = self.previous_frame.lock().lines.remove_entry(key) {
+        let previous_frame_entry = self.previous_frame.lock().lines.remove_entry(key);
+        let recent_entry = previous_frame_entry.or_else(|| self.recent.lock().get(key));
+        if let Some((key, layout)) = recent_entry {
             current_frame.lines.insert(key.clone(), layout.clone());
             current_frame.used_lines.push(key);
             layout
@@ -713,6 +752,7 @@ impl LineLayoutCache {
                 force_width,
             });
             let layout = Arc::new(layout);
+            self.recent.lock().insert(key.clone(), layout.clone());
             current_frame.lines.insert(key.clone(), layout.clone());
             current_frame.used_lines.push(key);
             layout
@@ -885,6 +925,7 @@ impl LineLayoutCache {
 
         *current_frame = FrameCache::default();
         *self.previous_frame.lock() = FrameCache::default();
+        *self.recent.lock() = RecentLines::default();
         self.cached_font_generation
             .store(font_generation, Ordering::Release);
         font_generation

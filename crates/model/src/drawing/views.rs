@@ -413,6 +413,13 @@ pub fn orientation_frame(o: ViewOrientation) -> ViewFrame {
     ViewFrame::new(dir, up)
 }
 
+/// The view frame (viewing direction, up) of a Part Studio named view: its
+/// camera's line of sight and up direction.
+pub fn named_view_frame(nv: &crate::partstudio::NamedView) -> [[f64; 3]; 2] {
+    let q = DQuat::from_array(nv.rotation).normalize();
+    [(q * DVec3::NEG_Z).to_array(), (q * DVec3::Y).to_array()]
+}
+
 /// Snap a sheet direction to the nearest multiple of 45 degrees.
 pub fn snap_direction(d: [f64; 2]) -> [f64; 2] {
     let a = d[1].atan2(d[0]);
@@ -2558,6 +2565,17 @@ mod tests {
         assert!((t.right - DVec3::X).length() < 1e-12 && (t.up - DVec3::Y).length() < 1e-12);
         let r = orientation_frame(ViewOrientation::Right);
         assert!((r.right - DVec3::Y).length() < 1e-12 && (r.up - DVec3::Z).length() < 1e-12);
+    }
+
+    #[test]
+    fn named_view_frame_is_the_camera() {
+        // The Part Studio's Front camera (+90° about X) gives the Front frame.
+        let q = DQuat::from_rotation_x(std::f64::consts::FRAC_PI_2);
+        let nv = crate::partstudio::NamedView { name: "N".into(), target: [0.0; 3], rotation: q.to_array(), distance: 1.0, perspective: false, section: Vec::new() };
+        let [d, u] = named_view_frame(&nv);
+        let f = ViewFrame::new(DVec3::from_array(d), DVec3::from_array(u));
+        let front = orientation_frame(ViewOrientation::Front);
+        assert!((f.dir - front.dir).length() < 1e-9 && (f.up - front.up).length() < 1e-9 && (f.right - front.right).length() < 1e-9, "{f:?}");
     }
 
     #[test]

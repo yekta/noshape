@@ -250,7 +250,8 @@ impl DrawingEditor {
         for (i, (tip, icon)) in SHAPES.iter().enumerate() {
             // Live dom drawing-detail-dialog: 30 px buttons, radius 2; the active
             // one `#cfdbe5` with a 1 px `#9aa5af` border.
-            let on = shape == i as u8;
+            // Live 604: once the profile exists no shape stays pressed.
+            let on = shape == i as u8 && !placed;
             let btn = div()
                 .id(SharedString::from(format!("det-shape-{i}")))
                 .size(px(30.))
@@ -323,11 +324,21 @@ impl DrawingEditor {
                         ),
                 )
                 .child(tools)
-                // Live 127: the active prompt field before the circle is drawn
-                // (`#dbf1fa`, 1 px `#1b5faa`, radius 2, 12 px `#616b73`).
-                .when(shape == 0 && matches!(self.tool, Tool::Detail { center: None, .. }), |e| {
-                    e.child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child("Create circle"))
-                })
+                // Live 127, 600–604 (behaviours.md "Detail view dialog: prompt
+                // field text per shape"): the query field reads Create circle /
+                // rectangle / closed profile / closed polygon until the profile
+                // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
+                // radius 2, 12 px `#616b73`).
+                .child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if placed {
+                    "Profile created"
+                } else {
+                    match shape {
+                        1 => "Create rectangle",
+                        2 => "Create closed profile",
+                        3 => "Create closed polygon",
+                        _ => "Create circle",
+                    }
+                }))
                 .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
                 .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))

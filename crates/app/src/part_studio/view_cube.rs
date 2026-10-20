@@ -10,257 +10,15 @@ use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
-use noshape_render::{Camera, Projection, StandardView};
+use noshape_render::{Projection, StandardView};
 
-/// Side of the whole widget (cube, arrows and the view menu button): Onshape's
-/// `VIEW_CUBE_SCREEN_SIZE_PX`.
-const WIDGET_PX: f32 = 150.0;
+// The cube's geometry is shared with its drawing in the 3D frame
+// (`noshape_render::overlay::view_cube`, `NOSHAPE_OVERLAY=wgpu`).
+pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, FACES, HALF_EDGE, HIDDEN_AXIS_OPACITY, WIDGET_PX, behind_cube, cube_shapes, face_axes, point_in_poly, widget_hit};
 
-// Onshape's view cube geometry (its WebGL view manipulator), in pixels from
-// the widget's center with y up.
 const G: f64 = WIDGET_PX as f64;
-/// The arrow tips touch the widget's edge.
-const ARROW_OUT: f64 = 0.5 * G;
-/// Half of `VIEW_CUBE_ARROW_WIDTH` and `VIEW_CUBE_ARROW_HEIGHT`.
-const ARROW_HALF_W: f64 = 0.05 * G;
-const ARROW_HALF_H: f64 = 0.065 * G;
-/// `VIEW_CUBE_ARROW_ARC_WIDTH`: the roll arcs' thickness.
-const ARC_W: f64 = 0.04 * G;
-/// Half the cube's edge: what's left inside the arrows, less room for the
-/// 12 px axis labels.
-const HALF_EDGE: f64 = ((0.5 - 2.0 * 0.05) / 1.6 - 12.0 / G / 1.5) * G;
-/// Each face is a rounded square: white on the near side, a light frame
-/// seen through on the far side (`VIEW_CUBE_FRONT_SIZE`, `_BACK_SIZE`,
-/// `_CORNER_SIZE` of the edge length).
-const FRONT_SIZE: f64 = 0.75;
-const BACK_SIZE: f64 = 0.97;
-const CORNER_SIZE: f64 = 0.2;
 /// The axis lines start `VIEW_CUBE_AXIS_GAP` outside the cube's corner.
 const AXIS_GAP: f64 = 1.0;
-/// Axis parts behind the cube (`VIEW_CUBE_HIDDEN_AXIS_OPACITY`).
-const HIDDEN_AXIS_OPACITY: f32 = 0.3;
-
-/// A clickable region of the cube, identified by the view direction it
-/// stands for: one non-zero component = face, three = corner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CubeCell(pub [i8; 3]);
-
-impl CubeCell {
-    fn dir(self) -> DVec3 {
-        DVec3::new(self.0[0] as f64, self.0[1] as f64, self.0[2] as f64)
-    }
-
-    /// Camera rotation for this cell: a face's standard view, or for a
-    /// corner Onshape's trimetric view from that side (30° off the side
-    /// face nearest the corner's front, 30° above or below the ground).
-    pub fn rotation(self) -> DQuat {
-        let view = match self.0 {
-            [0, -1, 0] => Some(StandardView::Front),
-            [0, 1, 0] => Some(StandardView::Back),
-            [-1, 0, 0] => Some(StandardView::Left),
-            [1, 0, 0] => Some(StandardView::Right),
-            [0, 0, 1] => Some(StandardView::Top),
-            [0, 0, -1] => Some(StandardView::Bottom),
-            _ => None,
-        };
-        if let Some(v) = view {
-            return Camera::rotation_for(v);
-        }
-        let quarter = match (self.0[0] > 0, self.0[1] > 0) {
-            (true, false) => 0.0,
-            (true, true) => 1.0,
-            (false, true) => 2.0,
-            (false, false) => 3.0,
-        };
-        let t = (quarter * 90.0 + 30.0f64).to_radians();
-        let eye = DVec3::new(0.75f64.sqrt() * t.sin(), -(0.75f64.sqrt()) * t.cos(), 0.5 * self.0[2].signum() as f64);
-        Camera::look_rotation(-eye, DVec3::Z)
-    }
-}
-
-/// Face labels by outward normal (Onshape: Front looks along +Y).
-const FACES: [([i8; 3], &str); 6] = [([0, -1, 0], "Front"), ([0, 1, 0], "Back"), ([-1, 0, 0], "Left"), ([1, 0, 0], "Right"), ([0, 0, 1], "Top"), ([0, 0, -1], "Bottom")];
-
-/// A face's in-plane axes: its label runs along the first, upright along
-/// the second.
-fn face_axes(n: [i8; 3]) -> (DVec3, DVec3) {
-    match n {
-        [0, -1, 0] => (DVec3::X, DVec3::Z),
-        [0, 1, 0] => (DVec3::NEG_X, DVec3::Z),
-        [-1, 0, 0] => (DVec3::NEG_Y, DVec3::Z),
-        [1, 0, 0] => (DVec3::Y, DVec3::Z),
-        [0, 0, 1] => (DVec3::X, DVec3::Y),
-        _ => (DVec3::X, DVec3::NEG_Y),
-    }
-}
-
-/// The rotate and roll arrows around the cube. While hovered, an arrow
-/// sits in the owner's hover slot as a pseudo cell ([`Arrow::cell`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Arrow {
-    Up,
-    Down,
-    Left,
-    Right,
-    Cw,
-    Ccw,
-}
-
-/// Marks an arrow's pseudo cell (no cube cell has a component this big).
-const ARROW_TAG: i8 = 9;
-
-impl Arrow {
-    const ALL: [Arrow; 6] = [Arrow::Up, Arrow::Down, Arrow::Left, Arrow::Right, Arrow::Cw, Arrow::Ccw];
-
-    fn cell(self) -> CubeCell {
-        CubeCell([ARROW_TAG, self as i8, 0])
-    }
-
-    fn of(cell: CubeCell) -> Option<Arrow> {
-        if cell.0[0] != ARROW_TAG {
-            return None;
-        }
-        Self::ALL.get(cell.0[1] as usize).copied()
-    }
-
-    /// Outline polygons, from the widget center with y up: a triangle on
-    /// each side; a roll arrow is an arc band with its head at the outer end.
-    fn polys(self) -> Vec<Vec<DVec2>> {
-        let (o, w) = (ARROW_OUT, ARROW_HALF_W);
-        let b = o - ARROW_HALF_H;
-        let tri = |p: [[f64; 2]; 3]| vec![p.iter().map(|q| DVec2::from(*q)).collect::<Vec<_>>()];
-        let arc = |a0: f64, a1: f64| {
-            let (r0, r1) = (o - w - ARC_W / 2.0, o - w + ARC_W / 2.0);
-            let at = |k: usize| a0 + (a1 - a0) * k as f64 / 6.0;
-            let mut p: Vec<DVec2> = (0..=6).map(|k| DVec2::from_angle(at(k)) * r1).collect();
-            p.extend((0..=6).rev().map(|k| DVec2::from_angle(at(k)) * r0));
-            p
-        };
-        let head = |sx: f64| {
-            let d = DVec2::new(sx, 1.0) * std::f64::consts::FRAC_1_SQRT_2;
-            let q = std::f64::consts::FRAC_PI_4 - ARROW_HALF_H / o;
-            vec![d * o, d * (o - 2.0 * w), DVec2::new(sx * q.cos(), q.sin()) * (o - w)]
-        };
-        use std::f64::consts::PI;
-        match self {
-            Arrow::Up => tri([[0.0, o], [-w, b], [w, b]]),
-            Arrow::Down => tri([[0.0, -o], [w, -b], [-w, -b]]),
-            Arrow::Left => tri([[-o, 0.0], [-b, -w], [-b, w]]),
-            Arrow::Right => tri([[o, 0.0], [b, w], [b, -w]]),
-            Arrow::Cw => vec![head(1.0), arc(0.25 * PI, 0.4 * PI)],
-            Arrow::Ccw => vec![head(-1.0), arc(0.6 * PI, 0.75 * PI)],
-        }
-    }
-}
-
-/// One visible piece of the cube, in pixels from the widget center with y up.
-#[derive(Clone, Debug)]
-struct CubeShape {
-    cell: CubeCell,
-    poly: Vec<DVec2>,
-    /// A far face's frame (light) rather than a white near face or corner.
-    frame: bool,
-}
-
-/// A rounded square in the plane through `c` spanned by `u` and `v`:
-/// half side `a`, corner radius `r`, 9 segments per corner.
-fn rounded_square(c: DVec3, u: DVec3, v: DVec3, a: f64, r: f64) -> Vec<DVec3> {
-    let mut out = Vec::with_capacity(40);
-    for (k, (su, sv)) in [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].into_iter().enumerate() {
-        let corner = c + u * (su * (a - r)) + v * (sv * (a - r));
-        for j in 0..=9 {
-            let t = (k as f64 + j as f64 / 9.0) * std::f64::consts::FRAC_PI_2;
-            out.push(corner + (u * t.cos() + v * t.sin()) * r);
-        }
-    }
-    out
-}
-
-/// The cube's visible pieces for a camera rotation, back to front, like
-/// Onshape's back-face-culled mesh: the far faces' frames seen through
-/// the gaps, a white disk under each near corner, the near faces' white
-/// squares.
-fn cube_shapes(rotation: DQuat) -> Vec<CubeShape> {
-    let inv = rotation.inverse();
-    let h = HALF_EDGE;
-    let (mut far, mut corners, mut near) = (Vec::new(), Vec::new(), Vec::new());
-    for (n, _) in FACES {
-        let cell = CubeCell(n);
-        let z = (inv * cell.dir()).z;
-        if z.abs() < 1e-6 {
-            continue;
-        }
-        let (u, v) = face_axes(n);
-        let size = if z > 0.0 { FRONT_SIZE } else { BACK_SIZE };
-        let poly = rounded_square(cell.dir() * h, u, v, size * h, CORNER_SIZE * 2.0 * h).into_iter().map(|p| (inv * p).truncate()).collect();
-        if z > 0.0 {
-            near.push(CubeShape { cell, poly, frame: false });
-        } else {
-            far.push(CubeShape { cell, poly, frame: true });
-        }
-    }
-    for i in 0..8 {
-        let s = |bit: i32| if i & bit == 0 { -1i8 } else { 1 };
-        let cell = CubeCell([s(1), s(2), s(4)]);
-        let d = cell.dir().normalize();
-        if (inv * d).z <= 1e-6 {
-            continue;
-        }
-        let center = cell.dir() * (0.8 * h);
-        let u = d.cross(DVec3::Z).normalize();
-        let v = d.cross(u);
-        let poly = (0..36)
-            .map(|k| {
-                let t = k as f64 / 36.0 * std::f64::consts::TAU;
-                (inv * (center + (u * t.cos() + v * t.sin()) * (0.24 * h))).truncate()
-            })
-            .collect();
-        corners.push(CubeShape { cell, poly, frame: false });
-    }
-    far.into_iter().chain(corners).chain(near).collect()
-}
-
-/// Front-most cube cell under a point (pixels from the widget center, y up).
-pub fn cube_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
-    cube_shapes(rotation).into_iter().rev().find(|s| point_in_poly(p, &s.poly)).map(|s| s.cell)
-}
-
-/// What's under a widget point: an arrow's pseudo cell or a cube cell.
-fn widget_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
-    Arrow::ALL.into_iter().find(|a| a.polys().iter().any(|q| point_in_poly(p, q))).map(Arrow::cell).or_else(|| cube_hit(rotation, p))
-}
-
-fn point_in_poly(p: DVec2, poly: &[DVec2]) -> bool {
-    let mut inside = false;
-    let mut j = poly.len().saturating_sub(1);
-    for i in 0..poly.len() {
-        let (a, b) = (poly[i], poly[j]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
-            inside = !inside;
-        }
-        j = i;
-    }
-    inside
-}
-
-/// Whether the cube hides a point (pixels, world axes) from a viewer
-/// towards `eye`.
-fn behind_cube(p: DVec3, eye: DVec3) -> bool {
-    let h = HALF_EDGE;
-    let (mut t0, mut t1) = (0.0f64, f64::INFINITY);
-    for i in 0..3 {
-        if eye[i].abs() < 1e-12 {
-            if p[i].abs() > h {
-                return false;
-            }
-        } else {
-            let (a, b) = ((-h - p[i]) / eye[i], (h - p[i]) / eye[i]);
-            t0 = t0.max(a.min(b));
-            t1 = t1.min(a.max(b));
-        }
-    }
-    t0 < t1
-}
 
 /// See [`CubeHooks::state`].
 pub type CubeState<'a> = (&'a mut Option<CubeCell>, &'a mut Option<Point<Pixels>>);
@@ -277,6 +35,9 @@ pub struct CubeHooks<V: 'static> {
     pub rotate: fn(&mut V, f64, f64, &mut Context<V>),
     /// Roll by degrees about the line of sight (arc arrows).
     pub roll: fn(&mut V, f64, &mut Context<V>),
+    /// The widget was laid out at this window position (its drawing in the
+    /// 3D frame follows it, `NOSHAPE_OVERLAY=wgpu`).
+    pub placed: fn(&mut V, Point<Pixels>, &mut Context<V>),
 }
 
 impl<V: 'static> Clone for CubeHooks<V> {
@@ -396,9 +157,18 @@ pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: Any
             canvas(
                 move |bounds, _, cx| {
                     // Records the widget origin for hit testing.
-                    view.update(cx, |this, _| *(hooks.state)(this).1 = Some(bounds.origin));
+                    view.update(cx, |this, cx| {
+                        *(hooks.state)(this).1 = Some(bounds.origin);
+                        if crate::viewport::wgpu_overlays() {
+                            (hooks.placed)(this, bounds.origin, cx);
+                        }
+                    });
                 },
                 move |bounds, _, window, _| {
+                    // Drawn into the 3D frame instead (the canvas stays the hit area).
+                    if crate::viewport::wgpu_overlays() {
+                        return;
+                    }
                     let o = bounds.origin;
                     let at = |v: DVec2| point(o.x + px((G * 0.5 + v.x) as f32), o.y + px((G * 0.5 - v.y) as f32));
                     for (polys, color) in &arrows {
@@ -431,7 +201,7 @@ pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: Any
             .left_0()
             .size_full(),
         )
-        .children(axis_labels)
+        .children(axis_labels.into_iter().filter(|_| !crate::viewport::wgpu_overlays()))
         .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
             let rot = (hooks.rotation)(this, cx);
             let (hover, origin) = (hooks.state)(this);
@@ -496,6 +266,10 @@ impl PartStudioView {
 
     pub(super) fn render_view_cube(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let rotation = self.viewport.read(cx).camera.rotation;
+        if crate::viewport::wgpu_overlays() {
+            let hover = self.ui.cube_hover;
+            self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
+        }
         let menu = self.render_camera_menu(cx);
         let hooks = CubeHooks {
             state: |this: &mut Self| (&mut this.ui.cube_hover, &mut this.ui.cube_origin),
@@ -503,6 +277,7 @@ impl PartStudioView {
             click: Self::cube_click,
             rotate: |this, dx, dy, cx| this.rotate_by(&(), dx, dy, cx),
             roll: Self::roll_view,
+            placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
         view_cube(rotation, self.ui.cube_hover, menu, hooks, cx)
     }
@@ -667,6 +442,8 @@ fn display_label(m: DisplayMode) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use noshape_render::Camera;
+    use noshape_render::overlay::view_cube::cube_hit;
     // The glob import brings GPUI's `test` attribute; use the built-in one.
     use std::prelude::v1::test;
 

@@ -19,9 +19,35 @@ pub struct VariableDef {
     pub kind: Option<VarKind>,
     #[serde(default)]
     pub description: String,
+    /// Description right-click › Convert to expression: `description` is an
+    /// expression (text is the string literal `"text"`), as in the Part
+    /// Studio Variable table (live 652–656).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub description_expr: bool,
     /// "From import": the CSV selection (kind `FromImport`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import: Option<CsvImport>,
+}
+
+impl VariableDef {
+    /// Description right-click › Convert to expression / Convert to text:
+    /// the text becomes the string literal `"text"` and back.
+    pub fn toggle_description_expr(&mut self) {
+        if self.description_expr {
+            if let Some(t) = crate::variable_table::string_literal(&self.description) {
+                self.description = t.to_string();
+            }
+        } else if !self.description.trim().is_empty() {
+            self.description = format!("\"{}\"", self.description);
+        }
+        self.description_expr = !self.description_expr;
+    }
+
+    /// The Description cell's text, typed: an expression description keeps
+    /// plain words as a string literal.
+    pub fn set_description(&mut self, text: &str) {
+        self.description = if self.description_expr { crate::variable_table::as_expression(text) } else { text.to_string() };
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -477,8 +503,22 @@ mod studio_scope_tests {
     use super::*;
     use crate::document::{Tab, TabContent};
 
+    #[test]
+    fn description_converts_to_expression_and_back() {
+        let mut v = VariableDef { name: "w".into(), expr: ExprValue::new("10 mm"), kind: Some(VarKind::Length), description: "half of 10".into(), description_expr: false, import: None };
+        v.toggle_description_expr();
+        assert_eq!((v.description.as_str(), v.description_expr), ("\"half of 10\"", true));
+        v.set_description("plate width");
+        assert_eq!(v.description, "\"plate width\"");
+        v.set_description("#w * 2");
+        assert_eq!(v.description, "#w * 2");
+        v.set_description("plate width");
+        v.toggle_description_expr();
+        assert_eq!((v.description.as_str(), v.description_expr), ("plate width", false));
+    }
+
     fn vs(vars: &[(&str, &str)], all: bool) -> VariableStudio {
-        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), import: None }).collect(), insert_into_all: all, inserted: Vec::new() }
+        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None }).collect(), insert_into_all: all, inserted: Vec::new() }
     }
 
     fn doc_with(studios: Vec<VariableStudio>) -> (crate::Document, TabId, Vec<TabId>) {
@@ -524,7 +564,7 @@ mod studio_scope_tests {
         assert_eq!(mm(element_variables(&doc, ps).get("a")), 5.0);
         // Studio 2 inserts studio 1 and uses its variable; its own `a` still wins.
         if let TabContent::VariableStudio(v) = &mut doc.tab_mut(ids[1]).unwrap().content {
-            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new(), import: None }];
+            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new(), description_expr: false, import: None }];
             v.inserted = vec![StudioRef::whole(ids[0])];
             v.insert_into_all = false;
         }

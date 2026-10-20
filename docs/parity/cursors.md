@@ -30,7 +30,7 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | Sketch linear / circular pattern, transform (`canCreatePattern`) and offset (preview shown): operation complete, nothing pre-highlighted and no dimension box open ("click to accept"; `showConfirmationCursor`) | image confirmation (`macConfirmation_Cursor` / `winConfirmation_Cursor`); while something is pre-highlighted the stack is empty, so the selection cursor shows | 1,1 | ✅ (read back: 32 px, hot 1,1) |
 | Hovering a dimension's value (draggable) | `move` | — | 🟡 (viewport `overlay_cursor`; read-back pending) |
 | Hovering a dimension's lines | `default` | — | ✅ |
-| Hovering a plane-type manipulator (section plane / move plane) | `move` | — | ❌ |
+| Hovering / dragging the section view arrow (and other 3D manipulators) | `default`: live (behaviours.md "Remaining cursor rows" (1)) never sets `move` or a grab cursor on 3D manipulators; there is no draggable plane surface | — | ✅ (ours keeps the canvas cursor) |
 | Ctrl held during a box selection (box deselect) | image remove-selection (`macRemoveSelectionCursor` / `winRemoveSelectionCursor`) | mac 3,3 · win 1,2 | ✅ (Part Studio and sketch box; Ctrl in a sketch box now also deselects; read back: 32 px, hot 3,3) |
 | Zoom to window mode ("Drag to create zoom bounding box.") | `zoom-in` | — | ✅ (theme `zoom-in` on X11; our drawing where the theme has none) |
 | Assembly: dragging a fixed instance | `no-drop` | — | ✅ (was not-allowed) |
@@ -42,7 +42,7 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | Rotate / pan / zoom drags (right / middle / Ctrl+right, Shift+middle, wheel) and left-drag box select | `default` (live: Onshape never changes the cursor for navigation) | — | ✅ (no hiding during drags) |
 | Manipulator arrows, triad, rotate rings, extrude depth arrow (hover and drag) | unchanged: the dialog's current canvas cursor (live) | — | ✅ |
 | Feature dialog open (e.g. new Extrude, Mate connector after its first pick) | the selection-count cursor: Onshape counts the whole selection minus rollback-bar items (`min(6, n)`), so the edited feature row makes it "1" | 3,3 | 🟡 (ours shows the arrow while a dialog is open; exact counting asked live, REQUESTS.md 20 Oct follow-up) |
-| Selection-count cursor outside the canvas | the same cursor is set on `.navbar` and on `#context-menu-layer` while a context menu is open | — | ❌ |
+| Selection-count cursor outside the canvas | the same cursor on `.navbar`; while a context menu is open the layer and the canvas are `default` (live dom/cursors-count.json) | — | ✅ (navbar via `CursorSync`) |
 | Follow mode (another user's pointer) | cloud-only (excluded) | — | — |
 | Comment tag placement (`comment-tag.svg`) | cloud-only (excluded) | — | — |
 
@@ -54,23 +54,23 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | Active tab, empty navbar, view cube faces / arrows, dialog ✓ / ✗ (enabled or not), panel-dialog header ✓ / ✗, selection chip text, feature and part rows | `default` / `auto` | ✅ |
 | Undo / Redo with nothing to undo, disabled camera items (Previous view), disabled buttons | `not-allowed` | ✅ (Undo/Redo; `Button` disabled → not-allowed) |
 | Text inputs (the whole box inside the border, padding included), document name and workspace label in the navbar, number fields | `text` | ✅ (vendored gpui-base `frame_hit`; app boxes via `input_frame`) |
-| Feature-dialog / panel-dialog header drag area (`.ns-drag-area:hover`, `.osx-panel-dialog-header`, `.ns-subdialog-header`) | `grab` (live: title and drag area) | 🟡 (feature dialog ✅; panel dialogs to audit) |
+| Feature-dialog / panel-dialog title (`.ns-drag-area` inside `.ns-dialog-header`, which is `auto`) | `grab`, also while dragging; the dialog moves (live: feature dialogs, Mass and section properties, Appearance, Isolate, Make transparent, Material, Named views, Section view, Replace instance, Interference detection; Measure is docked and does not move) | 🟡 (feature dialog, Create selection; Part Studio Mass, Section view, Material, Named views, Appearance; assembly Mass, Section view, Isolate / Make transparent: `ui::panel_title` + `PanelOffsets`; checked: Material moved exactly by the pointer's travel, reopens in place, and assembly Isolate moves too. Still to do: Replace instance, Interference detection, and the Part Studio Isolate panel, which isn't Onshape's dialog yet) |
 | Disabled dialog ✓ (`div.ns-dialog-button-ok.disabled`) | `default` (live) | ✅ |
 | Feature-list row, rollback bar (hover and drag) | `default` (live) | ✅ |
-| Dimension box drag strip (`.dimension-dialog-drag`) | `move` | ❌ |
-| Draggable table/section headers (`.draggable-header.is-draggable:hover` / `:active`) | `grab` / `grabbing` | ❌ |
-| Layout splitters (`.os-layout-splitter`, x / y axis) and resize handles (`osc-resize-handle.osc-x/.osc-y`) | `ew-resize` / `ns-resize` | ❌ |
-| Row / column splitters (`div.os-splitter`): features / parts list (live y 789), Configurations block (y 157), left panel / graphics (x 245) | `row-resize` / `col-resize` (live) | 🟡 (features/parts ✅; noshape has no left-panel width splitter nor a Configurations-block splitter yet) |
-| Table column resize grip (`.table-cell--header .drag-handle`) | `col-resize` | ❌ |
-| Resizable modals: edges / corner | `ns-resize`, `ew-resize`, `se-resize` | ❌ |
-| jQuery dialogs: title bar / edges / corners | `move`; `n/s/e/w/ne/nw/se/sw-resize` | ❌ |
+| Dimension box drag strip (`.dimension-dialog-drag`) | `move` (Chrome shows all-scroll) | ✅ (read back: 24 px all-scroll; dragging moves the box, and the sketch tool under it no longer follows the pointer) |
+| Configurations panel input headers (`.draggable-header.is-draggable`): drag to reorder | `auto` at rest, `grabbing` while dragging; a `#1651b0` pill with the name follows the pointer; the drop line is 2 px `#1651b0` from a 6 px open circle (live cursors/670–671) | 🟡 (Part Studio panel checked: pill at the pointer, drop line, closed hand read back, Ctrl+Z restores; the Variable table's inserted-table reorder (pale pill, red line where it can't drop) is still to do) |
+| Feature dialog right edge (`osc-resize-handle.osc-x`, 3 px inside the edge; `.osc-y` is 0×0) | `ew-resize`, width only, also at the bottom-right corner (live: no corner resize) | ✅ (was a 10 px corner grip that resized both ways; checked: ew-resize read back, 220 → 320 px) |
+| Row / column splitters (`div.os-splitter`): features / parts list, Configurations block (least = its title row; grows past its inputs), left panel / graphics (9 px zone in the graphics; ≥ default width, persists; no double-click), right panel / graphics (4 px zone; ≥ 235 px, persists) | `row-resize` / `col-resize` (live) | ✅ (`ui::left_splitter`, `cfg-box-splitter`, `ui::right_resizable` on the Part Studio panel and the five assembly panes; checked: col-resize / row-resize read back, left stops at 206, right 712 → 510, the block collapses to its title and grows past its inputs) |
+| Table column resize grip (`.table-cell--header .drag-handle`, 5 px inside the header cell's right edge: BOM, named positions, configurations, variable and custom tables) | `col-resize` | ❌ (no column resize yet; asked live how the drag behaves, REQUESTS.md 20 Oct "table column resize + colour Mixer") |
+| Resizable modals (`resizableModal`: Properties…, BOM / Inspection table template): bottom 5 px / right 5 px / 10 px corner | `ns-resize`, `ew-resize`, `se-resize`; at least 800×542, stays centred horizontally, size persists | 🟡 (Properties checked: ew / ns / se read back, the corner drag gave 1190×687 centred (live 1173×687); the table-template dialog isn't in noshape) |
+| jQuery dialogs: title bar / edges / corners | `move`; `n/s/e/w/ne/nw/se/sw-resize` | ✅ n/a (live: shipped in the bundle but never used) |
 | Drag grips in lists (selection-list drag handle, property lists, enum tables) | `ns-resize` | ❌ |
-| Customize toolbar: sled, tool-set drag handle, palette items | `move` | ❌ |
-| Color picker area / slider | `crosshair` / `ns-resize` | ❌ |
-| Drawing markup content (`.os-markup-content`) | `crosshair` | ❌ |
+| Customize toolbar: sled, tool-set drag handle, palette items | `move` | 🟡 (assembly Tools panel ✅ with `CursorStyle::Move`; the Part Studio's Customize toolbar is still the old arrow mode and needs the same Tools panel) |
+| Color picker area / slider | `crosshair` / `ns-resize` | ❌ (the Mixer tabs: asked live, REQUESTS.md 20 Oct "table column resize + colour Mixer") |
+| Drawing markup content (`.os-markup-content`) | `crosshair` | — (Comments panel › Markup: comments are cloud-only, excluded) |
 | `abbr[title]` | `help` | — |
-| Loading placeholders | `wait` | ❌ |
-| A collapsed layout splitter | `default` | ❌ |
+| Loading placeholders | `wait` | ✅ n/a (live: the `.placeholder` rule is never used) |
+| A collapsed layout splitter | `default` | ✅ n/a (live: a collapsed Configurations block keeps `row-resize`; no other collapsible splitter) |
 
 ## Still to capture live (REQUESTS.md, 20 Oct)
 

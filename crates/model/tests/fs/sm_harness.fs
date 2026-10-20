@@ -45,6 +45,25 @@ export const smHarness = defineFeature(function(context is Context, id is Id, de
         skRectangle(sk, "r", { "firstCorner" : vector(0, 0) * mm, "secondCorner" : vector(40, 20) * mm });
         skSolve(sk);
         run(context, id + "sm1", mergeMaps(model, { "process" : SMProcessType.THICKEN, "regions" : qSketchRegion(id + "sk"), "thickness" : 2 * mm, "radius" : 1 * mm }));
+        // sm2: sm1's plate (at y 200) + a 90° Flange, 10 mm, on its top long edge (live dom/fs-smprobe-2.txt).
+        const sk2 = newSketchOnPlane(context, id + "sk2", { "sketchPlane" : plane(vector(0, 200, 0) * mm, vector(0, 0, 1)) });
+        skRectangle(sk2, "r", { "firstCorner" : vector(0, 0) * mm, "secondCorner" : vector(40, 20) * mm });
+        skSolve(sk2);
+        run(context, id + "sm2", mergeMaps(model, { "process" : SMProcessType.THICKEN, "regions" : qSketchRegion(id + "sk2"), "thickness" : 2 * mm, "radius" : 1 * mm }));
+        try
+        {
+            const part2 = qBodyType(qCreatedBy(id + "sm2", EntityType.BODY), BodyType.SOLID);
+            sheetMetalFlange(context, id + "fl2", { "edges" : qContainsPoint(qOwnedByBody(part2, EntityType.EDGE), vector(20, 200, 2) * mm),
+                        "limitType" : SMFlangeBoundingType.BLIND, "distance" : 10 * mm, "angleControlType" : SMFlangeAngleControlType.BEND_ANGLE,
+                        "bendAngle" : 90 * degree, "autoMiter" : true, "useDefaultRadius" : true });
+            const err = getFeatureError(context, id + "fl2");
+            const parts = evaluateQuery(context, part2);
+            println("sm2 " ~ (err == undefined ? "" : toString(err) ~ " ") ~ "parts " ~ size(parts) ~ (size(parts) == 1 ? " areas " ~ toString(faceAreas(context, parts[0])) : ""));
+        }
+        catch (e)
+        {
+            println("sm2 flange threw " ~ toString(e));
+        }
         // sm3: Extrude of an open L (0,0) (30,0) (30,20) on Top (moved to y 100), 15 mm, 1.5 mm, r 2.
         const sk3 = newSketchOnPlane(context, id + "sk3", { "sketchPlane" : plane(vector(0, 100, 0) * mm, vector(0, 0, 1)) });
         skPolyline(sk3, "l", { "points" : [vector(0, 0) * mm, vector(30, 0) * mm, vector(30, 20) * mm] });

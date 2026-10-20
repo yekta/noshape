@@ -206,10 +206,33 @@ fn glyph(c: char) -> &'static Glyph {
     g.get(&c).or_else(|| c.to_uppercase().next().and_then(|u| g.get(&u))).unwrap_or_else(fallback)
 }
 
-/// Width of a single line of text of cap height `height`.
+/// The drawing's default font (Onshape: "Noto Sans ( Note )").
+pub const DEFAULT_FAMILY: &str = "Noto Sans";
+
+/// Advance of a character per cap height: Noto Sans' advance for the
+/// characters it draws ([`fill_supported`]), the stroke glyph's otherwise.
+fn char_width(c: char) -> f64 {
+    use std::sync::Mutex;
+    static CACHE: OnceLock<Mutex<HashMap<char, f64>>> = OnceLock::new();
+    if let Some(v) = CACHE.get_or_init(Default::default).lock().ok().and_then(|m| m.get(&c).copied()) {
+        return v;
+    }
+    let mut buf = [0u8; 4];
+    let v = if fill_supported(c.encode_utf8(&mut buf)) {
+        noshape_sketch::text::layout_text(c.encode_utf8(&mut buf), DEFAULT_FAMILY, false, false).width / fill_cap(DEFAULT_FAMILY, false, false)
+    } else {
+        glyph(c).advance / CAP
+    };
+    if let Ok(mut m) = CACHE.get_or_init(Default::default).lock() {
+        m.insert(c, v);
+    }
+    v
+}
+
+/// Width of a single line of text of cap height `height` (Noto Sans
+/// advances, the text as Onshape lays it out).
 pub fn text_width(text: &str, height: f64) -> f64 {
-    let units: f64 = text.chars().map(|c| glyph(c).advance).sum::<f64>();
-    (units - if text.is_empty() { 0.0 } else { SPACING }).max(0.0) * height / CAP
+    text.chars().map(char_width).sum::<f64>() * height
 }
 
 /// Offset of the text origin (left end of the baseline) from the anchor
@@ -233,11 +256,14 @@ pub fn text_strokes(t: &Text2) -> Vec<Vec<[f64; 2]>> {
     let mut x = 0.0;
     for ch in t.text.chars() {
         let g = glyph(ch);
+        // Each stroke glyph sits centred in the character's slot of the layout.
+        let slot = char_width(ch) * CAP;
+        let gx = x + (slot - (g.advance - SPACING)) / 2.0;
         for stroke in &g.strokes {
             let pts: Vec<[f64; 2]> = stroke
                 .iter()
                 .map(|p| {
-                    let lx = off[0] + (x + p[0]) * s;
+                    let lx = off[0] + (gx + p[0]) * s;
                     let ly = off[1] + p[1] * s;
                     [t.pos[0] + lx * c - ly * sn, t.pos[1] + lx * sn + ly * c]
                 })
@@ -248,7 +274,7 @@ pub fn text_strokes(t: &Text2) -> Vec<Vec<[f64; 2]>> {
                 out.push(pts);
             }
         }
-        x += g.advance;
+        x += slot;
     }
     out
 }
@@ -297,13 +323,13 @@ fn fill_cap(family: &str, bold: bool, italic: bool) -> f64 {
 pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<[f64; 2]>, Vec<u32>) {
     let (family, bold, italic) = match font {
         Some(f) => (f.family.as_str(), f.bold, f.italic),
-        None => ("Sans", false, false),
+        None => (DEFAULT_FAMILY, false, false),
     };
     let layout = noshape_sketch::text::layout_text(&t.text, family, bold, italic);
     if layout.contours.is_empty() || layout.width <= 0.0 {
         return (Vec::new(), Vec::new());
     }
-    let cap = if font.is_some() { fill_cap(family, bold, italic) } else { FILL_CAP };
+    let cap = fill_cap(family, bold, italic);
     let s = t.height / cap;
     let natural = layout.width * s;
     let target = text_width(&t.text, t.height);

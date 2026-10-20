@@ -993,6 +993,10 @@ fn snap_explode_progress_replace_and_config() {
     let replaced = asm.replace_instance(InstanceId(2), InstanceSource::Part { studio: f.studios[1], body: body2, config: ConfigValues::default() }, "Part 2", false);
     assert_eq!(replaced, vec![InstanceId(2)]);
     assert_eq!(asm.instances[1].name, "Part 2 <1>");
+    // Replaced by a part of the same name: the instance keeps its name (live 843).
+    let keep = asm.instances[1].source.clone();
+    asm.replace_instance(InstanceId(2), keep, "Part 2", false);
+    assert_eq!(asm.instances[1].name, "Part 2 <1>");
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
     assert_eq!(res.occurrences[1].studio, f.studios[1]);

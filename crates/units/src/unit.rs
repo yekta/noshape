@@ -260,15 +260,35 @@ pub struct UnitPrefs {
 /// Angle, 2 = Mechanical.
 pub const OTHER_UNITS: [(&str, u8, &[&str], u8, u8); 9] = [
     ("Linear acceleration", 0, &["Meter per second squared", "Millimeter per second squared", "Centimeter per second squared", "Inch per second squared", "Foot per second squared"], 1, 3),
-    ("Angular velocity", 1, &["Degree per second", "Radian per second", "Revolution per minute"], 0, 0),
+    ("Angular velocity", 1, &["Degree per second", "Radian per second", "Revolutions per minute"], 0, 0),
     ("Mass", 2, &["Kilogram", "Gram", "Pound", "Ounce"], 0, 2),
-    ("Density", 2, &["Kilogram per cubic meter", "Gram per cubic centimeter", "Pound per cubic inch", "Pound per cubic foot"], 0, 2),
+    ("Density", 2, &["Kilogram per cubic meter", "Gram per cubic centimeter", "Pound per cubic inch", "Pound per cubic foot", "Gram per liter", "Gram per milliliter"], 0, 2),
     ("Force", 2, &["Newton", "Kilonewton", "Pound-force"], 0, 2),
     ("Frequency", 2, &["Hertz", "Kilohertz"], 0, 0),
     ("Moment", 2, &["Newton-meter", "Newton-millimeter", "Inch-pound", "Foot-pound"], 0, 2),
-    ("Pressure", 2, &["Pascal", "Kilopascal", "Megapascal", "Pound per square inch"], 0, 3),
+    ("Pressure", 2, &["Pascal", "Kilopascal", "Megapascal", "Pound per square inch", "Gigapascal", "Kilopound per square inch"], 0, 3),
     ("Energy", 2, &["Joule", "Kilojoule", "Foot-pound force", "Inch-pound force"], 0, 2),
 ];
+
+/// Onshape's option lists of [`OTHER_UNITS`] (Workspace units, Preferences ›
+/// Units; live dom/dialog-workspace-units-options.txt): indices into each
+/// list, in Onshape's alphabetical order. The stored indices never change
+/// (documents keep them), so units Onshape does not offer are left out here
+/// and new ones are appended to the lists above.
+pub const OTHER_UNITS_SHOWN: [&[u8]; 9] = [
+    &[4, 3, 0, 1],
+    &[0, 1, 2],
+    &[1, 0, 3, 2],
+    &[1, 4, 5, 0, 3, 2],
+    &[1, 0, 2],
+    &[0],
+    &[3, 2, 0, 1],
+    &[4, 1, 5, 2, 0, 3],
+    &[2, 0],
+];
+
+/// Onshape's Length default unit list, in its order.
+pub const LENGTH_UNITS_SHOWN: [LengthUnit; 6] = [LengthUnit::Centimeter, LengthUnit::Foot, LengthUnit::Inch, LengthUnit::Meter, LengthUnit::Millimeter, LengthUnit::Yard];
 
 impl Default for UnitPrefs {
     fn default() -> Self {
@@ -309,6 +329,30 @@ impl UnitPrefs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shown_unit_lists_are_onshapes() {
+        // Live dom/dialog-workspace-units-options.txt, in its order.
+        let live: [&[&str]; 9] = [
+            &["Foot per second squared", "Inch per second squared", "Meter per second squared", "Millimeter per second squared"],
+            &["Degree per second", "Radian per second", "Revolutions per minute"],
+            &["Gram", "Kilogram", "Ounce", "Pound"],
+            &["Gram per cubic centimeter", "Gram per liter", "Gram per milliliter", "Kilogram per cubic meter", "Pound per cubic foot", "Pound per cubic inch"],
+            &["Kilonewton", "Newton", "Pound-force"],
+            &["Hertz"],
+            &["Foot-pound", "Inch-pound", "Newton-meter", "Newton-millimeter"],
+            &["Gigapascal", "Kilopascal", "Kilopound per square inch", "Megapascal", "Pascal", "Pound per square inch"],
+            &["Foot-pound force", "Joule"],
+        ];
+        for (k, shown) in OTHER_UNITS_SHOWN.iter().enumerate() {
+            let names: Vec<&str> = shown.iter().map(|&i| OTHER_UNITS[k].2[i as usize]).collect();
+            assert_eq!(names, live[k]);
+            // The metric and imperial defaults are offered.
+            assert!(shown.contains(&OTHER_UNITS[k].3) && shown.contains(&OTHER_UNITS[k].4));
+        }
+        let lengths: Vec<&str> = LENGTH_UNITS_SHOWN.iter().map(|u| u.name()).collect();
+        assert_eq!(lengths, ["Centimeter", "Foot", "Inch", "Meter", "Millimeter", "Yard"]);
+    }
 
     #[test]
     fn symbols_round_trip() {

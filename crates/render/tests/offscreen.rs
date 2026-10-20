@@ -853,3 +853,52 @@ fn texture_frames_stay_on_the_gpu_and_textures_are_reused_once_released() {
     assert!(f.texture.is_none());
     assert_eq!(f.bgra.len(), 320 * 240 * 4);
 }
+
+#[test]
+fn view_cube_overlay_is_drawn_in_the_top_right_corner_only() {
+    use noshape_render::overlay::{CubeColors, Overlay, ViewCube};
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let scene = std::sync::Arc::new(Scene::default());
+    let cam = Camera::default();
+    let (w, h) = (400u32, 300u32);
+    let req = || FrameRequest { scene: scene.clone(), camera: cam, width: w, height: h, device_pixel_ratio: 1.0, style: Style::default(), invalidate_pick: false };
+    let frame = |r: &mut Renderer, seq: u64| {
+        r.submit_frame(4, seq, req()).unwrap();
+        loop {
+            r.wait_oldest();
+            if let Some(Completed::Frame { result, .. }) = r.collect().into_iter().next() {
+                return result.unwrap();
+            }
+        }
+    };
+    let plain = frame(&mut r, 1);
+    // A red face (Onshape's is white, like the background here).
+    let colors = CubeColors { face: [1.0, 0.0, 0.0, 1.0], frame: [0.808, 0.859, 0.898, 0.6], highlight: [0.565, 0.808, 0.945, 0.6], label: [0.0, 0.0, 0.0, 0.85], axes: [[0.804, 0.0, 0.0, 1.0], [0.0, 0.58, 0.0, 1.0], [0.0, 0.0, 0.816, 1.0]] };
+    let cube = ViewCube { origin: [(w - 15 - 150) as f32, 15.0], hover: None, face_labels: Vec::new(), axis_labels: None, colors };
+    r.set_overlay(4, Some(std::sync::Arc::new(Overlay { world_fills: Vec::new(), view_cube: Some(cube) })));
+    let with = frame(&mut r, 2);
+    let px = |f: &Frame, x: u32, y: u32| -> [u8; 3] {
+        let o = ((y * w + x) * 4) as usize;
+        [f.bgra[o], f.bgra[o + 1], f.bgra[o + 2]]
+    };
+    if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
+        let mut rgba = with.bgra.clone();
+        for p in rgba.as_chunks_mut::<4>().0 {
+            p.swap(0, 2);
+        }
+        image::save_buffer(format!("{dir}/view_cube_overlay.png"), &rgba, w, h, image::ExtendedColorType::Rgba8).unwrap();
+    }
+    // The widget (150 px, 15 px in from the top-right corner) shows red faces.
+    let red = |f: &Frame| (15..165).flat_map(|y| (w - 165..w - 15).map(move |x| (x, y))).filter(|&(x, y)| px(f, x, y) == [0, 0, 255]).count();
+    assert_eq!(red(&plain), 0);
+    assert!(red(&with) > 3000, "{} face pixels", red(&with));
+    // Everything outside the widget is untouched.
+    let changed_outside = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| !(x >= w - 165 && y < 165)).filter(|&(x, y)| px(&plain, x, y) != px(&with, x, y)).count();
+    assert_eq!(changed_outside, 0);
+}

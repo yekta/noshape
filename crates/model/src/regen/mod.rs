@@ -100,16 +100,7 @@ impl Regenerator {
         let upto = opts.upto.unwrap_or_else(|| studio.rollback_index()).min(studio.features.len());
         // Configuration variables are visible to every feature.
         let mut outer_vars: BTreeMap<String, Quantity> = opts.document_variables.clone();
-        for (name, kind, text) in studio.configuration.variable_exprs(config) {
-            let dim = match kind {
-                crate::configuration::VariableKind::Length => noshape_units::Dim::LENGTH,
-                crate::configuration::VariableKind::Angle => noshape_units::Dim::ANGLE,
-                _ => noshape_units::Dim::UNITLESS,
-            };
-            if let Ok(q) = noshape_units::evaluate_as(&text, dim, units, &noshape_units::EmptyScope) {
-                outer_vars.insert(name, q);
-            }
-        }
+        outer_vars.extend(studio.configuration.variable_values(config, units));
         let mut key = hash_bytes(0, serde_json::to_vec(&(config, units, &outer_vars.keys().collect::<Vec<_>>())).unwrap_or_default().as_slice());
         for v in outer_vars.values() {
             key = hash_bytes(key, &v.value.to_le_bytes());

@@ -155,6 +155,11 @@ pub struct OsMenu {
     /// Onshape's Bootstrap dropdowns (the "+" add-element menu): 14 px `#555`
     /// text 43 px in, 27 px rows, 20 px icons 20 px in, radius 5.25, `#d7d7d7`.
     dropdown: bool,
+    /// Per-menu metrics over the style's own (each live menu differs, e.g.
+    /// the documents Create menu: 150 px, 29.5 px rows, text 48 px in).
+    min_width: Option<f32>,
+    row_height: Option<f32>,
+    text_inset: Option<f32>,
     /// The camera and render options menu (live dom/menu-camera-render):
     /// 222 px rows of 22 px, 12 px `#555` text 27 px in, 16 px icons 6 px in.
     camera: bool,
@@ -181,7 +186,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, camera: false, on_escape: None, ring: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -221,6 +226,24 @@ impl OsMenu {
     /// Bootstrap dropdown style ("+" menu).
     pub fn dropdown(mut self) -> Self {
         self.dropdown = true;
+        self
+    }
+
+    /// This menu's minimum width instead of its style's.
+    pub fn min_width(mut self, w: f32) -> Self {
+        self.min_width = Some(w);
+        self
+    }
+
+    /// This menu's row height instead of its style's.
+    pub fn row_height(mut self, h: f32) -> Self {
+        self.row_height = Some(h);
+        self
+    }
+
+    /// Where this menu's item text starts instead of its style's.
+    pub fn text_inset(mut self, x: f32) -> Self {
+        self.text_inset = Some(x);
         self
     }
 
@@ -396,6 +419,8 @@ impl Render for OsMenu {
             // Live: text 36 px in when an item has an icon, else 17 px.
             (ROW_H, ICON_X, ICON, if any_icon || any_check { TEXT_X } else { 17. }, TEXT)
         };
+        let row_h = self.row_height.unwrap_or(row_h);
+        let text_x = self.text_inset.unwrap_or(text_x);
         let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
         let camera = self.camera;
         let window_w = window.viewport_size().width;
@@ -542,6 +567,7 @@ impl Render for OsMenu {
             .border_color(gpui_kit::rgb(if dropdown { 0xd7d7d7 } else { 0xcccccc }))
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
+            .when_some(self.min_width, |d, w| d.min_w(px(w)))
             .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
             // 0 5px 10px rgba(0,0,0,.2); GPUI blurs twice as far as CSS.
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])

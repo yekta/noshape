@@ -2,6 +2,7 @@
 //! ANSI (A..E, inches, third angle) sheet setups with their title block
 //! layouts, applied per sheet.
 
+use super::tb_lang::TitleLanguage;
 use super::{DimUnits, Drawing, DrawingProps, Projection, SheetFormat, SheetSize, TitleBlockStyle};
 
 /// A sheet setup: size, title block and the drawing standard it implies.
@@ -20,13 +21,15 @@ pub struct DrawingTemplate {
     pub decimal_comma: bool,
     /// Custom template › Border, zones and start zones.
     pub format: SheetFormat,
+    /// Custom template › Language of the title block.
+    pub language: TitleLanguage,
 }
 
 impl DrawingTemplate {
     /// An Onshape template of a standard size: ISO in millimeters, first
     /// angle; ANSI in inches, third angle.
     pub fn standard(name: &'static str, size: SheetSize, style: TitleBlockStyle, inches: bool, projection: Projection) -> Self {
-        Self { name, size, style, inches, projection, units: None, decimal_comma: false, format: SheetFormat::default() }
+        Self { name, size, style, inches, projection, units: None, decimal_comma: false, format: SheetFormat::default(), language: TitleLanguage::English }
     }
 
     /// The drawing's units.
@@ -75,15 +78,18 @@ pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, Stri
         // Onshape's ANSI and ISO templates share one block (sheet.rs
         // `onshape_title_block`); the tolerance notes are fixed text.
         TitleBlockStyle::Iso | TitleBlockStyle::Ansi => vec![
-            ("Drawn by", ""),
+            // Live drawing/156, 164: DRAWN is the user and today; APPROVED
+            // and the three TITLE lines are property fields shown as "----"
+            // until set; MATERIAL starts blank.
+            ("Drawn by", "{user.name}"),
             ("Drawn date", "{date}"),
             ("Checked by", ""),
             ("Checked date", ""),
-            ("Approved by", ""),
-            ("Approved date", ""),
-            ("Material", "{part.material}"),
+            ("Approved by", "{release.approver}"),
+            ("Approved date", "{release.date}"),
+            ("Material", ""),
             ("Finish", ""),
-            ("Title", "{part.name}"),
+            ("Title", "{drawing.title1}\n{drawing.title2}\n{drawing.title3}"),
             ("Size", ""),
             ("Part number", "{part.number}"),
             ("Revision", "-"),
@@ -138,7 +144,14 @@ pub fn apply_template(drawing: &mut Drawing, sheet: usize, t: &DrawingTemplate) 
     drawing.projection = t.projection;
     drawing.sheets[sheet].size = t.size;
     drawing.sheets[sheet].format = t.format;
+    drawing.sheets[sheet].title_language = t.language;
     set_title_style(drawing, sheet, t.style);
+    // "1 of 1" in the title block's language (live: "1 von 1", "Page 1 de 1" …).
+    if let Some((_, v)) = drawing.sheets[sheet].title_block.fields.iter_mut().find(|(k, _)| k == "Sheet")
+        && v == "{sheet.number} of {sheet.count}"
+    {
+        *v = t.language.sheet_field();
+    }
     // The units note follows the template.
     if let Some((_, v)) = drawing.sheets[sheet].title_block.fields.iter_mut().find(|(k, _)| k == "Units") {
         *v = units_note_of(units).to_string();

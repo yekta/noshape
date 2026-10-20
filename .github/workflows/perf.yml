@@ -147,8 +147,20 @@ jobs:
           workspaces: src
           key: occt-V8_0_1
 
+      # PowerShell on Windows: under bash, Git's coreutils `link` shadows MSVC's link.exe.
+      - name: Build (release, Windows)
+        if: inputs.ref != '' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd src
+          cargo build --release --locked -p noshape
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\built" | Out-Null
+          Copy-Item target/release/noshape.exe "$env:RUNNER_TEMP\built\"
+          "BIN=$env:RUNNER_TEMP\built\noshape.exe" >> $env:GITHUB_ENV
+          "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> $env:GITHUB_ENV
+
       - name: Build (release)
-        if: inputs.ref != ''
+        if: inputs.ref != '' && runner.os != 'Windows'
         shell: bash
         run: |
           cd src
@@ -164,9 +176,6 @@ jobs:
             sed "s/@VERSION@/0.0.0/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
             codesign --force --deep --sign - "$app"
             echo "BIN=$app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
-          elif [[ "$RUNNER_OS" == Windows ]]; then
-            cp target/release/noshape.exe "$RUNNER_TEMP/built/"
-            echo "BIN=$RUNNER_TEMP/built/noshape.exe" >> "$GITHUB_ENV"
           else
             cp target/release/noshape "$RUNNER_TEMP/built/"
             echo "BIN=$RUNNER_TEMP/built/noshape" >> "$GITHUB_ENV"

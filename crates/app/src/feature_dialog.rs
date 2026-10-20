@@ -215,8 +215,8 @@ pub struct FeatureDialog {
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
     baselines: HashMap<String, String>,
-    /// Size after the user dragged the corner grip (Onshape dialogs resize).
-    pub size: Option<Size<Pixels>>,
+    /// Width after the user dragged the right edge (Onshape dialogs resize).
+    pub width: Option<Pixels>,
     /// "Configure features" mode: configurable parameters are outlined
     /// and clicking one configures it (Onshape: broken yellow outline).
     pub configure_mode: bool,
@@ -281,7 +281,7 @@ impl FeatureDialog {
             computed: HashMap::new(),
             initial_focus_done: false,
             baselines: HashMap::new(),
-            size: None,
+            width: None,
             configure_mode: false,
             active_query: None,
             cs_target: None,
@@ -2650,8 +2650,7 @@ impl Render for FeatureDialog {
             // border or radius, shadow 0 5px 10px rgba(0,0,0,.2) (GPUI blurs
             // twice as far as CSS: half the radius).
             .relative()
-            .w(self.size.map(|s| s.width).unwrap_or(px(220.)))
-            .when_some(self.size, |d, s| d.h(s.height))
+            .w(self.width.unwrap_or(px(220.)))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
@@ -2786,9 +2785,11 @@ impl Render for FeatureDialog {
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Cancel))),
                     ),
             )
-            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().when(self.size.is_some(), |d| d.flex_1().min_h_0()).children(rows))
-            // Resize grip at the bottom-right corner.
-            .child(div().id("dialog-grip").absolute().right_0().bottom_0().size(px(10.)).cursor(CursorStyle::ResizeUpLeftDownRight).on_drag(DialogResize, |d, _, _, cx| cx.new(|_| d.clone())))
+            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().children(rows))
+            // Live (`osc-resize-handle.osc-x`, dom/cursor-rows.json): a 3 px
+            // handle inside the right edge resizes the width only; there is
+            // no corner grip.
+            .child(div().id("dialog-grip").absolute().top_0().bottom_0().right_0().w(px(3.)).cursor(CursorStyle::ResizeLeftRight).on_drag(DialogResize, |d, _, _, cx| cx.new(|_| d.clone())))
             .child(
                 // Footer (live): no band; a 112 px preview slider at the
                 // left and the round ? help button at the right.
@@ -2929,7 +2930,7 @@ impl FeatureDialog {
                 set(this, e.position.x, cx);
             }))
             .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                if e.pressed_button == Some(MouseButton::Left) {
+                if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
                     set(this, e.position.x, cx);
                 }
             }))

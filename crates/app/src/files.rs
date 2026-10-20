@@ -7,9 +7,7 @@ use gpui_kit::*;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn config_dir() -> PathBuf {
-    let d = dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("noshape");
-    let _ = std::fs::create_dir_all(&d);
-    d
+    noshape_scene::config_dir()
 }
 
 pub fn documents_dir() -> PathBuf {
@@ -154,7 +152,7 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
     let session = if path.exists() {
         session::Session::open(&path)?
     } else {
-        session::Session::create(&path, create_with.unwrap_or_default())?
+        session::Session::create(&path, create_with.unwrap_or_else(crate::units_prefs::new_document))?
     };
     add_recent(&path);
     let (handle, _) = open_session_window(session, gpu, cx)?;

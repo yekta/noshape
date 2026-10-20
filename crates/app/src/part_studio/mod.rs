@@ -14,6 +14,7 @@ mod custom_tables;
 pub(crate) mod input_propagation;
 mod config_ids;
 pub(crate) mod config_var_dialog;
+mod annotations_ui;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
@@ -44,7 +45,6 @@ use crate::gpu::Gpu;
 use crate::scene_builder::{self, BuiltScene, GpuCache, PickKind, SceneOptions};
 use crate::theme::p;
 use crate::viewport::{Viewport, ViewportEvent};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -88,6 +88,46 @@ const TOOLBAR: &[&[&[&str]]] = &[
     &[&["frame"], &["frameTrim"], &["gusset"], &["endcap"], &["cutlist"]],
     &[&["sheetMetalStart", "sheetMetalFlange", "sheetMetalHem", "sheetMetalTab", "sheetMetalBend", "sheetMetalJog", "sheetMetalFormed", "sheetMetalLoft", "sheetMetalMakeJoint", "sheetMetalCorner", "sheetMetalBendRelief", "sheetMetalCornerBreak", "sheetMetalEnd"]],
 ];
+
+/// Whether the Part Studio toolbar fits (live part-studio/220: when it
+/// doesn't, each group after Sketch collapses into one split tool),
+/// measured from the last layout so the tools' real widths count.
+#[derive(Clone, Default)]
+pub(super) struct ToolbarFit {
+    row: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    tools: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    search: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    /// The tools' natural width when last shown in full, and the estimate
+    /// (`toolbar_full_width`) then, which tells when the tools changed.
+    full: std::rc::Rc<std::cell::Cell<Option<(f32, f32)>>>,
+}
+
+impl ToolbarFit {
+    fn collapses(&self, est: f32, viewport_w: f32, search_hidden: bool) -> bool {
+        // Not measured for these tools yet: show them in full once (clipped
+        // by the bar), so the next frame decides from their real width.
+        let full = match self.full.get() {
+            Some((w, e)) if e == est => w,
+            _ => return false,
+        };
+        let row = self.row.get();
+        // The bar's 2 px padding each side and gap, then "Search tools…"
+        // 10 px after the tools.
+        let avail = if row.size.width > px(0.) {
+            let search = if search_hidden { 0. } else { 10. + f32::from(self.search.get().size.width) };
+            f32::from(row.size.width) - 6. - search
+        } else {
+            viewport_w - crate::ui::RAIL_W - 4. - 172.
+        };
+        full > avail + 0.5
+    }
+}
+
+/// Customize toolbar's tool sets: the toolbar groups, then ⊞ "Add custom
+/// features" (live 341: it has a sled and is listed as a tool).
+const TOOLSETS: usize = TOOLBAR.len() + 1;
+const ADD_CUSTOM_SET: usize = TOOLBAR.len();
+static ADD_CUSTOM: [&str; 1] = ["addCustomFeatures"];
 
 /// A narrow window (live part-studio/220-221, dom/toolbar-narrow-900*.txt):
 /// each group after Sketch collapses into one split tool with this face and
@@ -392,7 +432,7 @@ impl PartStudioView {
             _subs: subs,
         };
         // Graphics preferences apply live (camera and render options dialog).
-        this._subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsPrefs>(|this, cx| this.apply_graphics_prefs(cx)));
+        this._subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.apply_graphics_prefs(cx)));
         this.apply_graphics_prefs(cx);
         this.schedule_regen(window, cx);
         this
@@ -983,6 +1023,13 @@ impl PartStudioView {
     }
 
     fn dispatch_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
+        // Dragging a datum box (live psb/r-921).
+        match ev {
+            ViewportEvent::ToolDown { position, .. } if self.annotation_drag_start(*position, cx) => return,
+            ViewportEvent::ToolDrag { position } if self.annotation_drag_move(*position, cx) => return,
+            ViewportEvent::ToolUp { .. } if self.annotation_drag_end(cx) => return,
+            _ => {}
+        }
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
                 self.ui.pointer = Some(*position);
@@ -1042,6 +1089,10 @@ impl PartStudioView {
                     self.analysis_pick(&t.reference, cx);
                 }
             }
+            // The Datum dialog places the symbol on the clicked face.
+            ViewportEvent::Click { position, .. } if self.ui.datum_edit.is_some() => {
+                self.datum_pick(*position, cx);
+            }
             // Section view dialog: picks fill its fields.
             ViewportEvent::Click { pick, .. } if self.ui.section_dialog.is_some() => {
                 if let Some(t) = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned()) {
@@ -1088,6 +1139,11 @@ impl PartStudioView {
                 self.box_select(ids, modifiers.control || modifiers.platform, cx);
             }
             ViewportEvent::ContextMenu { pick, position } => {
+                // A datum symbol under the pointer has its own menu.
+                if let Some(id) = self.ui.pointer.and_then(|p| self.annotation_at(p, cx)) {
+                    self.open_annotation_menu(id, *position, window, cx);
+                    return;
+                }
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
                 self.open_context_menu(target, *position, window, cx);
             }
@@ -1299,7 +1355,7 @@ impl PartStudioView {
             // Assembly context geometry is never missing (snapshot).
             r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
         });
-        let dialog_size = self.ui.dialog_size;
+        let dialog_width = self.ui.dialog_width;
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let studio_view = cx.entity().downgrade();
         dialog.update(cx, |d, cx| {
@@ -1308,7 +1364,7 @@ impl PartStudioView {
             }
             d.missing = missing;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
-            d.size = dialog_size;
+            d.width = dialog_width;
             d.variables = vars;
             d.final_available = later;
             window.focus(&d.focus_handle(cx), cx);
@@ -1348,25 +1404,12 @@ impl PartStudioView {
         self.remember_values(&feature);
         let config_values = self.config_values.clone();
         self.doc.update(cx, |doc, cx| {
-            let desc = if is_new { format!("Insert feature : {name}") } else { format!("Edit : {name}") };
+            let desc = if is_new { noshape_ops::studio::insert_description(&name) } else { noshape_ops::studio::edit_description(&name) };
             doc.edit_studio(self.tab, &desc, cx, |ps| {
                 if is_new {
-                    // Onshape hides the sketch a new feature consumes.
-                    if let Some(sid) = noshape_model::interaction::source_sketch(&ps.features, &feature)
-                        && let Some(sk) = ps.feature_mut(sid)
-                    {
-                        sk.hidden = true;
-                    }
-                    let at = index.min(ps.features.len());
-                    ps.features.insert(at, feature);
-                    if let Some(r) = ps.rollback {
-                        ps.rollback = Some(r + 1);
-                    }
-                } else if let Some(slot) = ps.features.get_mut(index) {
-                    // Configured parameters go to the active configuration's row.
-                    let mut feature = feature;
-                    ps.configuration.store_edit(slot, &mut feature, &config_values);
-                    *slot = feature;
+                    noshape_ops::studio::insert_feature(ps, feature, index);
+                } else {
+                    noshape_ops::studio::edit_feature(ps, index, feature, &config_values);
                 }
             });
         });
@@ -1424,35 +1467,22 @@ impl PartStudioView {
         if ids.is_empty() {
             return;
         }
-        let names: Vec<String> = self.studio(cx).map(|s| ids.iter().filter_map(|id| s.feature(*id).map(|f| f.name.clone())).collect()).unwrap_or_default();
+        let desc = self.studio(cx).map(|s| noshape_ops::studio::delete_description(s, &ids)).unwrap_or_else(|| noshape_ops::studio::delete_description(&Default::default(), &ids));
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, &format!("Delete : {}", names.join(", ")), cx, |ps| {
-                for id in &ids {
-                    ps.remove(*id);
-                }
-            });
+            doc.edit_studio(self.tab, &desc, cx, |ps| noshape_ops::studio::delete_features(ps, &ids));
         });
         self.selected_features.clear();
     }
 
     fn set_suppressed(&mut self, ids: Vec<FeatureId>, suppressed: bool, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            let verb = if suppressed { "Suppress" } else { "Unsuppress" };
-            doc.edit_studio(self.tab, verb, cx, |ps| {
-                for id in &ids {
-                    if let Some(f) = ps.feature_mut(*id) {
-                        f.suppressed = suppressed;
-                    }
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::suppress_description(suppressed), cx, |ps| noshape_ops::studio::set_suppressed(ps, &ids, suppressed));
         });
     }
 
     fn set_rollback(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Move rollback bar", cx, |ps| {
-                ps.rollback = index.filter(|i| *i < ps.features.len());
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::ROLLBACK_DESCRIPTION, cx, |ps| noshape_ops::studio::set_rollback(ps, index));
         });
     }
 
@@ -1558,176 +1588,204 @@ impl PartStudioView {
         // "Search tools…" at the right end.
         // Live: "Search tools…" follows the last tool (it is not pinned to
         // the right edge).
-        let mut bar = h_flex().flex_initial().min_w_0().overflow_hidden().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)).child(crate::ui::tool_separator());
-        let customizing = self.ui.customizing_toolbar;
-        let removed = self.ui.toolbar.removed.clone();
+        // The tools at their natural width (measured: `ToolbarFit`), clipped
+        // by the bar when the window is narrower still.
+        let mut bar = h_flex().flex_none().relative().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)).child(crate::ui::tool_separator());
+        let customizing = self.ui.tb_custom.is_some();
+        let hidden = self.ui.toolbar.hide_search;
+        // Customize toolbar… edits a draft: the toolbar shows it.
+        let (order, removed) = match &self.ui.tb_custom {
+            Some(c) => (c.order.clone(), c.removed.clone()),
+            None => (crate::toolbar_customize::full_order(&self.ui.toolbar.group_order, TOOLSETS), self.ui.toolbar.removed.clone()),
+        };
+        let is_removed = |id: &str| removed.iter().any(|r| r == id);
         // Live (part-studio/220): when the tools don't fit, every group after
         // Sketch collapses to one split tool. Room: the window minus the left
         // rail, the toolbar padding and "Search tools…" (172 px with its margin).
         let custom = self.doc.read(cx).custom_features().feature_types();
         self.custom_feature_count = custom.len();
-        let collapsed = !customizing && self.toolbar_full_width() > viewport_w - crate::ui::RAIL_W - 4. - 172.;
-        for (pos, gi) in self.ui.toolbar.ordered_groups(TOOLBAR.len()).into_iter().enumerate() {
-            let group = TOOLBAR[gi];
-            if pos > 0 {
-                bar = bar.child(crate::ui::tool_separator());
+        let est = self.toolbar_full_width();
+        let collapsed = !customizing && self.ui.tb_fit.collapses(est, viewport_w, hidden);
+        fn field(v: &mut PartStudioView) -> Option<&mut crate::toolbar_customize::Customize> {
+            v.ui.tb_custom.as_mut()
+        }
+        let mut first = true;
+        let mut custom_shown = false;
+        for gi in order {
+            // ⊞ "Add custom features" is a set of its own (live 341); the
+            // document's custom features come just before it.
+            if gi == ADD_CUSTOM_SET {
+                if !custom.is_empty() {
+                    bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom.clone(), cx));
+                    custom_shown = true;
+                }
+                if is_removed(ADD_CUSTOM[0]) {
+                    continue;
+                }
+                let btn = self.add_custom_features_button(custom.clone(), cx);
+                let el = if customizing {
+                    let t = crate::toolbar_customize::tool(btn, &ADD_CUSTOM, crate::assets::icon_path("add-custom-features"), cx);
+                    crate::toolbar_customize::toolset(gi, t, true, field, cx)
+                } else {
+                    btn
+                };
+                bar = bar.child(crate::ui::tool_separator()).child(el);
+                first = false;
+                continue;
             }
+            let group = TOOLBAR[gi];
             if collapsed && gi > 0 {
                 let items = collapsed_group(gi);
-                let live: Vec<&'static str> = items.iter().copied().filter(|id| !removed.iter().any(|r| r == id)).collect();
+                let live: Vec<&'static str> = items.iter().copied().filter(|id| !is_removed(id)).collect();
                 let Some(rep) = live.iter().find(|id| **id == COLLAPSED_FACE[gi]).or(live.first()).and_then(|id| features::get(id)) else { continue };
                 let key = COLLAPSED_KEY[gi];
                 let face = self.ui.toolbar_faces.get(key).and_then(|id| features::get(id)).unwrap_or(rep);
+                if !first {
+                    bar = bar.child(crate::ui::tool_separator());
+                }
                 bar = bar.child(self.tool_button(face, items, key, cx));
+                first = false;
                 continue;
             }
-            if customizing {
-                // Customize toolbar: move tool sets left/right.
-                bar = bar.child(self.group_mover(gi, -1, cx));
-            }
+            let mut buttons: Vec<AnyElement> = Vec::new();
             for items in group.iter() {
-                if items.iter().all(|id| removed.iter().any(|r| r == id)) {
-                    continue;
-                }
-                let Some(primary) = items.iter().find(|id| !removed.iter().any(|r| r == *id)).and_then(|id| features::get(id)) else { continue };
+                let Some(primary) = items.iter().find(|id| !is_removed(id)).and_then(|id| features::get(id)) else { continue };
                 // Onshape: the tool last picked from a dropdown becomes the
                 // group's face for the rest of the session.
                 let key = items[0];
                 let face = self.ui.toolbar_faces.get(key).and_then(|id| features::get(id)).unwrap_or(primary);
-                bar = bar.child(self.tool_button(face, items, key, cx));
-                if customizing {
-                    // Remove the tool (its whole dropdown) from the toolbar.
-                    let ids: Vec<String> = items.iter().map(|s| s.to_string()).collect();
-                    bar = bar.child(
-                        div()
-                            .id(SharedString::from(format!("tb-rm-{key}")))
-                            .text_xs()
-                            .text_color(p().error)
-                            .cursor_pointer()
-                            .child("×")
-                            .tooltip(crate::ui::tooltip("Remove from toolbar"))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.ui.toolbar.removed.extend(ids.iter().cloned());
-                                this.ui.toolbar.save();
-                                cx.notify();
-                            })),
-                    );
-                }
+                let btn = self.tool_button(face, items, key, cx);
+                // Customize: the tool drags with its whole dropdown (live 345).
+                buttons.push(if customizing { crate::toolbar_customize::tool(btn, items, feature_icon(face.id), cx) } else { btn });
             }
-            if customizing {
-                bar = bar.child(self.group_mover(gi, 1, cx));
+            if buttons.is_empty() {
+                continue;
             }
+            if !first {
+                bar = bar.child(crate::ui::tool_separator());
+            }
+            first = false;
+            bar = if customizing {
+                bar.child(crate::toolbar_customize::toolset(gi, h_flex().gap(px(2.)).children(buttons), true, field, cx))
+            } else {
+                bar.children(buttons)
+            };
         }
-        if customizing {
-            // Removed tools: click to put them back.
-            let view = cx.entity();
-            let removed_ids = removed.clone();
-            bar = bar
-                .child(crate::ui::tool_separator())
-                .child(
-                    Button::new("tb-removed")
-                        .label(format!("Removed ({})", removed.len()))
-                        .ghost()
-                        .xsmall()
-                        .dropdown_caret(true)
-                        .dropdown_menu(move |mut m, _, _| {
-                            for id in &removed_ids {
-                                let Some(t) = features::get(id) else { continue };
-                                let (v, id) = (view.clone(), id.clone());
-                                m = m.item(PopupMenuItem::new(t.name).icon(Icon::empty().path(feature_icon(t.id))).on_click(move |_, _, cx| {
-                                    v.update(cx, |this, cx| {
-                                        this.ui.toolbar.removed.retain(|r| *r != id);
-                                        this.ui.toolbar.save();
-                                        cx.notify();
-                                    })
-                                }));
-                            }
-                            m
-                        }),
-                )
-                .child({
-                    // Tools on the S shortcut toolbar (checked = shown).
-                    let v = cx.entity();
-                    let on = self.ui.toolbar.shortcut_tools();
-                    Button::new("tb-shortcuts").label("Shortcut toolbar (S)").ghost().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-                        for group in TOOLBAR.iter() {
-                            for items in group.iter() {
-                                for id in items.iter() {
-                                    let Some(t) = features::get(id) else { continue };
-                                    let (v, id) = (v.clone(), id.to_string());
-                                    let checked = on.contains(&id);
-                                    m = m.item(PopupMenuItem::new(t.name).checked(checked).on_click(move |_, _, cx| {
-                                        v.update(cx, |this, cx| {
-                                            this.ui.toolbar.toggle_shortcut(&id);
-                                            this.ui.toolbar.save();
-                                            cx.notify();
-                                        })
-                                    }));
-                                }
-                            }
-                        }
-                        m.scrollable(true).max_h(px(420.))
-                    })
-                })
-                .child(Button::new("tb-reset").label("Reset to default").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.ui.toolbar.removed.clear();
-                    this.ui.toolbar.group_order.clear();
-                    this.ui.toolbar.shortcut_tools = None;
-                    this.ui.toolbar.save();
-                    cx.notify();
-                })))
-                .child(Button::new("tb-done").label("Done").primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.ui.customizing_toolbar = false;
-                    cx.notify();
-                })));
+        // ⊞ removed: the custom features still end the toolbar.
+        if !custom.is_empty() && !custom_shown {
+            bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom, cx));
         }
-        // Custom features of the document's Feature Studios.
-        if !custom.is_empty() {
-            bar = bar.child(crate::ui::tool_separator());
-            bar = bar.child(self.custom_tools(custom.clone(), cx));
-        }
-        // Live: ⊞ "Add custom features" ends the toolbar.
-        bar = bar.child(crate::ui::tool_separator()).child(self.add_custom_features_button(custom, cx));
+        let fit = &self.ui.tb_fit;
+        let (tools_cell, full_cell, row_cell, search_cell) = (fit.tools.clone(), fit.full.clone(), fit.row.clone(), fit.search.clone());
+        bar = bar.child(
+            canvas(
+                move |b, _, _| {
+                    tools_cell.set(b);
+                    if !collapsed {
+                        full_cell.set(Some((f32::from(b.size.width), est)));
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        );
+        let watch = {
+            let fit = self.ui.tb_fit.clone();
+            let me = cx.entity().downgrade();
+            // After layout: re-render when the measured widths call for the
+            // other state (a resize, tools added or removed).
+            canvas(
+                move |b, _, _| row_cell.set(b),
+                move |_, _, _, cx| {
+                    if !customizing && fit.collapses(est, viewport_w, hidden) != collapsed {
+                        let me = me.clone();
+                        cx.defer(move |cx| {
+                            let _ = me.update(cx, |_, cx| cx.notify());
+                        });
+                    }
+                },
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+        };
         let view = cx.entity();
         crate::ui::toolbar()
             .id("part-studio-toolbar")
-            // Right-click the toolbar: Customize toolbar… (Onshape).
+            .relative()
+            .child(watch)
+            // Right-click the toolbar (live 331z): Customize toolbar… · Hide /
+            // Show "Search tools".
             .os_context_menu(move |m, _, _| {
                 let (v1, v2) = (view.clone(), view.clone());
-                m.item(crate::os_menu::OsMenuItem::new("Customize toolbar…").on_click(move |_, _, cx| {
-                    v1.update(cx, |this, cx| {
-                        this.ui.customizing_toolbar = true;
-                        cx.notify();
-                    })
-                }))
-                .item(crate::os_menu::OsMenuItem::new("Reset toolbar to default").on_click(move |_, _, cx| {
-                    v2.update(cx, |this, cx| {
-                        this.ui.toolbar.removed.clear();
-                        this.ui.toolbar.group_order.clear();
-                        this.ui.toolbar.save();
-                        cx.notify();
-                    })
-                }))
+                m.list_no_icons()
+                    .item(crate::os_menu::OsMenuItem::new("Customize toolbar…").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_toolbar_customize(window, cx))))
+                    .item(crate::os_menu::OsMenuItem::new(if hidden { "Show \"Search tools\"" } else { "Hide \"Search tools\"" }).on_click(move |_, _, cx| {
+                        v2.update(cx, |this, cx| {
+                            this.ui.toolbar.hide_search = !this.ui.toolbar.hide_search;
+                            this.ui.toolbar.save();
+                            cx.notify();
+                        })
+                    }))
             })
-            .child(bar)
-            .child(crate::ui::search_tools_toggle("tb-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
+            .child(h_flex().flex_initial().min_w_0().overflow_hidden().child(bar))
+            .when(!hidden, |d| {
+                d.child(
+                    crate::ui::search_tools_toggle("tb-search", self.palette.is_some())
+                        .relative()
+                        .ml(px(10.))
+                        .child(canvas(move |b, _, _| search_cell.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))),
+                )
+            })
             .into_any_element()
     }
 
-    /// Customize toolbar: arrow moving a tool set left (-1) or right (+1).
-    fn group_mover(&self, group: usize, delta: isize, cx: &mut Context<Self>) -> AnyElement {
-        div()
-            .id(SharedString::from(format!("tb-mv-{group}-{delta}")))
-            .text_xs()
-            .text_color(p().accent)
-            .cursor_pointer()
-            .child(if delta < 0 { "◂" } else { "▸" })
-            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.ui.toolbar.move_group(TOOLBAR.len(), group, delta);
-                this.ui.toolbar.save();
+    fn start_toolbar_customize(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (order, removed) = (self.ui.toolbar.group_order.clone(), self.ui.toolbar.removed.clone());
+        self.ui.tb_custom = Some(crate::toolbar_customize::Customize::new(TOOLSETS, &order, &removed, window, cx));
+        cx.notify();
+    }
+
+    /// Customize toolbar's "Tools" panel, under the toolbar at the left.
+    fn render_toolbar_customize_panel(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        static TOOLS: std::sync::OnceLock<Vec<crate::toolbar_customize::PanelTool>> = std::sync::OnceLock::new();
+        let tools = TOOLS.get_or_init(|| {
+            let mut out: Vec<crate::toolbar_customize::PanelTool> = Vec::new();
+            for group in TOOLBAR {
+                for items in group.iter() {
+                    for id in items.iter() {
+                        let Some(t) = features::get(id) else { continue };
+                        out.push(crate::toolbar_customize::PanelTool { ids: std::slice::from_ref(id), label: t.name.into(), icon: feature_icon(id) });
+                    }
+                }
+            }
+            out.push(crate::toolbar_customize::PanelTool { ids: &ADD_CUSTOM, label: "Add custom features".into(), icon: crate::assets::icon_path("add-custom-features") });
+            out
+        });
+        let panel = crate::toolbar_customize::panel(
+            self,
+            tools,
+            |v: &mut Self| v.ui.tb_custom.as_mut(),
+            |v: &mut Self, saved, cx| {
+                if let Some((order, removed)) = saved {
+                    v.ui.toolbar.group_order = order;
+                    v.ui.toolbar.removed = removed;
+                    v.ui.toolbar.save();
+                }
+                v.ui.tb_custom = None;
                 cx.notify();
-            }))
-            .into_any_element()
+            },
+            window,
+            cx,
+        )?;
+        // Live (dom): x 40 (the studio's left edge), 10 px under the toolbar
+        // (the sleds hang there).
+        Some(div().absolute().top(px(crate::ui::TOOLBAR_H + 10.)).left_0().child(panel).into_any_element())
     }
 
     fn tool_button(&mut self, ty: &'static FeatureType, group: &'static [&'static str], key: &'static str, cx: &mut Context<Self>) -> AnyElement {
@@ -2951,14 +3009,27 @@ impl PartStudioView {
         };
         let underdefined = !rolled_back && state.is_some_and(|s| s.underdefined);
         let id = f.id;
-        let msg = state.and_then(|s| s.message.clone());
         // Onshape (live part-studio/16, 90, 95): hovering a row shows its
         // error, else what it depends on ("Extrude 1 <- Sketch 1"), else its
-        // name, in a box beside the row.
-        let msg = msg.unwrap_or_else(|| {
-            let parents: Vec<String> = self.studio(cx).map(|studio| noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect()).unwrap_or_default();
-            if parents.is_empty() { name.clone() } else { format!("{} <- {}", f.name, parents.join(", ")) }
-        });
+        // name, in a box beside the row. Worked out when it opens (the
+        // dependencies scan the features above).
+        let tip = {
+            let (view, msg, name, feature_name) = (cx.entity().downgrade(), state.and_then(|s| s.message.clone()), name.clone(), f.name.clone());
+            move |cx: &App| -> SharedString {
+                if let Some(m) = &msg {
+                    return m.clone().into();
+                }
+                let parents: Vec<String> = view
+                    .upgrade()
+                    .and_then(|v| {
+                        let studio = v.read(cx).studio(cx)?;
+                        let i = studio.features.iter().position(|g| g.id == id)?;
+                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
+                    })
+                    .unwrap_or_default();
+                if parents.is_empty() { name.clone().into() } else { format!("{feature_name} <- {}", parents.join(", ")).into() }
+            }
+        };
         let manually_suppressed = f.suppressed;
         let hidden = f.hidden;
         // Sketches, planes and mate connectors can be hidden from the list.
@@ -3084,7 +3155,7 @@ impl PartStudioView {
             .on_drag(FeatureDrag { id, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
             .drag_over::<FeatureDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
-        let row = crate::ui::with_side_tooltip(row, msg);
+        let row = crate::ui::with_lazy_side_tooltip(row, tip);
         let view = cx.entity();
         let is_last = self.studio(cx).is_some_and(|s| i + 1 >= s.features.len());
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
@@ -3254,7 +3325,32 @@ impl PartStudioView {
         // Plane labels: Onshape draws the name *in the plane* (blue, at the
         // top-left corner, inside), so it skews with the view. The glyph
         // outlines are laid out in the plane and painted as projected paths.
-        if self.opts.show_planes {
+        if crate::viewport::wgpu_overlays() {
+            // Drawn into the 3D frame (perf): the same contours, in world space.
+            let mut contours: Vec<Vec<glam::DVec3>> = Vec::new();
+            if self.opts.show_planes {
+                for pl in self.display.planes.iter().filter(|p| !p.hidden) {
+                    let f = &pl.frame;
+                    let asc = 0.031 * 2.0 * pl.half_height;
+                    let top_left = f.origin + f.x * (-pl.half_width) + f.y * pl.half_height;
+                    in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
+                }
+            }
+            let c = Rgba::from(Hsla::from(pal.accent));
+            let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
+            // Inspection datums: black, the selected one in the selection
+            // color.
+            let sel = Rgba::from(Hsla::from(pal.accent));
+            for (contours, selected) in self.annotation_contours(cx) {
+                let color = if selected { [sel.r, sel.g, sel.b, 1.0] } else { [0.0, 0.0, 0.0, 1.0] };
+                fills.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color });
+            }
+            // The boxes keep their screen size: their drag handles follow the camera.
+            if self.studio(cx).is_some_and(|s| !s.annotations.is_empty()) {
+                self.sync_manipulator(cx);
+            }
+            self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
+        } else if self.opts.show_planes {
             let vp = self.viewport.read(cx);
             let mut polys: Vec<Vec<Point<Pixels>>> = Vec::new();
             for pl in self.display.planes.iter().filter(|p| !p.hidden) {
@@ -3266,6 +3362,14 @@ impl PartStudioView {
             }
             if !polys.is_empty() {
                 out.push(paint_paths(polys, pal.accent.into()));
+            }
+        }
+        // Inspection datums without the GPU overlay: projected and painted.
+        if !crate::viewport::wgpu_overlays() {
+            for (contours, selected) in self.annotation_contours(cx) {
+                let vp = self.viewport.read(cx);
+                let polys: Vec<Vec<Point<Pixels>>> = contours.iter().map(|c| c.iter().filter_map(|p| vp.project(*p)).map(|q| point(px(q.x as f32), px(q.y as f32))).collect()).collect();
+                out.push(paint_paths(polys, if selected { pal.accent.into() } else { gpui_kit::rgb(0x000000).into() }));
             }
         }
         // Graphics preferences (Camera and render options), in the dialog place.
@@ -3331,7 +3435,7 @@ impl PartStudioView {
             // With a right panel open the graphics area is too narrow for
             // that, so the bubble centres on it instead of running under the
             // feature list.
-            let left = if self.right_panel.is_some() { 0. } else { crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W } };
+            let left = if self.right_panel.is_some() { 0. } else { crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() } };
             out.push(div().absolute().top(px(8.)).left_0().right_0().pr(px(left)).flex().justify_center().child(bubble).into_any_element());
         }
         out
@@ -3537,6 +3641,13 @@ pub(super) struct PlaneText {
 /// [`PlaneText`] of `text`, laid out once: the plane and sketch names are
 /// drawn every frame (a keystroke anywhere re-renders the Part Studio), and
 /// laying out the font outlines each time was a measurable part of a frame.
+/// [`in_plane_text`]'s glyph contours in world space (drawn into the 3D frame).
+fn in_plane_contours(text: &str, top_left: glam::DVec3, x: glam::DVec3, y: glam::DVec3, asc: f64, out: &mut Vec<Vec<glam::DVec3>>) {
+    let layout = plane_text(text);
+    let base = top_left + x * (0.25 * asc) - y * (1.3 * asc);
+    out.extend(layout.polylines.iter().filter(|c| c.len() >= 3).map(|c| c.iter().map(|q| base + x * (q.x * asc) + y * (q.y * asc)).collect()));
+}
+
 pub(super) fn plane_text(text: &str) -> std::rc::Rc<PlaneText> {
     thread_local! {
         static CACHE: std::cell::RefCell<std::collections::HashMap<String, std::rc::Rc<PlaneText>>> = Default::default();
@@ -3670,15 +3781,6 @@ impl PartStudioView {
 
     /// What is drawn over the graphics area and the feature dialog.
     fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        // Panel dialogs that closed forget where they were moved.
-        let open = [
-            ("ps-mass", self.show_mass),
-            ("ps-section", self.ui.section_dialog.is_some()),
-            ("ps-appearance", self.ui.appearance_edit.is_some()),
-            ("ps-material", self.ui.material_panel.is_some()),
-            ("ps-named-views", self.named_views.is_some()),
-        ];
-        self.ui.panels.retain(|k| open.iter().any(|(o, on)| *o == k && *on));
         let mut overlay = self.render_viewport_overlay(cx);
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
@@ -3697,6 +3799,7 @@ impl PartStudioView {
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
         overlay.extend(self.render_variable_input(cx));
+        overlay.extend(self.render_datum_dialog(cx));
         overlay.extend(self.render_dynamic_suppression(cx));
         overlay.extend(self.render_insert_go(cx));
         overlay.extend(self.render_regen_panels(cx));
@@ -3721,6 +3824,13 @@ impl PartStudioView {
 impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        if crate::viewport::wgpu_overlays() {
+            // What GPUI draws that follows the camera (perf: otherwise camera
+            // moves are only presented): sketch labels, dialogs' manipulators
+            // and triads, shown dimensions, analysis and section labels.
+            let follows = self.sketch.is_some() || self.edit.is_some() || self.ui.shown_dims.is_some() || self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some();
+            self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
+        }
         if let Some(v) = self.pending_named_view.take() {
             self.apply_named_view(&v, window, cx);
         }
@@ -3738,9 +3848,11 @@ impl Render for PartStudioView {
             self.schedule_regen(window, cx);
         }
         let right = self.render_right_panel(window, cx);
+        let tb_panel = self.render_toolbar_customize_panel(window, cx);
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()
+            .relative()
             .key_context(if in_sketch { "PartStudio Sketch" } else { "PartStudio" })
             .track_focus(&self.focus)
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
@@ -3797,7 +3909,8 @@ impl Render for PartStudioView {
                 }
                 // An active Inspection panel tool ends.
                 if this.ui.inspection_tool.take().is_some() {
-                    cx.notify();
+                    this.ui.datum_edit = None;
+                    this.redraw_annotations(cx);
                     return;
                 }
                 if this.hide_dimensions(window, cx) {
@@ -3969,11 +4082,22 @@ impl Render for PartStudioView {
                     this.set_rollback(if r + 1 >= n { None } else { Some(r + 1) }, cx);
                 }
             }))
-            .child(slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()))
+            // Customizing: drawn every frame (a dragged tool leaves the bar
+            // while the drag runs, and nothing notifies the cached slice).
+            .child(if self.ui.tb_custom.is_some() {
+                div().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none().child(slices.toolbar.clone()).into_any_element()
+            } else {
+                slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()).into_any_element()
+            })
             .child(
                 h_flex()
                     .flex_1()
                     .min_h_0()
+                    .on_drag_move(cx.listener(|_, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
+                        if crate::ui::drag_left_panel(e) {
+                            cx.notify();
+                        }
+                    }))
                     .child(if self.ui.list_collapsed {
                         // Collapsed Features and parts list: Onshape collapses it
                         // to nothing; the toggle tab at the viewport's left edge reopens it.
@@ -3981,7 +4105,7 @@ impl Render for PartStudioView {
                     } else {
                         div()
                             .id("list-panel")
-                            .w(px(crate::ui::LEFT_PANEL_W))
+                            .w(px(crate::ui::left_panel_w()))
                             .h_full()
                             .flex_none()
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<SeparatorDrag>, _, cx| {
@@ -4031,15 +4155,15 @@ impl Render for PartStudioView {
                             .relative()
                             .overflow_hidden()
                             .bg(pal.app_bg)
-                            // Resizing the dialog by its corner grip (min 220 x 120).
+                            // Resizing the dialog by its right edge (width only, min 220).
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogResize>, _, cx| {
                                 let origin = this.ui.dialog_pos.unwrap_or(point(px(0.), px(3.)));
                                 let p = e.event.position - e.bounds.origin - origin;
-                                let size = size(p.x.max(px(220.)), p.y.max(px(120.)));
-                                this.ui.dialog_size = Some(size);
+                                let width = p.x.max(px(220.));
+                                this.ui.dialog_width = Some(width);
                                 if let Some(ed) = &this.edit {
                                     ed.dialog.update(cx, |d, cx| {
-                                        d.size = Some(size);
+                                        d.width = Some(width);
                                         cx.notify();
                                     });
                                 }
@@ -4059,12 +4183,15 @@ impl Render for PartStudioView {
                                 cx.notify();
                             }))
                             .child(self.viewport.clone())
+                            // Under the dialogs and the list toggle, as live.
+                            .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                             .child(slices.underlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
                             .children(self.render_dialog_layer())
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
                     )
                     .children(right),
-            );
+            )
+            .children(tb_panel);
         self.with_sketch_actions(root, cx)
     }
 }

@@ -3,7 +3,7 @@
 //! transform, so moving instances (drag, animation, explode) never
 //! re-uploads geometry. Pick ids map back to (instance path, reference).
 
-use crate::scene_builder::PickKind;
+use crate::scene_builder::{PickKind, MESH_LINE_COLOR};
 use crate::theme;
 use glam::{DMat4, DVec3, Mat4};
 use noshape_model::assembly::eval::{AssemblyResult, InstancePath};
@@ -66,6 +66,8 @@ struct CachedBody {
     mesh: MeshHandle,
     edges: LinesHandle,
     vertices: PointsHandle,
+    /// Mesh parts' triangle sides (live G35), when the part has mesh faces.
+    mesh_lines: Option<LinesHandle>,
 }
 
 #[derive(Default)]
@@ -165,6 +167,10 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
             if !opts.hide_edges || sketch {
                 scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
+                // A mesh part's triangle lines, as in the Part Studio.
+                if let Some(lines) = cached.mesh_lines.clone() {
+                    scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
+                }
             }
             scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).with_transform(t).pick_base(vert_base).pick_only().layer(2));
             if sketch {
@@ -199,7 +205,14 @@ fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),
     };
-    CachedBody { mesh: up.upload_mesh(&mesh), edges: up.upload_lines(&lines), vertices: up.upload_points(&points) }
+    let mesh_lines = (!m.mesh_lines.is_empty()).then(|| {
+        let mut l = LineData::default();
+        for s in m.mesh_lines.as_chunks::<2>().0 {
+            l.push_polyline(s, [0, 0, 0, 255], 0, 1.0, 0);
+        }
+        up.upload_lines(&l)
+    });
+    CachedBody { mesh: up.upload_mesh(&mesh), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines }
 }
 
 /// A coordinate triad overlay (world frame).

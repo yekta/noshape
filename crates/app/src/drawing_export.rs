@@ -100,11 +100,14 @@ pub struct ExportSettings {
     pub exclude_off_sheet: bool,
     /// Options: 0 Download, 1 Download and store, 2 Store file in a new tab.
     pub options: usize,
+    /// Document menu › Print…: the PDF opens in the system viewer (Onshape
+    /// opens a print-friendly page with print / save controls).
+    pub print: bool,
 }
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0 }
+        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
     }
 }
 
@@ -255,6 +258,23 @@ impl DrawingEditor {
         });
     }
 
+    /// Document menu › Print…: every sheet as a PDF (as Onshape's
+    /// print-friendly page), opened in the system viewer to print or save.
+    pub fn print(&mut self, cx: &mut Context<Self>) {
+        let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
+        let dir = std::env::temp_dir().join("noshape-print");
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            self.status = Some(format!("Print failed: {e}").into());
+            cx.notify();
+            return;
+        }
+        let safe: String = name.chars().map(|c| if c.is_alphanumeric() || " -_.".contains(c) { c } else { '_' }).collect();
+        let path = dir.join(format!("{safe}.pdf"));
+        let s = ExportSettings { print: true, ..Default::default() };
+        let sheets = (0..self.drawing.sheets.len()).collect();
+        self.write_export_with(s, sheets, name, Some(path), cx);
+    }
+
     /// Download (write to `path`) and / or store the exported file in a new
     /// file tab after the drawing (Options).
     fn deliver(&mut self, file_name: String, bytes: Vec<u8>, path: Option<&PathBuf>, store: bool, cx: &mut Context<Self>) -> Result<String, String> {
@@ -382,6 +402,19 @@ impl DrawingEditor {
                     };
                     this.deliver(file_name.clone(), bytes, path.as_ref(), store, cx)
                 });
+                if s.print {
+                    this.status = match done {
+                        Ok(_) => {
+                            if let Some(p) = &path {
+                                cx.open_url(&format!("file://{}", p.display()));
+                            }
+                            None
+                        }
+                        Err(e) => Some(format!("Print failed: {e}").into()),
+                    };
+                    cx.notify();
+                    return;
+                }
                 this.status = Some(done.unwrap_or_else(|e| format!("Export failed: {e}")).into());
                 cx.notify();
             })

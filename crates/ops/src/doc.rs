@@ -18,11 +18,15 @@ pub struct OpenDoc {
     /// Regeneration caches of every Part Studio (shared with Derived sources).
     pub studio_cache: crate::derived::StudioCache,
     regens: HashMap<TabId, Regenerator>,
+    assemblies: HashMap<TabId, noshape_model::assembly::eval::AssemblyEvaluator>,
+    /// Each Part Studio's chosen configuration (the Configurations box's
+    /// values; view state, not stored in the document).
+    pub active_config: HashMap<TabId, ConfigValues>,
 }
 
 impl OpenDoc {
     pub fn new(session: Session) -> Self {
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new() }
+        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new() }
     }
 
     pub fn doc(&self) -> &Document {
@@ -43,20 +47,37 @@ impl OpenDoc {
         }
     }
 
-    /// Regenerate a Part Studio in a configuration (None: the default one),
-    /// incrementally from the cached results.
+    /// The configuration a Part Studio shows: its defaults overridden by
+    /// the chosen values ([`OpenDoc::active_config`]).
+    pub fn current_config(&self, tab: TabId) -> Result<ConfigValues, OpError> {
+        let studio = studio(&self.session.doc, tab)?;
+        Ok(crate::config::current(studio, self.active_config.get(&tab).unwrap_or(&ConfigValues::default())))
+    }
+
+    /// Regenerate a Part Studio in a configuration (defaults overridden by
+    /// the given values; None: the active configuration), incrementally from
+    /// the cached results.
     pub fn regenerate(&mut self, tab: TabId, config: Option<&ConfigValues>) -> Result<RegenResult, OpError> {
         let opts = self.regen_options(tab);
         let units = self.session.doc.settings.units;
+        let values = match config {
+            Some(c) => crate::config::current(studio(&self.session.doc, tab)?, c),
+            None => self.current_config(tab)?,
+        };
         let studio = studio(&self.session.doc, tab)?;
-        let mut values = studio.configuration.defaults();
-        if let Some(c) = config {
-            for (k, v) in &c.0 {
-                values.0.insert(k.clone(), v.clone());
-            }
-        }
         let reg = self.regens.entry(tab).or_default();
         Ok(reg.regenerate(studio, &values, &units, &opts))
+    }
+}
+
+impl OpenDoc {
+    /// Evaluate (solve) an assembly tab as given (already configured, with
+    /// any previewed edits), as the Assembly view does.
+    pub fn evaluate_assembly(&mut self, tab: TabId, asm: &noshape_model::assembly::Assembly, opts: &noshape_model::assembly::eval::SolveOptions) -> noshape_model::assembly::eval::AssemblyResult {
+        let doc = &self.session.doc;
+        let ev = self.assemblies.entry(tab).or_default();
+        ev.retain_tabs(doc);
+        ev.evaluate(doc, asm, opts, None)
     }
 }
 

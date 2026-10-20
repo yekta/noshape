@@ -17,9 +17,7 @@ use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use crate::ui::{TipExt as _, TipSide};
 use noshape_model::document::{TabContent, TabId};
-use noshape_model::drawing::Drawing;
-use noshape_model::partstudio::PartStudio;
-use noshape_model::variables::VariableStudio;
+use noshape_ops::docedit;
 use std::collections::HashMap;
 
 enum TabView {
@@ -194,6 +192,11 @@ impl Workspace {
                         }
                         cx.notify();
                     }
+                    crate::feature_studio::FeatureStudioEvent::OpenStd { module, line, column } => {
+                        if let Err(e) = crate::std_source::open(module, *line, *column, this.gpu.clone(), cx) {
+                            log::warn!("Could not open the standard library: {e}");
+                        }
+                    }
                     crate::feature_studio::FeatureStudioEvent::FindSymbol { name, at, rename } => {
                         this.open_fs_search(window, cx);
                         if let Some((pane, _)) = &this.fs_search {
@@ -215,6 +218,16 @@ impl Workspace {
             _ => return,
         };
         self.views.insert(tab, view);
+    }
+
+    /// Show the Feature Studio tab named `name` with the caret at a 1-based
+    /// line and column (std source opened by ctrl+click).
+    pub fn goto_studio(&mut self, name: &str, line: usize, column: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(tab) = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == name).map(|t| t.id) else { return };
+        self.activate(tab, window, cx);
+        if let Some(TabView::FeatureStudio(v)) = self.views.get(&tab) {
+            v.update(cx, |v, cx| v.goto_line(line, column, window, cx));
+        }
     }
 
     fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
@@ -256,19 +269,10 @@ impl Workspace {
         let mut new_id = None;
         let after = self.active;
         self.doc.update(cx, |doc, cx| {
-            let (base, content) = match kind {
-                "partstudio" => ("Part Studio", TabContent::PartStudio(PartStudio::new())),
-                "assembly" => ("Assembly", TabContent::Assembly(Box::default())),
-                "drawing" => ("Drawing", TabContent::Drawing(Drawing::default())),
-                "featurestudio" => ("Feature Studio", TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(crate::feature_studio::FS_TEMPLATE))),
-                "materiallibrary" => ("Material Library", TabContent::MaterialLibrary(Default::default())),
-                _ => ("Variable Studio", TabContent::VariableStudio(VariableStudio::default())),
-            };
-            doc.edit_document(&format!("Insert tab : {base}"), cx, |d| {
-                let name = d.next_tab_name(base);
-                let id = d.add_tab(&name, content);
-                place_after(d, id, after);
-                new_id = Some(id);
+            // Any other kind ("variables") is a Variable Studio.
+            let (base, content) = docedit::new_tab_content(kind).or_else(|| docedit::new_tab_content("variablestudio")).expect("tab kinds");
+            doc.edit_document(&docedit::insert_tab_description(base), cx, |d| {
+                new_id = Some(docedit::insert_tab(d, base, content, after));
             });
         });
         if let Some(id) = new_id {
@@ -393,11 +397,9 @@ impl Workspace {
 
     fn duplicate_tab(&mut self, tab: TabId, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            let Some(t) = doc.session.doc.tab(tab).cloned() else { return };
-            doc.edit_document(&format!("Duplicate tab : {}", t.name), cx, |d| {
-                let name = format!("{} (copy)", t.name);
-                let id = d.add_tab(&name, t.content);
-                place_after(d, id, Some(tab));
+            let Some(name) = doc.session.doc.tab(tab).map(|t| t.name.clone()) else { return };
+            doc.edit_document(&docedit::duplicate_tab_description(&name), cx, |d| {
+                docedit::duplicate_tab(d, tab);
             });
         });
     }
@@ -529,7 +531,7 @@ impl Workspace {
                 let doc = ws.read(cx).doc.clone();
                 let x = e.position().x;
                 let (d1, d2, d3, d4, d5, d6, d7, d8) = (doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone());
-                let w = ws.clone();
+                let (w, w2) = (ws.clone(), ws.clone());
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                     m.dropdown()
                         .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
@@ -547,6 +549,8 @@ impl Workspace {
                                 cx.notify();
                             })
                         }))
+                        .separator()
+                        .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
                         .separator()
                         .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()))
                 });
@@ -571,6 +575,13 @@ impl Workspace {
         match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => Some(v.clone()),
             _ => None,
+        }
+    }
+
+    /// Document menu › Print…: a drawing opens as a print-friendly PDF.
+    fn print_active(&mut self, cx: &mut Context<Self>) {
+        if let Some(TabView::Drawing(v)) = self.active.and_then(|a| self.views.get(&a)) {
+            v.update(cx, |v, cx| v.print(cx));
         }
     }
 
@@ -1343,12 +1354,14 @@ impl Render for Workspace {
                                 .child(content)
                                 .children(self.render_toast(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
-                                .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::LEFT_PANEL_W)).child(p.clone()))),
+                                .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
                         )
-                        .child(tabs),
+                        .child(tabs)
+                        // Live document/75: the notices panel sits under the tab bar,
+                        // right of the left rail (the rail runs the full height).
+                        .children(self.fs_notices.as_ref().map(|(p, _)| p.clone())),
                     ),
             )
-            .children(self.fs_notices.as_ref().map(|(p, _)| p.clone()))
             .children(self.fs_search.as_ref().map(|(p, _)| p.clone()))
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
             // Onshape right-click menus opened with `os_context_menu`.
@@ -1662,16 +1675,7 @@ impl Workspace {
                 let mut new_id = None;
                 this.doc.update(cx, |doc, cx| {
                     doc.edit_document(&format!("Insert tab : {name}"), cx, |d| {
-                        let name = if name.is_empty() || d.tabs.iter().any(|t| t.name == name) { d.next_tab_name("Drawing") } else { name.clone() };
-                        let id = d.add_tab(&name, TabContent::Drawing(drawing));
-                        // The new drawing tab lands right after its source tab (Onshape).
-                        if let Some(src) = source.as_ref().map(|s| s.tab)
-                            && let Some(at) = d.settings.tab_order.iter().position(|t| *t == src)
-                        {
-                            d.settings.tab_order.retain(|t| *t != id);
-                            d.settings.tab_order.insert(at + 1, id);
-                        }
-                        new_id = Some(id);
+                        new_id = Some(docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab)));
                     });
                 });
                 let Some(id) = new_id else { return };
@@ -1724,15 +1728,7 @@ impl Workspace {
 
 
 /// Onshape inserts a new tab right after the active one (behaviours.md, tab bar).
-pub(crate) fn place_after(d: &mut noshape_model::Document, id: TabId, after: Option<TabId>) {
-    let order = &mut d.settings.tab_order;
-    let Some(at) = after.and_then(|a| order.iter().position(|t| *t == a)) else { return };
-    order.retain(|t| *t != id);
-    order.insert(at + 1, id);
-    // …and in the same folder.
-    let parent = after.and_then(|a| d.parent_of(a));
-    d.set_parent(id, parent);
-}
+pub(crate) use noshape_ops::docedit::place_after;
 
 /// A tab or folder dragged on the tab bar (also its drag preview).
 #[derive(Clone)]

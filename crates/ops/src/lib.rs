@@ -8,6 +8,9 @@
 //! app re-exports it. See `docs/AGENT_API.md`.
 
 pub mod analysis;
+pub mod assembly;
+pub mod config;
+pub mod coverage;
 pub mod derived;
 pub mod doc;
 pub mod docedit;

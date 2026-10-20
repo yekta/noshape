@@ -384,9 +384,8 @@ impl AssemblyView {
                 .into_any_element(),
         });
         let table = v_flex().items_start().child(head).child(rows);
-        v_flex()
-            .id("np-pane")
-            .w(px(712.))
+        crate::ui::right_resizable(v_flex().id("np-pane").relative(), 0.)
+            .w(px(crate::ui::right_panel_w()))
             .h_full()
             .occlude()
             .bg(rgb(0xffffff))
@@ -483,7 +482,7 @@ impl AssemblyView {
                 .left_0()
                 .right_0()
                 // Centered on the window (live), not the graphics area.
-                .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W }))
+                .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
                 .flex()
                 .justify_center()
                 .child(crate::os_ui::message_bubble("np-toast", crate::os_ui::BubbleKind::Success, text, move |_, _, cx| {

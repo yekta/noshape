@@ -9,6 +9,10 @@
 //! Native part files (SOLIDWORKS, Solid Edge, NX, Inventor; live G38b,
 //! dom/dialog-import-sldprt.txt, dialog-import-nxhub.txt): no tiles, and ☐
 //! Import material density after Import appearances.
+//! Mesh files (live G35, G35b): STL has no tiles, no Import appearances and
+//! a Units select defaulting to the document's unit; OBJ keeps the tiles and
+//! Import appearances, its Units default to Meter; 3MF is OBJ without Units.
+//! None of them has Join adjacent surfaces.
 
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
@@ -24,8 +28,7 @@ use std::rc::Rc;
 
 /// Native part files (their own dialog variant).
 const NATIVE_PARTS: &[&str] = &["sldprt", "par", "psm", "prt", "ipt"];
-/// Mesh files without units: Onshape asks for them (live G35,
-/// dom/dialog-import-stl.txt: Y-up, composite and a Units select, no tiles).
+/// Mesh files without units: Onshape asks for them (live G35, G35b).
 const MESH_FILES: &[&str] = &["stl", "obj"];
 /// The Units select, as Onshape lists units in its STL dialogs.
 const MESH_UNITS: [(&str, noshape_units::LengthUnit); 6] = [
@@ -54,12 +57,14 @@ struct Choice {
 /// `keep_files`: also keep each file as a file tab in "CAD Imports" (Import;
 /// not when translating an existing file tab).
 pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    // Native part files get Onshape's five-checkbox variant, mesh files the
-    // one with Units.
+    // Native part files get Onshape's five-checkbox variant, mesh files
+    // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
-    let (native, mesh) = (all_of(NATIVE_PARTS), all_of(MESH_FILES));
+    let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
+    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf"]), stl || obj);
     let doc_unit = doc.read(cx).session.doc.settings.units.length;
-    let unit = MESH_UNITS.iter().position(|(_, u)| *u == doc_unit).unwrap_or(4);
+    let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
+    let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
     let opened = Rc::new(opened);
     window.open_dialog(cx, move |dialog, _, cx| {
@@ -153,15 +158,15 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                 os::modal_body()
                     .pt(px(4.))
                     .gap(px(8.))
-                    .when(!native && !mesh, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
+                    .when(!native && !stl, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
                     // Live document/77: the checkbox rows are 34 px apart.
-                    .child(v_flex().gap(px(13.)).when(!mesh, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
+                    .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
                     .when(native, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
                     .child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone()))
                     .when(!mesh, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
-                    .when(mesh, |d| {
+                    .when(units_select, |d| {
                         let ch = choice.clone();
                         d.child(
                             v_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Units")).child(div().w(px(212.)).child(crate::os_ui::select_field(

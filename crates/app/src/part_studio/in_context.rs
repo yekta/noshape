@@ -513,7 +513,7 @@ impl PartStudioView {
                             )
                             .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, cx| set_slider(this, ev.position.x, cx)))
                             .on_mouse_move(cx.listener(move |this, ev: &MouseMoveEvent, _, cx| {
-                                if ev.pressed_button == Some(MouseButton::Left) {
+                                if ev.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
                                     set2(this, ev.position.x, cx);
                                 }
                             })),

@@ -52,7 +52,7 @@ pub use format::{format_number, format_quantity, format_quantity_exact, format_q
 pub use parser::parse;
 pub use quantity::Quantity;
 pub use scope::{EmptyScope, FnScope, LayeredScope, VariableScope};
-pub use unit::{AngleUnit, LengthUnit, OTHER_UNITS, Unit, UnitPrefs, UnknownUnit};
+pub use unit::{AngleUnit, LENGTH_UNITS_SHOWN, LengthUnit, OTHER_UNITS, OTHER_UNITS_SHOWN, Unit, UnitPrefs, UnknownUnit};
 pub use value::ExprValue;
 pub use variables::{
     EvalOrder, TableEvaluation, VarError, VariableDef, VariableTable, is_valid_variable_name,

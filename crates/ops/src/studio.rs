@@ -132,6 +132,15 @@ pub fn visibility_targets(targets: &[Reference], made_by: impl Fn(FeatureId) -> 
     t
 }
 
+/// The part a reference belongs to: a part itself, or one of its faces,
+/// edges or vertices.
+pub fn body_of(display: &noshape_model::display::StudioDisplay, r: &Reference) -> Option<BodyId> {
+    match r {
+        Reference::Body(b) => Some(b.clone()),
+        _ => display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| b.id.clone()),
+    }
+}
+
 /// "Hide" / "Show".
 pub fn visibility_description(hidden: bool) -> &'static str {
     if hidden { "Hide" } else { "Show" }

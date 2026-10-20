@@ -376,7 +376,7 @@ impl Render for FsSearchPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let primary = |id: &'static str, label: &'static str| Button::new(id).primary().h(px(30.)).px(px(10.5)).rounded(px(5.25)).child(div().text_size(px(14.)).child(label));
-        let field = |st: &Entity<InputState>| Input::new(st).h(px(30.)).text_size(px(14.));
+        let field = |st: &Entity<InputState>| crate::os_ui::input_h(Input::new(st), 30.).text_size(px(14.));
         let check = |id: &'static str, label: &'static str, on: bool| os::checkbox(id, label, on).flex_none().cursor_pointer();
         let mode_anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
         let probe = mode_anchor.clone();

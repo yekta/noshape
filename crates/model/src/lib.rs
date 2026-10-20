@@ -36,6 +36,7 @@ pub mod select;
 pub mod sheetmetal;
 pub mod sketch_feature;
 pub mod variables;
+pub mod annotations;
 pub mod configured_properties;
 pub mod variable_table;
 

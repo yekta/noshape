@@ -51,6 +51,9 @@ pub const GLYPH_CHEVRON_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/sv
 pub const GLYPH_LABEL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.7 4.7h10.6l4 5.3-4 5.3H2.7z"/><circle cx="12.6" cy="10" r="1.2"/></svg>"#;
 /// Create-label glyph (tag with a plus).
 pub const GLYPH_LABEL_ADD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M6.7 5.7h7.6l3.4 4.3-3.4 4.3H6.7z"/><path d="M1.5 10h5M4 7.5v5" stroke-linecap="round"/></svg>"#;
+/// Checklist marks (Publish FeatureScript): a heavy ✓ and a heavy ✗.
+pub const GLYPH_CHECK_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"><path d="m1.6 8.6 4.1 3.9L14.6 3.6"/></svg>"#;
+pub const GLYPH_CROSS_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m1.5 1.5 7 7M8.5 1.5l-7 7"/></svg>"#;
 pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 11 11M15.5 4.5l-11 11"/></svg>"#;
 pub const GLYPH_LIST_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 3.1h4.3l1.5 1.5v4.3H2.6zM2.6 11.1h4.3l1.5 1.5v4.3H2.6z" stroke-linejoin="round"/><path d="M10.5 5h7M10.5 7.5h5M10.5 13h7M10.5 15.5h5"/></svg>"#;
 pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 2.6h6.3v6.3H2.6zM11.1 2.6h6.3v6.3h-6.3zM2.6 11.1h6.3v6.3H2.6zM11.1 11.1h6.3v6.3h-6.3z"/></svg>"#;
@@ -60,6 +63,13 @@ pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" v
 pub const GLYPH_EMPTY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"><path d="M50 8 88 29v42L50 92 12 71V29z"/><path d="M12 29l38 21 38-21M50 50v42"/><ellipse cx="50" cy="29" rx="12" ry="6.5"/></svg>"#;
 
 /// A documents-page glyph as a tinted mask.
+/// A single-line input `h` px tall. The kit's own `Input::h` sizes only
+/// multi-line inputs (single-line ones stay at its 28 px); the styled
+/// height set here applies after the kit's.
+pub fn input_h(input: gpui_kit::component::input::Input, h: f32) -> gpui_kit::component::input::Input {
+    Styled::h(input, px(h))
+}
+
 pub fn glyph(data: &'static [u8], size: f32, color: impl Into<Hsla>) -> Icon {
     Icon::empty().data(data).size(px(size)).text_color(color.into())
 }

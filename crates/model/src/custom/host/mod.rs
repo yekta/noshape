@@ -112,6 +112,9 @@ pub struct CtxState {
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
     pub sketch_names: sketch::SketchNames,
+    /// Geometry of entities when they got their transient ids (TRACKING
+    /// queries find what they became after an operation renamed them).
+    pub snapshots: HashMap<Arc<str>, query::Snapshot>,
     /// Bodies hidden from the Part Studio (std sheet metal definition
     /// sheets): skipped by `qEverything` & co., found by attribute queries.
     pub hidden: HashSet<BodyId>,
@@ -174,6 +177,7 @@ impl FsContext {
                 sketches: HashMap::new(),
                 sketch_names: HashMap::new(),
                 hidden,
+                snapshots: HashMap::new(),
                 holes: HashMap::new(),
             }),
         })
@@ -217,6 +221,14 @@ impl CtxState {
             s.insert(0, 'A');
         }
         let id: Arc<str> = format!("J{s}").into();
+        // Where it is now, for tracking it through later operations.
+        let snapshot = {
+            let q = query::QueryCx::new(self);
+            q.from_ref(r).first().and_then(|e| q.snapshot(e))
+        };
+        if let Some(snap) = snapshot {
+            self.snapshots.insert(id.clone(), snap);
+        }
         self.transient_ids.insert(id.clone(), r.clone());
         self.transient_of.insert(r.clone(), id.clone());
         id

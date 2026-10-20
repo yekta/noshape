@@ -1,5 +1,7 @@
 //! The operations, by group. Each module's `ops()` lists its operations.
 
+mod assembly;
+mod configuration;
 mod document;
 mod export;
 mod feature;
@@ -8,6 +10,7 @@ mod meta;
 mod query;
 mod render;
 mod sketch;
+mod variables;
 
 use crate::doc::{self, OpenDoc};
 use crate::error::OpError;
@@ -22,6 +25,9 @@ pub fn all() -> Vec<Op> {
     v.extend(document::ops());
     v.extend(feature::ops());
     v.extend(sketch::ops());
+    v.extend(variables::ops());
+    v.extend(configuration::ops());
+    v.extend(assembly::ops());
     v.extend(query::ops());
     v.extend(render::ops());
     v.extend(export::ops());

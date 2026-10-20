@@ -417,9 +417,8 @@ impl AssemblyView {
             rows = rows.child(row_el);
         }
 
-        v_flex()
-            .id("bom-pane")
-            .w(px(712.))
+        crate::ui::right_resizable(v_flex().id("bom-pane").relative(), 0.)
+            .w(px(crate::ui::right_panel_w()))
             // Within its dock (at most half the graphics area): a fixed 712 px
             // ran under the panel strip and off the window ("Add columns" cut).
             .max_w_full()

@@ -6,6 +6,8 @@
 
 mod ao;
 pub mod camera;
+pub mod overlay;
+mod overlay_gpu;
 pub mod perf;
 pub mod primitives;
 pub mod renderer;

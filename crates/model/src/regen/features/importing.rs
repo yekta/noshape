@@ -289,16 +289,23 @@ fn linear(c: [f32; 3]) -> [f32; 4] {
     [l(c[0]), l(c[1]), l(c[2]), 1.0]
 }
 
+/// Onshape's generated colour for an imported mesh part without a colour of
+/// its own (live G35: STL "Part 1" rgb(248,135,1), isGenerated).
+const MESH_PART_COLOR: [f32; 3] = [248.0 / 255.0, 135.0 / 255.0, 1.0 / 255.0];
+
 /// Give an imported part the file's name, and with "Import appearances"
 /// its colours (the part's and its faces' own).
 fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     if let Some(name) = look.name.as_ref().filter(|n| !n.trim().is_empty()) {
         ev.ctx.bodies[bi] = std::sync::Arc::new(ev.ctx.bodies[bi].renamed(name.clone()));
     }
+    let body = ev.ctx.bodies[bi].clone();
+    if !(appearances && look.color.is_some()) && body.shape.is_mesh() {
+        ev.ctx.part_appearance.insert(body.id.clone(), linear(MESH_PART_COLOR));
+    }
     if !appearances {
         return;
     }
-    let body = ev.ctx.bodies[bi].clone();
     if let Some(c) = look.color {
         let mut c = linear(c);
         c[3] = look.opacity.unwrap_or(1.0);

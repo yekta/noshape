@@ -84,6 +84,17 @@ impl DrawingEditor {
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
         }
+        // A selected auxiliary view's edge in its parent (Onshape help).
+        let aux = self.aux_edge_highlight();
+        if !aux.is_empty() {
+            let mut lines = LineData::default();
+            let width = drawing_scene::px_width(noshape_model::drawing::sheet::LineStyle::Visible, self.zoom).max(2.0);
+            for (a, c) in aux {
+                lines.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
+            }
+            let up = self.gpu.uploader();
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+        }
         let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
         if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)) {
             anns.push(a);

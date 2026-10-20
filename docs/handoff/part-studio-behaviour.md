@@ -790,6 +790,40 @@ new render flags into `DrawMode` rather than new arguments.
     `render` because the box renders without the window). A value outside the range stays in the field,
     pink, with "Enter a value between 0 and 20. Current value is 50.", and isn't applied.
   - Live printed the maximum as "20.0"; ours prints "20". The number formatting rule is unknown.
+  - Verified in the app: "Variable input" (red title, ✓ greyed, Name in the error look, 1/0/100000 mm);
+    Default 5 > Maximum 3 marks both with the tooltip; Enter creates "Wid (#Wid) Default: 5 mm" with
+    "No features are configured"; ⋯ has Edit definition… after Rename, and it opens "Edit Wid"
+    (Default / Min / Max).
+  - Also verified: Configured properties paste (2 lines into 1 row gives "first") and the alpha slider
+    ("A 1.00" at the right).
+  - The Configurations box keeps an out-of-range value: verified, `50 mm` stays pink with "Enter a value
+    between 0 and 20. Current value is 50." (live writes "20.0").
+- **Inspection › Datum** (live psb 10-20 r, psb/r-910–922; model `annotations.rs`, app
+  `part_studio/annotations_ui.rs`):
+  - The tool opens "Datum ✓ ✕" with the next free letter (A, B, … Z, AA…).
+  - A click places the symbol on the first planar face under the pointer, through the default planes,
+    as a preview; ✓ (or Enter) keeps it and ✕ / Esc drops it.
+  - Annotations live in `PartStudio.annotations` (not features; merge.rs takes theirs like the other
+    lists).
+  - The symbol, a boxed letter over a filled triangle, lies in the face plane, upright for the placing
+    view and constant in screen size (`pixel_frame`).
+  - It's drawn as world fills next to the plane labels, so it's not in scene_builder.
+  - Right-click on it: Show all | Select | Zoom to fit | Delete annotation (verified, including Delete,
+    which empties the panel again). "Select other…" and "Add comment" are missing; Add comment is cloud
+    and excluded.
+  - Model definitions then shows "Model <part>", the tools, "⌄ Datums (n/n)" with a cell per letter, and
+    "⌄ Characteristics (0/0)" with the Type | Nominal value | Tolerance | Upper limit | Lower limit header.
+  - Still missing:
+    - the copy icon, "Select default tolerances…" and the Characteristics header icons (the picker and
+      the Types filter are captured; the rest need work);
+    - dragging the box is built (not yet verified). Each box's middle line is a viewport manipulator
+      handle (`annotation_handles`, merged in `sync_manipulator` and refreshed on every underlay
+      render), so a press there arrives as ToolDown / ToolDrag / ToolUp. The screen delta splits along
+      the symbol's projected axes into a pixel `offset`, and release is one "Move annotation" step,
+      drawn with a dashed leader. Live's "lighter" box after the move isn't reproduced (its colour
+      isn't captured);
+    - Geometric tolerance and Weld placement, the Dimension tool and the Set tools: not captured (the
+      live agent ran out of machine; request r is marked partial).
 - **Still open (mine)**:
   - The Variable Studio (variable_studio.rs, ui2's) should also turn a bare `5` into `5 mm`. The rule is
     now the shared `variable_table::with_workspace_unit`; the request is in theme-studios.md under "From

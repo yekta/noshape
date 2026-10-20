@@ -41,11 +41,14 @@ pub struct InsertViewState {
     /// Sheets panel › reference › Replace...: the replaced reference's part
     /// (`None` inside: the whole source); its views on every sheet switch.
     pub replace_part: Option<Option<noshape_model::BodyId>>,
+    /// View orientation › one of the source's named views and its frame
+    /// (replaces the standard orientation while set).
+    pub named: Option<(String, [[f64; 3]; 2])>,
 }
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None }
     }
 }
 
@@ -87,6 +90,19 @@ pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Optio
 }
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
+
+/// The named views a source offers in View orientation (Part Studios).
+pub fn named_views(doc: &noshape_model::document::Document, source: TabId) -> &[noshape_model::partstudio::NamedView] {
+    match doc.tab(source).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => &ps.named_views,
+        _ => &[],
+    }
+}
+
+/// The frame of the source's named view `name`, if it still exists.
+pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, name: &str) -> Option<[[f64; 3]; 2]> {
+    named_views(doc, source).iter().find(|v| v.name == name).map(views::named_view_frame)
+}
 
 const ORIENTATIONS: [ViewOrientation; 7] = [ViewOrientation::Top, ViewOrientation::Left, ViewOrientation::Right, ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Bottom, ViewOrientation::Isometric];
 const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
@@ -160,8 +176,17 @@ impl DrawingEditor {
             return;
         }
         let orientation = match &self.tool {
-            Tool::InsertView { orientation, .. } => *orientation,
-            _ => ViewOrientation::Front,
+            Tool::InsertView { orientation, source: old, .. } => {
+                // Named views belong to their source.
+                if *old != source {
+                    self.insert.named = None;
+                }
+                *orientation
+            }
+            _ => {
+                self.insert.named = None;
+                ViewOrientation::Front
+            }
         };
         self.tool = Tool::Select;
         self.insert.sketch = None;
@@ -173,6 +198,15 @@ impl DrawingEditor {
         if let Tool::InsertView { orientation, .. } = &mut self.tool {
             *orientation = o;
         }
+        self.insert.named = None;
+        self.update_preview(cx);
+        cx.notify();
+    }
+
+    /// View orientation › a named view of the source.
+    fn set_insert_named(&mut self, name: String, cx: &mut Context<Self>) {
+        let Tool::InsertView { source, .. } = &self.tool else { return };
+        self.insert.named = named_view_frame(&self.doc.read(cx).session.doc, *source, &name).map(|f| (name, f));
         self.update_preview(cx);
         cx.notify();
     }
@@ -228,7 +262,14 @@ impl DrawingEditor {
                 }
             }
         }
-        let orient_items: Vec<(String, bool, Act)> = ORIENTATIONS.iter().map(|&o| (format!("{o:?}"), o == orientation, std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| t.set_insert_orientation(o, cx)) as Act)).collect();
+        // The standard orientations, then the source's named views (help H:views).
+        let named = self.insert.named.as_ref().map(|n| n.0.clone());
+        let mut orient_items: Vec<(String, bool, Act)> = ORIENTATIONS.iter().map(|&o| (format!("{o:?}"), named.is_none() && o == orientation, std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| t.set_insert_orientation(o, cx)) as Act)).collect();
+        for nv in named_views(&self.doc.read(cx).session.doc, source) {
+            let name = nv.name.clone();
+            orient_items.push((nv.name.clone(), named.as_ref() == Some(&nv.name), std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| t.set_insert_named(name.clone(), cx)) as Act));
+        }
+        let orient_label = named.clone().unwrap_or_else(|| format!("{orientation:?}"));
         let cur_scale = self.insert.scale;
         let scale_items: Vec<(String, bool, Act)> = SCALES
             .iter()
@@ -293,7 +334,7 @@ impl DrawingEditor {
                         .child(Button::new("div-insert").label("Insert").icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("insert"))).outline().small().w(px(104.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_chooser(cx))))
                         .child(div().flex_1().min_w_0().child(if src_items.is_empty() { div().px_1().truncate().text_size(px(13.33)).child(source_label).into_any_element() } else { select("div-source", source_label, src_items) })),
                 )
-                .child(row("View orientation", select("div-orient", format!("{orientation:?}"), orient_items)))
+                .child(row("View orientation", select("div-orient", orient_label, orient_items)))
                 .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items)))
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))

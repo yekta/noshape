@@ -468,6 +468,23 @@ impl Configuration {
             })
             .collect()
     }
+
+    /// Configuration variables evaluated (the ones that evaluate), as every
+    /// feature of the Part Studio sees them.
+    pub fn variable_values(&self, values: &ConfigValues, units: &noshape_units::UnitPrefs) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+        let mut out = std::collections::BTreeMap::new();
+        for (name, kind, text) in self.variable_exprs(values) {
+            let dim = match kind {
+                VariableKind::Length => noshape_units::Dim::LENGTH,
+                VariableKind::Angle => noshape_units::Dim::ANGLE,
+                _ => noshape_units::Dim::UNITLESS,
+            };
+            if let Ok(q) = noshape_units::evaluate_as(&text, dim, units, &noshape_units::EmptyScope) {
+                out.insert(name, q);
+            }
+        }
+        out
+    }
 }
 
 /// Evaluated configuration variable.

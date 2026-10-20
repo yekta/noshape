@@ -374,6 +374,27 @@ pub struct Grip {
     pub kind: GripKind,
 }
 
+/// Where each annotation's geometry starts: (annotation, texts, lines, fills).
+type Starts<'a> = [(&'a Annotation, usize, usize, usize)];
+/// A point on a line with the segment ends and whether the line is closed.
+type OnLine = ([f64; 2], [f64; 2], [f64; 2], bool);
+
+impl SheetGeometry {
+    /// The point a datum attached by `o` sits on, with the segment it lies
+    /// on and whether that polyline is closed (a frame): from the geometry
+    /// of the annotation laid out so far (`starts`, see `annotations`).
+    fn attached_point(&self, starts: &Starts, o: &super::DatumOn) -> Option<OnLine> {
+        let k = starts.iter().position(|s| s.0.id == o.ann)?;
+        let l1 = starts.get(k + 1).map(|s| s.2).unwrap_or(self.lines.len());
+        let pick = (o.ann & 0xFFFF_FFFF) as u32;
+        let line = self.lines[starts[k].2..l1].iter().filter(|l| l.pick == pick).nth(o.line as usize)?;
+        let n = line.points.len();
+        let i = o.seg as usize;
+        let (w0, w1) = (*line.points.get(i)?, if i + 1 < n { line.points[i + 1] } else if line.closed && n > 2 { line.points[0] } else { return None });
+        Some(([w0[0] + (w1[0] - w0[0]) * o.t, w0[1] + (w1[1] - w0[1]) * o.t], w0, w1, line.closed))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GripKind {
     /// Where a dimension attaches to the geometry (Onshape: light-blue dot).
@@ -640,8 +661,8 @@ impl SheetGeometry {
         let scale_cols = if iso { [0.620, 0.8346] } else { [0.6033, 0.8258] };
         let k = bh / 38.2;
         let (lab, val) = (1.25 * k, 2.2 * k);
-        // Frame and grid.
-        self.rect(x0, y0, x1, y1, LineStyle::Border);
+        // Frame and grid (live 164: thin lines throughout).
+        self.rect(x0, y0, x1, y1, LineStyle::Thin);
         self.line([px(left), y0], [px(left), y1], LineStyle::Thin);
         self.line([px(mid), y0], [px(mid), y1], LineStyle::Thin);
         for v in &left_rows[1..left_rows.len() - 1] {
@@ -663,68 +684,105 @@ impl SheetGeometry {
         for c in scale_cols {
             self.line([px(c), y0], [px(c), py(right_rows[3])], LineStyle::Thin);
         }
+        // Custom template › Language (live: only the labels are translated;
+        // long translations wrap in their cell and some shrink).
+        let lang = sheet.title_language;
+        let tr = lang.strings();
+        let en = lang.is_english();
         let label = |g: &mut Self, u: f64, v: f64, t: &str| g.text([px(u) + 0.8 * k, py(v) - 0.6 * k - lab], lab, t.to_string(), Anchor::BottomLeft);
+        let label_h = |g: &mut Self, u: f64, v: f64, t: &str, h: f64| g.text([px(u) + 0.8 * k, py(v) - 0.6 * k - h], h, t.to_string(), Anchor::BottomLeft);
         // Left: tolerance notes, standard notes, projection.
         let top = left_rows[0];
-        label(self, 0.0, top, "UNLESS OTHERWISE SPECIFIED,");
         let units = sheet.title_field("Units").filter(|u| !u.is_empty()).unwrap_or(if iso { "MILLIMETERS" } else { "INCHES" });
-        label(self, 0.0, top - 0.055, &format!("DIMENSIONS ARE IN {units}"));
+        if en {
+            label(self, 0.0, top, "UNLESS OTHERWISE SPECIFIED,");
+            label(self, 0.0, top - 0.055, &format!("DIMENSIONS ARE IN {units}"));
+        } else {
+            let word = match units {
+                "MILLIMETERS" => tr.millimeters,
+                "INCHES" => tr.inches.unwrap_or("INCHES"),
+                u => u,
+            };
+            let h = lab * tr.unless_h;
+            for (i, line) in wrap_text(&tr.unless.replace("{u}", word), h, left * bw - 1.6 * k).iter().enumerate() {
+                label_h(self, 0.0, top - i as f64 * 0.055, line, h);
+            }
+        }
+        let angular = tr.angular.to_string();
         if iso {
-            self.text([px(0.11), py(0.80)], lab, "ANGULAR = ± °".to_string(), Anchor::BottomLeft);
+            self.text([px(0.11), py(0.80)], lab, angular, Anchor::BottomLeft);
         } else {
             for (i, t) in [".XX = ±.0-", ".XXX = ±.00-", ".XXXX = ±.000-"].iter().enumerate() {
                 self.text([x0 + 1.0 * k, py(0.81 - i as f64 * 0.05)], lab, t.to_string(), Anchor::BottomLeft);
             }
-            self.text([px(0.1), py(0.79)], lab, "ANGULAR = ± °".to_string(), Anchor::BottomLeft);
-            self.text([px(0.1), py(0.74)], lab, "FRACTIONAL = ±".to_string(), Anchor::BottomLeft);
+            self.text([px(0.1), py(0.79)], lab, angular, Anchor::BottomLeft);
+            self.text([px(0.1), py(0.74)], lab, tr.fractional.unwrap_or("FRACTIONAL = ±").to_string(), Anchor::BottomLeft);
         }
-        self.text([x0 + 0.8 * k, py(left_rows[1] + 0.09)], lab, "SURFACE FINISH".to_string(), Anchor::BottomLeft);
+        self.text([x0 + 0.8 * k, py(left_rows[1] + 0.09)], lab * tr.surface_h, tr.surface_finish.to_string(), Anchor::BottomLeft);
         let sf = [px(0.098), py(left_rows[1] + 0.12)];
         self.lines.push(Polyline2 { points: vec![[sf[0], sf[1]], [sf[0] + 0.8 * k, sf[1] - 1.6 * k], [sf[0] + 2.4 * k, sf[1] + 1.6 * k], [sf[0] + 5.0 * k, sf[1] + 1.6 * k]], style: LineStyle::Thin, closed: false, pick: 0 });
         let centred = |g: &mut Self, v0: f64, v1: f64, h: f64, t: &str| g.text([px(left / 2.0), (py(v0) + py(v1)) / 2.0], h, t.to_string(), Anchor::Center);
-        centred(self, left_rows[1], left_rows[2], 1.8 * k, "DO NOT SCALE DRAWING");
-        self.text([px(left / 2.0), py(left_rows[2]) - 1.4 * k], lab, "BREAK ALL SHARP EDGES AND".to_string(), Anchor::Center);
-        self.text([px(left / 2.0), py(left_rows[3]) + 1.4 * k], lab, "REMOVE BURRS".to_string(), Anchor::Center);
-        centred(self, left_rows[3], left_rows[4], lab, if projection == Projection::FirstAngle { "FIRST ANGLE PROJECTION" } else { "THIRD ANGLE PROJECTION" });
+        // Sized to its cell (live: it fits with a margin).
+        let dns = tr.do_not_scale;
+        let dns_h = (1.8 * k).min(left * bw * 0.86 / font::text_width(dns, 1.0).max(1e-9));
+        centred(self, left_rows[1], left_rows[2], dns_h, dns);
+        if en {
+            self.text([px(left / 2.0), py(left_rows[2]) - 1.4 * k], lab, "BREAK ALL SHARP EDGES AND".to_string(), Anchor::Center);
+            self.text([px(left / 2.0), py(left_rows[3]) + 1.4 * k], lab, "REMOVE BURRS".to_string(), Anchor::Center);
+        } else {
+            let lines = wrap_text(tr.break_edges, lab, left * bw - 1.6 * k);
+            let n = lines.len() as f64;
+            let cy = (py(left_rows[2]) + py(left_rows[3])) / 2.0;
+            for (i, l) in lines.iter().enumerate() {
+                self.text([px(left / 2.0), cy + ((n - 1.0) / 2.0 - i as f64) * 2.8 * k], lab, l.clone(), Anchor::Center);
+            }
+        }
+        let proj = if projection == Projection::FirstAngle { tr.first_angle } else { tr.third_angle.unwrap_or("THIRD ANGLE PROJECTION") };
+        centred(self, left_rows[3], left_rows[4], lab, proj);
         self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection);
         // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED.
-        let heads: &[&str] = if iso { &["NAME", "SIGNATURE", "DATE"] } else { &["NAME", "DATE"] };
+        let heads: Vec<&str> = if iso { vec![tr.name, tr.signature, tr.date] } else { vec![tr.name, tr.date] };
         for (i, h) in heads.iter().enumerate() {
             label(self, cols[i + 1], rows[0], h);
         }
-        let fields: [(&str, &str, &str); 3] = [("DRAWN", "Drawn by", "Drawn date"), ("CHECKED", "Checked by", "Checked date"), ("APPROVED", "Approved by", "Approved date")];
+        let fields: [(&str, &str, &str); 3] = [(tr.drawn, "Drawn by", "Drawn date"), (tr.checked, "Checked by", "Checked date"), (tr.approved, "Approved by", "Approved date")];
+        // A field's value centred in its cell; several lines stack.
         let value_in = |g: &mut Self, u0: f64, u1: f64, v0: f64, v1: f64, key: &str, h: f64| {
             let v = value_of(key, sheet.title_field(key).unwrap_or(""));
-            if !v.is_empty() {
-                g.text([(px(u0) + px(u1)) / 2.0, (py(v0) + py(v1)) / 2.0], h, v, Anchor::Center);
+            let lines: Vec<&str> = v.split('\n').filter(|l| !l.is_empty()).collect();
+            let n = lines.len() as f64;
+            let (cx, cy) = ((px(u0) + px(u1)) / 2.0, (py(v0) + py(v1)) / 2.0);
+            for (i, l) in lines.iter().enumerate() {
+                let y = cy + ((n - 1.0) / 2.0 - i as f64) * h * 1.6;
+                g.text([cx, y], h, l.to_string(), Anchor::Center);
             }
         };
         for (r, (l, name, date)) in fields.iter().enumerate() {
-            label(self, cols[0], rows[r + 1], l);
+            label_h(self, cols[0], rows[r + 1], l, lab * tr.signoff_h);
             value_in(self, cols[1], cols[2], rows[r + 2], rows[r + 1], name, lab);
             let dc = cols.len() - 2;
             value_in(self, cols[dc], cols[dc + 1], rows[r + 2], rows[r + 1], date, lab);
         }
-        label(self, cols[0], rows[6], "MATERIAL");
-        label(self, split, rows[6], "FINISH");
+        label(self, cols[0], rows[6], tr.material);
+        label(self, split, rows[6], tr.finish);
         value_in(self, cols[0], split, 0.0, rows[6] - 0.08, "Material", val * 0.8);
         value_in(self, split, mid, 0.0, rows[6] - 0.08, "Finish", val * 0.8);
         // Right: the logo row, TITLE, SIZE / DWG NO. / REV., SCALE / WEIGHT / SHEET.
         if iso {
             self.text([px((mid + 1.0) / 2.0), (py(right_rows[0]) + py(right_rows[1])) / 2.0], 3.5 * k, "noshape".to_string(), Anchor::Center);
         }
-        label(self, mid, right_rows[1], "TITLE");
+        label(self, mid, right_rows[1], tr.title);
         value_in(self, mid, 1.0, right_rows[2], right_rows[1], "Title", val);
-        label(self, mid, right_rows[2], "SIZE");
-        label(self, size_cols[0], right_rows[2], "DWG NO.");
-        label(self, size_cols[1], right_rows[2], "REV.");
+        label(self, mid, right_rows[2], tr.size);
+        label(self, size_cols[0], right_rows[2], tr.dwg_no);
+        label(self, size_cols[1], right_rows[2], tr.rev);
         let size = value_of("Size", sheet.title_field("Size").unwrap_or(""));
         self.text([(px(mid) + px(size_cols[0])) / 2.0, (py(right_rows[3]) + py(right_rows[2])) / 2.0 - 0.6 * k], val * 1.4, size, Anchor::Center);
         value_in(self, size_cols[0], size_cols[1], right_rows[3], right_rows[2] - 0.05, "Part number", val);
         value_in(self, size_cols[1], 1.0, right_rows[3], right_rows[2] - 0.05, "Revision", val);
-        label(self, mid, right_rows[3], "SCALE");
-        label(self, scale_cols[0], right_rows[3], "WEIGHT");
-        label(self, scale_cols[1], right_rows[3], "SHEET");
+        label(self, mid, right_rows[3], tr.scale);
+        label(self, scale_cols[0], right_rows[3], tr.weight);
+        label(self, scale_cols[1], right_rows[3], tr.sheet);
         value_in(self, mid + 0.03, scale_cols[0], 0.0, right_rows[3] - 0.03, "Scale", val);
         value_in(self, scale_cols[0], scale_cols[1], 0.0, right_rows[3] - 0.03, "Weight", val);
         value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", val);
@@ -1203,15 +1261,36 @@ impl SheetGeometry {
                         }
                     }
                 }
-                AnnotationKind::Datum { anchor, label } => {
-                    let c = a.position;
+                AnnotationKind::Datum { anchor, label, on } => {
                     let (bw, bh) = ((font::text_width(label, ah) + 3.0).max(7.0), 7.0);
+                    // On another annotation: the box follows it and the
+                    // triangle sits on the line square below the box; past
+                    // the end of an open line (an extension line) the line
+                    // is carried on to it.
+                    let (anchor, c, square) = match on.as_ref().and_then(|o| self.attached_point(&starts, o)) {
+                        Some((p, w0, w1, closed)) => {
+                            let c = [a.position[0] + p[0] - anchor[0], a.position[1] + p[1] - anchor[1]];
+                            let d = [w1[0] - w0[0], w1[1] - w0[1]];
+                            let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                            let t = ((c[0] - w0[0]) * d[0] + (c[1] - w0[1]) * d[1]) / dd;
+                            let t = if closed { t.clamp(0.0, 1.0) } else { t };
+                            let q = [w0[0] + d[0] * t, w0[1] + d[1] * t];
+                            if !(0.0..=1.0).contains(&t) {
+                                let end = if t > 1.0 { w1 } else { w0 };
+                                self.lines.push(Polyline2 { points: vec![end, q], style: LineStyle::Thin, closed: false, pick });
+                            }
+                            let n = [-d[1] / dd.sqrt(), d[0] / dd.sqrt()];
+                            let side = if (c[0] - q[0]) * n[0] + (c[1] - q[1]) * n[1] < 0.0 { -1.0 } else { 1.0 };
+                            (q, c, Some([n[0] * side, n[1] * side]))
+                        }
+                        None => (*anchor, a.position, None),
+                    };
                     self.lines.push(Polyline2 { points: vec![[c[0] - bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] - bh / 2.0], [c[0] + bw / 2.0, c[1] + bh / 2.0], [c[0] - bw / 2.0, c[1] + bh / 2.0]], style: LineStyle::Thin, closed: true, pick });
                     self.texts.push(Text2 { pos: c, height: ah, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     let d = [c[0] - anchor[0], c[1] - anchor[1]];
                     let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
                     if l > 1e-6 {
-                        let u = [d[0] / l, d[1] / l];
+                        let u = square.unwrap_or([d[0] / l, d[1] / l]);
                         let w = [-u[1], u[0]];
                         // Datum size: the triangle's height (base 1.2 x).
                         let ds = self.style.datum_size;
@@ -2270,4 +2349,39 @@ pub fn zone_letter(i: usize) -> String {
     const LETTERS: &[u8] = b"ABCDEFGHIJKLMNPQRSTUVWXYZ";
     let c = LETTERS[i % LETTERS.len()] as char;
     c.to_string().repeat(i / LETTERS.len() + 1)
+}
+
+/// Greedy line breaking of `text` at height `h` into lines at most `w` mm
+/// wide (words; a word wider than a line, e.g. CJK text without spaces,
+/// breaks between characters).
+pub fn wrap_text(text: &str, h: f64, w: f64) -> Vec<String> {
+    let fits = |s: &str| font::text_width(s, h) <= w;
+    let mut lines: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for word in text.split(' ').filter(|x| !x.is_empty()) {
+        let joined = if cur.is_empty() { word.to_string() } else { format!("{cur} {word}") };
+        if fits(&joined) {
+            cur = joined;
+            continue;
+        }
+        if !cur.is_empty() {
+            lines.push(std::mem::take(&mut cur));
+        }
+        if fits(word) {
+            cur = word.to_string();
+        } else {
+            for c in word.chars() {
+                let mut t = cur.clone();
+                t.push(c);
+                if !cur.is_empty() && !fits(&t) {
+                    lines.push(std::mem::take(&mut cur));
+                }
+                cur.push(c);
+            }
+        }
+    }
+    if !cur.is_empty() {
+        lines.push(cur);
+    }
+    lines
 }

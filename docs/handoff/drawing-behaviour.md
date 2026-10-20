@@ -513,3 +513,116 @@ at 1920 px and collapses only below ~1790 px.
   target flow (preview, B1/B2 numbering, origin pick → X/Y dimensions) and SK8 inference lines.
 - Next after RESUME: clippy + `cargo test -p noshape-model --lib drawing::`, then the app checks above,
   then the remaining ❌ rows (V15, V52, V54, V70, A30, A65, S13, SK7, EX13, EX19, K27, CR16/CR18).
+
+## RESUMED (asb, 20 Oct evening): checks done and ui2 round 8
+- Checked in the app (19:35 build + later): palette opens with the prefix focused (live blue border + 8 px
+  glow, deferred focus), typing previews ("2X 100"), Esc reverts (capture_key_down), choosing a tool accepts,
+  the palette stays where it opened (`PaletteDlg::at`); Datum dialog targets preview, number B1 / B2
+  (count the committed sheet + pending rows), origin pick fills the X / Y distances and draws the 12 / 12
+  dimensions, typing 20 moves the target, ✓ commits; SK8 red dashed alignment from a hovered endpoint;
+  Detail view scale blank until the profile, then 2:1.
+- Fixed: `overlay.infer` was overwritten after the tool overlays (sketch inference lines lost).
+- ui2 round 8:
+  - Sheet menu "Properties…": ours already matches both live captures — one sheet: Rename… | Properties… |
+    Duplicate | Copy; several sheets (drw2's capture drawing/760–772): Rename… · Duplicate · Paste · Copy ·
+    Move up / down · Delete, no Properties…. ui2 compared the one-sheet capture with a multi-sheet drawing.
+    Fixed alongside: a sheet chip's menu (panel closed) now uses that sheet alone.
+  - Inspection table rebuilt to live 95 / 98 (bordered View: select, ⋯, collapsible Datums with the info box,
+    Characteristics with Item / Sheet / Type / Units / Nominal value / Tolerance / Upper limit / Lower limit /
+    Nominal & Tolerance, "--" items, read-only grey cells). Checked in the app.
+  - Styles panel to live 474 (plain values, "number ▾ unit", colour swatch, inline arrow picker, Text gap
+    spinbox with ▲▼ — `DrawingEditor::styles_gap`). Checked in the app.
+  - Title blocks vs live 156 / 164: DRAWN `{user.name}` (upper case, `SheetInfo::user_name` =
+    `noshape_store::local_user_name()`), APPROVED `{release.approver}` / `{release.date}` and TITLE three lines
+    `{drawing.title1..3}` (empty → "----"), MATERIAL blank, thin frame, DO NOT SCALE DRAWING sized to its cell,
+    multi-line field values. Existing drawings keep their field values; new ones get these defaults. The ISO
+    block already is live's ANSI-style block with the logo cell ("noshape", no Onshape assets).
+  - Detail view prompt field per shape / "Profile created", shape buttons un-pressed after the profile
+    (behaviours.md "Detail view dialog: prompt field text per shape").
+
+## HANDOFF (asb → replacement, 10-20, account switch)
+
+State: no app instance running. Nothing committed (per rules). One background job may still be running:
+`/root/asb-scratch/bin/bg.sh mt test -p noshape-model --lib drawing::` → log `/root/asb-scratch/mt.log`,
+marker `mt.done`. Check that log first: it is the first run of the new test `datum_on_gdt_frame_follows_it`.
+
+Verified earlier this round (in the app): the fresh-drawing title block (ANSI_A_INCH via + › Create Drawing…)
+matches live 164. DRAWN shows "----" only because the test env has no USER.
+
+### V15 (aux view reference indicator): code written, model compiles, app not compiled yet
+- model `mod.rs` `AuxRef`: new `offset: Option<f64>` (sheet mm from the edge toward the view) and
+  `ext: Option<[f64; 2]>` (line extent on −/+ edge side), both serde default + skip-if-none.
+- model `build.rs`: new `pub struct AuxIndicator`, `pub fn aux_indicator(sheet, id, &parent_placement)`,
+  consts `AUX_OFFSET` 12, `AUX_EXT` 10, `AUX_LEG` 8. Indicator redrawn the Onshape way (help images
+  ui-ref/drawing/drawings__auxiliary-view-02/05/10.png): a chain viewing-plane line between two elbows, a leg
+  from each elbow back toward the edge, an arrow at the leg tip pointing at the edge, the letter beyond the tip.
+  Offset is clamped to [AUX_LEG, the middle of the aux view].
+- app `drawing_aux.rs` (new impl block at the end): `aux_indicator_of`, `aux_grips` (elbows, mid, tips;
+  shown via `selection_handles` in drawing_more.rs when the aux view is selected), `aux_grip_at`,
+  `drag_aux_grip` (an end grip lengthens/shortens its side; the mid grip slides the offset),
+  `aux_edge_highlight` (the parent's edge segments through the anchor, parallel to edge_dir).
+- app `drawing_view.rs`: `Drag::AuxIndicator { view, grip, orig }`. `drawing_extra.rs`: start in
+  `extra_start_drag` (the selected view's grips first, then the `PickTarget::AuxIndicator` arm), move in
+  `extra_drag_move`. `drawing_tools.rs`: added to the move/commit lists, undo name "Edit view reference indicator".
+  `drawing_related.rs` `push_related_highlights`: parent edge in REFERENCE_BLUE when the aux view is selected.
+- Unverified details asked of live capture (REQUESTS.md "asb (10-20 u)"): default offset and length, letter
+  position, snap points and which side an end grip changes, view vs indicator selection. Adjust once answered.
+- Row V15 in docs/parity/drawing.md is still ❌ (stale note). Set it to ✅/🔧 after the app check.
+
+### A30 (datum on GD&T frame / dimension lines): code written, uncompiled in the app
+- model `mod.rs`: `AnnotationKind::Datum { anchor, label, on: Option<DatumOn> }` and
+  `pub struct DatumOn { ann, line, seg, t }`: segment `seg` of the `line`-th polyline that annotation `ann`
+  draws (counting only lines with its pick), at `t`. All initializers updated (tests.rs, showcase.rs,
+  drawing_extra.rs).
+- model `sheet.rs`: `type Starts`, `type OnLine`, `SheetGeometry::attached_point`. The Datum layout:
+  when attached, the box = position + (current point − stored anchor), so it follows the target. The triangle
+  sits on the attached line square below the box (projection; clamped on closed frames). Past the end of an
+  open line (an extension line) a thin line carries it on. The target must come before the datum in
+  `sheet.annotations`; otherwise it falls back to the stored anchor.
+- app: `DrawingEditor.datum_on` field (drawing_view.rs), cleared in `set_tool` and after placement.
+  `datum_attach_at(c)` (drawing_extra.rs, before `open_annotation_panel`) finds the nearest GD&T or dimension
+  line segment. The Datum tool's first click uses it. While hovering, a red crosshair overlay (`overlay.tinted`)
+  marks the point.
+- Not done: "Dimension arrows or lines it covers are hidden"; dragging the attached datum's base grip.
+- Test added: model tests.rs `datum_on_gdt_frame_follows_it`.
+
+### Build state
+- Last `clippy -p noshape --all-targets -- -D warnings` failed on my `ViewId` import in drawing_aux.rs
+  (now fixed, not yet rechecked). It also failed on other agents' in-progress files: part_studio/mod.rs:48
+  (unused Button/ButtonVariants), mod.rs:1591 lifetime, toolbar_customize.rs:328 `.small()`. Earlier
+  clippy-only leftovers belong to others: cached_slice.rs:22, part_studio/annotations_ui.rs, part_studio/sketch.rs:2568.
+- Scripts: `/root/asb-scratch/bin/{bg.sh,dd.sh,stop.sh,shot.sh}` (target /root/target-behave, waits for
+  8 GB free). App check: `dd.sh` (demo drawing on Xvfb :104), then `shot.sh NAME`, then `stop.sh`.
+
+### Next steps
+1. mt.log result: 89 passed, 1 failed. `datum_on_gdt_frame_follows_it` panics at the first assert with `[5.0, 252.375]`. It matched the border zone letter "D", not the datum, so this is a bug in the test. Use a label that doesn't clash (e.g. "Q") or filter texts by the datum's pick, rerun, then fix the code if it still fails. Rerun clippy once the others' files compile.
+2. In the app, check V15 (select the aux view: edge highlight + 5 grips; drag the ends and the middle) and
+   A30 (Datum tool over a GD&T frame edge: red crosshair; place; move the GD&T and the datum follows; on a
+   dimension extension line past its end). Quit the app after. Update rows V15 and A30 plus this file.
+3. V54 (view label Ctrl+C / Alt+drag) needs view labels to be selectable entities. It is waiting on the live
+   capture request above.
+4. The remaining ❌ rows: V52, V70, A65, S13, SK7, EX13, EX19, K27, CR16 (probably stale: Insert view dialog
+   exists; check prefilling), CR18, V5 (no MBD data).
+
+## asb (new account, 10-20 night): state
+- Fixed `datum_on_gdt_frame_follows_it` (label "Q", so it no longer matches the zone letter "D"); passes.
+- New, uncompiled/unverified at the time of writing (check after the build):
+  - **EX19** Preferences › Drawings: `app/drawing_prefs.rs` (`DrawingPrefsView`, select Dark view (default) /
+    Light view + Save drawing settings, live drawing/482), between Toolbars and Release/Material libraries in
+    preferences_window.rs; stored as `ListPrefs.drawing_light_model_space` (preferences.json). Where the model
+    space background applies is waiting on REQUESTS "asb (10-20 v)" (how Onshape shows an imported DWG's model space).
+  - **V3 / V41 named views**: `DrawingView.named_view` (model mod.rs) + `views::named_view_frame` (camera
+    rotation → frame; test `named_view_frame_is_the_camera`). Insert view panel lists the source Part Studio's named
+    views after Isometric (`InsertViewState.named` = (name, frame)); the view context menu › View orientation and
+    View properties list them too (deleted one shown checked + grayed in the menu). Choosing a standard orientation
+    clears `named_view` and `custom_frame` (`set_standard_orientation`; it used to leave a custom frame in place).
+    `default_view_name` = the named view's name. Section planes of named views: not applied yet (REQUESTS w).
+  - **EX13 Print…**: document menu (workspace.rs) › Print… between separators after "Switch to view only mode"
+    (live 478). In a drawing: `DrawingEditor::print` writes every sheet as PDF to $TMP/noshape-print/<name>.pdf and
+    opens it in the system viewer (`ExportSettings.print`). Part Studio / Assembly print setup (dotted page border,
+    help Home__printing_part_studios_and_assemblies) is not done: psb / skb area, reported to the lead.
+- Capture requests filed (REQUESTS.md): v (DWG model space), w (named views / assembly insert / prefill: CR16, V6,
+  V70, V71), x (cross-sheet linked views V52 — Onshape moves views alone and keeps them linked; ours moves
+  descendants and orphans become base views), y (SK7 driving sketch dimensions), z (MBD datums in drawings: V5,
+  CR18, A65; psb's Part Studio datums exist in model/annotations.rs), z2 (Select a DWT, S13).
+- K27 looks done by someone else (shortcuts.rs has a Drawing tab, customizable); verify in Preferences and set ✅.

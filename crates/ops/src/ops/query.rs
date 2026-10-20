@@ -7,7 +7,6 @@ use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, refs};
 use glam::DVec3;
 use noshape_kernel::{Curve, ShapeType, Surface};
-use noshape_model::display::StudioDisplay;
 use noshape_model::reference::{BodyId, Reference};
 use noshape_model::regen::context::Body;
 use noshape_units::{Dim, UnitPrefs};
@@ -98,14 +97,6 @@ pub(crate) fn pt(p: DVec3, k: f64) -> Value {
 
 fn dir(d: DVec3) -> Value {
     json!([r6(d.x), r6(d.y), r6(d.z)])
-}
-
-/// The part a face, edge, vertex or body reference belongs to.
-pub(crate) fn body_of(display: &StudioDisplay, r: &Reference) -> Option<BodyId> {
-    if let Reference::Body(b) = r {
-        return Some(b.clone());
-    }
-    display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| b.id.clone())
 }
 
 fn find_part<'a>(bodies: &'a [std::sync::Arc<Body>], key: &str) -> Result<&'a Body, OpError> {

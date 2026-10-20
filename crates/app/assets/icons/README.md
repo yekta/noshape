@@ -92,3 +92,6 @@ New in this pass: `composite-part`, `cube`, `decal`, `derived-mirror`, `f-sphere
 drawn from scratch on the ISO 128 projection symbols).
 `rotation-reverse` (View properties › Rotation angle reverse-direction button; agent drw2).
 `sheet-width`, `sheet-height`, `zones-horizontal`, `zones-vertical` (Sheet properties › Size › Custom; agent drw2).
+`note-bold`, `note-italic`, `note-underline`, `note-strike`, `note-line-spacing`, `note-align-left|center|right|justify`,
+`note-list-none|bullets|numbers|letters`, `note-valign-top|middle|bottom`, `note-order-down|up`, `note-drawing-prop`,
+`note-sheet-prop`, `note-text-format`, `note-date` (the floating Note panel, live drawing/225; agent drw2).

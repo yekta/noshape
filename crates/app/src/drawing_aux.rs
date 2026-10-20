@@ -11,7 +11,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::AnnotationKind;
+use noshape_model::drawing::{AnnotationKind, ViewId};
 
 /// Auxiliary view dialog state.
 pub struct AuxDlg {
@@ -304,5 +304,75 @@ impl DrawingEditor {
                 )
                 .into_any_element(),
         )
+    }
+}
+
+/// The auxiliary view reference indicator once placed: its snap points
+/// (the two elbows, the middle and the two arrow tips), dragging them, and
+/// the parent edge highlighted while the view is selected.
+impl DrawingEditor {
+    /// Auxiliary view `v`'s reference indicator on the sheet, when shown.
+    pub fn aux_indicator_of(&self, v: ViewId) -> Option<noshape_model::drawing::build::AuxIndicator> {
+        let sheet = self.current_sheet();
+        sheet.view(v)?.aux_ref.as_ref().filter(|a| a.show && self.drawing.props.view_tab.aux_indicator)?;
+        let pl = self.placement(sheet.parent_of(v)?)?;
+        noshape_model::drawing::build::aux_indicator(sheet, v, &pl)
+    }
+
+    /// The snap points of the selected auxiliary views' indicators.
+    pub fn aux_grips(&self) -> Vec<[f64; 2]> {
+        self.selection
+            .iter()
+            .filter_map(|s| if let Sel::View(v) = s { self.aux_indicator_of(*v) } else { None })
+            .flat_map(|i| [i.elbows[0], i.elbows[1], i.mid, i.tips[0], i.tips[1]])
+            .collect()
+    }
+
+    /// The indicator snap point of view `v` under sheet point `s`: 0 / 1 an
+    /// end (elbow or arrow tip), 2 the middle.
+    pub fn aux_grip_at(&self, v: ViewId, s: [f64; 2]) -> Option<usize> {
+        let i = self.aux_indicator_of(v)?;
+        let tol = self.tol_mm(5.0);
+        [(i.mid, 2), (i.elbows[0], 0), (i.elbows[1], 1), (i.tips[0], 0), (i.tips[1], 1)].into_iter().find(|(p, _)| (p[0] - s[0]).hypot(p[1] - s[1]) < tol).map(|(_, k)| k)
+    }
+
+    /// Drag snap point `grip` of view `view`'s indicator to sheet point `c`:
+    /// an end lengthens or shortens the line on its side, the middle slides
+    /// it between the edge and the middle of the view.
+    pub fn drag_aux_grip(sheet: &mut noshape_model::drawing::Sheet, view: ViewId, grip: usize, orig: &noshape_model::drawing::AuxRef, ind: &noshape_model::drawing::build::AuxIndicator, c: [f64; 2]) {
+        let d = sub2(c, ind.anchor);
+        let Some(a) = sheet.view_mut(view).and_then(|v| v.aux_ref.as_mut()) else { return };
+        *a = orig.clone();
+        if grip == 2 {
+            a.offset = Some((d[0] * ind.ns[0] + d[1] * ind.ns[1]).clamp(noshape_model::drawing::build::AUX_LEG, ind.max_offset));
+        } else {
+            let t = d[0] * ind.es[0] + d[1] * ind.es[1];
+            let mut ext = ind.ext;
+            ext[grip] = (if grip == 0 { -t } else { t }).max(2.0 - ext[1 - grip]);
+            a.ext = Some(ext);
+        }
+    }
+
+    /// The parent edge of the selected auxiliary views (sheet segments).
+    pub fn aux_edge_highlight(&self) -> Vec<([f64; 2], [f64; 2])> {
+        let Some(b) = &self.built else { return vec![] };
+        let sheet = self.current_sheet();
+        let mut out = Vec::new();
+        for s in &self.selection {
+            let Sel::View(v) = s else { continue };
+            let Some(view) = sheet.view(*v) else { continue };
+            let (noshape_model::drawing::ViewKind::Auxiliary { parent, edge_dir }, Some(a)) = (&view.kind, view.aux_ref.as_ref()) else { continue };
+            let Some(pl) = self.placement(*parent) else { continue };
+            let (c, e) = (pl.to_sheet(a.anchor), unit(pl.dir_to_sheet(*edge_dir)));
+            for l in b.geometry.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(noshape_model::drawing::build::PickTarget::Edge { view, .. }) if view == parent)) {
+                for w in l.points.windows(2) {
+                    let d = unit(sub2(w[1], w[0]));
+                    if (d[0] * e[1] - d[1] * e[0]).abs() < 0.02 && noshape_model::drawing::views::dist_to_segment(c, w[0], w[1]) < 0.05 {
+                        out.push((w[0], w[1]));
+                    }
+                }
+            }
+        }
+        out
     }
 }

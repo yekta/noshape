@@ -36,6 +36,8 @@ enum Msg {
     Render(Box<RenderJob>),
     Pick { target: u64, token: u64, rect: PickRect },
     SetPresent(u64, Present),
+    SetOverlay(u64, Option<Arc<crate::overlay::Overlay>>),
+    SetTextShading(crate::overlay::TextShading),
     Drop(u64),
 }
 
@@ -84,6 +86,8 @@ impl RenderWorker {
                     }
                     Msg::Pick { target, token, rect } => picks.push((target, token, rect)),
                     Msg::SetPresent(target, present) => renderer.set_present(target, present),
+                    Msg::SetOverlay(target, overlay) => renderer.set_overlay(target, overlay),
+                    Msg::SetTextShading(shading) => renderer.set_text_shading(shading),
                     Msg::Drop(target) => {
                         jobs.retain(|j| j.target != target);
                         picks.retain(|p| p.0 != target);
@@ -192,6 +196,16 @@ impl RenderWorker {
     /// How `target`'s frames are delivered (default [`Present::Readback`]).
     pub fn set_present(&self, target: u64, present: Present) {
         let _ = self.tx.send(Msg::SetPresent(target, present));
+    }
+
+    /// Draw `overlay` into every frame of `target` from now on.
+    pub fn set_overlay(&self, target: u64, overlay: Option<Arc<crate::overlay::Overlay>>) {
+        let _ = self.tx.send(Msg::SetOverlay(target, overlay));
+    }
+
+    /// How overlay text masks are shaded.
+    pub fn set_text_shading(&self, shading: crate::overlay::TextShading) {
+        let _ = self.tx.send(Msg::SetTextShading(shading));
     }
 
     /// Release a target's GPU resources.

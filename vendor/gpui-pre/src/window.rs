@@ -5222,6 +5222,64 @@ impl Window {
         });
     }
 
+    /// NOSHAPE PATCH (agent perf): rasterize one line of `text` (a single
+    /// run, left aligned) the way `paint_line` and [`Self::paint_glyph`] paint
+    /// it with its line box's top-left corner at `origin`: same shaping,
+    /// baseline, sub-pixel variants, dilation and glyph rasters, merged into
+    /// one alpha mask. For drawing GPUI's exact text outside GPUI (noshape's
+    /// 3D viewport overlays). `None` for emoji or subpixel (LCD) text.
+    pub fn rasterize_text_line(&self, text: SharedString, font: crate::Font, font_size: Pixels, line_height: Pixels, color: Hsla, origin: Point<Pixels>) -> Option<crate::TextMask> {
+        let run = crate::TextRun { len: text.len(), font, color, background_color: None, underline: None, strikethrough: None };
+        let line = self.text_system().shape_line(text, font_size, &[run], None);
+        let baseline = (line_height - line.ascent - line.descent) / 2. + line.ascent;
+        let scale_factor = self.scale_factor();
+        let dilation = self.text_system().glyph_dilation_for_color(color);
+        let mut glyphs: Vec<(Point<i32>, Size<DevicePixels>, Vec<u8>)> = Vec::new();
+        for run in &line.runs {
+            for glyph in &run.glyphs {
+                if glyph.is_emoji || self.should_use_subpixel_rendering(run.font_id, font_size) {
+                    return None;
+                }
+                let glyph_origin = point(origin.x + glyph.position.x, origin.y + baseline).scale(scale_factor);
+                let quantized_origin = Point::new(
+                    round_half_toward_zero(glyph_origin.x.0 * SUBPIXEL_VARIANTS_X as f32) / SUBPIXEL_VARIANTS_X as f32,
+                    round_half_toward_zero(glyph_origin.y.0 * SUBPIXEL_VARIANTS_Y as f32) / SUBPIXEL_VARIANTS_Y as f32,
+                );
+                let subpixel_variant = Point::new((quantized_origin.x.fract() * SUBPIXEL_VARIANTS_X as f32) as u8, (quantized_origin.y.fract() * SUBPIXEL_VARIANTS_Y as f32) as u8);
+                let integer_origin = quantized_origin.map(|c| c.trunc() as i32);
+                let params = RenderGlyphParams { font_id: run.font_id, glyph_id: glyph.id, font_size, subpixel_variant, scale_factor, is_emoji: false, subpixel_rendering: false, dilation };
+                let raster_bounds = self.text_system().raster_bounds(&params).ok()?;
+                if raster_bounds.is_zero() {
+                    continue;
+                }
+                let (size, bytes) = self.text_system().rasterize_glyph(&params).ok()?;
+                let at = point(integer_origin.x + raster_bounds.origin.x.0, integer_origin.y + raster_bounds.origin.y.0);
+                glyphs.push((at, size, bytes));
+            }
+        }
+        let x0 = glyphs.iter().map(|g| g.0.x).min()?;
+        let y0 = glyphs.iter().map(|g| g.0.y).min()?;
+        let x1 = glyphs.iter().map(|g| g.0.x + g.1.width.0).max()?;
+        let y1 = glyphs.iter().map(|g| g.0.y + g.1.height.0).max()?;
+        let (w, h) = ((x1 - x0) as usize, (y1 - y0) as usize);
+        let mut alpha = vec![0u8; w * h];
+        for (at, glyph_size, bytes) in glyphs {
+            let (gw, gh) = (glyph_size.width.0 as usize, glyph_size.height.0 as usize);
+            // Monochrome glyphs are one byte per pixel; take alpha otherwise.
+            let stride = if gw * gh > 0 { bytes.len() / (gw * gh) } else { 1 };
+            for y in 0..gh {
+                for x in 0..gw {
+                    let a = bytes[(y * gw + x) * stride + stride - 1] as u32;
+                    let i = ((at.y - y0) as usize + y) * w + (at.x - x0) as usize + x;
+                    // Overlapping glyphs blend like separately drawn sprites.
+                    let d = alpha[i] as u32;
+                    alpha[i] = (a + d - a * d / 255).min(255) as u8;
+                }
+            }
+        }
+        Some(crate::TextMask { size: size(DevicePixels(w as i32), DevicePixels(h as i32)), alpha, origin: point(DevicePixels(x0), DevicePixels(y0)) })
+    }
+
     /// NOSHAPE PATCH (agent perf): present the last drawn frame again on the
     /// next frame request, without re-rendering any view: for when only the
     /// pixels of external textures ([`Self::paint_external_texture`]) changed.

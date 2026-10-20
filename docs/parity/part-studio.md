@@ -335,6 +335,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.36 | Filtered feature list: blue funnel, ⊗ clear, "Features (k of N)", Default geometry with "...", one "..." per hidden run, rollback bar kept | live 564 | ✅ |
 | 13.37 | Edit FeatureScript IDs: invalid id = tooltip only, duplicate = disabled button only, no spaces; excluded icon between chevron and name and after the value in the Configurations box | live 520–535 | ✅ |
 | 13.38 | Configured properties tab: Properties for ▾, Add property ▾, ⋯, per-input + property table, empty-state and "not affecting" info lines | live 526–536, 600–656 | 🔧 (all cell editors, Tab / Enter moves, paste down a column; rows from BOM edits need asb's BOM to call `set_for_configuration`) |
+| 13.39 | Inspection › Datum: "Datum ✓ ✕" with the next letter, placed on a planar face as a preview, boxed letter + triangle in the face plane at constant screen size, right-click Show all / Select / Zoom to fit / Delete annotation, Model definitions Datums (n/n) and the Characteristics header | live psb/r-910–922 | 🔧 (drag, Select other…, default tolerances, GTol / Weld / Dimension placement open; partly uncaptured) |
 
 ## Not applicable to a local app
 

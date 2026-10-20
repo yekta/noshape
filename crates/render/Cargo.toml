@@ -12,6 +12,8 @@ pollster.workspace = true
 log.workspace = true
 thiserror.workspace = true
 parking_lot.workspace = true
+# Screen overlays are tessellated exactly like GPUI's paths (same crate and version).
+lyon_tessellation = "1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

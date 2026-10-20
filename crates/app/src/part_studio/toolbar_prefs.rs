@@ -11,9 +11,13 @@ pub struct ToolbarPrefs {
     /// Tool ids removed from the Part Studio toolbar.
     #[serde(default)]
     pub removed: Vec<String>,
-    /// Group order: indices into the default toolbar groups.
+    /// Tool set order: indices into the default toolbar groups, ⊞ last
+    /// (Customize toolbar…; `toolbar_customize::full_order`).
     #[serde(default)]
     pub group_order: Vec<usize>,
+    /// Right-click the toolbar › Hide "Search tools".
+    #[serde(default)]
+    pub hide_search: bool,
     /// S shortcut toolbar tools (None = defaults).
     #[serde(default)]
     pub shortcut_tools: Option<Vec<String>>,
@@ -40,28 +44,6 @@ impl ToolbarPrefs {
         if let Ok(t) = serde_json::to_string_pretty(self) {
             let _ = std::fs::write(p, t);
         }
-    }
-
-    /// Group indices in display order (missing groups appended).
-    pub fn ordered_groups(&self, n: usize) -> Vec<usize> {
-        let mut out: Vec<usize> = self.group_order.iter().copied().filter(|g| *g < n).collect();
-        out.dedup();
-        for g in 0..n {
-            if !out.contains(&g) {
-                out.push(g);
-            }
-        }
-        out
-    }
-
-    /// Move a group one step left (-1) or right (+1).
-    pub fn move_group(&mut self, n: usize, group: usize, delta: isize) {
-        let mut order = self.ordered_groups(n);
-        if let Some(i) = order.iter().position(|g| *g == group) {
-            let j = (i as isize + delta).clamp(0, n as isize - 1) as usize;
-            order.swap(i, j);
-        }
-        self.group_order = order;
     }
 
     pub fn shortcut_tools(&self) -> Vec<String> {
@@ -103,11 +85,11 @@ mod tests {
     #[test]
     fn group_order_and_shortcuts() {
         let mut p = ToolbarPrefs::default();
-        assert_eq!(p.ordered_groups(3), vec![0, 1, 2]);
-        p.move_group(3, 2, -1);
-        assert_eq!(p.ordered_groups(3), vec![0, 2, 1]);
-        p.move_group(3, 0, -1);
-        assert_eq!(p.ordered_groups(3), vec![0, 2, 1]);
+        assert_eq!(crate::toolbar_customize::full_order(&p.group_order, 3), vec![0, 1, 2]);
+        p.group_order = vec![2, 0];
+        assert_eq!(crate::toolbar_customize::full_order(&p.group_order, 3), vec![2, 0, 1]);
+        p.group_order = vec![1, 1, 7];
+        assert_eq!(crate::toolbar_customize::full_order(&p.group_order, 3), vec![1, 0, 2]);
         assert!(p.shortcut_tools().contains(&"extrude".to_string()));
         p.toggle_shortcut("extrude");
         assert!(!p.shortcut_tools().contains(&"extrude".to_string()));

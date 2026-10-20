@@ -221,7 +221,7 @@ impl GraphicsPrefsDialog {
             .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| set(this, e.position.x, t2.get(), cx)))
             .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                if e.pressed_button == Some(MouseButton::Left) {
+                if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
                     set(this, e.position.x, t3.get(), cx);
                 }
             }))

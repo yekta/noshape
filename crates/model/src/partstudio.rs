@@ -197,6 +197,9 @@ pub struct PartStudio {
     /// Configured properties).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub property_tables: Vec<crate::configured_properties::PropertyTable>,
+    /// Inspection panel annotations (datums…); not features.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annotations: Vec<crate::annotations::Annotation>,
     #[serde(default)]
     pub next_folder_id: u32,
     /// Saved camera views (Shift+V).

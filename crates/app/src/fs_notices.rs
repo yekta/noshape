@@ -11,7 +11,7 @@ use crate::feature_studio::{Notice, studio_notices};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
@@ -267,7 +267,8 @@ impl Render for FsNoticesPanel {
                     .pl(px(24.))
                     .pr(px(8.))
                     .py(px(8.))
-                    .font_family("monospace")
+                    // Live 75: the console font (`"monospace"` does not resolve here).
+                    .font_family(cx.theme().mono_font_family.clone())
                     .text_size(px(13.33))
                     .children(printed.lines().map(|l| div().whitespace_nowrap().text_color(pal.text).child(l.to_string())).collect::<Vec<_>>())
                     .child(div().text_color(rgb(0xaaaaaa)).child(text))
@@ -291,7 +292,7 @@ impl Render for FsNoticesPanel {
                     .border_color(rgb(0xeaeaea))
                     .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("FeatureScript notices"))
                     .child(div().id("fsn-filter").size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).tooltip(crate::ui::tooltip("Filter FeatureScript notices")).child(crate::ui::glyph("filter", 20., pal.text)))
-                    .child(div().w(px(902.)).child(Input::new(&self.filter).h(px(30.)).text_size(px(14.)).pl(px(5.))))
+                    .child(div().w(px(902.)).child(crate::os_ui::input_h(Input::new(&self.filter), 30.).text_size(px(14.)).pl(px(5.))))
                     .child(div().flex_1())
                     .child(div().id("fsn-close").cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 16., pal.text_muted)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Close)))),
             )

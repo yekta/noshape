@@ -194,6 +194,9 @@ pub struct Instance {
     pub unlit: bool,
     /// Lit like Onshape's feature previews (see [`Instance::preview`]).
     pub preview: bool,
+    /// Section caps without hatching: mesh parts (live G35: the cap is the
+    /// part's colour, crossed only by its triangle lines).
+    pub plain_cap: bool,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
     /// Line width multiplier for line instances (Graphics preferences line widths).
@@ -250,6 +253,7 @@ impl Instance {
             ignore_clip: false,
             unlit: false,
             preview: false,
+            plain_cap: false,
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
@@ -320,6 +324,10 @@ impl Instance {
     /// the right side), instead of the part lighting.
     pub fn preview(mut self) -> Self {
         self.preview = true;
+        self
+    }
+    pub fn plain_cap(mut self) -> Self {
+        self.plain_cap = true;
         self
     }
 

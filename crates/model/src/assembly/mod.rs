@@ -1083,10 +1083,15 @@ impl Assembly {
         let Some(old) = self.instance(id).map(|i| i.source.clone()) else { return vec![] };
         let ids: Vec<InstanceId> = if all { self.instances.iter().filter(|i| i.source == old).map(|i| i.id).collect() } else { vec![id] };
         for i in &ids {
-            let name = self.next_instance_name(base_name);
+            // Live 843: an instance whose name is already the replacement's
+            // ("Part 1 <1>" replaced by another "Part 1") keeps it.
+            let keep = self.instance(*i).is_some_and(|inst| inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(b, _)| b) == base_name);
+            let name = if keep { None } else { Some(self.next_instance_name(base_name)) };
             if let Some(inst) = self.instance_mut(*i) {
                 inst.source = source.clone();
-                inst.name = name;
+                if let Some(name) = name {
+                    inst.name = name;
+                }
             }
         }
         ids

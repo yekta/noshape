@@ -1,14 +1,9 @@
-//! The assembly toolbar as tool sets, and Customize toolbar (live
-//! assembly/331z, 340–343, part-studio/340–347, dom/customize-toolbar-*.txt):
-//! right-click the toolbar → Customize toolbar… / Hide "Search tools". In
-//! customize mode every tool set gets a 10 px `#cccccc` sled with "•••"
-//! under it (drag to move the set), tools can be dragged onto the 640 px
-//! "Tools" panel (red dashed drop zone) to remove them, and back onto the
-//! toolbar; footer ☐ Show items already in toolbar · Save · Reset to default
-//! · Cancel. Saved in the config directory (`assembly_toolbar.json`).
+//! The assembly toolbar as tool sets, and its right-click menu (live
+//! assembly/331z): Customize toolbar… (`toolbar_customize`, shared with the
+//! Part Studio) / Hide "Search tools". Saved in the config directory
+//! (`assembly_toolbar.json`).
 
 use super::*;
-use gpui_kit::component::input::InputEvent;
 use serde::{Deserialize, Serialize};
 
 /// Onshape's assembly tool sets, in order (live dom/toolbar-assembly.txt).
@@ -102,47 +97,6 @@ impl AsmToolbarPrefs {
     pub fn sets(&self) -> Vec<(usize, Vec<&'static str>)> {
         self.set_order().into_iter().map(|i| (i, TOOLSETS[i].iter().copied().filter(|t| !self.removed.iter().any(|r| r == t)).collect::<Vec<_>>())).filter(|(_, t)| !t.is_empty()).collect()
     }
-
-    /// Move tool set `set` before tool set `before` (drag a sled).
-    pub fn move_set(&mut self, set: usize, before: usize) {
-        let mut order = self.set_order();
-        order.retain(|i| *i != set);
-        let at = order.iter().position(|i| *i == before).unwrap_or(order.len());
-        order.insert(at, set);
-        self.order = order;
-    }
-}
-
-/// A toolbar tool being dragged in customize mode.
-#[derive(Clone)]
-pub(crate) struct ToolDrag {
-    pub id: &'static str,
-}
-
-impl Render for ToolDrag {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().size(px(28.)).flex().items_center().justify_center().bg(rgb(0xffffff)).border_1().border_color(rgb(0xaaaaaa)).child(crate::assets::icon(tool_info(self.id).1, 20., cx))
-    }
-}
-
-/// A tool set's sled being dragged.
-#[derive(Clone)]
-pub(crate) struct ToolsetDrag {
-    pub set: usize,
-}
-
-impl Render for ToolsetDrag {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(40.)).h(px(10.)).bg(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child("•••")
-    }
-}
-
-/// Customize mode: the edited prefs, Show items already in toolbar, search.
-pub(crate) struct TbCustom {
-    pub draft: AsmToolbarPrefs,
-    pub show_all: bool,
-    pub search: Entity<InputState>,
-    _sub: Subscription,
 }
 
 impl AssemblyView {
@@ -164,196 +118,63 @@ impl AssemblyView {
     }
 
     pub(super) fn start_toolbar_customize(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
-        let sub = cx.subscribe(&search, |_, _, ev: &InputEvent, cx| {
-            if matches!(ev, InputEvent::Change) {
-                cx.notify();
-            }
-        });
-        self.ui.tb_custom = Some(TbCustom { draft: self.ui.tb_prefs.clone(), show_all: false, search, _sub: sub });
+        let (order, removed) = (self.ui.tb_prefs.order.clone(), self.ui.tb_prefs.removed.clone());
+        self.ui.tb_custom = Some(crate::toolbar_customize::Customize::new(TOOLSETS.len(), &order, &removed, window, cx));
         cx.notify();
     }
 
     /// The prefs the toolbar shows (the draft while customizing).
     pub(super) fn toolbar_prefs(&self) -> AsmToolbarPrefs {
-        self.ui.tb_custom.as_ref().map(|c| c.draft.clone()).unwrap_or_else(|| self.ui.tb_prefs.clone())
+        match &self.ui.tb_custom {
+            Some(c) => AsmToolbarPrefs { order: c.order.clone(), removed: c.removed.clone(), hide_search: self.ui.tb_prefs.hide_search },
+            None => self.ui.tb_prefs.clone(),
+        }
     }
 
-    /// One tool set: its tools, and in customize mode the `#f5f5f5`
-    /// background, draggable tools, the "•••" sled and the drop targets.
+    /// One tool set; in customize mode its tools drag and it gets its sled
+    /// (`toolbar_customize`).
     pub(super) fn render_toolset(&self, set: usize, tools: Vec<AnyElement>, ids: Vec<&'static str>, cx: &mut Context<Self>) -> AnyElement {
-        let Some(_) = &self.ui.tb_custom else { return h_flex().children(tools).into_any_element() };
+        if self.ui.tb_custom.is_none() {
+            return h_flex().children(tools).into_any_element();
+        }
         let mut row = h_flex();
         for (el, id) in tools.into_iter().zip(ids) {
-            row = row.child(div().id(SharedString::from(format!("tbc-{id}"))).cursor(CursorStyle::Move).on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())).child(el));
+            let Some(one) = TOOLSETS[set].iter().find(|t| **t == id) else { continue };
+            row = row.child(crate::toolbar_customize::tool(el, std::slice::from_ref(one), crate::assets::icon_path(tool_info(id).1), cx));
         }
-        v_flex()
-            .id(SharedString::from(format!("tbset-{set}")))
-            .bg(rgb(0xf5f5f5))
-            .child(row)
-            .child(
-                div()
-                    .id(SharedString::from(format!("tbsled-{set}")))
-                    .h(px(10.))
-                    .w_full()
-                    .bg(rgb(0xcccccc))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor(CursorStyle::Move)
-                    .text_size(px(10.))
-                    .font_weight(FontWeight::BOLD)
-                    .line_height(px(10.))
-                    .text_color(rgb(0x333333))
-                    .child("•••")
-                    .on_drag(ToolsetDrag { set }, |d, _, _, cx| cx.new(|_| d.clone())),
-            )
-            .drag_over::<ToolsetDrag>(|st, _, _, _| st.border_l_2().border_color(rgb(0x1651b0)))
-            .on_drop(cx.listener(move |this, d: &ToolsetDrag, _, cx| {
-                if let Some(c) = &mut this.ui.tb_custom
-                    && d.set != set
-                {
-                    c.draft.move_set(d.set, set);
-                    cx.notify();
-                }
-            }))
-            .drag_over::<ToolDrag>(|st, _, _, _| st.bg(rgb(0xe0eaf5)))
-            .on_drop(cx.listener(|this, d: &ToolDrag, _, cx| {
-                // A tool dragged back from the Tools panel returns to its set.
-                if let Some(c) = &mut this.ui.tb_custom {
-                    c.draft.removed.retain(|r| r != d.id);
-                    cx.notify();
-                }
-            }))
-            .into_any_element()
+        crate::toolbar_customize::toolset(set, row, true, |v: &mut Self| v.ui.tb_custom.as_mut(), cx)
     }
 
-    /// The 640 px "Tools" panel of customize mode.
-    pub(super) fn render_tb_custom_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let c = self.ui.tb_custom.as_ref()?;
-        let pal = p();
-        let query = c.search.read(cx).value().trim().to_lowercase();
-        let changed = c.draft != self.ui.tb_prefs;
-        let customized = c.draft != AsmToolbarPrefs { hide_search: c.draft.hide_search, ..Default::default() };
-        let all: Vec<&'static str> = TOOLSETS.iter().flat_map(|s| s.iter().copied()).collect();
-        let removed: Vec<&'static str> = all.iter().copied().filter(|t| c.draft.removed.iter().any(|r| r == t)).collect();
-        let listed: Vec<&'static str> = if c.show_all { all.clone() } else { removed.clone() }.into_iter().filter(|t| query.is_empty() || tool_info(t).0.to_lowercase().contains(&query)).collect();
-        let mut grid = div().flex().flex_wrap().p(px(8.));
-        for id in &listed {
-            let (label, icon) = tool_info(id);
-            let in_bar = !removed.contains(id);
-            grid = grid.child(
-                h_flex()
-                    .id(SharedString::from(format!("tbtool-{id}")))
-                    .w(px(192.))
-                    .h(px(34.))
-                    .px(px(8.))
-                    .gap(px(6.))
-                    .when(in_bar, |d| d.opacity(0.4))
-                    .when(!in_bar, |d| d.cursor(CursorStyle::Move).on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())))
-                    .child(crate::assets::icon(icon, 20., cx))
-                    .child(div().truncate().text_size(px(13.)).text_color(pal.text).child(label)),
-            );
-        }
-        let empty_note = listed.is_empty().then(|| {
-            v_flex()
-                .p(px(12.))
-                .items_center()
-                .text_size(px(13.))
-                .text_color(pal.text_muted)
-                .child(div().font_weight(FontWeight::BOLD).child("All items are already in the toolbar"))
-                .child("Drop items here to remove them from the toolbar")
+    /// Customize toolbar's "Tools" panel, 10 px under the toolbar (the
+    /// sleds hang there) at the left (live 340).
+    pub(super) fn render_tb_custom_panel(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        static TOOLS: std::sync::OnceLock<Vec<crate::toolbar_customize::PanelTool>> = std::sync::OnceLock::new();
+        let tools = TOOLS.get_or_init(|| {
+            TOOLSETS
+                .iter()
+                .flat_map(|s| s.iter())
+                .map(|id| {
+                    let (label, icon) = tool_info(id);
+                    crate::toolbar_customize::PanelTool { ids: std::slice::from_ref(id), label: label.into(), icon: crate::assets::icon_path(icon) }
+                })
+                .collect()
         });
-        let button = |id: &'static str, label: &'static str, primary: bool, enabled: bool| {
-            div()
-                .id(id)
-                .h(px(30.))
-                .px(px(10.))
-                .flex()
-                .items_center()
-                .rounded(px(3.5))
-                .text_size(px(14.))
-                .when(primary, |d| d.bg(rgb(0x1651b0)).text_color(rgb(0xffffff)))
-                .when(!primary, |d| d.bg(rgb(0xffffff)).border_1().border_color(rgb(0xaaaaaa)).text_color(rgb(0x333333)))
-                .when(!enabled, |d| d.opacity(0.25))
-                .when(enabled, |d| d.cursor_pointer())
-                .child(label)
-        };
-        let show_all = c.show_all;
-        Some(
-            v_flex()
-                .id("tb-custom-panel")
-                .occlude()
-                .absolute()
-                .top(px(2.))
-                .left(px(0.))
-                .w(px(600.))
-                .bg(rgb(0xffffff))
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-                .child(
-                    h_flex()
-                        .h(px(42.))
-                        .px(px(8.))
-                        .border_b_1()
-                        .border_color(rgb(0xd7d7d7))
-                        .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::BOLD).child("Tools"))
-                        .child(div().w(px(198.)).child(Input::new(&c.search).small().text_size(px(14.)).pl(px(5.)))),
-                )
-                .child(
-                    v_flex()
-                        .id("tb-custom-body")
-                        .min_h(px(120.))
-                        .max_h(px(330.))
-                        .overflow_y_scroll()
-                        .bg(rgb(0xf5f5f5))
-                        .children(empty_note)
-                        .child(grid)
-                        // Dropping a toolbar tool here removes it (red dashed zone while dragging).
-                        .drag_over::<ToolDrag>(|st, _, _, _| st.border_2().border_dashed().border_color(rgb(0xd0021b)))
-                        .on_drop(cx.listener(|this, d: &ToolDrag, _, cx| {
-                            if let Some(c) = &mut this.ui.tb_custom
-                                && !c.draft.removed.iter().any(|r| r == d.id)
-                            {
-                                c.draft.removed.push(d.id.to_string());
-                                cx.notify();
-                            }
-                        })),
-                )
-                .child(
-                    h_flex()
-                        .h(px(44.))
-                        .px(px(8.))
-                        .gap(px(6.))
-                        .border_t_1()
-                        .border_color(rgb(0xd7d7d7))
-                        .child(crate::os_ui::checkbox("tb-show-all", "Show items already in toolbar", show_all).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            if let Some(c) = &mut this.ui.tb_custom {
-                                c.show_all = !c.show_all;
-                            }
-                            cx.notify();
-                        })))
-                        .child(div().flex_1())
-                        .child(button("tb-save", "Save", true, changed).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            if changed && let Some(c) = this.ui.tb_custom.take() {
-                                this.ui.tb_prefs = c.draft;
-                                this.ui.tb_prefs.save();
-                            }
-                            cx.notify();
-                        })))
-                        .child(button("tb-reset", "Reset to default", false, customized).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            if let Some(c) = &mut this.ui.tb_custom
-                                && customized
-                            {
-                                c.draft = AsmToolbarPrefs { hide_search: c.draft.hide_search, ..Default::default() };
-                            }
-                            cx.notify();
-                        })))
-                        .child(button("tb-cancel", "Cancel", false, true).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.ui.tb_custom = None;
-                            cx.notify();
-                        }))),
-                )
-                .into_any_element(),
-        )
+        let panel = crate::toolbar_customize::panel(
+            self,
+            tools,
+            |v: &mut Self| v.ui.tb_custom.as_mut(),
+            |v: &mut Self, saved, cx| {
+                if let Some((order, removed)) = saved {
+                    v.ui.tb_prefs.order = order;
+                    v.ui.tb_prefs.removed = removed;
+                    v.ui.tb_prefs.save();
+                }
+                v.ui.tb_custom = None;
+                cx.notify();
+            },
+            window,
+            cx,
+        )?;
+        Some(div().absolute().top(px(10.)).left_0().child(panel).into_any_element())
     }
 }

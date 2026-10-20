@@ -69,7 +69,7 @@ impl DrawingEditor {
         };
         let (family, bold, italic) = match &style.font {
             Some(f) => (f.family.clone(), f.bold, f.italic),
-            None => (noshape_sketch::text::DEFAULT_FONT.to_string(), false, false),
+            None => (noshape_model::drawing::font::DEFAULT_FAMILY.to_string(), false, false),
         };
         let (cap, asc, desc) = metrics(&family);
         let font_px = h * self.zoom / cap;
@@ -141,7 +141,7 @@ impl DrawingEditor {
         let (ya, yb) = (*l.ys.get(r)?, *l.ys.get(r + 1)?);
         let f = t.cell_format(*row, *col);
         let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
-        let family = noshape_sketch::text::DEFAULT_FONT.to_string();
+        let family = noshape_model::drawing::font::DEFAULT_FAMILY.to_string();
         let (cap, asc, desc) = metrics(&family);
         let font_px = h * self.zoom / cap;
         let pitch_px = h * 1.6 * self.zoom;

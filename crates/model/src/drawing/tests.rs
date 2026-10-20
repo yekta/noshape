@@ -349,7 +349,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ChamferDimension { view: ViewId(1), a: [0.0, 0.0], b: [0.002, 0.002], c: [0.002, 0.002], d: [0.01, 0.002] }, [150.0, 180.0]);
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
-    add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into() }, [60.0, 112.0]);
+    add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into(), on: None }, [60.0, 112.0]);
     add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
@@ -1636,3 +1636,76 @@ fn datum_target_origin_dimensions_show_and_hide() {
     assert!(!hidden.iter().any(|t| t == "30"), "{hidden:?}");
 }
 
+#[test]
+fn custom_template_language_translates_the_title_block() {
+    use super::tb_lang::TitleLanguage;
+    use super::templates::{DrawingTemplate, apply_template};
+    let mut t = DrawingTemplate::standard("ISO A3", SheetSize::A3, TitleBlockStyle::Iso, false, Projection::FirstAngle);
+    t.language = TitleLanguage::German;
+    let mut d = Drawing::default();
+    apply_template(&mut d, 0, &t);
+    assert_eq!(d.sheets[0].title_language, TitleLanguage::German);
+    assert!(d.sheets[0].title_block.fields.iter().any(|(k, v)| k == "Sheet" && v == "{sheet.number} von {sheet.count}"));
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_border_and_title_full(&d.sheets[0], Projection::FirstAngle, &|s| s.to_string());
+    let texts: Vec<&str> = g.texts.iter().map(|t| t.text.as_str()).collect();
+    for label in ["BLATT", "MAßSTAB", "PROJEKTIONSMETHODE 1", "UNTERSCHRIFT", "ERSTELLT DURCH"] {
+        assert!(texts.contains(&label), "{label} in {texts:?}");
+    }
+    // The long dimensions note wraps inside the left cell.
+    assert!(texts.iter().any(|t| t.starts_with("SOWEIT NICHT ANDERS")));
+    assert!(!texts.contains(&"SURFACE FINISH"));
+    // Wrapping keeps every word, CJK text breaks between characters.
+    let lines = sheet::wrap_text("ALLE SCHARFEN KANTEN ABRUNDEN UND GRATE ENTFERNEN", 1.6, 30.0);
+    assert!(lines.len() > 1 && lines.join(" ") == "ALLE SCHARFEN KANTEN ABRUNDEN UND GRATE ENTFERNEN");
+    assert!(sheet::wrap_text("打磨所有鋒利邊緣並移除毛邊打磨所有鋒利邊緣並移除毛邊", 1.6, 10.0).len() > 1);
+}
+
+/// A datum on a GD&T frame edge (Onshape help: datum): its triangle sits on
+/// the edge, square below the box, and it follows the frame when moved.
+#[test]
+fn datum_on_gdt_frame_follows_it() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let gid = drawing.sheets[0].next_annotation_id();
+    let gdt = Annotation { id: gid, kind: AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "0.1".into(), "A".into()], leaders: vec![], extra: Default::default() }, position: [40.0, 40.0], ..Default::default() };
+    drawing.sheets[0].annotations.push(gdt);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    // The frame's bottom edge: the lowest horizontal segment of the GD&T.
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(gid)).unwrap() as u32;
+    let lines: Vec<_> = built.geometry.lines.iter().filter(|l| l.pick == pick).collect();
+    let mut bottom = None;
+    for (li, l) in lines.iter().enumerate() {
+        let n = l.points.len();
+        for seg in 0..if l.closed { n } else { n - 1 } {
+            let (a, b) = (l.points[seg], l.points[(seg + 1) % n]);
+            if (a[1] - b[1]).abs() < 1e-9 && (b[0] - a[0]).abs() > 5.0 && bottom.is_none_or(|(_, _, y, _, _): (usize, usize, f64, [f64; 2], [f64; 2])| a[1] < y) {
+                bottom = Some((li, seg, a[1], a, b));
+            }
+        }
+    }
+    let (line, seg, y, a, b) = bottom.unwrap();
+    let mid = [(a[0] + b[0]) / 2.0, y];
+    let on = DatumOn { ann: gid, line: line as u32, seg: seg as u32, t: 0.5 };
+    drawing.sheets[0].annotations.push(Annotation { id: gid + 1, kind: AnnotationKind::Datum { anchor: mid, label: "Q".into(), on: Some(on) }, position: [mid[0] + 3.0, y - 15.0], ..Default::default() });
+    let at = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &cache, false).unwrap();
+        let t = built.geometry.texts.iter().find(|t| t.text == "Q").unwrap().pos;
+        let tri = built.geometry.fills.iter().find(|f| f.points.len() == 3 && f.points.iter().any(|p| (p[1] - y).abs() < 1e-6 || (p[1] - y - 10.0).abs() < 1e-6)).map(|f| f.points.clone());
+        (t, tri)
+    };
+    // The box where placed; the triangle's base on the edge right above it.
+    let (t, tri) = at(&drawing);
+    assert!((t[0] - mid[0] - 3.0).abs() < 1e-6 && (t[1] - y + 15.0).abs() < 1e-6, "{t:?}");
+    let tri = tri.unwrap();
+    assert!(tri.iter().filter(|p| (p[1] - y).abs() < 1e-6).count() == 2 && tri.iter().all(|p| (p[0] - mid[0] - 3.0).abs() < 3.0), "{tri:?}");
+    // Moving the frame moves the datum with it.
+    let g = drawing.sheets[0].annotations.iter_mut().find(|a| a.id == gid).unwrap();
+    g.position = [50.0, 50.0];
+    if let AnnotationKind::Gdt { anchor, .. } = &mut g.kind {
+        *anchor = [50.0, 50.0];
+    }
+    let (t, _) = at(&drawing);
+    assert!((t[0] - mid[0] - 13.0).abs() < 1e-6 && (t[1] - y + 5.0).abs() < 1e-6, "{t:?}");
+}

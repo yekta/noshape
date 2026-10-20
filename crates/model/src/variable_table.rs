@@ -278,7 +278,7 @@ pub fn set_description(ps: &mut PartStudio, feature: FeatureId, text: &str) {
     }
 }
 
-fn as_expression(text: &str) -> String {
+pub fn as_expression(text: &str) -> String {
     let t = text.trim();
     if t.is_empty() || (t.starts_with('"') && t.ends_with('"') && t.len() >= 2) || noshape_units::parse(t).is_ok() { t.to_string() } else { format!("\"{t}\"") }
 }

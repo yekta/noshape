@@ -269,6 +269,9 @@ pub struct AssemblyView {
     /// View cube hover cell and last painted origin (`view_cube`).
     cube_hover: Option<crate::part_studio::view_cube::CubeCell>,
     cube_origin: Option<Point<Pixels>>,
+    /// Cached parts of the view (toolbar, list rows, graphics overlay): see
+    /// `crate::cached_slice`.
+    slices: Option<AsmSlices>,
     evaluator: Arc<Mutex<AssemblyEvaluator>>,
     result: Arc<AssemblyResult>,
     built: Option<AsmBuilt>,
@@ -424,6 +427,7 @@ impl AssemblyView {
             var_tables: HashMap::new(),
             cube_hover: None,
             cube_origin: None,
+            slices: None,
             evaluator: Arc::new(Mutex::new({
                 let mut ev = AssemblyEvaluator::new();
                 ev.set_external(Arc::new(AppExternal));
@@ -526,6 +530,15 @@ impl AssemblyView {
         // The configuration chosen above the instance list.
         if asm.has_configured() {
             asm.apply_configuration(&self.ui.config_values);
+        }
+        // Replace instance: the picked replacement is previewed in place
+        // before ✓ (live 842: drawn selected, mates that no longer resolve red).
+        if let Some(s) = &self.replace_panel
+            && let Some((source, base)) = &s.replacement
+        {
+            for id in &s.instances {
+                asm.replace_instance(*id, source.clone(), base, s.all);
+            }
         }
         let mut opts = SolveOptions::default();
         if let Some(s) = &self.mate
@@ -3347,36 +3360,40 @@ impl AssemblyView {
         if mates_open || filtering {
             rows.extend(mate_rows.into_iter().map(|r| div().pl(px(if filtering { 0. } else { 17. })).child(r).into_any_element()));
         }
+        v_flex().id("instance-list").size_full().overflow_y_scroll().track_scroll(&self.ui.list_scroll).children(rows).into_any_element()
+    }
+
+    /// The head of the instance list: the configurations box, the filter
+    /// and the "Instances (N)" row. Rendered with the view, outside the rows'
+    /// cached slice, so the filter box's keystrokes and caret blinks leave
+    /// the rows cached (the filter notifies them when it changes).
+    fn render_list_head(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let instances = self.assembly(cx).map(|a| a.instances.len()).unwrap_or(0);
         // A configured assembly: the Configurations box above the list (live 191).
-        let config_box = self.render_asm_config_box(cx);
-        v_flex()
-            .size_full()
-            .bg(pal.panel)
-            .border_r_1()
-            .border_color(pal.border)
-            .children(config_box)
-            .child(self.render_list_filter(cx))
-            .child(
-                // Live assembly/10: like the Part Studio's "Features (n)" row.
-                h_flex()
-                    .h(px(30.))
-                    .flex_none()
-                    .pl(px(4.))
-                    .pr(px(6.))
-                    .justify_between()
-                    .child(div().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(format!("Instances ({})", asm.instances.len())))
-                    .child(
-                        h_flex()
-                            .gap_1()
-                            // New folder (around the selection, or empty).
-                            .child(Button::new("asm-new-folder").child(crate::assets::icon("new-folder", 20., cx)).ghost().w(px(24.)).h(px(24.)).p_0().tooltip("New folder").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                let ids = this.selected.clone();
-                                this.folder_from_instances(ids, window, cx);
-                            }))),
-                    ),
-            )
-            .child(v_flex().id("instance-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.ui.list_scroll).children(rows))
-            .into_any_element()
+        let mut head: Vec<AnyElement> = self.render_asm_config_box(cx).into_iter().collect();
+        head.push(self.render_list_filter(cx));
+        head.push(
+            // Live assembly/10: like the Part Studio's "Features (n)" row.
+            h_flex()
+                .h(px(30.))
+                .flex_none()
+                .pl(px(4.))
+                .pr(px(6.))
+                .justify_between()
+                .child(div().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(format!("Instances ({instances})")))
+                .child(
+                    h_flex()
+                        .gap_1()
+                        // New folder (around the selection, or empty).
+                        .child(Button::new("asm-new-folder").child(crate::assets::icon("new-folder", 20., cx)).ghost().w(px(24.)).h(px(24.)).p_0().tooltip("New folder").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            let ids = this.selected.clone();
+                            this.folder_from_instances(ids, window, cx);
+                        }))),
+                )
+                .into_any_element(),
+        );
+        head
     }
 
     // ------------------------------------------------------------ render: panels
@@ -3695,6 +3712,38 @@ impl AssemblyView {
                         .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx))
                 };
                 let rigid = self.insert_rigid;
+                // Replace instance's picker (live 840): Parts, Sketches,
+                // Surfaces, Flat patterns; no composite or rigid toggles.
+                let picking = self.picking_replacement();
+                let fl = self.ui.insert_flat;
+                if picking {
+                    head = head.child(
+                        h_flex()
+                            .h(px(42.))
+                            .pt(px(6.))
+                            .px(px(6.))
+                            .pb(px(6.))
+                            .gap(px(6.))
+                            .border_b_1()
+                            .border_color(pal.border)
+                            .child(toggle("rep-f-parts", "part", "Parts", fp, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_filter.0 = !this.ui.insert_filter.0;
+                                cx.notify();
+                            })))
+                            .child(toggle("rep-f-sketch", "sketch", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_sketches = !this.ui.insert_sketches;
+                                cx.notify();
+                            })))
+                            .child(toggle("rep-f-surf", "surface-body", "Surfaces", fs, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_filter.1 = !this.ui.insert_filter.1;
+                                cx.notify();
+                            })))
+                            .child(toggle("rep-f-flat", "flat-pattern", "Flat patterns", fl, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_flat = !this.ui.insert_flat;
+                                cx.notify();
+                            }))),
+                    );
+                } else {
                 head = head.child(
                     h_flex()
                         .h(px(42.))
@@ -3731,6 +3780,7 @@ impl AssemblyView {
                             cx.notify();
                         }))),
                 );
+                }
             }
         }
         // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
@@ -3764,7 +3814,8 @@ impl AssemblyView {
                 let (only_parts, only_surfaces) = self.ui.insert_filter;
                 let only_sketches = self.ui.insert_sketches;
                 let composites_on = self.ui.insert_composites;
-                let any_filter = only_parts || only_surfaces || only_sketches || composites_on;
+                // Flat patterns (picker only): none are listed, so it narrows to nothing.
+                let any_filter = only_parts || only_surfaces || only_sketches || composites_on || (self.ui.insert_flat && self.picking_replacement());
                 let is_composite = |p: &CatalogPart| s.composites.contains(&p.0);
                 let kind_ok = |p: &CatalogPart| if is_composite(p) { composites_on } else { !any_filter || (only_parts && !p.3) || (only_surfaces && p.3) };
                 // Composite parts first, then the parts (live 320).
@@ -4055,14 +4106,13 @@ impl AssemblyView {
             .map(|t| div().pb(px(10.)).child(t).into_any_element())
             .collect();
         let empty = tables.is_empty();
-        v_flex()
-            .id("asm-variables")
+        crate::ui::right_resizable(v_flex().id("asm-variables"), 0.)
             .occlude()
             .absolute()
             .top_0()
             .bottom_0()
             .right_0()
-            .w(px(712.))
+            .w(px(crate::ui::right_panel_w()))
             .bg(pal.panel)
             .border_l_1()
             .border_color(pal.border)
@@ -4165,7 +4215,7 @@ impl AssemblyView {
             any_left = true;
         }
         if let Some(d) = self.render_interference_dialog(cx) {
-            left = left.child(d);
+            left = left.child(crate::ui::nudged_panel(d, self.ui.panels.get("asm-interference")));
             any_left = true;
         }
         if self.ui.mass.is_some() {
@@ -4189,7 +4239,9 @@ impl AssemblyView {
             any_left = true;
         }
         if self.replace_panel.is_some() {
-            left = left.child(self.render_replace_panel(cx));
+            // The picker beside it moves with the dialog.
+            let el = self.render_replace_panel(cx);
+            left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-replace")));
             any_left = true;
         }
         if self.step_edit.is_some() {
@@ -4228,6 +4280,10 @@ impl AssemblyView {
             left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-isolate")));
             any_left = true;
         }
+        // The view cube and the canvas tools under the dialogs: a dialog
+        // reaching the cube (the replacement picker beside Replace instance
+        // with a docked pane) is drawn over it, like live.
+        out.push(self.render_view_controls(cx));
         if any_left {
             out.push(left.into_any_element());
         }
@@ -4245,7 +4301,6 @@ impl AssemblyView {
             // Docked 712 px pane (live 181-strip-exploded-views).
             out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_explode_panel(cx)).into_any_element());
         }
-        out.push(self.render_view_controls(cx));
         if let Some(el) = self.render_manip_value(cx) {
             out.push(el);
         }
@@ -4285,7 +4340,7 @@ impl AssemblyView {
                     .left_0()
                     .right_0()
                     // Centered on the window (live), not the graphics area.
-                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W }))
+                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
                     .flex()
                     .justify_center()
                     .child(crate::os_ui::message_bubble(
@@ -4359,6 +4414,11 @@ impl AssemblyView {
         // graphics area's top-right corner, with the camera menu under it.
         use crate::part_studio::view_cube::{CubeHooks, view_cube};
         let rotation = self.viewport.read(cx).camera.rotation;
+        if crate::viewport::wgpu_overlays() {
+            // Drawn into the 3D frame (perf).
+            let hover = self.cube_hover;
+            self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
+        }
         let menu = self.render_camera_menu(cx);
         let hooks = CubeHooks {
             state: |this: &mut Self| (&mut this.cube_hover, &mut this.cube_origin),
@@ -4372,6 +4432,7 @@ impl AssemblyView {
                 let dir = if deg > 0.0 { RotateDir::CounterClockwise } else { RotateDir::Clockwise };
                 this.viewport.update(cx, |vp, cx| vp.rotate_step(dir, deg.abs(), cx));
             },
+            placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
         let cube = view_cube(rotation, self.cube_hover, menu, hooks, cx);
         // A docked 712 px pane narrows the graphics area (live 181): the cube
@@ -4432,13 +4493,72 @@ impl AssemblyView {
     }
 }
 
+/// The assembly's cached slices (see `crate::cached_slice`): a keystroke or a
+/// caret blink in the list filter re-renders the view but reuses these.
+#[derive(Clone)]
+struct AsmSlices {
+    toolbar: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    /// The instance list's rows (the filter notifies them when it changes).
+    rows: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    /// Everything over the graphics area: list toggle, dialogs, view cube,
+    /// panels, the right strip.
+    overlay: Entity<crate::cached_slice::Slice<AssemblyView>>,
+}
+
+impl AssemblyView {
+    fn slices(&mut self, cx: &mut Context<Self>) -> AsmSlices {
+        if let Some(s) = &self.slices {
+            return s.clone();
+        }
+        use crate::cached_slice::Slice;
+        let me = cx.entity();
+        let toolbar = Slice::new(&me, |this, _, cx| this.render_toolbar(cx), cx);
+        let rows = Slice::new(&me, |this, _, cx| this.render_list(cx), cx);
+        let overlay = Slice::new(&me, |this, _, cx| this.render_overlay_slice(cx), cx);
+        // The view cube and labels follow the camera, the list the
+        // highlights; all read the document.
+        for s in [&rows, &overlay] {
+            Slice::observing(s, &self.viewport, cx);
+        }
+        for s in [&toolbar, &rows, &overlay] {
+            Slice::observing(s, &self.doc, cx);
+        }
+        let s = AsmSlices { toolbar, rows, overlay };
+        self.slices = Some(s.clone());
+        s
+    }
+
+    /// The list filter changed: only the rows show it.
+    pub(super) fn filter_rows_changed(&self, cx: &mut Context<Self>) {
+        if let Some(s) = &self.slices {
+            s.rows.update(cx, |_, cx| cx.notify());
+        }
+    }
+
+    fn render_overlay_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let overlay = self.render_overlay(cx);
+        let rail = self.render_panel_rail(cx);
+        div()
+            .size_full()
+            .relative()
+            // Live assembly/10: the Part Studio's list toggle and evaluation tools.
+            .child(div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)))
+            .children(overlay)
+            .child(rail)
+            .into_any_element()
+    }
+}
+
 impl Render for AssemblyView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         // Width taken from the graphics area by a docked pane: its 712 px
         // and the 33 px strip at its left edge (live 181).
-        let dock_w = if self.pane_docked() { 33. + 712. } else { 0. };
+        let dock_w = if self.pane_docked() { 33. + crate::ui::right_panel_w() } else { 0. };
         self.ui.dock_w = dock_w;
+        if std::mem::take(&mut self.ui.eval_requested) {
+            self.schedule_eval(window, cx);
+        }
         self.ensure_filter_input(window, cx);
         if self.panel == Some(SidePanel::Configurations) {
             self.ensure_cfg_filter(window, cx);
@@ -4449,18 +4569,11 @@ impl Render for AssemblyView {
         if self.panel == Some(SidePanel::Variables) {
             self.sync_var_tables(window, cx);
         }
-        let toolbar = self.render_toolbar(cx);
-        let tb_panel = self.render_tb_custom_panel(cx);
-        let list = self.render_list(cx);
-        // Panel dialogs that closed forget where they were moved.
-        let open = [
-            ("asm-mass", self.ui.mass.is_some()),
-            ("asm-section", self.ui.section.is_some()),
-            ("asm-isolate", self.isolate.is_some() || self.ui.transparent.is_some()),
-        ];
-        self.ui.panels.retain(|k| open.iter().any(|(o, on)| *o == k && *on));
-        let overlay = self.render_overlay(cx);
-        let rail = self.render_panel_rail(cx);
+        let slices = self.slices(cx);
+        let tb_panel = self.render_tb_custom_panel(window, cx);
+        let list_head = self.render_list_head(cx);
+        // Moved panel dialogs reopen where they were left (live keeps each
+        // panel's rect: Interference detection opened at the remembered place).
         v_flex()
             .size_full()
             .key_context("Assembly")
@@ -4653,13 +4766,36 @@ impl Render for AssemblyView {
             .on_action(cx.listener(|this, _: &PanRight, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(1.0, 0.0, cx))))
             .on_action(cx.listener(|this, _: &PanUp, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(0.0, -1.0, cx))))
             .on_action(cx.listener(|this, _: &PanDown, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(0.0, 1.0, cx))))
-            .child(toolbar)
+            // Customizing: drawn every frame (a dragged tool leaves the bar
+            // while the drag runs, and nothing notifies the cached slice).
+            .child(if self.ui.tb_custom.is_some() {
+                div().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none().child(slices.toolbar.clone()).into_any_element()
+            } else {
+                slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()).into_any_element()
+            })
             .child(
                 h_flex()
                     .flex_1()
                     .min_h_0()
                     .relative()
-                    .when(!self.ui.list_collapsed, |d| d.child(div().w(px(crate::ui::LEFT_PANEL_W)).h_full().flex_none().child(list)))
+                    .on_drag_move(cx.listener(|_, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
+                        if crate::ui::drag_left_panel(e) {
+                            cx.notify();
+                        }
+                    }))
+                    .when(!self.ui.list_collapsed, |d| {
+                        d.child(
+                            div().w(px(crate::ui::left_panel_w())).h_full().flex_none().child(
+                                v_flex()
+                                    .size_full()
+                                    .bg(pal.panel)
+                                    .border_r_1()
+                                    .border_color(pal.border)
+                                    .children(list_head)
+                                    .child(slices.rows.clone().cached(StyleRefinement::default().w_full().flex_1().min_h_0())),
+                            ),
+                        )
+                    })
                     .child(
                         div()
                             .flex_1()
@@ -4681,12 +4817,10 @@ impl Render for AssemblyView {
                                     .left_0()
                                     .right(px(dock_w))
                                     .child(self.viewport.clone())
+                                    .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                                     .child(self.render_evaluation_tools(cx)),
                             )
-                            // Live assembly/10: the Part Studio's list toggle and evaluation tools.
-                            .child(div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)))
-                            .children(overlay)
-                            .child(rail),
+                            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
                     )
                     // Customize toolbar's Tools panel, over the list and graphics.
                     .children(tb_panel),

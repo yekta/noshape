@@ -183,6 +183,16 @@ impl Gpu {
         }
     }
 
+    /// Draw `overlay` (view cube, plane names) into the target's frames.
+    pub fn set_overlay(&self, target: u64, overlay: Option<Arc<noshape_render::overlay::Overlay>>) {
+        self.worker().set_overlay(target, overlay);
+    }
+
+    /// Shade overlay text like GPUI's text (its renderer's parameters).
+    pub fn set_text_shading(&self, shading: noshape_render::overlay::TextShading) {
+        self.worker().set_text_shading(shading);
+    }
+
     pub fn unregister_target(&self, id: u64) {
         let mut r = self.routes.lock();
         r.senders.remove(&id);

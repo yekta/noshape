@@ -211,6 +211,131 @@ Scratch now in /root/ui2-scratch (binary, `bin/shot.sh out.png [window]`, build.
     row, Text gap spinbox); toolbar groups (already sent); title block templates (live 156/164).
   - Capture requested: the location box's ↓≡ sort button (REQUESTS ui2 19:20).
 
+**Round 9 (20 Oct ~21:00–, lead: Variable Studio, Feature Studio, versions panel/graph, Compare,
+Preferences, Release/Publish):**
+- Variable Studio (live 12 identical otherwise): the own table's ⋯ menu offers "Collapse all tables"
+  only when inserted tables exist.
+- Feature Studio: Monitor box sizes to its text (max 247; live 168 px for "Monitor Part Studio 1");
+  notices panel: monospace result line uses the theme mono font, and the panel sits under the tab bar,
+  right of the rail (live 75; workspace.rs surgical).
+- Versions graph: 4 px lines, workspace ring r 7 / inner 4, Start = filled dot + 8 px stub + 12 px bar
+  (live 22).
+- Preferences: nav items 14 px (live navigation/61).
+- **Publish FeatureScript…** (history_panel.rs) rebuilt as live document/74: 598 px "Publish custom
+  features and tables at **V3**", info line, "Requirements to publish:" with a green ✓ / red ✗ per
+  requirement computed on the document at the version (custom feature or table defined, a PDF tab,
+  no FeatureScript errors/warnings, descriptions, every feature used in a Part Studio, all studios
+  committed); help ? at the left; the Publish button disabled until all pass. "Document is public" is
+  cloud sharing and not listed. New own glyphs `os_ui::GLYPH_CHECK_BOLD` / `GLYPH_CROSS_BOLD`.
+- **Version / workspace Properties…** (new `version_properties.rs`, main.rs `mod version_properties;`):
+  live document/72–73, 78 — the 800 px metadata modal with the 300 px `#f5f5f5` tree (⧫ V3 / *Version*,
+  expands to the tabs at that version with thumbnails, name, italic type), right side name heading,
+  Name \*, Description, greyed Category ("Onshape Version" / "Onshape Workspace"), ↶ ↷, Apply / Save /
+  Close. Opened by the version row's Properties…, "Create version and edit properties", the new
+  workspace-row "Properties…" and the new "Create workspace and edit properties" button (live 77–78).
+  Workspace descriptions are stored in store meta `workspace_description:<branch>` (the Create
+  workspace dialog used to drop the typed description). psb's `properties_dialog.rs`: surgical
+  visibility only (`label`, `gray_box`, `footer_button`, `bootstrap_modal`, `resizable_props`,
+  `props_size`, `PROPS_MIN` are `pub(crate)`).
+- Lead (20 Oct, late): scene_builder.rs / sketch_mode.rs now live in crates/scene/src/ (noshape-scene:
+  builder.rs, sketch_mode.rs); freeze lifted, edit them there. I had no pending edits in them.
+- **Verified in the app (20 Oct late build, no warnings):** Publish FeatureScript… against live 74 (title
+  lead-in 400 `#666` + 600 name — the kit's title made it semibold; body 8 px up for the kit's title
+  gap; disabled Publish = primary at 40 %, live (162,185,223)); version Properties… against live 72/73
+  (tree from y 73, thumbnails, Name 34 px; tab names 400). The same title weight fix applies to Create
+  version / Create workspace titles.
+- Feature Studio Module outline popover (live 71 empty state): 218 px min, `#ccc` border, 202 × 31 search
+  8 px in, 11 px "n symbols" / "No top-level symbols found". Populated look not captured (live rows are
+  "ƒ name(params)"); ours keeps 34 px rows and grows up to 420 px.
+- Feature Studio outline popover checked in the app against live 71 (empty state matches).
+- Dimension palette (ui's request): `render_palette`'s `field` text is `#555` (live
+  dom/drawing-dimension-edit-dialog: inputs 14 px rgb(85,85,85)); checked in the app (value "100").
+  asb's uncommitted edits in drawing_palette.rs (`at`, Esc capture) are untouched.
+- **Preferences › Units** (new `units_prefs.rs`, live prefs/00–01): "Change the default units for all
+  newly created documents…" + Learn more link, 11 rows (unit 226 px + Display decimals 150 px + help),
+  live's option lists and per-quantity decimals counts (7 7 7 7 8 9 9 9 8 9 9), Time format 12 / 24
+  hour, Save changes. Stored in config `units.json`; new documents (`files::open_document_window`,
+  documents-page Import) start with these units (`units_prefs::new_document`), and
+  `format_onshape_time` follows the time format (checked: "21:29 Today"). The section is first
+  (Keyboard shortcuts' scroll index moved to 4).
+- **Units crate (surgical, append-only):** `OTHER_UNITS` gains Onshape's missing units (Gram per liter,
+  Gram per milliliter, Gigapascal, Kilopound per square inch; "Revolutions per minute" spelt as live);
+  new `OTHER_UNITS_SHOWN` / `LENGTH_UNITS_SHOWN` give Onshape's option order (stored indices are
+  unchanged, so documents keep their units; a test pins the lists to live's dump). The Workspace
+  units dialog (doc_dialogs.rs) now shows live's lists (no Micrometer, alphabetical) and per-quantity
+  decimals counts (Length 6, …, 9).
+- **Shortcut toolbars:** Sketch first (default), ticks are a draft saved by "Save shortcut toolbar
+  settings" (live), 14 px rows with 20 px icons; **Toolbars** section with "Reset to defaults" (Part
+  Studio toolbar prefs cleared; the assembly toolbar's `assembly_toolbar.json` removed).
+- **Variable Studio:** Description cell right-click = Delete / Move up / Move down / Copy / Convert to
+  expression (or text), like the Part Studio table (live variable-studio/01–07, 652–656); model
+  `VariableDef.description_expr` (+ `toggle_description_expr`, `set_description`, a test);
+  `variable_table::as_expression` made `pub` (psb's file, visibility only). Name / Type / Value keep
+  Delete / Move up / Move down (the row menu now sits on those three cells: menus open in the capture
+  phase, so it can't wrap the Description's).
+- **Feature Studio Monitor ▾:** items carry the pulse (Monitor, new own `fs-monitor.svg`) and stopwatch
+  (Profile, `regen-timer`) icons as live 71. "Profile …" stays disabled: FeatureScript profiling is
+  not implemented (fs agent).
+- Release dialog: no live reference possible (Free plan shows only the premium upsell; behaviours.md
+  "Release management is not available").
+- **For the lead / other agents:**
+  - Version Properties tree: tab rows are read-only and do not expand to parts; live edits tab / part
+    metadata there (needs model support for tab metadata at a version).
+  - Version row menu lacks "View in repair"; workspace row menu lacks "Workspace protection…"
+    ("Open in new browser tab" / "Copy link" are web-only). Behaviour owners to decide.
+  - Feature Studio "Co-complete" toggle (AI completion): cloud or not — your call.
+  - Preferences: live has an "Environment profile settings" section (profile select, Create / Delete
+    profile, "Match pixel density…") that we lack; full-page capture requested (REQUESTS ui2 22:10).
+  - ui: os_menu `dropdown()` min width 253 px makes the Variable Studio ⋯ menu wider than live.
+  - Compare dialog: capture requested (REQUESTS ui2 21:40).
+  - `drawing_styles.rs:161` unused `pal` comes from an in-progress edit that is not mine.
+  - **Compare (live ui2/950–954, behaviours "Versions and history › Compare") — needs your routing.**
+    Live opens no dialog: the whole document enters a *compare mode* (URL …/w/<ws>/and/v/<v>/…):
+    (1) history panel: base row light blue `#b2ddf6` with a blue left bar, target row light pink with a
+    red bar (mine, history_panel.rs); (2) the toolbar is replaced by a centred white bar "Comparing
+    **Main** and **V3** [Reverse compare] (?)" (Main blue, V3 red); (3) every tab gets a status dot:
+    yellow "Compare has found differences.", white "Compare not supported for this tab." (drawings,
+    disabled), red "Tab only exists in 'Main'." (disabled; graphics show "NOT COMPARABLE");
+    (4) Part Studio: a ~400 px compare panel replaces the feature list (column headers "Main
+    (millimeter, degree)" blue / "V3 (…)" red, Features list, "☑ Only show differences", "Select a
+    feature to compare its parameters.") and the graphics turn grey with a Main○——V3 blend slider at
+    the top; (5) clicking another row leaves compare mode. Ours: Compare lists tab diffs inside the
+    history panel (non-Onshape). It touches workspace.rs (toolbar / tab bar), the Part Studio
+    feature panel and the viewport (grey + blend), so it needs owners there; I can build (1)–(3) and
+    the panel shell if you assign it to me. `noshape_model::compare` already gives per-tab
+    Added/Removed/Modified.
+  - **Preferences (live prefs/00–05, dom/preferences-full):** done here — Units (new, below),
+    Shortcut toolbars (Sketch first + Save button), Toolbars › Reset to defaults. asb added Drawings
+    (drawing_prefs.rs). Still missing, for owners / your decision: **Language** (9 languages; we have
+    English only — i18n), **Theming** (Light / Dark mode "beta" radios: ui, theme.rs), **Decimal
+    format** ("Use comma as decimal separator": number parsing/formatting app-wide), **Environment
+    profile settings** (profiles + "Match pixel density on high resolution displays (can affect
+    performance)" Automatic/On/Off: renderer), **User export rules** ("You have not added any export
+    rules." + Add export rule…: export), **Onshape Labs** (checkbox; tie-in with the Co-complete
+    decision). Shortcut toolbars › Assembly / Drawing contexts need skb's / asb's S toolbars to read
+    `ToolbarPrefs` (asb's drawing S toolbar is a fixed list). Live's Sketch list also starts with
+    Extrude / Revolve and ends with Section view / Mass and section properties / Measure (ours lists
+    sketch tools only; `shortcut_cmds::sketch_toolbar_tools`, Part Studio owners). Our "Release
+    management" section is not in live's user Preferences (company settings on paid plans).
+  - **All agents: `Input::new(..).h(px(N))` does nothing on single-line inputs.** The kit's
+    inherent `Input::h` is the *multi-line* height (vendor input.rs:291); a single-line input always
+    renders at the kit's h_8 = 28 px (rem 14). Live fields are 34 px (create-version Name live 75:
+    84–117; version Properties Name live 72: 151–184), ours were 28. Use `os_ui::input_h(input, 34.)`
+    (applies `Styled::h`, after the kit's height). Fixed in version_properties.rs and the
+    history_panel create-version / branch dialogs. Remaining call sites (check each against live
+    before changing; some may be multi-line): assembly_mass 252/472, doc_dialogs 29/90,
+    drawing_export 160/183, assembly_behaviors 2609, assembly_reflection 189, assembly_mate_dialog
+    519/564/593, material_library_view 226, feature_studio 953, variable_studio 636,
+    part_studio/custom_tables 608, files 336, tab_manager 275, select_item 531, workspace 910/1517,
+    preferences_window 844, start_window 1190/1781/2494/3156, file_tab_view 215, assembly_props 276,
+    fs_search 379, properties_dialog 317/659 (psb: the Properties modal fields, live 34),
+    part_studio/behaviors 1156, variable_import 69/70, assembly_panels 535/2859, fs_notices 295,
+    part_studio/sketch 2589/2950/3024. Mine now use `input_h` with their live heights: doc_dialogs
+    name prompts 32, preferences Name 32, FS outline search 31 (live 71: 84–114), fs_search 30,
+    notices filter 30, documents column search 32, location field 30. Left at 28 on purpose:
+    start_window 1190 (28 = live) and 1781 (inside its framed box); the 26 px rename fields in
+    variable_studio / tab_manager sit in fixed rows.
+
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
 Not committed, in the shared tree (all mine, all complete edits; none half done):

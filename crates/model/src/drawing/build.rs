@@ -184,6 +184,8 @@ impl ViewPlacement {
 pub struct SheetInfo {
     pub doc_name: String,
     pub drawing_name: String,
+    /// The user (title block DRAWN, `{user.name}`).
+    pub user_name: String,
     /// The drawing's revisions, oldest first (revision tables; from
     /// [`tables::revision_rows`]).
     pub revisions: Vec<tables::RevisionRow>,
@@ -314,6 +316,50 @@ impl Picks {
 
 /// Placement of view `id` showing geometry `g` (geometry is shared through
 /// the cache between views with identical projections, so `g.id` may differ).
+/// An auxiliary view's reference indicator on the sheet (Onshape: the
+/// viewing-plane line beside the edge, an "elbow" at each end and a short
+/// leg with an arrow pointing back at the edge).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AuxIndicator {
+    /// The anchor on the edge (sheet).
+    pub anchor: [f64; 2],
+    /// Along the edge and toward the view (sheet, unit).
+    pub es: [f64; 2],
+    pub ns: [f64; 2],
+    pub offset: f64,
+    pub ext: [f64; 2],
+    pub elbows: [[f64; 2]; 2],
+    pub tips: [[f64; 2]; 2],
+    /// The middle snap point (on the line).
+    pub mid: [f64; 2],
+    /// The largest offset: the middle of the auxiliary view.
+    pub max_offset: f64,
+}
+
+pub const AUX_OFFSET: f64 = 12.0;
+pub const AUX_EXT: f64 = 10.0;
+pub const AUX_LEG: f64 = 8.0;
+
+/// The reference indicator of auxiliary view `id`, `ppl` being its parent's
+/// placement.
+pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement) -> Option<AuxIndicator> {
+    let v = sheet.view(id)?;
+    let (ViewKind::Auxiliary { edge_dir, .. }, Some(a)) = (&v.kind, v.aux_ref.as_ref()) else { return None };
+    let l = (edge_dir[0].powi(2) + edge_dir[1].powi(2)).sqrt().max(1e-12);
+    let e = [edge_dir[0] / l, edge_dir[1] / l];
+    let n = views::auxiliary_toward(sheet, id).unwrap_or([-e[1], e[0]]);
+    let (es, ns) = (ppl.dir_to_sheet(e), ppl.dir_to_sheet(n));
+    let c = ppl.to_sheet(a.anchor);
+    let max_offset = ((v.position[0] - c[0]) * ns[0] + (v.position[1] - c[1]) * ns[1]).max(AUX_LEG);
+    let offset = a.offset.unwrap_or(AUX_OFFSET).clamp(AUX_LEG, max_offset);
+    let ext = a.ext.unwrap_or([AUX_EXT; 2]);
+    let base = [c[0] + ns[0] * offset, c[1] + ns[1] * offset];
+    let at = |t: f64| [base[0] + es[0] * t, base[1] + es[1] * t];
+    let elbows = [at(-ext[0]), at(ext[1])];
+    let tips = elbows.map(|p| [p[0] - ns[0] * AUX_LEG, p[1] - ns[1] * AUX_LEG]);
+    Some(AuxIndicator { anchor: c, es, ns, offset, ext, elbows, tips, mid: at((ext[1] - ext[0]) / 2.0), max_offset })
+}
+
 pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewPlacement> {
     let v = sheet.view(id)?;
     let scale = views::view_scale(sheet, id);
@@ -552,6 +598,11 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
         "part.description" => part().and_then(|(_, p, _)| p).map(|p| p.description).unwrap_or_default(),
         "model.name" => part().map(|(n, _, _)| n).unwrap_or_default(),
         "doc.name" => info.doc_name.clone(),
+        "user.name" => info.user_name.to_uppercase(),
+        // Release approver / date and the drawing's three title lines: empty
+        // until set (the title block shows its "----" placeholders, live
+        // drawing/156, 164).
+        "release.approver" | "release.date" | "drawing.title1" | "drawing.title2" | "drawing.title3" => String::new(),
         "drawing.name" => info.drawing_name.clone(),
         "sheet.name" => sheet.name.clone(),
         "sheet.number" => (si + 1).to_string(),
@@ -1209,25 +1260,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             // Auxiliary view reference indicator: a viewing-plane line beside
             // the edge with arrows along the line of sight and the letter.
-            ViewKind::Auxiliary { parent, edge_dir } => {
-                if let (Some(ppl), Some(a)) = (place(*parent), v.aux_ref.as_ref().filter(|a| a.show && drawing.props.view_tab.aux_indicator)) {
+            ViewKind::Auxiliary { parent, .. } => {
+                if let (Some(ppl), Some(a)) = (place(*parent), v.aux_ref.as_ref().filter(|a| a.show && drawing.props.view_tab.aux_indicator))
+                    && let Some(ind) = aux_indicator(sheet, v.id, &ppl)
+                {
                     let pick = picks.id(PickTarget::AuxIndicator(v.id));
-                    let l = (edge_dir[0].powi(2) + edge_dir[1].powi(2)).sqrt().max(1e-12);
-                    let e = [edge_dir[0] / l, edge_dir[1] / l];
-                    // Toward the view (the side it was placed on).
-                    let n = views::auxiliary_toward(sheet, v.id).unwrap_or([-e[1], e[0]]);
-                    let (es, ns) = (ppl.dir_to_sheet(e), ppl.dir_to_sheet(n));
-                    let c = ppl.to_sheet(a.anchor);
-                    let base = [c[0] + ns[0] * 12.0, c[1] + ns[1] * 12.0];
-                    let half = 10.0;
-                    let (p0, p1) = ([base[0] - es[0] * half, base[1] - es[1] * half], [base[0] + es[0] * half, base[1] + es[1] * half]);
-                    g.lines.push(Polyline2 { points: vec![p0, p1], style: LineStyle::Thin, closed: false, pick });
-                    let sight = [-ns[0], -ns[1]];
-                    for end in [p0, p1] {
-                        let tail = [end[0] + ns[0] * 8.0, end[1] + ns[1] * 8.0];
-                        g.lines.push(Polyline2 { points: vec![tail, end], style: LineStyle::Thin, closed: false, pick });
-                        g.arrow(end, sight, 3.5);
-                        g.texts.push(Text2 { pos: [tail[0] + ns[0] * 3.5, tail[1] + ns[1] * 3.5], height: 5.0, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    g.lines.push(Polyline2 { points: ind.elbows.to_vec(), style: LineStyle::Centerline, closed: false, pick });
+                    let sight = [-ind.ns[0], -ind.ns[1]];
+                    for (elbow, tip) in ind.elbows.into_iter().zip(ind.tips) {
+                        g.lines.push(Polyline2 { points: vec![elbow, tip], style: LineStyle::Thin, closed: false, pick });
+                        g.arrow(tip, sight, 3.5);
+                        g.texts.push(Text2 { pos: [tip[0] + sight[0] * 4.0, tip[1] + sight[1] * 4.0], height: 5.0, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     }
                 }
             }

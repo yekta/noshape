@@ -2565,7 +2565,7 @@ impl PartStudioView {
                                 .on_drag_move(cx.listener(|this, e: &DragMoveEvent<DimBoxMove>, _, cx| {
                                     let grab = *e.drag(cx).0.lock();
                                     let delta = e.event.position - grab - e.bounds.origin;
-                                    this.ui.dim_box_offset = this.ui.dim_box_offset + delta;
+                                    this.ui.dim_box_offset += delta;
                                     cx.notify();
                                 })),
                         )

@@ -218,6 +218,9 @@ impl PartStudioView {
             Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
             None => Vec::new(),
         };
+        // Datum boxes can be dragged too.
+        let mut handles = handles;
+        handles.extend(self.annotation_handles(cx));
         self.viewport.update(cx, |v, _| v.manipulators = handles);
     }
 

@@ -61,6 +61,9 @@ pub enum FeatureStudioEvent {
     /// Compiling the saved text produced new notices (the notices panel and
     /// the navbar { } icon follow).
     NoticesChanged,
+    /// Ctrl+click on a standard library symbol: open std's source there
+    /// (module, 1-based line and column).
+    OpenStd { module: String, line: usize, column: usize },
 }
 
 /// Search matches to highlight in each Feature Studio (set by the search
@@ -103,6 +106,34 @@ struct Symbol {
     line: usize,
     /// 0-based column of the name.
     column: usize,
+}
+
+/// [`outline`] of an editor's text, parsed again only when the text changes:
+/// the toolbar shows the current symbol on every render (each keystroke and
+/// caret blink), and parsing the module took ~0.7 ms. Keyed by a hash of the
+/// text, so several Feature Studios share it.
+fn outline_of(editor: &EditorState) -> Rc<Vec<Symbol>> {
+    use std::hash::{Hash, Hasher};
+    thread_local! {
+        static CACHE: std::cell::RefCell<Vec<(u64, Rc<Vec<Symbol>>)>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let text = editor.text();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for chunk in text.chunks() {
+        chunk.hash(&mut h);
+    }
+    let key = h.finish();
+    CACHE.with_borrow_mut(|cache| {
+        if let Some((_, s)) = cache.iter().find(|(k, _)| *k == key) {
+            return s.clone();
+        }
+        let symbols = Rc::new(outline(&text.to_string()));
+        if cache.len() >= 8 {
+            cache.remove(0);
+        }
+        cache.push((key, symbols.clone()));
+        symbols
+    })
 }
 
 /// FeatureScript top-level symbols: `export const myFeature =
@@ -351,6 +382,8 @@ pub struct FeatureStudioView {
     outline: Option<Entity<InputState>>,
     /// Places visited by jumps (back / forward), oldest first.
     nav: Vec<NavEntry>,
+    /// The caret before the last click in the code (a ctrl+click records it).
+    caret_before_click: Option<Position>,
     nav_at: usize,
     focus: FocusHandle,
     /// The toolbar's Import panel and the button's bounds (it hangs under it).
@@ -406,7 +439,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -615,8 +648,22 @@ impl FeatureStudioView {
     fn goto_definition(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((name, _)) = self.symbol_at_cursor(cx) else { return };
         let text = self.editor.read(cx).value().to_string();
-        let Some(to) = definition_of(&text, &name) else { return };
+        let Some(to) = definition_of(&text, &name) else {
+            // Live: a std symbol opens the std document, read-only, at its export.
+            if let Some((module, line, column)) = crate::std_source::std_definition(&name) {
+                cx.emit(FeatureStudioEvent::OpenStd { module: module.to_string(), line, column });
+            }
+            return;
+        };
         let here = self.editor.read(cx).cursor_position();
+        // Live history: the caret before the click, the use, the definition.
+        if let Some(before) = self.caret_before_click.take().filter(|b| *b != here) {
+            self.nav.truncate((self.nav_at + 1).min(self.nav.len()));
+            if self.nav.last().is_none_or(|l| l.pos != before) {
+                self.nav.push(NavEntry::caret(before));
+                self.nav_at = self.nav.len() - 1;
+            }
+        }
         let from = NavEntry { pos: here, label: format!("Use - {name}") };
         self.jump(from, NavEntry { pos: to, label: format!("Symbol - {name}") }, window, cx);
     }
@@ -831,11 +878,12 @@ impl FeatureStudioView {
             m = m.dropdown();
             for (id, name) in studios {
                 let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(format!("Monitor {name}")).on_click(move |_, _, cx| {
+                // Live 71: a pulse icon for Monitor, a stopwatch for Profile.
+                m = m.item(crate::os_menu::OsMenuItem::new(format!("Monitor {name}")).icon_name("fs-monitor").on_click(move |_, _, cx| {
                     let doc = v.read(cx).doc.clone();
                     crate::fs_notices::set_monitored(&doc, id, cx);
                 }));
-                m = m.item(crate::os_menu::OsMenuItem::new(format!("Profile {name}")).disabled(true));
+                m = m.item(crate::os_menu::OsMenuItem::new(format!("Profile {name}")).icon_name("regen-timer").disabled(true));
             }
             m
         });
@@ -904,9 +952,9 @@ impl FeatureStudioView {
         let field = self.outline.clone()?;
         let pal = p();
         let q = field.read(cx).value().to_lowercase();
-        let symbols: Vec<Symbol> = outline(self.editor.read(cx).value().as_ref()).into_iter().filter(|s| q.is_empty() || s.name.to_lowercase().contains(&q)).collect();
+        let symbols: Vec<Symbol> = outline_of(self.editor.read(cx)).iter().filter(|s| q.is_empty() || s.name.to_lowercase().contains(&q)).cloned().collect();
         let count = format!("{} symbol{}", symbols.len(), if symbols.len() == 1 { "" } else { "s" });
-        let empty = symbols.is_empty().then(|| div().text_size(px(14.)).text_color(pal.text_muted).child("No top-level symbols found"));
+        let empty = symbols.is_empty().then(|| div().mt(px(22.)).text_size(px(11.)).line_height(px(16.)).text_color(pal.text_muted).child("No top-level symbols found"));
         let rows: Vec<AnyElement> = symbols
             .into_iter()
             .enumerate()
@@ -937,23 +985,27 @@ impl FeatureStudioView {
                 v_flex()
                     .id("fs-outline")
                     .occlude()
-                    .w(px(254.))
+                    // Live 71 (empty): 218 px, #ccc, the 202 px search field 8 px in,
+                    // 11 px "0 symbols" / "No top-level symbols found".
+                    .min_w(px(218.))
+                    .max_w(px(420.))
                     .max_h(px(420.))
                     .bg(rgb(0xffffff))
                     .border_1()
-                    .border_color(rgb(0xd7d7d7))
-                    .rounded(px(5.25))
+                    .border_color(rgb(0xcccccc))
+                    .rounded(px(4.))
                     .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-                    .p(px(8.))
-                    .gap(px(6.))
+                    .pt(px(8.))
+                    .px(px(8.))
+                    .pb(px(12.))
                     .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
                         this.outline = None;
                         cx.notify();
                     }))
-                    .child(Input::new(&field).h(px(30.)).text_size(px(14.)))
-                    .child(div().text_size(px(12.)).text_color(pal.text_muted).child(count))
+                    .child(div().w(px(202.)).child(crate::os_ui::input_h(Input::new(&field), 31.).text_size(px(14.))))
+                    .child(div().mt(px(10.)).text_size(px(11.)).line_height(px(16.)).text_color(pal.text_muted).child(count))
                     .children(empty)
-                    .child(v_flex().id("fs-outline-list").overflow_y_scroll().children(rows)),
+                    .child(v_flex().id("fs-outline-list").mt(px(4.)).overflow_y_scroll().children(rows)),
             ))
             .with_priority(2)
             .into_any_element(),
@@ -1252,7 +1304,7 @@ impl Render for FeatureStudioView {
         let monitored = crate::fs_notices::monitored(&self.doc, cx);
         let monitor_name = monitored.and_then(|t| d.tab(t)).map(|t| format!("Monitor {}", t.name)).unwrap_or_else(|| "Monitor".into());
         let pos = self.editor.read(cx).cursor_position();
-        let symbols = outline(self.editor.read(cx).value().as_ref());
+        let symbols = outline_of(self.editor.read(cx));
         let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
         let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
         let mon_anchor: BoundsCell = Default::default();
@@ -1267,8 +1319,9 @@ impl Render for FeatureStudioView {
                     .relative()
                     .flex_none()
                     .h(px(29.))
-                    // Live 70-toolbar-1920: a fixed 247 px; the name truncates.
-                    .w(px(247.))
+                    // Live dom feature-studio-editor: sized to the text ("Monitor
+                    // Part Studio 1" 168 px + the caret cell); long names truncate.
+                    .max_w(px(247.))
                     .pl(px(6.))
                     .gap(px(6.))
                     .border_1()
@@ -1277,8 +1330,8 @@ impl Render for FeatureStudioView {
                     .cursor_pointer()
                     .tooltip(crate::ui::tooltip(monitor_name.clone()))
                     .child(os::glyph(os::GLYPH_PULSE, 18., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
-                    .child(div().w(px(14.)).h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
+                    .child(div().min_w_0().pr(px(4.)).truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
+                    .child(div().w(px(14.)).flex_none().h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
                     .child(probe(&mon_anchor))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let b = ma.get();
@@ -1366,6 +1419,10 @@ impl Render for FeatureStudioView {
                         if !*hovered && this.hover_at.take().is_some() {
                             cx.notify();
                         }
+                    }))
+                    // Before the editor moves the caret: where it was.
+                    .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                        this.caret_before_click = Some(this.editor.read(cx).cursor_position());
                     }))
                     // After the editor placed the caret at the click.
                     .on_mouse_down(MouseButton::Left, cx.listener(|_, e: &MouseDownEvent, window, cx| {

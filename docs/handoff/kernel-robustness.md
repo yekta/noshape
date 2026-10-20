@@ -492,27 +492,43 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
   mesh face again → MIXED parts (mesh face + planar caps), history composed; bounding boxes include mesh nodes.
   Test `features_b::mesh_parts_split_transform_union`. **Open**: triangle lines across section caps, assembly view.
 
-## PAUSED 2026-10-20 ~16:55 (lead: OOM reboot) — exact state
-Committed in dc0da0a: native assemblies (kernel tree/zip/configs, model `native_assembly.rs`, app zip import),
-native colours/opacity/Solid Edge colour, import names/colours, native dialog, ghost-partition curves.
-**Uncommitted, mine (all compile; status of each):**
-- Mesh booleans/splits → MIXED parts: `kernel/cpp/mesh_body.cpp` (facet_mesh / unfacet_mesh), `cpp/boolean.cpp`
-  (op_boolean / op_split use them, `remesh_facets`), `cpp/internal.hpp` (MeshFacets; `#include <Geom_Surface.hxx>`),
-  `cpp/geom.cpp` (bounding boxes include mesh nodes). Tested: `features_b` 18/18 incl.
-  `mesh_parts_split_transform_union`; kernel `mesh_import` 4/4, `export` 14/14 (1 ignored). GCC 13 syntax-checked.
-- Mesh triangle lines: `model/src/display.rs` (`MeshBuffers::mesh_lines`, `with_mesh_lines`), `model/src/regen/display.rs`,
-  `model/src/assembly/eval.rs` + `interaction.rs` (field added), `app/src/scene_builder.rs` (drawn #464646 1 px). Built and
-  verified in the app on Onshape's G35 STL (matches part-studio/551).
-- STL/OBJ import dialog variant (no tiles; Y-up, composite, **Units** select defaulting to the document unit; chosen unit
-  used to read the mesh): `app/src/import_dialog.rs`. `cargo check -p noshape` clean; **not yet built/verified in the
-  app, clippy not yet run** on this last change. Units options order assumed (Onshape's export list) — live G35b asked.
-- Test file `model/tests/features_b.rs` (mesh ops test), handoff (this file).
-**Not run since the last edits**: `cargo clippy -p noshape-kernel -p noshape-model -p noshape --all-targets -D warnings`.
-**Lost with /tmp**: only copies (app binary, screenshots, test binaries, /tmp/kern/imp test files). The assembly test
-zip is also in /root/kern-scratch/sldasm/zip; scratch tools are in /root/kern-scratch (kept).
-**Next on RESUME**: clippy the three crates; build the app; verify the STL dialog; then (5) section-cap triangle lines
-and the assembly view's mesh lines (asb's assembly_scene.rs), (4) BOM tab once psb/asb answer, NX/Inventor/SE
-assemblies; open live requests G38g, G38h, G35b.
+### Round 10 (2026-10-20 evening, after the OOM reboot)
+- Resumed per the lead: clippy, build, STL dialog verified in the app (Y-up, composite, Units select
+  Centimeter/Foot/Inch/Meter/Millimeter/Yard defaulting to the document unit; g35.stl shows its triangle lines).
+- **Mesh lines in the assembly view**: `app/src/assembly_scene.rs` (asb's file; `CachedBody::mesh_lines`, drawn with
+  the edges, unpickable, colour `noshape_scene::builder::MESH_LINE_COLOR` — now `pub`). The scene builder lives in
+  `crates/scene/src/builder.rs` (the app's `scene_builder.rs` only re-exports it): edit mesh-line drawing there.
+- **Build note**: the kernel build script panics without `OCCT_ROOT=/root/occt` (a resumed shell loses it).
+- **Mesh section caps (live G35-retry, part-studio/672–673)**: a cut mesh part's cap is the part colour, **not
+  hatched**, crossed by its triangulation's lines. `MeshBuffers::section_cap_lines(planes)` (model/display.rs: plane ∩
+  triangles → loops keyed by the cut mesh sides, holes by nesting, earcut without interior points, each plane's cap
+  clipped to the other planes' removed half-spaces); scene builder draws them (#464646, unpickable, not clipped,
+  cached per mesh + planes) and marks the part's mesh `plain_cap` (render: `Instance::plain_cap`, params.y bit 5;
+  `fs_mesh_section` skips the hatching). Test `display::tests::section_caps_are_triangulated_cross_sections`.
+  Onshape's own cap triangulation (Parasolid facetter) may pair different vertices; the look is the same.
+- **Mesh part colour (live G35)**: an imported mesh part without a colour of its own is Onshape's generated orange
+  rgb(248,135,1) (`importing.rs::MESH_PART_COLOR`; asserted in `features_b::mesh_parts_split_transform_union`).
+- **Import dialog, mesh variants (live G35b)**: STL no tiles / no Import appearances, Units = the document unit;
+  OBJ tiles + Import appearances, Units default **Meter**; 3MF like OBJ without Units; none has Join adjacent surfaces.
+- **Native assembly feasibility (4)**:
+  - **Inventor .iam**: OLE file; `UFRxDoc` lists the referenced files (.ipt and sub-assembly .iam); the RSe segments
+    `RSeStorage/B*` and `M*` are zlib after a header (B: 18 bytes `9ec22ba4…0401`; M: "RSe Meta Stream Version 8"
+    header, zlib at ~150), decompressed data is plain binary. Segment types from `RSeSegInfo`: AmDcSegment (document:
+    constraints, appearances), AmBrowserSegment (occurrence names "Battery holder:1", kinds AmPartInstEntry /
+    AmAssmInstEntry / AmPatternElementEntry, constraint names), AmRxSegment, AmBREPSegment, AmGraphicsSegment…
+    **Occurrence transforms not found**: no 3x3/3x4/4x4 orthonormal double or float matrix for the occurrences in
+    either sample (the only one, in AmDcSegment, is followed by the "matte steel" appearance record); the
+    data-port panel's RJ45 port is offset by a mate, so its placement is stored in an encoded RSe record form.
+    respira_battery_holder.iam (both .ipt present) sits at identity (battery on the tray floor, 7 mm end margins),
+    so it cannot discriminate. Needs: .iam samples with every referenced file and known placements (Onshape's
+    import of them as ground truth), then decoding the AmRxSegment / AmDcSegment occurrence records. Scratch:
+    `/root/kern-scratch/iam/py` (dez.py decompresses the segments, mat.py/mat2.py scan for matrices).
+  - **NX assembly .prt**: SPLMSSTR container (directory: u32 name length, name, u64 offset, u64 length);
+    `FastLoad/Structure` (UGS::Assy::StructureDescription) has component names but no transforms; `UG_PART` is
+    encoded (entropy 6.1, no raw doubles) — infeasible short-term; the same blocks NX curves and NX names/colours.
+  - **Solid Edge .asm**: `Preview/Structure/Sites` gives component paths; only identity matrices found
+    (PSMcluster0, PartsLiteData) — occurrence transforms not located.
+  - **SOLIDWORKS**: done (Round 9); sub-assemblies flattened, no ground truth yet.
 
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,

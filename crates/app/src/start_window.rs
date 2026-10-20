@@ -225,6 +225,10 @@ fn load_prefs() -> Prefs {
 
 pub struct StartView {
     focus: FocusHandle,
+    /// The window's body (sidebar, documents, details) as a cached view, so a
+    /// keystroke or caret blink in the search box re-renders only the title
+    /// bar (see `crate::cached_slice`); the search notifies it.
+    body: Option<Entity<crate::cached_slice::Slice<StartView>>>,
     library: Library,
     docs: Vec<DocEntry>,
     loaded: bool,
@@ -319,8 +323,12 @@ impl StartView {
             }),
             cx.subscribe_in(&search, window, |this: &mut Self, state, ev: &InputEvent, _, cx| {
                 if let InputEvent::Change = ev {
+                    // No `cx.notify()`: the field's own notification
+                    // re-renders the title bar; only the body shows the query.
                     this.query = state.read(cx).value().to_string();
-                    cx.notify();
+                    if let Some(b) = &this.body {
+                        b.update(cx, |_, cx| cx.notify());
+                    }
                 }
             }),
             cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -356,6 +364,7 @@ impl StartView {
         let source = prefs.source.clone().unwrap_or(if crate::files::recent().is_empty() { Source::All } else { Source::Recent });
         let mut this = Self {
             focus: cx.focus_handle(),
+            body: None,
             library: Library::default(),
             docs: Vec::new(),
             loaded: false,
@@ -651,7 +660,7 @@ impl StartView {
                 crate::files::open_document_window(path, None, gpu, cx)
             } else {
                 (|| {
-                    let mut doc = noshape_model::Document::new();
+                    let mut doc = crate::units_prefs::new_document();
                     let units = doc.settings.units;
                     let (name, file) = crate::workspace::import_names(&path);
                     let bytes = std::fs::read(&path)?;
@@ -1864,10 +1873,11 @@ impl StartView {
                 // Onshape (live documents/41): Document…, Folder… | Import
                 // files…, Import from ▸ (cloud drives, not offered locally),
                 // Label…. Live dom documents-create-menu: a Bootstrap
-                // dropdown, 20 px `#555` icons 20 px in, 14 px `#555` text.
+                // dropdown, 20 px `#555` icons 20 px in, 14 px `#555` text
+                // 48 px in; 150 px wide with 29.5 px rows.
                 let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
                 let item = |g: &'static [u8], label: &'static str| OsMenuItem::new(label).icon(os::glyph(g, 20., rgb(0x555555)));
-                menu.dropdown().item(item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
+                menu.dropdown().min_width(150.).row_height(29.5).text_inset(48.).item(item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
                     .item(item(os::GLYPH_FOLDER, "Folder…").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.new_folder(window, cx))))
                     .separator()
                     .item(item(os::GLYPH_OPEN, "Import files…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.import_files(window, cx))))
@@ -2490,7 +2500,7 @@ impl StartView {
                     this.save_prefs();
                     cx.notify();
                 })))
-                .child(div().w(px(142.)).child(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)).h(px(32.)).text_size(px(14.)).pl(px(7.)))),
+                .child(div().w(px(142.)).child(os::input_h(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)), 32.).text_size(px(14.)).pl(px(7.)))),
         );
         for (i, (c, shown)) in self.columns.clone().into_iter().enumerate() {
             if !q.is_empty() && !c.label().to_lowercase().contains(&q) {
@@ -2746,6 +2756,46 @@ impl StartView {
     }
 }
 
+impl StartView {
+    /// Sidebar, documents and the details panel (see `body`).
+    fn render_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let docs = self.visible();
+        let header = self.render_header(cx);
+        // Searching hides the folder area, except an advanced search for folders.
+        let folders = if self.query.trim().is_empty() && self.adv_query.as_ref().is_none_or(|q| q.folders_only()) { self.render_folders(cx) } else { None };
+        let strip = self.render_strip(cx);
+        let panel = self.render_doc_panel(cx);
+        let content = self.render_list(&docs, cx);
+        h_flex()
+            .flex_1()
+            .min_h_0()
+            .items_start()
+            .child(self.render_sidebar(cx))
+            .child(
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .child(header)
+                    .child({
+                        let probe = self.list_h.clone();
+                        v_flex()
+                            .relative()
+                            .flex_1()
+                            .min_h_0()
+                            .child(canvas(move |b, _, _| probe.set(f32::from(b.size.height)), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                            .children(folders)
+                            .child(div().flex_1().min_h_0().child(content))
+                    }),
+            )
+            // Live documents/69: the icon strip, then the open panel.
+            .child(strip)
+            .children(panel)
+            .size_full()
+            .into_any_element()
+    }
+}
+
 impl Render for StartView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
@@ -2755,14 +2805,15 @@ impl Render for StartView {
             self.placeholder = placeholder.clone();
             self.search.update(cx, |s, cx| s.set_placeholder(placeholder, window, cx));
         }
-        let docs = self.visible();
-        let header = self.render_header(cx);
-        // Searching hides the folder area, except an advanced search for folders.
-        let folders = if self.query.trim().is_empty() && self.adv_query.as_ref().is_none_or(|q| q.folders_only()) { self.render_folders(cx) } else { None };
-        let strip = self.render_strip(cx);
         self.ensure_props(window, cx);
-        let panel = self.render_doc_panel(cx);
-        let content = self.render_list(&docs, cx);
+        let body = match &self.body {
+            Some(b) => b.clone(),
+            None => {
+                let b = crate::cached_slice::Slice::new(&cx.entity(), |this, _, cx| this.render_body(cx), cx);
+                self.body = Some(b.clone());
+                b
+            }
+        };
         v_flex()
             .size_full()
             .bg(pal.app_bg)
@@ -2812,33 +2863,7 @@ impl Render for StartView {
                 }),
             )
             .child(self.render_title_bar(cx))
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .items_start()
-                    .child(self.render_sidebar(cx))
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .child(header)
-                            .child({
-                                let probe = self.list_h.clone();
-                                v_flex()
-                                    .relative()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(canvas(move |b, _, _| probe.set(f32::from(b.size.height)), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-                                    .children(folders)
-                                    .child(div().flex_1().min_h_0().child(content))
-                            }),
-                    )
-                    // Live documents/69: the icon strip, then the open panel.
-                    .child(strip)
-                    .children(panel),
-            )
+            .child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
             .child(self.render_footer())
             // Advanced search: under the search box, left-aligned with it (live documents/110).
             .when(self.adv_open, |d| {
@@ -3152,7 +3177,7 @@ impl LabelPick {
                     })),
             );
         }
-        field = field.child(div().flex_1().min_w(px(120.)).child(Input::new(search).appearance(false).disabled(none).h(px(30.)).text_size(px(14.)).pl(px(8.))));
+        field = field.child(div().flex_1().min_w(px(120.)).child(os::input_h(Input::new(search).appearance(false).disabled(none), 30.).text_size(px(14.)).pl(px(8.))));
         let matches: Vec<String> = self.all.iter().filter(|l| !chosen.contains(l) && (query.is_empty() || l.to_lowercase().contains(&query))).cloned().collect();
         let mut col = v_flex().relative().child(field);
         if focused && !none {
@@ -3244,7 +3269,22 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
                 os::modal_body()
                     .pt(px(0.))
                     .child(os::field_label(label))
-                    .child(Input::new(&state).h(px(32.)).text_size(px(14.)))
+                    // Live (dom/documents, inputs/5_New_document_modal_documentName):
+                    // Bootstrap `form-control`, 34 px, radius 3, 1 px `#aaa`; focused
+                    // a 2 px `#3e94ff` border (no glow) with the text kept 11 px in.
+                    .child({
+                        let focused = state.focus_handle(cx).is_focused(window);
+                        gpui_kit::base::input::input_frame(
+                            div()
+                                .h(px(34.))
+                                .flex()
+                                .items_center()
+                                .rounded(px(3.))
+                                .bg(rgb(0xffffff))
+                                .map(|d| if focused { d.border_2().border_color(rgb(0x3e94ff)).pl(px(9.)).pr(px(14.)) } else { d.border_1().border_color(rgb(0xaaaaaa)).pl(px(10.)).pr(px(15.)) })
+                                .child(Input::new(&state).appearance(false).text_size(px(14.)).px(px(0.))),
+                        )
+                    })
                     .when_some(hint.clone(), |d, h| d.child(div().text_size(px(12.)).text_color(p().text_muted).child(h)))
                     .when_some(labels.clone().zip(label_search.clone()), |d, (l, st)| d.child(div().pt(px(6.)).child(os::field_label("Document labels"))).child(l.render(&st, window, cx)))
                     .when_some(location.clone(), |d, loc| d.child(div().pt(px(6.)).child(os::field_label(loc.0))).child(loc.1.render())),

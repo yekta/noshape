@@ -189,7 +189,11 @@ impl ButtonVariant {
 #[derive(IntoElement)]
 pub struct Button {
     id: ElementId,
-    base: gpui_base::Button,
+    // NOSHAPE PATCH (agent qa4): the base control, the content style and the
+    // loading icon are boxed. Unboxed, a `Button` is ~7 KB and every builder
+    // call moves it (`.tooltip(..)`, `.on_click(..)`, `into_any_element`):
+    // tens of KB of memmove per button, ~1 ms a frame for a toolbar.
+    base: Box<gpui_base::Button>,
     icon: Option<ButtonIcon>,
     label: Option<SharedString>,
     /// The announced name, when the visible content is not it.
@@ -212,7 +216,7 @@ pub struct Button {
     hover_group: Option<SharedString>,
     hover_group_held: bool,
     size: Size,
-    content_style: StyleRefinement,
+    content_style: Box<StyleRefinement>,
     icon_size: Option<Size>,
     compact: bool,
     tooltip: Option<(
@@ -225,7 +229,7 @@ pub struct Button {
     on_click: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
     on_hover: Option<Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
     loading: bool,
-    loading_icon: Option<Icon>,
+    loading_icon: Option<Box<Icon>>,
     focus_ring_enabled: bool,
 
     tab_index: isize,
@@ -244,7 +248,7 @@ impl Button {
 
         Self {
             id: id.clone(),
-            base: gpui_base::Button::new(id),
+            base: Box::new(gpui_base::Button::new(id)),
             icon: None,
             label: None,
             accessibility_label: None,
@@ -264,7 +268,7 @@ impl Button {
             },
             border_edges: Edges::all(true),
             size: Size::Medium,
-            content_style: StyleRefinement::default(),
+            content_style: Box::default(),
             icon_size: None,
             tooltip: None,
             tooltip_placement: None,
@@ -287,7 +291,7 @@ impl Button {
 
     /// Uses a behavior primitive supplied by a compound Base control.
     pub(crate) fn with_base(mut self, base: gpui_base::Button) -> Self {
-        self.base = base;
+        self.base = Box::new(base);
         self
     }
 
@@ -303,7 +307,7 @@ impl Button {
     /// Presentation supplied by a styled compound control. Standalone buttons
     /// retain their normal size-derived content style.
     pub(crate) fn content_style(mut self, style: StyleRefinement, icon_size: Size) -> Self {
-        self.content_style = style;
+        self.content_style = Box::new(style);
         self.icon_size = Some(icon_size);
         self
     }
@@ -377,7 +381,7 @@ impl Button {
 
     /// Set the developer-assigned identifier exposed to accessibility clients.
     pub fn accessibility_id(mut self, id: impl Into<SharedString>) -> Self {
-        self.base = self.base.accessibility_id(id);
+        self.base = Box::new(self.base.accessibility_id(id));
         self
     }
 
@@ -472,7 +476,7 @@ impl Button {
     ///
     /// Default is a spinner icon.
     pub fn loading_icon(mut self, icon: impl Into<Icon>) -> Self {
-        self.loading_icon = Some(icon.into());
+        self.loading_icon = Some(Box::new(icon.into()));
         self
     }
 
@@ -617,7 +621,7 @@ impl RenderOnce for Button {
         let tooltip_show_delay = self.tooltip_show_delay;
         let hover_group = self.hover_group;
         let hover_group_held = self.hover_group_held;
-        let mut base = self.base;
+        let mut base = *self.base;
         let children = self.children;
         let instance_style = base.style().clone();
         let normal_style = style.normal(self.outline, cx);
@@ -773,7 +777,7 @@ impl RenderOnce for Button {
             .refine_style(&self.content_style)
             .when_some(self.icon, |this, icon| {
                 this.child(
-                    icon.loading_icon(self.loading_icon)
+                    icon.loading_icon(self.loading_icon.map(|i| *i))
                         .loading(self.loading)
                         .with_size(icon_size),
                 )

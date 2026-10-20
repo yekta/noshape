@@ -17,9 +17,12 @@ use gpui_kit::*;
 /// Renders a part of `V`.
 pub type SliceRender<V> = fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement;
 
+/// [`SliceRender`] as a shared closure (it may capture, e.g. a row's key).
+type SliceRenderFn<V> = Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement>;
+
 pub struct Slice<V: 'static> {
     parent: WeakEntity<V>,
-    render: Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement>,
+    render: SliceRenderFn<V>,
     subs: Vec<Subscription>,
 }
 

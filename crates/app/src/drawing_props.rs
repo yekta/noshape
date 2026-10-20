@@ -61,11 +61,22 @@ fn orientation_name(o: ViewOrientation) -> &'static str {
     ORIENTATIONS.iter().find(|(x, _)| *x == o).map(|(_, n)| *n).unwrap_or("Front")
 }
 
+/// A base view back on a standard orientation (no named view; a sketch
+/// view keeps facing its sketch).
+fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
+    if let ViewKind::Base { orientation, .. } = &mut v.kind {
+        *orientation = o;
+    }
+    if v.named_view.take().is_some() || v.sketch.is_none() {
+        v.custom_frame = None;
+    }
+}
+
 /// Default view name: the orientation of a base view or the standard
 /// orientation a projected view shows ("Right"), else the view type.
 pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
     match &v.kind {
-        ViewKind::Base { orientation, .. } => orientation_name(*orientation).to_string(),
+        ViewKind::Base { orientation, .. } => v.named_view.clone().unwrap_or_else(|| orientation_name(*orientation).to_string()),
         ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, v.id).map(|o| orientation_name(o).to_string()).unwrap_or_else(|| "Projected view".into()),
         ViewKind::Auxiliary { .. } => "Auxiliary view".into(),
         ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => format!("Section {label}-{label}"),
@@ -85,6 +96,8 @@ type PropsAct = std::rc::Rc<dyn Fn(&mut ViewProps)>;
 pub struct ViewProps {
     pub view: ViewId,
     orientation: Option<ViewOrientation>,
+    /// View orientation › a named view of the source.
+    named: Option<String>,
     /// None: parent (or sheet) scale.
     scale: Option<f64>,
     scale_input: Entity<InputState>,
@@ -168,22 +181,39 @@ impl DrawingEditor {
         }
         out.push(MenuEntry::Submenu("Show/hide".into(), show));
         // View orientation ▸ (base views; the current one is checked).
-        if let ViewKind::Base { orientation, .. } = &v.kind {
-            let cur = *orientation;
-            let entries = ORIENTATIONS
+        if let ViewKind::Base { orientation, source, .. } = &v.kind {
+            let (cur, source) = (*orientation, *source);
+            let cur_named = v.named_view.clone();
+            let mut entries: Vec<MenuEntry> = ORIENTATIONS
                 .iter()
                 .map(|&(o, name)| {
-                    MenuEntry::check(name, o == cur, move |t, _, cx| {
-                        if o != cur {
-                            t.edit_view("View orientation", id, cx, |v| {
-                                if let ViewKind::Base { orientation, .. } = &mut v.kind {
-                                    *orientation = o;
-                                }
-                            })
+                    let same = o == cur && cur_named.is_none();
+                    MenuEntry::check(name, same, move |t, _, cx| {
+                        if !same {
+                            t.edit_view("View orientation", id, cx, |v| set_standard_orientation(v, o))
                         }
                     })
                 })
                 .collect();
+            // The source's named views; a deleted one stays listed, grayed (help H:views).
+            let doc = &self.doc.read(cx).session.doc;
+            let named = crate::drawing_insert::named_views(doc, source);
+            for nv in named {
+                let (name, frame) = (nv.name.clone(), views::named_view_frame(nv));
+                let same = cur_named.as_ref() == Some(&nv.name);
+                entries.push(MenuEntry::check(nv.name.clone(), same, move |t, _, cx| {
+                    if !same {
+                        let name = name.clone();
+                        t.edit_view("View orientation", id, cx, move |v| {
+                            v.custom_frame = Some(frame);
+                            v.named_view = Some(name);
+                        })
+                    }
+                }));
+            }
+            if let Some(n) = cur_named.filter(|n| !named.iter().any(|v| &v.name == n)) {
+                entries.push(MenuEntry::check(n, true, |_, _, _| {}).disabled(true));
+            }
             out.push(MenuEntry::Submenu("View orientation".into(), entries));
         }
         // Tangent edges ▸ Hidden / Solid / Phantom.
@@ -434,6 +464,7 @@ impl DrawingEditor {
                 ViewKind::Base { orientation, .. } => Some(*orientation),
                 _ => None,
             },
+            named: v.named_view.clone(),
             scale: v.scale,
             scale_input: input(scale_text, window, cx),
             rotation: input(format!("{}", (deg * 1000.0).round() / 1000.0), window, cx),
@@ -468,6 +499,7 @@ impl DrawingEditor {
         let name = p.name.read(cx).value().trim().to_string();
         let label = p.label.read(cx).value().trim().to_string();
         let (view_label, scale_label, tangent, orientation) = (p.view_label, p.scale_label, p.tangent, p.orientation);
+        let named = p.named.clone();
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
         let Some(old) = self.current_sheet().view(id).cloned() else { return };
         let default_name = default_view_name(&self.drawing, self.current_sheet(), &old);
@@ -493,8 +525,19 @@ impl DrawingEditor {
                 }
                 _ => v.label = (view_label && !label.is_empty()).then_some(label).or_else(|| view_label.then(|| v.name.clone().unwrap_or(default_name.clone()).to_uppercase())),
             }
-            if let (ViewKind::Base { orientation: o, .. }, Some(n)) = (&mut v.kind, orientation) {
-                *o = n;
+            if let (ViewKind::Base { orientation: o, source, .. }, Some(n)) = (&mut v.kind, orientation) {
+                let source = *source;
+                if named != old.named_view {
+                    match named.as_ref().and_then(|name| crate::drawing_insert::named_view_frame(&self.doc.read(cx).session.doc, source, name)) {
+                        Some(frame) => {
+                            v.custom_frame = Some(frame);
+                            v.named_view = named;
+                        }
+                        None => set_standard_orientation(v, n),
+                    }
+                } else if *o != n {
+                    set_standard_orientation(v, n);
+                }
             }
         }
         if p.sheet != self.sheet {
@@ -598,14 +641,26 @@ impl DrawingEditor {
         ];
         // View orientation (base views choose it; derived views show theirs).
         if let Some(cur) = props.orientation {
-            let items = ORIENTATIONS
+            let cur_named = props.named.clone();
+            let mut items: Vec<(String, bool, PropsAct)> = ORIENTATIONS
                 .iter()
                 .map(|&(o, n)| {
-                    let f: PropsAct = std::rc::Rc::new(move |p| p.orientation = Some(o));
-                    (n.to_string(), o == cur, f)
+                    let f: PropsAct = std::rc::Rc::new(move |p| {
+                        p.orientation = Some(o);
+                        p.named = None;
+                    });
+                    (n.to_string(), cur_named.is_none() && o == cur, f)
                 })
                 .collect();
-            rows.push(row("View orientation", select("vp-orient", orientation_name(cur).into(), items, true)));
+            if let ViewKind::Base { source, .. } = &v.kind {
+                for nv in crate::drawing_insert::named_views(&self.doc.read(cx).session.doc, *source) {
+                    let name = nv.name.clone();
+                    let f: PropsAct = std::rc::Rc::new(move |p| p.named = Some(name.clone()));
+                    items.push((nv.name.clone(), cur_named.as_ref() == Some(&nv.name), f));
+                }
+            }
+            let label = cur_named.unwrap_or_else(|| orientation_name(cur).into());
+            rows.push(row("View orientation", select("vp-orient", label, items, true)));
         } else {
             rows.push(row("View orientation", value(default_view_name(&self.drawing, sheet, &v))));
         }

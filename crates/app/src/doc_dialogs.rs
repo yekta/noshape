@@ -26,7 +26,7 @@ fn name_modal(title: &'static str, ok: &'static str, name: String, description: 
             .child(
                 os::modal_body()
                     .child(os::field_label("Name"))
-                    .child(Input::new(&name_st).h(px(32.)).text_size(px(14.)))
+                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
                     .when_some(desc_st.clone(), |b, d| b.child(os::field_label("Description")).child(Textarea::new(&d).h(px(96.)).text_size(px(14.)))),
             )
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", ok))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
@@ -87,7 +87,7 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
             .child(
                 os::modal_body()
                     .child(os::field_label("Name"))
-                    .child(Input::new(&name_st).h(px(32.)).text_size(px(14.)))
+                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
                     .child(os::field_label("Description"))
                     .child(Textarea::new(&desc_st).h(px(96.)).text_size(px(14.)))
                     .child(v_flex().pt(px(6.)).child(os::field_label("Owner")).child(div().text_size(px(13.33)).child("me")))
@@ -358,7 +358,9 @@ pub enum WorkspaceUnitsEvent {
 impl EventEmitter<WorkspaceUnitsEvent> for WorkspaceUnits {}
 
 /// Display decimals options ("0", "0.1", … "0.12345678").
-const DECIMALS: [&str; 9] = ["0", "0.1", "0.12", "0.123", "0.1234", "0.12345", "0.123456", "0.1234567", "0.12345678"];
+pub(crate) const DECIMALS: [&str; 9] = ["0", "0.1", "0.12", "0.123", "0.1234", "0.12345", "0.123456", "0.1234567", "0.12345678"];
+/// How many [`DECIMALS`] options each of `OTHER_UNITS` offers (live).
+pub(crate) const OTHER_DECIMALS: [usize; 9] = [7, 7, 8, 9, 9, 9, 8, 9, 9];
 
 impl WorkspaceUnits {
     pub fn new(doc: Entity<DocModel>, cx: &mut Context<Self>) -> Self {
@@ -434,25 +436,30 @@ impl WorkspaceUnits {
 
 impl Render for WorkspaceUnits {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        use noshape_units::{AngleUnit, LengthUnit, OTHER_UNITS};
+        use noshape_units::{AngleUnit, LENGTH_UNITS_SHOWN, OTHER_UNITS, OTHER_UNITS_SHOWN};
         let pal = p();
         let d = self.draft;
-        let dec = |cur: u8| (DECIMALS.iter().map(|s| s.to_string()).collect::<Vec<_>>(), cur as usize);
+        // Live: each quantity has its own Display decimals list (Length 6
+        // options, Linear acceleration / Angle / Angular velocity 7, Mass and
+        // Moment 8, the rest 9).
+        let dec = |cur: u8, n: usize| (DECIMALS[..n].iter().map(|s| s.to_string()).collect::<Vec<_>>(), (cur as usize).min(n - 1));
         let mut groups: [Vec<AnyElement>; 3] = [Vec::new(), Vec::new(), Vec::new()];
-        // Length and angle (the units expressions use).
-        let lu = LengthUnit::ALL.iter().position(|u| *u == d.length).unwrap_or(0);
-        let (dl, dc) = dec(d.length_precision);
-        let unit = self.select("wu-length".into(), 210., LengthUnit::ALL.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LengthUnit::ALL[i], cx);
+        // Length and angle (the units expressions use), in Onshape's lists.
+        let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
+        let (dl, dc) = dec(d.length_precision, 6);
+        let unit = self.select("wu-length".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
         let decimals = self.select("wu-length-dec".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
         groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));
         let au = AngleUnit::ALL.iter().position(|u| *u == d.angle).unwrap_or(0);
-        let (al, ac) = dec(d.angle_precision);
+        let (al, ac) = dec(d.angle_precision, 7);
         let unit = self.select("wu-angle".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
         let decimals = self.select("wu-angle-dec".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
         groups[1].push(self.row("wu-row-angle", "Angle default unit".into(), unit, decimals));
         for (k, (label, group, names, _, _)) in OTHER_UNITS.iter().enumerate() {
-            let (dl, dc) = dec(d.other[k].1);
-            let unit = self.select(SharedString::from(format!("wu-{k}")), 210., names.iter().map(|s| s.to_string()).collect(), d.other[k].0 as usize, move |p, i| p.other[k].0 = i as u8, cx);
+            let (dl, dc) = dec(d.other[k].1, OTHER_DECIMALS[k]);
+            let shown = OTHER_UNITS_SHOWN[k];
+            let at = shown.iter().position(|&i| i == d.other[k].0).unwrap_or(0);
+            let unit = self.select(SharedString::from(format!("wu-{k}")), 210., shown.iter().map(|&i| names[i as usize].to_string()).collect(), at, move |p, i| p.other[k].0 = shown[i], cx);
             let decimals = self.select(SharedString::from(format!("wu-{k}-dec")), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
             let key: &'static str = ["wu-r0", "wu-r1", "wu-r2", "wu-r3", "wu-r4", "wu-r5", "wu-r6", "wu-r7", "wu-r8"][k];
             groups[*group as usize].push(self.row(key, format!("{label} default unit"), unit, decimals));

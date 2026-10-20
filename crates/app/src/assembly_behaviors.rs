@@ -161,7 +161,7 @@ pub(crate) struct AsmUi {
     pub insert_composites: bool,
     /// The user's toolbar (Customize toolbar…) and the open customize mode.
     pub tb_prefs: super::toolbar::AsmToolbarPrefs,
-    pub tb_custom: Option<super::toolbar::TbCustom>,
+    pub tb_custom: Option<crate::toolbar_customize::Customize>,
     /// The open Dynamic suppression dialog (instance, "Unsuppressed if").
     pub dynamic_suppression: Option<(super::props::DynTarget, Entity<InputState>, Subscription)>,
     /// Show instance list properties (state pills after the names).
@@ -215,6 +215,11 @@ pub(crate) struct AsmUi {
     /// has the window to re-evaluate).
     pub preview_done: bool,
     pub insert_source: u8,
+    /// Replace picker's Flat patterns filter (live 840).
+    pub insert_flat: bool,
+    /// Re-evaluate at the next render (a change with no Window at hand,
+    /// e.g. the Replace instance preview).
+    pub eval_requested: bool,
     pub insert_tab: u8,
     /// Part Studios tab type filters (Onshape's filter icons): show parts,
     /// show surfaces (both off: everything).
@@ -274,6 +279,8 @@ pub(crate) struct AsmUi {
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
     /// Mass and section properties dialog.
     pub mass: Option<super::mass::AsmMassUi>,
+    /// The Isolate slider being dragged (pressed on it, button still down).
+    pub iso_slider_drag: Option<&'static str>,
     /// Where panel dialogs were moved by their title.
     pub panels: crate::ui::PanelOffsets,
     /// Insert dialog: configuration list selects per (Part Studio, input).
@@ -434,13 +441,9 @@ impl AssemblyView {
         true
     }
 
-    /// Onshape's Isolate / Make transparent dialog (live assembly/61,
-    /// dom/dialog-assembly-isolate.txt): 220 px, title + ✕; "Transparency
-    /// controls" (☐ Select transparent geometry, transparency slider "Show/
-    /// hide internal geometry"), "Component controls" (Expand: connectivity
-    /// / distance select, slider "Expand isolate by mate connectivity").
+    /// Onshape's Isolate / Make transparent dialog (`isolate_ui`); here the
+    /// Expand select offers connectivity (by mates) and distance.
     pub(super) fn render_isolate_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
         let title = if self.isolate.is_some() {
             "Isolate"
         } else if self.ui.transparent.is_some() {
@@ -456,86 +459,44 @@ impl AssemblyView {
             };
             self.assembly(cx).map(|a| analysis::isolate_expansion(&self.result, a, &seeds, connectivity).len()).unwrap_or(0)
         };
-        let alpha = self.ui.transparency.unwrap_or(if title == "Isolate" { ISO_ALPHA_MIN } else { 0.35 });
-        let t_alpha = ((alpha - ISO_ALPHA_MIN) / (ISO_ALPHA_MAX - ISO_ALPHA_MIN)).clamp(0.0, 1.0);
-        let t_expand = if max_steps == 0 { 0.0 } else { steps as f32 / max_steps as f32 };
-        let section = |t: &'static str| div().pl(px(3.)).h(px(15.)).mt(px(10.)).mb(px(10.)).text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x666666)).child(t);
-        let select_t = self.ui.select_transparent;
-        Some(
-            v_flex()
-                .id("asm-isolate-dialog")
-                .occlude()
-                .w(px(220.))
-                .bg(with_alpha(rgb(0xffffff), 0.95))
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-                .text_color(pal.text)
-                .child(
-                    h_flex()
-                        .h(px(29.))
-                        .border_b_1()
-                        .border_color(rgb(0xd7d7d7))
-                        .child(crate::ui::panel_title("asm-isolate", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
-                        .child(
-                            div()
-                                .id("asm-iso-close")
-                                .size(px(28.))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .opacity(0.5)
-                                .child(Icon::new(IconName::Close).size(px(14.)))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.exit_isolate(cx);
-                                })),
-                        ),
-                )
-                .child(section("Transparency controls"))
-                .child(
-                    crate::os_ui::checkbox("asm-iso-select-transparent", "Select transparent geometry", select_t)
-                        .tooltip(crate::ui::tooltip("Enable selection of parts, faces, and edges from transparent bodies"))
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.ui.select_transparent = !this.ui.select_transparent;
-                            // Pickability changes: the pick buffer must be redrawn.
-                            this.rebuild_scene(true, cx);
-                            cx.notify();
-                        })),
-                )
-                .child(div().mt(px(6.)).child(iso_slider("asm-iso-transparency", t_alpha, "Show/hide internal geometry", cx, |this, f, cx| {
-                    this.ui.transparency = Some(ISO_ALPHA_MIN + f * (ISO_ALPHA_MAX - ISO_ALPHA_MIN));
-                    this.rebuild_scene(false, cx);
+        let alpha = self.ui.transparency.unwrap_or(if title == "Isolate" { crate::isolate_ui::ALPHA_MIN } else { 0.35 });
+        let view = cx.entity();
+        Some(crate::isolate_ui::dialog(
+            crate::isolate_ui::IsoDialog {
+                key: "asm-isolate",
+                title,
+                select_transparent: self.ui.select_transparent,
+                transparency: crate::isolate_ui::alpha_t(alpha),
+                expand: if max_steps == 0 { 0.0 } else { steps as f32 / max_steps as f32 },
+                expand_options: vec!["Expand: connectivity".to_string(), "Expand: distance".to_string()],
+                expand_ix: if connectivity { 0 } else { 1 },
+                expand_tip: if connectivity { "Expand isolate by mate connectivity" } else { "Expand isolate by distance" },
+                drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
+                close: |v: &mut Self, _, cx| {
+                    v.exit_isolate(cx);
+                },
+                toggle_select: |v: &mut Self, _, cx| {
+                    v.ui.select_transparent = !v.ui.select_transparent;
+                    // Pickability changes: the pick buffer must be redrawn.
+                    v.rebuild_scene(true, cx);
                     cx.notify();
-                })))
-                .child(section("Component controls"))
-                .child(
-                    crate::os_ui::select_field("asm-iso-type", vec!["Expand: connectivity".into(), "Expand: distance".into()], if connectivity { 0 } else { 1 }, {
-                        let v = cx.entity();
-                        move |i, _, cx| v.update(cx, |this, cx| this.set_iso_expand(Some(i == 0), 0, cx))
-                    })
-                    .h(px(26.))
-                    .w(px(194.))
-                    .pl(px(6.))
-                    .rounded(px(0.))
-                    .border_0()
-                    .border_b_1()
-                    .border_color(rgb(0xd7d7d7))
-                    .text_size(px(13.33)),
-                )
-                .child(
-                    h_flex()
-                        .mt(px(5.))
-                        .mb(px(5.))
-                        .child(div().flex_1().child(iso_slider("asm-iso-expand", t_expand, if connectivity { "Expand isolate by mate connectivity" } else { "Expand isolate by distance" }, cx, move |this, f, cx| {
-                            let want = (f * max_steps as f32).round() as i32;
-                            let have = this.ui.iso_expand.as_ref().map(|e| e.1).unwrap_or(0) as i32;
-                            if want != have {
-                                this.set_iso_expand(None, want - have, cx);
-                            }
-                        })))
-                        .child(div().mr(px(4.)).size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
-                )
-                .into_any_element(),
-        )
+                },
+                set_transparency: std::rc::Rc::new(|v: &mut Self, f, _, cx| {
+                    v.ui.transparency = Some(crate::isolate_ui::t_alpha(f));
+                    v.rebuild_scene(false, cx);
+                    cx.notify();
+                }),
+                set_expand: std::rc::Rc::new(move |v: &mut Self, f, _, cx| {
+                    let want = (f * max_steps as f32).round() as i32;
+                    let have = v.ui.iso_expand.as_ref().map(|e| e.1).unwrap_or(0) as i32;
+                    if want != have {
+                        v.set_iso_expand(None, want - have, cx);
+                    }
+                }),
+                pick_expand: std::rc::Rc::new(move |i, _, cx| view.update(cx, |this, cx| this.set_iso_expand(Some(i == 0), 0, cx))),
+            },
+            cx,
+        ))
     }
 
     /// A click in the graphics area leaves text fields (like Onshape): the
@@ -1959,8 +1920,11 @@ impl AssemblyView {
         let st = cx.new(|cx| InputState::new(window, cx));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
+                // No `cx.notify()`: the field's own notification re-renders
+                // the view (its ancestor) and the list head; of the cached
+                // slices only the rows show the filter.
                 this.ui.filter = ListFilter::parse(&st.read(cx).value());
-                cx.notify();
+                this.filter_rows_changed(cx);
             }
         });
         self.ui.filter_input = Some(st);
@@ -3772,50 +3736,6 @@ impl AssemblyView {
         let p = vp.project(*at)?;
         Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&icon_path("com-indicator"), 18., cx)).into_any_element())
     }
-}
-
-/// Transparency of the dimmed instances at the slider's ends.
-const ISO_ALPHA_MIN: f32 = 0.12;
-const ISO_ALPHA_MAX: f32 = 0.9;
-
-/// Onshape's noUi slider in the Isolate dialog: a 183 px track (2 px inset
-/// `#777` outline, radius 6) with an 11 px round white handle; click or drag
-/// sets the fraction.
-fn iso_slider(id: &'static str, t: f32, tip: &'static str, cx: &mut Context<AssemblyView>, set: impl Fn(&mut AssemblyView, f32, &mut Context<AssemblyView>) + 'static) -> AnyElement {
-    let track: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
-    let (t1, t2, t3) = (track.clone(), track.clone(), track);
-    let set = Rc::new(set);
-    let s2 = set.clone();
-    let frac = |x: Pixels, b: Bounds<Pixels>| (f32::from(x - b.left()) / f32::from(b.size.width).max(1.0)).clamp(0.0, 1.0);
-    div()
-        .id(id)
-        .relative()
-        .h(px(15.))
-        .mx(px(11.))
-        .cursor_pointer()
-        .tooltip(crate::ui::tooltip(tip))
-        .child(div().absolute().left_0().right_0().top(px(4.)).h(px(7.)).rounded(px(6.)).border_2().border_color(rgb(0x777777)))
-        .child(
-            div()
-                .absolute()
-                .top(px(2.))
-                .left(relative(t))
-                .ml(px(-6.))
-                .size(px(11.))
-                .rounded_full()
-                .bg(rgb(0xffffff))
-                .border_1()
-                .border_color(rgb(0x888888))
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]),
-        )
-        .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-        .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| set(this, frac(e.position.x, t2.get()), cx)))
-        .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-            if e.pressed_button == Some(MouseButton::Left) {
-                s2(this, frac(e.position.x, t3.get()), cx);
-            }
-        }))
-        .into_any_element()
 }
 
 #[cfg(test)]
