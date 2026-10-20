@@ -517,15 +517,15 @@ impl DrawingEditor {
             h_flex()
                 .gap(px(3.))
                 .pt(px(3.))
-                .child(menu("dp-fit-type", small(fo.fit_type.name().into()), 104., type_items))
-                .child(menu("dp-fit-hole", small(or_none(&hole_class)), 64., hole_items))
-                .child(menu("dp-fit-shaft", small(or_none(&shaft_class)), 64., shaft_items))
+                .child(menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items))
+                .child(menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items))
+                .child(menu("dp-fit-shaft", small(or_none(&shaft_class)), 58., shaft_items))
                 .child(menu("dp-fit-std", small(match fo.iso {
                     None => format!("{standard} (Drawing)"),
                     Some(_) => standard.to_string(),
                 }), 110., std_items))
                 .when(fo.mode != FitMode::Fit, |e| e.child(menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items)))
-                .child(menu("dp-fit-stack", small("H7/g6".into()), 60., stack_items))
+                .child(menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items))
                 .into_any_element()
         };
         let tol_row = h_flex()

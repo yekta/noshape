@@ -833,6 +833,7 @@ impl Viewport {
         // size changed.
         let shown = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
         if self.image.is_none() && shown.is_some() && shown == self.rendered {
+            noshape_render::perf::record_ms("v.present_only_count", 1.0);
             window.request_present();
         } else {
             cx.notify();
@@ -1592,6 +1593,7 @@ impl Render for Viewport {
         let image = self.image.clone();
         let texture_id = self.texture_id;
         self.rendered = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
+        noshape_render::perf::record_ms("v.render_count", 1.0);
         self.sync_cursor(window, cx);
         div()
             .id("viewport")

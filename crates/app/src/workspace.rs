@@ -39,6 +39,8 @@ pub struct Workspace {
     active: Option<TabId>,
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
+    /// Cached chrome (navbar, rail, tab bar): see `cached_slice`.
+    slices: Option<WsSlices>,
     /// The navbar logo (Onshape's documents link) as a Tab stop: where Tab
     /// past a feature dialog's last control lands (live psb 10-19 h).
     logo_focus: FocusHandle,
@@ -111,7 +113,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -1179,6 +1181,37 @@ fn kind_of(c: &TabContent) -> &'static str {
     }
 }
 
+/// The workspace's cached chrome (see `crate::cached_slice`).
+#[derive(Clone)]
+struct WsSlices {
+    title: Entity<crate::cached_slice::Slice<Workspace>>,
+    rail: Entity<crate::cached_slice::Slice<Workspace>>,
+    tabs: Entity<crate::cached_slice::Slice<Workspace>>,
+}
+
+impl Workspace {
+    fn ws_slices(&mut self, cx: &mut Context<Self>) -> WsSlices {
+        if let Some(s) = &self.slices {
+            return s.clone();
+        }
+        use crate::cached_slice::Slice;
+        let me = cx.entity();
+        let title = Slice::new(&me, |this, _, cx| this.render_title_bar(cx), cx);
+        let rail = Slice::new(&me, |this, _, cx| {
+            let (tab_list, _) = this.render_tab_bar(cx);
+            this.render_rail(tab_list, cx)
+        }, cx);
+        let tabs = Slice::new(&me, |this, _, cx| this.render_tab_bar(cx).1, cx);
+        // They show the document (name, tabs, versions).
+        for s in [&title, &rail, &tabs] {
+            Slice::observing(s, &self.doc, cx);
+        }
+        let s = WsSlices { title, rail, tabs };
+        self.slices = Some(s.clone());
+        s
+    }
+}
+
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
@@ -1186,9 +1219,12 @@ impl Render for Workspace {
         let count = self.selection_cursor_count(cx);
         let want = (self.navbar_hovered && count > 0 && _window.hovered_cursor_style().is_none()).then(|| crate::cursor::AppCursor::count(count));
         crate::cursor::CursorSync::sync(self, want, _window, cx, |w| &mut w.cursor_sync);
-        let title = self.render_title_bar(cx);
-        let (tab_list, tabs) = self.render_tab_bar(cx);
-        let rail = self.render_rail(tab_list, cx);
+        // The navbar, rail and tab bar are cached: a keystroke or a caret blink
+        // in a tab re-renders the workspace but reuses them.
+        let ws = self.ws_slices(cx);
+        let title = ws.title.cached(StyleRefinement::default().w_full().h(px(crate::ui::NAVBAR_H)).flex_none());
+        let rail = ws.rail.cached(StyleRefinement::default().w(px(crate::ui::RAIL_W)).h_full().flex_none());
+        let tabs = ws.tabs.cached(StyleRefinement::default().w_full().h(px(crate::ui::TAB_BAR_H)).flex_none());
         if let Some((DocPanel::Performance(panel), _)) = &self.doc_panel {
             let snap = self.perf_snapshot(cx);
             panel.update(cx, |p, cx| p.set_snapshot(snap, cx));

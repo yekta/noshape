@@ -776,6 +776,18 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   FS notices, history search and the Variable Studio add row. Crops before/after at scale 1 and 2
   (:113, GPUI_X11_SCALE_FACTOR=2): /tmp/ui-shots/final-caret-1x.png, final-caret-2x.png
   (/tmp/ui-tools/caretcrops.sh, caretsheet.py).
+- **Text insets checked against Onshape** (live dom/caret-inputs.json: computed padding/border and the
+  caret's x; ours read back at scale 1 and 2, caret column minus the box's left border, logical px):
+  Part Studio filter 6 / 6 (border 1 + padding 5; ours box border 1 + px 1 + `pl(4)`); Variable table
+  Name cell 7 / 7 (cell padding 0, input padding 6; ours `pl(4)` after the cell's `px(2)`); Variable
+  Studio cell 6.5 / 7 (Onshape's table sits on a half pixel); documents search 13 / 13 (border 2 +
+  padding 11; ours `pl(12)`); feature-dialog values (`.os-param-number/-text`, padding 3 at the sides):
+  number text ends 3 / 3 px from the right edge, the right-aligned caret 1 px further in than Chrome's
+  (the kit keeps it inside the text bounds). Caret width 1 px like Chrome (NOSHAPE PATCH
+  `CURSOR_WIDTH`). Open: Onshape's input text is 13.33 px (ours 14 in the filter / Variable Studio) and
+  its placeholder #666 weight 300 (we ship no light Roboto; ours #999 regular).
+- Scripts now live in /root/ui-scratch/tools (caretcrops.sh, caretnum.py, caretsheet.py, start.sh,
+  start2x.sh, build.sh, retry.sh); /tmp is wiped on reboot.
 - **Tab bar scroll buttons** (workspace.rs `render_tab_scroll_buttons`, `scroll_tabs`): ‹ › 24x30 at
   the right end only on overflow, dimmed at the ends, a press scrolls a page, a right press to the
   first/last tab, tooltips as live; the active tab scrolls into view on activation and when the Tab

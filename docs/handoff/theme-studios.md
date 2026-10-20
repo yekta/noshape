@@ -167,7 +167,12 @@ Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side
 - Checked equal already: BOM panel, Exploded views list (closed state), Named positions empty table.
 - Dimension palette: waiting for asb's model support (lead forwarded).
 
-## PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
+## RESUMED (20 Oct ~17:30): the palette `combo` edit compiled and is checked in the app (fit row as
+live 466; fit-row widths trimmed to fit 405 px: 98/58/58/110/58, rebuild pending). From psb: the Variable
+Studio Value cell now runs `variable_table::with_workspace_unit` ("5" → "5 mm", checked in the app).
+Scratch now in /root/ui2-scratch (binary, `bin/shot.sh out.png [window]`, build.log); one app at a time.
+
+## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
 Not committed, in the shared tree (all mine, all complete edits; none half done):
 - `crates/app/src/variable_studio.rs`: Enter in the Name row focuses the next empty Name row
