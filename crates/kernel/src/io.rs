@@ -58,6 +58,17 @@ pub struct ImportedShape {
     pub name: Option<String>,
     /// Surface color (sRGB, 0..1), if present.
     pub color: Option<[f32; 3]>,
+    /// Colours of single faces (index into the shape's faces, sRGB 0..1)
+    /// where the file gives them; they override `color`.
+    pub face_colors: Vec<(usize, [f32; 3])>,
+}
+
+/// The face colours of shape `i` of an import.
+fn face_colors_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, [f32; 3])> {
+    (0..r.face_part.len())
+        .filter(|&k| r.face_part[k] as usize == i)
+        .map(|k| (r.face_index[k] as usize, [r.face_colors[3 * k], r.face_colors[3 * k + 1], r.face_colors[3 * k + 2]]))
+        .collect()
 }
 
 /// Read a STEP file. Assemblies are flattened into one entry per part
@@ -74,7 +85,7 @@ pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false))
                 .then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, face_colors: face_colors_of(&r, i) })
         })
         .collect()
 }
@@ -292,6 +303,72 @@ pub fn read_native_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedSh
     imported(ck(ffi::read_native_parts_ffi(path_str(path)?))?, unit)
 }
 
+/// Read a native part file in one of its configurations (a SOLIDWORKS
+/// configuration id, as an assembly's component names it).
+pub fn read_native_parts_configuration(path: &Path, unit: LengthUnit, configuration: Option<i32>) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_native_parts_config_ffi(path_str(path)?, configuration.unwrap_or(-1)))?, unit)
+}
+
+/// One component of a native assembly.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeComponent {
+    /// The parent sub-assembly (index into the list), `None` at the top.
+    pub parent: Option<usize>,
+    /// Component name ("Shaft") and instance number (Shaft-1).
+    pub name: String,
+    pub number: u32,
+    /// The referenced file's name ("Shaft.SLDPRT").
+    pub file: String,
+    pub configuration: String,
+    pub configuration_id: Option<i32>,
+    /// Placement in its parent, metres.
+    pub transform: glam::DMat4,
+    pub suppressed: bool,
+    pub hidden: bool,
+    pub excluded_from_bom: bool,
+    /// A sub-assembly (its components follow with `parent` = this).
+    pub assembly: bool,
+}
+
+/// The components of a SOLIDWORKS assembly (.sldasm) in its active
+/// configuration, as a flattened tree.
+pub fn read_native_assembly(path: &Path) -> Result<Vec<NativeComponent>> {
+    let nodes = ck(ffi::read_sldasm_tree_ffi(path_str(path)?))?;
+    Ok(nodes
+        .into_iter()
+        .map(|n| {
+            // Row-vector matrix (p' = p M): its rows are glam's columns.
+            let mut m = [0.0; 16];
+            m.iter_mut().zip(n.transform.iter()).for_each(|(a, b)| *a = *b);
+            let mut transform = glam::DMat4::from_cols_array(&m);
+            if transform.w_axis.w.abs() > 1e-12 && (transform.w_axis.w - 1.0).abs() > 1e-12 {
+                // The last element is a uniform scale.
+                let s = transform.w_axis.w;
+                transform = glam::DMat4::from_cols(transform.x_axis * s, transform.y_axis * s, transform.z_axis * s, glam::DVec4::new(transform.w_axis.x, transform.w_axis.y, transform.w_axis.z, 1.0));
+            }
+            NativeComponent {
+                parent: usize::try_from(n.parent).ok(),
+                name: n.name,
+                number: n.number.max(1) as u32,
+                file: n.file,
+                configuration: n.configuration,
+                configuration_id: (n.config_id >= 0).then_some(n.config_id),
+                transform,
+                suppressed: n.suppressed,
+                hidden: n.hidden,
+                excluded_from_bom: n.exclude_bom,
+                assembly: n.assembly,
+            }
+        })
+        .collect())
+}
+
+/// Extract a zip archive's top-level files into `dir`; returns every entry
+/// name (entries in folders are listed but not extracted).
+pub fn extract_zip(zip: &Path, dir: &Path) -> Result<Vec<String>> {
+    Ok(ck(ffi::extract_zip_ffi(path_str(zip)?, path_str(dir)?))?.into_iter().collect())
+}
+
 /// Shapes in metres with names and colours, in `unit`.
 fn imported(r: ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let f = 1e3 / unit.mm_per_unit();
@@ -301,7 +378,7 @@ fn imported(r: ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> 
         .map(|(i, s)| {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false)).then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, face_colors: face_colors_of(&r, i) })
         })
         .collect()
 }

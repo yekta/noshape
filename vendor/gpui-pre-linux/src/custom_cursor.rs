@@ -29,7 +29,7 @@ pub struct CustomCursor {
 thread_local! {
     static CURRENT: RefCell<Option<CustomCursor>> = const { RefCell::new(None) };
     /// A CSS standard cursor GPUI has no style for ("move", "zoom-in",
-    /// "no-drop", "wait", "help"), shown from the cursor-shape protocol or
+    /// "no-drop"), shown from the cursor-shape protocol or
     /// the cursor theme.
     static NAMED: RefCell<Option<&'static str>> = const { RefCell::new(None) };
     /// Re-applies the cursor in the Wayland client (registered by it).

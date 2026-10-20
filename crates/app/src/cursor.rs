@@ -132,16 +132,19 @@ fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
         // Drawing Centermark: the plus with a 7 px square at its center (a
         // hollow 3 px middle), white halo, arms to the edges (hot 7,7).
         AppCursor::CrosshairBox => Art {
-            svg: r##"<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15"><path d="M6 0H9V4H6ZM6 11H9V15H6ZM0 6H4V9H0ZM11 6H15V9H11ZM3 3H12V12H3ZM6 6V9H9V6Z" fill="#fff" fill-rule="evenodd"/><path d="M7.5 0V4M7.5 11V15M0 7.5H4M11 7.5H15" stroke="#000" stroke-width="1"/><rect x="4.5" y="4.5" width="6" height="6" fill="none" stroke="#000" stroke-width="1"/></svg>"##.into(),
+            svg: r##"<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15"><path d="M6 0H9V4H6ZM6 11H9V15H6ZM0 6H4V9H0ZM11 6H15V9H11ZM3 3H12V12H3ZM6 6V9H9V6Z" fill="#fff" fill-rule="evenodd"/><path d="M7 0H8V4H7ZM7 11H8V15H7ZM0 7H4V8H0ZM11 7H15V8H11ZM4 4H11V11H4ZM5 5V10H10V5Z" fill="#000" fill-rule="evenodd"/></svg>"##.into(),
             side: 15.,
             hot: (7., 7.),
         },
         // Arrow and a mouse whose left button is green with a white check
         // ("click to accept"), hot 1,1.
         AppCursor::Confirmation => {
-            let mouse = r##"<rect x="13.5" y="7.5" width="15" height="24" rx="7.5" fill="#fff" stroke="#000" stroke-width="1.3"/><path d="M21 7.5 A7.5 7.5 0 0 0 13.5 15 V17.5 H21 Z" fill="#0a8a2a" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/><path d="M15.3 12.4 L17.4 14.6 L20.2 10.6" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="20.2" y="11.5" width="1.6" height="5.5" rx="0.8" fill="#fff" stroke="#000" stroke-width="0.8"/><path d="M13.5 17.5 H28.5" stroke="#000" stroke-width="1"/>"##;
+            // Onshape's is 36x37: an 18 px arrow beside a 19x32 mouse.
+            let mouse = r##"<rect x="14.5" y="2.5" width="19" height="31.5" rx="9.5" fill="#fff" stroke="#000" stroke-width="1.3"/><path d="M24 2.5 A9.5 9.5 0 0 0 14.5 12 V15.5 H24 Z" fill="#0a8a2a" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/><path d="M16.6 9.2 L19 11.7 L22.3 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="23.1" y="7" width="1.8" height="6.5" rx="0.9" fill="#fff" stroke="#000" stroke-width="0.8"/><path d="M14.5 15.5 H33.5" stroke="#000" stroke-width="1"/>"##;
             let arrow = if windows { WIN_ARROW } else { MAC_ARROW };
-            Art { svg: wrap(32., &format!(r##"<g transform="translate({} {})">{arrow}</g>{mouse}"##, if windows { 0.0 } else { -2.0 }, if windows { -1.0 } else { -2.4 })), side: 32., hot: (1., 1.) }
+            // The arrow scaled to 18 px with its tip on the hot spot.
+            let tip = if windows { (1.5, 2.2) } else { (3.0, 3.4) };
+            Art { svg: wrap(37., &format!(r##"<g transform="translate(1 1) scale(1.3) translate({} {})">{arrow}</g>{mouse}"##, -tip.0, -tip.1)), side: 37., hot: (1., 1.) }
         }
         // Arrow and a minus sign.
         AppCursor::RemoveSelection => {

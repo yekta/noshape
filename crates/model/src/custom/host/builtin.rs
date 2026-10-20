@@ -28,6 +28,9 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opBodyDraft", |i, a| BuiltinOp { vectors: &[("pullDirection", "pullDirection")], ..BuiltinOp::new("bodyDraft", "BODY_DRAFT_FAILED") }.run(i, a, crate::regen::features::detail_a::body_draft)),
     ("opSplineThroughEdges", |i, a| BuiltinOp::new("fitSpline", "REGEN_ERROR").run(i, a, crate::regen::features::curves::fit_spline)),
     ("opRuledSurface", op_ruled_surface),
+    ("opCreateCurvesOnFace", op_create_curves_on_face),
+    ("opFullRoundFillet", |i, a| BuiltinOp::new("fillet", "REGEN_ERROR").run(i, a, crate::regen::features::detail::fillet)),
+    ("evRuledSurfaceBases", ev_ruled_surface_bases),
     ("opDropCurve", |i, a| {
         let op = BuiltinOp { renames: &[("dropTools", "tools")], vectors: &[("directionQuery", "direction")], ..BuiltinOp::new("projectCurves", "REGEN_ERROR") };
         op.run(i, a, crate::regen::features::curves::project_curves)
@@ -72,6 +75,9 @@ impl BuiltinOp {
         // Enum presets (not constant-constructible).
         if self.type_id == "fitSpline" {
             p.set("fitType", ParamValue::Enum("EDGES".into()));
+        }
+        if self.type_id == "fillet" {
+            p.set("filletType", ParamValue::Enum("FULL_ROUND".into()));
         }
         if self.type_id == "projectCurves" {
             p.set("curveProjectionType", ParamValue::Enum("CURVE_TO_FACE".into()));
@@ -224,11 +230,23 @@ fn op_ruled_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let positions = def_arg(i, &a, 2)?.get("manipulatorPositions").clone();
     let cx = context_arg(i, &a)?;
     op.run(i, a, crate::regen::features::surfaces::ruled_surface)?;
-    // A frame at each requested edge position: origin on the edge, z along it.
+    ruled_bases(i, &cx, &positions)
+}
+
+/// `@evRuledSurfaceBases`: the frames `opRuledSurface` would return, without
+/// making the surface.
+pub fn ev_ruled_surface_bases(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let positions = a.get(1).map(|d| d.get("manipulatorPositions").clone()).unwrap_or_default();
+    ruled_bases(i, &cx, &positions)
+}
+
+/// A frame at each requested edge position: origin on the edge, z along it.
+fn ruled_bases(i: &mut Interp, cx: &Arc<FsContext>, positions: &Value) -> R<Value> {
     let mut bases = Vec::new();
     for pos in positions.as_array().iter().flat_map(|v| v.iter()) {
         let t = pos.get("parameter").as_number().unwrap_or(0.0);
-        let frame = super::query::with_ents(i, &cx, pos.get("edge"), |_, q, ents| {
+        let frame = super::query::with_ents(i, cx, pos.get("edge"), |_, q, ents| {
             Ok(ents.first().and_then(|e| {
                 let s = q.shape(e)?;
                 let info = s.edge_info().ok()?;
@@ -240,4 +258,47 @@ fn op_ruled_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         bases.push(coord_system_value(o, any_perpendicular(z), z));
     }
     Ok(Value::array(bases))
+}
+
+/// `opCreateCurvesOnFace`: isoparametric curves (the Isoparametric curve
+/// feature). `DIR1_ISO` / `DIR2_ISO` make one curve per name at
+/// `parameters[i]`, under `id + name`; the auto-spaced types make `nCurves`
+/// equally spaced curves under `id`.
+fn op_create_curves_on_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let id = id_arg(i, &a, 1)?;
+    let def = def_arg(i, &a, 2)?;
+    let f = crate::regen::features::curves::isoparametric_curve;
+    for item in def.get("curveDefinition").as_array().map(|v| v.iter().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+        let face = evaluate_refs(i, &cx, item.get("face"))?;
+        let kind = item.get("creationType").as_str().map(|s| s.to_string()).unwrap_or_default();
+        let dir = if kind.starts_with("DIR2") { "V" } else { "U" };
+        let base = |p: &mut ParamValues| {
+            p.set("face", ParamValue::Query(face.clone()));
+            p.set("directionType", ParamValue::Enum(dir.into()));
+        };
+        if kind.ends_with("AUTO_SPACED_ISO") {
+            let mut p = ParamValues::default();
+            base(&mut p);
+            p.set("equalSpacing", ParamValue::Bool(true));
+            p.set("nCurves", expr(format!("{}", item.get("nCurves").as_number().unwrap_or(1.0))));
+            run_op_with(i, &cx, &id, "REGEN_ERROR", &p, f)?;
+            continue;
+        }
+        let names: Vec<String> = item.get("names").as_array().map(|v| v.iter().filter_map(|n| n.as_str().map(|s| s.to_string())).collect()).unwrap_or_default();
+        let params: Vec<f64> = item.get("parameters").as_array().map(|v| v.iter().filter_map(|n| n.as_number()).collect()).unwrap_or_default();
+        for (name, t) in names.iter().zip(params) {
+            let mut p = ParamValues::default();
+            base(&mut p);
+            p.set("equalSpacing", ParamValue::Bool(false));
+            let mut row = ParamValues::default();
+            row.set("selectPoint", ParamValue::Bool(false));
+            row.set("uvValue", expr(format!("{t}")));
+            p.set("uvParamList", ParamValue::Array(vec![row]));
+            let mut sub = id.clone();
+            sub.push(name.as_str().into());
+            run_op_with(i, &cx, &sub, "REGEN_ERROR", &p, f)?;
+        }
+    }
+    Ok(Value::Undefined)
 }

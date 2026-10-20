@@ -735,7 +735,7 @@ impl PartStudioView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.close_insert_go(cx);
                                 })),

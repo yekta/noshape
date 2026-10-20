@@ -47,6 +47,16 @@ fn arithmetic_and_strings() {
     assert_eq!(run_str("function f() { var x = undefined; return x ?? 5; }"), "5");
 }
 
+/// Onshape's `?:` is left-associative (live behaviours.md, fs-smprobe).
+#[test]
+fn conditional_is_left_associative() {
+    assert_eq!(run_str("function f() { return false ? 1 : true ? 2 : 3; }"), "2");
+    assert_eq!(run_str("function f() { return true ? (false ? 1 : 2) : 3; }"), "2");
+    assert_eq!(run_str("function f() { return true ? false ? 1 : 2 : 3; }"), "2");
+    let e = run_str("function f() { return true ? \"X\" : false ? \"Y\" : \"Z\"; }");
+    assert!(e.contains("First operand of logical or conditional operator must be boolean, value is string"), "{e}");
+}
+
 #[test]
 fn value_semantics_and_boxes() {
     assert_eq!(run_str("function f() { var a = [1, 2]; var b = a; a[0] = 9; return b; }"), "[ 1 , 2 ]");

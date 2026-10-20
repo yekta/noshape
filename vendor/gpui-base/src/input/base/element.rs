@@ -1470,8 +1470,10 @@ impl<M: InputModeKind> TextElement<M> {
             S::Info => 1,
             S::Hint => 0,
         };
-        let rows: Vec<(Pixels, S)> = {
+        let (rows, gutter_left): (Vec<(Pixels, S)>, Pixels) = {
             let state = self.state.read(cx);
+            // The gutter starts the editor's left padding before the text bounds.
+            let gutter_left = origin_x - state.editor_paddings.left;
             let Some(diagnostics) = state.mode.diagnostics().filter(|d| !d.is_empty()) else {
                 return Vec::new();
             };
@@ -1492,13 +1494,13 @@ impl<M: InputModeKind> TextElement<M> {
                 }
                 offset_y += line.wrapped_lines.len() * last_layout.line_height;
             }
-            rows
+            (rows, gutter_left)
         };
         let line_height = last_layout.line_height;
         rows.into_iter()
             .map(|(offset_y, severity)| {
                 let mut marker = gpui::div().size(MARKER).flex().items_center().justify_center().child(render(severity, cx)).into_any_element();
-                let origin = point(origin_x + px(2.), bounds.origin.y + offset_y + (line_height - MARKER).half());
+                let origin = point(gutter_left + px(2.), bounds.origin.y + offset_y + (line_height - MARKER).half());
                 marker.prepaint_as_root(origin, size(MARKER, MARKER).into(), window, cx);
                 marker
             })

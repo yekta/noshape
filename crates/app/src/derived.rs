@@ -83,7 +83,6 @@ pub struct VersionChoice {
 /// What another document offers as Derived sources.
 #[derive(Clone, Debug)]
 pub struct ExternalDocInfo {
-    pub path: std::path::PathBuf,
     pub name: String,
     /// Named versions, newest first, then "Current state".
     pub versions: Vec<VersionChoice>,
@@ -156,7 +155,7 @@ pub fn external_doc_info(path: &std::path::Path) -> anyhow::Result<ExternalDocIn
     let head = store.head(store.default_branch()?)?;
     versions.push(VersionChoice { label: "Current state".into(), microversion: head });
     let name = store.meta().map(|m| m.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-    Ok(ExternalDocInfo { path: path.to_path_buf(), name, versions })
+    Ok(ExternalDocInfo { name, versions })
 }
 
 /// The newest named version of a document, if it differs from `pinned`

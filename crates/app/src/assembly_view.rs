@@ -310,8 +310,6 @@ pub struct AssemblyView {
     explode_edit: bool,
     explode_progress: Option<f64>,
     explode_preview: Option<ExplodeStep>,
-    explode_slider: Option<(usize, Entity<gpui_kit::component::slider::SliderState>, Subscription)>,
-    explode_play: Option<Task<()>>,
     renaming: Option<(RenameTarget, Entity<InputState>)>,
     /// Enter handler of the active transient input (rename / named position).
     transient_sub: Option<Subscription>,
@@ -461,8 +459,6 @@ impl AssemblyView {
             explode_edit: false,
             explode_progress: None,
             explode_preview: None,
-            explode_slider: None,
-            explode_play: None,
             renaming: None,
             transient_sub: None,
             config_panel: None,
@@ -760,9 +756,10 @@ impl AssemblyView {
             h.selected_entities = m.clone();
         }
         self.interference_highlights(&mut h);
-        // The instances to analyze show selected while the dialog is open.
+        // The instances to analyze show selected while the dialog is open;
+        // around red overlaps they are see-through and neutral (live 736).
         if let Some(d) = &self.ui.interference {
-            h.selected_tops = d.instances.clone();
+            h.selected_tops = if d.rows.is_empty() { d.instances.clone() } else { Vec::new() };
         }
         // Group dialog: its instances are shown selected.
         if let Some((_, ids)) = &self.ui.group {
@@ -927,7 +924,7 @@ impl AssemblyView {
 
     /// Instances the manipulator moves.
     fn manip_targets(&self, cx: &App) -> Vec<InstanceId> {
-        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() || self.ui.group.is_some() {
+        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() || self.ui.group.is_some() || self.replace_panel.is_some() || self.ui.interference.is_some() {
             return vec![];
         }
         let Some(asm) = self.assembly(cx) else { return vec![] };
@@ -1598,31 +1595,27 @@ impl AssemblyView {
         self.explode = i;
         self.explode_progress = None;
         self.explode_preview = None;
-        self.explode_play = None;
+        // A step's value box doesn't outlive explode mode.
+        self.manip_value = None;
         if i.is_none() {
             self.explode_edit = false;
         }
         self.reapply_display(cx);
     }
 
-    fn add_exploded_view(&mut self, auto: bool, cx: &mut Context<Self>) {
+    /// Add exploded view (panel footer, top row menu): a new empty view in
+    /// explode mode, "Editing Explode N [Done]" (live assembly/62; the how-to
+    /// is the panel's info box, not a message).
+    fn add_exploded_view(&mut self, cx: &mut Context<Self>) {
         let n = self.assembly(cx).map(|a| a.exploded_views.len()).unwrap_or(0);
         let name = format!("Explode {}", n + 1);
-        let view = if auto {
-            // Auto explode from the assembled positions.
-            let mut r = (*self.result).clone();
-            let solved = r.solved.clone();
-            r.apply_placements(solved, None);
-            analysis::auto_exploded_view(&r, &name, 0.9)
-        } else {
-            ExplodedView { name: name.clone(), steps: vec![] }
-        };
+        let view = ExplodedView { name: name.clone(), steps: vec![] };
         self.edit(&format!("Insert : {name}"), cx, |a| a.exploded_views.push(view));
-        self.explode_edit = !auto;
+        self.selected.clear();
+        self.selected_mate = None;
+        self.explode_edit = true;
+        self.panel = Some(SidePanel::Explode);
         self.activate_explode(Some(n), cx);
-        if !auto {
-            self.message = Some((false, "Select instances, then drag or rotate them with the triad to add explode steps.".into()));
-        }
     }
 
     fn delete_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -1665,35 +1658,6 @@ impl AssemblyView {
     fn set_explode_progress(&mut self, p: f64, cx: &mut Context<Self>) {
         self.explode_progress = Some(p);
         self.reapply_display(cx);
-    }
-
-    /// Play the exploded view from assembled to fully exploded.
-    fn play_explode(&mut self, cx: &mut Context<Self>) {
-        let Some(n) = self.explode_view(cx).map(|v| v.steps.len()) else { return };
-        if n == 0 {
-            return;
-        }
-        self.explode_progress = Some(0.0);
-        self.explode_play = Some(cx.spawn(async move |this, cx| {
-            let mut t = 0.0f64;
-            loop {
-                cx.background_executor().timer(Duration::from_millis(33)).await;
-                t += 0.033 / 0.8;
-                let done = t >= n as f64;
-                let ok = this.update(cx, |this: &mut Self, cx| {
-                    this.explode_progress = Some(t.min(n as f64));
-                    this.reapply_display(cx);
-                    // The slider is rebuilt at the new position.
-                    this.explode_slider = None;
-                    if done {
-                        this.explode_play = None;
-                    }
-                });
-                if ok.is_err() || done {
-                    break;
-                }
-            }
-        }));
     }
 
     // ------------------------------------------------------------ animation
@@ -1746,7 +1710,7 @@ impl AssemblyView {
             // Live: Show analysis tools opens the tool list; Display mass and
             // section properties toggles the Mass properties dialog.
             .child(btn("asm-eval-analysis", "analysis-tools", false, cx).tooltip("Show analysis tools").on_click(cx.listener(|this, ev: &ClickEvent, window, cx| this.open_analysis_menu(ev.position(), window, cx))))
-            .child(btn("asm-eval-mass", "mass-properties", self.ui.mass.is_some(), cx).tooltip("Display mass and section properties").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_mass(cx))))
+            .child(btn("asm-eval-mass", "mass-properties", self.ui.mass.is_some(), cx).tooltip("Display mass and section properties").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_mass(window, cx))))
             .into_any_element()
     }
 
@@ -1820,7 +1784,7 @@ impl AssemblyView {
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
-        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none();
+        let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
         let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
@@ -1957,6 +1921,11 @@ impl AssemblyView {
         self.message = Some((false, "Snapped and fastened. Pick another pair, or press Shift+S to leave snap mode.".into()));
     }
 
+    /// The number on the selection-count cursor (also shown over the navbar).
+    pub fn selection_cursor_count(&self, cx: &App) -> usize {
+        self.viewport.read(cx).selection_count
+    }
+
     fn on_viewport_event(&mut self, _: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
             ViewportEvent::Hover(id) => {
@@ -2044,6 +2013,11 @@ impl AssemblyView {
                     // Measure tool: clicked entities are measured.
                     if let Some(t) = self.pick(*pick) {
                         self.measure_pick(t, cx);
+                    }
+                } else if self.replace_panel.is_some() {
+                    // Replace instance: clicking an instance adds or removes it.
+                    if let Some(top) = self.pick(*pick).map(|t| t.path[0]) {
+                        self.toggle_replace_instance(top, cx);
                     }
                 } else if self.ui.interference.is_some() {
                     // Interference detection: clicking an instance adds or removes it.
@@ -2675,11 +2649,14 @@ impl AssemblyView {
             this.panel = if this.panel == Some(panel) { None } else { Some(panel) };
             cx.notify();
         };
+        // Docked pane open: the strip sits at the pane's left edge (live 181,
+        // part-studio/77).
+        let right = if self.pane_docked() { 711. } else { -1. };
         div()
             .absolute()
             .top_0()
             .bottom_0()
-            .right(px(-1.))
+            .right(px(right))
             .flex()
             .flex_col()
             .justify_center()
@@ -2833,7 +2810,7 @@ impl AssemblyView {
             .when(is_top, |d| {
                 // Eye icon on hover (kept visible on hidden instances).
                 d.child(
-                    div().when(!hidden, |d| d.invisible().group_hover(SharedString::from(format!("inst-row-{}", top.0)), |d| d.visible())).child(
+                    div().when(!hidden, |d| crate::ui::hover_reveal(d, SharedString::from(format!("inst-row-{}", top.0)))).child(
                         Button::new(SharedString::from(format!("eye-{}", top.0)))
                             .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
                             .ghost()
@@ -2858,6 +2835,10 @@ impl AssemblyView {
             .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                 if this.ui.interference.is_some() {
                     this.toggle_interference_instance(p3[0], cx);
+                    return;
+                }
+                if this.replace_panel.is_some() {
+                    this.toggle_replace_instance(p3[0], cx);
                     return;
                 }
                 if this.ui.group.is_some() {
@@ -2970,8 +2951,8 @@ impl AssemblyView {
                 // Eye icon (shown on hover, or always while hidden) toggles the mate indicator.
                 d.child(
                     div()
-                        .invisible()
-                        .group_hover(SharedString::from(format!("mate-row-{}", id.0)), |d| d.visible())
+                        .opacity(0.)
+                        .group_hover(SharedString::from(format!("mate-row-{}", id.0)), |d| d.opacity(1.))
                         .child(Button::new(SharedString::from(format!("meye-{}", id.0))).icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" }))).ghost().xsmall().tooltip(if hidden { "Show" } else { "Hide" }).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             cx.stop_propagation();
                             this.set_mates_hidden(vec![id], !hidden, cx);
@@ -3322,6 +3303,12 @@ impl AssemblyView {
     // ------------------------------------------------------------ render: panels
 
     fn panel_frame(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str) -> Div {
+        Self::panel_frame_with(title, body, close, id, false)
+    }
+
+    /// `panel_frame`; `plain_close`: Onshape's grey × at 50 % (`btn-close`,
+    /// live dom dialog-animate) instead of the red cancel ✕.
+    pub(super) fn panel_frame_with(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool) -> Div {
         let pal = p();
         // Onshape dialog frame: white at 95%, no border or radius, 28 px header (§3.9).
         v_flex()
@@ -3335,11 +3322,16 @@ impl AssemblyView {
                     .h(px(28.))
                     .flex_none()
                     .pl(px(6.))
-                    .bg(pal.panel)
+                    // Live `ns-dialog-header`: white, 1 px `#d7d7d7` under it.
+                    .bg(gpui_kit::white())
                     .border_b_1()
-                    .border_color(pal.border)
+                    .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string()))
-                    .child(Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(18.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)),
+                    .child(if plain_close {
+                        Button::new(id).ghost().child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x333333))).opacity(0.5).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
+                    } else {
+                        Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(18.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
+                    }),
             )
             .child(body)
     }
@@ -3492,7 +3484,7 @@ impl AssemblyView {
                             .bg(gpui_kit::white())
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Cancel"))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mate(window, cx))),
                     ),
             )
@@ -3814,7 +3806,7 @@ impl AssemblyView {
                             .child(crate::ui::glyph("check", 18., gpui_kit::white()))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
-                    .child(Button::new("insert-close").ghost().child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)))),
+                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)))),
             )
             .child(head)
             .child(body)
@@ -3929,9 +3921,8 @@ impl AssemblyView {
             .absolute()
             .top_0()
             .bottom_0()
-            .right(px(33.))
+            .right_0()
             .w(px(712.))
-            .max_w(relative(0.5))
             .bg(pal.panel)
             .border_l_1()
             .border_color(pal.border)
@@ -3982,18 +3973,13 @@ impl AssemblyView {
             .into_any_element()
     }
 
-    fn render_side_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        match self.panel {
-            Some(SidePanel::Explode) => self.render_explode_panel(cx),
-            Some(SidePanel::Bom) | Some(SidePanel::Configurations) | Some(SidePanel::Positions) | Some(SidePanel::Variables) | None => div().into_any_element(),
-        }
-    }
-
     fn render_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
         // Left column: insert panel / mate dialog / relation dialog / animation.
-        let mut left = v_flex().id("asm-left-dialogs").occlude().absolute().top_3().left_3().gap_2();
+        // Live (dom dialog-assembly-insert, dialog-mate-*, dialog-animate): the
+        // dialogs sit flush at the viewport's top left (x 246, y 79).
+        let mut left = v_flex().id("asm-left-dialogs").occlude().absolute().top(px(3.)).left(px(1.)).gap_2();
         let mut any_left = false;
         if self.insert_open {
             left = left.child(self.render_insert_panel(cx));
@@ -4108,15 +4094,16 @@ impl AssemblyView {
         if self.panel == Some(SidePanel::Variables) {
             out.push(self.render_variables_panel(cx));
         } else if self.panel == Some(SidePanel::Configurations) {
-            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_asm_config_panel(cx)).into_any_element());
+            out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_asm_config_panel(cx)).into_any_element());
         } else if self.panel == Some(SidePanel::Bom) {
             // Docked 712 px pane, like the variable table (live 181).
-            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_bom_panel(cx)).into_any_element());
+            out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_bom_panel(cx)).into_any_element());
         } else if self.panel == Some(SidePanel::Positions) {
             // Docked 712 px pane, like the variable table (live 150).
-            out.push(div().absolute().top_0().bottom_0().right(px(33.)).max_w(relative(0.5)).border_l_1().border_color(pal.border).child(self.render_np_pane(cx)).into_any_element());
-        } else if self.panel.is_some() {
-            out.push(div().absolute().top_3().right(px(56.)).child(self.render_side_panel(cx)).into_any_element());
+            out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_np_pane(cx)).into_any_element());
+        } else if self.panel == Some(SidePanel::Explode) {
+            // Docked 712 px pane (live 181-strip-exploded-views).
+            out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_explode_panel(cx)).into_any_element());
         }
         out.push(self.render_view_controls(cx));
         if let Some(el) = self.render_manip_value(cx) {
@@ -4132,6 +4119,23 @@ impl AssemblyView {
             out.push(div().absolute().bottom_3().right_3().px_2().py_1().rounded_md().bg(with_alpha(pal.accent, 0.25)).text_xs().child("Exploded view").into_any_element());
         }
         if let Some((err, msg)) = self.message.clone() {
+            // Info notices fade after 4 s like the Part Studio's (errors stay
+            // until dismissed; qa4: a notice must not linger).
+            if !err && self.ui.msg_fading.as_deref() != Some(msg.as_str()) {
+                self.ui.msg_fading = Some(msg.clone());
+                let m = msg.clone();
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(Duration::from_secs(4)).await;
+                    let _ = this.update(cx, |this: &mut Self, cx| {
+                        if this.message.as_ref().is_some_and(|(e, t)| !*e && *t == m) {
+                            this.message = None;
+                            this.ui.msg_fading = None;
+                            cx.notify();
+                        }
+                    });
+                })
+                .detach();
+            }
             // Onshape's message bubble, top center of the viewport.
             let kind = if err { crate::ui::AlertKind::Error } else { crate::ui::AlertKind::Info };
             out.push(
@@ -4232,9 +4236,16 @@ impl AssemblyView {
         let cube = view_cube(rotation, self.cube_hover, menu, hooks, cx);
         // A docked 712 px pane narrows the graphics area (live 181): the cube
         // stays 15 px from the pane's left edge.
-        let docked = matches!(self.panel, Some(SidePanel::Bom | SidePanel::Configurations | SidePanel::Positions | SidePanel::Variables));
-        let right = if docked { 15. + 33. + 712f32.min(self.viewport.read(cx).size().x as f32 * 0.5) } else { 15. };
+        // The canvas is narrowed by a docked pane: the cube stays 15 px from
+        // its right edge (the overlay spans the pane too).
+        let right = 15. + self.ui.dock_w;
         div().absolute().top(px(15.)).right(px(right)).child(cube).into_any_element()
+    }
+
+    /// Whether a 712 px pane is docked at the right (BOM, Configurations,
+    /// Exploded views, Named positions, Variable table).
+    fn pane_docked(&self) -> bool {
+        matches!(self.panel, Some(SidePanel::Bom | SidePanel::Configurations | SidePanel::Positions | SidePanel::Variables | SidePanel::Explode))
     }
 
     /// The camera menu under the cube (Onshape's "Camera and render options").
@@ -4284,7 +4295,14 @@ impl AssemblyView {
 impl Render for AssemblyView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
+        // Width taken from the graphics area by a docked pane: its 712 px
+        // and the 33 px strip at its left edge (live 181).
+        let dock_w = if self.pane_docked() { 33. + 712. } else { 0. };
+        self.ui.dock_w = dock_w;
         self.ensure_filter_input(window, cx);
+        if self.panel == Some(SidePanel::Configurations) {
+            self.ensure_cfg_filter(window, cx);
+        }
         if std::mem::take(&mut self.ui.preview_done) {
             self.finish_mate_preview(window, cx);
         }
@@ -4377,6 +4395,10 @@ impl Render for AssemblyView {
             }))
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {
+                // Esc also dismisses an info notice (Onshape's go with Esc).
+                if this.message.as_ref().is_some_and(|(err, _)| !*err) {
+                    this.message = None;
+                }
                 if this.cancel_bom_cell(cx) {
                     window.focus(&this.focus, cx);
                 } else if this.triad_menu.is_some() {
@@ -4390,6 +4412,9 @@ impl Render for AssemblyView {
                     this.close_insert(window, cx);
                 } else if this.mate.is_some() {
                     this.close_mate(window, cx);
+                } else if this.anim.is_some() {
+                    // The Animate mate dialog (it stayed open on Esc).
+                    this.close_animation(window, cx);
                 } else if this.ui.cfg_mode.is_some() {
                     this.finish_configure_features(window, cx);
                 } else if this.snap.is_some() {
@@ -4398,6 +4423,8 @@ impl Render for AssemblyView {
                     this.close_mc(window, cx);
                 } else if this.ui.folder_name.is_some() {
                     this.close_folder_name(false, window, cx);
+                } else if this.replace_panel.is_some() {
+                    this.close_replace(cx);
                 } else if this.ui.interference.is_some() {
                     this.close_interference(cx);
                 } else if this.ui.reflection_dialog.is_some() {
@@ -4492,10 +4519,21 @@ impl Render for AssemblyView {
                             .h_full()
                             .relative()
                             .bg(pal.app_bg)
-                            .child(self.viewport.clone())
+                            // A docked 712 px pane narrows the graphics area (live
+                            // 181: the canvas, its fit and its bottom-right tools end
+                            // at the pane).
+                            .child(
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .bottom_0()
+                                    .left_0()
+                                    .right(px(dock_w))
+                                    .child(self.viewport.clone())
+                                    .child(self.render_evaluation_tools(cx)),
+                            )
                             // Live assembly/10: the Part Studio's list toggle and evaluation tools.
                             .child(div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)))
-                            .child(self.render_evaluation_tools(cx))
                             .children(overlay)
                             .child(rail),
                     )

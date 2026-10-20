@@ -208,13 +208,16 @@ impl DrawingEditor {
             Tool::Detail { parent: Some(p), .. } => views::view_scale(self.current_sheet(), *p),
             _ => self.current_sheet().scale,
         };
-        let shown = scale.unwrap_or(parent_scale * 2.0);
         let fmt = |s: f64| noshape_model::drawing::sheet::format_scale(s);
+        // Live: the scale stays blank until the detail is placed.
+        let placed = matches!(self.tool, Tool::Detail { radius: Some(_), .. });
+        let current = scale.or(placed.then_some(parent_scale * 2.0));
+        let shown = current.map(fmt).unwrap_or_default();
         let ed2 = ed.clone();
-        let scale_btn = Button::new("det-scale").label(fmt(shown)).ghost().small().w(px(110.)).dropdown_caret(true).os_dropdown_menu("det-scale-dd", true, move |mut m, _, _| {
+        let scale_btn = Button::new("det-scale").label(shown).ghost().small().w(px(106.)).h(px(25.)).rounded(px(0.)).dropdown_caret(true).os_dropdown_menu("det-scale-dd", true, move |mut m, _, _| {
             for s in SCALES {
                 let e = ed2.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(fmt(s)).checked((s - shown).abs() < 1e-9).on_click(move |_, _, cx| {
+                m = m.item(crate::os_menu::OsMenuItem::new(fmt(s)).checked(current.is_some_and(|c| (s - c).abs() < 1e-9)).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {
                         if let Some(d) = &mut t.detail_dlg {
                             d.scale = Some(s);
@@ -227,7 +230,7 @@ impl DrawingEditor {
             m
         });
         let ed3 = ed.clone();
-        let style_btn = Button::new("det-style").label(STYLES[style as usize]).ghost().small().w(px(110.)).dropdown_caret(true).os_dropdown_menu("det-style-dd", true, move |mut m, _, _| {
+        let style_btn = Button::new("det-style").label(STYLES[style as usize]).ghost().small().w(px(117.)).h(px(25.)).rounded(px(0.)).dropdown_caret(true).os_dropdown_menu("det-style-dd", true, move |mut m, _, _| {
             for (i, s) in STYLES.iter().enumerate() {
                 let e = ed3.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(*s).checked(i as u8 == style).on_click(move |_, _, cx| {
@@ -242,9 +245,25 @@ impl DrawingEditor {
             }
             m
         });
-        let mut tools = h_flex().px(px(4.)).py(px(3.)).gap(px(1.));
+        let mut tools = h_flex().pl(px(4.)).pt(px(3.)).pb(px(3.)).gap(px(2.));
         for (i, (tip, icon)) in SHAPES.iter().enumerate() {
-            tools = tools.child(crate::ui::tool_button(SharedString::from(format!("det-shape-{i}")), icon, shape == i as u8, cx).tooltip(*tip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            // Live dom drawing-detail-dialog: 30 px buttons, radius 2; the active
+            // one `#cfdbe5` with a 1 px `#9aa5af` border.
+            let on = shape == i as u8;
+            let btn = div()
+                .id(SharedString::from(format!("det-shape-{i}")))
+                .size(px(30.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(2.))
+                .border_1()
+                .cursor_pointer()
+                .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)).border_color(gpui_kit::rgb(0x9aa5af)))
+                .when(!on, |d| d.border_color(gpui_kit::transparent_black()).hover(|d| d.bg(gpui_kit::rgb(0xe6ebef))))
+                .child(crate::assets::icon(icon, 20., cx))
+                .tooltip(crate::ui::tooltip(*tip));
+            tools = tools.child(btn.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {
                     d.shape = i as u8;
                     d.pts.clear();
@@ -256,9 +275,12 @@ impl DrawingEditor {
                 cx.notify();
             })));
         }
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
+        // Live dom drawing-detail-dialog: 26 px rows, the 12 px label 5 px in,
+        // white fields with a `#ddd` underline at the right edge.
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(5.)).child(div().flex_1().text_size(px(12.)).child(label)).child(body).into_any_element();
+        let field = |w: f32| div().w(px(w)).h(px(26.)).flex_none().bg(gpui_kit::white()).border_b_1().border_color(gpui_kit::rgb(0xdddddd));
         let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DetailDlg, bool), cx: &mut Context<Self>| {
-            div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new(id).label(label).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+            div().h(px(26.)).flex().items_center().pl(px(4.)).child(Checkbox::new(id).label(label).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {
                     f(d, *v);
                 }
@@ -272,9 +294,10 @@ impl DrawingEditor {
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
-                .w(px(240.))
+                .w(px(200.))
+                .pb(px(3.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -294,14 +317,19 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                         ),
                 )
                 .child(tools)
-                .child(row("View scale", scale_btn.into_any_element()))
-                .child(row("View label", div().w(px(110.)).child(Input::new(&d.label).small()).into_any_element()))
-                .child(row("Profile style", style_btn.into_any_element()))
+                // Live 127: the active prompt field before the circle is drawn
+                // (`#dbf1fa`, 1 px `#1b5faa`, radius 2, 12 px `#616b73`).
+                .when(shape == 0 && matches!(self.tool, Tool::Detail { center: None, .. }), |e| {
+                    e.child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child("Create circle"))
+                })
+                .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
+                .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).appearance(false).small()).into_any_element()).into_any_element())))
+                .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))
                 .child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx))
                 .child(check("det-clip", "Clip border to geometry", clip, |d, v| d.clip_border = v, cx))
                 .when(shape >= 2, |e| e.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click points; double-click to close the profile")))

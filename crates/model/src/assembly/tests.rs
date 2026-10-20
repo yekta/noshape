@@ -172,6 +172,21 @@ fn two_blocks_fastened_face_to_face() {
     let o = origin_of(&res, 2);
     assert!((o.z - 0.015).abs() < 1e-6, "offset: {o:?}");
 
+    // Same-orientation connectors (live assembly/740–748: the top faces of
+    // two plates, Z axes aligned): the instance picked first ends +offset
+    // along the second connector's Z, whichever of the two is fixed.
+    let top2 = face_with(&r, "CapEnd");
+    for (first, second, expect) in [(2u64, 1u64, 0.01), (1, 2, -0.01)] {
+        let mut m = mate(11, MateType::Revolute, conn(first, top2.clone(), Inference::Centroid), conn(second, top2.clone(), Inference::Centroid));
+        m.flip_primary = true;
+        m.offset_z = Some(ExprValue::new("10 mm"));
+        let a = Assembly { mates: vec![m], ..asm.clone() };
+        let res = ev.evaluate(&f.doc, &a, &SolveOptions::default(), None);
+        assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+        let o = origin_of(&res, 2);
+        assert!((o.z - expect).abs() < 1e-6, "{first} picked first: block 2 at {o:?}");
+    }
+
     // Flip primary: Z axes agree, so B is turned upside down and sits below A's top face.
     let mut asm3 = asm.clone();
     asm3.mates[0].flip_primary = true;
@@ -2640,4 +2655,25 @@ fn assembly_mass_properties_combine_parts_where_they_sit() {
     let missing = super::analysis::assembly_mass_properties(&res, &[], &|o| (o.top() == InstanceId(1)).then_some(1000.0)).unwrap();
     assert!(missing.props.mass.is_none());
     assert_eq!(missing.without_material.len(), 1);
+}
+
+#[test]
+fn propagated_inputs_set_the_instances_configuration() {
+    use super::config::{param, AsmConfiguredParam, ConfigTarget};
+    use crate::configuration::ConfigValues;
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, _) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let mut asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true)], ..Default::default() };
+    asm.configuration.inputs.push(super::config::new_list_input("size".into(), 1));
+    asm.add_config_row("size", "Large", "large".into());
+    // Input propagation: Block <1>'s own "size" follows the assembly's.
+    let values = ["default", "large"].iter().map(|k| (k.to_string(), ParamValue::Text(k.to_string()))).collect();
+    asm.configuration.configured.push(AsmConfiguredParam { input: "size".into(), target: ConfigTarget::Instance(InstanceId(1)), param: format!("{}size", param::INPUT_PREFIX), values });
+    let key = |a: &Assembly| a.instances[0].source.clone().config_mut().and_then(|c| c.0.get("size").cloned());
+    let mut cfg = ConfigValues::default();
+    cfg.0.insert("size".into(), "large".into());
+    assert_eq!(key(&asm.configured(&cfg)).as_deref(), Some("large"));
+    cfg.0.insert("size".into(), "default".into());
+    assert_eq!(key(&asm.configured(&cfg)).as_deref(), Some("default"));
 }

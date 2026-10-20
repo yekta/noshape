@@ -14,11 +14,12 @@ use x11rb::protocol::render::{ConnectionExt as _, CreatePictureAux, PictType};
 use x11rb::protocol::xproto::{ChangeWindowAttributesAux, ConnectionExt as _, CreateGCAux, ImageFormat};
 use x11rb::rust_connection::RustConnection;
 
-/// Cursor theme names for a CSS cursor name, most specific first (the names
-/// Chrome and GTK look up).
+/// Cursor theme names for a CSS cursor name, in the order Chrome looks them
+/// up on X11.
 pub(crate) fn theme_names(css: &str) -> &'static [&'static str] {
     match css {
-        "move" => &["move", "fleur", "all-scroll", "size_all"],
+        // Chrome shows all-scroll for `move` (Blink doesn't tell them apart).
+        "move" => &["all-scroll", "fleur", "size_all"],
         "zoom-in" => &["zoom-in"],
         "no-drop" => &["no-drop", "dnd-no-drop", "not-allowed", "crossed_circle"],
         _ => &[],

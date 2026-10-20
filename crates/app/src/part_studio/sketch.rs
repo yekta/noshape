@@ -2565,7 +2565,7 @@ impl PartStudioView {
                                 .border_color(rgb(0xcccccc))
                                 .shadow_md()
                                 .child(div().w(px(20.)).flex().justify_center().child(crate::ui::glyph("ui-chevron-right", 12., rgb(0xd7d7d7))))
-                                .child(
+                                .child(gpui_kit::base::input::input_frame(
                                     div()
                                         .w(px(100.))
                                         .h(px(24.))
@@ -2573,7 +2573,7 @@ impl PartStudioView {
                                         .border_color(pal.accent)
                                         // Live sketch/141: right-aligned, ~13.33 px, ending 7 px from the field's edge.
                                         .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).h(px(24.))),
-                                )
+                                ))
                                 .child(
                                     div()
                                         .id("sk-dim-tol")
@@ -3114,8 +3114,8 @@ impl PartStudioView {
             );
             let view = cx.entity();
             let members: Vec<Tool> = group.to_vec();
-            let caret = crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx).dropdown_menu(move |mut menu, _, _| {
-                menu = menu.min_w(px(180.));
+            let caret = crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx).dropdown_menu(move |mut menu, window, _| {
+                menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
                 for t in &members {
                     let (v, t) = (view.clone(), *t);
                     let label: &'static str = t.label();
@@ -3215,8 +3215,8 @@ impl PartStudioView {
             crate::ui::split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
         );
         let view = cx.entity();
-        let caret = crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx).dropdown_menu(move |mut menu, _, _| {
-            menu = menu.min_w(px(180.));
+        let caret = crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx).dropdown_menu(move |mut menu, window, _| {
+            menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
             for t in &members {
                 let (v, t) = (view.clone(), *t);
                 // "Line (L)": the name, and the shortcut as chips.

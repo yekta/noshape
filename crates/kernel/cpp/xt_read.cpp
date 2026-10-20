@@ -22,6 +22,11 @@
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Extrema_GenLocateExtPS.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <Geom2dAdaptor_Curve.hxx>
+#include <Adaptor3d_CurveOnSurface.hxx>
+#include <Extrema_LocateExtPC.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
 #include <GeomLib.hxx>
@@ -522,6 +527,26 @@ occ::handle<Geom_BSplineCurve> bspline_through(const std::vector<gp_Pnt>& pts)
   return in.Curve();
 }
 
+// How far an edge's 3D curve strays from its (first) curve on a surface.
+double off_pcurve(const TopoDS_Edge& E)
+{
+  double                       f, l, pf, pl;
+  const occ::handle<Geom_Curve> c = BRep_Tool::Curve(E, f, l);
+  occ::handle<Geom2d_Curve>     p;
+  occ::handle<Geom_Surface>     s;
+  TopLoc_Location               loc;
+  BRep_Tool::CurveOnSurface(E, p, s, loc, pf, pl);
+  if (c.IsNull() || p.IsNull() || s.IsNull())
+    return 1e300;
+  double worst = 0;
+  for (int k = 0; k <= 400; ++k)
+  {
+    const gp_Pnt2d uv = p->Value(pf + (pl - pf) * k / 400);
+    worst             = std::max(worst, c->Value(f + (l - f) * k / 400).Distance(s->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())));
+  }
+  return worst;
+}
+
 // The point on both surfaces in the plane through x0 normal to t (Newton
 // from parameters uv1, uv2), as for the writer's exact intersection edges.
 bool on_both(const GeomAdaptor_Surface& a1, const GeomAdaptor_Surface& a2, gp_Pnt2d& p1, gp_Pnt2d& p2, const gp_Pnt& x0, const gp_Vec& t,
@@ -580,6 +605,10 @@ struct Builder
     double                     u = 0, v = 0; // the last foot
   };
   std::map<const Geom_Surface*, std::unique_ptr<Projector>> projectors;
+  // Attribute nodes by owner (built on first use).
+  mutable std::map<long long, std::vector<long long>> attrs_by_owner;
+  // Faces' own colours (SDL/TYSA_COLOUR on the face), by their surface.
+  std::map<const Geom_Surface*, std::array<double, 3>> face_colour;
   std::map<long long, occ::handle<Geom_Curve>>   curves;
   std::map<long long, double>                    cone_cos; // cones: OCCT (u, v) = (u, v / cos a)
   std::map<long long, TopoDS_Vertex>             verts;
@@ -1358,8 +1387,13 @@ struct Builder
       // projected later).
       B.MakeEdge(E);
       B.UpdateEdge(E, etol);
-      bool   ranged = false;
-      double t1 = 0, t2 = 0;
+      struct FinCurve
+      {
+        occ::handle<Geom2d_Curve> c;
+        long long                 s;
+        double                    a, b;
+      };
+      std::vector<FinCurve> fins;
       for (long long fi : {e.ptr("fin"), other})
       {
         if (!r.has(fi))
@@ -1392,19 +1426,110 @@ struct Builder
           a  = c2->ReversedParameter(a);
           b  = c2->ReversedParameter(b);
         }
-        if (ranged && (std::abs(a - t1) > 1e-9 || std::abs(b - t2) > 1e-9))
-          continue;
-        B.UpdateEdge(E, c2, surface(s), TopLoc_Location(), etol);
-        t1 = a, t2 = b, ranged = true;
+        fins.push_back({c2, s, a, b});
       }
-      B.Range(E, t1, t2);
-      BRepLib::BuildCurve3d(E, etol);
+      if (fins.empty())
+        B.Range(E, 0, 0);
+      else
+      {
+        // The first fin's SP-curve gives the edge its curve and parameter.
+        B.UpdateEdge(E, fins[0].c, surface(fins[0].s), TopLoc_Location(), etol);
+        B.Range(E, fins[0].a, fins[0].b);
+        // The 3D curve from it: OCCT's automatic segment count is too few for
+        // a curve winding many times round its surface (a thread's helix: 3 mm
+        // off over 16 turns), and it keeps the asked tolerance whatever the
+        // fit. Checked, with more segments until it fits.
+        for (int segs : {0, 300, 3000})
+          if (BRepLib::BuildCurve3d(E, etol, GeomAbs_C1, 14, segs) && off_pcurve(E) <= etol)
+            break;
+        // The other fin's SP-curve follows the edge only to within its
+        // tolerance, not in its parameter: put on the edge's parameter point
+        // by point (else projected later).
+        if (fins.size() > 1 && fins[1].s != fins[0].s)
+          if (const occ::handle<Geom2d_Curve> pc = along_edge(E, fins[1].c, fins[1].a, fins[1].b, surface(fins[1].s), etol); !pc.IsNull())
+          {
+            double f, l;
+            BRep_Tool::Range(E, f, l);
+            B.UpdateEdge(E, pc, surface(fins[1].s), TopLoc_Location(), etol);
+            B.Range(E, surface(fins[1].s), TopLoc_Location(), f, l);
+          }
+      }
     }
     v1.Orientation(TopAbs_FORWARD);
     v2.Orientation(TopAbs_REVERSED);
     B.Add(E, v1);
     B.Add(E, v2);
     return edges[idx] = E;
+  }
+
+  // A fin's SP-curve c (from a to b, along the edge) in the edge's own
+  // parameter: points of the edge's 3D curve matched to it, marching along
+  // it, and interpolated. Null when they don't meet within the tolerance.
+  static occ::handle<Geom2d_Curve> along_edge(const TopoDS_Edge& E, const occ::handle<Geom2d_Curve>& c, double a, double b,
+                                              const occ::handle<Geom_Surface>& S, double tol)
+  {
+    double                        f, l;
+    const occ::handle<Geom_Curve> C = BRep_Tool::Curve(E, f, l);
+    if (C.IsNull() || !(l > f) || !(b > a))
+      return {};
+    int knots = 16;
+    {
+      occ::handle<Geom2d_Curve> basis = c;
+      while (auto t = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+        basis = t->BasisCurve();
+      if (auto bs = occ::down_cast<Geom2d_BSplineCurve>(basis))
+        knots = std::max(knots, bs->NbKnots());
+    }
+    const int                                     n  = std::min(4000, std::max(200, 16 * knots));
+    const occ::handle<Geom2dAdaptor_Curve>        ac = new Geom2dAdaptor_Curve(c, a, b);
+    const occ::handle<GeomAdaptor_Surface>        as = new GeomAdaptor_Surface(S);
+    const Adaptor3d_CurveOnSurface                on(ac, as);
+    occ::handle<NCollection_HArray1<gp_Pnt2d>>    pts = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+    occ::handle<NCollection_HArray1<double>>      par = new NCollection_HArray1<double>(1, n + 1);
+    // Seeds: the points at the same fraction of arc length along both (they
+    // trace one path to within the tolerance), refined locally.
+    const int           m = 8 * n;
+    std::vector<double> lc(m + 1, 0.0), ls(m + 1, 0.0);
+    for (int j = 1; j <= m; ++j)
+    {
+      lc[j] = lc[j - 1] + C->Value(f + (l - f) * j / m).Distance(C->Value(f + (l - f) * (j - 1) / m));
+      ls[j] = ls[j - 1] + on.Value(a + (b - a) * j / m).Distance(on.Value(a + (b - a) * (j - 1) / m));
+    }
+    if (!(lc[m] > 0) || !(ls[m] > 0))
+      return {};
+    double u = a;
+    for (int k = 0; k <= n; ++k)
+    {
+      const double t = f + (l - f) * k / n;
+      const gp_Pnt P = C->Value(t);
+      if (k == n)
+        u = b;
+      else if (k > 0)
+      {
+        const double want = lc[(size_t)k * 8] / lc[m] * ls[m];
+        const size_t j    = (size_t)(std::lower_bound(ls.begin(), ls.end(), want) - ls.begin());
+        const double j0   = j == 0 ? 0 : (double)j - 1 + (want - ls[j - 1]) / std::max(ls[j] - ls[j - 1], 1e-300);
+        Extrema_LocateExtPC loc(P, on, a + (b - a) * std::min(1.0, j0 / m), 1e-12);
+        if (!loc.IsDone() || loc.Point().Parameter() < u - 1e-12)
+          return {};
+        u = loc.Point().Parameter();
+      }
+      if (on.Value(u).Distance(P) > 10 * tol)
+        return {};
+      pts->SetValue(k + 1, c->Value(u));
+      par->SetValue(k + 1, t);
+    }
+    try
+    {
+      Geom2dAPI_Interpolate in(pts, par, false, 1e-12);
+      in.Perform();
+      if (in.IsDone())
+        return in.Curve();
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+    return {};
   }
 
   // Outward normal of a rolling-ball blend face at p: away from the ball's
@@ -1442,6 +1567,14 @@ struct Builder
     const XNode&              n  = r.at_index(idx);
     const long long           si = n.ptr("surface");
     occ::handle<Geom_Surface> s  = surface(si);
+    {
+      std::string           unused;
+      std::array<double, 3> c{};
+      bool                  has = false;
+      attributes(idx, unused, c, has);
+      if (has)
+        face_colour[s.get()] = c;
+    }
     TopoDS_Face               F;
     B.MakeFace(F, s, tol);
     for (long long l = n.ptr("loop"); l; l = r.at_index(l).ptr("next"))
@@ -1572,12 +1705,38 @@ struct Builder
   }
 
   // Attributes owned by node `owner`, by definition name.
+  // The part's faces that carry their own colour, matched through their
+  // surfaces (healing keeps them; a trimmed copy wraps the same one).
+  void face_colours_of(XtPart& part) const
+  {
+    if (face_colour.empty())
+      return;
+    ShapeIMap faces;
+    TopExp::MapShapes(part.shape, TopAbs_FACE, faces);
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      TopLoc_Location           loc;
+      occ::handle<Geom_Surface> s = BRep_Tool::Surface(TopoDS::Face(faces(i)), loc);
+      while (auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+        s = t->BasisSurface();
+      const auto it = face_colour.find(s.get());
+      if (it != face_colour.end())
+        part.face_colours.emplace_back(i - 1, it->second);
+    }
+  }
+
   void attributes(long long owner, std::string& name, std::array<double, 3>& colour, bool& has_colour) const
   {
-    for (const auto& [i, n] : r.nodes)
+    if (attrs_by_owner.empty())
+      for (const auto& [i, n] : r.nodes)
+        if (n.type == 81)
+          attrs_by_owner[n.ptr("owner")].push_back(i);
+    const auto it = attrs_by_owner.find(owner);
+    if (it == attrs_by_owner.end())
+      return;
+    for (long long i : it->second)
     {
-      if (n.type != 81 || n.ptr("owner") != owner)
-        continue;
+      const XNode& n = r.at_index(i);
       const std::string def = attribute_def_name(n.ptr("definition"));
       const auto*       fs  = n.get("fields");
       if (!fs || fs->empty() || !r.has((*fs)[0].i))
@@ -1927,6 +2086,7 @@ std::vector<XtPart> read_xt_data(std::string data)
     {
       XtPart part;
       part.shape = b.body(idx);
+      b.face_colours_of(part);
       if (place.Form() != gp_Identity)
         part.shape = BRepBuilderAPI_Transform(part.shape, place, true).Shape();
       b.attributes(idx, part.name, part.colour, part.has_colour);

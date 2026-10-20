@@ -454,6 +454,54 @@ State: run 5's edits were complete (no half-done code found); everything below b
   form; they read as missing), thumbnails of other documents' Assemblies rows.
 * R11 GUI-checked: under Xvfb a double-click registers with `xdotool click --repeat 2 --delay 1` (both presses in
   one gpui batch); 80 ms splits them.
+* Live answer "assembly analysis + mass" (live assembly/730–739): the analysis menu has only Interference detection…,
+  Zebra stripes…, Reflection analysis…, so Curve/surface analysis and `assembly_curvature.rs` are removed (with
+  `Highlights.analysis_lines`). Interference detection is now the live 220 px dialog (`assembly_interference.rs`,
+  `AsmUi.interference`), replacing `SidePanel::Interference` / `run_interference`; model
+  `analysis::instance_interferences` (reuses `interference::interferences`: volume, box, mesh). Scene:
+  `Highlights.red_meshes` (red, over the see-through parts) and `Highlights.boxes` (hovered row, yellow).
+* Mass and section properties per live 737–739 (see LA43). Open: Mass Override behaviour (REQUESTS "skb (10-20
+  assembly mass override)"), Face tab values.
+
+* Realistic session (Assembly 2 in the demo: insert ×3, fix, Revolute with offset, Fastened pin with flip, Animate,
+  exploded view) found and fixed:
+  - mate offset direction: the first connector sits at +offset in the second's frame (live 740–748); solver
+    `residuals` now `t = rel.origin + R_rel·offset` (was in the first's frame); test in `two_blocks_fastened_face_to_face`.
+    Open: default primary alignment of same-orientation edge connectors (Onshape keeps two top hole rims coincident
+    with primaryAxisAlignment false; ours aligns Z opposed, so a Fastened pin rim → bore rim flips). REQUESTS
+    "skb (10-20 mate primary-axis alignment)" asks for face/edge cases + REST connector frames before changing it.
+  - mate dialog Offset section per dom/dialog-mate-fastened-offset.txt (icon rows, Rotate about X ▾, Rotation angle).
+  - Exploded views pane rebuilt per the bundle (`explosionItemComponent`): docked 712 px, tree with steps and the
+    rollback bar (`ExplodeRollbackDrag`), info box rule, footer button; Auto / Play / the Assembled↔Exploded slider
+    removed (not Onshape); Done leaves explode mode; new icons `explode-step-translation`, `explode-step-rotation`
+    (original). Open: REQUESTS "skb (10-20 exploded view steps)" (step names, row menus, rolled-back look).
+  - Mass Override (live 720–730), see LA43. Surgical edit in the shared `properties_dialog.rs`: the Mass row also
+    shows when `computed_mass` is given without a material (assemblies).
+  - New-assembly flow, Insert, Fix, mate menus, Animate dialog, mate-row menu: as live (DOM checked).
+
+* qa4 (docs/handoff/qa-round-4.md):
+  - Configurations panel: "Filter inputs" is a real field (name filter), the List / Checkbox / Configuration variable
+    icons toggle "Show only … inputs", ⋯ = Copy all inputs (shared `config_visibility::copy_inputs`, green toast
+    "Inputs copied.") and Collapse / Expand all inputs (2+ inputs), then Visibility conditions… / Input
+    propagation… for all inputs, as the Part Studio panel. The input ⋯ (Copy table, Copy input, Rename,
+    Visibility conditions…, Input propagation… | Delete, live 200) opens psb's dialogs for that input
+    (`open_asm_visibility`, `open_asm_input_propagation` via psb's `open_propagation_dialog`, surgical edits noted in
+    part-studio-behaviour.md). Propagation = instances whose source (Part Studio / subassembly, this or another
+    document) has an input with the same id and kind; ✓ adds `param::INPUT_PREFIX + id` columns (values
+    `Text(option id)`, applied by `apply_configuration` through `InstanceSource::config_mut`; cells are a dropdown
+    of the instance's own options; header = its input name). Model test
+    `propagated_inputs_set_the_instances_configuration`.
+  - Replace instance: no "Select an instance to replace." notice; the toolbar opens the 220 px "Replace instance"
+    ✓ ✕ dialog (live 833–836): Instances to replace (active; clicks in the graphics / list add or remove, its picks
+    are the selection), the part-icon "Select replacement component" field (title and field red once an instance is
+    picked without a replacement), ☐ Replace all instances, ?; Esc cancels, empty clicks don't. The field opens this
+    document's Part Studios / parts beside the dialog; the real Onshape picker is asked live (REQUESTS "skb
+    (10-20 replace instance picker)").
+  - Notices: assembly info notices (`message`, non-error) and the configuration toasts (`show_cfg_toast`) fade
+    after 4 s like the Part Studio's info / success bubbles, and Esc dismisses an info notice; errors stay until ×.
+    The move triad is hidden while the Replace / Interference dialogs take instance picks.
+  - Docked panes as live 181 / part-studio/77: fixed 712 px flush right with the strip at the pane's left edge, and
+    the graphics canvas (with its fit and bottom-right tools) ends at the strip (`pane_docked`, `AsmUi.dock_w`).
 
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 
@@ -470,3 +518,6 @@ State: run 5's edits were complete (no half-done code found); everything below b
   `regen::measure::measure_shapes` (shared Onshape readout rules: "Perp planes angle" for two
   perpendicular faces as live 707, "Min dist" instead of "Distance", "Area"/"Length" totals). Your
   `assembly_mass_properties` already had the parallel-axis term; the Part Studio one now does too.
+* (psb, user bug) Hover-revealed eyes on instance, folder and mate rows now use `ui::hover_reveal`
+  (opacity, not `invisible()`): an invisible element has no mouse listeners in gpui, so quick clicks fell
+  through to the row. Please use `hover_reveal` for new hover-only controls.

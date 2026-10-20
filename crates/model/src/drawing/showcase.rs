@@ -62,7 +62,7 @@ pub fn showcase_document() -> Document {
         add(s, AnnotationKind::Gdt { anchor: [24.0, 112.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![], extra: Default::default() }, [24.0, 112.0]);
         add(s, AnnotationKind::Datum { anchor: [150.0, 144.0], label: "A".into() }, [150.0, 126.0]);
         add(s, AnnotationKind::Datum { anchor: [160.0, 200.0], label: "B".into() }, [175.0, 200.0]);
-        add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into() }, [95.0, 156.2]);
+        add(s, AnnotationKind::SurfaceFinish { anchor: [95.0, 156.2], value: "Ra 1.6".into(), leaders: Vec::new() }, [95.0, 156.2]);
         // A grouped ordinate dimension along the bottom of the top view.
         let o = [-0.05, -0.03];
         add(s, AnnotationKind::OrdinateGroup { view: ViewId(2), origin: o, points: vec![o, [-0.038, -0.018], [-0.0332, -0.018], [0.0, 0.0], [0.038, 0.018], [0.05, 0.03]], horizontal: true }, [110.0, 168.0]);
@@ -111,7 +111,7 @@ pub fn showcase_document() -> Document {
         let top = base(4, ViewOrientation::Top, [90.0, 120.0]);
         s.views.push(top);
         s.views.push(DrawingView { id: ViewId(5), kind: ViewKind::AlignedSection { parent: ViewId(4), center: [0.0, 0.0], a: [0.0, -0.045], b: [0.0475, 0.0225], label: "C".into() }, position: [200.0, 120.0], ..Default::default() });
-        s.views.push(DrawingView { id: ViewId(6), kind: ViewKind::Section { parent: ViewId(4), line: vec![[-0.06, -0.018], [-0.038, -0.018], [-0.038, 0.0], [0.06, 0.0]], label: "D".into() }, position: [90.0, 50.0], ..Default::default() });
+        s.views.push(DrawingView { id: ViewId(6), kind: ViewKind::Section { parent: ViewId(4), line: vec![[-0.06, -0.018], [-0.038, -0.018], [-0.038, 0.0], [0.06, 0.0]], label: "D".into(), cuts: vec![] }, position: [90.0, 50.0], ..Default::default() });
         let mut t = Table::new(1, TableKind::General { cells: vec![vec!["REV".into(), "DESCRIPTION".into(), "DATE".into()], vec!["A".into(), "Initial release of {part.name}".into(), "{date}".into()], vec!["B".into(), "Added hole table\nand BOM".into(), "{date}".into()]], title: Some("REVISIONS".into()), header: true }, [410.0, 287.0]);
         t.corner = TableCorner::TopRight;
         s.tables.push(t);
@@ -136,8 +136,8 @@ pub fn showcase_document() -> Document {
         front.broken_out.push(BrokenOut { profile: vec![[-0.024, -0.003], [0.0, -0.006], [0.024, -0.003], [0.026, 0.016], [0.0, 0.019], [-0.026, 0.016]], spline: true, depth: 0.03, depth_ref: None });
         s.views.push(front);
         s.views.push(base(2, ViewOrientation::Top, [85.0, 150.0]));
-        s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.025, -0.012], [-0.025, 0.012]], label: "E".into() }, position: [175.0, 150.0], partial: true, label: Some("PARTIAL".into()), ..Default::default() });
-        s.views.push(DrawingView { id: ViewId(4), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.06, -0.045], [0.06, 0.045]], label: "F".into() }, position: [125.0, 62.0], ..Default::default() });
+        s.views.push(DrawingView { id: ViewId(3), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.025, -0.012], [-0.025, 0.012]], label: "E".into(), cuts: vec![] }, position: [175.0, 150.0], partial: true, label: Some("PARTIAL".into()), ..Default::default() });
+        s.views.push(DrawingView { id: ViewId(4), kind: ViewKind::Section { parent: ViewId(2), line: vec![[-0.06, -0.045], [0.06, 0.045]], label: "F".into(), cuts: vec![] }, position: [125.0, 62.0], ..Default::default() });
         let mut cropped = base(5, ViewOrientation::Top, [262.0, 215.0]);
         cropped.crop = Some(Crop::Spline(vec![[0.012, -0.03], [0.05, -0.022], [0.05, 0.03], [0.03, 0.03], [0.02, 0.005]]));
         cropped.scale = Some(1.5);

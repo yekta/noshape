@@ -584,29 +584,38 @@ impl PartStudioView {
         noshape_units::format_quantity(q, &units)
     }
 
-    /// A measured value as the Measure readout / panel show it (bundle
-    /// `formatValue`, live part-studio/81: "90.000 deg", "11.902 in²"): the
-    /// document's display precision with trailing zeros kept, "deg" for
-    /// degrees.
-    fn measure_fmt(&self, q: Quantity, cx: &App) -> String {
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let angle = q.dim == Dim::ANGLE;
-        let decimals = usize::from(if angle { units.angle_precision } else { units.length_precision });
-        let mut num = format!("{:.*}", decimals, q.value / units.si_factor(q.dim));
-        if num.starts_with('-') && num[1..].chars().all(|c| c == '0' || c == '.') {
-            num.remove(0);
+    /// The Measure panel's (x): a new Variable feature with the measured
+    /// value, in its dialog.
+    fn create_variable_from_measure(&mut self, kind: &str, value: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.is_some() {
+            return;
         }
-        let unit = if angle {
-            units.angle.symbol().to_string()
-        } else {
-            let power = match q.dim.length {
-                2 => "²",
-                3 => "³",
-                _ => "",
-            };
-            format!("{}{power}", units.length.symbol())
-        };
-        format!("{num} {unit}")
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let Some(studio) = self.studio(cx) else { return };
+        let Some(mut feature) = studio.new_feature("assignVariable", &units) else { return };
+        let index = studio.rollback_index();
+        feature.params.set("mode", noshape_model::params::ParamValue::Enum("ASSIGNED".into()));
+        feature.params.set("variableType", noshape_model::params::ParamValue::Enum(kind.into()));
+        feature.params.set(noshape_model::variable_table::value_param(kind), noshape_model::params::ParamValue::Expr(noshape_units::ExprValue::new(value)));
+        self.open_dialog(feature, index, true, window, cx);
+    }
+
+    /// A measured value as the status-bar readout shows it (document units).
+    fn measure_fmt(&self, q: Quantity, cx: &App) -> String {
+        measure_fmt_in(q, &self.doc.read(cx).session.doc.settings.units)
+    }
+
+    /// The Measure panel's units: its own Length / Angle unit selects over
+    /// the workspace units.
+    fn measure_units(&self, cx: &App) -> noshape_units::UnitPrefs {
+        let mut u = self.doc.read(cx).session.doc.settings.units;
+        if let Some(l) = self.ui.measure_length_unit {
+            u.length = l;
+        }
+        if let Some(a) = self.ui.measure_angle_unit {
+            u.angle = a;
+        }
+        u
     }
 
     /// The live measurement of the selection left of the evaluation tools
@@ -614,6 +623,7 @@ impl PartStudioView {
     /// monospace; a point reads "Point: X↘ … Y↗ … Z↑ …" with colored axes).
     fn selection_readout(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let sel = self.selection.clone();
+        let sel_count = sel.len();
         let ctx = self.measure_context(&sel, cx)?;
         let results = match &self.measure_cache {
             Some((s, r)) if *s == sel => r.clone(),
@@ -623,7 +633,12 @@ impl PartStudioView {
                 r
             }
         };
-        let (label, m) = results.into_iter().next()?;
+        // Live (psb 10-20 m): the first primary row, plus the distances of a
+        // circular context on the same line; nothing for three edges.
+        let line = measure::quick_line(&results, sel_count);
+        if line.is_empty() {
+            return None;
+        }
         let pal = p();
         // "12.5 mm" -> number (monospace, underlined) and unit.
         let value = |text: String| {
@@ -634,24 +649,27 @@ impl PartStudioView {
                 .child(div().child(unit))
         };
         let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
-        let row = h_flex().gap(px(4.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
-        Some(match m {
-            Measurement::Point(pt) => {
-                let axis = |name: &'static str, color: u32, v: f64| h_flex().gap(px(2.)).child(div().text_color(gpui_kit::rgb(color)).child(name)).child(value(l(v)));
-                row.child(format!("{label}:")).child(axis("X↘", 0xd52b1e, pt.x)).child(axis("Y↗", 0x2e9b2e, pt.y)).child(axis("Z↑", 0x2a5bd7, pt.z)).into_any_element()
-            }
-            m => {
-                let text = match m {
-                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
-                    Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
-                    Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
-                    Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
-                    Measurement::Distance { distance, .. } => l(distance),
-                    Measurement::Point(_) => String::new(),
-                };
-                row.child(format!("{label}:")).child(value(text)).into_any_element()
-            }
-        })
+        let mut row = h_flex().gap(px(12.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
+        for (label, m) in line {
+            let item = h_flex().gap(px(4.)).child(format!("{label}:"));
+            row = row.child(match m {
+                // Live: "Point: 0.000 mm 5.000 mm 20.000 mm".
+                Measurement::Point(pt) => item.child(value(l(pt.x))).child(value(l(pt.y))).child(value(l(pt.z))),
+                m => {
+                    let text = match m {
+                        Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
+                        Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
+                        Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
+                        Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
+                        Measurement::Percent(x) => format!("{x:.2} %"),
+                        Measurement::Distance { distance, .. } => l(distance),
+                        Measurement::Point(_) => String::new(),
+                    };
+                    item.child(value(text))
+                }
+            });
+        }
+        Some(row.into_any_element())
     }
 
     /// Model evaluation tools at the bottom right (Onshape): Measure and
@@ -735,6 +753,8 @@ impl PartStudioView {
         }
         let ctx = self.context.clone().unwrap();
         let mut rows: Vec<(String, String)> = Vec::new();
+        // The Measure panel's rows: (label, value, X/Y/Z sub-row axis).
+        let mut mrows: Vec<MeasureRow> = Vec::new();
         let mut title = "Measure";
         // Part tab of Mass and section properties, laid out like Onshape's dialog.
         let mut mass_view: Option<MassView> = None;
@@ -827,41 +847,43 @@ impl PartStudioView {
                 }
             };
             let filter = self.ui.measure_type;
+            let units = self.measure_units(cx);
+            let f = |q: Quantity| measure_fmt_in(q, &units);
+            let l = |x: f64| f(Quantity::new(x, Dim::LENGTH));
             for (label, m) in results {
-                // Measure type selector (Onshape): show only one kind.
-                if let Some(f) = filter
-                    && !measurement_kind(&m).eq_ignore_ascii_case(f)
+                // Measure type selector (bundle: each type and the rows it keeps).
+                if let Some(t) = filter
+                    && measure_filter_type(&label) != Some(t)
                 {
                     continue;
                 }
                 let v = match m {
-                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx),
-                    Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
-                    Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
-                    Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
-                    Measurement::Point(p) => {
-                        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
-                        format!("{}, {}, {}", l(p.x), l(p.y), l(p.z))
-                    }
-                    Measurement::Distance { distance, dx, dy, dz, .. } => {
-                        let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
-                        rows.push(("ΔX / ΔY / ΔZ".into(), format!("{} / {} / {}", l(dx), l(dy), l(dz))));
-                        l(distance)
-                    }
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(x),
+                    Measurement::Area(x) => f(Quantity::new(x, Dim { length: 2, angle: 0 })),
+                    Measurement::Volume(x) => f(Quantity::new(x, Dim { length: 3, angle: 0 })),
+                    Measurement::Angle(x) => f(Quantity::new(x, Dim::ANGLE)),
+                    Measurement::Percent(x) => format!("{x:.2} %"),
+                    // Live: "Point: 0.000 in 0.197 in 0.787 in".
+                    Measurement::Point(p) => format!("{} {} {}", l(p.x), l(p.y), l(p.z)),
+                    Measurement::Distance { distance, .. } => l(distance),
                 };
-                rows.push((label, v));
-            }
-            if rows.is_empty() {
-                if !self.ui.measure_pinned {
-                    return Vec::new();
+                // (x) creates a variable with the value (not for areas or %).
+                let var = match m {
+                    Measurement::Angle(_) => Some(("ANGLE", v.clone())),
+                    Measurement::Area(_) | Measurement::Volume(_) | Measurement::Percent(_) | Measurement::Point(_) => None,
+                    _ => Some(("LENGTH", v.clone())),
+                };
+                mrows.push((label, v, None, var));
+                // Live: signed X / Y / Z sub-rows under a distance.
+                if let Measurement::Distance { dx, dy, dz, .. } = m {
+                    for (i, d) in [dx, dy, dz].into_iter().enumerate() {
+                        mrows.push((String::new(), l(d), Some(i), Some(("LENGTH", l(d)))));
+                    }
                 }
-                // Measure opened with `[`: prompt for a selection.
-                rows.push(("Select entities to measure".into(), String::new()));
             }
         }
         let current_type = self.ui.measure_type.unwrap_or("Show all");
         let view = cx.entity();
-        let units = self.doc.read(cx).session.doc.settings.units;
         let close = move |id: &'static str, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -871,7 +893,7 @@ impl PartStudioView {
                 .justify_center()
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.panel_hover))
-                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.show_mass = false;
                     this.ui.measure_pinned = false;
@@ -985,7 +1007,7 @@ impl PartStudioView {
                             .border_b_1()
                             .border_color(pal.border)
                             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties"))
-                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).child(crate::assets::icon("dialog-ok", 20., cx)))
+                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx)))
                             .child(close("mass-close", cx)),
                     )
                     .child(body.px(px(0.)).pb(px(4.)))
@@ -1018,7 +1040,7 @@ impl PartStudioView {
             .border_b_1()
             .border_color(pal.border)
             .dropdown_menu(move |mut m, _, _| {
-                for t in ["Show all", "Distance", "Length", "Area", "Angle", "Radius", "Diameter", "Position"] {
+                for t in MEASURE_TYPES {
                     let v = view.clone();
                     m = m.item(PopupMenuItem::new(t).checked(t == current_type).on_click(move |_, _, cx| {
                         v.update(cx, |this, cx| {
@@ -1030,8 +1052,48 @@ impl PartStudioView {
                 m
             })
             .into_any_element();
-        let length_unit: SharedString = format!("{:?}", units.length).into();
-        let angle_unit: SharedString = format!("{:?}", units.angle).into();
+        // Length unit / Angle unit: the panel's own (live: native selects;
+        // the workspace unit preselected, part-studio/190).
+        let munits = self.measure_units(cx);
+        let unit_menu = |id: &'static str, value: String, items: Vec<UnitChoice>, cx: &mut Context<Self>| {
+            let view = cx.entity();
+            let items = std::rc::Rc::new(items);
+            Button::new(id)
+                .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false))
+                .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).child(value.clone())).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
+                .flex_1()
+                .h(px(22.))
+                .px(px(4.))
+                .rounded(px(0.))
+                .border_b_1()
+                .border_color(pal.border)
+                .dropdown_menu(move |mut m, _, _| {
+                    for (i, (name, _)) in items.iter().enumerate() {
+                        let (v, items) = (view.clone(), items.clone());
+                        m = m.item(PopupMenuItem::new(name.clone()).checked(*name == value).on_click(move |_, _, cx| {
+                            v.update(cx, |this, cx| {
+                                (items[i].1)(this);
+                                cx.notify();
+                            })
+                        }));
+                    }
+                    m
+                })
+                .into_any_element()
+        };
+        let length_items: Vec<UnitChoice> = MEASURE_LENGTH_UNITS
+            .iter()
+            .map(|&(name, u)| (name.to_string(), Box::new(move |this: &mut Self| this.ui.measure_length_unit = Some(u)) as UnitAction))
+            .collect();
+        let angle_items: Vec<UnitChoice> = [("Degree", noshape_units::AngleUnit::Degree), ("Radian", noshape_units::AngleUnit::Radian)]
+            .into_iter()
+            .map(|(name, u)| (name.to_string(), Box::new(move |this: &mut Self| this.ui.measure_angle_unit = Some(u)) as UnitAction))
+            .collect();
+        let length_name = MEASURE_LENGTH_UNITS.iter().find(|(_, u)| *u == munits.length).map(|(n, _)| n.to_string()).unwrap_or_else(|| format!("{:?}", munits.length));
+        let angle_name = format!("{:?}", munits.angle);
+        let length_menu = unit_menu("measure-length-unit", length_name, length_items, cx);
+        let angle_menu = unit_menu("measure-angle-unit", angle_name, angle_items, cx);
+        let view_rows = cx.entity();
         vec![
             v_flex()
                 .id("measure-panel")
@@ -1046,17 +1108,36 @@ impl PartStudioView {
                 .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", cx)))
                 .child(field("Select entities to measure", selected_names, true, false))
                 .child(select_row("Measure type:", current_type.into(), Some(type_menu)))
-                .child(select_row("Length unit:", length_unit, None))
-                .child(select_row("Angle unit:", angle_unit, None))
+                .child(select_row("Length unit:", SharedString::default(), Some(length_menu)))
+                .child(select_row("Angle unit:", SharedString::default(), Some(angle_menu)))
                 .child(crate::ui::os_checkbox("measure-ref", "Reference coordinate system", false))
-                .children(rows.into_iter().filter(|(k, _)| !k.starts_with("Select")).map(|(k, v)| {
-                    h_flex()
-                        .min_h(px(26.))
-                        .px(px(5.))
-                        .gap(px(4.))
-                        .text_size(px(13.33))
-                        .child(div().text_color(pal.text).child(format!("{k}:")))
-                        .child(div().px(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).border_b_1().border_color(pal.border).font_family("monospace").text_size(px(12.)).child(v))
+                .children(mrows.into_iter().enumerate().map(|(n, (k, v, axis, var))| {
+                    // "12.5 in" -> monospace number on an underline and the unit.
+                    let (num, unit) = v.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((v, String::new()));
+                    let value = h_flex()
+                        .gap(px(2.))
+                        .child(div().font_family("monospace").text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(num))
+                        .child(div().text_size(px(12.)).child(unit));
+                    let row = h_flex().min_h(px(26.)).px(px(4.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text);
+                    let row = match axis {
+                        // Live: "X↘", "Y↗", "Z↑" in the axis colours, indented.
+                        Some(i) => {
+                            let (name, color, glyph) = [("X", 0xd52b1e, "↘"), ("Y", 0x2e9b2e, "↗"), ("Z", 0x2a5bd7, "↑")][i];
+                            row.pl(px(20.)).child(h_flex().child(div().text_color(pal.text_muted).child(name)).child(div().text_color(gpui_kit::rgb(color)).child(glyph))).child(value)
+                        }
+                        None => row.child(div().child(format!("{k}:"))).child(value),
+                    };
+                    // Live (behaviours.md: each row has an (x) "create variable"
+                    // icon at the right).
+                    let view = view_rows.clone();
+                    row.child(div().flex_1()).children(var.map(|(kind, text)| {
+                        div()
+                            .id(SharedString::from(format!("measure-var-{n}")))
+                            .cursor_pointer()
+                            .child(crate::assets::icon("variable", 16., cx))
+                            .tooltip(crate::ui::tooltip("Create variable"))
+                            .on_click(move |_, window, cx| view.update(cx, |this, cx| this.create_variable_from_measure(kind, &text, window, cx)))
+                    }))
                 }))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().bg(gpui_kit::rgb(0xeeeeee)).child(help()))
                 .into_any_element(),
@@ -1077,15 +1158,66 @@ struct MassView {
 }
 
 /// Kind of a measurement for the measure type selector.
-fn measurement_kind(m: &Measurement) -> &'static str {
-    match m {
-        Measurement::Length(_) => "Length",
-        Measurement::Area(_) | Measurement::Volume(_) => "Area",
-        Measurement::Radius(_) => "Radius",
-        Measurement::Diameter(_) => "Diameter",
-        Measurement::Distance { .. } => "Distance",
-        Measurement::Angle(_) => "Angle",
-        Measurement::Point(_) => "Position",
+/// A Measure panel row: label, value, X/Y/Z sub-row axis, and the (x)
+/// variable it creates (type, value).
+type MeasureRow = (String, String, Option<usize>, Option<(&'static str, String)>);
+
+/// A Measure panel unit choice: its name and what picking it does.
+type UnitAction = Box<dyn Fn(&mut PartStudioView)>;
+type UnitChoice = (String, UnitAction);
+
+/// The Measure panel's types (bundle: the Measure type select).
+const MEASURE_TYPES: [&str; 12] = ["Show all", "Position", "Center position", "Min distance", "Max distance", "Length", "Diameter", "Radius", "Angle", "Face tangent angle", "Curvature deviation", "Surface area"];
+
+/// The panel's Length unit choices (live order).
+const MEASURE_LENGTH_UNITS: [(&str, noshape_units::LengthUnit); 6] = [
+    ("Centimeter", noshape_units::LengthUnit::Centimeter),
+    ("Foot", noshape_units::LengthUnit::Foot),
+    ("Inch", noshape_units::LengthUnit::Inch),
+    ("Meter", noshape_units::LengthUnit::Meter),
+    ("Millimeter", noshape_units::LengthUnit::Millimeter),
+    ("Yard", noshape_units::LengthUnit::Yard),
+];
+
+/// The Measure type a row belongs to (bundle: the map from each type to
+/// its measurement types; Angle keeps every angle; the other distances only
+/// show with Show all).
+fn measure_filter_type(label: &str) -> Option<&'static str> {
+    Some(match label {
+        "Point" => "Position",
+        "Center" => "Center position",
+        "Min dist" => "Min distance",
+        "Max dist" => "Max distance",
+        "Length" => "Length",
+        "Diameter" => "Diameter",
+        "Radius" => "Radius",
+        "Angle" | "Perp planes angle" | "Perp lines angle" | "Perp axes angle" | "Perp line and plane angle" => "Angle",
+        "Curvature deviation" => "Curvature deviation",
+        "Area" => "Surface area",
+        _ => return None,
+    })
+}
+
+/// A measured value as Onshape's measure readout and panel write it (bundle
+/// `formatValue`, live part-studio/81: "90.000 deg", "11.902 in²"): the
+/// display precision with trailing zeros kept, "deg" for degrees.
+fn measure_fmt_in(q: Quantity, units: &noshape_units::UnitPrefs) -> String {
+    let angle = q.dim == Dim::ANGLE;
+    let decimals = usize::from(if angle { units.angle_precision } else { units.length_precision });
+    let mut num = format!("{:.*}", decimals, q.value / units.si_factor(q.dim));
+    if num.starts_with('-') && num[1..].chars().all(|c| c == '0' || c == '.') {
+        num.remove(0);
     }
+    let unit = if angle {
+        units.angle.symbol().to_string()
+    } else {
+        let power = match q.dim.length {
+            2 => "²",
+            3 => "³",
+            _ => "",
+        };
+        format!("{}{power}", units.length.symbol())
+    };
+    format!("{num} {unit}")
 }
 

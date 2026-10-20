@@ -109,7 +109,18 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             }
         };
         let props = studio.part_properties.get(&b.id);
-        let color = props.and_then(|p| p.appearance).map(|a| a.color).unwrap_or(PART_COLORS[b.color % PART_COLORS.len()]);
+        let color = props
+            .and_then(|p| p.appearance)
+            .map(|a| a.color)
+            .or_else(|| ctx.part_appearance.get(&b.id).copied())
+            .unwrap_or(PART_COLORS[b.color % PART_COLORS.len()]);
+        // Faces a feature colored (an import's face colours).
+        let face_colors: Vec<Option<[f32; 4]>> = if ctx.face_appearance.is_empty() {
+            Vec::new()
+        } else {
+            b.faces.iter().map(|n| ctx.face_appearance.iter().rev().find(|(id, f, _)| *id == b.id && n.descends_from(f)).map(|(_, _, c)| *c)).collect()
+        };
+        let face_colors = if face_colors.iter().any(Option::is_some) { face_colors } else { Vec::new() };
         let bounds = b.shape.bounding_box(false).ok().map(|x| (x.min, x.max));
         d.bodies.push(BodyDisplay {
             id: b.id.clone(),
@@ -124,6 +135,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             bounds,
             composite: b.composite.clone(),
             is_mesh: b.shape.is_mesh(),
+            face_colors,
         });
     }
     meshes.retain(|k, _| used.contains(k));
@@ -148,8 +160,13 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         };
         d.planes.push(PlaneDisplay { reference: p.reference.clone(), name: p.name.clone(), frame: p.frame, half_width: p.half_width, half_height: p.half_height, hidden });
     }
-    // Renamed default planes and planes sized with "Size to Part Studio".
+    // Renamed default planes and planes sized with "Size to Part Studio";
+    // hidden default planes (they come from `StudioDisplay::defaults`, not
+    // `ctx.planes`: Hide on Top/Front/Right left them drawn).
     for p in &mut d.planes {
+        if matches!(p.reference, Reference::Plane(_)) {
+            p.hidden = studio.hidden_defaults.contains(&p.reference);
+        }
         if let Some((_, n)) = studio.default_names.iter().find(|(r, _)| *r == p.reference) {
             p.name = n.clone();
         }
@@ -270,5 +287,17 @@ mod plane_override_tests {
         let pl = res.display.planes.iter().find(|p| p.reference == top).expect("top plane");
         assert_eq!(pl.name, "Base");
         assert_eq!((pl.half_width, pl.half_height), (0.2, 0.1));
+    }
+
+    /// User bug (v0.4.0): Hide on a default plane left it drawn.
+    #[test]
+    fn hidden_default_planes_and_origin() {
+        let mut ps = crate::partstudio::PartStudio::new();
+        ps.hidden_defaults = vec![Reference::Plane(DatumPlane::Front), Reference::Origin];
+        let res = Regenerator::new().regenerate(&ps, &Default::default(), &noshape_units::UnitPrefs::default(), &RegenOptions::default());
+        let hidden = |d: DatumPlane| res.display.planes.iter().find(|p| p.reference == Reference::Plane(d)).is_some_and(|p| p.hidden);
+        assert!(hidden(DatumPlane::Front));
+        assert!(!hidden(DatumPlane::Top));
+        assert!(!res.display.show_origin);
     }
 }

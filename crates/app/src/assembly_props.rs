@@ -99,10 +99,13 @@ impl AssemblyView {
             let TabContent::Assembly(a) = &t.content else { return };
             (t.name.clone(), a.properties.clone())
         };
+        // This assembly's own row: its computed mass and Mass override
+        // (live assembly/726: "Mass ƒ ☑ Override 2 lb").
+        let computed = (tab == self.tab).then(|| self.assembly_total_mass(cx)).flatten();
         let spec = MetaSpec {
             category: "Onshape Assembly",
             material: None,
-            computed_mass: None,
+            computed_mass: (tab == self.tab).then(|| computed.map(|m| format!("{m:.4} kg")).unwrap_or_default()),
             bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()),
             values: MetaValues {
                 name,
@@ -110,7 +113,7 @@ impl AssemblyView {
                 part_number: props.part_number.clone().unwrap_or_default(),
                 revision: props.revision.clone().unwrap_or_default(),
                 meta: props.meta.clone(),
-                mass_override: None,
+                mass_override: props.mass_override.map(|m| format!("{m} kg")),
                 bom: BomBehavior::ALL.iter().position(|b| *b == props.bom_behavior).unwrap_or(0),
             },
         };
@@ -128,6 +131,7 @@ impl AssemblyView {
                                 a.properties.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
                                 a.properties.meta = v.meta.clone();
                                 a.properties.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
+                                a.properties.mass_override = v.mass_override.as_deref().and_then(parse_mass);
                             }
                         }
                     })
@@ -306,7 +310,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.dynamic_suppression = None;
                                     cx.notify();
@@ -1054,7 +1058,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.ps_in_context = None;
                                     cx.notify();

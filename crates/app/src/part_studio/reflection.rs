@@ -217,7 +217,7 @@ impl PartStudioView {
                 .child(div().w(px(48.)).text_color(pal.text_muted).child(label))
                 .child(h_flex().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(div().flex_1().text_color(pal.text).child(value)).child(Icon::new(IconName::ChevronDown).with_size(px(12.)).text_color(pal.text_muted)))
         };
-        let mut body = v_flex().flex_1().p(px(6.)).gap(px(6.)).child(div().border_1().border_color(gpui_kit::rgb(0xbdbdbd)).rounded(px(2.)).child(Input::new(&search).appearance(false).small()));
+        let mut body = v_flex().flex_1().p(px(6.)).gap(px(6.)).child(gpui_kit::base::input::input_frame(div().border_1().border_color(gpui_kit::rgb(0xbdbdbd)).rounded(px(2.)).child(Input::new(&search).appearance(false).small())));
         match tab {
             2 => {
                 let view = cx.entity();

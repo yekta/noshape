@@ -119,10 +119,6 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    pub fn has_revision_table(&self) -> bool {
-        self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Revision { .. }))
-    }
-
     /// The revision new callouts get: the latest (pending first), else "A".
     pub fn latest_revision(&self) -> String {
         self.info.revisions.last().map(|r| r.revision.clone()).unwrap_or_else(|| noshape_model::release::next_label(None))
@@ -182,7 +178,7 @@ impl DrawingEditor {
 
     /// Right-click on a revision table (`cell`: the cell under the cursor).
     pub fn revision_table_entries(&self, id: u64, cell: Option<(usize, usize)>) -> Vec<MenuEntry> {
-        let mut out = vec![MenuEntry::item("Revision table properties…", move |t, w, cx| t.open_revision_props(id, w, cx))];
+        let mut out = vec![MenuEntry::item("Revision table properties...", move |t, w, cx| t.open_revision_props(id, w, cx))];
         let Some(t) = self.drawing.sheets[self.sheet].table(id) else { return out };
         // The revision of the row under the cursor (row 0 is the header).
         let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
@@ -325,7 +321,7 @@ impl DrawingEditor {
                 .justify_center()
                 .cursor_pointer()
                 .when(accept, |e| e.bg(gpui_kit::rgb(0x009500)).child(crate::ui::glyph("check", 18., gpui_kit::white())))
-                .when(!accept, |e| e.child(crate::ui::glyph("close", 14., pal.cancel)))
+                .when(!accept, |e| e.child(crate::drawing_chrome::cancel_x(cx)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.close_revision_dlg(accept, cx)))
         };
         Some(
@@ -336,7 +332,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(250.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())

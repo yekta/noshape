@@ -227,8 +227,8 @@ impl Render for NumberingPrefsView {
             .child(div().absolute().left(px(x_preview)).w(px(130.)).top_0().flex().justify_center().child(bold("Preview")))
             .child(div().absolute().left(px(x_min - 10.)).w(px(66.)).top(px(mid - 17.0 - 26.0)).flex().justify_center().child(bold("Min length")))
             .child(div().absolute().left(px(x_next)).w(px(46.)).top(px(mid - 17.0 - 26.0)).flex().justify_center().child(bold("Next")))
-            .child(div().absolute().left(px(x_min)).top(px(mid - 17.0)).child(chart_box(46.).justify_center().child(Input::new(&inp.min_length).appearance(false).small())))
-            .child(div().absolute().left(px(x_next)).top(px(mid - 17.0)).child(chart_box(46.).justify_center().child(Input::new(&inp.next).appearance(false).small())))
+            .child(div().absolute().left(px(x_min)).top(px(mid - 17.0)).child(gpui_kit::base::input::input_frame(chart_box(46.).justify_center().child(Input::new(&inp.min_length).appearance(false).small()))))
+            .child(div().absolute().left(px(x_next)).top(px(mid - 17.0)).child(gpui_kit::base::input::input_frame(chart_box(46.).justify_center().child(Input::new(&inp.next).appearance(false).small()))))
             .child(hline(x_lbracket, x_min, mid))
             .child(hline(x_min + 46.0, x_next, mid))
             .child(hline(x_next + 46.0, x_rbracket, mid))
@@ -238,7 +238,7 @@ impl Render for NumberingPrefsView {
             let y = center(r);
             chart = chart
                 .child(div().absolute().left(px(10.)).top(px(y - 10.)).child(bold(label)))
-                .when_some(inp.prefixes.get(r), |d, st| d.child(div().absolute().left(px(x_prefix)).top(px(y - 17.)).child(chart_box(75.).child(Input::new(st).appearance(false).small()))))
+                .when_some(inp.prefixes.get(r), |d, st| d.child(div().absolute().left(px(x_prefix)).top(px(y - 17.)).child(gpui_kit::base::input::input_frame(chart_box(75.).child(Input::new(st).appearance(false).small())))))
                 .child(hline(x_prefix + 75.0, x_lbracket, y))
                 .child(hline(x_rbracket, x_preview, y))
                 .child(div().absolute().left(px(x_preview)).top(px(y - 17.)).child(chart_box(130.).justify_end().text_color(pal.text_muted).child(s.preview(r))));

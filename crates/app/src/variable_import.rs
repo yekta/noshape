@@ -66,7 +66,7 @@ pub fn open(doc: Entity<DocModel>, tab: TabId, i: usize, window: &mut Window, cx
         let file_name = state.file.and_then(|t| doc.read(cx).session.doc.tab(t)).filter(|t| matches!(t.content, TabContent::File(_))).map(|t| t.name.clone());
         let preview = noshape_model::variables::import_value(&doc.read(cx).session.doc, &state).map(|v| v.to_string()).unwrap_or_else(|_| "?".into());
         let title = format!("#{} = {}", name.read(cx).value(), preview);
-        let underline = |st: &Entity<InputState>| div().flex_1().border_b_1().border_color(rgb(0xcccccc)).child(Input::new(st).appearance(false).h(px(26.)).text_size(px(14.)));
+        let underline = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(rgb(0xcccccc)).child(Input::new(st).appearance(false).h(px(26.)).text_size(px(14.))));
         let num_row = |label: &'static str, st: &Entity<InputState>| h_flex().h(px(30.)).pl(px(18.)).gap(px(8.)).child(div().text_size(px(13.33)).text_color(pal.text_muted).child(label)).child(div().w(px(60.)).ml_auto().child(Input::new(st).appearance(false).h(px(26.)).text_size(px(14.)).text_right()));
         let select = |id: &'static str, opts: Vec<String>, cur: usize, set: Rc<dyn Fn(usize)>| os::select_field(id, opts, cur, move |k, w, _| {
             set(k);

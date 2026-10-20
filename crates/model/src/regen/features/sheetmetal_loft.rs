@@ -7,7 +7,7 @@
 //! flattened.
 
 use super::bshared::{curve_edges, order_chain, sample_chain};
-use super::sheetmetal_ops::{bend_corner, rip_corner};
+use super::sheetmetal_ops::{bend_corner, slot_rip};
 use super::sheetmetal_util::*;
 use crate::display::BodyKind;
 use crate::naming::Name;
@@ -288,7 +288,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     for j in joints {
         let (a, b) = ((j + nf - 1) % nf, j % nf);
         if c1 && j == rip_at {
-            rip_corner(ev, bi, &mut data, a, b, "EDGE").map_err(|e| fe(format!("The loft rip failed: {}", e.message)))?;
+            slot_rip(ev, bi, &mut data, a, b, "EDGE").map_err(|e| fe(format!("The loft rip failed: {}", e.message)))?;
             continue;
         }
         if normals[a].cross(normals[b]).length() < 1e-9 {

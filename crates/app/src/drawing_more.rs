@@ -17,7 +17,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::views;
 use noshape_model::drawing::*;
-use noshape_model::drawing::{format, templates};
+use noshape_model::drawing::format;
 
 fn sub(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     [a[0] - b[0], a[1] - b[1]]
@@ -188,8 +188,11 @@ impl DrawingEditor {
                 if len(sub(c, s)) < 4.0 {
                     return None;
                 }
-                let n = self.current_sheet().annotations.iter().filter(|x| matches!(&x.kind, AnnotationKind::DatumTarget { label, .. } if label.starts_with('A'))).count() + 1;
-                Some(Annotation { id, kind: AnnotationKind::DatumTarget { view: a.view, anchor: a.p, label: format!("A{n}"), area: DatumTargetArea::Point }, position: c, refs: refs(vec![(0, a.r.clone())]), ..Default::default() })
+                // Help datum: the digit increments within a set (A1, A2…), a
+                // new set takes the next letter (B1, C1…).
+                let letter = self.datum_target_letter.unwrap_or_else(|| self.next_target_set());
+                let n = self.current_sheet().annotations.iter().filter(|x| matches!(&x.kind, AnnotationKind::DatumTarget { label, .. } if label.starts_with(letter))).count() + 1;
+                Some(Annotation { id, kind: AnnotationKind::DatumTarget { view: a.view, anchor: a.p, label: format!("{letter}{n}"), area: DatumTargetArea::Point }, position: c, refs: refs(vec![(0, a.r.clone())]), ..Default::default() })
             }
             _ => None,
         }
@@ -207,9 +210,13 @@ impl DrawingEditor {
     }
 
     pub fn more_overlay(&self, overlay: &mut Overlay) {
-        // Selected table cells.
-        if let Some((a, b)) = self.cell_sel_rect() {
-            overlay.rect(a, b, false);
+        // Table cells: the drag-select rubber band (tan) and the selected
+        // block (blue, 2 px; help images table-select-cells-01, table-copy-01).
+        let rect = |a: [f64; 2], b: [f64; 2]| vec![a, [b[0], a[1]], b, [a[0], b[1]], a];
+        if let Drag::SelectCells { start, .. } = self.drag {
+            overlay.tinted.push((rect(start, self.cursor), [249, 229, 193, 255], 2.0));
+        } else if let Some((a, b)) = self.cell_sel_rect() {
+            overlay.tinted.push((rect(a, b), [33, 96, 168, 255], 2.0));
         }
         let c = self.hover_snap.unwrap_or(self.cursor);
         match &self.tool {
@@ -264,6 +271,9 @@ impl DrawingEditor {
             }
             Tool::CropPoly { parent, mut points, spline } => {
                 if let Some(pp) = self.view_point(parent) {
+                    if self.crop_refused(pp.view) {
+                        return true;
+                    }
                     if parent.is_none() {
                         points.clear();
                     }
@@ -278,6 +288,9 @@ impl DrawingEditor {
             }
             Tool::DatumTarget { anchor: Some(_) } => {
                 if let Some(a) = self.pending_annotation() {
+                    if let AnnotationKind::DatumTarget { label, .. } = &a.kind {
+                        self.datum_target_letter = label.chars().next();
+                    }
                     self.edit_sheet("Datum target", cx, |s| s.annotations.push(a));
                     self.tool = Tool::DatumTarget { anchor: None };
                 }
@@ -291,6 +304,8 @@ impl DrawingEditor {
                     Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
                     Some(AnnotationKind::Note { style, .. }) => style.leaders.push(leader),
                     Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
+                    Some(AnnotationKind::Balloon { callout, .. }) => callout.leaders.push(leader),
+                    Some(AnnotationKind::SurfaceFinish { leaders, .. }) => leaders.push(leader),
                     _ => {}
                 });
                 self.tool = Tool::Select;
@@ -371,41 +386,9 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ menus
 
-    pub fn view_more_entries(&self, id: ViewId) -> Vec<MenuEntry> {
-        let mut out = Vec::new();
-        let sheet = self.current_sheet();
-        let Some(v) = sheet.view(id).cloned() else { return out };
-        if matches!(v.kind, ViewKind::Section { .. }) {
-            let partial = v.partial;
-            out.push(MenuEntry::check("Partial section", partial, move |t, _, cx| t.edit_view("Partial section", id, cx, |v| v.partial = !partial)));
-            if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
-                out.push(MenuEntry::item("Cutting line angle…", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
-            }
-        }
-        if !v.broken_out.is_empty() {
-            for i in 0..v.broken_out.len() {
-                out.push(MenuEntry::item(format!("Edit broken-out section {}…", i + 1), move |t, w, cx| t.open_broken_out_panel(id, i, w, cx)));
-            }
-            out.push(MenuEntry::item("Remove broken-out sections", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
-        }
-        let mut sheets: Vec<MenuEntry> = self
-            .drawing
-            .sheets
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != self.sheet)
-            .map(|(i, s)| MenuEntry::item(s.name.clone(), move |t, _, cx| t.move_selected_views(id, Some(i), cx)))
-            .collect();
-        if !sheets.is_empty() {
-            sheets.push(MenuEntry::Separator);
-        }
-        sheets.push(MenuEntry::item("New sheet", move |t, _, cx| t.move_selected_views(id, None, cx)));
-        out.push(MenuEntry::Submenu("Move to sheet".into(), sheets));
-        out
-    }
 
     /// Move the selected views (with `id`) to sheet `to` (None = a new sheet).
-    fn move_selected_views(&mut self, id: ViewId, to: Option<usize>, cx: &mut Context<Self>) {
+    pub fn move_selected_views(&mut self, id: ViewId, to: Option<usize>, cx: &mut Context<Self>) {
         let mut ids: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
         if !ids.contains(&id) {
             ids = vec![id];
@@ -413,11 +396,12 @@ impl DrawingEditor {
         let mut d = self.drawing.clone();
         let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
         match d.move_views_to_sheet(self.sheet, &ids, to, Some(&self.sources)) {
-            Ok(_) => {
+            Ok(moved) => {
                 let name = d.sheets[to].name.clone();
-                self.selection.clear();
                 self.commit("Move to sheet", d, cx);
                 self.switch_sheet(to, cx);
+                // Live drawing/286: the moved object stays selected.
+                self.selection = moved.iter().map(|(_, n)| Sel::View(*n)).collect();
                 self.status = Some(format!("Moved to {name}").into());
             }
             Err(e) => self.status = Some(e.into()),
@@ -451,8 +435,34 @@ impl DrawingEditor {
                     }));
                 }
             }
+            // Callouts and surface finish symbols (help callout_balloon,
+            // surface_finish): Add leader / Remove leaders.
+            AnnotationKind::Balloon { callout, .. } => {
+                out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                if !callout.leaders.is_empty() {
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                        t.edit_sheet("Remove leaders", cx, |s| {
+                            if let Some(AnnotationKind::Balloon { callout, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                                callout.leaders.clear();
+                            }
+                        })
+                    }));
+                }
+            }
+            AnnotationKind::SurfaceFinish { leaders, .. } => {
+                out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                if !leaders.is_empty() {
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                        t.edit_sheet("Remove leaders", cx, |s| {
+                            if let Some(AnnotationKind::SurfaceFinish { leaders, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                                leaders.clear();
+                            }
+                        })
+                    }));
+                }
+            }
             AnnotationKind::Weld { spec, .. } => {
-                out.push(MenuEntry::item("Edit…", move |t, w, cx| t.open_weld_edit(id, w, cx)));
+                out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_weld_edit(id, w, cx)));
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !spec.leaders.is_empty() {
                     out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
@@ -491,7 +501,7 @@ impl DrawingEditor {
                 out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog }, cx)));
             }
             &AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } => {
-                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle }, cx)));
+                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false }, cx)));
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                 let label = if direct { "Display as foreshortened diameter" } else { "Display as direct diameter" };
@@ -530,48 +540,18 @@ impl DrawingEditor {
             }
             AnnotationKind::DatumTarget { .. } => {
                 let a2 = a.clone();
-                out.push(MenuEntry::item("Edit…", move |t, w, cx| t.open_more_panel(&a2, w, cx)));
+                out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_more_panel(&a2, w, cx)));
             }
             _ => {}
         }
         out
     }
 
-    pub fn template_entries(&self) -> Vec<MenuEntry> {
-        let cur = self.current_sheet();
-        templates::standard_templates()
-            .into_iter()
-            .map(|tp| {
-                let checked = cur.size == tp.size && cur.title_style == tp.style && self.drawing.units_mm != tp.inches;
-                let (w, h) = tp.size.size_mm();
-                let label = format!("{}  ({} × {} {})", tp.name, if tp.inches { format::format_number(w / 25.4, Some(1), 1) } else { format!("{w}") }, if tp.inches { format::format_number(h / 25.4, Some(1), 1) } else { format!("{h}") }, if tp.inches { "in" } else { "mm" });
-                MenuEntry::check(label, checked, move |t, _, cx| {
-                    let si = t.sheet;
-                    t.edit(&format!("Template {}", tp.name), cx, |d| templates::apply_template(d, si, &tp));
-                    t.fitted = false;
-                })
-            })
-            .collect()
-    }
-
-    pub fn title_style_entries(&self) -> Vec<MenuEntry> {
-        let cur = self.current_sheet().title_style;
-        TitleBlockStyle::ALL
-            .into_iter()
-            .map(|st| {
-                MenuEntry::check(st.name(), cur == st, move |t, _, cx| {
-                    let si = t.sheet;
-                    t.edit("Title block layout", cx, |d| templates::set_title_style(d, si, st));
-                })
-            })
-            .collect()
-    }
-
     pub fn table_more_entries(&self, t: &Table, cell: Option<(usize, usize)>) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         let id = t.id;
         let Some((r, c)) = cell.map(|(r, c)| t.anchor_cell(r, c)) else { return out };
-        out.push(MenuEntry::item("Format cell…", move |t, w, cx| t.open_cell_format_panel(id, r, c, w, cx)));
+        out.push(MenuEntry::item("Format cell...", move |t, w, cx| t.open_cell_format_panel(id, r, c, w, cx)));
         let m = t.merge_at(r, c).unwrap_or(CellMerge { row: r, col: c, rows: 1, cols: 1 });
         let ncols = self.built.as_ref().and_then(|b| b.table_layout(id)).map(|l| l.xs.len() - 1).unwrap_or(1);
         let nrows = self.built.as_ref().and_then(|b| b.table_layout(id)).map(|l| l.ys.len() - 1 - l.title as usize).unwrap_or(1);
@@ -604,7 +584,7 @@ impl DrawingEditor {
                 ],
             ));
             let (w, h) = (l.xs.get(c + 1).zip(l.xs.get(c)).map(|(b, a)| b - a).unwrap_or(20.0), t.row_height);
-            out.push(MenuEntry::item("Resize…", move |t, win, cx| {
+            out.push(MenuEntry::item("Resize...", move |t, win, cx| {
                 let width = t.input(&format::format_number(w, None, 2), win, cx);
                 let height = t.input(&format::format_number(h, None, 2), win, cx);
                 t.panel = Some(Panel::CellResize { table: id, col: c, width, height });
@@ -635,7 +615,7 @@ impl DrawingEditor {
         }
     }
 
-    fn open_broken_out_panel(&mut self, view: ViewId, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_broken_out_panel(&mut self, view: ViewId, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(b) = self.current_sheet().view(view).and_then(|v| v.broken_out.get(index)).cloned() else { return };
         let u = format::length_units(&self.drawing, &DimFormat::default());
         let depth = self.input(&format::format_number(b.depth / u.meters(), None, 4), window, cx);
@@ -653,7 +633,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(table) else { return };
         let f = t.cell_format(row, col);
         let height = self.input(&f.height.map(|h| format::format_number(h, None, 2)).unwrap_or_default(), window, cx);

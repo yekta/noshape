@@ -48,6 +48,9 @@ pub fn import_foreign() -> FeatureType {
     let p = vec![
         hidden(ParamSpec::bool("dependsOnBlob", "Depends on blob", false)),
         hidden(ParamSpec::text("blobData", "Blob data", "")),
+        // The file's parts (JSON list of [`ImportPartInfo`], one per child of
+        // the compound in `blobData`): names and appearances.
+        hidden(ParamSpec::text("partInfo", "Part info", "")),
         hidden(ParamSpec::text("foreignId", "Foreign id", "")),
         ParamSpec::bool("importAppearances", "Import appearances", true),
         hidden(ParamSpec::bool("specifyMaterialData", "Specify material data", false)),
@@ -67,4 +70,17 @@ pub fn import_foreign() -> FeatureType {
         hidden(ParamSpec::bool("fixSingleCompositeEmptyName", "Fix single composite empty name", false)),
     ];
     FeatureType::new("importForeign", "Import", Category::Import, p).hidden().describe("Geometry imported from a CAD file")
+}
+
+/// What an imported file says about one of its parts: its name, its colour
+/// and its faces' own colours (sRGB 0..1; face index in the part shape's
+/// face order). Stored as JSON in the Import feature's `partInfo`.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ImportPartInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<[f32; 3]>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faces: Vec<(usize, [f32; 3])>,
 }

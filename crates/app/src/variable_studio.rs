@@ -134,9 +134,15 @@ impl VariableStudioView {
         // The add row's cell shows Onshape's "Name" placeholder.
         let placeholder = if key == "new" { "Name" } else { "" };
         let st = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder).default_value(value.clone()));
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+        let add_row = key == "new";
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
+                // The add row empties once used: Enter then the blur that
+                // follows added the variable twice ("cd", "cd").
+                if add_row && !v.trim().is_empty() {
+                    st.update(cx, |s, cx| s.set_value("", window, cx));
+                }
                 commit(this, v, cx);
             }
         });
@@ -485,11 +491,14 @@ impl Render for VariableStudioView {
                         }))
                         .into_any_element()
                 }
-                None => cell_div()
-                    .id(("vs-val", i))
-                    .when_some(error, |d, e| d.text_color(pal.error).tooltip(crate::ui::tooltip(e)))
-                    .child(cell_input(&expr))
-                    .into_any_element(),
+                // The whole cell takes clicks (Onshape's cell is the input).
+                None => gpui_kit::base::input::input_frame(
+                    cell_div()
+                        .id(("vs-val", i))
+                        .when_some(error, |d, e| d.text_color(pal.error).tooltip(crate::ui::tooltip(e)))
+                        .child(cell_input(&expr)),
+                )
+                .into_any_element(),
             };
             let kind = v.kind.unwrap_or(VarKind::Any);
             let cell_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -503,7 +512,7 @@ impl Render for VariableStudioView {
                     .bg(rgb(0xffffff))
                     .text_size(px(14.))
                     .text_color(pal.text)
-                    .child(cell_div().child(cell_input(&name)))
+                    .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&name))))
                     .child(
                         cell_div()
                             .relative()
@@ -554,8 +563,8 @@ impl Render for VariableStudioView {
                         ),
                     )
                     .child(value_cell)
-                    .child(cell_div().child(cell_input(&desc)))
-                    .os_context_menu(move |m, _, _| {
+                    .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&desc))))
+                    .os_context_menu_over_inputs(move |m, _, _| {
                         let (v1, v2, v3) = (menu_view.clone(), menu_view.clone(), menu_view.clone());
                         let m = m.item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.delete_variable(i, cx))));
                         let m = if i > 0 { m.item(crate::os_menu::OsMenuItem::new("Move up").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.move_variable(i, false, cx)))) } else { m };
@@ -663,7 +672,7 @@ impl Render for VariableStudioView {
                         .children(["Name", "Variable type", "Value", "Description"].map(|h| cell_div().justify_center().child(h))),
                 )
                 .children(rows)
-                .when(only.is_none(), |t| t.child(h_flex().child(cell_div().border_l_1().italic().child(cell_input(&new_name)))))
+                .when(only.is_none(), |t| t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().italic().child(cell_input(&new_name))))))
             });
         if self.host.is_some() {
             return v_flex().track_focus(&self.focus).child(table).into_any_element();

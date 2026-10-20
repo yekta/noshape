@@ -240,7 +240,7 @@ pub fn configure_pin_length(ps: &mut PartStudio) {
     use crate::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption};
     let Some(ex) = ps.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id) else { return };
     let opt = |id: &str| ListOption { id: id.into(), name: id.into() };
-    ps.configuration.inputs.push(ConfigInput { id: "Length".into(), name: "Length".into(), kind: ConfigInputKind::List { options: vec![opt("Standard"), opt("Long")], default: "Standard".into() }, visible_when: None });
+    ps.configuration.inputs.push(ConfigInput { id: "Length".into(), name: "Length".into(), kind: ConfigInputKind::List { options: vec![opt("Standard"), opt("Long")], default: "Standard".into() }, visible_when: None, excluded: false });
     ps.configuration.configured.push(ConfiguredParam {
         input: "Length".into(),
         feature: ex,
@@ -358,7 +358,7 @@ pub fn demo_document_with_drawing() -> Document {
         right.style = RenderStyle::HiddenLinesVisible;
         sheet.views.push(right);
         sheet.views.push(view(4, ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 1.0]) }, [335.0, 215.0]));
-        sheet.views.push(view(5, ViewKind::Section { parent: ViewId(2), line: vec![[0.0, -0.04], [0.0, 0.04]], label: "A".into() }, [230.0, 215.0]));
+        sheet.views.push(view(5, ViewKind::Section { parent: ViewId(2), line: vec![[0.0, -0.04], [0.0, 0.04]], label: "A".into(), cuts: Vec::new() }, [230.0, 215.0]));
         let mut detail = view(6, ViewKind::Detail { parent: ViewId(2), center: [0.038, 0.018], radius: 0.011, label: "B".into() }, [335.0, 115.0]);
         detail.scale = Some(2.0);
         sheet.views.push(detail);
@@ -384,8 +384,8 @@ pub fn demo_document_with_drawing() -> Document {
     add(sheet, lin(2, [-0.05, 0.03], [0.05, 0.03], 8.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, 0.03, 0.0))), (1, v(DVec3::new(0.05, 0.03, 0.0)))]);
     add(sheet, lin(2, [-0.05, -0.03], [-0.05, 0.03], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(-0.05, 0.03, 0.0)))]);
     // Hole sizes.
-    add(sheet, AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 2.4 }, [0.0; 2], vec![(0, c(DVec3::ZERO, false))]);
-    add(sheet, AnnotationKind::RadialDimension { view: ViewId(6), center: [0.038, 0.018], radius: 0.0048, diameter: false, angle: 0.9 }, [0.0; 2], vec![(0, c(DVec3::new(0.038, 0.018, 0.0), false))]);
+    add(sheet, AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: true, angle: 2.4, dim_line: false }, [0.0; 2], vec![(0, c(DVec3::ZERO, false))]);
+    add(sheet, AnnotationKind::RadialDimension { view: ViewId(6), center: [0.038, 0.018], radius: 0.0048, diameter: false, angle: 0.9, dim_line: false }, [0.0; 2], vec![(0, c(DVec3::new(0.038, 0.018, 0.0), false))]);
     // Front view: width and thickness.
     add(sheet, lin(1, [-0.05, 0.0], [0.05, 0.0], -10.0, DimOrientation::Horizontal), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0))), (1, v(DVec3::new(0.05, -0.03, 0.0)))]);
     add(sheet, lin(1, [-0.05, 0.0], [-0.05, 0.012], -8.0, DimOrientation::Vertical), [0.0; 2], vec![(0, v(DVec3::new(-0.05, -0.03, 0.0)))]);

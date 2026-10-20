@@ -146,7 +146,7 @@ pub(crate) fn changes_since(path: &std::path::Path, mv: noshape_store::Microvers
 fn version_sources(path: &std::path::Path, mv: noshape_store::MicroversionId, except: &str) -> Vec<RefSource> {
     let Ok(doc) = crate::derived::external_snapshot(path, mv) else { return Vec::new() };
     let key = |tab: &str| crate::derived::ExternalRef { path: path.to_path_buf(), microversion: mv, tab: tab.to_string() };
-    crate::fs_reference::sources(&doc, except, |tab| crate::derived::external_context(&key(tab)).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default())
+    crate::fs_reference::sources(&doc, except, |tab| crate::derived::external_context(&key(tab)).map(|c| crate::fs_reference::parts_and_sketches(&c)).unwrap_or_default())
         .into_iter()
         .map(|s| RefSource { tab: key(&s.tab).key(), ..s })
         .collect()
@@ -446,7 +446,8 @@ impl SelectItemPanel {
                     let value = crate::fs_reference::part_value(&s.tab, &body);
                     let on = current == value;
                     let studio = s.tab.clone();
-                    out.push(row(SharedString::from(format!("sel-part-{value}")), 36., None, &value, "part", name, on, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let icon = if body.index == u32::MAX { "sketch" } else { "part" };
+                    out.push(row(SharedString::from(format!("sel-part-{value}")), 36., None, &value, icon, name, on, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         let cfg = this.cfg_edit.get(&studio).cloned().unwrap_or_default();
                         this.pick(join_value(&value, &cfg), cx);
                     })).into_any_element());
@@ -527,7 +528,7 @@ impl SelectItemPanel {
                     h_flex()
                         .h(px(26.))
                         .child(label(input.name.clone()))
-                        .child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&field).appearance(false).text_size(px(13.33)).h(px(25.)).when(right, |i| i.text_align(TextAlign::Right))))
+                        .child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&field).appearance(false).text_size(px(13.33)).h(px(25.)).when(right, |i| i.text_align(TextAlign::Right)))))
                         .into_any_element()
                 }
             };

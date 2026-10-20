@@ -47,6 +47,29 @@ impl ViewClipboard {
     }
 }
 
+/// A whole sheet on the clipboard (Sheets panel › Copy).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SheetClipboard {
+    /// Marker so other clipboard JSON is not taken for a sheet.
+    pub noshape_drawing_sheet: u32,
+    pub sheet: Sheet,
+}
+
+impl SheetClipboard {
+    pub fn new(sheet: Sheet) -> Self {
+        Self { noshape_drawing_sheet: 1, sheet }
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+
+    pub fn from_json(text: &str) -> Option<Self> {
+        let c: SheetClipboard = serde_json::from_str(text).ok()?;
+        (c.noshape_drawing_sheet == 1).then_some(c)
+    }
+}
+
 impl Drawing {
     /// Copy annotations and tables of sheet `sheet` (Copy on a note,
     /// callout, GD&T frame, datum, surface finish or weld symbol, table).
@@ -191,6 +214,22 @@ mod tests {
         assert_eq!(s.parent_of(ViewId(4)), Some(ViewId(3)));
         let (a, b) = (s.view(ViewId(3)).unwrap().position, s.view(ViewId(4)).unwrap().position);
         assert!(((a[0] + b[0]) * 0.5 - 300.0).abs() < 1e-9 && (a[1] - 200.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn copy_and_paste_sheets() {
+        let mut d = Drawing::default();
+        d.sheets[0].name = "Sheet1".into();
+        d.add_sheet(0);
+        let clip = SheetClipboard::new(d.sheets[0].clone());
+        let json = clip.to_json();
+        assert!(ViewClipboard::from_json(&json).is_none(), "a sheet is not a view copy");
+        let back = SheetClipboard::from_json(&json).expect("round trip");
+        assert!(SheetClipboard::from_json(&ViewClipboard::default().to_json()).is_none());
+        // Pasted at the bottom, renamed when the name is taken.
+        let i = d.paste_sheet(back.sheet);
+        assert_eq!(i, d.sheets.len() - 1);
+        assert_eq!(d.sheets[i].name, "Sheet1 copy");
     }
 
     #[test]

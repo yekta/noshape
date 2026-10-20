@@ -41,6 +41,11 @@ pub struct ConfigInput {
     /// dialog): when the input shows and, for lists, which options do.
     #[serde(default, deserialize_with = "de_visibility")]
     pub visible_when: Option<Visibility>,
+    /// Input ⋯ › Exclude from properties (Help
+    /// PartStudio__configured_properties): configured properties, the BOM
+    /// and releases treat the input as its default.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub excluded: bool,
 }
 
 /// An input's visibility conditions. Only inputs above it (lists and
@@ -110,6 +115,32 @@ pub struct InputVisibility {
     pub visible: bool,
     /// List inputs: the options that show (all of them without rules).
     pub options: Vec<String>,
+}
+
+/// FeatureScript's reserved words (Onshape's bundle: language keywords,
+/// `const`/`var`, standard types, `true`/`false`), which ids can't be.
+pub const FS_KEYWORDS: &[&str] = &[
+    "annotation", "as", "assert", "break", "case", "catch", "const", "continue", "default", "do", "else", "enum", "export", "FeatureScript", "for", "function", "if", "import", "in", "inf", "is", "new", "operator", "precondition", "predicate",
+    "return", "returns", "switch", "throw", "try", "type", "typecheck", "typeconvert", "var", "while", "array", "boolean", "box", "builtin", "map", "number", "string", "undefined", "true", "false",
+];
+
+/// A FeatureScript identifier for a new input or list row made from its
+/// name ("List 2" → `List_2`), not a keyword and not in `taken`.
+pub fn fs_identifier(name: &str, taken: &[String]) -> String {
+    let mut id: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).collect();
+    if id.is_empty() || id.starts_with(|c: char| c.is_ascii_digit()) {
+        id.insert(0, '_');
+    }
+    if FS_KEYWORDS.contains(&id.as_str()) {
+        id.push('_');
+    }
+    let base = id.clone();
+    let mut n = 2;
+    while taken.contains(&id) {
+        id = format!("{base}_{n}");
+        n += 1;
+    }
+    id
 }
 
 /// One configured feature parameter: its value for each list option or
@@ -270,6 +301,66 @@ impl Configuration {
         self.visibility(values).1
     }
 
+    /// Edit FeatureScript IDs…: rename input `input` to `new_id` and, for a
+    /// list, its options (`(old, new)` pairs), here and in everything of
+    /// this configuration that refers to them (configured columns and their
+    /// rows, visibility conditions, option rules, the default). References
+    /// from other tabs break, as in Onshape.
+    pub fn change_ids(&mut self, input: &str, new_id: &str, options: &[(String, String)]) {
+        let opt = |o: &String| options.iter().find(|(a, _)| a == o).map(|(_, b)| b.clone()).unwrap_or_else(|| o.clone());
+        let renames_options = |name: &str| name == input;
+        for i in &mut self.inputs {
+            if i.id == input {
+                if let ConfigInputKind::List { options: opts, default } = &mut i.kind {
+                    for o in opts.iter_mut() {
+                        o.id = opt(&o.id);
+                    }
+                    *default = opt(default);
+                    if let Some(v) = &mut i.visible_when {
+                        for r in &mut v.option_rules {
+                            r.show = match &r.show {
+                                ShownOptions::Options(xs) => ShownOptions::Options(xs.iter().map(opt).collect()),
+                                ShownOptions::Range(a, b) => ShownOptions::Range(opt(a), opt(b)),
+                                ShownOptions::Unset => ShownOptions::Unset,
+                            };
+                        }
+                    }
+                }
+                i.id = new_id.to_string();
+            }
+            if let Some(v) = &mut i.visible_when {
+                let conds = v.conditions.iter_mut().chain(v.option_rules.iter_mut().flat_map(|r| r.conditions.iter_mut()));
+                for c in conds.filter(|c| renames_options(&c.input)) {
+                    c.input = new_id.to_string();
+                    c.test = match &c.test {
+                        ConditionTest::Is(xs) => ConditionTest::Is(xs.iter().map(opt).collect()),
+                        ConditionTest::Between(a, b) => ConditionTest::Between(opt(a), opt(b)),
+                    };
+                }
+            }
+        }
+        for c in self.configured.iter_mut().filter(|c| c.input == input) {
+            c.input = new_id.to_string();
+            c.values = std::mem::take(&mut c.values).into_iter().map(|(k, v)| (opt(&k), v)).collect();
+        }
+    }
+
+    /// The values configured properties, the BOM and releases use: inputs
+    /// excluded from properties take their defaults (or, when visibility
+    /// conditions hide the default, the first shown value; Help
+    /// PartStudio__configured_properties).
+    pub fn for_properties(&self, values: &ConfigValues) -> ConfigValues {
+        let mut v = self.effective(values);
+        let defaults = self.defaults();
+        for i in self.inputs.iter().filter(|i| i.excluded) {
+            match defaults.0.get(&i.id) {
+                Some(d) => v.0.insert(i.id.clone(), d.clone()),
+                None => v.0.remove(&i.id),
+            };
+        }
+        self.effective(&v)
+    }
+
     /// Visibility conditions are repaired (removed) when the inputs or
     /// options they name are gone (Help: "Repairing visibility conditions").
     /// Returns the names of the inputs whose conditions changed.
@@ -394,9 +485,9 @@ mod describe_tests {
     fn describes_non_default_values() {
         let cfg = Configuration {
             inputs: vec![
-                ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None },
-                ConfigInput { id: "c".into(), name: "Fillet".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None },
-                ConfigInput { id: "t".into(), name: "Label".into(), kind: ConfigInputKind::Text { default: "x".into() }, visible_when: None },
+                ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None, excluded: false },
+                ConfigInput { id: "c".into(), name: "Fillet".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false },
+                ConfigInput { id: "t".into(), name: "Label".into(), kind: ConfigInputKind::Text { default: "x".into() }, visible_when: None, excluded: false },
             ],
             configured: vec![],
         };
@@ -411,7 +502,7 @@ mod describe_tests {
     #[test]
     fn dialogs_edit_the_active_configuration() {
         let mut cfg = Configuration {
-            inputs: vec![ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None }],
+            inputs: vec![ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "Small".into() }, ListOption { id: "b".into(), name: "Large".into() }], default: "a".into() }, visible_when: None, excluded: false }],
             configured: vec![],
         };
         let e = |t: &str| ParamValue::Expr(ExprValue::new(t));
@@ -435,7 +526,7 @@ mod visibility_tests {
     use super::*;
 
     fn list(id: &str, opts: &[&str], default: &str) -> ConfigInput {
-        ConfigInput { id: id.into(), name: id.into(), kind: ConfigInputKind::List { options: opts.iter().map(|o| ListOption { id: (*o).into(), name: (*o).into() }).collect(), default: default.into() }, visible_when: None }
+        ConfigInput { id: id.into(), name: id.into(), kind: ConfigInputKind::List { options: opts.iter().map(|o| ListOption { id: (*o).into(), name: (*o).into() }).collect(), default: default.into() }, visible_when: None, excluded: false }
     }
 
     fn values(pairs: &[(&str, &str)]) -> ConfigValues {
@@ -455,6 +546,24 @@ mod visibility_tests {
         let (vis, eff) = cfg.visibility(&values(&[("Height", "Tall"), ("Width", "Wide")]));
         assert!(vis[1].visible);
         assert_eq!(eff.0["Width"], "Wide");
+    }
+
+    /// Edit FeatureScript IDs…: the input and option ids change everywhere
+    /// in the configuration.
+    #[test]
+    fn change_ids_rewrites_references() {
+        let mut width = list("Width", &["Default", "Wide"], "Default");
+        width.visible_when = Some(Visibility { conditions: vec![Condition { input: "Height".into(), test: ConditionTest::Is(vec!["Tall".into()]) }], option_rules: Vec::new() });
+        let mut cfg = Configuration { inputs: vec![list("Height", &["Short", "Tall"], "Short"), width], configured: Vec::new() };
+        cfg.configured.push(ConfiguredParam { input: "Height".into(), feature: crate::FeatureId(1), param: "depth".into(), values: [("Short".to_string(), crate::params::ParamValue::Bool(true)), ("Tall".to_string(), crate::params::ParamValue::Bool(false))].into_iter().collect() });
+        cfg.change_ids("Height", "height_id", &[("Tall".into(), "tall_id".into())]);
+        assert_eq!(cfg.inputs[0].id, "height_id");
+        assert!(matches!(&cfg.inputs[0].kind, ConfigInputKind::List { options, .. } if options[1].id == "tall_id"));
+        let c = &cfg.inputs[1].visible_when.as_ref().unwrap().conditions[0];
+        assert_eq!(c.input, "height_id");
+        assert_eq!(c.test, ConditionTest::Is(vec!["tall_id".into()]));
+        assert_eq!(cfg.configured[0].input, "height_id");
+        assert!(cfg.configured[0].values.contains_key("tall_id"));
     }
 
     /// Assemblies evaluate their own configuration through the same rules.
@@ -479,7 +588,7 @@ mod visibility_tests {
                 OptionRule { show: ShownOptions::Range("B".into(), "C".into()), always: false, conditions: vec![Condition { input: "Big".into(), test: ConditionTest::Is(vec!["true".into()]) }] },
             ],
         });
-        let big = ConfigInput { id: "Big".into(), name: "Big".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None };
+        let big = ConfigInput { id: "Big".into(), name: "Big".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false };
         let cfg = Configuration { inputs: vec![big, size], configured: Vec::new() };
         let (vis, eff) = cfg.visibility(&values(&[("Big", "false"), ("Size", "C")]));
         assert_eq!(vis[1].options, vec!["A".to_string()]);

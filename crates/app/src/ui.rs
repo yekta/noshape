@@ -45,7 +45,7 @@ pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) 
     let text: SharedString = text.into();
     move |window, cx| {
         let pal = p();
-        Tooltip::new(text.clone())
+        let tip = Tooltip::new(text.clone())
             .bg(pal.tooltip)
             .text_color(pal.text)
             .border_0()
@@ -56,7 +56,19 @@ pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) 
             .pb(px(3.))
             .text_size(px(12.))
             .font_weight(FontWeight::MEDIUM)
-            .build(window, cx)
+            .build(window, cx);
+        cx.new(|_| MenuAwareTip(tip)).into()
+    }
+}
+
+/// A tooltip hidden while a context menu is open: a row's tooltip (shown
+/// once the pointer rests on the right-clicked row) was drawn over the
+/// menu's first items, e.g. "Open version Start" over "Open".
+struct MenuAwareTip(AnyView);
+
+impl Render for MenuAwareTip {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div().when(!crate::os_menu::is_open(cx), |d| d.child(self.0.clone()))
     }
 }
 
@@ -202,23 +214,24 @@ pub enum TipSide {
 
 /// An Onshape tooltip placed against its element: a 26 px `#d0dbe5` box with
 /// 12 px / 500 text and 4 px padding, 2-3 px from the element (centered on
-/// it across that side).
+/// it across that side), kept inside the window.
 pub struct PlacedTooltip {
     text: SharedString,
     side: TipSide,
     /// The element's bounds.
     anchor: Bounds<Pixels>,
+    /// The box's width, measured on the first frame (drawn hidden): a
+    /// centered or left-side box can only be placed once it is known.
+    width: std::rc::Rc<std::cell::Cell<Option<Pixels>>>,
 }
 
-/// Room for a centered tooltip whose width isn't known before layout.
-const TIP_STRIP_W: f32 = 600.;
-
 impl Render for PlacedTooltip {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
         let a = self.anchor;
         let h = px(26.);
+        let measured = self.width.clone();
         let content = div()
             .font_family(cx.theme().font_family.clone())
             .text_size(px(12.))
@@ -227,23 +240,35 @@ impl Render for PlacedTooltip {
             .h(h)
             .px(px(4.))
             .flex()
+            .flex_none()
             .items_center()
             .bg(pal.tooltip)
             .shadow(shadow)
             .whitespace_nowrap()
-            .child(self.text.clone());
+            .child(self.text.clone())
+            .child(canvas(move |b, window, _| {
+                if measured.get() != Some(b.size.width) {
+                    measured.set(Some(b.size.width));
+                    // (`refresh` is ignored while drawing.)
+                    window.request_animation_frame();
+                }
+            }, |_, _, _, _| {}).absolute().top_0().left_0().size_full());
         let mid_y = a.center().y - h * 0.5;
-        let strip = div().w(px(TIP_STRIP_W)).flex();
-        let (at, el) = match self.side {
-            TipSide::Right => (point(a.right() + px(3.), mid_y), content.into_any_element()),
-            TipSide::Left => (point(a.left() - px(2. + TIP_STRIP_W), mid_y), strip.justify_end().child(content).into_any_element()),
-            TipSide::Above => (point(a.center().x - px(TIP_STRIP_W * 0.5), a.top() - px(4.) - h), strip.justify_center().child(content).into_any_element()),
-            TipSide::Below => (point(a.center().x - px(TIP_STRIP_W * 0.5), a.bottom() + px(8.)), strip.justify_center().child(content).into_any_element()),
+        // Placed from the measured width (a fixed-width centering strip got
+        // flipped to the far side by `anchored` near the window's edge: the
+        // bottom-right tools' tooltips showed 600 px to their left).
+        let win = window.viewport_size().width;
+        let w = self.width.get();
+        let clamp_x = |x: Pixels, w: Pixels| x.min(win - w - px(2.)).max(px(2.));
+        let at = match (self.side, w) {
+            (TipSide::Right, _) => point(a.right() + px(3.), mid_y),
+            (TipSide::Left, Some(w)) => point(clamp_x(a.left() - px(2.) - w, w), mid_y),
+            (TipSide::Above, Some(w)) => point(clamp_x(a.center().x - w * 0.5, w), a.top() - px(4.) - h),
+            (TipSide::Below, Some(w)) => point(clamp_x(a.center().x - w * 0.5, w), a.bottom() + px(8.)),
+            (_, None) => point(px(0.), mid_y),
         };
-        // Only the beside-the-element box snaps into the window: snapping a
-        // centering strip would move the box off its element.
-        let snap = self.side == TipSide::Right;
-        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).when(snap, |a| a.snap_to_window()).child(el)))
+        let hidden = self.side != TipSide::Right && w.is_none();
+        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(content.when(hidden, |c| c.opacity(0.)))))
     }
 }
 
@@ -256,7 +281,7 @@ pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide)
         .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .tooltip(move |_, cx| {
             let (text, anchor) = (text.clone(), anchor.get());
-            cx.new(|_| PlacedTooltip { text, side, anchor }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default() }).into()
         })
 }
 
@@ -296,6 +321,13 @@ pub fn text_tool_button(id: impl Into<ElementId>, icon: &str, label: impl Into<S
         .pr(px(10.))
         .rounded(px(3.))
         .when(active, |b| b.bg(p().tool_active))
+}
+
+/// A toolbar dropdown kept inside the window: it scrolls when its tools don't
+/// fit under the toolbar (the collapsed Plane group has 26 tools; on a
+/// 1280x800 screen the last ones were off the window, unreachable).
+pub fn fit_tool_menu(menu: gpui_kit::component::menu::PopupMenu, window: &Window) -> gpui_kit::component::menu::PopupMenu {
+    menu.scrollable(true).max_h(window.viewport_size().height - px(84.))
 }
 
 /// The 18 px dropdown caret cell next to a split tool (§3.2).
@@ -438,7 +470,7 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
         .child(with_tooltip(
             "tt-undo",
             undo_tip,
-            tool_button("tb-undo", "undo", false, cx).opacity(if can_undo { 1.0 } else { 0.4 }).on_click(move |_, _, cx| {
+            tool_button("tb-undo", "undo", false, cx).opacity(if can_undo { 1.0 } else { 0.4 }).when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_undo {
                     d1.update(cx, |d, cx| d.undo(cx));
                 }
@@ -447,7 +479,7 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
         .child(with_tooltip(
             "tt-redo",
             redo_tip,
-            tool_button("tb-redo", "redo", false, cx).opacity(if can_redo { 1.0 } else { 0.4 }).on_click(move |_, _, cx| {
+            tool_button("tb-redo", "redo", false, cx).opacity(if can_redo { 1.0 } else { 0.4 }).when(!can_redo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_redo {
                     d2.update(cx, |d, cx| d.redo(cx));
                 }
@@ -530,6 +562,8 @@ pub fn caret(open: bool) -> Div {
         .flex()
         .items_center()
         .justify_center()
+        // Live: the expander (`.node-expander`) shows the pointer.
+        .cursor_pointer()
         .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x666666)))
 }
 
@@ -581,4 +615,13 @@ pub fn rail_button(id: impl Into<ElementId>, icon: &str, active: bool, indicator
             let bar = div().absolute().top_0().bottom_0().w(px(4.)).bg(pal.accent);
             d.bg(with_alpha(pal.accent, 0.08)).child(if indicator_left { bar.left_0() } else { bar.right_0() })
         })
+}
+
+/// A control revealed while its row (`group`) is hovered: Onshape's eye on
+/// feature, part and instance rows. It stays painted at opacity 0 rather
+/// than `invisible()`: gpui registers no mouse listeners for an invisible
+/// element, so a quick click (or a trackpad tap, before a hover frame was
+/// drawn) went to the row instead.
+pub fn hover_reveal<E: InteractiveElement + Styled>(el: E, group: impl Into<SharedString>) -> E {
+    el.opacity(0.).group_hover(group, |s| s.opacity(1.))
 }

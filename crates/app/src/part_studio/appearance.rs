@@ -83,6 +83,17 @@ pub fn hex_of(rgb: [u8; 3]) -> String {
 /// get its color, others alpha 0 (the part color).
 pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[FaceAppearance]) -> Option<Vec<[u8; 4]>> {
     let mut colors: Option<Vec<[u8; 4]>> = None;
+    // Colours the features gave faces (an import's) first.
+    for (fi, c) in body.face_colors.iter().enumerate() {
+        let (Some(c), Some(&(first, count))) = (c, body.mesh.face_ranges.get(fi)) else { continue };
+        let c = [lin_to_srgb(c[0]), lin_to_srgb(c[1]), lin_to_srgb(c[2]), 255];
+        let v = colors.get_or_insert_with(|| vec![[0; 4]; body.mesh.positions.len()]);
+        for &i in &body.mesh.indices[first as usize..(first + count) as usize] {
+            if let Some(slot) = v.get_mut(i as usize) {
+                *slot = c;
+            }
+        }
+    }
     for a in appearances {
         let c = [lin_to_srgb(a.color[0]), lin_to_srgb(a.color[1]), lin_to_srgb(a.color[2]), 255];
         for (fi, r) in body.face_refs.iter().enumerate() {
@@ -318,7 +329,9 @@ impl PartStudioView {
                 .occlude()
                 .absolute()
                 .top_3()
-                .left(px(340.))
+                // Live (part-studio/173): beside an open right panel (it
+                // covered the editor's right half and its ✓ ✕ here).
+                .map(|d| if self.right_panel.is_some() { d.right(px(4.)) } else { d.left(px(340.)) })
                 .w(px(250.))
                 .p_2()
                 .gap_2()
@@ -387,16 +400,16 @@ impl PartStudioView {
         let names = self.labeler(cx);
         let sketches_tab = self.ui.appearance_sketches;
         let grid = rgb_u32(0xaaaaaa);
-        let swatch = |color: [f32; 4]| {
+        // Live (part-studio/173): a selected part's row has a 2 px `#1651b0`
+        // outline and `#def1fb` cells; the cells keep their height inside it.
+        let swatch = |color: [f32; 4], selected: bool| {
             let c = gpui_kit::Rgba { r: lin_to_srgb(color[0]) as f32 / 255.0, g: lin_to_srgb(color[1]) as f32 / 255.0, b: lin_to_srgb(color[2]) as f32 / 255.0, a: color[3].clamp(0.0, 1.0) };
             div()
                 .flex_1()
-                .h(px(29.))
-                .p(px(3.))
-                .bg(rgb_u32(0xeaeaea))
-                .border_t_1()
-                .border_r_1()
-                .border_b_1()
+                .h(px(if selected { 25. } else { 29. }))
+                .p(px(if selected { 2. } else { 3. }))
+                .bg(rgb_u32(if selected { 0xdef1fb } else { 0xeaeaea }))
+                .when(!selected, |d| d.border_t_1().border_r_1().border_b_1())
                 .border_color(grid)
                 .child(
                     // Translucent colors show over a checkerboard (live `checkerboard-background`).
@@ -421,20 +434,21 @@ impl PartStudioView {
                     }),
                 )
         };
-        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool| {
+        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool, selected: bool| {
             h_flex()
                 .id(id)
                 .w_full()
                 .cursor_pointer()
+                .when(selected, |d| d.border_2().border_color(rgb_u32(0x1651b0)))
                 .child(
                     div()
                         .flex_1()
-                        .h(px(29.))
+                        .h(px(if selected { 25. } else { 29. }))
                         .flex()
                         .items_center()
-                        .pl(px(if indent { 18. } else { 4. }))
-                        .bg(rgb_u32(0xeaeaea))
-                        .border_1()
+                        .pl(px(if indent { 18. } else { 4. }) - px(if selected { 2. } else { 0. }))
+                        .bg(rgb_u32(if selected { 0xdef1fb } else { 0xeaeaea }))
+                        .map(|d| if selected { d.border_r_1() } else { d.border_1() })
                         .border_color(grid)
                         .text_size(px(14.))
                         .when(!indent, |d| d.font_weight(FontWeight::BOLD))
@@ -442,7 +456,7 @@ impl PartStudioView {
                         .truncate()
                         .child(label),
                 )
-                .child(swatch(color))
+                .child(swatch(color, selected))
         };
         let mut rows: Vec<AnyElement> = Vec::new();
         if !sketches_tab {
@@ -453,10 +467,14 @@ impl PartStudioView {
                 let custom = props.is_some_and(|p| p.appearance.is_some());
                 let view = cx.entity();
                 rows.push(
-                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false)
+                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false, self.selection.contains(&Reference::Body(body.id.clone())))
+                        // Live: a click selects the part (row and part
+                        // highlighted), a double click edits its appearance.
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
                             if ev.click_count() >= 2 {
                                 this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
+                            } else {
+                                this.pick_body(b1.clone(), cx);
                             }
                         }))
                         .when(custom, |d| {
@@ -485,7 +503,7 @@ impl PartStudioView {
             };
             let view = cx.entity();
             rows.push(
-                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch)
+                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch, false)
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Hovering a face appearance highlights its faces.
                         this.ui.appearance_hover = if *h { faces.clone() } else { Vec::new() };
@@ -510,7 +528,7 @@ impl PartStudioView {
                 let f = sk.feature;
                 let color = sk.color.unwrap_or_else(|| crate::theme::lin(crate::theme::viewport::INACTIVE));
                 rows.push(
-                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false)
+                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false)
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
                             if ev.click_count() >= 2 {
                                 this.edit_appearance(EditTarget::Feature(f, None), w, cx);

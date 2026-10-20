@@ -156,10 +156,23 @@ impl Bend {
 pub struct Rip {
     pub feature: FeatureId,
     pub a: usize,
+    /// The other wall, or `usize::MAX` when the rip separated it into
+    /// another part (`other` names it there).
     pub b: usize,
     /// EDGE / BUTT / BUTT2.
     pub style: String,
     pub gap: f64,
+    /// Reference-side face of wall `b` when it is in another part.
+    pub other: Option<Name>,
+    /// Faces the rip cut (the walls' ends facing each other).
+    pub faces: Vec<Name>,
+}
+
+impl Rip {
+    /// Whether a face is one of the rip's cut faces.
+    pub fn has_face(&self, n: &TopoName) -> bool {
+        self.faces.iter().any(|f| n.descends_from(f))
+    }
 }
 
 /// What a [`FlatMark`] stands for in the flat pattern.

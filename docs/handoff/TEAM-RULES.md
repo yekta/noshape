@@ -22,25 +22,27 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
   ONSHAPE_EMAIL / ONSHAPE_PASSWORD (from /root/.config/noshape/onshape.env). Never print, log or commit them.
   Only the live-capture agent drives the Chrome instance on DISPLAY=:107 (CDP port 9333). If you need something
   captured, write the request into /root/onshape-research/live/REQUESTS.md (one line per request, your name).
-- **Build (changed 2026-10-19): ONE shared target dir for everyone:**
-  `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-shared nice cargo build -p noshape`.
-  Per-agent target dirs choked the machine (7 parallel full builds, RAM exhausted, hour-long builds). Cargo locks the
-  shared dir, so builds queue one at a time ("Blocking waiting for file lock" is normal), and each reuses everyone's
-  compiled output, so builds stay incremental. Rules: never `cargo clean`; never delete anything in target-shared;
-  build only when you need to; batch edits before building; prefer `cargo check` and single-test runs
-  (`cargo test -p <crate> <name>`) over full suites. **Right after your build, copy the binary** to your own folder
-  (`cp /root/target-shared/debug/noshape /tmp/<you>/noshape`) and run that copy, since the next agent's build overwrites
-  it. Build in the shared tree /root/noshape. A private worktree is allowed only when the shared tree doesn't compile
-  for reasons outside your area, and then it must still use /root/target-shared. Use your own Xvfb display.
-- **Disk:** the disk hit 100% once. After each build, if `<target>/debug/incremental` is over 2 GB, delete it.
+- **Build (changed 2026-10-20): three shared target dirs, one per group** (bigger machine: 16 cores, 30 GB):
+  - UI group (ui, ui2, qa*): `CARGO_TARGET_DIR=/root/target-shared`
+  - Behaviour group (psb, skb, asb, drw*): `CARGO_TARGET_DIR=/root/target-behave`
+  - Engine group (kern, fs): `CARGO_TARGET_DIR=/root/target-engine`
+  Use `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=<your group's dir> nice cargo build -p noshape`. Cargo locks each dir, so builds
+  within a group queue ("Blocking waiting for file lock" is normal) and reuse each other's output. Rules: never `cargo clean`;
+  never delete anything in a shared target dir (the lead clears them); batch edits; prefer `cargo check` and single tests.
+  **Right after your build, copy the binary** to /tmp/<you>/ and run that copy. Build in the shared tree /root/noshape.
+  A private worktree is allowed only when the shared tree is broken outside your area, and it must still use your group's dir.
+- **Disk:** never delete anything in /root/target-shared (including debug/incremental); the lead clears it at quiet moments.
+  Only your own non-shared dirs (private worktrees, /tmp/<you>) are yours to clean.
   Each test binary is ~130 MB (OCCT is linked in), so old ones pile up. When you're not building, delete the stale
   executables: `find <target>/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' -mmin +60 -delete`.
   Never delete `debug/deps` files while a build might be running.
 - **Machine (upgraded 2026-10-19): 16 cores, 30 GB RAM, 301 GB disk.** After a reboot /tmp is wiped: restart your own Xvfb display
   (`Xvfb :10x -screen 0 1600x1000x24 &`) if it's missing and recreate your /tmp/<you> folder.
 - **Memory:** 30 GB RAM for everyone; earlyoom kills compilers when it runs out ("could not compile" with no
-  error = killed). `~/.cargo/config.toml` sets a rustc wrapper (`~/.local/bin/rustc-throttle`) that lets at most 4
+  error = killed). `~/.cargo/config.toml` sets a rustc wrapper (`~/.local/bin/rustc-throttle`) that lets at most 6
   compiles of noshape's big crates run at once machine-wide, so a build may wait a little for a slot. Don't bypass it.
+- **Xvfb screenshots:** with no window manager the window is never active, so carets and selections don't paint.
+  Run `xdotool windowfocus <window>` before capturing.
 - **New windows** must open with `os_menu::open_window` (not `gpui_kit::open_window`), so the window draws its own
   menus on top.
 - **No time-limited background waits/watchers** (they end your turn). Run builds and tests in the foreground.

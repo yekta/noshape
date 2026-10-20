@@ -69,6 +69,28 @@ impl SheetSize {
     pub fn is_ansi(self) -> bool {
         matches!(self, SheetSize::AnsiA | SheetSize::AnsiAPortrait | SheetSize::AnsiB | SheetSize::AnsiC | SheetSize::AnsiD | SheetSize::AnsiE)
     }
+
+    /// Horizontal x vertical zones of Onshape's template for this size
+    /// (live drawing/09 ANSI A 2 x 2, drawing/156 ISO A3 6 x 4, drawing/560
+    /// A0 16 x 12, A1 12 x 8, A2 8 x 6; ISO A4 has none); custom sizes get
+    /// zones about 66 mm wide.
+    pub fn standard_zones(self) -> [u32; 2] {
+        match self {
+            SheetSize::AnsiA | SheetSize::AnsiAPortrait => [2, 2],
+            SheetSize::AnsiB => [4, 2],
+            SheetSize::AnsiC => [4, 4],
+            SheetSize::AnsiD | SheetSize::AnsiE => [8, 4],
+            SheetSize::A4 => [0, 0],
+            SheetSize::A3 => [6, 4],
+            SheetSize::A2 => [8, 6],
+            SheetSize::A1 => [12, 8],
+            SheetSize::A0 => [16, 12],
+            SheetSize::Custom { .. } => {
+                let (w, h) = self.size_mm();
+                [((w - 20.0) / 66.0).round().max(2.0) as u32, ((h - 20.0) / 66.0).round().max(2.0) as u32]
+            }
+        }
+    }
 }
 
 /// Layout of a sheet's title block.
@@ -136,7 +158,15 @@ pub enum ViewKind {
     /// Full section: `line` (two points in the parent's view coordinates,
     /// meters) is the cutting line; the viewing direction points from the
     /// side of the line the section view is placed on toward the line.
-    Section { parent: ViewId, line: Vec<[f64; 2]>, label: String },
+    /// `cuts`: the points the cutting line passes through (Edit section's
+    /// orange dots); with several the line steps between them.
+    Section {
+        parent: ViewId,
+        line: Vec<[f64; 2]>,
+        label: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        cuts: Vec<[f64; 2]>,
+    },
     /// Enlarged circular crop of the parent (`center`/`radius` in the
     /// parent's view coordinates, meters).
     Detail { parent: ViewId, center: [f64; 2], radius: f64, label: String },
@@ -294,6 +324,10 @@ pub struct DrawingView {
     /// Section views of assemblies: "Exclude from cut" (these parts stay whole).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exclude_from_cut: Vec<crate::BodyId>,
+    /// A section of a section view: "Cut from section" (cut the parent's
+    /// sectioned geometry, else the base geometry).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut_from_section: bool,
     /// A sketch view (Onshape: insert a sketch; Part Studio "Create Drawing
     /// of Sketch N…"): base views of this sketch feature of the source show
     /// its curves; views derived from it too.
@@ -324,6 +358,20 @@ pub struct DrawingView {
     /// Show/Hide threads (cosmetic threads of tapped holes; shown by default).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_threads: bool,
+    /// Adjust linestyle: edges drawn in their own style.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edge_styles: Vec<EdgeStyle>,
+    /// Automatic centermarks deleted one by one (`build::centermark_key`
+    /// of their centers).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deleted_centermarks: Vec<[i64; 2]>,
+    /// Show/hide edges: model edges left out of the view.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_edges: Vec<(BodyId, TopoName)>,
+    /// While the Show/hide edges dialog is open (not saved): hidden edges
+    /// draw thick and grey and occluded edges grey, so both can be picked.
+    #[serde(skip)]
+    pub editing_edges: bool,
     /// Parts left out of this view (Show/hide parts › Hidden parts).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_parts: Vec<BodyId>,
@@ -448,6 +496,10 @@ impl Default for DrawingView {
             hide_bend_lines: false,
             hide_bend_notes: false,
             hide_threads: false,
+            edge_styles: Vec::new(),
+            hidden_edges: Vec::new(),
+            deleted_centermarks: Vec::new(),
+            editing_edges: false,
             pinned: None,
             detail_profile: None,
             detail_style: 0,
@@ -456,6 +508,7 @@ impl Default for DrawingView {
             detail_label_at: None,
             section_depth_ref: None,
             exclude_from_cut: Vec::new(),
+            cut_from_section: false,
             broken_out: Vec::new(),
             custom_frame: None,
             tangent_phantom: false,
@@ -477,7 +530,18 @@ pub enum AnnotationKind {
         style: note::NoteStyle,
     },
     LinearDimension { view: ViewId, a: [f64; 2], b: [f64; 2], offset: f64, orientation: DimOrientation, override_text: Option<String> },
-    RadialDimension { view: ViewId, center: [f64; 2], radius: f64, diameter: bool, angle: f64 },
+    /// `dim_line`: a diameter's line runs on through the center to the far
+    /// side (Drawing properties › Show dimension lines by default when it
+    /// was made); else a leader to the arrow on the near side.
+    RadialDimension {
+        view: ViewId,
+        center: [f64; 2],
+        radius: f64,
+        diameter: bool,
+        angle: f64,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        dim_line: bool,
+    },
     /// Angle from leg `a` counterclockwise to leg `b`. `three_point`: made
     /// with the 3 point angular tool (dragging the arc across a leg swaps the
     /// legs: 360° minus the angle).
@@ -498,6 +562,11 @@ pub enum AnnotationKind {
         size: f64,
         #[serde(default, skip_serializing_if = "is_zero")]
         angle: f64,
+        /// Extra length of each arm (+x, +y, −x, −y of the mark; view
+        /// units): dragging an end grip lengthens all four, Shift+drag
+        /// only that arm (live drawing/483–493).
+        #[serde(default, skip_serializing_if = "no_arms")]
+        arms: [f64; 4],
     },
     Centerline { view: ViewId, a: [f64; 2], b: [f64; 2] },
     /// Circular centerline (bolt circle): through three points, or (two
@@ -519,7 +588,13 @@ pub enum AnnotationKind {
         #[serde(default, skip_serializing_if = "CalloutStyle::is_default")]
         callout: CalloutStyle,
     },
-    SurfaceFinish { anchor: [f64; 2], value: String },
+    SurfaceFinish {
+        anchor: [f64; 2],
+        value: String,
+        /// Leaders added with Add leader.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        leaders: Vec<Leader>,
+    },
     /// Weld symbol: the arrow points at `target` (view coordinates in
     /// `view`, else sheet), the reference line starts at the annotation's
     /// position.
@@ -630,18 +705,31 @@ pub enum DimUnits {
     Meter,
     Inch,
     Foot,
+    Yard,
+    /// Inches as fractions (to 1/64).
+    InchFraction,
+    /// Feet and inches: 1' 2.5".
+    FeetInches,
 }
 
 impl DimUnits {
+    /// Drawing properties › Units.
     pub const ALL: [DimUnits; 5] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::Foot];
+    /// A hole callout's units list (live drawing/461, "Inches (Drawing)" is
+    /// the drawing's own and listed apart).
+    pub const CALLOUT: [DimUnits; 8] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::InchFraction, DimUnits::FeetInches, DimUnits::Foot, DimUnits::Yard];
+    pub fn imperial(self) -> bool {
+        matches!(self, DimUnits::Inch | DimUnits::Foot | DimUnits::Yard | DimUnits::InchFraction | DimUnits::FeetInches)
+    }
     /// Meters per unit.
     pub fn meters(self) -> f64 {
         match self {
             DimUnits::Millimeter => 0.001,
             DimUnits::Centimeter => 0.01,
             DimUnits::Meter => 1.0,
-            DimUnits::Inch => 0.0254,
-            DimUnits::Foot => 0.3048,
+            DimUnits::Inch | DimUnits::InchFraction => 0.0254,
+            DimUnits::Foot | DimUnits::FeetInches => 0.3048,
+            DimUnits::Yard => 0.9144,
         }
     }
     pub fn symbol(self) -> &'static str {
@@ -649,8 +737,10 @@ impl DimUnits {
             DimUnits::Millimeter => "mm",
             DimUnits::Centimeter => "cm",
             DimUnits::Meter => "m",
-            DimUnits::Inch => "in",
+            DimUnits::Inch | DimUnits::InchFraction => "in",
             DimUnits::Foot => "ft",
+            DimUnits::Yard => "yd",
+            DimUnits::FeetInches => "",
         }
     }
     pub fn name(self) -> &'static str {
@@ -660,6 +750,9 @@ impl DimUnits {
             DimUnits::Meter => "Meters",
             DimUnits::Inch => "Inches",
             DimUnits::Foot => "Feet",
+            DimUnits::Yard => "Yards",
+            DimUnits::InchFraction => "Inches fractional",
+            DimUnits::FeetInches => "Feet and inches",
         }
     }
 }
@@ -716,11 +809,116 @@ pub struct DimFormat {
     pub prefix: String,
     #[serde(default)]
     pub suffix: String,
+    /// Palette "Above text" / "Below text": lines over and under the value.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub above: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub below: String,
+    /// Palette "Parentheses" (a reference value).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reference: bool,
+    /// Palette "Inspection dimension": an oval frame around the value.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inspection_frame: bool,
+    /// Palette "Dual dimension": Some(true) dual, Some(false) single;
+    /// None the drawing's (Units and precision › Dual).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dual: Option<bool>,
+    /// Palette "Count type" (None: no count).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<HoleCount>,
+    /// The Fit tolerance types' options.
+    #[serde(default, skip_serializing_if = "FitOpts::is_default")]
+    pub fit: FitOpts,
 }
 
 impl DimFormat {
     pub fn is_default(&self) -> bool {
         *self == DimFormat::default()
+    }
+}
+
+/// The dimension palette's Fit tolerance options (live drawing/466–467):
+/// which Fit entry (Fit, Fit with tolerance, Fit (Tolerance only)), the fit
+/// type, standard, how the classes stack and the fit tolerance precision.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FitOpts {
+    pub mode: FitMode,
+    pub fit_type: FitType,
+    /// Some(true) ISO, Some(false) ANSI; None the drawing's Fit standard.
+    pub iso: Option<bool>,
+    pub stacking: FitStacking,
+    /// None: Units and precision › Fit class tolerance precision.
+    pub precision: Option<u8>,
+    /// "Toggle hole class visibility" / shaft class visibility.
+    pub hide_hole: bool,
+    pub hide_shaft: bool,
+}
+
+impl FitOpts {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FitMode {
+    #[default]
+    Fit,
+    WithTolerance,
+    ToleranceOnly,
+}
+
+impl FitMode {
+    pub fn name(self) -> &'static str {
+        match self {
+            FitMode::Fit => "Fit",
+            FitMode::WithTolerance => "Fit with tolerance",
+            FitMode::ToleranceOnly => "Fit (Tolerance only)",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FitType {
+    #[default]
+    UserDefined,
+    Clearance,
+    Transition,
+    Interference,
+}
+
+impl FitType {
+    pub const ALL: [FitType; 4] = [FitType::UserDefined, FitType::Clearance, FitType::Transition, FitType::Interference];
+    pub fn name(self) -> &'static str {
+        match self {
+            FitType::UserDefined => "User defined",
+            FitType::Clearance => "Clearance",
+            FitType::Transition => "Transition",
+            FitType::Interference => "Interference",
+        }
+    }
+}
+
+/// How hole and shaft classes stack (D36); inline by default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FitStacking {
+    WithoutLine,
+    /// Inline "H7/g6" (the default).
+    #[default]
+    Diagonal,
+    WithLine,
+}
+
+impl FitStacking {
+    pub const ALL: [FitStacking; 3] = [FitStacking::WithoutLine, FitStacking::Diagonal, FitStacking::WithLine];
+    pub fn name(self) -> &'static str {
+        match self {
+            FitStacking::WithoutLine => "Stacked without line",
+            FitStacking::Diagonal => "Stacked diagonally",
+            FitStacking::WithLine => "Stacked with line",
+        }
     }
 }
 
@@ -824,9 +1022,6 @@ pub enum TableKind {
         fs_version: Option<String>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bottom_to_top: bool,
-        /// Edited cells: (row, column, text).
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        overrides: Vec<(usize, usize, String)>,
     },
 }
 
@@ -1198,11 +1393,165 @@ pub struct Annotation {
     /// Group annotation (notes and callouts): members move together.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ann_group: Option<u64>,
+    /// Styles panel: this annotation's own style (None fields: the drawing
+    /// properties' value, shown "(Drawing)").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<Box<AnnStyle>>,
+    /// Hole callouts: the panel's options (None: the defaults).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hole: Option<Box<HoleCalloutOpts>>,
+}
+
+/// Where dual values sit relative to the primary ones.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DualLocation {
+    #[default]
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+impl DualLocation {
+    pub const ALL: [DualLocation; 4] = [DualLocation::Top, DualLocation::Bottom, DualLocation::Left, DualLocation::Right];
+    pub fn name(self) -> &'static str {
+        match self {
+            DualLocation::Top => "Top",
+            DualLocation::Bottom => "Bottom",
+            DualLocation::Left => "Left",
+            DualLocation::Right => "Right",
+        }
+    }
+}
+
+/// Drawing properties › Units and precision › Dual (live drawing/18):
+/// show dual dimensions / the dual unit, where the dual values go on
+/// dimensions and hole callouts, their units and precisions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DualDims {
+    pub show: bool,
+    pub show_unit: bool,
+    pub dim_location: DualLocation,
+    pub hole_location: DualLocation,
+    /// None: millimeters on inch drawings, inches on metric ones.
+    pub units: Option<DimUnits>,
+    pub precision: Option<u8>,
+    pub tolerance_precision: Option<u8>,
+}
+
+impl DualDims {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+    /// The dual units of a drawing whose primary units are metric or not.
+    pub fn units_for(&self, metric: bool) -> DimUnits {
+        self.units.unwrap_or(if metric { DimUnits::Inch } else { DimUnits::Millimeter })
+    }
+}
+
+/// How a hole callout counts its holes (live drawing/461).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HoleCount {
+    None,
+    /// Same-size holes in the view.
+    View,
+    /// Same-size holes made by the same hole feature on one face.
+    Face,
+    /// The hole's feature or pattern instances.
+    #[default]
+    Pattern,
+    /// Same-size holes in the part.
+    Part,
+    /// One face, pattern instances not counted.
+    FaceExcludingPatterns,
+}
+
+impl HoleCount {
+    pub const ALL: [HoleCount; 6] = [HoleCount::None, HoleCount::View, HoleCount::Face, HoleCount::Pattern, HoleCount::Part, HoleCount::FaceExcludingPatterns];
+    pub fn name(self) -> &'static str {
+        match self {
+            HoleCount::None => "None",
+            HoleCount::View => "Count by view",
+            HoleCount::Face => "Count by face",
+            HoleCount::Pattern => "Count by pattern",
+            HoleCount::Part => "Count by part",
+            HoleCount::FaceExcludingPatterns => "Count by face (Excluding patterns)",
+        }
+    }
+}
+
+/// Hole callout panel options (live drawing/460–467) beyond the shared
+/// palette fields of `Annotation::format` (above / below text, prefix,
+/// suffix, units, parentheses, dual): the count, and whether the callout's
+/// own precision / tolerance override the hole feature's.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HoleCalloutOpts {
+    pub count: HoleCount,
+    pub override_tol: bool,
+}
+
+/// An annotation's own style from the Styles panel (live drawing/474–477):
+/// font, text height, color, arrowhead size and type, and for dimensions
+/// text justification, text alignment and text gap.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AnnStyle {
+    pub font: Option<sheet::TextFont>,
+    pub height: Option<f64>,
+    pub color: Option<[u8; 3]>,
+    pub arrow: Option<f64>,
+    pub arrow_type: Option<sheet::ArrowType>,
+    pub justify: Option<TextJustify>,
+    /// Text alignment: Some(true) horizontal, Some(false) with the line.
+    pub horizontal: Option<bool>,
+    pub text_gap: Option<f64>,
+}
+
+impl AnnStyle {
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Apply to the sheet style for one annotation.
+    pub fn apply(&self, s: &mut sheet::SheetStyle, dimension: bool) {
+        if dimension {
+            if let Some(h) = self.height {
+                s.dim_text = h;
+            }
+            if let Some(a) = self.arrow {
+                s.dim_arrow = a;
+            }
+            if let Some(t) = self.arrow_type {
+                s.dim_arrow_type = t;
+            }
+            if let Some(h) = self.horizontal {
+                s.text_horizontal = h;
+            }
+            if let Some(g) = self.text_gap {
+                s.text_gap = g;
+            }
+        } else {
+            if let Some(h) = self.height {
+                s.ann_text = h;
+            }
+            if let Some(a) = self.arrow {
+                s.ann_arrow = a;
+            }
+            if let Some(t) = self.arrow_type {
+                s.ann_arrow_type = t;
+            }
+            if let Some(j) = self.justify {
+                s.callout_justify = j;
+            }
+        }
+    }
 }
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None }
     }
 }
 
@@ -1353,6 +1702,27 @@ impl AnnotationKind {
         }
     }
 
+    /// The value a linear or radial dimension measures (meters; a view
+    /// rotated by `rotation` radians on the sheet measures along the sheet
+    /// axes), for the palette's value field.
+    pub fn measured(&self, rotation: f64) -> Option<f64> {
+        match self {
+            AnnotationKind::LinearDimension { a, b, orientation, .. } => {
+                let d = [b[0] - a[0], b[1] - a[1]];
+                Some(match orientation {
+                    DimOrientation::Aligned => (d[0] * d[0] + d[1] * d[1]).sqrt(),
+                    o => {
+                        let axis = if *o == DimOrientation::Horizontal { [1.0, 0.0] } else { [0.0, 1.0] };
+                        let va = views::rotate2(axis, -rotation);
+                        (d[0] * va[0] + d[1] * va[1]).abs()
+                    }
+                })
+            }
+            AnnotationKind::RadialDimension { radius, diameter, .. } => Some(if *diameter { radius * 2.0 } else { *radius }),
+            _ => None,
+        }
+    }
+
     /// Dimensions (that show a measured value and accept a [`DimFormat`]).
     pub fn is_dimension(&self) -> bool {
         matches!(
@@ -1434,6 +1804,45 @@ pub struct Sheet {
     /// Inserted images (logos, QR and bar codes).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<SheetImage>,
+    /// Border and zones (Custom template / Sheet properties).
+    #[serde(default, skip_serializing_if = "SheetFormat::is_default")]
+    pub format: SheetFormat,
+}
+
+/// Where zone labelling starts (Custom template › Start zones): numbers
+/// count from that corner's side and letters from its edge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ZoneStart {
+    #[default]
+    BottomRight,
+    TopLeft,
+}
+
+/// A sheet's border frame and zones (help H:custom_drawing_templates,
+/// H:sheets): include the border or not, the number of horizontal and
+/// vertical zones (`None` = the size's standard count) and the start corner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SheetFormat {
+    pub border: bool,
+    pub zones: Option<[u32; 2]>,
+    pub start: ZoneStart,
+}
+
+impl Default for SheetFormat {
+    fn default() -> Self {
+        Self { border: true, zones: None, start: ZoneStart::BottomRight }
+    }
+}
+
+impl SheetFormat {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Horizontal and vertical zone counts of a sheet of `size`.
+    pub fn zone_counts(&self, size: SheetSize) -> [u32; 2] {
+        self.zones.unwrap_or_else(|| size.standard_zones())
+    }
 }
 
 /// An image placed on a sheet (Insert image): the encoded file (PNG, JPEG
@@ -1507,6 +1916,55 @@ impl Sheet {
         }
     }
 
+    /// The points a section's cutting line passes through (Edit section):
+    /// the stored ones, else the middle of the line's first segment.
+    pub fn section_cuts(&self, id: ViewId) -> Option<Vec<[f64; 2]>> {
+        match &self.view(id)?.kind {
+            ViewKind::Section { cuts, .. } if !cuts.is_empty() => Some(cuts.clone()),
+            ViewKind::Section { line, .. } if line.len() >= 2 => Some(vec![[(line[0][0] + line[1][0]) / 2.0, (line[0][1] + line[1][1]) / 2.0]]),
+            _ => None,
+        }
+    }
+
+    /// Edit section (live drawing/499–504): set the points the cutting line
+    /// passes through; the line runs along its first segment's direction,
+    /// through the points in order, stepping across halfway between
+    /// neighbours, its ends where they were (extended to cover the points).
+    pub fn set_section_cuts(&mut self, id: ViewId, mut cuts: Vec<[f64; 2]>) -> bool {
+        let Some(v) = self.view_mut(id) else { return false };
+        let ViewKind::Section { line, cuts: stored, .. } = &mut v.kind else { return false };
+        if line.len() < 2 || cuts.is_empty() {
+            return false;
+        }
+        let d = [line[1][0] - line[0][0], line[1][1] - line[0][1]];
+        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        if l < 1e-12 {
+            return false;
+        }
+        let u = [d[0] / l, d[1] / l];
+        let n = [-u[1], u[0]];
+        let along = |p: [f64; 2]| p[0] * u[0] + p[1] * u[1];
+        let across = |p: [f64; 2]| p[0] * n[0] + p[1] * n[1];
+        let pt = |a: f64, c: f64| [u[0] * a + n[0] * c, u[1] * a + n[1] * c];
+        cuts.sort_by(|a, b| along(*a).total_cmp(&along(*b)));
+        let (s0, s1) = (along(line[0]), along(*line.last().unwrap_or(&line[0])));
+        let margin = (s1 - s0).abs() * 0.02;
+        let start = s0.min(along(cuts[0]) - margin);
+        let end = s1.max(along(*cuts.last().unwrap_or(&cuts[0])) + margin);
+        let mut out = vec![pt(start, across(cuts[0]))];
+        for w in cuts.windows(2) {
+            let m = (along(w[0]) + along(w[1])) / 2.0;
+            if (across(w[0]) - across(w[1])).abs() > 1e-12 {
+                out.push(pt(m, across(w[0])));
+                out.push(pt(m, across(w[1])));
+            }
+        }
+        out.push(pt(end, across(*cuts.last().unwrap_or(&cuts[0]))));
+        *line = out;
+        *stored = cuts;
+        true
+    }
+
     /// Replace a section view's cutting line points (see [`Self::section_points`]).
     pub fn set_section_points(&mut self, id: ViewId, pts: Vec<[f64; 2]>) -> bool {
         let Some(v) = self.view_mut(id) else { return false };
@@ -1572,7 +2030,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![] }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default() }
     }
 }
 
@@ -1622,6 +2080,19 @@ pub struct DrawingProps {
     pub tolerance_leading_zeros: bool,
     #[serde(default = "yes")]
     pub tolerance_trailing_zeros: bool,
+    /// Units and precision › Fit class tolerance precision (live default
+    /// 0.1234; None: 4 decimals).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit_tolerance_precision: Option<u8>,
+    /// Units and precision › Dual.
+    #[serde(default, skip_serializing_if = "DualDims::is_default")]
+    pub dual: DualDims,
+    /// Footer: the template the properties were last updated from
+    /// ("Update properties from a template…") and ☐ Lock drawing properties.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
     /// Inspection: bubble shape, hide all (toolbar toggle), leave callouts
     /// out of automatic numbering.
     #[serde(default)]
@@ -1775,8 +2246,8 @@ pub struct DrawingProps {
     pub callout_stack: StackDirection,
     #[serde(default = "stack_gap")]
     pub callout_stack_gap: f64,
-    /// Annotations › Datums › Target hatch pattern: indices into
-    /// `sheet_sketch::HATCH_PATTERNS` (standard, pattern).
+    /// Annotations › Datums › Target hatch pattern: group and pattern
+    /// (`hatch_pat::pattern`).
     #[serde(default)]
     pub target_hatch: (usize, usize),
     /// Annotations › Hole/thread callouts › Indicator (the count's "X")
@@ -2028,6 +2499,9 @@ pub struct CalloutStyle {
     /// Stacked callouts (Add stacked callouts), in order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub stacked: Vec<StackedCallout>,
+    /// Leaders added with Add leader (arrows).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub leaders: Vec<Leader>,
 }
 
 /// One stacked callout: its instance (part) and text (empty = that part's
@@ -2042,7 +2516,7 @@ pub struct StackedCallout {
 
 impl Default for CalloutStyle {
     fn default() -> Self {
-        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new() }
+        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), leaders: Vec::new() }
     }
 }
 
@@ -2050,6 +2524,64 @@ impl CalloutStyle {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
     }
+}
+
+/// Adjust linestyle (live drawing/443–446): an edge's linestyle, dash
+/// scale, thickness (mm) and color.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EdgeStyle {
+    pub body: BodyId,
+    pub name: TopoName,
+    pub pattern: LinePattern,
+    /// Dashes: the dash pattern's scale (1.00).
+    pub dashes: f64,
+    pub thickness: f64,
+    #[serde(default)]
+    pub color: Option<[u8; 3]>,
+}
+
+/// Adjust linestyle › Linestyle (live order).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LinePattern {
+    #[default]
+    Solid,
+    Phantom,
+    Center,
+    Dashed,
+    Dotted,
+}
+
+impl LinePattern {
+    pub const ALL: [LinePattern; 5] = [LinePattern::Solid, LinePattern::Phantom, LinePattern::Center, LinePattern::Dashed, LinePattern::Dotted];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            LinePattern::Solid => "Solid",
+            LinePattern::Phantom => "Phantom",
+            LinePattern::Center => "Center",
+            LinePattern::Dashed => "Dashed",
+            LinePattern::Dotted => "Dotted",
+        }
+    }
+
+    /// The dash pattern (mm) at scale `k`.
+    pub fn dashes(self, k: f64) -> Vec<f64> {
+        let base: &[f64] = match self {
+            LinePattern::Solid => &[],
+            LinePattern::Phantom => &[8.0, 1.5, 1.5, 1.5, 1.5, 1.5],
+            LinePattern::Center => &[8.0, 1.5, 1.5, 1.5],
+            LinePattern::Dashed => &[3.0, 1.5],
+            LinePattern::Dotted => &[0.3, 1.0],
+        };
+        base.iter().map(|d| d * k.max(0.01)).collect()
+    }
+}
+
+/// Adjust linestyle › Thickness choices (mm, live order).
+pub const LINE_THICKNESSES: [f64; 19] = [0.13, 0.15, 0.18, 0.20, 0.25, 0.30, 0.35, 0.40, 0.50, 0.53, 0.60, 0.70, 0.80, 0.90, 1.00, 1.20, 1.40, 1.60, 2.00];
+
+fn no_arms(a: &[f64; 4]) -> bool {
+    a.iter().all(|x| *x == 0.0)
 }
 
 fn no_jogs(j: &[Option<ExtJog>; 2]) -> bool {
@@ -2209,7 +2741,7 @@ pub struct ViewDefaults {
 
 impl Default for ViewDefaults {
     fn default() -> Self {
-        Self { simplification: Simplification::Auto, auto_centermarks: false, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true }
+        Self { simplification: Simplification::Auto, auto_centermarks: true, auto_centerlines: false, hidden_lines: false, tangent: 1, scale_label: true }
     }
 }
 
@@ -2272,7 +2804,7 @@ fn is_zero(x: &f64) -> bool {
 
 impl Default for DrawingProps {
     fn default() -> Self {
-        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_color: None, inspection_solid_fill: false,
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, fit_tolerance_precision: None, dual: DualDims::default(), template: None, locked: false, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_color: None, inspection_solid_fill: false,
             view_defaults: ViewDefaults::default(),
             dim_text_height: 3.5,
             dim_arrow: 3.0,
@@ -2383,6 +2915,18 @@ impl Drawing {
         copy.name = (1..).map(|n| if n == 1 { format!("{base} copy") } else { format!("{base} copy {n}") }).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
         self.sheets.insert(i + 1, copy);
         Some(i + 1)
+    }
+
+    /// Sheets panel › Paste of a copied sheet: appended at the bottom (help
+    /// H:sheets), named like a duplicate when the name is taken. Returns
+    /// its index.
+    pub fn paste_sheet(&mut self, mut sheet: Sheet) -> usize {
+        let base = sheet.name.clone();
+        if self.sheets.iter().any(|s| s.name == base) {
+            sheet.name = (1..).map(|n| if n == 1 { format!("{base} copy") } else { format!("{base} copy {n}") }).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
+        }
+        self.sheets.push(sheet);
+        self.sheets.len() - 1
     }
 
     /// Delete sheet `i`; the last remaining sheet cannot be deleted.
@@ -2542,6 +3086,7 @@ pub mod clipboard;
 pub mod create;
 pub mod cad_export;
 pub mod sheet_sketch;
+pub mod hatch_pat;
 pub mod export;
 pub mod font;
 pub mod format;

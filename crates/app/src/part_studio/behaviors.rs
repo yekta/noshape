@@ -108,6 +108,11 @@ pub struct UiState {
     pub palette_closed: Option<std::time::Instant>,
     /// Variable hovered in the variable table.
     pub var_hover: Option<String>,
+    /// The Variable table's own table is folded (header ⌄ / Collapse all tables).
+    pub var_folded: bool,
+    /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
+    pub inspection_tool: Option<&'static str>,
+    pub inspection_more: bool,
     /// Custom tables panel (selected table, its result, the hovered row).
     pub ct: super::custom_tables::CtState,
     /// Variable Studio tables shown in the Variable table panel.
@@ -141,8 +146,8 @@ pub struct UiState {
     pub show_regen_times: bool,
     /// Parts list: collapsed sections, height, part properties shown.
     pub collapsed_sections: HashSet<&'static str>,
-    /// Height of the parts list once the separator was dragged (None: 35%
-    /// of the panel, live).
+    /// The parts list's share of the list panel's height once the separator
+    /// was dragged (None: 35%, live).
     pub parts_height: Option<f32>,
     pub show_part_props: bool,
     /// The whole Features and parts list collapsed.
@@ -151,6 +156,9 @@ pub struct UiState {
     pub mass_faces: bool,
     /// Measure type filter (None = Show all).
     pub measure_type: Option<&'static str>,
+    /// The Measure panel's Length / Angle unit selects (None = workspace units).
+    pub measure_length_unit: Option<noshape_units::LengthUnit>,
+    pub measure_angle_unit: Option<noshape_units::AngleUnit>,
     /// Feature dialog position after the user moved it.
     pub dialog_pos: Option<Point<Pixels>>,
     /// Feature dialog size after the user resized it.
@@ -225,6 +233,8 @@ pub struct UiState {
     pub cfg_only_kinds: [bool; 3],
     pub cfg_folded: std::collections::HashSet<String>,
     pub cfg_editing: Option<String>,
+    /// The rename input still has to take the keyboard (once, when it opens).
+    pub cfg_editing_focus: bool,
     pub cfg_filter: Option<Entity<InputState>>,
     /// Feature list "Configurations" box: one select per List input.
     pub cfg_selects: std::collections::HashMap<String, (Entity<crate::os_select::OsSelect>, Subscription)>,
@@ -285,6 +295,9 @@ impl UiState {
             palette_top: std::rc::Rc::new(std::cell::Cell::new(px(76.))),
             palette_closed: None,
             var_hover: None,
+            var_folded: false,
+            inspection_tool: None,
+            inspection_more: false,
             ct: Default::default(),
             var_tables: Default::default(),
             section: Vec::new(),
@@ -309,6 +322,8 @@ impl UiState {
             list_collapsed: false,
             mass_faces: false,
             measure_type: None,
+            measure_length_unit: None,
+            measure_angle_unit: None,
             dialog_pos: None,
             dialog_size: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
@@ -347,6 +362,7 @@ impl UiState {
             cfg_only_kinds: [false; 3],
             cfg_folded: Default::default(),
             cfg_editing: None,
+            cfg_editing_focus: false,
             cfg_filter: None,
             cfg_selects: Default::default(),
             zebra: None,
@@ -1511,6 +1527,27 @@ impl PartStudioView {
                 }
             });
         });
+        // Default geometry is shown from the regeneration's display, which a
+        // visibility change doesn't regenerate: update it here (it stayed
+        // drawn after Hide, user bug v0.4.0).
+        if !defaults.is_empty() || !feats.is_empty() {
+            let display = std::sync::Arc::make_mut(&mut self.display);
+            for p in &mut display.planes {
+                if defaults.contains(&p.reference) || matches!(&p.reference, Reference::FeaturePlane(f) if feats.contains(f)) {
+                    p.hidden = hidden;
+                }
+            }
+            for sk in &mut display.sketches {
+                if feats.contains(&sk.feature) {
+                    sk.hidden = hidden;
+                }
+            }
+            if defaults.contains(&Reference::Origin) {
+                display.show_origin = !hidden;
+            }
+            // Planes and the origin are baked into the built scene.
+            self.rebuild_scene(cx);
+        }
     }
 
     /// Shift+Y: show hidden selected items, otherwise every hidden part.
@@ -1537,8 +1574,16 @@ impl PartStudioView {
                 ps.hidden_defaults.clear();
             });
         });
+        let display = std::sync::Arc::make_mut(&mut self.display);
+        for p in &mut display.planes {
+            if matches!(p.reference, Reference::Plane(_)) {
+                p.hidden = false;
+            }
+        }
+        display.show_origin = true;
         self.opts.show_planes = true;
         self.opts.show_sketches = true;
+        self.rebuild_scene(cx);
         cx.notify();
     }
 

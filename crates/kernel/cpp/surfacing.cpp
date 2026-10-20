@@ -4,9 +4,12 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
+#include <Bnd_Box.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepLib.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -29,6 +32,7 @@
 #include <NCollection_Array2.hxx>
 #include <NCollection_HArray1.hxx>
 #include <ShapeFix_Face.hxx>
+#include <ShapeFix_Solid.hxx>
 #include <TopExp_Explorer.hxx>
 #include <gp_Pnt2d.hxx>
 #include <gp_Trsf.hxx>
@@ -655,6 +659,288 @@ std::unique_ptr<OcShapeList> isocline_edges(const OcShape& face, P3 dir, double 
 }
 
 // ---------------------------------------------------------------- surface fitting
+
+namespace
+{
+
+// One direction of a B-spline in OCCT's terms: distinct knots and their
+// multiplicities over n poles.
+struct SplineDir
+{
+  std::vector<double> k;
+  std::vector<int>    m;
+  int                 n        = 0;
+  bool                periodic = false;
+};
+
+// From FeatureScript's full knot vector (repeats written out) over n poles:
+// the open form, which OCCT reads as given (clamped or not).
+SplineDir open_dir(const rust::Vec<double>& flat, int degree, int n, const std::string& what)
+{
+  if (degree < 1 || degree > 25)
+    fail_invalid(what + ": the degree must be 1 to 25");
+  if (n < degree + 1)
+    fail_invalid(what + ": needs at least degree + 1 control points");
+  if ((int)flat.size() != n + degree + 1)
+    fail_invalid(what + ": needs control points + degree + 1 knots");
+  SplineDir d;
+  d.n = n;
+  for (size_t i = 0; i < flat.size(); ++i)
+  {
+    if (i > 0 && flat[i] < flat[i - 1])
+      fail_invalid(what + ": the knots must be non-decreasing");
+    if (!d.k.empty() && flat[i] - d.k.back() <= 1e-12 * std::max(1.0, std::abs(flat[i])))
+      ++d.m.back();
+    else
+    {
+      d.k.push_back(flat[i]);
+      d.m.push_back(1);
+    }
+  }
+  for (int m : d.m)
+    if (m > degree + 1)
+      fail_invalid(what + ": a knot repeats more than degree + 1 times");
+  return d;
+}
+
+// The periodic form of a direction given with its `degree` overlapping
+// poles: the unique poles and the knots of one period (false when the knots
+// are not periodic).
+bool periodic_dir(const rust::Vec<double>& flat, int degree, int n, SplineDir& p)
+{
+  const int nu = n - degree;
+  if (nu < 2)
+    return false;
+  const double a = flat[(size_t)degree], b = flat[(size_t)n], tol = 1e-12 * std::max(1.0, std::abs(b - a));
+  int          mb = 0;
+  for (double t : flat)
+    mb += std::abs(t - a) <= tol ? 1 : 0;
+  mb = std::min(mb, degree);
+  p  = SplineDir{{a}, {mb}, nu, true};
+  for (double t : flat)
+    if (t > a + tol && t < b - tol)
+    {
+      if (t - p.k.back() <= tol)
+        ++p.m.back();
+      else
+      {
+        p.k.push_back(t);
+        p.m.push_back(1);
+      }
+    }
+  p.k.push_back(b);
+  p.m.push_back(mb);
+  int sum = 0;
+  for (int m : p.m)
+    sum += m;
+  return sum - mb == nu;
+}
+
+NCollection_Array1<double> array_of(const std::vector<double>& v)
+{
+  NCollection_Array1<double> a(1, (int)v.size());
+  for (size_t i = 0; i < v.size(); ++i)
+    a((int)i + 1) = v[i];
+  return a;
+}
+
+NCollection_Array1<int> array_of(const std::vector<int>& v)
+{
+  NCollection_Array1<int> a(1, (int)v.size());
+  for (size_t i = 0; i < v.size(); ++i)
+    a((int)i + 1) = v[i];
+  return a;
+}
+
+void check_weights(const rust::Vec<double>& w, size_t n, const std::string& what)
+{
+  if (!w.empty() && w.size() != n)
+    fail_invalid(what + ": needs one weight per control point");
+  for (double x : w)
+    if (!(x > 0))
+      fail_invalid(what + ": the weights must be positive");
+}
+
+occ::handle<Geom_BSplineSurface> spline_surface(const BSplineSurfF& s)
+{
+  const int nu = (int)s.nu, nv = (int)s.nv;
+  if (nu < 2 || nv < 2 || s.poles.size() != (size_t)nu * nv * 3)
+    fail_invalid("spline surface: the control points must be a grid of rows by columns");
+  check_weights(s.weights, (size_t)nu * nv, "spline surface");
+  const SplineDir u0 = open_dir(s.u_knots, s.u_degree, nu, "spline surface (u)");
+  const SplineDir v0 = open_dir(s.v_knots, s.v_degree, nv, "spline surface (v)");
+  const auto      build = [&](const SplineDir& u, const SplineDir& v) {
+    NCollection_Array2<gp_Pnt> P(1, u.n, 1, v.n);
+    NCollection_Array2<double> W(1, u.n, 1, v.n);
+    for (int i = 0; i < u.n; ++i)
+      for (int j = 0; j < v.n; ++j)
+      {
+        const size_t q = (size_t)i * nv + j;
+        P(i + 1, j + 1) = gp_Pnt(s.poles[3 * q], s.poles[3 * q + 1], s.poles[3 * q + 2]);
+        W(i + 1, j + 1) = s.weights.empty() ? 1.0 : s.weights[q];
+      }
+    if (s.weights.empty())
+      return occ::handle<Geom_BSplineSurface>(new Geom_BSplineSurface(P, array_of(u.k), array_of(v.k), array_of(u.m), array_of(v.m),
+                                                                      s.u_degree, s.v_degree, u.periodic, v.periodic));
+    return occ::handle<Geom_BSplineSurface>(new Geom_BSplineSurface(P, W, array_of(u.k), array_of(v.k), array_of(u.m), array_of(v.m),
+                                                                    s.u_degree, s.v_degree, u.periodic, v.periodic));
+  };
+  occ::handle<Geom_BSplineSurface> open;
+  try
+  {
+    open = build(u0, v0);
+  }
+  catch (const Standard_Failure& e)
+  {
+    fail_invalid(std::string("spline surface: ") + e.GetMessageString());
+  }
+  if (!s.u_periodic && !s.v_periodic)
+    return open;
+  // Periodic where asked and the knots allow, kept when it is the same surface.
+  SplineDir u = u0, v = v0, p;
+  if (s.u_periodic && periodic_dir(s.u_knots, s.u_degree, nu, p))
+    u = p;
+  if (s.v_periodic && periodic_dir(s.v_knots, s.v_degree, nv, p))
+    v = p;
+  try
+  {
+    const occ::handle<Geom_BSplineSurface> per = build(u, v);
+    double                                 a0, a1, b0, b1;
+    open->Bounds(a0, a1, b0, b1);
+    Bnd_Box box;
+    for (int i = 0; i < nu * nv; ++i)
+      box.Add(gp_Pnt(s.poles[3 * i], s.poles[3 * i + 1], s.poles[3 * i + 2]));
+    const double tol = 1e-9 * std::max(1e-3, std::sqrt(box.SquareExtent()));
+    for (int i = 0; i <= 8; ++i)
+      for (int j = 0; j <= 8; ++j)
+      {
+        const double x = a0 + (a1 - a0) * i / 8, y = b0 + (b1 - b0) * j / 8;
+        if (per->Value(x, y).Distance(open->Value(x, y)) > tol)
+          return open;
+      }
+    return per;
+  }
+  catch (const Standard_Failure&)
+  {
+    return open;
+  }
+}
+
+occ::handle<Geom2d_BSplineCurve> spline_curve_2d(const BSpline2dF& c)
+{
+  const int n = (int)(c.poles.size() / 2);
+  if (n < 2 || c.poles.size() != (size_t)n * 2)
+    fail_invalid("spline surface boundary: needs 2D control points");
+  check_weights(c.weights, (size_t)n, "spline surface boundary");
+  const SplineDir d0    = open_dir(c.knots, c.degree, n, "spline surface boundary");
+  const auto      build = [&](const SplineDir& d) {
+    NCollection_Array1<gp_Pnt2d> P(1, d.n);
+    NCollection_Array1<double>   W(1, d.n);
+    for (int i = 0; i < d.n; ++i)
+    {
+      P(i + 1) = gp_Pnt2d(c.poles[2 * (size_t)i], c.poles[2 * (size_t)i + 1]);
+      W(i + 1) = c.weights.empty() ? 1.0 : c.weights[(size_t)i];
+    }
+    if (c.weights.empty())
+      return occ::handle<Geom2d_BSplineCurve>(new Geom2d_BSplineCurve(P, array_of(d.k), array_of(d.m), c.degree, d.periodic));
+    return occ::handle<Geom2d_BSplineCurve>(new Geom2d_BSplineCurve(P, W, array_of(d.k), array_of(d.m), c.degree, d.periodic));
+  };
+  occ::handle<Geom2d_BSplineCurve> open;
+  try
+  {
+    open = build(d0);
+  }
+  catch (const Standard_Failure& e)
+  {
+    fail_invalid(std::string("spline surface boundary: ") + e.GetMessageString());
+  }
+  SplineDir p;
+  if (!c.periodic || !periodic_dir(c.knots, c.degree, n, p))
+    return open;
+  try
+  {
+    const occ::handle<Geom2d_BSplineCurve> per = build(p);
+    for (int i = 0; i <= 16; ++i)
+    {
+      const double t = open->FirstParameter() + (open->LastParameter() - open->FirstParameter()) * i / 16;
+      if (per->Value(t).Distance(open->Value(t)) > 1e-12)
+        return open;
+    }
+    return per;
+  }
+  catch (const Standard_Failure&)
+  {
+    return open;
+  }
+}
+
+} // namespace
+
+// FeatureScript's opCreateBSplineSurface: a sheet of the spline surface, all
+// of it or inside one loop of 2D boundary curves in its parameter space; a
+// solid instead when asked and the sheet encloses a region.
+std::unique_ptr<OcShape> bspline_surface_face(const BSplineSurfF& surface, rust::Slice<const BSpline2dF> boundary, bool make_solid)
+{
+  const occ::handle<Geom_BSplineSurface> S = spline_surface(surface);
+  TopoDS_Face                            F;
+  if (boundary.empty())
+  {
+    BRepBuilderAPI_MakeFace mf(S, Precision::Confusion());
+    if (!mf.IsDone())
+      fail_op("could not build the spline surface");
+    F = mf.Face();
+  }
+  else
+  {
+    BRepBuilderAPI_MakeWire mw;
+    for (const BSpline2dF& c : boundary)
+    {
+      BRepBuilderAPI_MakeEdge me(spline_curve_2d(c), S);
+      if (!me.IsDone())
+        fail_invalid("spline surface boundary: a curve could not be put on the surface");
+      mw.Add(me.Edge());
+      if (!mw.IsDone())
+        fail_invalid("spline surface boundary: the curves must form one closed loop");
+    }
+    const TopoDS_Wire W = mw.Wire();
+    if (!BRep_Tool::IsClosed(W))
+      fail_invalid("spline surface boundary: the curves must form one closed loop");
+    BRepBuilderAPI_MakeFace mf(S, W, true);
+    if (!mf.IsDone())
+      fail_op("could not bound the spline surface");
+    F = mf.Face();
+    BRepLib::BuildCurves3d(F);
+    ShapeFix_Face fix(F);
+    fix.Perform();
+    F = fix.Face();
+  }
+  if (make_solid)
+  {
+    // The sheet joined to itself along its closed directions: a solid when
+    // that closes it (a face closed both ways by its seams already is).
+    BRepBuilderAPI_Sewing sew(Precision::Confusion());
+    sew.Add(F);
+    sew.Perform();
+    std::vector<TopoDS_Shell> shells;
+    for (TopExp_Explorer e(sew.SewedShape(), TopAbs_SHELL); e.More(); e.Next())
+      shells.push_back(TopoDS::Shell(e.Current()));
+    {
+      TopoDS_Shell sh;
+      BRep_Builder().MakeShell(sh);
+      BRep_Builder().Add(sh, F);
+      shells.push_back(sh);
+    }
+    for (const TopoDS_Shell& sh : shells)
+      if (BRep_Tool::IsClosed(sh))
+      {
+        ShapeFix_Solid     fix;
+        const TopoDS_Solid so = fix.SolidFromShell(sh);
+        if (!so.IsNull())
+          return wrap(so);
+      }
+  }
+  return wrap(F);
+}
 
 std::unique_ptr<OcShape> bspline_grid_face(const PlaneF& frame, double x0, double dx, double y0, double dy,
                                            rust::Slice<const double> z, uint32_t nx, uint32_t ny, int32_t deg_max,

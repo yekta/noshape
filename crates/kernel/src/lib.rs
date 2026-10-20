@@ -46,14 +46,15 @@ pub use history::{History, HistoryRecord, OpResult, Relation};
 pub use hlr::{EdgeClass, ProjectedEdge, Visibility, project_hlr, project_hlr_with};
 pub use io::{
     ExportShape, ImportedShape, LengthUnit, StepOptions, StepSchema, StlFormat, read_brep, read_iges, read_mesh, read_step, write_brep,
-    rhino_brep_count, write_acis, write_iges, write_jt, write_obj, write_obj_mesh, write_parasolid, write_pvz, read_parasolid, read_parasolid_parts, read_native_parts, read_acis_parts, read_jt_parts, read_rhino_parts, read_pvz, read_mesh_bodies, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
+    rhino_brep_count, write_acis, write_iges, write_jt, write_obj, write_obj_mesh, write_parasolid, write_pvz, read_parasolid, read_parasolid_parts, read_native_parts, read_native_parts_configuration, read_native_assembly, extract_zip, NativeComponent, read_acis_parts, read_jt_parts, read_rhino_parts, read_pvz, read_mesh_bodies, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
 };
 pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_with};
 pub use ops::*;
 pub use props::{Distance, MassProperties, angle_between, distance, linear_properties, surface_properties, volume_properties};
 pub use shape::{AncestorMap, Orientation, Shape, ShapeType};
 pub use surfacing::{
-    Developable, Placement2d, SurfaceFit, SurfaceFitOptions, bspline_surface_from_grid, fit_surface, isocline_curves, max_deviation, wrap_faces,
+    BSplineCurve2dData, BSplineSurfaceData, Developable, Placement2d, SurfaceFit, SurfaceFitOptions, bspline_surface_from_grid, fit_surface,
+    isocline_curves, make_bspline_surface, max_deviation, wrap_faces,
 };
 pub use transform::{Transform, transform};
 

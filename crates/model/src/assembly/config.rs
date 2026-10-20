@@ -33,6 +33,10 @@ pub mod param {
     pub const ROTATION: &str = "rotation";
     /// Mate "Flip primary axis".
     pub const FLIP: &str = "flipPrimary";
+    /// An instance's own configuration input (`input:<id>`), set from the
+    /// assembly's input (Input propagation; values `Text(option id)` /
+    /// `Text("true" | "false")`).
+    pub const INPUT_PREFIX: &str = "input:";
 }
 
 /// Column header label of a configured parameter (live 196: "Unsuppressed",
@@ -117,6 +121,7 @@ pub fn new_list_input(id: String, n: usize) -> ConfigInput {
         name: if n == 1 { "Configuration".into() } else { format!("List {n}") },
         kind: ConfigInputKind::List { options: vec![ListOption { id: "default".into(), name: "Default".into() }], default: "default".into() },
         visible_when: None,
+        excluded: false,
     }
 }
 
@@ -229,6 +234,12 @@ impl Assembly {
                         && let Some(i) = self.instance_mut(id)
                     {
                         i.suppressed = !b;
+                    }
+                    // A propagated input: the instance's configuration follows.
+                    if let (Some(input), ParamValue::Text(t)) = (c.param.strip_prefix(param::INPUT_PREFIX), v)
+                        && let Some(cfg) = self.instance_mut(id).and_then(|i| i.source.config_mut())
+                    {
+                        cfg.0.insert(input.to_string(), t.clone());
                     }
                 }
                 ConfigTarget::Mate(id) => {

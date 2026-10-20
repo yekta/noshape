@@ -2430,6 +2430,18 @@ impl<M: InputModeKind> InputBaseState<M> {
         if window.default_prevented() {
             return;
         }
+        self.press(event, window, cx);
+    }
+
+    /// NOSHAPE PATCH: the press itself, also for a press in the input's
+    /// frame around the text (see `frame_hit`), where the frame's own focus
+    /// handling has already marked the event.
+    pub(super) fn press(
+        &mut self,
+        event: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.undo_manager.break_transaction_coalescing();
         // Input has its own text selection; suppress the window-level text
         // selection (Root) so it does not start a drag from here.
@@ -4761,6 +4773,9 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
                     .pb(self.editor_paddings.bottom)
                     .pl(self.editor_paddings.left)
             })
+            // NOSHAPE PATCH: presses in the frame's padding and the I-beam
+            // over the whole frame (see `frame_hit`).
+            .child(super::frame_hit::FrameHitArea::new(entity.clone(), self.disabled))
             .child(TextElement::new(entity.clone()).placeholder(self.placeholder.clone()))
             .when(self.shows_scrollbar(), |this| {
                 this.child(EditorScrollbar::new(entity.clone()))

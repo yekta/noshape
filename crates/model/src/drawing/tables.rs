@@ -408,11 +408,12 @@ pub fn evaluate_custom_tables(doc: &Document, drawing: &Drawing, sources: &Sourc
     out
 }
 
-/// Content of a custom table: the column names as the (bold) header, a row
-/// per table row (missing values "Not set", errors their text), the
-/// columns' alignment; the first table of a `TableArray`.
+/// Content of a custom table (live drawing/267–268): the column names as
+/// the bold, centred header, a row per table row (missing values "Not set",
+/// error / info cells their plain text), left-aligned whatever the column's
+/// alignment; the first non-empty table of a `TableArray`, no title row.
 fn custom_data(kind: &TableKind, result: Option<&Result<Vec<CustomTable>, String>>) -> TableData {
-    let TableKind::Custom { bottom_to_top, overrides, .. } = kind else { return TableData::default() };
+    let TableKind::Custom { bottom_to_top, .. } = kind else { return TableData::default() };
     let table = match result {
         Some(Ok(tables)) => tables.first(),
         Some(Err(e)) => return TableData { rows: vec![vec![e.clone()]], ..Default::default() },
@@ -420,27 +421,12 @@ fn custom_data(kind: &TableKind, result: Option<&Result<Vec<CustomTable>, String
     };
     let Some(t) = table else { return TableData { header: Some(vec![String::new()]), header_bold: true, ..Default::default() } };
     let header = Some(t.columns.iter().map(|c| c.name.clone()).collect());
-    let col_align = t
-        .columns
-        .iter()
-        .map(|c| match c.alignment.as_deref() {
-            Some("RIGHT") => CellAlign::Right,
-            Some("CENTER") => CellAlign::Center,
-            _ => CellAlign::Left,
-        })
-        .collect();
+    let col_align = vec![CellAlign::Left; t.columns.len()];
     let mut rows: Vec<Vec<String>> = t.rows.iter().map(|r| t.columns.iter().map(|c| r.text(&c.id).to_string()).collect()).collect();
     if *bottom_to_top {
         rows.reverse();
     }
-    let mut overridden = Vec::new();
-    for (r, c, v) in overrides {
-        if let Some(cell) = rows.get_mut(*r).and_then(|row| row.get_mut(*c)) {
-            *cell = v.clone();
-            overridden.push((*r, *c));
-        }
-    }
-    TableData { header, rows, header_bottom: *bottom_to_top, overridden, col_align, header_bold: true, ..Default::default() }
+    TableData { header, rows, header_bottom: *bottom_to_top, col_align, header_bold: true, ..Default::default() }
 }
 
 /// Table cell grid on the sheet.

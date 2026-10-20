@@ -131,8 +131,8 @@ impl DrawingEditor {
             let row = self.gdt_row(sym(r.first()), r, extra.prefix.get(i + 1).map(String::as_str).unwrap_or(""), extra.suffix.get(i + 1).map(String::as_str).unwrap_or(""), window, cx);
             rows.push(row);
         }
-        let upper = cx.new(|cx| InputState::new(window, cx).placeholder("Upper text").default_value(extra.upper.clone()));
-        let lower = cx.new(|cx| InputState::new(window, cx).placeholder("Lower text").default_value(extra.lower.clone()));
+        let upper = cx.new(|cx| InputState::new(window, cx).default_value(extra.upper.clone()));
+        let lower = cx.new(|cx| InputState::new(window, cx).default_value(extra.lower.clone()));
         GdtDlg { edit, rows, upper, lower, leader: extra.leader, symbols: false, focus: (0, VALUE) }
     }
 
@@ -280,10 +280,15 @@ impl DrawingEditor {
         let frames = d.rows.len();
         let (upper, lower) = (d.upper.clone(), d.lower.clone());
         let rows: Vec<(Option<usize>, Vec<Entity<InputState>>)> = d.rows.iter().map(|r| (r.symbol, r.inputs.clone())).collect();
-        // A box that records the focused slot (for the symbol palette).
+        // A slot (live dom drawing-gdt-dialog-empty): a borderless input over a
+        // `#999` underline; it records the focused slot (for the symbol palette).
         let slot_box = |row: usize, slot: usize, input: &Entity<InputState>, w: f32, cx: &mut Context<Self>| {
             div()
                 .w(px(w))
+                .h(px(24.))
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0x999999))
+                .text_size(px(16.))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _: &MouseDownEvent, _, cx| {
@@ -293,10 +298,14 @@ impl DrawingEditor {
                         cx.notify();
                     }),
                 )
-                .child(Input::new(input).small())
+                .child(Input::new(input).appearance(false).small())
         };
-        let label_row = h_flex().px(px(8.)).gap(px(4.)).text_size(px(14.)).child(div().w(px(69.)).child("Prefix")).child(div().w(px(50.)).child("Type")).child(div().w(px(221.)).child("Tolerance")).child(div().w(px(222.)).child("Datums")).child(div().w(px(69.)).child("Suffix"));
-        let mut frame_rows = v_flex().gap(px(6.));
+        // A 69 x 34 cell: 1 px `#ccc`, radius 4, the slot 6 px in.
+        let cell = |row: usize, slot: usize, input: &Entity<InputState>, cx: &mut Context<Self>| div().w(px(69.)).h(px(34.)).flex_none().px(px(6.)).pt(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).child(slot_box(row, slot, input, 55., cx));
+        // Label columns as live: Prefix 87, Type 67, Tolerance 239, Datums 245, Suffix.
+        let label_row = h_flex().h(px(20.)).mt(px(3.)).text_size(px(14.)).child(div().w(px(87.)).child("Prefix")).child(div().w(px(67.)).child("Type")).child(div().w(px(239.)).child("Tolerance")).child(div().w(px(245.)).child("Datums")).child(div().child("Suffix"));
+        let sep = || div().w(px(1.)).h(px(34.)).mx(px(8.)).flex_none().bg(gpui_kit::rgb(0xdddddd));
+        let mut frame_rows = v_flex().mt(px(6.)).gap(px(6.));
         for (ri, (symbol, inputs)) in rows.iter().enumerate() {
             // Type: the 14 types; rows after the first start with Composite.
             let ed2 = ed.clone();
@@ -305,7 +314,8 @@ impl DrawingEditor {
                 Some(i) => GDT_TYPES[i].0.to_string(),
                 None => "⌖⌖".to_string(),
             };
-            let type_btn = Button::new(("gdt-type", ri)).label(label).ghost().small().w(px(50.)).dropdown_caret(true).tooltip(match cur {
+            // Live: a 50 x 30 white button, 1 px `#ccc`, radius 4: the symbol and a caret.
+            let type_btn = Button::new(("gdt-type", ri)).child(div().text_size(px(18.)).child(label)).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).dropdown_caret(true).tooltip(match cur {
                 Some(i) => GDT_TYPES[i].1,
                 None => "Composite",
             });
@@ -366,30 +376,43 @@ impl DrawingEditor {
             });
             frame_rows = frame_rows.child(
                 h_flex()
-                    .px(px(8.))
-                    .gap(px(4.))
+                    .pl(px(1.))
                     .on_mouse_down(MouseButton::Right, row_menu)
-                    .child(slot_box(ri, PREFIX, &inputs[PREFIX], 69., cx))
+                    .child(cell(ri, PREFIX, &inputs[PREFIX], cx))
+                    .child(sep())
                     .child(type_btn)
-                    .child(
+                    .child(div().w(px(16.)))
+                    .child({
+                        // The tolerance cell: 221 x 34, the active one 2 px `#abcbff`.
+                        let active = focus.0 == ri && (BEFORE..=AFTER).contains(&focus.1);
                         h_flex()
                             .w(px(221.))
-                            .gap(px(2.))
-                            .border_1()
-                            .border_color(if focus.0 == ri && (BEFORE..=AFTER).contains(&focus.1) { gpui_kit::rgb(0xabcbff) } else { gpui_kit::rgb(0xcccccc) })
+                            .h(px(34.))
+                            .flex_none()
+                            .px(px(6.))
+                            .pt(px(2.))
                             .rounded(px(4.))
-                            .child(slot_box(ri, BEFORE, &inputs[BEFORE], 40., cx))
-                            .child(slot_box(ri, VALUE, &inputs[VALUE], 130., cx))
-                            .child(slot_box(ri, AFTER, &inputs[AFTER], 40., cx)),
-                    )
-                    .child(slot_box(ri, DATUM0, &inputs[DATUM0], 72., cx))
-                    .child(slot_box(ri, DATUM0 + 1, &inputs[DATUM0 + 1], 72., cx))
-                    .child(slot_box(ri, DATUM0 + 2, &inputs[DATUM0 + 2], 72., cx))
-                    .child(slot_box(ri, SUFFIX, &inputs[SUFFIX], 69., cx)),
+                            .bg(gpui_kit::white())
+                            .when(active, |d| d.border_2().border_color(gpui_kit::rgb(0xabcbff)))
+                            .when(!active, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
+                            .child(slot_box(ri, BEFORE, &inputs[BEFORE], 69., cx))
+                            .child(div().w(px(6.)))
+                            .child(slot_box(ri, VALUE, &inputs[VALUE], 49., cx))
+                            .child(div().w(px(6.)))
+                            .child(slot_box(ri, AFTER, &inputs[AFTER], 69., cx))
+                    })
+                    .child(sep())
+                    .child(cell(ri, DATUM0, &inputs[DATUM0], cx))
+                    .child(div().w(px(10.)))
+                    .child(cell(ri, DATUM0 + 1, &inputs[DATUM0 + 1], cx))
+                    .child(div().w(px(10.)))
+                    .child(cell(ri, DATUM0 + 2, &inputs[DATUM0 + 2], cx))
+                    .child(sep())
+                    .child(cell(ri, SUFFIX, &inputs[SUFFIX], cx)),
             );
         }
         let ed3 = ed.clone();
-        let leader_btn = Button::new("gdt-leader").label("↙").ghost().small().dropdown_caret(true).tooltip("Leader").os_dropdown_menu("gdt-leader-dd", false, move |mut m, _, _| {
+        let leader_btn = Button::new("gdt-leader").child(div().text_size(px(16.)).child("↙")).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).dropdown_caret(true).tooltip("Leader").os_dropdown_menu("gdt-leader-dd", false, move |mut m, _, _| {
             for (l, v) in [("Leader", GdtLeader::Leader), ("All around", GdtLeader::AllAround), ("All over", GdtLeader::AllOver)] {
                 let e = ed3.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(l).checked(leader == v).on_click(move |_, _, cx| {
@@ -404,7 +427,7 @@ impl DrawingEditor {
             m
         });
         let palette = show_symbols.then(|| {
-            let mut grid = h_flex().flex_wrap().px(px(8.)).gap(px(2.));
+            let mut grid = h_flex().flex_wrap().gap(px(2.));
             for (i, (sym, tip)) in PALETTE.iter().enumerate() {
                 let enabled = if focus.0 == usize::MAX || focus.1 == PREFIX || focus.1 == SUFFIX { true } else { allowed(focus.1, sym) };
                 grid = grid.child(
@@ -425,9 +448,17 @@ impl DrawingEditor {
             }
             grid
         });
-        let text_box = |which: usize, input: &Entity<InputState>, cx: &mut Context<Self>| {
+        // Upper / Lower text: a 28 px underlined field, its placeholder italic
+        // `#999` (live 200).
+        let text_box = |which: usize, input: &Entity<InputState>, placeholder: &'static str, cx: &mut Context<Self>| {
+            let empty = input.read(cx).value().is_empty();
             div()
-                .px(px(8.))
+                .relative()
+                .h(px(28.))
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0x999999))
+                .text_size(px(14.))
+                .when(empty, |d| d.child(div().absolute().left(px(4.)).top_0().bottom_0().flex().items_center().italic().text_size(px(14.67)).text_color(gpui_kit::rgb(0x999999)).child(placeholder)))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _: &MouseDownEvent, _, cx| {
@@ -437,7 +468,7 @@ impl DrawingEditor {
                         cx.notify();
                     }),
                 )
-                .child(Input::new(input).small())
+                .child(Input::new(input).appearance(false).small())
         };
         let can_accept = entered && editing;
         Some(
@@ -447,10 +478,8 @@ impl DrawingEditor {
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
                 .w(px(726.))
-                .pb(px(6.))
-                .gap(px(4.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -459,19 +488,28 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(28.))
                         .pl(px(11.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Geometric tolerance"))
-                        .child(div().id("gdt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.opacity(0.2)).when(can_accept, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(true, cx)))).child(crate::ui::glyph("check", 18., gpui_kit::white())))
-                        .child(div().id("gdt-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(false, cx)))),
+                        .child(div().id("gdt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).when(can_accept, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(true, cx)))).child(crate::ui::glyph("check", 18., gpui_kit::white())))
+                        .child(div().id("gdt-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(false, cx)))),
                 )
-                .child(text_box(0, &upper, cx))
-                .child(label_row)
-                .child(frame_rows)
                 .child(
+                    v_flex()
+                        .p(px(9.))
+                        .child(text_box(0, &upper, "Upper text", cx))
+                        .child(label_row)
+                        .child(frame_rows)
+                        .child(
                     h_flex()
-                        .px(px(8.))
-                        .gap(px(4.))
+                        .mt(px(11.))
+                        .pl(px(1.))
+                        .pb(px(10.))
+                        .gap(px(6.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xdddddd))
                         // Up to 5 frames (help).
-                        .child(Button::new("gdt-add").label("+").ghost().small().tooltip("Add frame").disabled(frames >= 5).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        .child(Button::new("gdt-add").child(div().text_size(px(20.)).child("+")).ghost().small().w(px(50.)).h(px(30.)).text_size(px(20.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).tooltip("Add frame").disabled(frames >= 5).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let row = this.gdt_row(None, &[], "", "", window, cx);
                             if let Some(d) = &mut this.gdt_dlg {
                                 d.rows.push(row);
@@ -479,15 +517,16 @@ impl DrawingEditor {
                             cx.notify();
                         })))
                         .child(leader_btn)
-                        .child(Button::new("gdt-symbols").label("Ø").ghost().small().tooltip("Show/hide symbols").when(show_symbols, |b| b.selected(true)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(Button::new("gdt-symbols").child(div().text_size(px(16.)).child("Ø")).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).tooltip("Show/hide symbols").when(show_symbols, |b| b.selected(true)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             if let Some(d) = &mut this.gdt_dlg {
                                 d.symbols = !d.symbols;
                             }
                             cx.notify();
                         }))),
                 )
-                .children(palette)
-                .child(text_box(1, &lower, cx))
+                        .children(palette.map(|p| p.mt(px(6.))))
+                        .child(div().mt(px(6.)).child(text_box(1, &lower, "Lower text", cx))),
+                )
                 .into_any_element(),
         )
     }

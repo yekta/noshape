@@ -227,6 +227,17 @@ fn fit_surface(points, normals: &[(usize, DVec3)], &SurfaceFitOptions{tolerance,
    // height field over the points' best-fit plane spanning their extent: thin-plate interpolation through the
    // points (normals constrain the tangent plane), or a local least-squares fit for dense / noisy points (meshes)
 fn max_deviation(face, points) -> Result<f64>;
+fn make_bspline_surface(&BSplineSurfaceData, boundary: &[BSplineCurve2dData], make_solid: bool) -> Result<Shape>;
+   // FeatureScript's opCreateBSplineSurface. BSplineSurfaceData { poles: Vec<DVec3> /* [i*nv+j], i = row along u */,
+   // nu, nv, weights: Option<Vec<f64>>, u_knots, v_knots /* full knot vectors, repeats written out */, u_degree,
+   // v_degree, u_periodic, v_periodic } = std's BSplineSurface after bSplineSurface() padded the knots and overlapped
+   // a periodic direction's control points (n + degree rows/columns, n + 2·degree + 1 knots; clamped or unclamped
+   // ends are both taken as given). BSplineCurve2dData { poles: Vec<DVec2>, weights, knots, degree, periodic } = a
+   // dimension-2 BSplineCurve in the surface's (u, v). Result: one sheet face over the whole parameter range, or
+   // inside the boundary (one closed loop, else an error); a periodic direction gets a seam. make_solid: a solid
+   // when the sheet encloses a region (closed both ways, or closed with collapsed ends), else the sheet.
+   // Errors (KernelError::Invalid): knot count != poles + degree + 1, decreasing knots, a knot repeated more than
+   // degree + 1 times, degree outside 1..25, non-positive weights, an open boundary loop.
 ```
 
 ## Tessellation (`mesh`)

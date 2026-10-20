@@ -616,14 +616,17 @@ impl<'a> Parser<'a> {
         self.ternary()
     }
 
+    /// `?:` is left-associative in Onshape (live, behaviours.md "?:"):
+    /// `a ? x : b ? y : z` is `(a ? x : b) ? y : z`.
     fn ternary(&mut self) -> PResult<Expr> {
-        let cond = self.binary(0)?;
-        if self.is_op(Op::Question) {
+        let mut cond = self.binary(0)?;
+        while self.is_op(Op::Question) {
             self.bump();
             let a = self.ternary()?;
             self.expect_op(Op::Colon)?;
-            let b = self.ternary()?;
-            return Ok(Expr::new(cond.pos, ExprKind::Cond(cond, a, b)));
+            let b = self.binary(0)?;
+            let pos = cond.pos;
+            cond = Expr::new(pos, ExprKind::Cond(cond, a, b));
         }
         Ok(cond)
     }

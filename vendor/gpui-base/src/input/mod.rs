@@ -84,6 +84,10 @@ mod display_map;
 mod editor;
 #[path = "base/element.rs"]
 mod element;
+// NOSHAPE PATCH: the whole input box is the hit target.
+#[path = "base/frame_hit.rs"]
+mod frame_hit;
+pub use frame_hit::{InputFrame, InputFrameHit, input_frame};
 #[path = "editor/highlighting.rs"]
 mod highlighting;
 #[path = "editor/indent.rs"]

@@ -552,7 +552,7 @@ impl Render for TabManager {
             )
             // Live document/30: the search box 6 px under the header, the filter row
             // 40 px, rows from y 154.
-            .when(self.show_search, |d| d.child(div().px(px(6.)).pt(px(6.)).flex_none().child(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(4.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))))
+            .when(self.show_search, |d| d.child(div().px(px(6.)).pt(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(4.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic())))))
             .when(self.show_filters, |d| d.child(
                 h_flex()
                     .h(px(41.))

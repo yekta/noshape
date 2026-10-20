@@ -68,7 +68,11 @@ impl DrawingEditor {
     /// Ctrl+S: open / close the Sheets panel ("Display sheet menu").
     pub fn toggle_sheets_panel(&mut self, cx: &mut Context<Self>) {
         self.sheets_open = !self.sheets_open;
-        cx.notify();
+        // The panel pushes the canvas (live drawing/30): pan so the sheet
+        // stays where it was on screen.
+        let half = f64::from(crate::drawing_extra::SHEETS_W) / 2.0 / self.zoom.max(1e-9);
+        self.center[0] += if self.sheets_open { half } else { -half };
+        self.redraw(cx);
     }
 
     /// Shift+N: rename the selected view (View properties › Name), else the current sheet.
@@ -279,6 +283,7 @@ impl DrawingEditor {
         for (k, v) in rows {
             col = col.child(gpui_kit::component::h_flex().gap_3().text_size(px(12.)).child(div().w(px(70.)).text_color(pal.text_muted).child(k)).child(div().child(v)));
         }
-        Some(div().absolute().left(px(8.)).bottom(px(34.)).min_w(px(200.)).p_2().bg(pal.dialog_bg).border_1().border_color(pal.border).shadow_md().text_color(pal.text).child(col).into_any_element())
+        // Beside the Sheets panel when it is open.
+        Some(div().absolute().left(px(self.dialog_left() + 4.)).bottom(px(34.)).min_w(px(200.)).p_2().bg(pal.dialog_bg).border_1().border_color(pal.border).shadow_md().text_color(pal.text).child(col).into_any_element())
     }
 }

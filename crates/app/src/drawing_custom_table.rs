@@ -113,14 +113,14 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// The dialog's table kind (keeping a table's edited cells).
+    /// The dialog's table kind (keeping the pinned Part Studio version).
     fn custom_kind(d: &CustomDlg, old: Option<&TableKind>) -> Option<TableKind> {
         let (studio, t) = (d.studio?, d.chosen.as_ref()?);
-        let (version, overrides) = match old {
-            Some(TableKind::Custom { version, overrides, .. }) => (version.clone(), overrides.clone()),
-            _ => (None, Vec::new()),
+        let version = match old {
+            Some(TableKind::Custom { version, .. }) => version.clone(),
+            _ => None,
         };
-        Some(TableKind::Custom { studio, version, fs: t.fs, name: t.name.clone(), fs_version: t.version.clone(), bottom_to_top: d.bottom_to_top, overrides })
+        Some(TableKind::Custom { studio, version, fs: t.fs, name: t.name.clone(), fs_version: t.version.clone(), bottom_to_top: d.bottom_to_top })
     }
 
     /// Editing a table: apply the dialog live.
@@ -221,7 +221,14 @@ impl DrawingEditor {
                 this.update(cx, |this, cx| {
                     this.custom_tables.running.remove(&k2);
                     this.custom_tables.stamps.insert(k2.clone(), stamp);
-                    this.info.custom_tables.insert(k2, Arc::new(result));
+                    // Live drawing/277: a table that throws keeps its last
+                    // good content, with an info toast.
+                    let had = this.info.custom_tables.get(&k2).is_some_and(|r| r.is_ok());
+                    if result.is_err() && had {
+                        this.status = Some("Table creation failed. For details, open the FeatureScript notices pane and view the table in the Part Studio side pane.".into());
+                    } else {
+                        this.info.custom_tables.insert(k2, Arc::new(result));
+                    }
                     this.refresh(cx);
                 })
                 .ok();
@@ -252,17 +259,16 @@ impl DrawingEditor {
         let mut out = Vec::new();
         let sheet = self.current_sheet();
         let Some(t) = sheet.table(id) else { return out };
-        let custom = matches!(t.kind, TableKind::Custom { .. });
         out.push(match t.kind {
-            TableKind::Custom { .. } => MenuEntry::item("Custom table properties…", move |t, _, cx| t.open_custom_props(id, cx)),
-            TableKind::Bom { .. } => MenuEntry::item("BOM table properties…", move |t, _, cx| t.open_table_props(id, cx)),
-            _ => MenuEntry::item("Cut list table properties…", move |t, _, cx| t.open_table_props(id, cx)),
+            TableKind::Custom { .. } => MenuEntry::item("Custom table properties...", move |t, _, cx| t.open_custom_props(id, cx)),
+            TableKind::Bom { .. } => MenuEntry::item("BOM table properties...", move |t, _, cx| t.open_table_props(id, cx)),
+            TableKind::CutList { .. } => MenuEntry::item("Cut list table properties...", move |t, _, cx| t.open_table_props(id, cx)),
+            // General tables (live drawing/549): only the fixed corner.
+            _ => MenuEntry::item("Table properties...", move |t, _, cx| t.open_table_props_corner(id, cx)),
         });
         let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
-        out.extend(self.split_entries(t, cell));
-        if custom {
-            let can_paste = crate::drawing_props::view_clipboard(cx).is_some();
-            out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)).disabled(!can_paste));
+        if !matches!(t.kind, TableKind::General { .. }) {
+            out.extend(self.split_entries(t, cell));
         }
         out.push(MenuEntry::item("Copy", move |t, _, cx| {
             if !t.selection.contains(&Sel::Table(id)) {
@@ -270,11 +276,10 @@ impl DrawingEditor {
             }
             t.copy_entities(cx);
         }));
-        if custom {
-            out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
-            }).disabled(self.clipboard_cells(cx).is_none()));
-        }
+        // Live: always present, never greyed.
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
         let cur = t.layer;
         let layers: Vec<MenuEntry> = SheetLayer::FORMAT
             .iter()
@@ -284,10 +289,11 @@ impl DrawingEditor {
             .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
-        // The table list is the stacking order (last = front).
-        let at = sheet.tables.iter().position(|x| x.id == id).unwrap_or(0);
-        out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(at + 1 == sheet.tables.len()));
-        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(at == 0));
+        // The table list is the stacking order. Live drawing/289: greyed only
+        // when the table is the only object on its sheet.
+        let alone = sheet.tables.len() == 1 && sheet.views.is_empty() && sheet.annotations.is_empty() && sheet.images.is_empty();
+        out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
         out.push(MenuEntry::Separator);
         let doc = &self.doc.read(cx).session.doc;
         if let TableKind::Bom { view, .. } = t.kind
@@ -314,12 +320,7 @@ impl DrawingEditor {
             out.push(MenuEntry::item(format!("Switch to {fs_name}"), move |_, w, cx| crate::workspace::request_activate_tab(fs, w, cx)));
         }
         }
-        let mut sheets: Vec<MenuEntry> = self.drawing.sheets.iter().enumerate().filter(|(i, _)| *i != self.sheet).map(|(i, s)| MenuEntry::item(s.name.clone(), move |t, _, cx| t.move_table_to_sheet(id, Some(i), cx))).collect();
-        if !sheets.is_empty() {
-            sheets.push(MenuEntry::Separator);
-        }
-        sheets.push(MenuEntry::item("New sheet", move |t, _, cx| t.move_table_to_sheet(id, None, cx)));
-        out.push(MenuEntry::Submenu("Move to sheet…".into(), sheets));
+        out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::Table(id), cx)));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
             t.selection.clear();
@@ -354,41 +355,23 @@ impl DrawingEditor {
         let Some(i) = d.sheets[self.sheet].tables.iter().position(|t| t.id == id) else { return };
         let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
         let mut t = d.sheets[self.sheet].tables.remove(i);
-        t.id = d.sheets[to].next_table_id();
+        let nid = d.sheets[to].next_table_id();
+        t.id = nid;
         d.sheets[to].tables.push(t);
         let name = d.sheets[to].name.clone();
-        self.selection.clear();
         self.commit("Move to sheet", d, cx);
         self.switch_sheet(to, cx);
+        self.selection = vec![Sel::Table(nid)];
         self.status = Some(format!("Moved to {name}").into());
         cx.notify();
     }
 
-    /// Double-click a custom table cell: edit its text (help: "double-click
-    /// in any cell to open the Note panel"); the header is the model's.
+    /// Click / double-click a custom table cell (live drawing/269): the
+    /// cell is selected and the Cell format panel opens; the text itself is
+    /// not editable.
     pub fn open_custom_cell(&mut self, t: &Table, window: &mut Window, cx: &mut Context<Self>) {
         let Some((r, c)) = self.built.as_ref().and_then(|b| b.table_layout(t.id)).and_then(|l| l.cell_at(self.cursor)) else { return };
-        let data = noshape_model::drawing::tables::table_data_with(&self.drawing, t, None, None, None, &self.info, &|s| s.to_string());
-        let header_row = if data.header_bottom { data.rows.len() } else { 0 };
-        if r == header_row {
-            return;
-        }
-        let row = if data.header_bottom { r } else { r - 1 };
-        let text = data.rows.get(row).and_then(|x| x.get(c)).cloned().unwrap_or_default();
-        let input = self.textarea(&text, 2, window, cx);
-        self.panel = Some(Panel::Cell { table: t.id, row, col: c, input });
-        cx.notify();
-    }
-
-    /// Apply a custom table cell edit (row: in the table's rows).
-    pub fn apply_custom_cell(&mut self, table: u64, row: usize, col: usize, text: String, cx: &mut Context<Self>) {
-        self.edit_table(table, "Edit custom table", cx, |t| {
-            if let TableKind::Custom { overrides, .. } = &mut t.kind {
-                overrides.retain(|(r, c, _)| !(*r == row && *c == col));
-                overrides.push((row, col, text));
-            }
-            t.col_widths.clear();
-        });
+        self.open_cell_format_panel(t.id, r, c, window, cx);
     }
 
     fn pick_studio(&mut self, tab: TabId, cx: &mut Context<Self>) {
@@ -523,7 +506,7 @@ impl DrawingEditor {
             .child(action("ct-insert", "featurescript-table", "Insert", d.studio.is_some(), d.chosen.is_none(), cx))
             .when_some(d.chosen.as_ref().map(|t| t.display.clone()), |r, n| r.child(div().flex_1().child(select("ct-table", n, table_items))));
         let close = |id: &'static str, cx: &mut Context<Self>| {
-            div().id(id).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_custom_dlg(false, cx)))
+            div().id(id).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_custom_dlg(false, cx)))
         };
         let title = h_flex()
             .h(px(28.))
@@ -539,7 +522,7 @@ impl DrawingEditor {
             .w(px(if editing { 300. } else { 210. }))
             .pb(px(6.))
             .bg(pal.dialog_bg)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .shadow(crate::drawing_chrome::dialog_shadow())
             .text_color(ink)
             .text_size(px(12.))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -548,13 +531,15 @@ impl DrawingEditor {
         if editing {
             // Properties (help custom-tables-16): the document, workspace,
             // the Part Studio and Feature Studio links, the version, the sheet.
-            let link = |id: &'static str, icon: &'static str, text: String, tab: Option<TabId>| {
+            // Links (live drawing/271): tooltip "Switch to the tab: <tab>".
+            let tab_name = |tab: Option<TabId>| tab.and_then(|t| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone())).unwrap_or_default();
+            let link = |id: &'static str, icon: &'static str, text: String, tab: Option<TabId>, tip: String| {
                 h_flex()
                     .id(id)
                     .gap(px(4.))
                     .child(crate::assets::icon(icon, 18., cx))
                     .child(div().truncate().text_size(px(13.)).text_color(gpui_kit::rgb(0x1651b0)).child(text))
-                    .when_some(tab, |l, tab| l.cursor_pointer().on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)))
+                    .when_some(tab, |l, tab| l.cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab: {tip}"))).on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)))
                     .into_any_element()
             };
             let chosen = d.chosen.clone();
@@ -562,8 +547,10 @@ impl DrawingEditor {
             dlg = dlg
                 .child(row("Document:", div().text_size(px(13.)).child(doc_name).into_any_element()))
                 .child(row("Workspace:", div().text_size(px(13.)).child(ws_name).into_any_element()))
-                .child(row("Custom table:", link("ct-props-studio", "part-studio", studio_name.clone().unwrap_or_default(), d.studio)))
-                .child(row("Feature Studio:", link("ct-props-fs", "feature-studio", chosen.as_ref().map(|t| t.fs_name.clone()).unwrap_or_default(), fs_tab)))
+                // "Custom table: [Part Studio icon] FS sizes" — the table's
+                // name, linking to its Part Studio (live drawing/271).
+                .child(row("Custom table:", link("ct-props-studio", "part-studio", chosen.as_ref().map(|t| t.display.clone()).unwrap_or_default(), d.studio, tab_name(d.studio))))
+                .child(row("Feature Studio:", link("ct-props-fs", "feature-studio", chosen.as_ref().map(|t| t.fs_name.clone()).unwrap_or_default(), fs_tab, tab_name(fs_tab))))
                 .when_some(chosen.and_then(|t| t.version_label), |v, label| v.child(row("", h_flex().gap(px(4.)).child(crate::ui::glyph("version", 14., ink)).child(div().text_size(px(13.)).child(label)).into_any_element())))
                 .child(row("Sheet", div().text_size(px(13.)).child(self.current_sheet().name.clone()).into_any_element()));
         } else {
@@ -662,7 +649,7 @@ impl DrawingEditor {
             .left(px(self.dialog_left() + 216.))
             .w(px(300.))
             .bg(pal.dialog_bg)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .shadow(crate::drawing_chrome::dialog_shadow())
             .text_color(ink)
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())

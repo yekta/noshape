@@ -11,16 +11,17 @@ use crate::drawing_view::*;
 use noshape_model::drawing::PointRef;
 use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::views::ModelEdge;
-use noshape_render::{Drawable, Instance, LineData, LineSegment, Scene, state};
+use noshape_render::{Drawable, Instance, LineData, LineSegment, PointData, PointSprite, Scene, state};
 
-/// The reference highlight color. Provisional: the exact drawing blue is
-/// not captured yet (REQUESTS.md asb 10-20 e).
-const REFERENCE_BLUE: [u8; 4] = [0x1e, 0x6f, 0xd9, 255];
+/// The reference highlight color (live drawing/400–437: #90CEF1, about
+/// 2 px wide, on hover and while selected).
+const REFERENCE_BLUE: [u8; 4] = [0x90, 0xce, 0xf1, 255];
 
-/// Whether model edge `me` is (or ends at) point reference `r`.
+/// Whether model edge `me` is the edge point reference `r` lies on
+/// (vertices are shown as points instead).
 fn edge_matches(me: &ModelEdge, r: &PointRef) -> bool {
     match r {
-        PointRef::Vertex { .. } => me.ends.iter().flatten().any(|(p, _)| p == r),
+        PointRef::Vertex { .. } => false,
         PointRef::Center { body, name } | PointRef::Midpoint { body, name } | PointRef::Quadrant { body, name, .. } => me.body == *body && *me.name == *name,
         PointRef::Intersection { body, name, body2, name2 } => (me.body == *body && *me.name == *name) || (me.body == *body2 && *me.name == *name2),
     }
@@ -50,24 +51,55 @@ impl DrawingEditor {
             .collect()
     }
 
+    /// Sheet positions of the vertices annotation `id` references.
+    pub fn reference_vertex_points(&self, id: u64) -> Vec<[f64; 2]> {
+        let Some(b) = &self.built else { return Vec::new() };
+        let Some(a) = b.resolved.annotations.iter().find(|a| a.id == id) else { return Vec::new() };
+        let Some(view) = a.kind.view() else { return Vec::new() };
+        let (Some(g), Some(pl)) = (self.geoms.get(&view), self.placement(view)) else { return Vec::new() };
+        let mut out: Vec<[f64; 2]> = Vec::new();
+        for r in a.refs.iter().filter(|r| matches!(r.point, PointRef::Vertex { .. })) {
+            if let Some(p) = g.model_edges.iter().flat_map(|me| me.ends.iter().flatten()).find(|(p, _)| *p == r.point).map(|(_, at)| pl.to_sheet(*at))
+                && !out.contains(&p)
+            {
+                out.push(p);
+            }
+        }
+        out
+    }
+
     /// Add the related-entity highlights of the hovered / selected
     /// annotations to the scene.
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
+        // The Hatch region dialog's closed profiles (live drawing/469).
+        let outlines = self.hatch_profile_outlines();
+        if !outlines.is_empty() {
+            let mut lines = LineData::default();
+            for l in &outlines {
+                for w in l.windows(2) {
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: 4.0, style: LineSegment::ON_TOP });
+                }
+            }
+            let up = self.gpu.uploader();
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+        }
         let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).collect();
         if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)) {
             anns.push(a);
         }
-        if anns.is_empty() {
+        if anns.is_empty() && self.table_row_highlight().is_empty() {
             return;
         }
         let mut edges: Vec<u32> = anns.iter().flat_map(|a| self.reference_edge_picks(*a)).collect();
+        // A hovered BOM row's callouts (live drawing/421: blue).
+        edges.extend(self.table_row_highlight());
         edges.sort_unstable();
         edges.dedup();
         if !edges.is_empty() {
             let mut lines = LineData::default();
             for l in b.geometry.lines.iter().filter(|l| edges.contains(&l.pick)) {
-                let width = drawing_scene::px_width(l.style, self.zoom).max(1.5);
+                let width = drawing_scene::px_width(l.style, self.zoom).max(2.0);
                 for w in l.points.windows(2) {
                     lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
                 }
@@ -77,9 +109,18 @@ impl DrawingEditor {
                 scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
             }
         }
-        // The rest of a selected annotation's group (yellow).
+        let points: Vec<[f64; 2]> = anns.iter().flat_map(|a| self.reference_vertex_points(*a)).collect();
+        if !points.is_empty() {
+            let mut data = PointData::default();
+            for p in points {
+                data.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.65], color: REFERENCE_BLUE, pick_id: 0, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+            }
+            let up = self.gpu.uploader();
+            scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&data))).per_primitive_color().unpickable().layer(18));
+        }
+        // The rest of a hovered / selected annotation's group (yellow).
         let sheet = self.current_sheet();
-        for id in self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }) {
+        for id in anns.iter().copied() {
             let Some(g) = sheet.annotations.iter().find(|a| a.id == id).and_then(|a| a.ann_group) else { continue };
             for other in sheet.annotations.iter().filter(|x| x.ann_group == Some(g) && x.id != id) {
                 for p in self.picks_of(Sel::Annotation(other.id)) {

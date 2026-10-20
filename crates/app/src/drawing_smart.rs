@@ -82,6 +82,41 @@ impl DrawingEditor {
         self.line_pick().or_else(|| self.arc_pick()).or_else(|| self.hovered_edge().and_then(|_| self.circle_pick(c)))
     }
 
+    /// 2 point linear, Point to line and Line to line: the click adds only
+    /// the entity type the tool takes (points; a point and a line; two
+    /// parallel lines), in the first pick's view; a picked entity clicked
+    /// again is deselected.
+    pub fn typed_linear_click(&self, kind: DimTool, c: [f64; 2], picks: &mut Vec<Pick>) {
+        let point = || self.snap_at(c).map(Pick::Point);
+        let line = || self.line_pick();
+        let has_point = picks.iter().any(|p| matches!(p, Pick::Point(_)));
+        let p = match kind {
+            DimTool::Point2 => point(),
+            DimTool::PointLine if picks.is_empty() => point().or_else(line),
+            DimTool::PointLine if has_point => line(),
+            DimTool::PointLine => point(),
+            _ => line().filter(|l| match (picks.first(), l) {
+                // The second line must be parallel to the first.
+                (Some(Pick::Line { a: a1, b: b1 }), Pick::Line { a: a2, b: b2 }) => {
+                    let (u, v) = (norm(sub(b1.p, a1.p)), norm(sub(b2.p, a2.p)));
+                    (u[0] * v[1] - u[1] * v[0]).abs() < 1e-6
+                }
+                _ => true,
+            }),
+        };
+        let Some(p) = p else { return };
+        if let Some(i) = picks.iter().position(|q| same(q, &p)) {
+            picks.remove(i);
+            return;
+        }
+        if picks.first().is_some_and(|f| view_of(f) != view_of(&p)) {
+            return;
+        }
+        if picks.len() < 2 {
+            picks.push(p);
+        }
+    }
+
     /// With one pick: does a click at `c` add (or deselect) a pick rather
     /// than place the dimension?
     pub fn smart_takes(&self, c: [f64; 2], first: &Pick) -> bool {
@@ -175,7 +210,7 @@ impl DrawingEditor {
                 let diameter = matches!(picks[0], Pick::Circle { .. });
                 let cs = self.placement(*view)?.to_sheet(*center);
                 let d = sub(c, cs);
-                Some((AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter, angle: d[1].atan2(d[0]) }, vec![(0, r.clone())]))
+                Some((AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter, angle: d[1].atan2(d[0]), dim_line: diameter && self.drawing.radial_dim_lines() }, vec![(0, r.clone())]))
             }
             [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] => {
                 let (u, w) = (norm(sub(b1.p, a1.p)), norm(sub(b2.p, a2.p)));

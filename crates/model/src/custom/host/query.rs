@@ -542,7 +542,7 @@ impl<'a> QueryCx<'a> {
 
     // ------------------------------------------------------------ adjacency
 
-    fn faces_of_edge(&self, b: usize, e: usize) -> Vec<Ent> {
+    pub fn faces_of_edge(&self, b: usize, e: usize) -> Vec<Ent> {
         self.topo(b).edge_faces.get(e).map(|v| v.iter().map(|f| Ent::Face(b, *f as usize)).collect()).unwrap_or_default()
     }
 
@@ -562,7 +562,7 @@ impl<'a> QueryCx<'a> {
 
     /// Edges and vertices bounding an entity (faces: their edges and
     /// vertices; edges: their vertices; vertices: themselves).
-    fn boundary(&self, e: &Ent) -> (Vec<Ent>, Vec<Ent>) {
+    pub fn boundary(&self, e: &Ent) -> (Vec<Ent>, Vec<Ent>) {
         match e {
             Ent::Face(b, f) => (self.edges_of_face(*b, *f), self.vertices_of_face(*b, *f)),
             Ent::Edge(b, i) => (vec![e.clone()], self.vertices_of_edge(*b, *i)),
@@ -821,7 +821,8 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "SM_DEFINITION_ENTITY_FILTER" | "CORRESPONDING_IN_FLAT" | "PARTS_ATTACHED_TO" | "SM_APPLICATION_TYPE_FILTER" => Vec::new(),
         "COMPOSITE_PART_TYPE_FITLER" | "CONSUMED" | "TOLERANCE_FILTER" => sub(i, "subquery")?,
-        "CONTAINED_IN_COMPOSITE" | "COMPOSITE_CONTAINING" | "SOURCE_MESH" | "OP_HOLE_PROFILE" | "OP_HOLE_FACE" | "PATTERN_INSTANCES" => Vec::new(),
+        "OP_HOLE_FACE" | "OP_HOLE_PROFILE" => filter(super::hole::op_hole_query(i, q, query, &*kind == "OP_HOLE_FACE")?),
+        "CONTAINED_IN_COMPOSITE" | "COMPOSITE_CONTAINING" | "SOURCE_MESH" | "PATTERN_INSTANCES" => Vec::new(),
         "VERTEX_ADJACENT" | "EDGE_ADJACENT" => {
             let t = entity_type.unwrap_or(EType::Face);
             let mut out = Vec::new();
@@ -1056,6 +1057,15 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
         };
     }
     match &*kind {
+        // Default planes and the origin (Show code's packed queries; live
+        // dom/fs-packed-query.txt): only unprefixed ids resolve.
+        "DUMMY" => match op.iter().map(|c| &**c).collect::<Vec<_>>().as_slice() {
+            ["Top.planeOp"] => vec![Ent::Datum(DatumPlane::Top)],
+            ["Front.planeOp"] => vec![Ent::Datum(DatumPlane::Front)],
+            ["Right.planeOp"] => vec![Ent::Datum(DatumPlane::Right)],
+            ["Origin.pointOp"] => vec![Ent::Origin],
+            _ => Vec::new(),
+        },
         // A part of another Part Studio (PartStudioData.partQuery): the
         // bodies its feature made, told apart by their sketch edges.
         "SWEPT_BODY" => {

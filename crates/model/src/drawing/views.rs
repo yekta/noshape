@@ -1384,6 +1384,9 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
             }
             fx(cut.toward_view[0], &mut h);
             fx(cut.toward_view[1], &mut h);
+            if let Some(pre) = pre_cut(sheet, id) {
+                view_key(drawing, sheet, pre, sources, exact)?.hash(&mut h);
+            }
         }
         ViewKind::Detail { parent, center, radius, .. } => {
             2u8.hash(&mut h);
@@ -1395,6 +1398,13 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
                 fx(p[0], &mut h);
                 fx(p[1], &mut h);
             }
+        }
+        // Projected views carry their parent's broken-out sections, or with
+        // Shift+click its section cut.
+        ViewKind::Projected { parent, .. } if projects_section(sheet, id) || !broken_out_cuts(drawing, sheet, *parent).is_empty() => {
+            4u8.hash(&mut h);
+            v.cut_from_section.hash(&mut h);
+            view_key(drawing, sheet, *parent, sources, exact)?.hash(&mut h);
         }
         _ => 0u8.hash(&mut h),
     }
@@ -1459,7 +1469,8 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
         ViewKind::Section { parent, .. } => {
             let cut = section_cut(sheet, id).expect("cut exists (key computed)");
             let pf = view_frame(drawing, sheet, *parent).expect("parent frame");
-            section_geometry(id, &ctx, part.as_ref(), &frame, &pf, &cut, exact)
+            let pre = pre_cut(sheet, id).and_then(|s| Some((section_cut(sheet, s)?, view_frame(drawing, sheet, sheet.parent_of(s)?)?)));
+            section_geometry(id, &ctx, part.as_ref(), &frame, &frame, &pf, &cut, pre.as_ref(), exact)
         }
         ViewKind::AlignedSection { parent, .. } => {
             let cut = section_cut(sheet, id).expect("cut exists (key computed)");
@@ -1469,8 +1480,21 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
         ViewKind::Base { .. } if v.flat => flat_geometry(id, &ctx, part.as_ref(), &frame),
         // Sketch views (and views projected from them): the sketch's curves.
         ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } if sketch_of(sheet, id).is_some() => sketch_geometry(id, &ctx, &sketch_of(sheet, id).expect("checked"), &frame),
-        _ if !v.broken_out.is_empty() => broken_out_geometry(id, &ctx, part.as_ref(), &frame, &v.broken_out, exact),
-        _ => projected_geometry(id, &ctx, part.as_ref(), &frame, exact),
+        // Shift+click: a projected view with the parent section's cut.
+        ViewKind::Projected { parent, .. } if projects_section(sheet, id) => {
+            let (Some(cut), Some(sf), Some(pf)) = (section_cut(sheet, *parent), view_frame(drawing, sheet, *parent), sheet.parent_of(*parent).and_then(|gp| view_frame(drawing, sheet, gp))) else {
+                return fail("The parent section is not available");
+            };
+            section_geometry(id, &ctx, part.as_ref(), &frame, &sf, &pf, &cut, None, exact)
+        }
+        _ => {
+            let cuts = broken_out_cuts(drawing, sheet, id);
+            if cuts.is_empty() {
+                projected_geometry(id, &ctx, part.as_ref(), &frame, exact)
+            } else {
+                broken_out_geometry(id, &ctx, part.as_ref(), &frame, &cuts, exact)
+            }
+        }
     };
     if !matches!(v.kind, ViewKind::Detail { .. }) {
         simplify_edges(&mut g, &ctx, part.as_ref(), simplification);
@@ -1990,14 +2014,28 @@ fn section_segments_of(faces: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]>
     out
 }
 
-fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, _exact: bool) -> ViewGeometry {
+/// "Cut from section": the section view whose cut a section of it applies
+/// first (its parent; not for broken-out parents, which always cut the
+/// base geometry).
+pub fn pre_cut(sheet: &Sheet, id: ViewId) -> Option<ViewId> {
+    let v = sheet.view(id)?;
+    let ViewKind::Section { parent, .. } = v.kind else { return None };
+    let p = sheet.view(parent)?;
+    (v.cut_from_section && matches!(p.kind, ViewKind::Section { .. }) && p.broken_out.is_empty()).then_some(parent)
+}
+
+/// `frame` projects the result; `section` is the frame of the section view
+/// whose cut this is (its line of sight is normal to the cut; a projected
+/// view placed with Shift+click passes its parent section's).
+#[allow(clippy::too_many_arguments)]
+fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, section: &ViewFrame, parent: &ViewFrame, cut: &SectionCut, pre: Option<&(SectionCut, ViewFrame)>, _exact: bool) -> ViewGeometry {
     let partial = cut.partial;
     let all = view_bodies(ctx, part);
     // Exclude from cut: those parts are projected whole.
     let (bodies, kept): (Vec<&Arc<Body>>, Vec<&Arc<Body>>) = all.iter().copied().partition(|b| !cut.exclude.contains(&b.id));
     let diag = bodies_diagonal(&all);
     let center = bodies_center(&all);
-    let sight = frame.dir;
+    let sight = section.dir;
     let big = diag * 4.0 + 1.0;
     let mut tool = removal_tool(parent, &cut.points, cut.toward_view, center, big, partial);
     // Section depth: Blind, or Up to entity (the depth to that point,
@@ -2017,7 +2055,18 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
             (Err(e), _) | (_, Err(e)) => Err(e),
         };
     }
-    let (mut pbs, mut faces, error) = cut_bodies(&bodies, &tool, sight);
+    let (mut pbs, mut faces, error) = match pre {
+        // Cut from section: the parent section's cut first, then this one
+        // (only this cut's faces are hatched).
+        Some((pc, pf)) => {
+            let pre_tool = removal_tool(pf, &pc.points, pc.toward_view, center, big, pc.partial);
+            let (first, _, e0) = cut_bodies(&bodies, &pre_tool, sight);
+            let pieces = first.into_iter().map(|pb| CutPiece { body: pb.body, shape: pb.shape, map: pb.edge_map }).collect();
+            let (pbs, faces, e1) = cut_pieces(pieces, &tool, sight);
+            (pbs, faces, e0.or(e1))
+        }
+        None => cut_bodies(&bodies, &tool, sight),
+    };
     pbs.extend(kept.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }));
     // Plane of the first leg (keeps snaps on the remaining side).
     let along = parent.lift([cut.points[1][0] - cut.p0[0], cut.points[1][1] - cut.p0[1]]).normalize();
@@ -2185,6 +2234,32 @@ pub fn model_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame) -> f
     hi - lo
 }
 
+/// A projected view placed with Shift+click from a section view: it shows
+/// the parent's cut (help H:projected_view).
+pub fn projects_section(sheet: &Sheet, id: ViewId) -> bool {
+    let Some(v) = sheet.view(id) else { return false };
+    let ViewKind::Projected { parent, .. } = v.kind else { return false };
+    v.cut_from_section && sheet.view(parent).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }))
+}
+
+/// The broken-out sections a view shows with the frame each was drawn in:
+/// its own, and for projected views their parent's ("Projected views
+/// created from broken-out views will also be broken", help
+/// H:projected_view).
+pub fn broken_out_cuts(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Vec<(BrokenOut, ViewFrame)> {
+    let Some(v) = sheet.view(id) else { return Vec::new() };
+    let mut out = match v.kind {
+        ViewKind::Projected { parent, .. } if !projects_section(sheet, id) => broken_out_cuts(drawing, sheet, parent),
+        _ => Vec::new(),
+    };
+    if !v.broken_out.is_empty()
+        && let Some(f) = view_frame(drawing, sheet, id)
+    {
+        out.extend(v.broken_out.iter().map(|b| (b.clone(), f)));
+    }
+    out
+}
+
 /// Depth of a broken-out section below the model's nearest point.
 pub fn broken_out_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, b: &BrokenOut) -> f64 {
     match &b.depth_ref {
@@ -2198,16 +2273,18 @@ pub fn broken_out_depth(ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame,
 
 /// A view with broken-out sections: each profile, extruded from in front of
 /// the model down to its depth, is cut away; the pocket floors are hatched.
-fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewFrame, cuts: &[BrokenOut], exact: bool) -> ViewGeometry {
+fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &ViewFrame, cuts: &[(BrokenOut, ViewFrame)], exact: bool) -> ViewGeometry {
     let bodies = view_bodies(ctx, part);
     let diag = bodies_diagonal(&bodies);
     let center = bodies_center(&bodies);
-    let (front, _) = depth_range(&bodies, frame.dir);
     let margin = diag * 0.05 + 1e-4;
     let mut tools: Vec<Shape> = Vec::new();
-    let mut regions: Vec<(Vec<[f64; 2]>, f64)> = Vec::new();
+    let mut regions: Vec<(Vec<[f64; 2]>, f64, ViewFrame)> = Vec::new();
     let mut error = None;
-    for b in cuts {
+    // Each profile is cut along the frame of the view it was drawn in (a
+    // projected view's inherited cuts use its parent's).
+    for (b, frame) in cuts {
+        let (front, _) = depth_range(&bodies, frame.dir);
         let mut poly = broken_out_outline(b);
         poly.dedup_by(|p, q| (p[0] - q[0]).abs() < 1e-12 && (p[1] - q[1]).abs() < 1e-12);
         if poly.len() > 2 && poly.first() == poly.last() {
@@ -2224,8 +2301,9 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: 
             Ok(t) => tools.push(t.shape),
             Err(e) => error = Some(format!("Broken-out section failed: {e}")),
         }
-        regions.push((poly, front + depth));
+        regions.push((poly, front + depth, *frame));
     }
+    let frame = view;
     if tools.is_empty() {
         let mut g = projected_geometry(id, ctx, part, frame, exact);
         if g.error.is_none() {
@@ -2237,7 +2315,7 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: 
     let (pbs, faces, err2) = cut_bodies(&bodies, &tool, frame.dir);
     // Vertices removed by a pocket are no snap points.
     let tol = diag * 1e-7;
-    let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor)| p.dot(frame.dir) < floor - tol && point_in_polygon(frame.project(p), poly));
+    let keep = |_: usize, p: DVec3| !regions.iter().any(|(poly, floor, f)| p.dot(f.dir) < floor - tol && point_in_polygon(f.project(p), poly));
     // Exact HLR on cut solids (see `section_geometry`).
     let mut g = project_bodies(id, &pbs, frame, true, &keep);
     if g.error.is_none() {

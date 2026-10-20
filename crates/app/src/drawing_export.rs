@@ -289,6 +289,10 @@ impl DrawingEditor {
             return;
         }
         let mut drawing = self.drawing.clone();
+        // Help H:drawing_properties_-_annotations: "all exported drawings
+        // will, by default, no longer contain Drawing and Sheet Property
+        // placeholders (----)".
+        drawing.props.hide_placeholder = true;
         if s.hide_inspection {
             drawing.props.hide_inspection = true;
         }

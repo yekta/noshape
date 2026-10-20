@@ -7,7 +7,6 @@
 use super::*;
 use crate::os_ui as os;
 use gpui_kit::component::input::InputEvent;
-use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use noshape_model::configuration::ConfigInputKind;
 use noshape_units::{Dim, EmptyScope, Quantity};
 
@@ -174,9 +173,14 @@ pub(crate) struct ConfigSession {
     pub texts: Vec<(String, Entity<InputState>)>,
 }
 
+/// The Replace instance dialog (live assembly/833–836): the instances to
+/// replace, the chosen replacement (source, name), Replace all instances,
+/// and whether the replacement picker is open.
 pub(crate) struct ReplaceSession {
-    pub instance: InstanceId,
+    pub instances: Vec<InstanceId>,
     pub all: bool,
+    pub replacement: Option<(InstanceSource, String)>,
+    pub picking: bool,
 }
 
 fn section(label: &str) -> Div {
@@ -634,7 +638,7 @@ impl AssemblyView {
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
                         .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                        .child(crate::assets::icon("dialog-cancel", 18., cx))
+                        .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx))),
                 )
         };
@@ -1391,10 +1395,10 @@ impl AssemblyView {
         let name = self.explode.and_then(|i| self.assembly(cx).and_then(|a| a.exploded_views.get(i).map(|v| v.name.clone()))).unwrap_or_default();
         Some(super::positions::yellow_banner(
             format!("Editing {name}"),
+            // Done leaves explode mode (bundle `exitExplodeMode`): assembled again.
             cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.explode_edit = false;
                 this.message = None;
-                this.refresh_scene(false, cx);
+                this.activate_explode(None, cx);
                 cx.notify();
             }),
         ))
@@ -1508,130 +1512,242 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ exploded views panel
 
+    /// The docked 712 px Exploded views pane (bundle `explosionItemComponent`
+    /// and the pane around it; live 181-strip-exploded-views, 62–64): with no
+    /// view, [Add exploded view] over the zero state; else the tree of views
+    /// (› expander, explode icon, name; the one in explode mode blue with a
+    /// 5 px bar), their steps and the rollback bar, the "Build steps by
+    /// dragging components" box (one view with at most one step) and the
+    /// footer's [Add exploded view] + help. A click selects a row; a double
+    /// click enters / leaves explode mode (a step: up to it, and edits it).
     pub(super) fn render_explode_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let views: Vec<ExplodedView> = self.assembly(cx).map(|a| a.exploded_views.clone()).unwrap_or_default();
-        let mut body = v_flex().id("explode-body").p_2().gap_1().overflow_y_scroll().max_h(px(520.));
-        body = body.child(
-            h_flex()
-                .gap_1()
-                .child(Button::new("ex-add").icon(IconName::Plus).label("Add exploded view").small().ghost().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_exploded_view(false, cx))))
-                .child(Button::new("ex-auto").icon(Icon::empty().path(icon_path("explode"))).label("Auto").small().ghost().tooltip("Automatic exploded view").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_exploded_view(true, cx)))),
-        );
-        if views.is_empty() {
-            body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child("No exploded views yet."));
-        }
-        for (i, v) in views.iter().enumerate() {
-            let active = self.explode == Some(i);
-            let mut row = h_flex()
-                .id(SharedString::from(format!("ex-row-{i}")))
+        let blue = rgb(0x1651b0);
+        let add_button = |id: &'static str, cx: &mut Context<Self>| {
+            div()
+                .id(id)
                 .h(px(26.))
-                .px_2()
-                .gap_2()
-                .rounded_sm()
-                .text_sm()
-                .when(active, |d| d.bg(pal.accent_soft))
+                .px(px(11.))
+                .flex()
+                .items_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .bg(rgb(0xffffff))
+                .text_size(px(13.33))
+                .text_color(pal.text)
+                .cursor_pointer()
                 .hover(|d| d.bg(pal.panel_hover))
-                .child(svg().path(icon_path("explode")).size_3p5().text_color(if active { pal.accent } else { pal.text_muted }));
-            match self.rename_input(RenameTarget::Explode(i), cx) {
-                Some(inp) => row = row.child(inp),
-                None => {
-                    let name = v.name.clone();
-                    row = row
-                        .child(div().flex_1().truncate().child(v.name.clone()))
-                        .child(div().text_xs().text_color(pal.text_faint).child(format!("{} steps", v.steps.len())))
-                        .child(Button::new(SharedString::from(format!("ex-ren-{i}"))).icon(Icon::empty().path(icon_path("rename"))).ghost().xsmall().tooltip("Rename").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            cx.stop_propagation();
-                            this.start_rename(RenameTarget::Explode(i), name.clone(), window, cx);
-                        })))
-                        .child(Button::new(SharedString::from(format!("ex-del-{i}"))).icon(Icon::empty().path(icon_path("delete"))).ghost().xsmall().tooltip("Delete").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            cx.stop_propagation();
-                            this.delete_exploded_view(i, cx);
-                        })));
-                }
-            }
-            body = body.child(row.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                let next = if this.explode == Some(i) { None } else { Some(i) };
-                this.activate_explode(next, cx);
-                if next.is_some() {
-                    this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
-                }
-            })));
-            if !active {
-                continue;
-            }
-            // Steps of the active view.
-            let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-            let units = self.units(cx);
-            for (k, st) in v.steps.iter().enumerate() {
-                let what = match st.rotation_axis {
-                    Some(_) => format!("Rotate {}", noshape_units::format_quantity(Quantity::radians(st.rotation_angle), &units)),
-                    None => format!("Translate {}", noshape_units::format_quantity(Quantity::meters(DVec3::from(st.translation).length()), &units)),
+                .tooltip(crate::ui::tooltip("Add exploded view"))
+                .child("Add exploded view")
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_exploded_view(cx)))
+        };
+        let title = div().pt(px(4.)).child(
+            div()
+                .h(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .border_b_1()
+                .border_color(blue)
+                .text_size(px(13.33))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(blue)
+                .child("Exploded views"),
+        );
+        let mut pane = v_flex().id("ex-pane").w(px(712.)).h_full().occlude().bg(rgb(0xffffff)).text_color(rgb(0x333333)).child(title);
+        if views.is_empty() {
+            // Zero state: the button, an illustration and the how-to.
+            pane = pane.child(
+                v_flex()
+                    .flex_1()
+                    .items_center()
+                    .pt(px(8.))
+                    .child(add_button("ex-add-top", cx))
+                    .child(div().mt(px(105.)).opacity(0.35).child(crate::assets::icon("explode", 120., cx)))
+                    .child(
+                        v_flex()
+                            .mt(px(16.))
+                            .w(px(420.))
+                            .items_center()
+                            .text_size(px(13.33))
+                            .text_color(pal.text_muted)
+                            .child(div().text_center().child("Add exploded views to visualize how components fit together in an assembly by moving instances from their mated positions."))
+                            .child(div().id("ex-learn").mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about exploded views.").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/exploded_views.htm"))),
+                    ),
+            );
+        } else {
+            let mut tree = v_flex().id("ex-tree").flex_shrink_1().min_h_0().overflow_y_scroll().pt(px(1.));
+            let sel = self.ui.explode_sel;
+            for (i, v) in views.iter().enumerate() {
+                let active = self.explode == Some(i);
+                let open = active || self.ui.explode_open.contains(&i);
+                let row_sel = sel == Some((i, None));
+                let name_el: AnyElement = match self.rename_input(RenameTarget::Explode(i), cx) {
+                    Some(inp) => inp,
+                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).child(v.name.clone()).into_any_element(),
                 };
-                let who = st.instances.iter().filter_map(|i| names.get(i).cloned()).collect::<Vec<_>>().join(", ");
-                let editing_step = self.step_edit.as_ref().is_some_and(|s| s.view == i && s.step == k);
-                let accent = pal.accent;
-                let label: SharedString = format!("{}  {}", k + 1, what).into();
-                body = body.child(
+                let name = v.name.clone();
+                tree = tree.child(
                     h_flex()
-                        .id(SharedString::from(format!("ex-step-{k}")))
-                        .pl(px(26.))
-                        .pr_1()
-                        .gap_2()
-                        .min_h(px(24.))
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(editing_step, |d| d.bg(pal.accent_soft))
-                        .hover(|d| d.bg(pal.panel_hover))
-                        .child(div().text_xs().text_color(pal.text_faint).child(format!("{}", k + 1)))
-                        .child(v_flex().flex_1().child(div().text_sm().child(what)).child(div().text_xs().text_color(pal.text_muted).truncate().child(who)))
-                        .child(Button::new(SharedString::from(format!("ex-sdel-{k}"))).icon(IconName::Close).ghost().xsmall().tooltip("Delete step").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            cx.stop_propagation();
-                            this.delete_explode_step(k, cx)
-                        })))
-                        .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Click to edit, drag to reorder").build(w, cx))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_step_edit(k, window, cx)))
-                        .on_drag(ExplodeStepDrag { index: k, label }, |d, _, _, cx| cx.new(|_| d.clone()))
-                        .drag_over::<ExplodeStepDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
-                        .on_drop(cx.listener(move |this, d: &ExplodeStepDrag, _, cx| this.move_explode_step(d.index, k, cx))),
+                        .id(SharedString::from(format!("ex-row-{i}")))
+                        .h(px(26.))
+                        .border_l(px(5.))
+                        .border_color(if active { blue.into() } else { gpui_kit::transparent_black() })
+                        .when(row_sel, |d| d.bg(pal.accent_soft))
+                        .when(!row_sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("ex-exp-{i}")))
+                                .w(px(20.))
+                                .h_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    if !this.ui.explode_open.remove(&i) {
+                                        this.ui.explode_open.insert(i);
+                                    }
+                                    cx.notify();
+                                })),
+                        )
+                        .child(div().w(px(23.)).flex_none().opacity(0.8).child(crate::assets::icon("explode", 17., cx)))
+                        .child(name_el)
+                        .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+                            this.ui.explode_sel = Some((i, None));
+                            if ev.click_count() >= 2 {
+                                // Enter / leave explode mode for this view.
+                                if this.explode == Some(i) {
+                                    this.activate_explode(None, cx);
+                                } else {
+                                    this.explode_edit = true;
+                                    this.activate_explode(Some(i), cx);
+                                }
+                            }
+                            cx.notify();
+                        }))
+                        .os_context_menu({
+                            let view = cx.entity();
+                            move |m, _, _| {
+                                let (v1, v2, n) = (view.clone(), view.clone(), name.clone());
+                                m.list_no_icons()
+                                    .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_rename(RenameTarget::Explode(i), n.clone(), window, cx))))
+                                    .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.delete_exploded_view(i, cx))))
+                            }
+                        }),
+                );
+                if !open {
+                    continue;
+                }
+                // Steps, then the rollback bar after the steps in effect.
+                let n = v.steps.len();
+                let upto = if active { self.explode_progress.map(|p| p.round() as usize).unwrap_or(n).min(n) } else { n };
+                let bar = |id: SharedString, _: &mut Context<Self>| {
+                    div()
+                        .id(id)
+                        .h(px(26.))
+                        .pl(px(25. + 15.))
+                        .pr(px(5.))
+                        .flex()
+                        .items_center()
+                        .cursor_grab()
+                        .tooltip(crate::ui::tooltip("Rollback bar"))
+                        .child(div().w_full().h(px(6.)).bg(rgb(0xcccccc)))
+                        .on_drag(ExplodeRollbackDrag { view: i }, |d, _, _, cx| cx.new(|_| d.clone()))
+                        .into_any_element()
+                };
+                for (k, st) in v.steps.iter().enumerate() {
+                    if k == upto {
+                        tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
+                    }
+                    let rotation = st.rotation_axis.is_some();
+                    let step_sel = sel == Some((i, Some(k)));
+                    let label: SharedString = format!("{} {}", if rotation { "Rotation" } else { "Translation" }, k + 1).into();
+                    let accent = pal.accent;
+                    tree = tree.child(
+                        h_flex()
+                            .id(SharedString::from(format!("ex-step-{i}-{k}")))
+                            .h(px(26.))
+                            .pl(px(5. + 20. + 15.))
+                            .when(k >= upto, |d| d.opacity(0.5))
+                            .when(step_sel, |d| d.bg(pal.accent_soft))
+                            .when(!step_sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                            .child(div().w(px(23.)).flex_none().child(crate::assets::icon(if rotation { "explode-step-rotation" } else { "explode-step-translation" }, 17., cx)))
+                            .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).child(label.clone()))
+                            .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                                this.ui.explode_sel = Some((i, Some(k)));
+                                if ev.click_count() >= 2 {
+                                    // Explode mode up to this step, editing it.
+                                    if this.explode != Some(i) {
+                                        this.explode_edit = true;
+                                        this.activate_explode(Some(i), cx);
+                                    }
+                                    this.set_explode_progress((k + 1) as f64, cx);
+                                    this.open_step_edit(k, window, cx);
+                                }
+                                cx.notify();
+                            }))
+                            .os_context_menu({
+                                let view = cx.entity();
+                                move |m, _, _| {
+                                    let v = view.clone();
+                                    m.list_no_icons().item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| {
+                                        v.update(cx, |this, cx| {
+                                            if this.explode != Some(i) {
+                                                this.activate_explode(Some(i), cx);
+                                            }
+                                            this.delete_explode_step(k, cx);
+                                        })
+                                    }))
+                                }
+                            })
+                            .on_drag(ExplodeStepDrag { index: k, label }, |d, _, _, cx| cx.new(|_| d.clone()))
+                            .drag_over::<ExplodeStepDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
+                            .on_drop(cx.listener(move |this, d: &ExplodeStepDrag, _, cx| this.move_explode_step(d.index, k, cx)))
+                            .drag_over::<ExplodeRollbackDrag>(move |st, _, _, _| st.border_b_2().border_color(accent))
+                            .on_drop(cx.listener(move |this, d: &ExplodeRollbackDrag, _, cx| {
+                                if d.view == i {
+                                    if this.explode != Some(i) {
+                                        this.activate_explode(Some(i), cx);
+                                    }
+                                    this.set_explode_progress((k + 1) as f64, cx);
+                                }
+                            })),
+                    );
+                }
+                if upto >= n {
+                    tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
+                }
+            }
+            pane = pane.child(tree);
+            // The how-to box: one view with at most one step (bundle `A()`).
+            if views.len() == 1 && views[0].steps.len() <= 1 {
+                pane = pane.child(
+                    div().mx(px(18.)).mt(px(18.)).mb(px(14.)).p(px(15.)).rounded(px(4.)).border_1().border_color(rgb(0xa6d5ec)).bg(rgb(0xd9edf7)).text_size(px(13.33)).text_color(rgb(0x094174)).child(
+                        v_flex()
+                            .child(div().font_weight(FontWeight::BOLD).child("Build steps by dragging components"))
+                            .child(div().child("Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.")),
+                    ),
                 );
             }
-            let n = v.steps.len();
-            let editing = self.explode_edit;
-            body = body.child(
-                h_flex()
-                    .pl(px(26.))
-                    .gap_1()
-                    .child(Button::new("ex-edit").label(if editing { "Done" } else { "Add steps" }).small().when(editing, |b| b.primary()).when(!editing, |b| b.ghost()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.explode_edit = !this.explode_edit;
-                        this.message = None;
-                        this.explode_progress = None;
-                        this.reapply_display(cx);
-                    })))
-                    .child(Button::new("ex-play").icon(IconName::Play).label("Play").small().ghost().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.play_explode(cx)))),
-            );
-            if n > 0 {
-                let cur = self.explode_progress.unwrap_or(n as f64).min(n as f64) as f32;
-                if self.explode_slider.as_ref().is_none_or(|(m, _, _)| *m != n) {
-                    let st = cx.new(|_| SliderState::new().min(0.).max(n as f32).step(0.01).default_value(cur));
-                    let sub = cx.subscribe(&st, |this: &mut Self, _, ev: &SliderEvent, cx| match ev {
-                        SliderEvent::Change(v) | SliderEvent::Release(v) => {
-                            this.explode_play = None;
-                            this.set_explode_progress(v.start() as f64, cx);
-                        }
-                    });
-                    self.explode_slider = Some((n, st, sub));
-                }
-                if let Some((_, st, _)) = &self.explode_slider {
-                    body = body.child(h_flex().pl(px(26.)).pr_2().gap_2().child(div().text_xs().text_color(pal.text_muted).child("Assembled")).child(div().flex_1().child(Slider::new(st))).child(div().text_xs().text_color(pal.text_muted).child("Exploded")));
-                }
-            }
+            // The list and the box sit at the top (live 63); the footer stays at the bottom.
+            pane = pane.child(div().flex_1());
         }
-        Self::panel_frame("Exploded views", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.panel = None;
-            this.explode_edit = false;
-            cx.notify();
-        }), "ex-close")
+        // Footer: [Add exploded view] (when views exist) and help.
+        pane.child(
+            h_flex()
+                .h(px(40.))
+                .flex_none()
+                .border_t_1()
+                .border_color(pal.border)
+                .bg(rgb(0xf5f5f5))
+                .child(div().flex_1())
+                .when(!views.is_empty(), |d| d.child(add_button("ex-add", cx)))
+                .child(h_flex().flex_1().justify_end().pr(px(14.)).child(super::props::help_dot())),
+        )
         .into_any_element()
     }
 
@@ -1748,74 +1864,221 @@ impl AssemblyView {
     }
 
     pub(super) fn open_replace(&mut self, top: InstanceId, cx: &mut Context<Self>) {
-        self.replace_panel = Some(ReplaceSession { instance: top, all: false });
+        self.open_replace_with(vec![top], cx);
+    }
+
+    /// Open the Replace instance dialog with these instances (none: the
+    /// field is simply empty and active; live 833).
+    pub(super) fn open_replace_with(&mut self, instances: Vec<InstanceId>, cx: &mut Context<Self>) {
+        self.selected = instances.clone();
+        self.replace_panel = Some(ReplaceSession { instances, all: false, replacement: None, picking: false });
+        self.update_capture(cx);
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
-    fn do_replace(&mut self, source: InstanceSource, base: String, cx: &mut Context<Self>) {
-        let Some(s) = self.replace_panel.take() else { return };
-        self.replace_with_matching(s.instance, s.all, source, base, cx);
+    pub(super) fn close_replace(&mut self, cx: &mut Context<Self>) {
+        if self.replace_panel.take().is_some() {
+            self.selected.clear();
+            self.update_capture(cx);
+            self.refresh_scene(false, cx);
+            cx.notify();
+        }
+    }
+
+    /// A click on an instance while the dialog is open adds or removes it.
+    pub(super) fn toggle_replace_instance(&mut self, id: InstanceId, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.replace_panel else { return };
+        match s.instances.iter().position(|x| *x == id) {
+            Some(i) => {
+                s.instances.remove(i);
+            }
+            None => s.instances.push(id),
+        }
+        self.selected = s.instances.clone();
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
+    /// ✓: replace every instance to replace (and, with Replace all
+    /// instances, the others of the same source) with the replacement.
+    fn accept_replace(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = &self.replace_panel else { return };
+        let Some((source, base)) = s.replacement.clone() else { return };
+        if s.instances.is_empty() {
+            return;
+        }
+        let (ids, all) = (s.instances.clone(), s.all);
+        self.replace_panel = None;
+        for id in ids {
+            self.replace_with_matching(id, all, source.clone(), base.clone(), cx);
+        }
+        self.selected.clear();
+        self.update_capture(cx);
+        cx.notify();
+    }
+
+    /// The 220 px Replace instance dialog (live 833: title, ✓ ✕, Instances
+    /// to replace (active), the replacement field with a part icon, ☐ Replace
+    /// all instances, ?; 836: title and the empty replacement field red once
+    /// an instance is picked). The replacement field opens the component list
+    /// beside the dialog.
     pub(super) fn render_replace_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.replace_panel else { return div().into_any_element() };
-        let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
-        let all = s.all;
-        let mut body = v_flex()
-            .id("replace-body")
-            .p_2()
-            .gap_1()
-            .overflow_y_scroll()
-            .max_h(px(440.))
-            .child(div().px_1().text_xs().text_color(pal.text_muted).child(format!("Replace {name} with:")))
-            .child(Checkbox::new("rep-all").label("Replace all instances").checked(all).on_click(cx.listener(|this, v: &bool, _, cx| {
+        let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+        let (all, picking) = (s.all, s.picking);
+        let missing = !s.instances.is_empty() && s.replacement.is_none();
+        let red = gpui_kit::rgb(0xbd3039);
+        let entries: Vec<AnyElement> = s
+            .instances
+            .iter()
+            .map(|id| {
+                let id = *id;
+                let n = names.get(&id).cloned().unwrap_or_default();
+                crate::os_ui::query_row(SharedString::from(format!("rep-i-{}", id.0)), n.clone())
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("rep-x-{}", id.0)))
+                            .px(px(5.))
+                            .text_size(px(16.67))
+                            .text_color(rgb(0x666666))
+                            .cursor_pointer()
+                            .tooltip(crate::ui::tooltip(format!("Delete {n}")))
+                            .child("×")
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                cx.stop_propagation();
+                                this.toggle_replace_instance(id, cx);
+                            })),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+        let replacement = s.replacement.as_ref().map(|(_, n)| n.clone());
+        let field = h_flex()
+            .id("rep-component")
+            .mx(px(3.))
+            .h(px(28.))
+            .px(px(5.))
+            .gap(px(4.))
+            .rounded(px(2.))
+            .border_1()
+            .border_color(if missing { red } else { pal.border })
+            .when(missing, |d| d.bg(gpui_kit::rgb(0xf9ebec)))
+            .cursor_pointer()
+            .child(div().opacity(if replacement.is_some() { 1.0 } else { 0.4 }).child(crate::assets::icon("part", 20., cx)))
+            .child(match replacement {
+                Some(n) => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(rgb(0x555555)).child(n),
+                None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if missing { red } else { pal.text_faint }).child("Select replacement component"),
+            })
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.replace_panel {
-                    s.all = *v;
+                    s.picking = !s.picking;
                 }
                 cx.notify();
-            })));
+            }));
+        let dialog = v_flex()
+            .id("rep-dialog")
+            .occlude()
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .pl(px(6.))
+                    .bg(rgb(0xffffff))
+                    .border_b_1()
+                    .border_color(rgb(0xd7d7d7))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if missing { red } else { pal.text }).child("Replace instance"))
+                    .child(
+                        div()
+                            .id("rep-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(pal.accept)
+                            .cursor_pointer()
+                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_replace(cx))),
+                    )
+                    .child(
+                        div()
+                            .id("rep-close")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_replace(cx))),
+                    ),
+            )
+            .child(div().mx(px(3.)).mt(px(5.)).mb(px(4.)).child(crate::os_ui::query_box("rep-instances", "Instances to replace", !picking, entries)))
+            .child(field)
+            .child(crate::os_ui::checkbox("rep-all", "Replace all instances", all).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(s) = &mut this.replace_panel {
+                    s.all = !s.all;
+                }
+                cx.notify();
+            })))
+            .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()));
+        if !picking {
+            return dialog.into_any_element();
+        }
+        // The replacement components of this document (Part Studios whole,
+        // and their parts), beside the dialog.
+        let mut list = v_flex().id("rep-list").w(px(260.)).max_h(px(440.)).overflow_y_scroll().occlude().bg(pal.dialog_bg).border_1().border_color(pal.border).p(px(4.)).gap(px(1.));
         for st in self.catalog.studios.clone() {
             let (tab, sname) = (st.tab, st.name.clone());
-            body = body.child(
+            list = list.child(
                 h_flex()
                     .id(SharedString::from(format!("rep-ps-{tab}")))
-                    .h(px(24.))
-                    .px_2()
-                    .gap_2()
-                    .rounded_sm()
+                    .h(px(26.))
+                    .px(px(4.))
+                    .gap(px(6.))
                     .cursor_pointer()
-                    .text_sm()
+                    .text_size(px(13.33))
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path("part-studio")).size_3p5().text_color(pal.accent))
-                    .child(div().flex_1().truncate().child(format!("{sname} (rigid)")))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.do_replace(InstanceSource::PartStudio { studio: tab, config: ConfigValues::default() }, sname.clone(), cx))),
+                    .child(crate::assets::icon("part-studio", 17., cx))
+                    .child(div().flex_1().truncate().child(sname.clone()))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(s) = &mut this.replace_panel {
+                            s.replacement = Some((InstanceSource::PartStudio { studio: tab, config: ConfigValues::default() }, sname.clone()));
+                            s.picking = false;
+                        }
+                        cx.notify();
+                    })),
             );
             for (body_id, pname, _, _) in st.parts {
-                let pname2 = pname.clone();
-                body = body.child(
+                list = list.child(
                     h_flex()
                         .id(SharedString::from(format!("rep-part-{tab}-{body_id}")))
-                        .h(px(24.))
-                        .pl(px(26.))
-                        .pr_2()
-                        .gap_2()
-                        .rounded_sm()
+                        .h(px(26.))
+                        .pl(px(24.))
+                        .pr(px(4.))
+                        .gap(px(6.))
                         .cursor_pointer()
-                        .text_sm()
+                        .text_size(px(13.33))
                         .hover(|d| d.bg(pal.panel_hover))
-                        .child(svg().path(icon_path("part")).size_3p5().text_color(pal.text_muted))
-                        .child(div().flex_1().truncate().child(pname))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.do_replace(InstanceSource::Part { studio: tab, body: body_id.clone(), config: ConfigValues::default() }, pname2.clone(), cx))),
+                        .child(crate::assets::icon("part", 17., cx))
+                        .child(div().flex_1().truncate().child(pname.clone()))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(s) = &mut this.replace_panel {
+                                s.replacement = Some((InstanceSource::Part { studio: tab, body: body_id.clone(), config: ConfigValues::default() }, pname.clone()));
+                                s.picking = false;
+                            }
+                            cx.notify();
+                        })),
                 );
             }
         }
-        Self::panel_frame("Replace instance", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.replace_panel = None;
-            cx.notify();
-        }), "rep-close")
-        .into_any_element()
+        h_flex().items_start().gap(px(1.)).child(dialog).child(list).into_any_element()
     }
 }
 
@@ -1827,6 +2090,19 @@ pub(crate) enum TriadAction {
     AlignZ(usize, bool),
     /// Rotate about triad axis k by an angle (radians).
     Rotate(usize, f64),
+}
+
+/// The exploded view's rollback bar being dragged (Onshape's
+/// `ns-list-item-rollbackbar`): dropped after a step, the view plays up to it.
+#[derive(Clone)]
+pub(crate) struct ExplodeRollbackDrag {
+    pub view: usize,
+}
+
+impl Render for ExplodeRollbackDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().w(px(200.)).h(px(6.)).bg(rgb(0xcccccc))
+    }
 }
 
 /// Explode step being dragged in the panel (reorder).
@@ -2588,7 +2864,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .relative()
-                        .child(Input::new(st).small().cleanable(true))
+                        .child(Input::new(st).h(px(30.)).cleanable(true))
                         .when(empty, |d| d.child(div().absolute().left(px(9.)).top_0().bottom_0().flex().items_center().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child(ph))),
                 )
                 .into_any_element(),

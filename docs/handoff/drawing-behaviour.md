@@ -358,3 +358,108 @@ migrating the drawing menus to `os_menu` (`fill_os_menu`): keep edits surgical, 
   stored only (live request asb 10-20 d).
 - GD&T dialog limits (`limit_gdt_texts`), Add frame up to 5.
 - Surgical fix in fs's select_item.rs (borrow of `s.configuration` in the source rows) to unblock the build.
+
+## 20 Oct (later): related highlights, selection, menus, small rows
+- app/drawing_related.rs: hovered / selected annotations show their references (vertex refs as blue points, edge refs
+  drawn blue; `REFERENCE_BLUE` is provisional until live request asb 10-20 e) and group members get `state::ACCENT`.
+- Selection is additive with a plain click (toggle), empty click clears (`select_click`), as Onshape.
+- Dimension tool wakes circle centers (`woken_centers`, cleared by `set_tool`).
+- `AngularDimension.three_point` + `in_sweep`: the 3 point angular arc on the other side gives 360° − angle.
+- `cylinder_silhouettes` (drawing_smart.rs): Ø prefix for line-to-line on a cylinder's silhouette.
+- `Drag::Reattach` (drawing_jog.rs `attach_grip_at` / `reattached`): drag a linear dimension's attachment grip.
+- Annotation menus end with Clear selection, Zoom to fit, Delete; GD&T adds Paste / Paste as table.
+- General table cell menu (`general_cell_entries`) and `Table::duplicate_rows / duplicate_cols`.
+- Datum tool stays active; datum target sets A1… / B1… (`datum_target_letter`, `next_target_set`); crops refused on
+  detail / break / flat views (`crop_refused`).
+- Requests filed: asb 10-20 e (highlight colors), f (dialogs for the remaining ❌ rows), g (general table menus).
+
+## 20 Oct (evening): hatch patterns, Cut from section, replication
+- model/drawing/hatch_pat.rs: the live pattern lists (ANSI 9 incl. "ANSI31 general (drawing)" at index 8, ISO 14,
+  General 31) as .pat-style line families (angle, origin, delta, dashes; ANSI/General in inches, ISO in mm, AR-
+  patterns at 1/48). `lines()` clips them to a profile (even-odd holes). Stored indices of older documents keep their
+  meaning (old ISO / General entries first; `display_order` gives the dialog order). `HATCH_PATTERNS` is gone.
+- Pattern icons: `cargo test -p noshape-model hatch_icons -- --ignored` writes app/assets/icons/hatch-<group>-<i>.svg.
+- app/drawing_hatch.rs rebuilt to live 468–472 (tabs, Closed profiles list, editable Scale / Angle, preview canvas);
+  the dialog's hatches preview tan, profiles blue (`hatch_profile_outlines`, drawn in drawing_related).
+- Styles panel: hatch regions (`render_hatch_styles`).
+- V24 Cut from section: `DrawingView::cut_from_section`, `views::pre_cut`; `section_geometry` chains the parent's
+  removal cut through `cut_pieces` so edge names still map.
+- V68 app/drawing_replicate.rs: Select for replication ▸ View / Region…, Replicate annotations, Replicate region
+  dialog; references re-found by same ref or same-kind snap at the mapped point. os_menu labels "Text\tbadge" draw a
+  blue "beta" pill (surgical, os_menu.rs `label_el`). Request asb 10-20 h asks for the notification wording and the
+  placing details.
+- Restored the broken-out view menu "Edit section" (lost with `view_more_entries`).
+- Surgical: `.into_any_element()` on `input_frame` in start_search / assembly_positions / release_dialog /
+  drawing_detail (the InputFrame change had left the app uncompilable for an hour).
+- qa-round-4 (drawing): app/drawing_toolbar.rs replaces `render_toolbar` (drawing_ui.rs) and `sketch_toolbar`
+  (drawing_sketch.rs): tools are `TbTool` descriptors per category; when the full width doesn't fit beside the
+  rail, every category collapses into one split tool (first tool's icon + ▾ listing the category; tools with
+  their own ▾ contribute their items), as live's narrow Part Studio (no overflow button). Live drawing has no
+  "Search tools…". Request asb 10-20 i asks for the live narrow drawing toolbar to confirm faces / lists.
+- The open Sheets panel is a flex sibling before the canvas (pushes it); `toggle_sheets_panel` pans by half the
+  panel width so the sheet keeps its screen spot (live drawing/30 vs 469: the sheet doesn't move);
+  `dialog_left()` is 0; the panel toggle is a canvas child drawn under the dialogs.
+- Surgical: assembly_panels.rs:1581 `flex_shrink()` → `flex_shrink_1()` (blocked every app build since 09:08).
+
+## 20 Oct (late): dimension palette, hole callout panel, units, Units and precision (for ui2)
+**Dimension palette / hole callout panel — app/drawing_palette.rs** (`DrawingEditor::palette: Option<PaletteDlg>`).
+Behaviour is done; the look is ui2's (only touch `render_palette`; the state and actions are stable):
+- Open: double-click a dimension or a hole callout, or the dimension's right-click Edit… →
+  `open_dim_palette(id)` / `open_hole_callout(id)` (both via `open_annotation_panel`). The old
+  "Dimension properties" panel (`Panel::Dimension`) is gone.
+- `PaletteDlg` fields: `hole` (callout or dimension), inputs `above / prefix / value / suffix / below /
+  tol_a / tol_b` (InputStates; `value` overrides a linear dimension's text when changed), `tol` (the list
+  entry name, `DIM_TOLERANCES` / `HOLE_TOLERANCES`), `target` (where symbols go), `cur` (the edited
+  Annotation, previewed live), `orig`.
+- Actions: `edit_palette(|d| …)` for dropdown / toggle changes (then re-reads the inputs and previews);
+  `close_palette(accept)` — Enter or a sheet click accepts (one undo step "Edit dimension" / "Edit hole
+  callout"), Esc cancels. Lists: `SYMBOLS`, `PRECISIONS` (with "(Drawing)" = None), `DimUnits::CALLOUT` +
+  the "(Drawing)" entry, `HoleCount::ALL`, `FitType::ALL`, `FitStacking::ALL`, `fits::hole_classes /
+  shaft_classes`.
+- Placement: `palette_at(id)` (beside the annotation text's upper right, editor px).
+**Model (DimFormat, D31–D38):** `above`, `below`, `reference` (parentheses), `inspection_frame` (oval),
+`dual: Option<bool>`, `count: Option<HoleCount>` (stored; dimensions don't count yet), `fit: FitOpts { mode
+(Fit / WithTolerance / ToleranceOnly), fit_type, iso: Option<bool>, stacking, precision, hide_hole,
+hide_shaft }`. `format::dim_text` renders parentheses, above / below (`DimText::above/below`), the oval
+(`DimText::oval`, drawn by `SheetGeometry::dim_label`), stacked or diagonal fit classes and the fit
+deviations (`fits::deviations`, precision `fit.precision` → Drawing properties `fit_tolerance_precision`).
+`AnnotationKind::measured(rotation)` gives a linear / radial value for the value box.
+**Hole callouts:** `Annotation::hole: Option<Box<HoleCalloutOpts { count, override_tol }>>`; above / below /
+prefix / suffix / units / reference / dual come from `format` (shared with dimensions). `build::hole_count`
+(None / view / face / pattern / part / face excluding patterns), `build::hole_callout_count`; without
+Override the callout ignores `format.precision / tolerance`; with it Symmetrical / Deviation / Limits /
+MIN / MAX / Fit apply to the diameter.
+**Units:** `DimUnits::{Yard, InchFraction, FeetInches}` (1/64 fractions, `1' 2.5"`), `DimUnits::CALLOUT`,
+`DimUnits::imperial()`.
+**Drawing properties › Units and precision:** `fit_tolerance_precision`, `dual: DualDims { show,
+show_unit, dim_location, hole_location (DualLocation Top/Bottom/Left/Right), units (None: mm on inch
+drawings, in on metric), precision, tolerance_precision }` (stored; dual values not drawn yet), footer
+`template: Option<String>` ("Update properties from a template…": the DWT list, `templates::template_props`)
+and `locked` (`set_drawing_prop` ignores every change but the lock while locked). Rows are in
+drawing_drawprops.rs tab 0 and `drawing_props_footer`.
+**Other:** Table tool ✓ disabled until placed, Rows focused + selected; Detail view scale blank until the
+circle is placed; GD&T type already defaults to Position (the ⌖ vs ⊕ difference is the glyph); toolbar
+right-end tools (title block, sheet ▾, zoom to fit; not in live) removed with their menus
+(`template_entries`, `title_style_entries`, `sheet_size_entries`, `Panel::Scale`), so the full toolbar fits
+at 1920 px and collapses only below ~1790 px.
+
+## For drw2 (asb, 20 Oct): built but not yet checked in the app
+- Checked by asb today (no need to redo): SK9 / SK17 hatch dialog and styles, V24 Cut from section, V68 menus
+  and Replicate region dialog, toolbar collapse at 1440 px, Sheets panel push.
+- Not yet checked (your 🔧 queue, most recent first): D31–D38 dimension palette, A57 / A58 hole callout
+  palette, V68 replication result after the snap fix (copy a view, delete a dimension on the copy, Region… →
+  Replicate annotations → place over the same hole), V63 Adjust linestyle, V23 Edit section, D42 / A64 Styles
+  rows, Units and precision Dual / Fit class / footer, Table tool ✓ / Rows focus, Detail scale blank,
+  centermark arms, callout / surface finish leaders, radial dim lines, ISO ordinate.
+- Builds: behaviour group in /root/target-behave. asb uses Xvfb :104; please use another display.
+
+## From drw2 (20 Oct): shared functions I touched (docs/handoff/drawing-verify.md has the details)
+- `views.rs`: `compute_view` (new Projected arm `projects_section`; the broken-out arm now uses `broken_out_cuts`),
+  `view_key` (Projected views hash their parent when they inherit cuts), `broken_out_geometry` now takes
+  `&[(BrokenOut, ViewFrame)]` (each cut in the frame it was drawn in). New `projects_section`, `broken_out_cuts`.
+  `DrawingView.cut_from_section` also means "Shift+click projected view of a section" now.
+- `sheet.rs`: `add_border_and_title_full` split out `add_zones`; `Sheet.format: SheetFormat { border, zones, start }`
+  (mod.rs), `SheetSize::standard_zones` (ISO A4 = no zones, live 560), `zone_letter` (skips O).
+- `templates.rs`: `DrawingTemplate` gained `units`, `decimal_comma`, `format`; build them with
+  `DrawingTemplate::standard(..)`. `units_note_of(DimUnits)`.
+- `drawing_tools.rs`: `double_click(triple, ..)` (triple-click a note selects all), Projected refuses Detail parents.

@@ -106,6 +106,10 @@ pub struct BodyDisplay {
     pub composite: Option<CompositeInfo>,
     /// A mesh part (imported STL, OBJ, PVZ, …): parts-list mesh icon, faceted.
     pub is_mesh: bool,
+    /// Colours features gave single faces (an import's), by face index,
+    /// linear RGBA; empty when none. Face appearances set in the Part
+    /// Studio draw over them.
+    pub face_colors: Vec<Option<[f32; 4]>>,
 }
 
 /// A Composite part's members (Help PartStudio__composite_part). An open

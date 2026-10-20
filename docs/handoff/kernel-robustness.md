@@ -396,6 +396,70 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
   suite green but for another agent's in-progress isocline tests in `custom_features.rs`; clippy `-D warnings` clean
   for noshape-kernel and noshape-model (`--no-deps`).
 
+### Round 8 (2026-10-20, kern on a new account; took over mid-task)
+- **Reader bug behind fluxpad (G38b)**: Onshape's own XT of fluxpad_102 read as 169 faces, invalid. Two causes, both in
+  `xt_read.cpp`: (1) a closed edge (one vertex at both ends) on a closed but non-periodic curve (an intersection
+  curve whose chart returns to its start) got the range 0..0 — now the whole curve; (2) **OCCT's unbounded
+  `GeomAPI_ProjectPointOnSurf(P, S)` uses Precision::Confusion as its parametric tolerance** and misses the foot on a
+  blend tube whose u range is a few centimetres (5.9 mm off at an exact vertex), so the intersection refiner jumped
+  to another branch. Now `Builder::project`: one projector per surface (Init once, PConfusion), seeded local Newton
+  (`Extrema_GenLocateExtPS`) from the last foot, kept within 1 µm, else the global search. Densification points that
+  jump more than half their segment are dropped (`intersection`, `blend_boundary`). Result: fluxpad (native SLDPRT
+  and Onshape's XT) 167 faces, valid, 255.7679 (Onshape 255.7689); reading went 46 s → 3.7 s; corpus 63 s → 13 s.
+  Cliff-edge blends ('E') were fine: the XT ref (p. 61) says one support is a zero-range blended edge whose spine is
+  the cliff edge — our tube round the spine is exact.
+- **Tolerant edges (SP-curves only)**: the 3D curve from the first fin's SP-curve is checked against it
+  (`off_pcurve`) and rebuilt with more segments if needed; the **other fin's SP-curve is put on the edge's parameter**
+  (`along_edge`: arc-length-fraction seeds, `Extrema_LocateExtPC`, interpolated) instead of being assumed
+  same-parameter. Onshape's XT of the McMaster screw had its 8 helix edges at 3 mm tolerance and meshed to 451.8 mm²
+  (true 407.6); now 25 faces, mesh 407.86. Quadrature volume 254.522 (native SW read 254.423; Onshape's XT is a
+  re-approximated geometry with 3 µm tolerant edges).
+- **G38c answered: Onshape's mass properties are approximate, with bounds** (behaviours.md "G38c"): bracket 19378.847
+  [19370.150, 19387.544] (ours 19377.869 = exact by hand formula), McMaster 254.404 [248.203, 260.604], fluxpad 255.769
+  [255.686, 255.852], Bell Crank 2050.837 [2050.433, 2051.240]. Ours are all inside. The API ignores an accuracy
+  option; centroid/inertia need a material (hasMass). **For whoever owns mass-property display (ui/psb):** Onshape
+  shows its approximate value; ours is the exact one — same to ~5 significant digits on these parts.
+- Tests: `export.rs::parasolid_from_onshape` + fluxpad (Onshape's XT); `native_cad_parts` + fluxpad SLDPRT;
+  `parasolid_from_onshape_mass_bounds` (McMaster/Bell Crank/bracket from Onshape's XTs: inside Onshape's bounds, the
+  bracket exact, tessellated area = face area).
+- **For fs: `make_bspline_surface`** (FeatureScript opCreateBSplineSurface; `surfacing.cpp::bspline_surface_face`,
+  docs/kernel-api.md, test `surfacing.rs::bspline_surface_from_featurescript_definition`; note in fs's handoff).
+- Scratch: `/root/kern-scratch/xth/probe` (probe = per-face BRepCheck dump, probe2/3/4/5/6 = XT node / curve /
+  projection checks, vp = our quadrature per face (`KF` step factor), meshv = mesh volume/area (`DEFL`, `PERFACE`),
+  runcorp.sh = 118-file corpus, old.txt = baseline before round 8).
+- JT LSG placements (queue item 2) were already done in round 7 (working tree): `jt_import` passes (36 placed parts).
+
+### Round 8b (2026-10-20): sheet-metal Convert and joints like Onshape (live G34c/G34d)
+- **Convert** (`sheetmetal.rs::convert`, `convert_joints`): walls are built **outward** from the part's faces
+  (`oppositeDirection` = inward), with `shell_solid` (sharp corners, Parasolid semantics; the old Arc-join shell
+  rounded them). Every sharp wall corner that isn't a selected bend edge becomes an **edge-joint rip**; the rips go
+  first, then each bend is made in the part holding both its walls; walls the rips separate become **separate parts**
+  ("Part 1", "Part 2"), each with its own `SheetMetalData` (`sheetmetal_ops::piece_data` renumbers walls, bends,
+  rips, flat marks).
+- **Joint geometry** (`sheetmetal_ops::rip_corners`, used by Convert, Make joint and Modify joint): in each wall's
+  frame (u along its definition face towards the corner line, v through the thickness) a wall keeps `u ≤ hi`: an edge
+  joint stops both walls the minimal gap short of the line (the outer corner open); a butt joint lets one wall run
+  over the other's thickness and stops the other the gap short of it. **Direction 1 = the wall first in Onshape's
+  entity order runs through** (`detail::face_order`, now `pub(crate)`; G34d: the block's top over its +X face).
+  Matches G34d exactly: rip 1199.4 + 599.4, bend 1810.6858347 with **14 faces** (`split_bend_sides`: a bend's side
+  faces are split from the walls' at its tangent lines), joint EDGE 1798.8, BUTT / BUTT2 1829.4.
+  The old diagonal slot is kept as `slot_rip` for the sheet-metal loft seam only.
+- **Make joint errors** (Onshape's text): picks at an existing joint (a rip's cut faces or their edges, a bend) →
+  "An internal edge cannot be used to create a joint."; picks on more than one part → "Cannot connect multiple parts
+  to create a joint." (`Rip` gained `other` (wall in another part) and `faces`).
+- Tests: `sheetmetal_frames.rs::convert_rips_and_bends_like_onshape` (G34d) and `convert_box_with_bends_and_joints`
+  rewritten to Onshape's semantics (open box, front/back bends → 3 parts, 6 rips, exact flat strip, radius change,
+  Make joint at a rip errors). Inward Convert walls follow the same rule but are **unverified** live.
+
+### Open from G38/G38b (for the next kern)
+- **Wire bodies "Curve N"**: Onshape imports SolidWorks' helix (McMaster: one B-spline edge, 228.34 mm, r 2.007, z
+  −12.7..0) from the SLDPRT's **`Config-<n>-GhostPartition`** section (28-byte header, then zlib → a Parasolid v28
+  partition with ~10 wire bodies, a 1-face sheet and empty ones; Onshape kept only the helix). **G38d** asked live which
+  body and why. NX polycarb's 8 curves are NX's own curve objects (not Parasolid). Scratch: `probe/ghost.cpp`,
+  `probe/sec-GhostPartition.bin`, `probe/ghost.xt`.
+- **Colours / names on import**: `app/src/workspace.rs::read_foreign` flattens parts to one compound, so file
+  colours and names are lost (Onshape: "Import appearances" on by default). Needs the import feature to carry them.
+
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,
 shell.rs), `noshape-model` (kernel_robustness.rs 14/14), `noshape` app (`cargo check` clean). Nothing half-done;

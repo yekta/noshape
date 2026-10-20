@@ -522,7 +522,7 @@ impl AddItemsDialog {
                 .pt(px(6.))
                 .px(px(6.))
                 .child(div().w(px(32.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("filter", 20., if searching { blue } else { gpui_kit::rgb(0x666666) })))
-                .child(div().ml(px(6.)).flex_1().h(px(30.)).rounded_l(px(3.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.browse.url).appearance(false).cleanable(true).small()))
+                .child(gpui_kit::base::input::input_frame(div().ml(px(6.)).flex_1().h(px(30.)).rounded_l(px(3.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.browse.url).appearance(false).cleanable(true).small())))
                 .child(
                     div()
                         .id("add-other-search")

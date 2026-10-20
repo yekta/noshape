@@ -13,12 +13,15 @@ use gpui_kit::component::input::InputEvent;
 use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties};
 
 /// Mass properties dialog state.
-#[derive(Default)]
 pub(crate) struct AsmMassUi {
     /// Face tab (else Part).
     pub faces: bool,
     /// The "material not defined" warning was dismissed.
     pub warning_closed: bool,
+    /// The assembly's Mass ☑ Override (top-level row) and its field.
+    pub override_on: bool,
+    pub override_input: Entity<InputState>,
+    _override_sub: Subscription,
 }
 
 /// The analysis tools of an assembly, in menu order (live assembly/734).
@@ -54,9 +57,59 @@ impl AssemblyView {
         }
     }
 
-    /// "Display mass and section properties" toggles the dialog.
-    pub(super) fn toggle_mass(&mut self, cx: &mut Context<Self>) {
-        self.ui.mass = if self.ui.mass.is_some() { None } else { Some(AsmMassUi::default()) };
+    /// "Display mass and section properties" toggles the dialog; the Mass
+    /// Override starts from the assembly's stored one (live 720–730).
+    pub(super) fn toggle_mass(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ui.mass.take().is_none() {
+            let stored = self.assembly(cx).and_then(|a| a.properties.mass_override);
+            let (sym, factor) = mass_unit(&self.units(cx));
+            let text = stored.map(|m| format!("{} {sym}", number(m * factor))).unwrap_or_default();
+            let override_input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+            // Typing (and Enter) re-evaluates the values with the new mass.
+            let sub = cx.subscribe_in(&override_input, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
+                if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
+                    cx.notify();
+                }
+            });
+            self.ui.mass = Some(AsmMassUi { faces: false, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub });
+        }
+        cx.notify();
+    }
+
+    /// Computed mass of the whole assembly (kg), for its Properties….
+    pub(super) fn assembly_total_mass(&self, cx: &App) -> Option<f64> {
+        let doc = &self.doc.read(cx).session.doc;
+        let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
+            _ => None,
+        };
+        let all: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().map(|i| i.id).collect()).unwrap_or_default();
+        assembly_mass_properties(&self.result, &all, &density).and_then(|m| m.props.mass)
+    }
+
+    /// The overriding mass being typed (kg): with a unit as written, else in
+    /// the user's mass unit.
+    fn typed_mass(&self, cx: &App) -> Option<f64> {
+        let ui = self.ui.mass.as_ref().filter(|m| m.override_on)?;
+        let text = ui.override_input.read(cx).value().to_string();
+        if text.chars().any(|c| c.is_ascii_alphabetic()) {
+            crate::properties_dialog::parse_mass(&text)
+        } else {
+            let (_, factor) = mass_unit(&self.units(cx));
+            text.trim().parse::<f64>().ok().filter(|v| *v > 0.0).map(|v| v / factor)
+        }
+    }
+
+    /// ✓: store the assembly's Mass override (or clear it) and close.
+    fn accept_mass(&mut self, cx: &mut Context<Self>) {
+        let value = self.typed_mass(cx);
+        let on = self.ui.mass.as_ref().is_some_and(|m| m.override_on);
+        let stored = self.assembly(cx).and_then(|a| a.properties.mass_override);
+        let new = if on { value.or(stored) } else { None };
+        if new != stored {
+            self.edit("Properties : Mass", cx, |a| a.properties.mass_override = new);
+        }
+        self.ui.mass = None;
         cx.notify();
     }
 
@@ -79,7 +132,7 @@ impl AssemblyView {
     /// place, plus Onshape's warning bubble when a part has no material.
     pub(super) fn render_mass_dialog(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let Some(ui) = &self.ui.mass else { return vec![] };
-        let (faces, warning_closed) = (ui.faces, ui.warning_closed);
+        let (faces, warning_closed, override_on, override_input) = (ui.faces, ui.warning_closed, ui.override_on, ui.override_input.clone());
         let pal = p();
         let units = self.units(cx);
         let mass = if faces { None } else { self.assembly_mass(cx) };
@@ -97,6 +150,17 @@ impl AssemblyView {
         let len_sym = units.length.symbol();
         let in_units = |x: f64, dim: noshape_units::Dim| number(x / units.si_factor(dim));
         let missing = mass.as_ref().is_some_and(|m| !m.without_material.is_empty());
+        // Mass ☑ Override (top-level assembly only): the typed mass replaces
+        // the computed one and scales the inertia; the toast goes (live 720–730).
+        let overriding = top_level && override_on;
+        let computed_mass = mass.as_ref().and_then(|m| m.props.mass);
+        let typed = if overriding { self.typed_mass(cx).or(self.assembly(cx).and_then(|a| a.properties.mass_override)) } else { None };
+        let scale = match (typed, computed_mass) {
+            (Some(t), Some(c)) if c > 0.0 => t / c,
+            _ => 1.0,
+        };
+        let stored = self.assembly(cx).and_then(|a| a.properties.mass_override).is_some();
+        let can_accept = top_level && (overriding || stored);
         let tab = |id: &'static str, label: &'static str, on_faces: bool, cx: &mut Context<Self>| {
             let on = faces == on_faces;
             div()
@@ -128,12 +192,13 @@ impl AssemblyView {
                 .border_1()
                 .border_color(if active { pal.accent } else { pal.border })
                 .when(active, |d| d.bg(rgb(0xdef1fb)))
-                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(rgb(0x555555)).child(label.to_string()))
+                .child(div().px(px(6.)).when(empty, |d| d.pt(px(6.)).pb(px(5.)).line_height(px(13.33)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(rgb(0x555555)).child(label.to_string()))
                 .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().px(px(5.)).text_size(px(16.67)).text_color(rgb(0x666666)).child("×"))))
         };
         let value = |v: String| div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v);
         let value_row = |label: &'static str, v: String| h_flex().h(px(28.)).child(div().px(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(label)).child(value(v));
         // Override: a greyed box (live 737–738), white for the assembly's Mass (739).
+        // Greyed ones only show the tooltip "Override" (live 728).
         let override_check = |id: &'static str, enabled: bool| {
             h_flex()
                 .id(id)
@@ -142,6 +207,7 @@ impl AssemblyView {
                 .gap(px(4.))
                 .text_size(px(13.33))
                 .text_color(pal.text_muted)
+                .when(!enabled, |d| d.tooltip(crate::ui::tooltip("Override")))
                 .child(div().size(px(12.)).rounded(px(3.)).when(enabled, |d| d.bg(rgb(0xffffff)).border_1().border_color(rgb(0x888888))).when(!enabled, |d| d.bg(rgb(0x999999))))
                 .child("Override")
         };
@@ -160,19 +226,45 @@ impl AssemblyView {
         let c = props.map(|p| p.center_of_mass).unwrap_or_default();
         let com = |v: f64| with_unit(have.then(|| in_units(v, length)), len_sym.to_string());
         body = body
-            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(override_check("amass-override", top_level)).child(value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string()))))
+            .child({
+                let check: AnyElement = if top_level {
+                    crate::ui::os_checkbox("amass-override", "Override", override_on)
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let computed = this.assembly_mass(cx).and_then(|m| m.props.mass);
+                            let (sym, factor) = mass_unit(&this.units(cx));
+                            if let Some(m) = &mut this.ui.mass {
+                                m.override_on = !m.override_on;
+                                // Ticked: the field starts at the computed mass.
+                                if m.override_on && m.override_input.read(cx).value().trim().is_empty() {
+                                    let text = computed.map(|c| format!("{} {sym}", number(c * factor))).unwrap_or_default();
+                                    m.override_input.update(cx, |s, cx| s.set_value(text, window, cx));
+                                }
+                            }
+                            cx.notify();
+                        }))
+                        .into_any_element()
+                } else {
+                    override_check("amass-override", false).into_any_element()
+                };
+                let shown: AnyElement = if overriding {
+                    gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(Input::new(&override_input).appearance(false).text_size(px(13.33)).text_right().h(px(23.))).into_any_element()).into_any_element()
+                } else {
+                    value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string())).into_any_element()
+                };
+                h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(check).child(shown)
+            })
             .child(value_row("Volume", with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³"))))
             .child(value_row("Surface area", with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²"))))
-            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
-            .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(26.)).child(axis(l, col, g)).child(value(com(v)))))
-            .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
+            .child(h_flex().h(px(30.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
+            .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(31.)).child(axis(l, col, g)).child(value(com(v)))))
+            .child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
         let f = units.si_factor(length).powi(2);
         let i = props.map(|p| p.inertia).unwrap_or(glam::DMat3::ZERO);
-        let iv = |x: f64| if have { number(x * mass_factor / f) } else { String::new() };
+        let iv = |x: f64| if have { number(x * scale * mass_factor / f) } else { String::new() };
         let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
         let labels = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
         for (r, row_names) in labels.iter().enumerate() {
-            let mut row = h_flex().h(px(26.)).px(px(5.)).gap(px(8.));
+            let mut row = h_flex().h(px(28.)).px(px(5.)).gap(px(8.));
             for (k, n) in row_names.iter().enumerate() {
                 row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
             }
@@ -195,8 +287,19 @@ impl AssemblyView {
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties"))
-                        // Live: the ✓ is shown disabled (op .2).
-                        .child(div().size(px(28.)).flex().items_center().justify_center().bg(pal.accept).opacity(0.2).child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff))))
+                        // Live: the ✓ is pale (op .2) until the Mass override is in play.
+                        .child(
+                            div()
+                                .id("amass-ok")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(pal.accept)
+                                .when(!can_accept, |d| d.opacity(0.2))
+                                .when(can_accept, |d| d.cursor_pointer().tooltip(crate::ui::tooltip("Accept (Enter)")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_mass(cx))))
+                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff))),
+                        )
                         .child(
                             div()
                                 .id("amass-close")
@@ -207,18 +310,20 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.mass = None;
                                     cx.notify();
                                 })),
                         ),
                 )
+                // Live: two 22 px help rows, the ? in the lower one.
                 .child(body.pb(px(4.)))
+                .child(div().h(px(22.)))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(help))
                 .into_any_element(),
         ];
-        if missing && !warning_closed {
+        if missing && !warning_closed && !overriding {
             // Live (part-studio/82): a yellow warning bubble under the toolbar.
             out.push(
                 div()
@@ -358,7 +463,7 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(false, cx))),
                         ),
                 )

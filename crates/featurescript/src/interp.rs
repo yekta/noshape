@@ -846,7 +846,7 @@ impl Interp {
                 if v.is_undefined() { self.eval(b) } else { Ok(v) }
             }
             ExK::Cond(c, a, b) => {
-                if self.cond(c, "Conditional operator condition", c.pos)? {
+                if self.cond(c, "First operand of logical or conditional operator", c.pos)? {
                     self.eval(a)
                 } else {
                     self.eval(b)

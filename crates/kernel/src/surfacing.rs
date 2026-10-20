@@ -242,6 +242,67 @@ pub fn isocline_curves(face: &Shape, direction: DVec3, angle: f64, extend_past_b
     Ok(list_to_vec(&l))
 }
 
+/// A B-spline surface as FeatureScript's `BSplineSurface` gives it (std's
+/// `bSplineSurface` has already padded the knots and overlapped the control
+/// points): `poles[i * nv + j]` is row `i` (along u), column `j` (along v);
+/// full knot vectors, repeats written out (`nu + u_degree + 1` and
+/// `nv + v_degree + 1` knots); a periodic direction includes its `degree`
+/// overlapping rows or columns.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BSplineSurfaceData {
+    pub poles: Vec<DVec3>,
+    pub nu: usize,
+    pub nv: usize,
+    pub weights: Option<Vec<f64>>,
+    pub u_knots: Vec<f64>,
+    pub v_knots: Vec<f64>,
+    pub u_degree: u32,
+    pub v_degree: u32,
+    pub u_periodic: bool,
+    pub v_periodic: bool,
+}
+
+/// A curve in a surface's parameter space (FeatureScript's `BSplineCurve` of
+/// dimension 2): full knot vector, overlapping poles when periodic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BSplineCurve2dData {
+    pub poles: Vec<DVec2>,
+    pub weights: Option<Vec<f64>>,
+    pub knots: Vec<f64>,
+    pub degree: u32,
+    pub periodic: bool,
+}
+
+/// FeatureScript's `opCreateBSplineSurface`: a sheet of the surface, over its
+/// whole parameter range, or inside `boundary` (2D curves in its (u, v) space
+/// forming one closed loop); with `make_solid`, a solid instead when the sheet
+/// encloses a region.
+pub fn make_bspline_surface(surface: &BSplineSurfaceData, boundary: &[BSplineCurve2dData], make_solid: bool) -> Result<Shape> {
+    let s = ffi::BSplineSurfF {
+        poles: surface.poles.iter().flat_map(|p| [p.x, p.y, p.z]).collect(),
+        weights: surface.weights.clone().unwrap_or_default(),
+        nu: surface.nu as u32,
+        nv: surface.nv as u32,
+        u_knots: surface.u_knots.clone(),
+        v_knots: surface.v_knots.clone(),
+        u_degree: surface.u_degree as i32,
+        v_degree: surface.v_degree as i32,
+        u_periodic: surface.u_periodic,
+        v_periodic: surface.v_periodic,
+    };
+    let b: Vec<ffi::BSpline2dF> = boundary
+        .iter()
+        .map(|c| ffi::BSpline2dF {
+            poles: c.poles.iter().flat_map(|p| [p.x, p.y]).collect(),
+            weights: c.weights.clone().unwrap_or_default(),
+            knots: c.knots.clone(),
+            degree: c.degree as i32,
+            periodic: c.periodic,
+        })
+        .collect();
+    Shape::from_res(ffi::bspline_surface_face(&s, &b, make_solid))
+}
+
 /// B-spline face approximating a height grid over `frame`:
 /// `heights[i * ny + j]` is the height (along the frame normal) at plane
 /// coordinates `(x0 + i·dx, y0 + j·dy)`. The face spans the grid.

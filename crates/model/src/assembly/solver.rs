@@ -556,7 +556,12 @@ fn mate_residuals(bodies: &[Frame], m: &SolverMate, out: &mut Vec<f64>) {
     }
     let r = relative(bodies, m);
     let z = r.rotation * DVec3::Z;
-    let t = r.origin - m.offset;
+    // Offset: the first connector sits at +offset in the second's frame
+    // (bundle `getSecondMateConnectorOffsetTransform`; live assembly/740–748:
+    // the plate picked first ends 10 mm above the other). In the first's
+    // frame: rel.origin = -R_rel * offset, R_rel the full relative rotation.
+    let full = bodies[m.a].mul(&m.a_local).inverse().mul(&bodies[m.b].mul(&m.b_local));
+    let t = r.origin + full.rotation * m.offset;
     let rot_target = DQuat::from_rotation_z(m.rotation);
     match m.kind {
         MateType::Fastened => {

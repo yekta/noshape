@@ -350,7 +350,7 @@ fn dimension_formats_and_new_dimension_types() {
     add(sheet, AnnotationKind::ArcLengthDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.01, a: [0.01, 0.0], b: [0.0, 0.01], mid: [0.00707, 0.00707], offset: 5.0 }, [0.0; 2]);
     add(sheet, AnnotationKind::Gdt { anchor: [40.0, 40.0], frame: vec!["⌖".into(), "Ø0.1Ⓜ".into(), "A".into(), "B".into()], leaders: vec![], extra: Default::default() }, [40.0, 40.0]);
     add(sheet, AnnotationKind::Datum { anchor: [60.0, 100.0], label: "A".into() }, [60.0, 112.0]);
-    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into() }, [80.0, 100.0]);
+    add(sheet, AnnotationKind::SurfaceFinish { anchor: [80.0, 100.0], value: "Ra 1.6".into(), leaders: Vec::new() }, [80.0, 100.0]);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     for want in ["100", "+0.1", "-0.05", "2.362 in", "Ø24 H7", "0", "88", "2 X 45.0°", "⌒15.71", "⌖", "Ø0.1Ⓜ", "A", "Ra 1.6"] {
@@ -396,6 +396,7 @@ fn configured_views_show_their_configuration() {
             name: "Size".into(),
             kind: ConfigInputKind::List { options: vec![ListOption { id: "thin".into(), name: "Thin".into() }, ListOption { id: "thick".into(), name: "Thick".into() }], default: "thin".into() },
             visible_when: None,
+            excluded: false,
         });
         let mut values = std::collections::BTreeMap::new();
         values.insert("thin".to_string(), ParamValue::Expr(ExprValue::new("5 mm")));
@@ -509,6 +510,40 @@ fn broken_out_section_exposes_interior() {
 }
 
 #[test]
+fn projected_views_inherit_broken_out_and_section_cuts() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // A broken-out section in the front view (1) carries into its projected
+    // top view (2), cut along the front view's direction.
+    let before = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
+    let profile = vec![[-0.02, -0.003], [0.0, -0.005], [0.02, -0.003], [0.022, 0.015], [-0.022, 0.015]];
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().broken_out.push(BrokenOut { profile, spline: true, depth: 0.03, depth_ref: None });
+    let cuts = views::broken_out_cuts(&drawing, &drawing.sheets[0], ViewId(2));
+    assert_eq!(cuts.len(), 1);
+    assert_eq!(Some(cuts[0].1), views::view_frame(&drawing, &drawing.sheets[0], ViewId(1)));
+    let after = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
+    assert!(after.error.is_none(), "{:?}", after.error);
+    assert_ne!(views::view_key(&drawing, &drawing.sheets[0], ViewId(2), &sources, false), None);
+    assert!(after.edges.len() != before.edges.len() || after.snaps.len() != before.snaps.len(), "the top view shows the pocket");
+    // Shift+click from the section view (5): the projected view keeps the cut.
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.04], [-0.025, 0.04]]);
+    let pos = drawing.sheets[0].view(ViewId(5)).unwrap().position;
+    let id = ViewId(78);
+    drawing.sheets[0].views.push(DrawingView { id, kind: ViewKind::Projected { parent: ViewId(5), direction: Some([0.0, 1.0]) }, position: [pos[0], pos[1] + 80.0], ..Default::default() });
+    let whole = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, false);
+    assert!(!views::projects_section(&drawing.sheets[0], id));
+    drawing.sheets[0].view_mut(id).unwrap().cut_from_section = true;
+    assert!(views::projects_section(&drawing.sheets[0], id));
+    let cut = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, false);
+    assert!(cut.error.is_none(), "{:?}", cut.error);
+    let size = |g: &views::ViewGeometry| (g.max[0] - g.min[0]) * (g.max[1] - g.min[1]);
+    assert!(size(&cut) < size(&whole) - 1e-5, "{} vs {}", size(&cut), size(&whole));
+    // The cut face is seen edge-on: nothing to hatch.
+    assert!(cut.section_segments.is_empty() || seg_range(&cut.section_segments, 0).min(seg_range(&cut.section_segments, 1)) < 1e-6);
+}
+
+#[test]
 fn section_cut_only_and_depth() {
     let (doc, mut drawing) = demo();
     let sources = regenerate_sources(&doc, &drawing);
@@ -531,6 +566,28 @@ fn section_cut_only_and_depth() {
     assert!(shallow.error.is_none(), "{:?}", shallow.error);
     assert!(shallow.edges.len() < full.edges.len(), "{} vs {}", shallow.edges.len(), full.edges.len());
     assert!((seg_range(&shallow.section_segments, 1) - 0.06).abs() < 1e-3, "{}", seg_range(&shallow.section_segments, 1));
+}
+
+#[test]
+fn section_of_a_section_cuts_from_the_section() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    drawing.sheets[0].set_section_points(ViewId(5), vec![[-0.025, -0.04], [-0.025, 0.04]]);
+    let pos = drawing.sheets[0].view(ViewId(5)).unwrap().position;
+    let id = ViewId(77);
+    drawing.sheets[0].views.push(DrawingView { id, kind: ViewKind::Section { parent: ViewId(5), line: vec![[-0.02, 0.0], [0.02, 0.0]], label: "Z".into(), cuts: vec![] }, position: [pos[0], pos[1] - 60.0], ..Default::default() });
+    let base = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, false);
+    assert!(base.error.is_none(), "{:?}", base.error);
+    assert!(views::pre_cut(&drawing.sheets[0], id).is_none());
+    drawing.sheets[0].view_mut(id).unwrap().cut_from_section = true;
+    assert_eq!(views::pre_cut(&drawing.sheets[0], id), Some(ViewId(5)));
+    let cut = compute_view(&drawing, &drawing.sheets[0], id, &sources, &cache, false);
+    assert!(cut.error.is_none(), "{:?}", cut.error);
+    assert!(!cut.section_segments.is_empty());
+    // The parent's removed side is gone: a smaller view.
+    let size = |g: &views::ViewGeometry| (g.max[0] - g.min[0]) * (g.max[1] - g.min[1]);
+    assert!(size(&cut) < size(&base) - 1e-5, "{} vs {}", size(&cut), size(&base));
 }
 
 #[test]
@@ -1396,7 +1453,7 @@ export const partFaces = defineTable(function(context is Context, definition is 
     let studio = studio_tab(&doc);
     drawing.sheets[0].views.clear();
     drawing.sheets[0].tables.clear();
-    let kind = TableKind::Custom { studio, version: None, fs, name: "partFaces".into(), fs_version: None, bottom_to_top: false, overrides: Vec::new() };
+    let kind = TableKind::Custom { studio, version: None, fs, name: "partFaces".into(), fs_version: None, bottom_to_top: false };
     drawing.sheets[0].tables.push(Table::new(1, kind, [400.0, 280.0]));
     assert_eq!(drawing.sheets[0].tables[0].type_name(), "Custom table");
     // The studio is a source although no view shows it.
@@ -1417,19 +1474,18 @@ export const partFaces = defineTable(function(context is Context, definition is 
     assert!(data.title.is_none() && data.header_bold);
     assert_eq!(data.rows.len(), t.rows.len());
     assert_eq!(data.rows[0][2], "Not set");
-    assert_eq!(data.col_align, vec![CellAlign::Left, CellAlign::Right, CellAlign::Left]);
+    // Live: the column's RIGHT alignment is ignored in drawings.
+    assert_eq!(data.col_align, vec![CellAlign::Left; 3]);
     let built = render_sheet_with(&drawing, 0, &sources, &ViewCache::default(), false, &info).unwrap();
     let txt = texts(&built);
     assert!(txt.iter().any(|s| s == "Faces") && txt.iter().any(|s| s == &data.rows[0][0]), "{txt:?}");
-    // Bottom to top: reversed, header last; an edited cell keeps its text.
-    if let TableKind::Custom { bottom_to_top, overrides, .. } = &mut drawing.sheets[0].tables[0].kind {
+    // Bottom to top: reversed, header last.
+    if let TableKind::Custom { bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {
         *bottom_to_top = true;
-        overrides.push((0, 2, "edited".into()));
     }
     let d2 = tables::table_data_with(&drawing, &drawing.sheets[0].tables[0], None, None, None, &info, &|s| s.to_string());
     assert!(d2.header_bottom);
     assert_eq!(d2.rows.last().map(|r| &r[0]), data.rows.first().map(|r| &r[0]));
-    assert_eq!((d2.rows[0][2].as_str(), d2.overridden.as_slice()), ("edited", &[(0, 2)][..]));
 }
 
 #[test]
@@ -1466,3 +1522,101 @@ fn jogged_extension_lines_and_broken_dimensions() {
     assert!((jog.points[1][1] + 15.0).abs() < 1e-9 && (jog.points[2][1] + 20.0).abs() < 1e-9, "45° jog from the middle: {:?}", jog.points);
     assert_eq!(g.grips.iter().filter(|gr| gr.pick == 1 && gr.kind == GripKind::Jog).count(), 2);
 }
+
+#[test]
+fn custom_template_border_zones_and_units() {
+    use super::templates::{DrawingTemplate, apply_template};
+    let zone_texts = |s: &Sheet| {
+        let mut g = sheet::SheetGeometry::new(s.size.size_mm().0, s.size.size_mm().1);
+        g.add_border_and_title(s);
+        // Zone labels sit in the 10 mm band along the left edge.
+        let left: Vec<(f64, String)> = g.texts.iter().filter(|t| t.pos[0] < 10.0).map(|t| (t.pos[1], t.text.clone())).collect();
+        let top: Vec<(f64, String)> = g.texts.iter().filter(|t| t.pos[1] > g.height - 10.0).map(|t| (t.pos[0], t.text.clone())).collect();
+        (left, top, g.lines.len())
+    };
+    let mut s = Sheet { size: SheetSize::AnsiB, title_style: TitleBlockStyle::None, ..Default::default() };
+    let (left, top, lines) = zone_texts(&s);
+    // ANSI B: 4 x 2, numbered from the right, lettered from the bottom.
+    assert_eq!(top.len(), 4);
+    assert_eq!(top.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "4");
+    assert_eq!(left.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "A");
+    // 6 x 3 zones starting top left.
+    s.format = SheetFormat { border: true, zones: Some([6, 3]), start: ZoneStart::TopLeft };
+    let (left, top, _) = zone_texts(&s);
+    assert_eq!(top.len(), 6);
+    assert_eq!(top.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "1");
+    assert_eq!(left.len(), 3);
+    assert_eq!(left.iter().max_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "A");
+    // No border: only the sheet edge.
+    s.format.border = false;
+    let (left, top, none) = zone_texts(&s);
+    assert!(left.is_empty() && top.is_empty() && none < lines);
+    // ISO A4 has no zones.
+    assert_eq!(SheetSize::A4.standard_zones(), [0, 0]);
+    assert_eq!(sheet::zone_letter(13), "N");
+    // A custom template sets the units, decimal separator and format.
+    let mut t = DrawingTemplate::standard("ISO A3", SheetSize::A3, TitleBlockStyle::Iso, false, Projection::FirstAngle);
+    t.units = Some(DimUnits::Centimeter);
+    t.decimal_comma = true;
+    t.format = SheetFormat { border: false, zones: None, start: ZoneStart::BottomRight };
+    let mut d = Drawing::default();
+    apply_template(&mut d, 0, &t);
+    assert_eq!(d.props.units, Some(DimUnits::Centimeter));
+    assert!(d.props.decimal_comma && d.units_mm && !d.sheets[0].format.border);
+    assert!(d.sheets[0].title_block.fields.iter().any(|(k, v)| k == "Units" && v == "CENTIMETERS"));
+}
+
+#[test]
+fn auto_centermarks_delete_one_by_one_and_edges_hide() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // New views get automatic centermarks (Onshape's templates; live
+    // Drawing properties › Views › Auto centermarks On).
+    let mut v = DrawingView::default();
+    ViewDefaults::default().apply(&mut v);
+    assert!(v.show_centerlines);
+    let top = ViewId(2);
+    drawing.sheets[0].view_mut(top).unwrap().show_centerlines = true;
+    let marks = |d: &Drawing| -> Vec<[i64; 2]> {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        b.picks.iter().filter_map(|p| match p {
+            PickTarget::AutoCentermark { view, center } if *view == top => Some(*center),
+            _ => None,
+        }).collect()
+    };
+    let all = marks(&drawing);
+    assert!(all.len() >= 3, "{all:?}");
+    drawing.sheets[0].view_mut(top).unwrap().deleted_centermarks.push(all[0]);
+    let left = marks(&drawing);
+    assert_eq!(left.len(), all.len() - 1);
+    assert!(!left.contains(&all[0]));
+    // Show/hide edges: a hidden model edge is left out of the view, and
+    // drawn grey (pickable) while the dialog is open.
+    let g = compute_view(&drawing, &drawing.sheets[0], top, &sources, &cache, false);
+    let me = &g.model_edges[g.edges.iter().find_map(|e| e.model.filter(|_| e.visible && matches!(e.class, EdgeClass::Sharp | EdgeClass::Outline))).unwrap() as usize];
+    let lines = |d: &Drawing| render_sheet(d, 0, &sources, &cache, false).unwrap().geometry.lines.len();
+    let before = lines(&drawing);
+    drawing.sheets[0].view_mut(top).unwrap().hidden_edges.push((me.body.clone(), (*me.name).clone()));
+    assert!(lines(&drawing) < before);
+    drawing.sheets[0].view_mut(top).unwrap().editing_edges = true;
+    let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(b.geometry.colors.iter().any(|c| c.rgb == [170, 170, 170]));
+}
+
+#[test]
+fn dimension_labels_draw_above_below_and_oval() {
+    use super::format::DimText;
+    use super::sheet::SheetGeometry;
+    let mut g = SheetGeometry::new(297.0, 210.0);
+    let t = DimText { main: "100".into(), above: Some("TYP".into()), below: Some("2X".into()), oval: true, ..Default::default() };
+    g.linear_dimension_text([20.0, 20.0], [120.0, 20.0], -10.0, DimOrientation::Horizontal, &t, 5);
+    let texts: Vec<&str> = g.texts.iter().filter(|x| x.pick == 5).map(|x| x.text.as_str()).collect();
+    assert!(texts.contains(&"100") && texts.contains(&"TYP") && texts.contains(&"2X"), "{texts:?}");
+    // TYP above the value, 2X below it.
+    let y = |s: &str| g.texts.iter().find(|x| x.text == s).unwrap().pos[1];
+    assert!(y("TYP") > y("100") && y("2X") < y("100"));
+    // The oval: one closed polyline around the value.
+    assert!(g.lines.iter().any(|l| l.pick == 5 && l.closed && l.points.len() > 20));
+}
+

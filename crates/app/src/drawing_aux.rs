@@ -146,7 +146,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(240.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
@@ -157,7 +157,7 @@ impl DrawingEditor {
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Auxiliary view"))
                         .child(div().id("auxe-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_aux_edit(cx))))
-                        .child(div().id("auxe-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("auxe-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.aux_edit = None;
                             cx.notify();
                         }))),
@@ -165,7 +165,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small()))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
                         .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("auxe-rev").label("Reverse").small().checked(reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some((_, d)) = &mut this.aux_edit {
                                 d.reverse = *v;
@@ -226,7 +226,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(240.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -246,14 +246,14 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                         ),
                 )
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small()))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
                         .child(h_flex().mt(px(3.)).child(tab("aux-normal", "Normal", 0, cx)).child(tab("aux-inline", "In line", 1, cx)).child(tab("aux-axis", "Axis", 2, cx)))
                         .child(
                             h_flex()

@@ -12,6 +12,7 @@ fn configured_depth_changes_volume() {
         name: "Size".into(),
         kind: ConfigInputKind::List { options: vec![ListOption { id: "thin".into(), name: "Thin".into() }, ListOption { id: "thick".into(), name: "Thick".into() }], default: "thin".into() },
         visible_when: None,
+        excluded: false,
     });
     ps.configuration.configured.push(ConfiguredParam {
         input: "size".into(),
@@ -38,6 +39,7 @@ fn configuration_variable_drives_expression() {
         name: "t".into(),
         kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("5 mm"), min: None, max: None },
         visible_when: None,
+        excluded: false,
     });
     ps.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("#t * 2")));
     let units = UnitPrefs::default();

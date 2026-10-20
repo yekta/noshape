@@ -37,6 +37,15 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     // parameters (the dialog's inputs, or propagated from this studio's own
     // inputs by Input propagation).
     let config = derived_configuration(ev.params);
+    // Live (psb 10-20 l): a second Derived of the same source in the same
+    // configuration fails (configurations compared with the source's
+    // defaults filled in).
+    let effective = |c: &crate::configuration::ConfigValues| provider.configuration(&tab).map(|sc| sc.effective(c)).unwrap_or_else(|| c.clone());
+    let mine = effective(&config);
+    let earlier = ev.features.iter().take_while(|f| f.id != ev.feature);
+    if earlier.filter(|f| f.type_id == "importDerived" && !f.suppressed && f.params.text("partStudio").trim() == tab).any(|f| effective(&derived_configuration(&f.params)) == mine) {
+        return err("Creating multiple Derived features from the same source and configuration is not allowed. Consider editing the previous Derived feature.");
+    }
     let src = if config.is_empty() { provider.context(&tab) } else { provider.context_configured(&tab, &config) };
     let Some(src) = src else {
         return err("The source Part Studio could not be regenerated (deleted, or a circular reference)");
@@ -152,19 +161,33 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             other => return err(format!("Unsupported import format .{other}")),
         }
     };
+    // The file's parts with what it says about each (names, colours).
+    let info: Vec<crate::features::importing::ImportPartInfo> = serde_json::from_str(ev.params.text("partInfo")).unwrap_or_default();
+    let shapes: Vec<(k::Shape, Option<crate::features::importing::ImportPartInfo>)> = match shapes.as_slice() {
+        [s] if !info.is_empty() && s.shape_type() == ShapeType::Compound && s.children().len() == info.len() => s.children().into_iter().zip(info.into_iter().map(Some)).collect(),
+        _ => shapes.into_iter().map(|s| (s, None)).collect(),
+    };
+    let appearances = ev.bool("importAppearances");
     let up = ev.bool("yAxisIsUp");
     let mut tools = Vec::new();
+    // Per tool: its name, colour and faces' colours (sub-shapes of it).
+    let mut looks: Vec<Look> = Vec::new();
+    let mut wires: Vec<(k::Shape, Look)> = Vec::new();
     // Mesh imports (STL, OBJ, PVZ; Onshape G22/G27): per part, its closed
     // pieces make a mesh part; the open pieces of a part whose mesh doesn't
     // close become surfaces grouped in a closed composite part.
     let mut open_groups: Vec<Vec<k::Shape>> = Vec::new();
-    for s in shapes {
+    for (s, part) in shapes {
         let s = if up { s.transformed(&k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::X, angle: std::f64::consts::FRAC_PI_2 })? } else { s };
+        let part = part.unwrap_or_default();
+        let colored_faces: Vec<(k::Shape, [f32; 3])> = part.faces.iter().filter_map(|&(i, c)| Some((s.sub_shape(ShapeType::Face, i).ok()?, c))).collect();
         if s.is_mesh() {
             let children = s.children();
             let parts = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
             for part in parts {
-                tools.extend(part.solids());
+                let solids = part.solids();
+                looks.extend(solids.iter().map(|_| Look::default()));
+                tools.extend(solids);
                 let open: Vec<k::Shape> = part.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
                 if !open.is_empty() {
                     open_groups.push(open);
@@ -176,23 +199,33 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         let parts = if s.count(ShapeType::Solid) > 0 { s.solids() } else if s.count(ShapeType::Shell) > 0 { s.shells() } else { vec![s] };
         for p in parts {
             if p.count(ShapeType::Face) == 0 {
+                // Wire bodies come in as curves ("Curve 1", live G38/G38d).
+                if p.count(ShapeType::Edge) > 0 {
+                    wires.push((p, Look { name: part.name.clone(), color: part.color, faces: Vec::new() }));
+                }
                 continue;
             }
+            let faces = colored_faces.iter().filter(|(f, _)| p.index_of(f, ShapeType::Face).is_some()).cloned().collect();
+            looks.push(Look { name: part.name.clone(), color: part.color, faces });
             tools.push(p);
         }
     }
-    if tools.is_empty() && open_groups.is_empty() {
+    if tools.is_empty() && open_groups.is_empty() && wires.is_empty() {
         return err("The imported file contains no parts or surfaces");
     }
     // "Join adjacent surfaces": sew the surface bodies along shared edges
     // (closed results become solids).
     if ev.bool("joinAdjacentSurfaces") {
-        let (solids, surfaces): (Vec<k::Shape>, Vec<k::Shape>) = tools.into_iter().partition(|t| t.count(ShapeType::Solid) > 0);
-        tools = solids;
+        let (solids, surfaces): (Vec<Tool>, Vec<Tool>) = tools.into_iter().zip(std::mem::take(&mut looks)).partition(|t| t.0.count(ShapeType::Solid) > 0);
+        (tools, looks) = solids.into_iter().unzip();
+        let surfaces: Vec<k::Shape> = surfaces.into_iter().map(|t| t.0).collect();
         if surfaces.len() > 1 {
             let sewn = k::sew(&surfaces, 1e-6, true)?.shape;
-            tools.extend(if sewn.count(ShapeType::Solid) > 0 { sewn.solids() } else if sewn.count(ShapeType::Shell) > 0 { sewn.shells() } else { vec![sewn] });
+            let joined = if sewn.count(ShapeType::Solid) > 0 { sewn.solids() } else if sewn.count(ShapeType::Shell) > 0 { sewn.shells() } else { vec![sewn] };
+            looks.extend(joined.iter().map(|_| Look::default()));
+            tools.extend(joined);
         } else {
+            looks.extend(surfaces.iter().map(|_| Look::default()));
             tools.extend(surfaces);
         }
     }
@@ -209,9 +242,20 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         }
         Ok(())
     };
-    for p in tools {
+    for (p, look) in tools.into_iter().zip(looks) {
         let kind = if p.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
+        let before = ev.ctx.bodies.len();
         add(ev, p, kind)?;
+        for bi in before..ev.ctx.bodies.len() {
+            apply_look(ev, bi, &look, appearances);
+        }
+    }
+    for (p, look) in wires {
+        let before = ev.ctx.bodies.len();
+        add(ev, p, BodyKind::Wire)?;
+        for bi in before..ev.ctx.bodies.len() {
+            apply_look(ev, bi, &look, appearances);
+        }
     }
     for (gi, group) in open_groups.into_iter().enumerate() {
         let before = ev.ctx.bodies.len();
@@ -225,6 +269,43 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
     }
     Ok(())
+}
+
+/// An imported part's shape with what the file says about it.
+type Tool = (k::Shape, Look);
+
+/// What an imported file says about one of its parts.
+#[derive(Clone, Default)]
+struct Look {
+    name: Option<String>,
+    color: Option<[f32; 3]>,
+    faces: Vec<(k::Shape, [f32; 3])>,
+}
+
+/// sRGB (0..1) as linear RGBA.
+fn linear(c: [f32; 3]) -> [f32; 4] {
+    let l = |v: f32| if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) };
+    [l(c[0]), l(c[1]), l(c[2]), 1.0]
+}
+
+/// Give an imported part the file's name, and with "Import appearances"
+/// its colours (the part's and its faces' own).
+fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
+    if let Some(name) = look.name.as_ref().filter(|n| !n.trim().is_empty()) {
+        ev.ctx.bodies[bi] = std::sync::Arc::new(ev.ctx.bodies[bi].renamed(name.clone()));
+    }
+    if !appearances {
+        return;
+    }
+    let body = ev.ctx.bodies[bi].clone();
+    if let Some(c) = look.color {
+        ev.ctx.part_appearance.insert(body.id.clone(), linear(c));
+    }
+    for (face, c) in &look.faces {
+        if let Some(fi) = body.shape.index_of(face, ShapeType::Face) {
+            ev.ctx.face_appearance.push((body.id.clone(), body.faces[fi].clone(), linear(*c)));
+        }
+    }
 }
 
 pub fn decal(_ev: &mut EvalCtx) -> FResult<()> {

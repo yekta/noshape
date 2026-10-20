@@ -163,7 +163,7 @@ impl AssemblyView {
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_reflection(false, cx))),
                     ),
             )
@@ -268,7 +268,7 @@ impl AssemblyView {
                 .child(h_flex().flex_1().border_b_1().border_color(rgb(0xd7d7d7)).child(div().flex_1().text_color(pal.text).child(value)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., pal.text)))
         };
         let button = |id: &'static str, label: &'static str| div().id(id).px(px(12.)).py(px(4.)).border_1().border_color(rgb(0xbdbdbd)).rounded(px(2.)).text_size(px(13.)).cursor_pointer().hover(|d| d.bg(pal.panel_hover)).child(label);
-        let mut body = v_flex().flex_1().p(px(6.)).gap(px(6.)).child(div().border_1().border_color(rgb(0xbdbdbd)).rounded(px(2.)).child(Input::new(&search).appearance(false).small()));
+        let mut body = v_flex().flex_1().p(px(6.)).gap(px(6.)).child(gpui_kit::base::input::input_frame(div().border_1().border_color(rgb(0xbdbdbd)).rounded(px(2.)).child(Input::new(&search).appearance(false).small())));
         match tab {
             2 => {
                 let view = cx.entity();

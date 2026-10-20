@@ -280,6 +280,7 @@ pub fn display_bodies(c: &AssemblyContext, bodies: &[Arc<Body>]) -> Vec<crate::d
             bounds,
             composite: None,
             is_mesh: b.shape.is_mesh(),
+            face_colors: Vec::new(),
         });
     }
     out

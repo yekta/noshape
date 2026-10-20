@@ -8,7 +8,6 @@
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
@@ -45,7 +44,24 @@ pub enum DialogEvent {
     /// Tab past the last control (`forward`) or Shift+Tab before the first
     /// one: the focus leaves the dialog (live: to the navbar / to <body>).
     LeaveFocus { forward: bool },
+    /// The "Create variable" popup's ✓ (live part-studio/153): a Variable
+    /// feature (or, `configuration`, a configuration variable) named `name`.
+    CreateVariable { name: String, kind: &'static str, value: String, description: String, configuration: bool },
 }
+
+/// The "Create variable" popup of a numeric field (live
+/// dom/dialog-create-variable-popup.txt).
+struct CreateVar {
+    path: String,
+    configuration: bool,
+    /// LENGTH, ANGLE, NUMBER, ANY.
+    kind: usize,
+    name: Entity<InputState>,
+    value: Entity<InputState>,
+    description: Entity<InputState>,
+}
+
+const CREATE_VAR_KINDS: [(&str, &str); 4] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any")];
 
 pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
 
@@ -53,10 +69,7 @@ pub type RefLabeler = Arc<dyn Fn(&Reference) -> String + Send + Sync>;
 #[derive(Clone, Debug)]
 pub struct DerivedSource {
     pub tab: String,
-    pub name: String,
     pub parts: Vec<(noshape_model::BodyId, String)>,
-    /// A configured source's configuration (its inputs show in the dialog).
-    pub configuration: noshape_model::configuration::Configuration,
 }
 
 pub struct FeatureDialog {
@@ -104,8 +117,6 @@ pub struct FeatureDialog {
     pub ref_gpu: Option<crate::gpu::Gpu>,
     /// Preview the end of the history instead of rolling to this feature.
     pub show_final: bool,
-    /// "Other document…" chooser: the document, the selected version index.
-    ext_pick: Option<(crate::derived::ExternalDocInfo, usize)>,
     /// Resolved external source: key, label, parts, newer version.
     ext_info: Option<ExtInfo>,
     ext_task: Option<Task<()>>,
@@ -135,6 +146,8 @@ pub struct FeatureDialog {
     pub sketch_region_count: Arc<dyn Fn(FeatureId) -> usize + Send + Sync>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
+    /// Open "Create variable" popup.
+    create_var: Option<CreateVar>,
     /// Field text when it was focused or last applied with Enter: Enter
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
@@ -165,7 +178,6 @@ pub type DialogExtra = Arc<dyn Fn(&mut Window, &mut Context<FeatureDialog>) -> (
 #[derive(Clone)]
 struct ExtInfo {
     key: String,
-    label: String,
     parts: Vec<(noshape_model::BodyId, String)>,
     newer: Option<crate::derived::VersionChoice>,
 }
@@ -230,7 +242,6 @@ impl FeatureDialog {
             ref_except: String::new(),
             ref_gpu: None,
             show_final: false,
-            ext_pick: None,
             ext_info: None,
             ext_task: None,
             user_set: Default::default(),
@@ -244,6 +255,7 @@ impl FeatureDialog {
             missing: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             completion: None,
+            create_var: None,
             extra: None,
         };
         d.active_query = d.first_visible_query();
@@ -858,6 +870,14 @@ impl FeatureDialog {
     /// field and close the list.
     fn accept_completion(&mut self, index: Option<usize>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(c) = self.completion.take() else { return };
+        // "New variable…" opens the Create variable popup (live 153).
+        if c.picks_new(index)
+            && let Some(name) = c.new_variable.clone()
+        {
+            self.open_create_variable(c.key.clone(), name, window, cx);
+            cx.notify();
+            return;
+        }
         let Some(state) = self.inputs.get(&c.key).cloned() else { return };
         if let Some(text) = c.accept(index, &state, window, cx) {
             self.on_text_changed(&c.key, text, cx);
@@ -872,7 +892,7 @@ impl FeatureDialog {
     fn completion_keys(&self, el: Stateful<Div>, path: &str, cx: &mut Context<Self>) -> Stateful<Div> {
         use gpui_kit::component::input::{Enter, Escape, MoveDown, MoveUp};
         let open = |this: &Self, p: &str| this.completion.as_ref().is_some_and(|c| c.key == p);
-        let (p1, p2, p3, p4) = (path.to_string(), path.to_string(), path.to_string(), path.to_string());
+        let (p1, p2, p3, p4, p5) = (path.to_string(), path.to_string(), path.to_string(), path.to_string(), path.to_string());
         el.capture_action(cx.listener(move |this, _: &MoveUp, _, cx| {
             if open(this, &p1) {
                 cx.stop_propagation();
@@ -904,6 +924,140 @@ impl FeatureDialog {
                 cx.notify();
             }
         }))
+        // Tab accepts too (live 152: "Tab/Enter").
+        .capture_action(cx.listener(move |this, _: &crate::actions::DialogTab, window, cx| {
+            if open(this, &p5) {
+                cx.stop_propagation();
+                this.accept_completion(None, window, cx);
+            }
+        }))
+    }
+
+    /// The "Create variable" popup for field `path`: Name `name`, Value the
+    /// default length selected (live 153: "1 in"), Feature / Length tabs.
+    fn open_create_variable(&mut self, path: String, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let value_text = noshape_model::params::default_expr(&noshape_model::params::NumSpec::length(25.0, 1.0), &self.units).text;
+        let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let value = cx.new(|cx| InputState::new(window, cx).default_value(value_text));
+        let description = cx.new(|cx| InputState::new(window, cx));
+        value.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.create_var = Some(CreateVar { path, configuration: false, kind: 0, name, value, description });
+    }
+
+    /// The "Create variable" popup (live part-studio/153, dom/dialog-create-
+    /// variable-popup.txt): 220 px, right of the field and level with it;
+    /// title + ✓ ✕; tabs Feature | Configuration and Length | Angle |
+    /// Number | Any; Name, Value, Description.
+    fn render_create_variable(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let Some(c) = &self.create_var else { return div().into_any_element() };
+        let blue = gpui_kit::rgb(0x1651b0);
+        let tab = |id: SharedString, label: &'static str, on: bool, w: f32| {
+            div()
+                .id(id)
+                .w(px(w))
+                .h(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .text_size(px(12.))
+                .when(on, |d| d.font_weight(FontWeight::MEDIUM).text_color(blue).border_b_2().border_color(blue))
+                .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                .child(label)
+        };
+        let target = h_flex()
+            .child(tab("cv-feature".into(), "Feature", !c.configuration, 95.).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(c) = &mut this.create_var {
+                    c.configuration = false;
+                }
+                cx.notify();
+            })))
+            .child(tab("cv-config".into(), "Configuration", c.configuration, 125.).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(c) = &mut this.create_var {
+                    c.configuration = true;
+                }
+                cx.notify();
+            })));
+        let widths = [60., 53., 65., 42.];
+        let mut kinds = h_flex();
+        for (i, (_, label)) in CREATE_VAR_KINDS.iter().enumerate() {
+            kinds = kinds.child(tab(SharedString::from(format!("cv-kind-{i}")), label, c.kind == i, widths[i]).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                if let Some(c) = &mut this.create_var {
+                    c.kind = i;
+                }
+                cx.notify();
+            })));
+        }
+        let row = |label: &'static str, st: &Entity<InputState>| {
+            h_flex()
+                .h(px(26.))
+                .w(px(194.))
+                .child(div().flex_none().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
+                .child(gpui_kit::base::input::input_frame(div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(st).small().appearance(false).text_size(px(13.33)))))
+        };
+        let popup = v_flex()
+            .id("create-variable")
+            .occlude()
+            .w(px(220.))
+            .bg(gpui_kit::rgb(0xffffff))
+            .shadow_md()
+            .text_color(pal.text)
+            // Enter commits, Esc cancels (like a feature dialog).
+            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| match e.keystroke.key.as_str() {
+                "enter" => {
+                    cx.stop_propagation();
+                    this.commit_create_variable(cx);
+                }
+                "escape" => {
+                    cx.stop_propagation();
+                    this.create_var = None;
+                    cx.notify();
+                }
+                _ => {}
+            }))
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .border_b_1()
+                    .border_color(gpui_kit::rgb(0xd7d7d7))
+                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Create variable"))
+                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009400)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_create_variable(cx))))
+                    .child(div().id("cv-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.create_var = None;
+                        cx.notify();
+                    }))),
+            )
+            .child(target)
+            .child(kinds)
+            .child(row("Name", &c.name))
+            .child(row("Value", &c.value))
+            .child(row("Description", &c.description));
+        // Anchored at a zero-size box under the field: up beside it.
+        div().relative().w_full().h_0().child(deferred(anchored().offset(point(px(107.), px(-40.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
+    }
+
+    /// ✓: create the variable; the field then resolves.
+    fn commit_create_variable(&mut self, cx: &mut Context<Self>) {
+        let Some(c) = self.create_var.take() else { return };
+        let name = c.name.read(cx).value().trim().trim_start_matches('#').to_string();
+        let value = c.value.read(cx).value().to_string();
+        let kind = CREATE_VAR_KINDS[c.kind].0;
+        if let Some(dim) = match kind {
+            "LENGTH" => Some(noshape_units::Dim::LENGTH),
+            "ANGLE" => Some(noshape_units::Dim::ANGLE),
+            "NUMBER" => Some(noshape_units::Dim::UNITLESS),
+            _ => None,
+        } && let Ok(q) = noshape_units::evaluate_as(&value, dim, &self.units, &self.variables)
+        {
+            self.variables.insert(name.clone(), q);
+        }
+        cx.emit(DialogEvent::CreateVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration });
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
     }
 
     fn on_text_changed(&mut self, path: &str, text: String, cx: &mut Context<Self>) {
@@ -1319,12 +1473,11 @@ impl FeatureDialog {
                         let (t1, t2) = (toggle.clone(), toggle);
                         let focus = self.tab_stop(&format!("cb:{path}"), cx);
                         let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), "", on, focus.is_focused(window))
-                            .child(div().flex_1().min_w_0().ml(px(-4.)).child(s.label))
+                            // Live (psb 10-20 l, part-studio/402): a long label stays
+                            // on one line, clipped with an ellipsis ("Preserve active
+                            // sheet meta…"), no tooltip.
+                            .child(div().flex_1().min_w_0().ml(px(-4.)).truncate().child(s.label))
                             .rounded(px(2.))
-                            // Long labels wrap inside the dialog (HTML labels do),
-                            // e.g. Derived's "Preserve active sheet metal models".
-                            .h_auto()
-                            .min_h(px(27.))
                             .flex_shrink(1.)
                             .min_w_0()
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| t1(this, cx)));
@@ -2013,97 +2166,17 @@ impl FeatureDialog {
     fn render_derived_picker(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let current = self.feature.params.text("partStudio").to_string();
-        let selected_parts: Vec<noshape_model::BodyId> = self.feature.params.query("parts").iter().filter_map(|r| match r {
-            Reference::Body(b) => Some(b.clone()),
-            _ => None,
-        }).collect();
-        let sources = self.derived_sources.clone();
         let external = crate::derived::ExternalRef::parse(&current);
         if let Some(r) = &external {
             self.resolve_external(r.clone(), cx);
         }
         let ext_info = self.ext_info.clone().filter(|i| i.key == current);
-        let label = match (&external, &ext_info) {
-            (Some(_), Some(i)) => i.label.clone(),
-            (Some(_), None) => "Loading other document…".into(),
-            _ => sources.iter().find(|s| s.tab == current).map(|s| s.name.clone()).unwrap_or_else(|| "Select a Part Studio".into()),
-        };
-        let view = cx.entity();
-        let picker = Button::new("derived-src")
-            .label(label)
-            .outline()
-            .small()
-            .dropdown_caret(true)
-            .dropdown_menu({
-                let sources = sources.clone();
-                move |mut m, _, _| {
-                    if sources.is_empty() {
-                        m = m.label("No other Part Studios in this document");
-                    }
-                    for s in &sources {
-                        let v = view.clone();
-                        let tab = s.tab.clone();
-                        m = m.item(gpui_kit::component::menu::PopupMenuItem::new(s.name.clone()).on_click(move |_, _, cx| {
-                            v.update(cx, |this, cx| {
-                                this.feature.params.set("parts", ParamValue::Query(Vec::new()));
-                                // A new source starts in its default configuration.
-                                this.feature.params.0.retain(|k, _| !k.starts_with(noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX));
-                                this.set_value("partStudio", ParamValue::Text(tab.clone()), cx);
-                            })
-                        }));
-                    }
-                    let v = view.clone();
-                    m.separator().item(gpui_kit::component::menu::PopupMenuItem::new("Other document…").on_click(move |_, window, cx| {
-                        let v = v.clone();
-                        crate::files::request_open_path("Derive from document", "noshape documents", &["noshape"], window, cx, move |path, cx| {
-                            v.update(cx, |this, cx| {
-                                match crate::derived::external_doc_info(&path) {
-                                    Ok(info) => this.ext_pick = Some((info, 0)),
-                                    Err(e) => this.status = Some((FeatureStatus::Error, format!("Could not open {}: {e:#}", path.display()))),
-                                }
-                                cx.notify();
-                            });
-                        });
-                    }))
-                }
-            });
-        let parts = match &ext_info {
-            Some(i) => i.parts.clone(),
-            None => sources.iter().find(|s| s.tab == current).map(|s| s.parts.clone()).unwrap_or_default(),
-        };
-        let checks: Vec<AnyElement> = parts
-            .into_iter()
-            .map(|(id, name)| {
-                let on = selected_parts.is_empty() || selected_parts.contains(&id);
-                let id2 = id.clone();
-                gpui_kit::component::checkbox::Checkbox::new(SharedString::from(format!("dp-{id}")))
-                    .label(name)
-                    .checked(on)
-                    .small()
-                    .on_click(cx.listener(move |this, v: &bool, _, cx| {
-                        let src = this.feature.params.text("partStudio").to_string();
-                        let all: Vec<noshape_model::BodyId> = match this.ext_info.as_ref().filter(|i| i.key == src) {
-                            Some(i) => i.parts.iter().map(|p| p.0.clone()).collect(),
-                            None => this.derived_sources.iter().find(|s| s.tab == src).map(|s| s.parts.iter().map(|p| p.0.clone()).collect()).unwrap_or_default(),
-                        };
-                        let mut sel: Vec<noshape_model::BodyId> = this.feature.params.query("parts").iter().filter_map(|r| match r {
-                            Reference::Body(b) => Some(b.clone()),
-                            _ => None,
-                        }).collect();
-                        if sel.is_empty() {
-                            sel = all.clone();
-                        }
-                        sel.retain(|b| *b != id2);
-                        if *v {
-                            sel.push(id2.clone());
-                        }
-                        // All selected is stored as "all parts" (empty).
-                        let q = if sel.len() == all.len() { Vec::new() } else { sel.into_iter().map(Reference::Body).collect() };
-                        this.set_value("parts", ParamValue::Query(q), cx);
-                    }))
-                    .into_any_element()
-            })
-            .collect();
+        // Live (part-studio/403–418): the "Part Studio" field opens the
+        // Select Part Studio panel (shared with FeatureScript references),
+        // where the studio or one of its parts is picked and a configured
+        // studio's inputs are set (Generate); none of it shows in the dialog.
+        let value = self.derived_reference_value();
+        let field = self.render_reference_field("Part Studio", "partStudio", noshape_model::params::ReferenceKind::PartStudio, &value, cx);
         let update = ext_info.as_ref().and_then(|i| i.newer.clone()).zip(external.clone()).map(|(newer, r)| {
             h_flex()
                 .gap_2()
@@ -2119,62 +2192,56 @@ impl FeatureDialog {
                 })))
                 .into_any_element()
         });
-        let chooser = self.render_ext_chooser(cx);
-        // A configured source: its inputs (lists and checkboxes; hidden ones
-        // per its visibility conditions), like the Insert dialog's expanded
-        // configured Part Studio ("Size ▾ Default").
-        let config_rows = self.render_derived_configuration(&sources, &current, cx);
-        v_flex()
-            .gap_1p5()
-            .w_full()
-            .child(div().text_xs().text_color(pal.text_muted).child("Part Studio"))
-            .child(picker)
-            .children(config_rows)
-            .children(chooser)
-            .children(update)
-            .children(checks)
-            .into_any_element()
+        v_flex().w_full().child(field).children(update).into_any_element()
     }
 
-    fn render_derived_configuration(&mut self, sources: &[DerivedSource], current: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        use noshape_model::configuration::ConfigInputKind;
-        use noshape_model::regen::features::importing::{DERIVED_CONFIG_PREFIX, derived_configuration};
-        let pal = p();
-        let Some(cfg) = sources.iter().find(|s| s.tab == current).map(|s| s.configuration.clone()).filter(|c| !c.inputs.is_empty()) else { return Vec::new() };
-        let chosen = derived_configuration(&self.feature.params);
-        let (vis, eff) = cfg.visibility(&chosen);
-        let mut rows = Vec::new();
-        for (input, v) in cfg.inputs.iter().zip(&vis) {
-            if !v.visible {
-                continue;
+    /// The Derived source as a reference value for the panel: `tab[#part]`,
+    /// then the source configuration after a tab (`input=value;…`).
+    pub(crate) fn derived_reference_value(&self) -> String {
+        let studio = self.feature.params.text("partStudio").to_string();
+        let parts: Vec<String> = self.feature.params.query("parts").iter().filter_map(|r| match r {
+            Reference::Body(b) => Some(b.to_string()),
+            _ => None,
+        }).collect();
+        let base = match (parts.as_slice(), studio.strip_prefix("ext:")) {
+            ([one], Some(rest)) => {
+                let mut it = rest.splitn(3, '|');
+                match (it.next(), it.next(), it.next()) {
+                    (Some(mv), Some(tab), Some(path)) => format!("ext:{mv}|{tab}#{one}|{path}"),
+                    _ => studio.clone(),
+                }
             }
-            let key = format!("{DERIVED_CONFIG_PREFIX}{}", input.id);
-            let value = eff.0.get(&input.id).cloned().unwrap_or_default();
-            let control: AnyElement = match &input.kind {
-                ConfigInputKind::List { options, .. } => {
-                    let items = options.iter().filter(|o| v.options.contains(&o.id)).map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
-                    let k = key.clone();
-                    self.os_select(&key, items, &value, move |this, id, cx| this.set_value(&k, ParamValue::Text(id.to_string()), cx), cx).into_any_element()
-                }
-                ConfigInputKind::Checkbox { .. } => {
-                    let on = value == "true";
-                    let k = key.clone();
-                    crate::ui::os_checkbox(SharedString::from(format!("dcfg-{}", input.id)), "", on)
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&k, ParamValue::Text((!on).to_string()), cx)))
-                        .into_any_element()
-                }
-                _ => continue,
-            };
-            rows.push(
-                h_flex()
-                    .w_full()
-                    .gap(px(6.))
-                    .child(div().w(px(80.)).flex_none().truncate().text_size(px(12.)).text_color(pal.text_muted).child(input.name.clone()))
-                    .child(div().flex_1().min_w_0().child(control))
-                    .into_any_element(),
-            );
+            ([one], None) => format!("{studio}#{one}"),
+            _ => studio.clone(),
+        };
+        let cfg = noshape_model::regen::features::importing::derived_configuration(&self.feature.params);
+        if cfg.0.is_empty() {
+            return base;
         }
-        rows
+        let pairs: Vec<String> = cfg.0.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        format!("{base}\t{}", pairs.join(";"))
+    }
+
+    /// A pick in the Select Part Studio panel: the studio (or one of its
+    /// parts) and its configuration become the Derived parameters.
+    pub(crate) fn pick_derived_source(&mut self, value: &str, cx: &mut Context<Self>) {
+        use noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX;
+        let (base, cfg) = value.split_once('\t').unwrap_or((value, ""));
+        let (key, part) = split_part_value(base);
+        let body = part.and_then(|p| {
+            let local = self.derived_sources.iter().find(|s| s.tab == key).and_then(|s| s.parts.iter().find(|(b, _)| b.to_string() == p).map(|(b, _)| b.clone()));
+            local.or_else(|| self.ext_info.as_ref().filter(|i| i.key == key).and_then(|i| i.parts.iter().find(|(b, _)| b.to_string() == p).map(|(b, _)| b.clone())))
+        });
+        self.feature.params.0.retain(|k, _| !k.starts_with(DERIVED_CONFIG_PREFIX));
+        for kv in cfg.split(';').filter(|s| !s.is_empty()) {
+            if let Some((k, v)) = kv.split_once('=') {
+                self.feature.params.set(&format!("{DERIVED_CONFIG_PREFIX}{k}"), ParamValue::Text(v.to_string()));
+            }
+        }
+        self.feature.params.set("parts", ParamValue::Query(body.into_iter().map(Reference::Body).collect()));
+        // Clicking the selected studio again clears the field (live).
+        let key = if key.is_empty() { String::new() } else { key };
+        self.set_value("partStudio", ParamValue::Text(key), cx);
     }
 
     /// Load the label, parts and update status of an external source in the background.
@@ -2187,10 +2254,9 @@ impl FeatureDialog {
             let r2 = r.clone();
             let info = cx
                 .background_spawn(async move {
-                    let label = crate::derived::describe_external(&r2);
                     let parts = crate::derived::external_context(&r2).map(|c| c.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect()).unwrap_or_default();
                     let newer = crate::derived::newer_version(&r2);
-                    ExtInfo { key: r2.key(), label, parts, newer }
+                    ExtInfo { key: r2.key(), parts, newer }
                 })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
@@ -2199,65 +2265,6 @@ impl FeatureDialog {
                 cx.notify();
             });
         }));
-    }
-
-    /// Version and Part Studio chooser shown after picking another document.
-    fn render_ext_chooser(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (info, vi) = self.ext_pick.clone()?;
-        let pal = p();
-        let version = info.versions.get(vi)?.clone();
-        let studios: Vec<(String, String)> = crate::derived::external_snapshot(&info.path, version.microversion)
-            .map(|d| crate::derived::DocStudios::sources(&d))
-            .unwrap_or_default();
-        let view = cx.entity();
-        let versions = info.versions.clone();
-        let version_menu = Button::new("ext-version").label(version.label.clone()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-            for (i, v) in versions.iter().enumerate() {
-                let view = view.clone();
-                m = m.item(gpui_kit::component::menu::PopupMenuItem::new(v.label.clone()).checked(i == vi).on_click(move |_, _, cx| {
-                    view.update(cx, |this, cx| {
-                        if let Some(p) = &mut this.ext_pick {
-                            p.1 = i;
-                        }
-                        cx.notify();
-                    })
-                }));
-            }
-            m
-        });
-        let rows: Vec<AnyElement> = studios
-            .into_iter()
-            .map(|(tab, name)| {
-                let r = crate::derived::ExternalRef { path: info.path.clone(), microversion: version.microversion, tab: tab.clone() };
-                div()
-                    .id(SharedString::from(format!("ext-{tab}")))
-                    .px_2()
-                    .py_1()
-                    .rounded_sm()
-                    .text_xs()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(name)
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.ext_pick = None;
-                        this.feature.params.set("parts", ParamValue::Query(Vec::new()));
-                        this.set_value("partStudio", ParamValue::Text(r.key()), cx);
-                    }))
-                    .into_any_element()
-            })
-            .collect();
-        let empty = rows.is_empty();
-        Some(
-            v_flex()
-                .gap_1()
-                .p_1p5()
-                .rounded_md()
-                .border_1()
-                .border_color(pal.border_strong)
-                .child(h_flex().gap_2().child(div().flex_1().text_xs().font_weight(FontWeight::SEMIBOLD).truncate().child(info.name.clone())).child(version_menu))
-                .when(empty, |d| d.child(div().text_xs().text_color(pal.text_faint).child("No Part Studios in this version")))
-                .children(rows)
-                .into_any_element(),
-        )
     }
 
     /// Input element for a numeric or text value.
@@ -2305,6 +2312,12 @@ impl FeatureDialog {
         let path_s = path.to_string();
         let st2 = state.clone();
         let st3 = state.clone();
+        let create_var_popup = self.create_var.as_ref().is_some_and(|c| c.path == path).then(|| self.render_create_variable(cx));
+        // Live (part-studio/155): a value that doesn't evaluate (bad syntax,
+        // an unknown #variable) is pink with a red underline and the hover
+        // tooltip "Enter a valid expression.".
+        let unresolved = num.is_some_and(|n| !focused && !text.trim().is_empty() && noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).is_err());
+        let invalid = err.is_some() || unresolved;
         let field = v_flex().id(SharedString::from(format!("num-{path}")));
         let field = self.completion_keys(field, path, cx);
         // Enter in a changed field applies it; the next Enter commits.
@@ -2329,16 +2342,18 @@ impl FeatureDialog {
                 .gap_0p5()
                 // Onshape underline field: no box, 1 px #d7d7d7 underline (blue on hover/focus),
                 // invalid values get a pink fill and red underline (§3.9, §4.2).
-                .child(
+                // The whole field box takes clicks and shows the I-beam.
+                .child(gpui_kit::base::input::input_frame(
                     div()
+                        .id(SharedString::from(format!("numf-{path}")))
                         .border_b_1()
-                        .border_color(if err.is_some() { pal.error } else { pal.border })
-                        .when(err.is_some(), |d| d.bg(pal.error_fill))
+                        .border_color(if invalid { pal.error } else { pal.border })
+                        .when(invalid, |d| d.bg(pal.error_fill).tooltip(crate::ui::tooltip("Enter a valid expression.")))
                         .hover(|d| d.border_color(pal.accent))
                         // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
                         // (A 1 px border plus a 1 px inset line above it, so
                         // the underline thickens upward like live's inset shadow.)
-                        .when(focused && err.is_none(), |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))
+                        .when(focused && !invalid, |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))
                         // The input stays in the tree (so clicks and Tab can
                         // focus it); unfocused, the converted value covers it.
                         .relative()
@@ -2364,12 +2379,12 @@ impl FeatureDialog {
                                     })),
                             )
                         }),
-                )
+                ))
                 .when_some(self.completion.as_ref().filter(|c| c.key == path), |d, c| {
                     let view = cx.entity();
                     d.child(c.render(&self.variables, &self.units, move |i, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(i), window, cx))))
                 })
-                .when_some(err, |d, e| d.child(div().text_xs().text_color(pal.text_invalid).child(e)))
+                .children(create_var_popup)
                 .when_some(hint, |d, h| d.child(div().text_xs().text_color(pal.text_faint).child(format!("= {h}"))))
                 .when_some(num, |d, n| {
                     // Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1.
@@ -2604,8 +2619,9 @@ impl Render for FeatureDialog {
                             .p_0()
                             .rounded(px(0.))
                             .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
-                            // Live (dom/cursors.txt): the disabled ✓ shows the default arrow.
-                            .when(invalid, |b| b.cursor(CursorStyle::Arrow))
+                            // Live (dom/cursors.txt): ✓ and ✗ show the default arrow
+                            // (`.ns-dialog-button-ok/-cancel`), enabled or not.
+                            .cursor(CursorStyle::Arrow)
                             .tooltip("Accept (Enter)")
                             // Onshape: the ✓ is disabled while the feature errors
                             // (Enter still commits it).
@@ -2624,6 +2640,7 @@ impl Render for FeatureDialog {
                             .h(px(28.))
                             .p_0()
                             .rounded(px(0.))
+                            .cursor(CursorStyle::Arrow)
                             .tooltip("Cancel (Esc)")
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Cancel))),
                     ),
@@ -2831,3 +2848,22 @@ impl Render for DialogMoveGhost {
 /// text (the model reads them for hole callouts and fits).
 pub use noshape_model::fits::Tolerance;
 
+/// A Part Studio reference value split into the studio key and the picked
+/// part: `tab#part`, or `ext:<microversion>|<tab>#<part>|<path>` (as the
+/// model's FeatureScript references store it).
+fn split_part_value(value: &str) -> (String, Option<String>) {
+    if let Some(rest) = value.strip_prefix("ext:") {
+        let mut it = rest.splitn(3, '|');
+        if let (Some(mv), Some(tab), Some(path)) = (it.next(), it.next(), it.next()) {
+            let (tab, part) = match tab.split_once('#') {
+                Some((t, p)) => (t, Some(p.to_string())),
+                None => (tab, None),
+            };
+            return (format!("ext:{mv}|{tab}|{path}"), part);
+        }
+    }
+    match value.split_once('#') {
+        Some((t, p)) => (t.to_string(), Some(p.to_string())),
+        None => (value.to_string(), None),
+    }
+}

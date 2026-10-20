@@ -980,6 +980,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         bounds,
         composite: None,
         is_mesh: false,
+        face_colors: Vec::new(),
     };
     ctx.bodies = vec![Arc::new(body)];
     let mut display = studio.display.clone();

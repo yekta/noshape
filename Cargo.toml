@@ -91,4 +91,12 @@ gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
 # Only the lines marked "NOSHAPE PATCH" in src/input/mod.rs,
 # src/input/base/element.rs, src/input/base/state.rs and
 # src/input/editor/highlighting.rs differ from 0.7.3.
+# NOSHAPE PATCH (agent ui): the whole input box (padding included, or an
+# app's own box marked with `input::input_frame`) takes presses and shows the
+# I-beam, as in browsers (src/input/base/frame_hit.rs, src/input/base/mod.rs,
+# src/input/base/state.rs).
 gpui-base = { path = "vendor/gpui-base" }
+# NOSHAPE PATCH (agent ui): `Button` shows the pointer when clickable and
+# `not-allowed` when disabled, like Onshape's buttons in Chrome (only the
+# lines marked "NOSHAPE PATCH" in src/button/button.rs differ from 0.7.3).
+gpui-component = { path = "vendor/gpui-component" }

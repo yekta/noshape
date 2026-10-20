@@ -22,6 +22,7 @@ use std::sync::Arc;
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opConstrainedSurface", op_constrained_surface),
     ("opEditCurve", op_edit_curve),
+    ("opModifyCompositePart", op_modify_composite_part),
     ("opWrap", op_wrap),
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
@@ -59,6 +60,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opReplaceFace", op_replace_face),
     ("opMoveFace", op_move_face),
     ("opExtractWires", op_extract_wires),
+    ("opOffsetWire", op_offset_wire),
 ];
 
 /// (context, id, definition) of an operation native.
@@ -1070,6 +1072,67 @@ fn op_offset_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
+/// opOffsetWire (@internal, the Thin option's wall regions): the Thin
+/// wall builder with `offset1` / `offset2` as the wall thicknesses. Open
+/// chains put `offset1` to the left of the first edge seen from `normal`;
+/// closed loops put it outside. `makeRegions` keeps the planar wall regions
+/// (sheet bodies), otherwise the offset curves become wire bodies.
+fn op_offset_wire(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let refs = evaluate_refs(i, &cx, def.get("edges"))?;
+    let t1 = length_of(def.get("offset1")).unwrap_or(0.0);
+    let t2 = length_of(def.get("offset2")).unwrap_or(0.0);
+    let normal = vec3_of(def.get("normal"));
+    let regions = def_bool(&def, "makeRegions", false);
+    let mut p = ParamValues::default();
+    p.set("thickness1", length_param(t1));
+    p.set("thickness2", length_param(t2));
+    p.set("flipWall", ParamValue::Bool(def_bool(&def, "flip", false)));
+    if refs.is_empty() {
+        return Err(raise_error(i, "OFFSET_WIRE_SELECT_WALL_PATH", None));
+    }
+    run_op_with(i, &cx, &id, "OFFSET_WIRE_GENERIC_ERROR", &p, |ev| {
+        let mut profiles = crate::regen::features::thin::thin_profiles(ev, &refs)?;
+        // The wall builder measures "left" of open chains around its own
+        // plane normal (closed loops: walls with a hole keep "outside").
+        let opposed = |p: &crate::regen::eval::Profile| p.shape.wires().len() == 1 && normal.is_some_and(|n| p.frame.normal.dot(n) < 0.0);
+        if profiles.iter().any(opposed) {
+            let mut flipped = p.clone();
+            flipped.set("flipWall", ParamValue::Bool(!def_bool(&def, "flip", false)));
+            let ev2 = EvalCtx::new(ev.feature, "", &flipped, ev.units, std::mem::take(&mut ev.ctx), ev.outer_vars);
+            let r = crate::regen::features::thin::thin_profiles(&ev2, &refs);
+            ev.ctx = ev2.ctx;
+            let again = r?;
+            profiles = profiles.into_iter().zip(again).map(|(a, b)| if opposed(&a) { b } else { a }).collect();
+        }
+        let source = Shape::compound(&edge_shapes(ev, &refs)?);
+        let ends: Vec<DVec3> = source.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
+        for prof in profiles {
+            if regions {
+                let names = fresh_names(ev, &prof.shape);
+                add_bodies(ev, vec![NamedShape::new(prof.shape, names)], BodyKind::Surface)?;
+                continue;
+            }
+            // The offset curves: region edges off the selected curves.
+            let offs: Vec<Shape> = prof
+                .shape
+                .edges()
+                .into_iter()
+                .filter(|e| {
+                    let on_source = e.edge_info().ok().and_then(|inf| e.point_at((inf.first_param + inf.last_param) * 0.5).ok()).and_then(|m| k::make_vertex(m).ok()).and_then(|v| k::distance(&v, &source).ok()).is_some_and(|d| d.distance < 1e-9);
+                    let cap = ends.iter().any(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, e).ok()).is_some_and(|d| d.distance < 1e-9));
+                    !on_source && !cap
+                })
+                .collect();
+            if !offs.is_empty() {
+                add_wire(ev, Shape::compound(&offs))?;
+            }
+        }
+        Ok(())
+    })?;
+    Ok(Value::Undefined)
+}
+
 /// A direct edit modifies the part's faces, it doesn't create them (Onshape:
 /// qCreatedBy(part feature) still finds them). OCCT's offset history reports
 /// every face as generated, so the evaluator names them `Offset(parent)` under
@@ -1208,11 +1271,13 @@ fn op_constrained_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
     let tolerance = def_length_opt(&def, "tolerance").unwrap_or(1e-6).max(1e-9);
     let smooth = def_bool(&def, "smooth", false);
+    let interpolate = def.get("references").is_undefined();
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         if points.len() < 3 {
             return err("Select at least three points (vertices) to fit a surface");
         }
-        let opts = k::SurfaceFitOptions { tolerance, interpolate: true, smooth };
+        // Mesh points (std passes the meshes as `references`) are fitted, picked points interpolated.
+        let opts = k::SurfaceFitOptions { tolerance, interpolate, smooth };
         let fit = k::fit_surface(&points, &normals, &opts).map_err(|e| FeatureError::new(format!("The surface could not be fitted: {e}")))?;
         let name: Name = Arc::new(TopoName::face(ev.feature, Role::New(0)));
         ev.apply_operation(vec![NamedShape::new(fit.face, vec![name])], "NEW", None, BodyKind::Surface)
@@ -1343,6 +1408,63 @@ fn op_edit_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             body.vertices = old.vertices.clone();
         }
         ev.ctx.bodies[bi] = Arc::new(body);
+        Ok(())
+    })?;
+    Ok(Value::Undefined)
+}
+
+/// `opModifyCompositePart`: `toAdd` / `toRemove` bodies of `composite`. The
+/// composite keeps its id and name. A closed composite consumed its members,
+/// so only adding to it is possible.
+fn op_modify_composite_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let composite = evaluate_refs(i, &cx, def.get("composite"))?;
+    let add = evaluate_refs(i, &cx, def.get("toAdd"))?;
+    let remove = evaluate_refs(i, &cx, def.get("toRemove"))?;
+    run_op(i, &cx, &id, "CUSTOM_ERROR", |ev| {
+        // The composite itself (resolving it would give its members).
+        let ci = composite.iter().find_map(|r| match r {
+            Reference::Body(id) => ev.ctx.bodies.iter().position(|b| &b.id == id && b.composite.is_some()),
+            _ => None,
+        });
+        let Some(ci) = ci.or_else(|| ev.resolve_bodies(&composite).into_iter().find(|&b| ev.ctx.bodies[b].composite.is_some())) else { return err("Select a composite part") };
+        let old = ev.ctx.bodies[ci].clone();
+        let Some(info) = old.composite.clone() else { return err("Select a composite part") };
+        let adding: Vec<BodyId> = ev.resolve_bodies(&add).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).filter(|b| *b != old.id).collect();
+        let removing: Vec<BodyId> = ev.resolve_bodies(&remove).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect();
+        if info.closed && !removing.is_empty() {
+            return err("Bodies cannot be removed from a closed composite part");
+        }
+        let mut members: Vec<BodyId> = if info.closed { Vec::new() } else { info.members.iter().filter(|m| !removing.contains(m)).cloned().collect() };
+        for b in adding {
+            if !members.contains(&b) {
+                members.push(b);
+            }
+        }
+        // A closed composite's own shape stands for its consumed members.
+        ev.ctx.bodies.remove(ci);
+        let mut idx: Vec<usize> = members.iter().filter_map(|m| ev.ctx.bodies.iter().position(|b| &b.id == m)).collect();
+        if info.closed {
+            ev.ctx.bodies.push(old.clone());
+            idx.insert(0, ev.ctx.bodies.len() - 1);
+        }
+        if idx.is_empty() {
+            return err("A composite part needs at least one body");
+        }
+        crate::regen::features::refgeom::make_composite(ev, &idx, info.closed, 0)?;
+        // The new composite (last, or where the closed one was put) takes the old identity.
+        let pos = ev.ctx.bodies.iter().rposition(|b| b.composite.is_some() && b.id.feature == ev.feature).ok_or_else(|| FeatureError::new("The composite part could not be rebuilt"))?;
+        let made = ev.ctx.bodies[pos].clone();
+        let mut body = crate::regen::context::Body::new(old.id.clone(), old.name.clone(), made.kind, made.shape.clone(), made.faces.clone(), old.color, ev.feature);
+        body.edges = made.edges.clone();
+        body.vertices = made.vertices.clone();
+        body.composite = made.composite.clone().map(|mut c| {
+            if info.closed {
+                c.members = info.members.iter().cloned().chain(c.members.into_iter().filter(|m| *m != old.id)).collect();
+            }
+            c
+        });
+        ev.ctx.bodies[pos] = Arc::new(body);
         Ok(())
     })?;
     Ok(Value::Undefined)

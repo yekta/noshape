@@ -415,6 +415,17 @@ impl Render for OsMenu {
                         MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
                     })
                 };
+                // "Label\tbeta": the label and a blue badge (live drawing/447:
+                // "Select for replication [beta]").
+                let label_el = |label: &SharedString| -> AnyElement {
+                    match label.split_once('\t') {
+                        Some((text, badge)) => h_flex()
+                            .child(text.to_string())
+                            .child(div().ml(px(15.)).px(px(6.)).h(px(20.)).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)).text_size(px(12.)).child(badge.to_string()))
+                            .into_any_element(),
+                        None => label.clone().into_any_element(),
+                    }
+                };
                 let row = |id: usize| {
                     h_flex()
                         .id(id)
@@ -443,7 +454,7 @@ impl Render for OsMenu {
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
                         })
-                        .child(label.clone())
+                        .child(label_el(label))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -456,7 +467,7 @@ impl Render for OsMenu {
                         .text_color(pal.text)
                         .when(hovered, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
-                        .child(div().flex_1().child(label.clone()))
+                        .child(div().flex_1().child(label_el(label)))
                         // The small ▸ at the right (live: a 5 px `#666` triangle 9 px
                         // from the border).
                         .pr(px(6.))
@@ -620,6 +631,25 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
     fn os_context_menu(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
         let f = Rc::new(f);
         self.on_mouse_down(MouseButton::Right, move |e, window, cx| {
+            cx.stop_propagation();
+            let f = f.clone();
+            let menu = OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
+            if !menu.read(cx).is_empty() {
+                open(e.position + point(px(0.), px(2.)), menu, window, cx);
+            }
+        })
+    }
+
+    /// [`os_context_menu`](Self::os_context_menu) taken in the capture phase,
+    /// so it wins over a text input inside the element, whose own Cut / Copy /
+    /// Paste menu would open instead: Onshape's table rows show the row menu
+    /// over their cells, focused or not (live variable-studio/01–07).
+    fn os_context_menu_over_inputs(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
+        let f = Rc::new(f);
+        self.capture_any_mouse_down(move |e, window, cx| {
+            if e.button != MouseButton::Right {
+                return;
+            }
             cx.stop_propagation();
             let f = f.clone();
             let menu = OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));

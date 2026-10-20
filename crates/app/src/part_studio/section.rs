@@ -287,8 +287,8 @@ impl PartStudioView {
                 .child(
                     div()
                         .id(SharedString::from(format!("{id}-x")))
-                        .invisible()
-                        .group_hover("srow", |d| d.visible())
+                        .opacity(0.)
+                        .group_hover("srow", |d| d.opacity(1.))
                         .cursor_pointer()
                         .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
                         .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {

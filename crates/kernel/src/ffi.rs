@@ -103,6 +103,53 @@ pub(crate) mod ffi {
         periodic: bool,
     }
 
+    /// A B-spline surface as FeatureScript's BSplineSurface gives it: poles
+    /// `nu` rows (u) by `nv` columns (v), flattened xyz row by row; `weights`
+    /// empty when non-rational; full knot vectors (repeats written out); a
+    /// periodic direction with its `degree` overlapping rows/columns.
+    #[derive(Debug, Clone)]
+    struct BSplineSurfF {
+        poles: Vec<f64>,
+        weights: Vec<f64>,
+        nu: u32,
+        nv: u32,
+        u_knots: Vec<f64>,
+        v_knots: Vec<f64>,
+        u_degree: i32,
+        v_degree: i32,
+        u_periodic: bool,
+        v_periodic: bool,
+    }
+
+    /// One component of a native assembly (flattened tree; `parent` -1 =
+    /// top level), transform row-vector 4x4 as the file stores it.
+    #[derive(Debug, Clone)]
+    struct AsmNodeF {
+        parent: i32,
+        name: String,
+        file: String,
+        configuration: String,
+        config_id: i32,
+        number: i32,
+        transform: Vec<f64>,
+        suppressed: bool,
+        hidden: bool,
+        exclude_bom: bool,
+        assembly: bool,
+    }
+
+    /// A 2D B-spline curve (FeatureScript's BSplineCurve of dimension 2):
+    /// poles flattened xy, `weights` empty when non-rational, full knot
+    /// vector, overlapping poles when periodic.
+    #[derive(Debug, Clone)]
+    struct BSpline2dF {
+        poles: Vec<f64>,
+        weights: Vec<f64>,
+        knots: Vec<f64>,
+        degree: i32,
+        periodic: bool,
+    }
+
     /// 2D sketch segment. kind: 0 line (p0..p3 = ax ay bx by),
     /// 1 circular arc (cx cy r a0 a1), 2 full circle (cx cy r),
     /// 3 elliptic arc (cx cy rmaj rmin rot a0 a1), 4 full ellipse (cx cy rmaj rmin rot),
@@ -177,6 +224,10 @@ pub(crate) mod ffi {
         names: Vec<String>,
         colors: Vec<f32>,
         has_color: Vec<bool>,
+        /// Face colours: (shape index, face index, sRGB) per entry.
+        face_part: Vec<u32>,
+        face_index: Vec<u32>,
+        face_colors: Vec<f32>,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -488,6 +539,9 @@ pub(crate) mod ffi {
         fn read_parasolid_parts(path: &str) -> Result<StepImport>;
         fn read_rhino_parts_ffi(path: &str) -> Result<StepImport>;
         fn read_native_parts_ffi(path: &str) -> Result<StepImport>;
+        fn read_native_parts_config_ffi(path: &str, config: i32) -> Result<StepImport>;
+        fn read_sldasm_tree_ffi(path: &str) -> Result<Vec<AsmNodeF>>;
+        fn extract_zip_ffi(zip: &str, dir: &str) -> Result<Vec<String>>;
         fn read_sat_parts_ffi(path: &str) -> Result<StepImport>;
         fn read_jt_parts_ffi(path: &str) -> Result<StepImport>;
         fn write_acis(shapes: &OcShapeList, path: &str) -> Result<()>;
@@ -502,6 +556,7 @@ pub(crate) mod ffi {
         // ---- surfacing (wrap, isocline, surface fitting)
         fn op_wrap_faces(faces: &OcShapeList, src: &DevSurf, dst: &DevSurf, xf: &[f64], tol: f64) -> Result<OpOut>;
         fn isocline_edges(face: &OcShape, dir: P3, angle: f64, extend: bool) -> Result<UniquePtr<OcShapeList>>;
+        fn bspline_surface_face(surface: &BSplineSurfF, boundary: &[BSpline2dF], make_solid: bool) -> Result<UniquePtr<OcShape>>;
         fn bspline_grid_face(
             frame: &PlaneF,
             x0: f64,

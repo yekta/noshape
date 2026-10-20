@@ -9,7 +9,6 @@ use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::h_flex;
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_render::{Camera, Projection, StandardView};
 
@@ -391,7 +390,8 @@ pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: Any
         .id("view-cube")
         .relative()
         .size(px(WIDGET_PX))
-        .when(hover.is_some(), |d| d.cursor_pointer())
+        // Live (dom/cursors-controls.json): the cube's faces and arrows keep
+        // the default cursor (they're part of the canvas), no pointer.
         .child(
             canvas(
                 move |bounds, _, cx| {

@@ -574,8 +574,8 @@ impl PreferencesView {
                     .id(SharedString::from(format!("kb-edit-{}", e.id)))
                     .ml(px(8.))
                     .cursor_pointer()
-                    .invisible()
-                    .group_hover(group.clone(), |d| d.visible())
+                    .opacity(0.)
+                    .group_hover(group.clone(), |d| d.opacity(1.))
                     .child(crate::assets::icon("shortcut-edit", 18., cx))
                     .tooltip(crate::ui::tooltip("Edit"))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_edit(e, window, cx))),
@@ -586,8 +586,8 @@ impl PreferencesView {
                         .id(SharedString::from(format!("kb-reset-{}", e.id)))
                         .ml(px(12.))
                         .cursor_pointer()
-                        .invisible()
-                        .group_hover(group, |d| d.visible())
+                        .opacity(0.)
+                        .group_hover(group, |d| d.opacity(1.))
                         .child(crate::assets::icon("shortcut-reset", 18., cx))
                         .tooltip(crate::ui::tooltip("Reset"))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.reset_entry(e, cx))),

@@ -14,7 +14,8 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::AnnotationKind;
+use noshape_model::drawing::views::SourceKey;
+use noshape_model::drawing::{AnnotationKind, ViewKind};
 
 /// Panels docked at the right (Drawing properties keeps its own state).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -242,6 +243,70 @@ impl DrawingEditor {
             .into_any_element()
     }
 
+    /// MBD status (live drawing/95, dom/drawing-panel-mbd-status.txt):
+    /// "Model:" (Current sheet / All models / the referenced parts), the
+    /// Datums and Characteristics sections and, while the referenced models
+    /// have no MBD annotations, the blue info box.
+    fn render_mbd_status(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let section = |label: &'static str| {
+            h_flex()
+                .h(px(28.))
+                .px(px(6.))
+                .gap(px(2.))
+                .bg(gpui_kit::rgb(0xebebeb))
+                .border_y_1()
+                .border_color(gpui_kit::hsla(0., 0., 0., 0.1))
+                .child(crate::ui::glyph("expander-down", 12., gpui_kit::rgb(0x333333)))
+                .child(div().text_size(px(16.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(label))
+        };
+        let mut models: Vec<String> = vec!["Current sheet".into(), "All models".into()];
+        // The referenced parts (or Part Studios / assemblies shown whole).
+        for v in self.drawing.sheets.iter().flat_map(|s| &s.views) {
+            let ViewKind::Base { source, part, .. } = &v.kind else { continue };
+            let name = match part {
+                Some(b) => self.sources.get(&SourceKey::studio(*source)).and_then(|s| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())),
+                None => self.doc.read(cx).session.doc.tab(*source).map(|t| t.name.clone()),
+            };
+            if let Some(name) = name
+                && !models.contains(&name)
+            {
+                models.push(name);
+            }
+        }
+        let current = self.mbd_model.min(models.len() - 1);
+        let entity = cx.entity().downgrade();
+        let model = crate::os_ui::select_field("mbd-model", models, current, move |i, _, cx| {
+            let _ = entity.update(cx, |t: &mut Self, cx| {
+                t.mbd_model = i;
+                cx.notify();
+            });
+        })
+        .w(px(130.))
+        .h(px(26.))
+        .text_size(px(13.));
+        v_flex()
+            .size_full()
+            .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Model:")).child(model))
+            .child(section("Datums").mt(px(5.)))
+            .child(section("Characteristics").mt(px(5.)))
+            .child(
+                v_flex()
+                    .m(px(5.))
+                    .p(px(15.))
+                    .gap(px(4.))
+                    .rounded(px(4.))
+                    .bg(gpui_kit::rgb(0xd9edf7))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xbce8f1))
+                    .text_size(px(14.))
+                    .line_height(px(20.))
+                    .text_color(gpui_kit::rgb(0x31708f))
+                    .child(div().font_weight(FontWeight::BOLD).child("Add dimensions and annotations to build an MBD status table."))
+                    .child(div().child("An MBD status table reveals all the MBD requirements within the document.")),
+            )
+            .into_any_element()
+    }
+
     pub fn render_right_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.right_panel?;
         let pal = p();
@@ -252,8 +317,8 @@ impl DrawingEditor {
         };
         let body = match panel {
             RightPanel::InspectionTable => self.render_inspection_table(cx),
-            RightPanel::Styles => div().p(px(12.)).text_size(px(12.)).text_color(pal.text_muted).child("No styles in this drawing").into_any_element(),
-            RightPanel::MbdStatus => div().p(px(12.)).text_size(px(12.)).text_color(pal.text_muted).child("No MBD annotations in the referenced models").into_any_element(),
+            RightPanel::Styles => self.render_styles_panel(cx),
+            RightPanel::MbdStatus => self.render_mbd_status(cx),
         };
         Some(
             v_flex()
@@ -270,16 +335,16 @@ impl DrawingEditor {
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                // Live dom/drawing-panel-*.txt: a 34 px header, the title
+                // centred (18.67 px / 500, #1b5faa) over a 2 px #1b5faa
+                // underline; no close button (the strip icon closes it).
                 .child(
                     h_flex()
-                        .h(px(40.))
-                        .px(px(8.))
-                        .child(div().flex_1().text_center().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.accent).child(title))
-                        .child(Button::new("rp-close").ghost().child(crate::ui::glyph("close", 14., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.right_panel = None;
-                            this.panel_highlight = None;
-                            cx.notify();
-                        }))),
+                        .h(px(34.))
+                        .flex_none()
+                        .border_b(px(2.))
+                        .border_color(gpui_kit::rgb(0x1b5faa))
+                        .child(div().flex_1().text_center().text_size(px(18.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x1b5faa)).child(title)),
                 )
                 .child(div().flex_1().min_h_0().child(body))
                 .into_any_element(),

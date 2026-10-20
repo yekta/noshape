@@ -11,6 +11,9 @@ use noshape_kernel::ShapeType;
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("clusterBodies", cluster_bodies),
     ("constructPaths", construct_paths),
+    ("evEdgeCurvatureDerivatives", ev_edge_curvature_derivatives),
+    ("evPointsDeviation", ev_points_deviation),
+    ("evMeshPoints", ev_mesh_points),
     ("evMaxPathDeviation", ev_max_path_deviation),
     ("approximateSpline", approximate_spline),
     ("evApproximateBSplineCurve", ev_approximate_bspline_curve),
@@ -965,4 +968,79 @@ fn ev_max_path_deviation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     Ok(Value::map_from([("deviation", length_value(best.0)), ("side1Point", point_value(best.1)), ("side2Point", point_value(best.2))]))
+}
+
+/// `@evEdgeCurvatureDerivatives`: d(curvature vector)/ds at each parameter
+/// (the third derivative with respect to arc length; 1/m², e.g. 1/R² along
+/// a circle), by central differences of the exact unit tangent.
+fn ev_edge_curvature_derivatives(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let params: Vec<f64> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(|x| x.as_number()).collect()).unwrap_or_default();
+    let arc = field(&a, "arcLengthParameterization").as_bool().unwrap_or(true);
+    let out = on_first(i, &cx, &a, "edge", "NO_TANGENT_LINE", |q, e| {
+        let s = q.shape(e)?;
+        let info = s.edge_info().ok()?;
+        let h = (info.last_param - info.first_param) * 1e-3;
+        // Curvature vector dT/ds at curve parameter u.
+        let kappa = |u: f64| -> Option<(DVec3, DVec3)> {
+            let (a, b) = (u - h, u + h);
+            let (ta, tb) = (s.tangent_at(a).ok()?.normalize_or_zero(), s.tangent_at(b).ok()?.normalize_or_zero());
+            let ds = (s.point_at(b).ok()? - s.point_at(a).ok()?).length().max(1e-300);
+            Some(((tb - ta) / ds, s.point_at(u).ok()?))
+        };
+        let mut out = Vec::new();
+        for t in &params {
+            let u = edge_param(&s, &info, *t, arc).clamp(info.first_param + 2.0 * h, info.last_param - 2.0 * h);
+            let ((ka, pa), (kb, pb)) = (kappa(u - h)?, kappa(u + h)?);
+            let d = (kb - ka) / (pb - pa).length().max(1e-300);
+            out.push(dir_value(d));
+        }
+        Some(out)
+    })?;
+    Ok(Value::array(out))
+}
+
+/// `@evPointsDeviation`: each point's distance to `topologies` (or only
+/// the largest): `{ deviation, pointPoint, topologyPoint }` maps.
+fn ev_points_deviation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let points: Vec<DVec3> = field(&a, "points").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
+    let all = field(&a, "allDeviations").as_bool().unwrap_or(false);
+    let target = with_ents(i, &cx, &field(&a, "topologies"), |_, q, ents| Ok(ents.iter().filter_map(|e| q.shape(e)).collect::<Vec<_>>()))?;
+    if target.is_empty() || points.is_empty() {
+        return Err(raise_error(i, "INVALID_INPUT", None));
+    }
+    let target = k::Shape::compound(&target);
+    let mut rows = Vec::new();
+    for p in points {
+        let Ok(d) = k::make_vertex(p).and_then(|v| k::distance(&v, &target)) else { continue };
+        rows.push((d.distance, p, d.point_b));
+    }
+    if !all
+        && let Some(max) = rows.iter().cloned().max_by(|a, b| a.0.total_cmp(&b.0))
+    {
+        rows = vec![max];
+    }
+    Ok(Value::array(rows.into_iter().map(|(d, p, t)| Value::map_from([("deviation", length_value(d)), ("pointPoint", point_value(p)), ("topologyPoint", point_value(t))])).collect()))
+}
+
+/// `@evMeshPoints`: the distinct vertex positions of the mesh faces and
+/// bodies (constrained surface from meshes).
+fn ev_mesh_points(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let points = with_ents(i, &cx, &field(&a, "meshes"), |_, q, ents| {
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for e in &ents {
+            let Some(s) = q.shape(e) else { continue };
+            for v in s.vertices() {
+                let Ok(p) = v.vertex_point() else { continue };
+                if seen.insert([(p.x * 1e9).round() as i64, (p.y * 1e9).round() as i64, (p.z * 1e9).round() as i64]) {
+                    out.push(point_value(p));
+                }
+            }
+        }
+        Ok(out)
+    })?;
+    Ok(Value::array(points))
 }

@@ -5546,6 +5546,12 @@ impl Window {
         subscription
     }
 
+    /// NOSHAPE PATCH: the cursor style the hovered elements asked for in the
+    /// last frame (`None`: none did, the window shows the arrow).
+    pub fn hovered_cursor_style(&self) -> Option<CursorStyle> {
+        self.rendered_frame.cursor_style(self)
+    }
+
     fn reset_cursor_style(&self, cx: &mut App) {
         // Set the cursor only if we're the active window.
         if self.is_window_hovered() {

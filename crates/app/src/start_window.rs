@@ -655,9 +655,9 @@ impl StartView {
                     doc.settings.tab_order.clear();
                     match stored.kind() {
                         noshape_model::file_tab::FileKind::Cad => {
-                            let brep = crate::workspace::read_foreign(&path, &units)?;
+                            let foreign = crate::workspace::read_foreign(&path, &units)?;
                             let mut ps = noshape_model::PartStudio::new();
-                            crate::workspace::add_import_feature(&mut ps, &file, brep, &units);
+                            crate::workspace::add_import_feature(&mut ps, &file, foreign, &units);
                             doc.add_tab(&name, noshape_model::TabContent::PartStudio(ps));
                             let folder = crate::file_tab_view::cad_imports_folder(&mut doc);
                             crate::file_tab_view::add_file_tab(&mut doc, stored, Some(folder), None);
@@ -1772,7 +1772,8 @@ impl StartView {
                                         .border_1()
                                         .border_color(pal.border_strong)
                                         .rounded_l(px(2.))
-                                        .child(div().flex_1().child(Input::new(&self.search).appearance(false).small().h(px(26.)).italic().cleanable(true)))
+                                        // The whole box left of the ▾ takes clicks (input_frame).
+                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).appearance(false).small().h(px(26.)).italic().cleanable(true))))
                                         .child(
                                             div()
                                                 .id("adv-caret")

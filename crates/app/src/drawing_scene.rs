@@ -108,8 +108,10 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>)
         } else {
             INK
         };
-        let width = px_width(l.style, zoom);
-        for piece in dash(&l.points, l.closed, l.style.dashes()) {
+        // Adjust linestyle pens override the style's width and dashes.
+        let (width_mm, dashes) = g.line_pen(li);
+        let width = (width_mm * zoom * 0.45).clamp(1.0, 7.0) as f32;
+        for piece in dash(&l.points, l.closed, &dashes) {
             push(&mut lines, &piece, color, l.pick, width);
         }
     }
@@ -281,6 +283,9 @@ pub struct Overlay {
     /// Snap point markers (Onshape: orange square = endpoint, triangle =
     /// midpoint, diamond = quadrant, circle = center): (point, kind, size mm).
     pub marks: Vec<([f64; 2], SnapMark, f64)>,
+    /// Polylines with their own color and width (px), e.g. table cell
+    /// selections.
+    pub tinted: Vec<(Vec<[f64; 2]>, [u8; 4], f32)>,
 }
 
 /// Shape of a snap point marker.
@@ -307,7 +312,7 @@ impl SnapMark {
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
-        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.marks.is_empty()
+        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.marks.is_empty() && self.tinted.is_empty()
     }
     pub fn circle(&mut self, c: [f64; 2], r: f64, dashed: bool) {
         let pts = (0..=72).map(|i| {
@@ -332,6 +337,11 @@ impl Overlay {
                     width: 1.5,
                     style: LineSegment::ON_TOP | if *dashed { LineSegment::DASHED } else { 0 },
                 });
+            }
+        }
+        for (pts, color, width) in &self.tinted {
+            for w in pts.windows(2) {
+                l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: *color, pick_id: 0, width: *width, style: LineSegment::ON_TOP });
             }
         }
         for (a, b) in &self.infer {

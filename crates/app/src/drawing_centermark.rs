@@ -58,7 +58,7 @@ impl DrawingEditor {
             let id = self.current_sheet().next_annotation_id();
             let refs = r.map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default();
             let c = self.cursor;
-            self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25, angle: 0.0 }, position: c, refs, ..Default::default() }));
+            self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25, angle: 0.0, arms: [0.0; 4] }, position: c, refs, ..Default::default() }));
             return true;
         }
         if let Some(d) = &mut self.centermark_dlg {
@@ -90,7 +90,7 @@ impl DrawingEditor {
         let centers: Vec<[f64; 2]> = d.picks.iter().map(|p| p.center).collect();
         let pos = self.cursor;
         let mut new: Vec<(AnnotationKind, Vec<AnnotationRef>)> = Vec::new();
-        let mark = |c: &CmCircle, angle: f64| (AnnotationKind::Centermark { view, center: c.center, size: c.radius * 1.25, angle }, c.r.clone().map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default());
+        let mark = |c: &CmCircle, angle: f64| (AnnotationKind::Centermark { view, center: c.center, size: c.radius * 1.25, angle, arms: [0.0; 4] }, c.r.clone().map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default());
         if d.mode == 1 {
             // Pattern center: the circle through the first three centers (or the mean).
             let pc = match centers.len() {
@@ -119,7 +119,7 @@ impl DrawingEditor {
             }
             if d.reference_center {
                 let s = d.picks.iter().map(|p| p.radius).fold(f64::MAX, f64::min) * 0.6;
-                new.push((AnnotationKind::Centermark { view, center: pc, size: s, angle: 0.0 }, vec![]));
+                new.push((AnnotationKind::Centermark { view, center: pc, size: s, angle: 0.0, arms: [0.0; 4] }, vec![]));
             }
         } else {
             for c in &d.picks {
@@ -201,7 +201,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(220.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -221,7 +221,7 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .bg(gpui_kit::rgb(0x009500))
-                                .when(!can_accept, |e| e.opacity(0.2))
+                                .when(!can_accept, |e| e.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED)))
                                 .cursor_pointer()
                                 .child(crate::ui::glyph("check", 18., gpui_kit::white()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_centermark(cx))),
@@ -235,7 +235,7 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                         ),
                 )

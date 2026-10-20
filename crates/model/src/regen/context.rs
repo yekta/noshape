@@ -272,6 +272,12 @@ pub struct Context {
     // --- end batch SM ---
     /// Holes made by Hole features (drawings' hole / thread callouts).
     pub holes: Vec<HoleRecord>,
+    /// Appearances features gave their parts (Import: the file's colours),
+    /// linear RGBA; a part's own appearance (part properties) wins.
+    pub part_appearance: BTreeMap<BodyId, [f32; 4]>,
+    /// Appearances features gave single faces (Import), by body and face
+    /// name: the body's faces descending from it keep it. Linear RGBA.
+    pub face_appearance: Vec<(BodyId, crate::naming::Name, [f32; 4])>,
 }
 
 /// One hole of a Hole feature: where it starts, its direction into the

@@ -50,9 +50,10 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 
 | Context | Cursor | Status |
 |---|---|---|
-| Buttons, `[role=button]`, toolbar tools, menu items (`.context-menu-item.hover`), tabs (`.document-tab`, `.os-dialog-tab`), tree rows (`.os-tree-container element-node`, `.tree-container .list-group-item`), node expanders, dialog checkboxes and their labels, group headers, close buttons, graphics dropdowns, `.os-selectable-item` | `pointer` | 🟡 (most of ours set `cursor_pointer`; audit) |
-| Disabled buttons / inputs / selects / disabled menu items / disabled filters | `not-allowed` | ❌ |
-| Text inputs, renamable table column titles, document name (hover), measurement values | `text` | 🟡 (GPUI inputs show the I-beam) |
+| Buttons, `[role=button]`, toolbar tools and ▾ carets, Search tools…, menu items, inactive tabs, + and tab-list buttons, navbar ☰ / ?, node expanders, Features header icons, left rail / right strip icons, the list toggle, dialog option tabs, checkbox labels, dropdowns, chip ×, (?) help, view cube ▾, camera menu items | `pointer` (live dom/cursors-controls.json) | ✅ (vendored gpui-component `Button`: pointer when clickable; read back with /tmp/ui-tools/cursweep.sh) |
+| Active tab, empty navbar, view cube faces / arrows, dialog ✓ / ✗ (enabled or not), panel-dialog header ✓ / ✗, selection chip text, feature and part rows | `default` / `auto` | ✅ |
+| Undo / Redo with nothing to undo, disabled camera items (Previous view), disabled buttons | `not-allowed` | ✅ (Undo/Redo; `Button` disabled → not-allowed) |
+| Text inputs (the whole box inside the border, padding included), document name and workspace label in the navbar, number fields | `text` | ✅ (vendored gpui-base `frame_hit`; app boxes via `input_frame`) |
 | Feature-dialog / panel-dialog header drag area (`.ns-drag-area:hover`, `.osx-panel-dialog-header`, `.ns-subdialog-header`) | `grab` (live: title and drag area) | 🟡 (feature dialog ✅; panel dialogs to audit) |
 | Disabled dialog ✓ (`div.ns-dialog-button-ok.disabled`) | `default` (live) | ✅ |
 | Feature-list row, rollback bar (hover and drag) | `default` (live) | ✅ |

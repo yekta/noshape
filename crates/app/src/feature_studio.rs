@@ -25,15 +25,26 @@ use std::time::Duration;
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-actions!(feature_studio, [Commit, CommitAll, SearchStudios]);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference]);
 
-/// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt).
+/// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt):
+/// Commit, Commit all, Top level symbols dropdown (the Module outline),
+/// Back / Forward reference. The code editor's own ctrl+[ / ctrl+]
+/// (outdent / indent) give way to the references, as in Onshape, so those
+/// are bound again at the editor (registered after the kit's, they win).
 pub fn bind_keys(cx: &mut App) {
     let c = Some("FeatureStudio");
+    let code = Some("FeatureStudio > Input");
     cx.bind_keys([
         KeyBinding::new("secondary-s", Commit, c),
         KeyBinding::new("secondary-shift-s", CommitAll, c),
         KeyBinding::new("secondary-shift-f", SearchStudios, c),
+        KeyBinding::new("secondary-shift-o", ModuleOutline, c),
+        KeyBinding::new("secondary-[", BackReference, c),
+        KeyBinding::new("secondary-]", ForwardReference, c),
+        KeyBinding::new("secondary-shift-o", ModuleOutline, code),
+        KeyBinding::new("secondary-[", BackReference, code),
+        KeyBinding::new("secondary-]", ForwardReference, code),
     ]);
 }
 
@@ -291,6 +302,8 @@ pub struct FeatureStudioView {
     /// The toolbar's Import panel and the button's bounds (it hangs under it).
     import_panel: Option<(Entity<crate::fs_import::ImportPanel>, Subscription)>,
     import_anchor: BoundsCell,
+    /// The Module outline button's bounds (its popover hangs under it).
+    outline_anchor: BoundsCell,
     /// The pointer over the code (the diagnostic tooltip follows it).
     hover_at: Option<Point<Pixels>>,
     _subs: Vec<Subscription>,
@@ -336,7 +349,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), hover_at: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -901,7 +914,10 @@ impl Render for FeatureStudioView {
         let symbols = outline(self.editor.read(cx).value().as_ref());
         let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
         let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
-        let (mon_anchor, out_anchor): (BoundsCell, BoundsCell) = Default::default();
+        let mon_anchor: BoundsCell = Default::default();
+        // Kept across renders: the outline popover is placed before this
+        // frame paints the button (opened by ctrl+shift+O as well).
+        let out_anchor = self.outline_anchor.clone();
         let ma = mon_anchor.clone();
         toolbar = toolbar
             .child(
@@ -966,6 +982,9 @@ impl Render for FeatureStudioView {
             .on_action(cx.listener(|this, _: &Commit, _, cx| this.commit(cx)))
             .on_action(cx.listener(|this, _: &CommitAll, _, cx| this.commit_all(cx)))
             .on_action(cx.listener(|_, _: &SearchStudios, _, cx| cx.emit(FeatureStudioEvent::OpenSearch)))
+            .on_action(cx.listener(|this, _: &ModuleOutline, window, cx| this.toggle_outline(window, cx)))
+            .on_action(cx.listener(|this, _: &BackReference, window, cx| this.navigate(-1, window, cx)))
+            .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
             .child(toolbar.border_b_1().border_color(rgb(0xd7d7d7)))
             .child(

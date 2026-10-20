@@ -221,7 +221,7 @@ impl PartStudioView {
         let mut body = v_flex();
         if custom {
             for (i, f) in FIELDS.iter().enumerate() {
-                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&custom_fields[i]).appearance(false))));
+                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&custom_fields[i]).appearance(false)))));
             }
         } else {
             // Library select and "+" (Add material library…).
@@ -454,7 +454,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(if can_apply { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
                                 .when(can_apply, |d| d.cursor_pointer())
-                                .child(crate::assets::icon("dialog-ok", 20., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_material(cx))),
                         )
                         .child(
@@ -466,7 +466,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.material_panel = None;
                                     cx.notify();

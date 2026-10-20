@@ -5,7 +5,6 @@
 //! jog's snap points (help jog-dimensionline-highlightex).
 
 use crate::drawing_view::*;
-use gpui_kit::*;
 use noshape_model::drawing::sheet::{LinearFrame, linear_frame};
 use noshape_model::drawing::{Annotation, AnnotationKind, ExtJog};
 
@@ -17,6 +16,9 @@ fn seg_dist(c: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     let p = [a[0] + d[0] * t, a[1] + d[1] * t];
     ((c[0] - p[0]).powi(2) + (c[1] - p[1]).powi(2)).sqrt()
 }
+
+/// A centermark's center, arm ends (+x, +y, −x, −y) and arm lengths.
+type CentermarkArms = ([f64; 2], [[f64; 2]; 4], [f64; 4]);
 
 impl DrawingEditor {
     /// A linear dimension's geometry on the sheet (resolved positions).
@@ -56,19 +58,18 @@ impl DrawingEditor {
     }
 
     /// Onshape's menu of a linear dimension (None for other annotations).
-    pub fn dimension_entries(&self, id: u64, cx: &App) -> Option<Vec<MenuEntry>> {
+    pub fn dimension_entries(&self, id: u64) -> Option<Vec<MenuEntry>> {
         let a = self.resolved_annotation(id)?;
         if !matches!(a.kind, AnnotationKind::LinearDimension { .. }) || a.inspection.is_some() {
             return None;
         }
         let mut out = Vec::new();
         let a2 = a.clone();
-        out.push(MenuEntry::item("Edit…", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
-        if self.clipboard_cells(cx).is_some() {
-            out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                t.start_paste_table(cx);
-            }));
-        }
+        out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+        // Live: always present.
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
         let unbroken = a.unbroken;
         out.push(MenuEntry::item(if unbroken { "Break dimension" } else { "Unbreak dimension" }, move |t, _, cx| {
             t.edit_sheet(if unbroken { "Break dimension" } else { "Unbreak dimension" }, cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.unbroken = !unbroken))
@@ -77,12 +78,28 @@ impl DrawingEditor {
             if a.jogs[k].is_some() {
                 out.push(MenuEntry::item("Remove jog", move |t, _, cx| t.edit_sheet("Remove jog", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.jogs[k] = None))));
             } else {
-                // Outward: away from the other extension line, 3 mm at 45°.
+                // Live drawing/331–340: a 45° diagonal 0.44 in (11.2 mm)
+                // outward, centered on the line; a line shorter than about
+                // 44.7 mm first moves the dimension line away from the part.
                 let f = self.dimension_frame(&a)?;
                 let along = |p: [f64; 2]| p[0] * f.dir[0] + p[1] * f.dir[1];
                 let (mine, other) = if k == 0 { (f.dp, f.dq) } else { (f.dq, f.dp) };
-                let shift = if along(mine) <= along(other) { -3.0 } else { 3.0 };
-                out.push(MenuEntry::item("Add jog", move |t, _, cx| t.edit_sheet("Add jog", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.jogs[k] = Some(ExtJog::new(shift))))));
+                const JOG: f64 = 11.2;
+                const MIN_LEG: f64 = 44.7;
+                let shift = if along(mine) <= along(other) { -JOG } else { JOG };
+                let l = f.legs[k].2;
+                let grow = (MIN_LEG - l).max(0.0);
+                let at = ((l + grow - JOG) / 2.0) / (l + grow).max(1e-9);
+                out.push(MenuEntry::item("Add jog", move |t, _, cx| {
+                    t.edit_sheet("Add jog", cx, |s| {
+                        for x in s.annotations.iter_mut().filter(|x| x.id == id) {
+                            if let AnnotationKind::LinearDimension { offset, .. } = &mut x.kind {
+                                *offset += grow * offset.signum();
+                            }
+                            x.jogs[k] = Some(ExtJog { at, shift, drop: JOG });
+                        }
+                    })
+                }));
             }
         }
         out.push(MenuEntry::Separator);
@@ -122,6 +139,52 @@ impl DrawingEditor {
             }
             None
         })
+    }
+
+    /// A centermark's arm ends (+x, +y, −x, −y) on the sheet, its center and
+    /// arm directions.
+    fn centermark_arms(&self, a: &Annotation) -> Option<CentermarkArms> {
+        let AnnotationKind::Centermark { view, center, size, angle, arms } = &a.kind else { return None };
+        let pl = self.placement(*view)?;
+        let c = pl.to_sheet(*center);
+        let rot = pl.rotation + angle;
+        let (u, w) = ([rot.cos(), rot.sin()], [-rot.sin(), rot.cos()]);
+        let dirs = [u, w, [-u[0], -u[1]], [-w[0], -w[1]]];
+        let lens = [0, 1, 2, 3].map(|i| pl.len_to_sheet(size + arms[i]));
+        Some((c, dirs, lens))
+    }
+
+    /// An arm-end grip of a selected centermark under `start`: (mark, arm).
+    pub fn centermark_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {
+        let tol = self.tol_mm(5.0);
+        self.selection.iter().find_map(|s| {
+            let Sel::Annotation(id) = s else { return None };
+            let a = self.resolved_annotation(*id)?;
+            let (c, dirs, lens) = self.centermark_arms(&a)?;
+            (0..4).find(|k| seg_dist(start, [c[0] + dirs[*k][0] * lens[*k], c[1] + dirs[*k][1] * lens[*k]], [c[0] + dirs[*k][0] * lens[*k], c[1] + dirs[*k][1] * lens[*k]]) < tol).map(|k| (a.clone(), k))
+        })
+    }
+
+    /// The centermark `orig` with arm `k`'s end dragged to the cursor: all
+    /// four arms change by the same amount, only that arm with Shift.
+    pub fn dragged_centermark(&self, orig: &Annotation, k: usize, shift: bool) -> Annotation {
+        let mut a = orig.clone();
+        let Some((c, dirs, lens)) = self.centermark_arms(orig) else { return a };
+        let AnnotationKind::Centermark { view, size, arms, .. } = &mut a.kind else { return a };
+        let Some(pl) = self.placement(*view) else { return a };
+        let along = (self.cursor[0] - c[0]) * dirs[k][0] + (self.cursor[1] - c[1]) * dirs[k][1];
+        // Sheet mm -> view units.
+        let per = pl.len_to_sheet(1.0).max(1e-12);
+        let delta = (along.max(0.5) - lens[k]) / per;
+        let min = -*size * 0.9;
+        if shift {
+            arms[k] = (arms[k] + delta).max(min);
+        } else {
+            for x in arms.iter_mut() {
+                *x = (*x + delta).max(min);
+            }
+        }
+        a
     }
 
     /// An attachment point (light-blue grip) of a selected linear dimension

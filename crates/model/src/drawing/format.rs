@@ -12,6 +12,11 @@ pub struct DimText {
     pub upper: Option<String>,
     pub lower: Option<String>,
     pub boxed: bool,
+    /// Palette "Above text" / "Below text".
+    pub above: Option<String>,
+    pub below: Option<String>,
+    /// Inspection dimension: an oval frame.
+    pub oval: bool,
 }
 
 impl DimText {
@@ -37,8 +42,44 @@ pub fn default_digits(u: DimUnits) -> usize {
     match u {
         DimUnits::Millimeter => 2,
         DimUnits::Centimeter => 3,
-        DimUnits::Meter | DimUnits::Foot => 4,
-        DimUnits::Inch => 3,
+        DimUnits::Meter | DimUnits::Foot | DimUnits::Yard => 4,
+        DimUnits::Inch | DimUnits::InchFraction | DimUnits::FeetInches => 3,
+    }
+}
+
+/// Inches as a whole number and a reduced fraction to 1/64: "1 3/8".
+fn inch_fraction(inches: f64) -> String {
+    let sign = if inches < 0.0 { "-" } else { "" };
+    let x = inches.abs();
+    let (mut whole, mut n) = (x.trunc(), ((x - x.trunc()) * 64.0).round() as u32);
+    if n == 64 {
+        whole += 1.0;
+        n = 0;
+    }
+    let mut d = 64;
+    while n > 0 && n % 2 == 0 {
+        n /= 2;
+        d /= 2;
+    }
+    match (whole as u64, n) {
+        (w, 0) => format!("{sign}{w}"),
+        (0, n) => format!("{sign}{n}/{d}"),
+        (w, n) => format!("{sign}{w} {n}/{d}"),
+    }
+}
+
+/// A length (meters) as a number in `u` (fractions and feet-and-inches
+/// spelled out).
+fn unit_number(drawing: &Drawing, meters: f64, u: DimUnits, precision: Option<u8>, drawing_precision: Option<u8>, tolerance: bool) -> String {
+    match u {
+        DimUnits::InchFraction => inch_fraction(meters / 0.0254),
+        DimUnits::FeetInches => {
+            let inches = meters / 0.0254;
+            let ft = (inches.abs() / 12.0).trunc() * inches.signum();
+            let rest = (inches - ft * 12.0).abs();
+            format!("{}' {}\"", ft as i64, number(drawing, rest, precision, drawing_precision, 3, tolerance))
+        }
+        _ => number(drawing, meters / u.meters(), precision, drawing_precision, default_digits(u), tolerance),
     }
 }
 
@@ -86,8 +127,8 @@ fn number(drawing: &Drawing, v: f64, precision: Option<u8>, drawing_precision: O
 /// A length (meters) in the dimension's units, without tolerance.
 pub fn format_len(drawing: &Drawing, f: &DimFormat, meters: f64) -> String {
     let u = length_units(drawing, f);
-    let s = number(drawing, meters / u.meters(), f.precision, drawing.props.precision, default_digits(u), false);
-    if f.show_units { format!("{s} {}", u.symbol()) } else { s }
+    let s = unit_number(drawing, meters, u, f.precision, drawing.props.precision, false);
+    if f.show_units && !u.symbol().is_empty() { format!("{s} {}", u.symbol()) } else { s }
 }
 
 fn signed(s: String) -> String {
@@ -149,7 +190,7 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
             format!("{}°", number(drawing, v.to_degrees(), f.precision, if tol { p.angular_tolerance_precision } else { p.angular_precision }, 2, tol))
         } else {
             let u = length_units(drawing, f);
-            number(drawing, v / u.meters(), f.precision, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, default_digits(u), tol)
+            unit_number(drawing, v, u, f.precision, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, tol)
         }
     };
     let num = |v: f64| num_with(v, false);
@@ -173,17 +214,58 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
         Tolerance::Min => t.main.push_str(" MIN"),
         Tolerance::Max => t.main.push_str(" MAX"),
         Tolerance::Fit { hole, shaft } => {
-            let fit = match (hole.trim(), shaft.trim()) {
+            let fo = &f.fit;
+            let h = if fo.hide_hole { "" } else { hole.trim() };
+            let sh = if fo.hide_shaft { "" } else { shaft.trim() };
+            // Deviations of the hole class (else the shaft's) for "Fit with
+            // tolerance" and "Fit (Tolerance only)", at the fit precision.
+            let class = if hole.trim().is_empty() { shaft.trim() } else { hole.trim() };
+            let dev = (fo.mode != super::FitMode::Fit && !angular).then(|| crate::fits::deviations(value, class)).flatten();
+            let fp = DimFormat { precision: fo.precision.or(p.fit_tolerance_precision).or(f.precision), ..f.clone() };
+            let devs = dev.map(|(up, lo)| (format_deviation(drawing, &fp, up, false), format_deviation(drawing, &fp, lo, true)));
+            let classes = match (h, sh) {
                 ("", "") => String::new(),
                 (h, "") => h.to_string(),
                 ("", s) => s.to_string(),
                 (h, s) => format!("{h}/{s}"),
             };
-            if !fit.is_empty() {
-                t.main = format!("{} {fit}", t.main);
+            match (fo.mode, devs) {
+                (super::FitMode::ToleranceOnly, Some((up, lo))) => {
+                    t.upper = Some(up);
+                    t.lower = Some(lo);
+                }
+                (super::FitMode::WithTolerance, Some((up, lo))) => {
+                    if !classes.is_empty() {
+                        t.main = format!("{} {classes}", t.main);
+                    }
+                    t.upper = Some(up);
+                    t.lower = Some(lo);
+                }
+                // Stacked classes (hole over shaft) unless diagonal.
+                _ if !h.is_empty() && !sh.is_empty() && fo.stacking != super::FitStacking::Diagonal => {
+                    t.upper = Some(h.to_string());
+                    t.lower = Some(sh.to_string());
+                }
+                _ if !classes.is_empty() => t.main = format!("{} {classes}", t.main),
+                _ => {}
             }
         }
     }
+    // Palette: parentheses, above / below text, the inspection oval.
+    if f.reference {
+        if t.main.is_empty() {
+            t.upper = t.upper.map(|u| format!("({u})"));
+            t.lower = t.lower.map(|l| format!("({l})"));
+        } else if t.upper.is_some() {
+            t.main = format!("({}", t.main);
+            t.lower = t.lower.map(|l| format!("{l})"));
+        } else {
+            t.main = format!("({})", t.main);
+        }
+    }
+    t.above = (!f.above.is_empty()).then(|| f.above.clone());
+    t.below = (!f.below.is_empty()).then(|| f.below.clone());
+    t.oval = f.inspection_frame;
     t
 }
 
@@ -477,5 +559,32 @@ mod tests {
         assert_eq!(expand_fields("{part.name} #{part.number} {nope} {", &look), "Plate #---- {nope} {");
         assert_eq!(civil_from_days(0), (1970, 1, 1));
         assert_eq!(civil_from_days(20744), (2026, 10, 18));
+    }
+
+    #[test]
+    fn palette_options_and_units() {
+        use crate::drawing::{FitMode, FitOpts, FitStacking};
+        let d = Drawing::default();
+        // Inches fractional, feet and inches, yards.
+        let f = |u| DimFormat { units: Some(u), ..Default::default() };
+        assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 1.375, false, "").main, "1 3/8");
+        assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 0.5, false, "").main, "1/2");
+        assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 14.5, false, "").main, "1' 2.5\"");
+        assert_eq!(dim_text(&d, &f(DimUnits::Yard), 0.9144 * 2.0, false, "").main, "2");
+        // Parentheses, above / below text, the inspection oval.
+        let t = dim_text(&d, &DimFormat { reference: true, above: "TYP".into(), below: "2X".into(), inspection_frame: true, ..Default::default() }, 0.0125, false, "");
+        assert_eq!((t.main.as_str(), t.above.as_deref(), t.below.as_deref(), t.oval), ("(12.5)", Some("TYP"), Some("2X"), true));
+        // Fit: classes stacked by default, inline when diagonal; with
+        // tolerance adds the H7 deviations; tolerance only shows just them.
+        let fit = |mode, stacking| DimFormat { tolerance: Tolerance::Fit { hole: "H7".into(), shaft: "g6".into() }, fit: FitOpts { mode, stacking, ..Default::default() }, ..Default::default() };
+        let t = dim_text(&d, &fit(FitMode::Fit, FitStacking::WithoutLine), 0.010, false, "");
+        assert_eq!((t.main.as_str(), t.upper.as_deref(), t.lower.as_deref()), ("10", Some("H7"), Some("g6")));
+        assert_eq!(dim_text(&d, &fit(FitMode::Fit, FitStacking::Diagonal), 0.010, false, "").main, "10 H7/g6");
+        let t = dim_text(&d, &fit(FitMode::WithTolerance, FitStacking::WithoutLine), 0.010, false, "");
+        assert_eq!(t.main, "10 H7/g6");
+        assert!(t.upper.as_deref().is_some_and(|u| u.starts_with('+')), "{t:?}");
+        let t = dim_text(&d, &fit(FitMode::ToleranceOnly, FitStacking::WithoutLine), 0.010, false, "");
+        assert_eq!(t.main, "10");
+        assert!(t.upper.is_some() && t.lower.is_some());
     }
 }

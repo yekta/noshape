@@ -17,7 +17,7 @@ You coordinate agents that build noshape (Onshape clone). The user's rules are i
   /tmp/*-shots/final-*.png.
 
 ## Build load (user, 2026-10-19: "careful with agents that build the app")
-- Agents that build the app all use ONE shared target dir, /root/target-shared. Cargo's lock serialises the builds,
+- App builds use three group target dirs (2026-10-20, bigger machine): UI → /root/target-shared, behaviour → /root/target-behave, engine → /root/target-engine. Cargo's lock serialises the builds,
   and artifacts are shared. Never give an agent its own target dir again; 7 parallel full builds choked the machine.
 - At most ~5 app-building agents at once. Research/capture agents (no builds) don't count. kern and fs are paused for
   load; resume them (message_agent) when a building agent finishes.

@@ -59,6 +59,14 @@ fn value_name(sources: &[RefSource], value: &str) -> Option<String> {
     sources.iter().find(|s| s.tab == source_tab(value.split('\t').next().unwrap_or(value))).map(|s| s.name.clone())
 }
 
+/// A Part Studio's parts, then its sketches (live 741: "Part 1", "Sketch 1";
+/// a sketch is listed as `assembly::eval::sketch_body_id`).
+pub fn parts_and_sketches(ctx: &noshape_model::regen::context::Context) -> Vec<(noshape_model::BodyId, String)> {
+    let parts = ctx.bodies.iter().map(|b| (b.id.clone(), b.name.clone()));
+    let sketches = ctx.sketches.iter().map(|s| (noshape_model::assembly::eval::sketch_body_id(s.feature), s.name.clone()));
+    parts.chain(sketches).collect()
+}
+
 /// The file tabs and studios of `doc` (Part Studios without `except`,
 /// the one being edited), sorted by name like Onshape's lists.
 pub fn sources(doc: &Document, except: &str, parts: impl Fn(&str) -> Vec<(noshape_model::BodyId, String)>) -> Vec<RefSource> {
@@ -177,7 +185,9 @@ impl FeatureDialog {
     }
 
     fn open_reference_picker(&mut self, path: String, kind: ReferenceKind, window: &mut Window, cx: &mut Context<Self>) {
-        let value = self.values_text(&path);
+        // Derived's source (psb): the studio, part and configuration params.
+        let derived = self.ty.id == "importDerived" && path == "partStudio";
+        let value = if derived { self.derived_reference_value() } else { self.values_text(&path) };
         let setup = PanelSetup {
             mode: PanelMode::Reference(kind),
             sources: self.ref_sources.clone(),
@@ -196,7 +206,11 @@ impl FeatureDialog {
                 if !matches!(kind, ReferenceKind::PartStudio | ReferenceKind::VariableStudio) {
                     this.ref_picker = None;
                 }
-                this.set_value(&p2, ParamValue::Text(v.clone()), cx);
+                if derived {
+                    this.pick_derived_source(v, cx);
+                } else {
+                    this.set_value(&p2, ParamValue::Text(v.clone()), cx);
+                }
             }
             SelectItemEvent::Close => {
                 this.ref_picker = None;
@@ -277,8 +291,48 @@ pub async fn render_thumbnails(gpu: crate::gpu::Gpu, doc: Document, tabs: Vec<no
                 out.push((part.map_or_else(|| studio.clone(), |p| part_value(&studio, &p)), img));
             }
         }
+        // Sketches: each alone, seen normal to its plane.
+        for sk in &display.sketches {
+            let mut d = display.clone();
+            for b in &mut d.bodies {
+                b.hidden = true;
+            }
+            d.sketches.retain(|x| x.feature == sk.feature);
+            if let Some(x) = d.sketches.first_mut() {
+                x.hidden = false;
+            }
+            let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: true, show_origin: false, ..Default::default() };
+            let mut cache = crate::scene_builder::GpuCache::default();
+            let built = crate::scene_builder::build(&d, &opts, &mut cache, gpu.uploader());
+            let Some((lo, hi)) = built.scene.bounds() else { continue };
+            let camera = fit_camera_normal(lo.as_dvec3(), hi.as_dvec3(), 140. / 80., &sk.frame);
+            let Ok(png) = gpu.render_png(std::sync::Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style(), 140, 80).await else { continue };
+            if let Some(img) = decode(&png) {
+                out.push((part_value(&key(tab), &noshape_model::assembly::eval::sketch_body_id(sk.feature)), img));
+            }
+        }
     }
     out
+}
+
+/// A camera looking at the box normal to a sketch plane (its X right).
+fn fit_camera_normal(lo: glam::DVec3, hi: glam::DVec3, aspect: f64, frame: &noshape_model::display::PlaneFrame) -> noshape_render::Camera {
+    let mut camera = noshape_render::Camera { rotation: noshape_render::Camera::look_rotation(-frame.normal, frame.y), ..Default::default() };
+    let (right, up) = (camera.right(), camera.up());
+    let center = (lo + hi) * 0.5;
+    let (mut x0, mut x1, mut y0, mut y1) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+    for i in 0..8 {
+        let c = glam::DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z }) - center;
+        let (x, y) = (c.dot(right), c.dot(up));
+        x0 = x0.min(x);
+        x1 = x1.max(x);
+        y0 = y0.min(y);
+        y1 = y1.max(y);
+    }
+    let target = center + right * ((x0 + x1) * 0.5) + up * ((y0 + y1) * 0.5);
+    let half_h = ((y1 - y0) * 0.5).max((x1 - x0) * 0.5 / aspect).max(1e-5);
+    camera.fit_sphere(target, half_h * 1.1 / 1.15, aspect.max(1.0));
+    camera
 }
 
 /// PNG -> GPUI image (BGRA), white made transparent so it sits on the

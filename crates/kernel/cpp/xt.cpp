@@ -1642,6 +1642,13 @@ StepImport import_of(const std::vector<XtPart>& parts)
     for (double c : p.colour)
       out.colors.push_back((float)c);
     out.has_color.push_back(p.has_colour);
+    for (const auto& [face, c] : p.face_colours)
+    {
+      out.face_part.push_back((uint32_t)(out.names.size() - 1));
+      out.face_index.push_back((uint32_t)face);
+      for (double v : c)
+        out.face_colors.push_back((float)v);
+    }
   }
   return out;
 }
@@ -1660,6 +1667,42 @@ StepImport read_rhino_parts_ffi(rust::Str path)
 StepImport read_native_parts_ffi(rust::Str path)
 {
   return import_of(read_native_parts(std::string(path)));
+}
+
+StepImport read_native_parts_config_ffi(rust::Str path, int32_t config)
+{
+  return import_of(read_native_parts(std::string(path), config));
+}
+
+rust::Vec<AsmNodeF> read_sldasm_tree_ffi(rust::Str path)
+{
+  rust::Vec<AsmNodeF> out;
+  for (const AsmNode& n : read_sldasm_tree(std::string(path)))
+  {
+    AsmNodeF f;
+    f.parent        = n.parent;
+    f.name          = rust::String(n.name);
+    f.file          = rust::String(n.file);
+    f.configuration = rust::String(n.configuration);
+    f.config_id     = n.config_id;
+    f.number        = n.number;
+    for (double v : n.m)
+      f.transform.push_back(v);
+    f.suppressed  = n.suppressed;
+    f.hidden      = n.hidden;
+    f.exclude_bom = n.exclude_bom;
+    f.assembly    = n.assembly;
+    out.push_back(std::move(f));
+  }
+  return out;
+}
+
+rust::Vec<rust::String> extract_zip_ffi(rust::Str zip, rust::Str dir)
+{
+  rust::Vec<rust::String> out;
+  for (const std::string& n : extract_zip(std::string(zip), std::string(dir)))
+    out.push_back(rust::String(n));
+  return out;
 }
 
 StepImport read_sat_parts_ffi(rust::Str path)

@@ -111,6 +111,8 @@ pub fn part_items(doc: &DocModel, tab: TabId, parts: &[BodyId], names: &[String]
         _ => None,
     });
     let props = studio.map(|ps| ps.part_properties.clone());
+    // Inputs excluded from properties are released at their defaults.
+    let config = &studio.map(|ps| ps.configuration.for_properties(config)).unwrap_or_else(|| config.clone());
     let desc = studio.map(|ps| ps.configuration.describe(config)).unwrap_or_default();
     parts
         .iter()
@@ -427,7 +429,7 @@ impl AddItemsDialog {
                             st
                         }
                     };
-                    div().w(px(140.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&st).appearance(false).xsmall()).into_any_element()
+                    gpui_kit::base::input::input_frame(div().w(px(140.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&st).appearance(false).xsmall()).into_any_element()).into_any_element()
                 }
             };
             col = col.child(h_flex().gap_2().child(div().w(px(110.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone())).child(control));
@@ -756,7 +758,7 @@ impl Render for AddItemsDialog {
                 None => {
                     left = left
                         .child(kind_tabs)
-                        .child(div().p(px(6.)).child(div().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small())))
+                        .child(div().p(px(6.)).child(gpui_kit::base::input::input_frame(div().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small()))))
                         .children(self.render_changes(cx))
                         .children(none_available)
                         .child(div().id("add-tree").flex_1().overflow_y_scroll().child(tree));
@@ -1545,7 +1547,7 @@ impl Render for ReleaseDialog {
                     .px(px(6.))
                     .gap(px(4.))
                     .font_weight(FontWeight::NORMAL)
-                    .child(div().flex_1().h(px(28.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small()))
+                    .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small())))
                     .child(small("rel-filter", "filter", "Filter", cx).when(self.filter_open || !self.kinds.is_empty(), |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.filter_open = !this.filter_open;
                         cx.notify();
@@ -1927,7 +1929,7 @@ impl Render for ReleaseDialog {
                     .child(
                         h_flex()
                             .gap(px(4.))
-                            .child(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only)))
+                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
                             // Numbering schemes › Release names: "Generate next
                             // release name" (not for obsoletions).
                             .when(self.seq_names && self.mode == Mode::Release, |d| {

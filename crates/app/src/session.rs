@@ -53,6 +53,19 @@ impl Session {
         Ok(self.store.head(self.branch)?)
     }
 
+    /// The name of the version being viewed ("V1"), when the viewed point in
+    /// history is a version.
+    pub fn viewing_version(&self) -> Option<String> {
+        let mv = self.viewing?;
+        if let Some(v) = self.store.list_versions().ok()?.into_iter().find(|v| v.microversion == mv) {
+            return Some(v.name);
+        }
+        // The first point of the history is the "Start" version (live:
+        // "Versions are view only. Viewing Start.").
+        let graph = self.store.graph().ok()?;
+        graph.microversions.iter().find(|m| m.id == mv && m.parents.is_empty()).map(|_| "Start".to_string())
+    }
+
     /// No edits: viewing a point in history, or Onshape's "view only mode".
     pub fn read_only(&self) -> bool {
         self.viewing.is_some() || self.view_only

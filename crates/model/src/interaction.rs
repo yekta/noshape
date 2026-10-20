@@ -731,6 +731,22 @@ mod tests {
         assert!(z.0.z < -1e-6, "flipped extrude goes below the plane: {z:?}");
     }
 
+    /// Live (part-studio/585–590): Add folder with nothing selected makes an
+    /// empty "New folder (0)" at the rollback bar; with a selection it wraps
+    /// it, collapsed.
+    #[test]
+    fn new_folder_empty_at_rollback_or_wrapping_the_selection() {
+        let mut ps = studio();
+        let last = ps.features.last().unwrap().id;
+        let empty = ps.new_folder(&[], Some("New folder".into()));
+        assert_eq!(ps.folder_count(empty), 0);
+        assert_eq!(ps.folder(empty).and_then(|f| f.after), Some(last));
+        assert_eq!(ps.empty_folders_after(Some(last)).len(), 1);
+        let wrap = ps.new_folder(&[FeatureId(1003)], Some("New folder".into()));
+        assert_eq!(ps.folder_count(wrap), 1);
+        assert!(ps.folder(wrap).unwrap().collapsed);
+    }
+
     #[test]
     fn folders_nest_and_unpack_into_their_parent() {
         let mut ps = studio();
@@ -850,6 +866,7 @@ mod tests {
             bounds: None,
             composite: None,
             is_mesh: false,
+            face_colors: Vec::new(),
         };
         let d = StudioDisplay { bodies: vec![body], ..Default::default() };
         let hits = entities_along_ray(&d, DVec3::new(0.0, 0.01, 5.0), DVec3::NEG_Z, 0.05, &|_| false, 20);

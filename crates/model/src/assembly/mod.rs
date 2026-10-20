@@ -56,6 +56,19 @@ pub enum InstanceSource {
 }
 
 impl InstanceSource {
+    /// The configuration the source is used in (None for standard content).
+    pub fn config_mut(&mut self) -> Option<&mut ConfigValues> {
+        match self {
+            InstanceSource::Part { config, .. }
+            | InstanceSource::PartStudio { config, .. }
+            | InstanceSource::Assembly { config, .. }
+            | InstanceSource::MirroredPart { config, .. }
+            | InstanceSource::External { config, .. }
+            | InstanceSource::Sketch { config, .. } => Some(config),
+            InstanceSource::Standard { .. } => None,
+        }
+    }
+
     /// The opposite-handed version of a part source (mirrored parts turn
     /// back into the plain part). `None` for Part Studios and assemblies.
     pub fn mirrored(&self) -> Option<InstanceSource> {
@@ -680,6 +693,10 @@ pub struct AssemblyProperties {
     /// Subassembly BOM behavior.
     #[serde(default, skip_serializing_if = "BomBehavior::is_default")]
     pub bom_behavior: BomBehavior,
+    /// Mass ☑ Override of the assembly (kg; Mass and section properties
+    /// with the top-level assembly, and its Properties…; live assembly/720–730).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mass_override: Option<f64>,
 }
 
 impl AssemblyProperties {

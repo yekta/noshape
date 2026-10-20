@@ -28,6 +28,8 @@ impl AssemblyView {
     /// Open the dialog with these instances to analyze.
     pub(super) fn open_interference_with(&mut self, instances: Vec<InstanceId>, cx: &mut Context<Self>) {
         let seq = self.ui.interference.as_ref().map_or(0, |d| d.seq);
+        // The dialog's picks are the selection (their list rows highlight).
+        self.selected = instances.clone();
         self.ui.interference = Some(InterferenceDialog { instances, include_standard: false, top_only: false, rows: Vec::new(), meshes: Vec::new(), hover: None, seq });
         self.recompute_interference(cx);
         self.update_capture(cx);
@@ -42,6 +44,7 @@ impl AssemblyView {
 
     pub(super) fn close_interference(&mut self, cx: &mut Context<Self>) {
         if self.ui.interference.take().is_some() {
+            self.selected.clear();
             self.update_capture(cx);
             self.rebuild_scene(false, cx);
             cx.notify();
@@ -57,6 +60,7 @@ impl AssemblyView {
             }
             None => d.instances.push(id),
         }
+        self.selected = d.instances.clone();
         self.recompute_interference(cx);
         cx.notify();
     }

@@ -63,8 +63,8 @@ impl AssemblyView {
             let n = a.configuration.inputs.len() + 1;
             let id = format!("in{}", rand_id());
             let input = match kind {
-                "Checkbox" => ConfigInput { id, name: format!("Checkbox {n}"), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None },
-                "Variable" => ConfigInput { id, name: format!("Variable {n}"), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None },
+                "Checkbox" => ConfigInput { id, name: format!("Checkbox {n}"), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false },
+                "Variable" => ConfigInput { id, name: format!("Variable {n}"), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None, excluded: false },
                 _ => acfg::new_list_input(id, n),
             };
             a.configuration.inputs.push(input);
@@ -128,7 +128,7 @@ impl AssemblyView {
         let mut added = false;
         self.edit(&format!("Configure {mate_name}"), cx, |a| added = a.configure_param(&input, ConfigTarget::Mate(id), param));
         if added {
-            self.ui.cfg_toast = Some(format!("{mate_name} {} added to {input_name}", acfg::param_label(param)));
+            self.show_cfg_toast(format!("{mate_name} {} added to {input_name}", acfg::param_label(param)), false, cx);
             if let Some(s) = &self.mate {
                 s.dialog.update(cx, |d, cx| {
                     if let Some(list) = &mut d.configuring {
@@ -149,7 +149,7 @@ impl AssemblyView {
         let mut added = false;
         self.edit(&format!("Configure suppression : {name}"), cx, |a| added = a.configure_param(&input.id, ConfigTarget::Instance(id), acfg::param::UNSUPPRESSED));
         if added {
-            self.ui.cfg_toast = Some(format!("{name} suppression configured in {}", input.name));
+            self.show_cfg_toast(format!("{name} suppression configured in {}", input.name), false, cx);
         }
         self.panel = Some(SidePanel::Configurations);
         cx.notify();
@@ -171,6 +171,24 @@ impl AssemblyView {
     }
 
     /// The blue "ⓘ <text> ×" message bubble at the top of the graphics area.
+    /// A configuration toast (info, or green success) that fades after
+    /// 4 s like the Part Studio's info / success bubbles.
+    pub(super) fn show_cfg_toast(&mut self, text: String, ok: bool, cx: &mut Context<Self>) {
+        self.ui.cfg_toast = Some(text.clone());
+        self.ui.cfg_toast_ok = ok;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_secs(4)).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if this.ui.cfg_toast.as_deref() == Some(text.as_str()) {
+                    this.ui.cfg_toast = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
     pub(super) fn render_cfg_toast(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let text = self.ui.cfg_toast.clone()?;
         let view = cx.entity();
@@ -184,7 +202,7 @@ impl AssemblyView {
                 .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W }))
                 .flex()
                 .justify_center()
-                .child(crate::os_ui::message_bubble("cfg-toast", crate::os_ui::BubbleKind::Info, text, move |_, _, cx| {
+                .child(crate::os_ui::message_bubble("cfg-toast", if self.ui.cfg_toast_ok { crate::os_ui::BubbleKind::Success } else { crate::os_ui::BubbleKind::Info }, text, move |_, _, cx| {
                     view.update(cx, |this, cx| {
                         this.ui.cfg_toast = None;
                         cx.notify();
@@ -251,20 +269,20 @@ impl AssemblyView {
         let view = cx.entity();
         let main = div()
             .id("acfg-configure")
-            .h(px(28.))
-            .px(px(10.))
+            .h(px(33.))
+            .px(px(10.5))
             .flex()
             .items_center()
             .gap(px(6.))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("table", 16., cx))
+            .child(crate::assets::icon("table", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Assembly"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
         let caret = div()
             .id("acfg-configure-more")
-            .w(px(22.))
-            .h(px(28.))
+            .w(px(26.))
+            .h(px(33.))
             .flex()
             .items_center()
             .justify_center()
@@ -287,18 +305,20 @@ impl AssemblyView {
         v_flex()
             .items_center()
             .pt(px(8.))
-            .child(h_flex().rounded(px(3.)).border_1().border_color(border).bg(pal.panel).child(main).child(caret))
+            .child(h_flex().rounded(px(5.25)).border_1().border_color(border).bg(gpui_kit::white()).child(main).child(caret))
             .child(div().mt(px(105.)).child(crate::assets::icon("config-illustration", 160., cx)))
             .child(
                 v_flex()
                     .mt(px(18.))
                     .items_center()
-                    .text_size(px(13.33))
-                    .line_height(px(20.))
-                    .text_color(pal.text_muted)
-                    .child("Add configurations to create multiple variants of an assembly using")
-                    .child("instance configurations, patterns, mates, mate connectors, or")
-                    .child(h_flex().child("suppression states.\u{a0}").child(link("acfg-help-1", "Learn more about assembly")))
+                    // Live dom assembly-panel-configuration: 14 px #666 on 21 px
+                    // lines in a 400 px box (its line breaks).
+                    .text_size(px(14.))
+                    .line_height(px(21.))
+                    .text_color(rgb(0x666666))
+                    .child("Add configurations to create multiple variants of an assembly")
+                    .child("using instance configurations, patterns, mates, mate connectors,")
+                    .child(h_flex().child("or suppression states.\u{a0}").child(link("acfg-help-1", "Learn more about assembly")))
                     .child(link("acfg-help-2", "configurations.")),
             )
             .into_any_element()
@@ -306,13 +326,147 @@ impl AssemblyView {
 
     /// Column header of a configured parameter: the feature name over the
     /// parameter (two-level header, live 196).
-    fn cfg_column_names(&self, target: ConfigTarget, param: &str, cx: &App) -> (String, &'static str) {
+    fn cfg_column_names(&self, target: ConfigTarget, param: &str, cx: &App) -> (String, String) {
         let asm = self.assembly(cx);
         let name = match target {
             ConfigTarget::Instance(id) => asm.and_then(|a| a.instance(id)).map(|i| i.name.clone()),
             ConfigTarget::Mate(id) => asm.and_then(|a| a.mate(id)).map(|m| m.name.clone()),
         };
-        (name.unwrap_or_else(|| "Deleted".into()), acfg::param_label(param))
+        (name.unwrap_or_else(|| "Deleted".into()), self.cfg_param_label(target, param, cx))
+    }
+
+    /// A column's parameter label; a propagated input reads as the
+    /// instance's own input name.
+    fn cfg_param_label(&self, target: ConfigTarget, param: &str, cx: &App) -> String {
+        match (target, param.strip_prefix(acfg::param::INPUT_PREFIX)) {
+            (ConfigTarget::Instance(id), Some(input)) => self.instance_source_input(id, input, cx).map(|i| i.name).unwrap_or_else(|| input.to_string()),
+            _ => acfg::param_label(param).to_string(),
+        }
+    }
+
+    /// The configuration inputs of an instance's source (its Part Studio or
+    /// subassembly, of this document or another one).
+    fn instance_source_inputs(&self, id: InstanceId, cx: &App) -> Vec<ConfigInput> {
+        let Some(inst) = self.assembly(cx).and_then(|a| a.instance(id)) else { return Vec::new() };
+        let of_tab = |doc: &noshape_model::Document, tab: noshape_model::document::TabId| match doc.tab(tab).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => ps.configuration.inputs.clone(),
+            Some(TabContent::Assembly(a)) => a.configuration.inputs.clone(),
+            _ => Vec::new(),
+        };
+        match &inst.source {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => of_tab(&self.doc.read(cx).session.doc, *studio),
+            InstanceSource::Assembly { assembly, .. } => of_tab(&self.doc.read(cx).session.doc, *assembly),
+            InstanceSource::External { key, .. } => {
+                use noshape_model::assembly::eval::ExternalStudios as _;
+                super::AppExternal.studio(key).map(|(d, t)| of_tab(&d, t)).unwrap_or_default()
+            }
+            InstanceSource::Standard { .. } => Vec::new(),
+        }
+    }
+
+    fn instance_source_input(&self, id: InstanceId, input: &str, cx: &App) -> Option<ConfigInput> {
+        self.instance_source_inputs(id, cx).into_iter().find(|i| i.id == input)
+    }
+
+    /// The Configuration visibility conditions dialog (psb's
+    /// `config_visibility`) for every input, or one input (input ⋯).
+    fn open_asm_visibility(&mut self, input: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let cfg = noshape_model::configuration::Configuration { inputs: self.asm_configuration(cx).inputs, configured: Vec::new() };
+        let values = self.ui.config_values.clone();
+        let view = cx.entity().downgrade();
+        crate::config_visibility::open(
+            cfg,
+            values,
+            input,
+            move |edited, window, cx| {
+                let _ = view.update(cx, |this, cx| {
+                    this.edit("Edit visibility conditions", cx, |a| {
+                        for i in &mut a.configuration.inputs {
+                            if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
+                                i.visible_when = e.visible_when.clone();
+                            }
+                        }
+                    });
+                    this.schedule_eval(window, cx);
+                });
+            },
+            window,
+            cx,
+        );
+    }
+
+    /// Input propagation… (input ⋯; live part-studio/443, help Input
+    /// propagation): psb's dialog over this assembly's instances whose source
+    /// has an input with the same id and kind; ✓ configures the instance's
+    /// input to follow the assembly's (`param::INPUT_PREFIX`).
+    fn open_asm_input_propagation(&mut self, input: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        let cfg = self.asm_configuration(cx);
+        let inputs: Vec<(String, String)> = cfg
+            .inputs
+            .iter()
+            .filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }))
+            .filter(|i| input.is_none_or(|id| i.id == id))
+            .map(|i| (i.id.clone(), i.name.clone()))
+            .collect();
+        if inputs.is_empty() {
+            return;
+        }
+        let instances: Vec<(InstanceId, String)> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+        let mut rows: crate::part_studio::input_propagation::PropagationRows = Vec::new();
+        for (iid, name) in instances {
+            let theirs = self.instance_source_inputs(iid, cx);
+            let cells: Vec<Option<bool>> = inputs
+                .iter()
+                .map(|(id, _)| {
+                    let own = cfg.inputs.iter().find(|i| &i.id == id)?;
+                    let t = theirs.iter().find(|t| &t.id == id)?;
+                    (std::mem::discriminant(&t.kind) == std::mem::discriminant(&own.kind)).then(|| cfg.configured.iter().any(|c| c.target == ConfigTarget::Instance(iid) && c.param == format!("{}{id}", acfg::param::INPUT_PREFIX)))
+                })
+                .collect();
+            if cells.iter().any(|c| c.is_some()) {
+                rows.push((noshape_model::reference::FeatureId(iid.0), name, cells));
+            }
+        }
+        let checked = rows.iter().map(|r| r.2.iter().map(|c| c.unwrap_or(false)).collect()).collect();
+        let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let view = cx.entity().downgrade();
+        let ids: Vec<String> = inputs.iter().map(|i| i.0.clone()).collect();
+        let on_confirm: crate::part_studio::input_propagation::OnConfirm = Rc::new(move |picked, _: &mut Window, cx: &mut App| {
+            let ids = ids.clone();
+            let _ = view.update(cx, |this, cx| this.propagate_asm_inputs(&ids, &picked, cx));
+        });
+        crate::part_studio::input_propagation::open_propagation_dialog(name, inputs, rows, checked, on_confirm, window, cx);
+    }
+
+    /// Configure the picked instances' inputs to follow the assembly's (each
+    /// option to the option with the same id; a checkbox to its state).
+    fn propagate_asm_inputs(&mut self, ids: &[String], picked: &[(usize, noshape_model::reference::FeatureId)], cx: &mut Context<Self>) {
+        let cfg = self.asm_configuration(cx);
+        let picked: Vec<(String, Vec<String>, InstanceId)> = picked
+            .iter()
+            .filter_map(|(k, f)| {
+                let input = cfg.inputs.iter().find(|i| i.id == ids[*k])?;
+                let keys: Vec<String> = match &input.kind {
+                    ConfigInputKind::List { options, .. } => options.iter().map(|o| o.id.clone()).collect(),
+                    _ => vec!["true".into(), "false".into()],
+                };
+                Some((input.id.clone(), keys, InstanceId(f.0)))
+            })
+            .collect();
+        if picked.is_empty() {
+            return;
+        }
+        self.edit("Input propagation", cx, |a| {
+            for (input, keys, iid) in picked {
+                let param = format!("{}{input}", acfg::param::INPUT_PREFIX);
+                if a.configuration.configured.iter().any(|c| c.target == ConfigTarget::Instance(iid) && c.param == param) {
+                    continue;
+                }
+                let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
+                a.configuration.configured.push(acfg::AsmConfiguredParam { input: input.clone(), target: ConfigTarget::Instance(iid), param, values });
+            }
+        });
+        self.show_cfg_toast("Matching parameters successfully configured.".into(), true, cx);
     }
 
     fn render_asm_config_input(&mut self, cfg: &acfg::AsmConfiguration, input: &ConfigInput, cx: &mut Context<Self>) -> AnyElement {
@@ -432,6 +586,15 @@ impl AssemblyView {
                                         })
                                     }
                                 }))
+                                // psb's dialogs, for this input (live 200).
+                                .item(crate::os_menu::OsMenuItem::new("Visibility conditions…").on_click({
+                                    let (v, r) = (v.clone(), iid.clone());
+                                    move |_, window, cx| v.update(cx, |this, cx| this.open_asm_visibility(Some(r.clone()), window, cx))
+                                }))
+                                .item(crate::os_menu::OsMenuItem::new("Input propagation…").on_click({
+                                    let (v, r) = (v.clone(), iid.clone());
+                                    move |_, window, cx| v.update(cx, |this, cx| this.open_asm_input_propagation(Some(&r), window, cx))
+                                }))
                                 .separator()
                                 .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| {
                                     let d = d.clone();
@@ -483,7 +646,7 @@ impl AssemblyView {
                     let (fname, _) = self.cfg_column_names(t, &columns[i].1.param, cx);
                     let mut sub = h_flex();
                     for (_, c) in &columns[i..i + span] {
-                        sub = sub.child(head(COL_W).child(div().truncate().child(acfg::param_label(&c.param))));
+                        sub = sub.child(head(COL_W).child(div().truncate().child(self.cfg_param_label(c.target, &c.param, cx))));
                     }
                     hrow = hrow.child(v_flex().child(head(COL_W * span as f32).child(div().truncate().child(fname))).child(sub));
                     i += span;
@@ -621,6 +784,38 @@ impl AssemblyView {
                 })))
                 .into_any_element();
         }
+        // A propagated input: the instance's option, chosen from its own list.
+        if let (Some(ParamValue::Text(t)), Some(input), ConfigTarget::Instance(iid)) = (&val, c.param.strip_prefix(acfg::param::INPUT_PREFIX), c.target) {
+            let options: Vec<(String, String)> = match self.instance_source_input(iid, input, cx).map(|i| i.kind) {
+                Some(ConfigInputKind::List { options, .. }) => options.into_iter().map(|o| (o.id, o.name)).collect(),
+                Some(ConfigInputKind::Checkbox { .. }) => vec![("true".into(), "Checked".into()), ("false".into(), "Unchecked".into())],
+                _ => Vec::new(),
+            };
+            let label = options.iter().find(|(id, _)| id == t).map(|(_, n)| n.clone()).unwrap_or_else(|| t.clone());
+            let view = cx.entity();
+            return div()
+                .id(SharedString::from(format!("acv-sel-{ci}-{key}")))
+                .flex_1()
+                .h_full()
+                .px(px(3.))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .child(h_flex().w_full().child(div().flex_1().truncate().text_size(px(14.)).child(label)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))))
+                .os_dropdown_menu(SharedString::from(format!("acv-dd-{ci}-{key}")), true, move |mut menu, _, _| {
+                    for (id, name) in options.clone() {
+                        let (v, kk) = (view.clone(), kk.clone());
+                        menu = menu.item(crate::os_menu::OsMenuItem::new(name).on_click(move |_, _, cx| {
+                            let (kk, id) = (kk.clone(), id.clone());
+                            v.update(cx, |this, cx| {
+                                this.edit("Edit configured value", cx, |a| a.set_config_cell(ci, &kk, ParamValue::Text(id)));
+                            })
+                        }));
+                    }
+                    menu
+                })
+                .into_any_element();
+        }
         let text = match &val {
             Some(ParamValue::Expr(e)) => e.text.clone(),
             _ => String::new(),
@@ -706,6 +901,20 @@ impl AssemblyView {
     }
 
     /// The docked 712 px Configuration panel.
+    /// The Configurations panel's "Filter inputs" field (made on first use).
+    pub(super) fn ensure_cfg_filter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ui.cfg_filter.is_some() {
+            return;
+        }
+        let f = cx.new(|cx| InputState::new(window, cx));
+        self.ui.cfg_filter_sub = Some(cx.subscribe(&f, |_, _, ev: &InputEvent, cx| {
+            if matches!(ev, InputEvent::Change) {
+                cx.notify();
+            }
+        }));
+        self.ui.cfg_filter = Some(f);
+    }
+
     pub(super) fn render_asm_config_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let cfg = self.asm_configuration(cx);
@@ -750,19 +959,100 @@ impl AssemblyView {
         } else if self.ui.cfg_props_tab {
             self.render_cfg_properties(&cfg, cx)
         } else {
-            let mut col = v_flex().child(
-                h_flex()
-                    .h(px(34.))
-                    .gap(px(6.))
-                    .px(px(4.))
-                    .child(crate::ui::glyph("filter", 16., pal.text))
-                    .child(div().flex_1().h(px(24.)).border_1().border_color(pal.border_strong).rounded(px(2.)).flex().items_center().pl(px(6.)).italic().text_size(px(13.)).text_color(pal.text_faint).child("Filter inputs"))
-                    .child(crate::assets::icon("table", 20., cx))
-                    .child(crate::assets::icon("checkbox-input", 20., cx))
-                    .child(crate::assets::icon("variable", 20., cx))
-                    .child(crate::assets::icon("more", 20., cx)),
+            // Filter row as in the Part Studio panel (the same Onshape
+            // component): funnel, "Filter inputs" (name filter), the kind
+            // toggles "Show only … inputs", and ⋯ (Copy all inputs,
+            // Collapse / Expand all inputs).
+            let query = self.ui.cfg_filter.as_ref().map(|f| f.read(cx).value().trim().to_lowercase()).unwrap_or_default();
+            let filter_el: AnyElement = match &self.ui.cfg_filter {
+                Some(f) => div()
+                    .flex_1()
+                    .child(gpui_kit::base::input::input_frame(
+                        div()
+                            .relative()
+                            .h(px(24.))
+                            .border_1()
+                            .border_color(pal.border_strong)
+                            .rounded(px(2.))
+                            .flex()
+                            .items_center()
+                            .child(Input::new(f).appearance(false).small().text_size(px(13.)))
+                            .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().italic().text_size(px(13.)).text_color(pal.text_faint).child("Filter inputs"))),
+                    ))
+                    .into_any_element(),
+                None => div().flex_1().into_any_element(),
+            };
+            let kinds = [("table", "list"), ("checkbox-input", "checkbox"), ("variable", "configuration variable")];
+            let mut row = h_flex().h(px(34.)).gap(px(6.)).px(px(4.)).child(crate::ui::glyph("filter", 16., pal.text)).child(filter_el);
+            for (k, (icon, what)) in kinds.into_iter().enumerate() {
+                let only = self.ui.cfg_only_kinds[k];
+                row = row.child(
+                    div()
+                        .id(SharedString::from(format!("acfg-kind-{k}")))
+                        .size(px(26.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.))
+                        .cursor_pointer()
+                        .when(only, |d| d.bg(pal.panel_active))
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .tooltip(crate::ui::tooltip(format!("Show only {what} inputs")))
+                        .child(crate::assets::icon(icon, 20., cx))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.ui.cfg_only_kinds[k] = !this.ui.cfg_only_kinds[k];
+                            cx.notify();
+                        })),
+                );
+            }
+            let ids: Vec<String> = cfg.inputs.iter().map(|i| i.id.clone()).collect();
+            let all_folded = !ids.is_empty() && ids.iter().all(|id| self.ui.cfg_folded.contains(id));
+            let view = cx.entity();
+            row = row.child(
+                div().id("acfg-panel-more").size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                    let (view, ids) = (view.clone(), ids.clone());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                        let (v1, v2, ids) = (view.clone(), view.clone(), ids.clone());
+                        let several = ids.len() > 1;
+                        let mut m = m.list_no_icons().item(crate::os_menu::OsMenuItem::new("Copy all inputs").on_click(move |_, _, cx| {
+                            v1.update(cx, |this, cx| {
+                                crate::config_visibility::copy_inputs(this.asm_configuration(cx).inputs.clone());
+                                this.show_cfg_toast("Inputs copied.".into(), true, cx);
+                            })
+                        }));
+                        if several {
+                            m = m.item(crate::os_menu::OsMenuItem::new(if all_folded { "Expand all inputs" } else { "Collapse all inputs" }).on_click(move |_, _, cx| {
+                                let ids = ids.clone();
+                                v2.update(cx, |this, cx| {
+                                    if all_folded {
+                                        this.ui.cfg_folded.clear();
+                                    } else {
+                                        this.ui.cfg_folded.extend(ids);
+                                    }
+                                    cx.notify();
+                                })
+                            }));
+                        }
+                        // Live (Part Studio panel 434): then Visibility
+                        // conditions… and Input propagation… for every input.
+                        let (v3, v4) = (view.clone(), view.clone());
+                        m.item(crate::os_menu::OsMenuItem::new("Visibility conditions…").on_click(move |_, window, cx| v3.update(cx, |this, cx| this.open_asm_visibility(None, window, cx))))
+                            .item(crate::os_menu::OsMenuItem::new("Input propagation…").on_click(move |_, window, cx| v4.update(cx, |this, cx| this.open_asm_input_propagation(None, window, cx))))
+                    });
+                    crate::os_menu::open(e.position(), menu, window, cx);
+                }),
             );
+            let mut col = v_flex().child(row);
+            let only = self.ui.cfg_only_kinds;
             for input in cfg.inputs.clone() {
+                let kind_ix = match input.kind {
+                    ConfigInputKind::List { .. } => 0,
+                    ConfigInputKind::Checkbox { .. } => 1,
+                    _ => 2,
+                };
+                if (only.iter().any(|o| *o) && !only[kind_ix]) || (!query.is_empty() && !input.name.to_lowercase().contains(&query)) {
+                    continue;
+                }
                 col = col.child(self.render_asm_config_input(&cfg, &input, cx));
             }
             col.into_any_element()
@@ -834,30 +1124,7 @@ impl AssemblyView {
                     .tooltip(crate::ui::tooltip("Modify visibility conditions"))
                     // Live: the Configuration visibility conditions dialog for
                     // every input (psb's config_visibility).
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        let cfg = noshape_model::configuration::Configuration { inputs: this.asm_configuration(cx).inputs, configured: Vec::new() };
-                        let values = this.ui.config_values.clone();
-                        let view = cx.entity().downgrade();
-                        crate::config_visibility::open(
-                            cfg,
-                            values,
-                            None,
-                            move |edited, window, cx| {
-                                let _ = view.update(cx, |this, cx| {
-                                    this.edit("Edit visibility conditions", cx, |a| {
-                                        for i in &mut a.configuration.inputs {
-                                            if let Some(e) = edited.inputs.iter().find(|e| e.id == i.id) {
-                                                i.visible_when = e.visible_when.clone();
-                                            }
-                                        }
-                                    });
-                                    this.schedule_eval(window, cx);
-                                });
-                            },
-                            window,
-                            cx,
-                        );
-                    })),
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_asm_visibility(None, window, cx))),
             )
             .child(
                 div()

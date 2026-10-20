@@ -279,5 +279,146 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const n = size(evaluateQuery(context, qContainsPoint(qCreatedBy(sub + "sk", EntityType.VERTEX), vector(5, 5, 2400) * mm)));
             check("skConicSegment low/highParameter", n == 1, n);
         });
+        step(context, id, "modifycomposite", function(sub) {
+            fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 2500) * mm, "corner2" : vector(1, 1, 2501) * mm });
+            fCuboid(context, sub + "b", { "corner1" : vector(2, 0, 2500) * mm, "corner2" : vector(3, 1, 2501) * mm });
+            fCuboid(context, sub + "c", { "corner1" : vector(4, 0, 2500) * mm, "corner2" : vector(5, 1, 2501) * mm });
+            opCreateCompositePart(context, sub + "cp", { "bodies" : qUnion([qCreatedBy(sub + "a", EntityType.BODY), qCreatedBy(sub + "b", EntityType.BODY)]) });
+            const cp = qCreatedBy(sub + "cp", EntityType.BODY);
+            opModifyCompositePart(context, sub + "m", { "composite" : cp, "toAdd" : qCreatedBy(sub + "c", EntityType.BODY), "toRemove" : qCreatedBy(sub + "a", EntityType.BODY) });
+            const v = evVolume(context, { "entities" : qCreatedBy(sub + "cp", EntityType.BODY) });
+            check("opModifyCompositePart", abs(v - 2 * mm ^ 3) < 1e-12 * meter ^ 3, v);
+        });
+        step(context, id, "curvderiv", function(sub) {
+            fCylinder(context, sub + "c", { "bottomCenter" : vector(0, 0, 2600) * mm, "topCenter" : vector(0, 0, 2610) * mm, "radius" : 10 * mm });
+            const circle = qContainsPoint(qCreatedBy(sub + "c", EntityType.EDGE), vector(0, 10, 2600) * mm);
+            const d = evEdgeCurvatureDerivative(context, { "edge" : circle, "parameter" : 0.3 });
+            const dev = evPointsDeviation(context, { "points" : [vector(0, 0, 2600) * mm, vector(20, 0, 2600) * mm], "topologies" : circle, "allDeviations" : true });
+            check("evEdgeCurvatureDerivative+evPointsDeviation", abs(norm(d) - 10000) < 1 && size(dev) == 2 && abs(dev[1].deviation - 10 * mm) < 1e-9 * meter, [norm(d), dev]);
+        });
+        step(context, id, "fullround", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 2700) * mm, "corner2" : vector(4, 20, 2710) * mm });
+            const face = function(p) { return qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), p); };
+            const before = evVolume(context, { "entities" : qCreatedBy(sub + "c", EntityType.BODY) });
+            opFullRoundFillet(context, sub + "f", { "side1Face" : face(vector(0, 10, 2705) * mm), "side2Face" : face(vector(4, 10, 2705) * mm),
+                    "centerFaces" : face(vector(2, 10, 2710) * mm), "tangentPropagation" : false });
+            const after = evVolume(context, { "entities" : qCreatedBy(sub + "c", EntityType.BODY) });
+            check("opFullRoundFillet", after < before && after > before * 0.9, [before, after]);
+        });
+        step(context, id, "curvesonface", function(sub) {
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 2800) * mm, "corner2" : vector(10, 20, 2810) * mm });
+            const top = qContainsPoint(qCreatedBy(sub + "c", EntityType.FACE), vector(5, 5, 2810) * mm);
+            opCreateCurvesOnFace(context, sub + "i", { "curveDefinition" : [curveOnFaceDefinition(top, FaceCurveCreationType.DIR1_ISO, ["a", "b"], [0.25, 0.75])] });
+            const n = size(evaluateQuery(context, qCreatedBy(sub + "i", EntityType.EDGE)));
+            const a = size(evaluateQuery(context, qCreatedBy(sub + "i" + "a", EntityType.EDGE)));
+            check("opCreateCurvesOnFace", n == 2 && a == 1, [n, a]);
+        });
+        step(context, id, "hole", function(sub) {
+            fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 2900) * mm, "corner2" : vector(10, 10, 2910) * mm });
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 2890) * mm, "corner2" : vector(10, 10, 2900) * mm });
+            const both = qUnion([qCreatedBy(sub + "a", EntityType.BODY), qCreatedBy(sub + "b", EntityType.BODY)]);
+            const def = holeDefinition([
+                        holeProfileBeforeReference(HolePositionReference.TARGET_START, 0 * mm, 3 * mm, { "name" : "a" }),
+                        holeProfile(HolePositionReference.TARGET_START, 2 * mm, 3 * mm, { "name" : "b" }),
+                        holeProfile(HolePositionReference.TARGET_START, 2 * mm, 1.5 * mm, { "name" : "c" }),
+                        holeProfile(HolePositionReference.LAST_TARGET_START, 4 * mm, 1.5 * mm, { "name" : "d" }),
+                        holeProfile(HolePositionReference.LAST_TARGET_START, 5 * mm, 0 * mm, { "name" : "tip" })
+                    ], { "faceNames" : ["cap", "cbore", "cboreFloor", "shaft", "tip"] });
+            const r = opHole(context, sub + "h", { "holeDefinition" : def, "axes" : [line(vector(5, 5, 2915) * mm, vector(0, 0, -1))], "targets" : both });
+            const ex = r[0].targetToDepthExtremes[qCreatedBy(sub + "b", EntityType.BODY)];
+            var exB;
+            for (var q, e in r[0].targetToDepthExtremes)
+            {
+                if (e.firstEntrance > 10 * mm)
+                    exB = e;
+            }
+            const refs = r[0].positionReferenceInfo;
+            const ok = r[0].success && size(r[0].targetToDepthExtremes) == 2 && abs(exB.firstEntrance - 15 * mm) < 1e-9 * meter && abs(exB.fullExit - 25 * mm) < 1e-9 * meter &&
+                abs(refs[HolePositionReference.TARGET_START].referenceRootEnd - 5 * mm) < 1e-9 * meter &&
+                abs(refs[HolePositionReference.LAST_TARGET_START].referenceRootStart - 15 * mm) < 1e-9 * meter;
+            check("opHole return", ok, r);
+            check("opHole holeDepth", abs(r[0].holeDepth - 14 * mm) < 1e-9 * meter, r[0].holeDepth);
+            // Live dom/fs-ophole.txt: faces cap 0, cbore 1, cboreFloor 1, shaft 2, tip 1; profiles a 0, b/c/d one
+            // edge, tip one vertex; 5 faces, 4 profiles in all.
+            var counts = [];
+            for (var n in ["cap", "cbore", "cboreFloor", "shaft", "tip"])
+                counts = append(counts, size(evaluateQuery(context, qOpHoleFace(sub + "h", { "name" : n }))));
+            for (var n in ["a", "b", "c", "d"])
+                counts = append(counts, size(evaluateQuery(context, qEntityFilter(qOpHoleProfile(sub + "h", { "name" : n }), EntityType.EDGE))));
+            counts = append(counts, size(evaluateQuery(context, qEntityFilter(qOpHoleProfile(sub + "h", { "name" : "tip" }), EntityType.VERTEX))));
+            counts = append(counts, size(evaluateQuery(context, qOpHoleFace(sub + "h"))));
+            counts = append(counts, size(evaluateQuery(context, qOpHoleProfile(sub + "h"))));
+            const vol = evVolume(context, { "entities" : qCreatedBy(sub + "a", EntityType.BODY) });
+            check("opHole faces/profiles", counts == [0, 1, 1, 2, 1, 0, 1, 1, 1, 1, 5, 4] && vol < 1000 * mm ^ 3, [counts, vol, ex]);
+            // Slanted entrance (live case 2): extremes on the 1.5 mm shaft, TARGET_START range on the 3 mm counterbore.
+            const sk = newSketchOnPlane(context, sub + "wsk", { "sketchPlane" : plane(vector(0, 100, 2900) * mm, vector(0, -1, 0), vector(1, 0, 0)) });
+            skPolyline(sk, "p", { "points" : [vector(0, 0) * mm, vector(20, 0) * mm, vector(20, 12) * mm, vector(0, 10) * mm, vector(0, 0) * mm] });
+            skSolve(sk);
+            opExtrude(context, sub + "W", { "entities" : qSketchRegion(sub + "wsk"), "direction" : vector(0, 1, 0), "endBound" : BoundingType.BLIND, "endDepth" : 20 * mm });
+            const r2 = opHole(context, sub + "h2", { "holeDefinition" : def, "axes" : [line(vector(10, 110, 2920) * mm, vector(0, 0, -1))], "targets" : qCreatedBy(sub + "W", EntityType.BODY) });
+            const ts = r2[0].positionReferenceInfo[HolePositionReference.TARGET_START];
+            var e2;
+            for (var q, e in r2[0].targetToDepthExtremes)
+                e2 = e;
+            const near = function(a, b) { return abs(a - b * mm) < 1e-6 * mm; };
+            check("opHole slanted", near(ts.referenceRootStart, 8.7) && near(ts.referenceRootEnd, 9.3) && near(e2.firstEntrance, 8.85) && near(e2.fullEntrance, 9.15) && near(r2[0].holeDepth, 4.3), r2);
+            // Misses: HOLE_NO_HITS with the targets at fault; a second axis that misses is { success : false }.
+            const miss = try silent(opHole(context, sub + "h3", { "holeDefinition" : def, "axes" : [line(vector(500, 5, 2915) * mm, vector(0, 0, -1))], "targets" : both }));
+            var thrown;
+            try silent
+            {
+                opHole(context, sub + "h4", { "holeDefinition" : def, "axes" : [line(vector(500, 5, 2915) * mm, vector(0, 0, -1))], "targets" : both });
+            }
+            catch (e)
+            {
+                thrown = e;
+            }
+            const mixed = opHole(context, sub + "h5", { "holeDefinition" : def, "axes" : [line(vector(2, 8, 2915) * mm, vector(0, 0, -1)), line(vector(500, 5, 2915) * mm, vector(0, 0, -1))], "targets" : both });
+            check("opHole misses", miss == undefined && thrown.message == ErrorStringEnum.HOLE_NO_HITS && thrown.faultyParameters == ["targets"] && mixed[0].success && mixed[1] == { "success" : false }, [thrown, mixed]);
+        });
+        step(context, id, "offsetwire", function(sub) {
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 3000) * mm, vector(0, 0, 1)) });
+            skPolyline(sk, "l", { "points" : [vector(0, 0) * mm, vector(20, 0) * mm, vector(20, 10) * mm] });
+            skRectangle(sk, "r", { "firstCorner" : vector(40, 0) * mm, "secondCorner" : vector(60, 10) * mm });
+            skSolve(sk);
+            const open = qUnion([sketchEntityQuery(sub + "sk", EntityType.EDGE, "l.line0"), sketchEntityQuery(sub + "sk", EntityType.EDGE, "l.line1")]);
+            opOffsetWire(context, sub + "o", { "edges" : open, "normal" : vector(0, 0, 1), "offset1" : 1 * mm, "offset2" : 0 * mm, "makeRegions" : true });
+            const a = evArea(context, { "entities" : qCreatedBy(sub + "o", EntityType.FACE) });
+            // Left of the first edge (+x direction, seen from +z) is +y: inside the L corner.
+            const inside = size(evaluateQuery(context, qContainsPoint(qCreatedBy(sub + "o", EntityType.FACE), vector(10, 0.5, 3000) * mm)));
+            const rect = qCreatedBy(sub + "sk", EntityType.EDGE);
+            opOffsetWire(context, sub + "c", { "edges" : qSubtraction(rect, open), "normal" : vector(0, 0, 1), "offset1" : 1 * mm, "offset2" : 1 * mm, "makeRegions" : true });
+            const ca = evArea(context, { "entities" : qCreatedBy(sub + "c", EntityType.FACE) });
+            opOffsetWire(context, sub + "w", { "edges" : open, "normal" : vector(0, 0, -1), "offset1" : 1 * mm, "offset2" : 0 * mm });
+            const wires = size(evaluateQuery(context, qCreatedBy(sub + "w", EntityType.BODY)));
+            check("opOffsetWire", abs(a - 29 * mm ^ 2) < 1e-9 * meter ^ 2 && inside == 1 && abs(ca - 120 * mm ^ 2) < 1e-6 * mm ^ 2 && wires == 1, [a, inside, ca, wires]);
+        });
+        step(context, id, "offsetdetect", function(sub) {
+            fCuboid(context, sub + "plate", { "corner1" : vector(0, 0, 3100) * mm, "corner2" : vector(40, 20, 3102) * mm });
+            fCylinder(context, sub + "outer", { "bottomCenter" : vector(100, 0, 3100) * mm, "topCenter" : vector(100, 0, 3110) * mm, "radius" : 7 * mm });
+            fCylinder(context, sub + "inner", { "bottomCenter" : vector(100, 0, 3099) * mm, "topCenter" : vector(100, 0, 3111) * mm, "radius" : 5 * mm });
+            opBoolean(context, sub + "tube", { "tools" : qCreatedBy(sub + "inner", EntityType.BODY), "targets" : qCreatedBy(sub + "outer", EntityType.BODY), "operationType" : BooleanOperationType.SUBTRACTION });
+            fCuboid(context, sub + "thin", { "corner1" : vector(0, 300, 3100) * mm, "corner2" : vector(20, 320, 3101) * mm });
+            fCuboid(context, sub + "thick", { "corner1" : vector(50, 300, 3100) * mm, "corner2" : vector(70, 320, 3103) * mm });
+            const plate = evOffsetDetection(context, { "bodies" : qCreatedBy(sub + "plate", EntityType.BODY) });
+            const tube = evOffsetDetection(context, { "bodies" : qCreatedBy(sub + "outer", EntityType.BODY) });
+            const tt = evOffsetDetection(context, { "bodies" : qUnion([qCreatedBy(sub + "thin", EntityType.BODY), qCreatedBy(sub + "thick", EntityType.BODY)]) });
+            const all = evOffsetDetection(context, { "bodies" : qUnion([qCreatedBy(sub + "plate", EntityType.BODY), qCreatedBy(sub + "outer", EntityType.BODY), qCreatedBy(sub + "thin", EntityType.BODY), qCreatedBy(sub + "thick", EntityType.BODY)]) });
+            const areaOf = function(q) { return evArea(context, { "entities" : q }); };
+            const ok = size(plate) == 1 && size(plate[0].side0) == 1 && abs(plate[0].offsetLow - 2 * mm) < 1e-9 * meter && abs(areaOf(plate[0].side0[0]) - 800 * mm ^ 2) < 1e-9 * meter ^ 2 &&
+                size(tube) == 1 && abs(tube[0].offsetHigh - 2 * mm) < 1e-9 * meter &&
+                size(tt) == 1 && abs(tt[0].offsetLow - 1 * mm) < 1e-9 * meter &&
+                size(all) == 2;
+            check("evOffsetDetection", ok, [plate, tube, tt, all]);
+        });
+        step(context, id, "packed", function(sub) {
+            const top = qCompressed(1.0, "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY", newId());
+            const prefixed = qCompressed(1.0, "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY", makeId("X"));
+            const both = qCompressed(1.0, "%B5$QueryM2S9$queryTypeB9$QueryTypeS5$UNIONSa$subqueriesA2C0M4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpR0S5$DUMMYC0M4R3C6S6$VERTEXR5R6R7CbA1S6.7$OriginpointOpR0Ra", newId());
+            const ok = top.entityType == EntityType.FACE && top is Query && prefixed.operationId == makeId("X") + "Top.planeOp" &&
+                size(evaluateQuery(context, top)) == 1 && size(evaluateQuery(context, prefixed)) == 0 && size(evaluateQuery(context, both)) == 2 &&
+                both.queryType == QueryType.UNION;
+            check("qCompressed", ok, [top, prefixed, both]);
+        });
         println("done");
     });

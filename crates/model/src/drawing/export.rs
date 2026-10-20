@@ -85,6 +85,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     // Sheet layers per element (exploded text keeps its text's layer).
     let mut ll: Vec<Option<SheetLayer>> = (0..g.lines.len()).map(|i| g.line_sheet_layer(i)).collect();
     let mut fl: Vec<Option<SheetLayer>> = (0..g.fills.len()).map(|i| g.fill_sheet_layer(i)).collect();
+    // Line pens (Adjust linestyle); added lines use their style's pen.
+    let mut lp: Vec<Option<(f64, Vec<f64>)>> = (0..g.lines.len()).map(|i| g.pens.iter().rev().find(|s| s.lines.contains(&i)).map(|p| (p.width_mm, p.dashes.clone()))).collect();
     let mut tl: Vec<Option<SheetLayer>> = Vec::new();
     out.fonts.clear();
     if o.underline_overrides {
@@ -133,6 +135,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             v.retain(|_| *k.next().unwrap_or(&true));
         }
         filter(&mut lc, &keep_l);
+        lp.resize(keep_l.len(), None);
+        filter(&mut lp, &keep_l);
         filter(&mut fc, &keep_f);
         filter(&mut tc, &keep_t);
         filter(&mut ll, &keep_l);
@@ -148,6 +152,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         out.texts.retain(|_| *k.next().unwrap_or(&true));
     }
     out.colors = spans_of(&lc, &tc, &fc);
+    out.pens = lp.into_iter().enumerate().filter_map(|(i, p)| p.map(|(width_mm, dashes)| super::sheet::PenSpan { lines: i..i + 1, width_mm, dashes })).collect();
     let one = |i: usize, l: &Option<SheetLayer>, k: u8| l.map(|layer| LayerSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
     out.layers = ll.iter().enumerate().filter_map(|(i, l)| one(i, l, 0)).chain(tl.iter().enumerate().filter_map(|(i, l)| one(i, l, 1))).chain(fl.iter().enumerate().filter_map(|(i, l)| one(i, l, 2))).collect();
     out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
@@ -231,13 +236,13 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         let pts: Vec<String> = l.points.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
         let tag = if l.closed { "polygon" } else { "polyline" };
         let stroke = g.line_color(li).map(|c| format!(r#" stroke="{}""#, hex(Some(c)))).unwrap_or_default();
-        let dash = l.style.dashes();
+        let (width_mm, dash) = g.line_pen(li);
         let dash_attr = if dash.is_empty() {
             String::new()
         } else {
             format!(r#" stroke-dasharray="{}""#, dash.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(" "))
         };
-        let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}{stroke}/>"#, pts.join(" "), l.style.width_mm());
+        let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}{stroke}/>"#, pts.join(" "), width_mm);
     }
     for (fi, f) in g.fills.iter().enumerate() {
         let pts: Vec<String> = f.points.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
@@ -494,14 +499,14 @@ fn pdf_content(g: &SheetGeometry) -> String {
             continue;
         }
         let _ = writeln!(content, "{} RG", rgb(g.line_color(li)));
-        let dash = l.style.dashes();
+        let (width_mm, dash) = g.line_pen(li);
         if dash.is_empty() {
             content.push_str("[] 0 d\n");
         } else {
             let d: Vec<String> = dash.iter().map(|x| format!("{:.3}", x * pt)).collect();
             let _ = writeln!(content, "[{}] 0 d", d.join(" "));
         }
-        let _ = writeln!(content, "{:.3} w", l.style.width_mm() * pt);
+        let _ = writeln!(content, "{:.3} w", width_mm * pt);
         for (i, p) in l.points.iter().enumerate() {
             let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
         }

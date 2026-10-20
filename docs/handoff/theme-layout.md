@@ -695,25 +695,67 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   cursors with their hot spots and mac/Windows variants, the CSS cursor rules by control). Live
   capture of the ❓ states requested (REQUESTS.md 20 Oct). Onshape's cursor files can be looked at
   for reference in /tmp/ui/cursor-ref (fetched from cad.onshape.com, never copied into the repo).
-- **Infrastructure** (cursor.rs, rewritten): `AppCursor` = `Count(1..=6)` (6 = "5+"), `Crosshair`
-  (15 px, hot 7.5), `Confirmation` (hot 1,1), `RemoveSelection`, `SnapMate` (hot 7.5), and CSS
-  standard `Move`, `ZoomIn`, `NoDrop`, `Wait`, `Help`. Image art is ours (SVG built at runtime;
-  Windows gets the white-arrow variants with hot 1,2, other OSes black arrows with hot 3,3).
-  Backends: X11 (RENDER image or the theme cursor by CSS name with fallbacks,
-  `cursor_x11::theme_names`), Wayland (patched gpui-pre-linux: `set_named_cursor` next to
-  `set_custom_cursor`; cursor-shape-v1 `css_to_shape` or theme icon names; `custom_cursor::active`),
-  macOS (`NSCursor` image; `operationNotAllowedCursor` for no-drop), Windows (`HCURSOR` image or
-  `IDC_SIZEALL/IDC_NO/IDC_WAIT/IDC_HELP`).
-- **Viewport**: `tool_cursor` (owner-set top of Onshape's stack) wins over the selection count;
-  the viewport adds Zoom to window (`zoom-in`) and Ctrl during a box select (remove-selection);
-  navigation drags keep the cursor (the bundle pushes nothing for them).
-- **Wired**: Part Studio sketch tools → crosshair (pattern tools keep the arrow), hovering a
-  dimension value → move (the label no longer sets the pointer hand); assembly selection count and
-  snap-mate while a snap drag runs (assembly_view.rs, surgical); feature dialog title = grab, a
-  disabled ✓ = not-allowed. Read back with /tmp/ui-tools/getcursor.py (XFixes).
-- Not yet: confirmation cursor states, no-drop for fixed assembly drags, analysis legend cursors,
-  drawing tools, remaining HTML rules (splitters/resizers/disabled controls/draggable headers);
-  see the ❌ rows in cursors.md.
+- **Live answers** (REQUESTS.md 20 Oct, live/dom/cursors.txt + cursors-*.json) are folded into
+  cursors.md: navigation never changes the cursor; manipulators keep the current cursor; rollback
+  bar and feature rows `default`; disabled dialog ✓ `default`; splitters `row-resize` /
+  `col-resize`; drawing tools a 15 px crosshair (Centermark a boxed one), hot 7,7. Follow-up asked
+  (which selection the count cursor counts while a feature dialog is open).
+- **Infrastructure** (cursor.rs): `AppCursor` = `Count(1..=6)` (6 = "5+"), `Crosshair` (15 px,
+  white caps, hot 7.5 → Chrome truncates to 7,7, and so do we), `CrosshairBox` (drawing
+  Centermark), `Confirmation` (hot 1,1), `RemoveSelection`, `SnapMate`, and CSS standard `Move`
+  (X11/Wayland: `all-scroll`/`fleur`, as Chrome; Windows `IDC_SIZEALL`), `ZoomIn`, `NoDrop`. Art is
+  ours. Backends: X11 (RENDER image or theme cursor, `cursor_x11::theme_names`), Wayland (patched
+  gpui-pre-linux `set_named_cursor` / `set_custom_cursor`), macOS (`NSCursor`), Windows (`HCURSOR` /
+  `IDC_*`). `CursorSync` (cursor.rs) applies an app cursor for a view other than the viewport
+  (drawing sheet, workspace navbar).
+- **Vendored GPUI patches (this round)**: gpui-pre-linux X11 `set_cursor_style` treats a window
+  whose cursor was never set (it showed the root window's X cursor) and a cursor the app set
+  (`custom_cursor::invalidate_style`) as "unset", so GPUI's own style is applied again;
+  gpui-pre `Window::hovered_cursor_style()` (the style the hovered elements asked for).
+- **Viewport**: `tool_cursor` (top of Onshape's stack) wins over the selection count;
+  `overlay_cursor` applies over GPUI overlays drawn on the graphics area (dimension value `move`,
+  analysis color map crosshair); Zoom to window `zoom-in`; Ctrl during a box select
+  remove-selection (Part Studio box and, new, the sketch box, which now also deselects with Ctrl).
+  Clearing our cursor refreshes the window so GPUI puts its own back.
+- **Wired and read back on X11** (/tmp/ui-tools/curtest.sh, curtest2.sh, curtest3.sh;
+  getcursor.py): arrow on a fresh window; sketch tools crosshair 15 px hot 7,7; count 1 and 5+
+  hot 3,3; pattern / transform / offset "click to accept" confirmation hot 1,1 (count cursor
+  while something is pre-highlighted); dimension value all-scroll; Zoom to window zoom-in; Ctrl box
+  remove-selection; drawing Dimension crosshair and Centermark boxed crosshair hot 7,7, no tool
+  arrow. Also: feature dialog title and Create selection title grab; analysis legend grab /
+  grabbing, ticks ew-resize; features/parts splitter row-resize; rollback bar and disabled ✓ the
+  arrow; navbar shows the count cursor over its empty area (Onshape sets it on `.navbar`).
+- Not yet: the count cursor while a feature dialog is open (waiting for the live follow-up),
+  the context-menu layer's count cursor, no left-panel / Configurations-block splitters exist in
+  noshape to give `col-resize` / `row-resize`, disabled-control `not-allowed` audit (feature dialog
+  params, `.disabled-tool`), see the ❌ rows in cursors.md.
+
+## Round 12 (2026-10-20, lead: input hit area; qa4: button cursors, notices layout)
+
+- **Inputs: the whole box is the hit target** (vendor/gpui-base, NOSHAPE PATCH,
+  `src/input/base/frame_hit.rs`, plus `base/mod.rs` probes and `base/state.rs` `FrameHitArea` /
+  `press`). The kit frame (`InputBase`) publishes its padding box while its children prepaint; the
+  text element claims the outermost frame; the frame inserts a hitbox over itself in its own
+  content mask (the text element clips its overflow, and hitboxes are clipped to the mask they are
+  made in), asks for the I-beam before its children paint (a clear button keeps its cursor), and
+  forwards presses outside the text element: focus, caret at the nearest position (`press`, which
+  skips the "default prevented" bail-out because the frame's own focus handling marks the event),
+  drag-select (window-wide already), right-button release for the context menu.
+  App boxes drawn around an `Input::new(..).appearance(false)`: wrap the box in
+  `gpui_kit::base::input::input_frame(..)`. Done for 38 one-line sites (script
+  /tmp/ui-tools/wrapframe.py) plus the feature-list filter, the feature dialog value field, the
+  sketch dimension box and the Variable Studio cells.
+- **Buttons: pointer when clickable, not-allowed when disabled** (vendored gpui-component 0.7.3,
+  NOSHAPE PATCH in `src/button/button.rs`; an app `.cursor(..)` still wins). Arrow overrides where
+  Onshape keeps it: feature dialog ✓/✗ and panel-dialog header ✓/✗ (the `dialog-ok` /
+  `dialog-cancel` icon buttons; not the sketch dimension box's, which are pointer live). Also:
+  Undo/Redo with nothing to do `not-allowed`, active tab default, navbar name and workspace label
+  I-beam, expander chevrons and the filter funnel pointer. Read back over the controls of
+  live/dom/cursors-controls.json (/tmp/ui-tools/cursweep.sh): all match.
+- **Features / parts split** is now a share of the list panel (35% until dragged), so the
+  FeatureScript notices panel no longer squeezes the feature tree to nothing.
+- Open: the funnel's filter dropdown (Onshape opens a feature-type filter menu) isn't
+  implemented.
 
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 

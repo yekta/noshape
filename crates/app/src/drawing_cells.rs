@@ -1,6 +1,5 @@
 //! Drawing editor: table cell selection, copy and paste. Click a cell to
-//! select it, Shift+click another to select the block between them (a row
-//! or a column); Ctrl+C copies the cells as tab-separated text (Excel /
+//! select it, drag across cells to select a block; Ctrl+C copies the cells as tab-separated text (Excel /
 //! Sheets / another drawing). Ctrl+V (or "Paste as table") with
 //! spreadsheet text on the clipboard places a new editable table with its
 //! top-left corner at the next click; the clipboard is used up.
@@ -64,17 +63,33 @@ impl DrawingEditor {
             self.cell_sel = None;
             return false;
         };
-        match self.cell_sel {
-            Some(cs) if shift && cs.table == id => self.cell_sel = Some(CellSel { b: cell, ..cs }),
-            _ => {
-                self.selection = vec![Sel::Table(id)];
-                self.cell_sel = Some(CellSel { table: id, a: cell, b: cell });
-            }
-        }
+        // Live (behaviours.md "General table"): Shift+click moves the
+        // single-cell selection rather than extending it; blocks are
+        // drag-selected.
+        let _ = shift;
+        self.selection = vec![Sel::Table(id)];
+        self.cell_sel = Some(CellSel { table: id, a: cell, b: cell });
         self.status = None;
         self.update_preview(cx);
         self.redraw(cx);
         true
+    }
+
+    /// End of a cell drag-selection: the cells the rubber band `a`–`b`
+    /// touches (below the title row) become the selected block.
+    pub fn select_cells_in(&mut self, id: u64, a: [f64; 2], b: [f64; 2], cx: &mut Context<Self>) {
+        let Some(l) = self.built.as_ref().and_then(|x| x.table_layout(id)).cloned() else { return };
+        let (x0, x1) = (a[0].min(b[0]), a[0].max(b[0]));
+        let (y0, y1) = (a[1].min(b[1]), a[1].max(b[1]));
+        let cols: Vec<usize> = l.xs.windows(2).enumerate().filter(|(_, w)| w[1] >= x0 && w[0] <= x1).map(|(i, _)| i).collect();
+        let t0 = l.title as usize;
+        let rows: Vec<usize> = l.ys.windows(2).enumerate().skip(t0).filter(|(_, w)| w[0] >= y0 && w[1] <= y1).map(|(i, _)| i - t0).collect();
+        if let (Some(&c0), Some(&c1), Some(&r0), Some(&r1)) = (cols.first(), cols.last(), rows.first(), rows.last()) {
+            self.selection = vec![Sel::Table(id)];
+            self.cell_sel = Some(CellSel { table: id, a: (r0, c0), b: (r1, c1) });
+        }
+        self.update_preview(cx);
+        self.redraw(cx);
     }
 
     /// The selected cells' outline (sheet mm) for the overlay.

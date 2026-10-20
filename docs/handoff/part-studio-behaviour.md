@@ -590,3 +590,98 @@ new render flags into `DrawMode` rather than new arguments.
   already did this.
 - Feature dialog checkboxes: long labels wrap inside the 220 px dialog (label in a shrinkable div;
   rows keep 27 px min height). Live check requested (psb 10-20 l).
+- Measure readout / panel values use `menus::measure_fmt` (bundle `formatValue`): the display precision
+  with trailing zeros kept and "deg" — "Perp planes angle: 90.000 deg", "Area: 1000.000 mm²", as live
+  81. A straight edge parallel to a planar face reads "Parallel dist". Verified in the app.
+
+## Pass 11 (20 Oct, lead's round 4 + live answers psb 10-20 j/k/l/m)
+
+- **Measure (m, dom/measure-readouts-final.txt)**: `measure_shapes` emits the live panel rows per case
+  (Parallel dist | Area | Min | Max; Angle 135° for a 45° chamfer (angle between the faces, not the
+  normals) vs Perp planes angle; Perp lines angle + Perp dist for skew lines; Perp line and plane angle;
+  Angle + Curvature deviation 0.00 % for an oblique line/plane; Parallel axes dist / Perp axes angle +
+  Perp axes dist / Center axes dist for cylinders; Center dist for circles and vertex+circle; Diameter |
+  Area | Radius and Diameter | Center | Length for one round entity; three edges: Length only).
+  **Max dist** rows (lead item 2) from sampled points (`max_row`); distances carry signed X/Y/Z.
+  `measure::quick_line(rows, count)` = the status bar (bundle `getPrimaryMeasurements`: the first
+  non-secondary row; in a circular context the following distance rows on the same line; totals are
+  secondary). The Measure panel: live type list and filter map (bundle), its own Length/Angle unit
+  selects (`UiState.measure_length_unit/angle_unit`), signed X↘/Y↗/Z↑ sub-rows. New
+  `Measurement::Percent`. Not done: the per-row (x) "create variable" icon.
+- **Version view (k, navigation/301)**: `Session::viewing_version()`; navbar shows "V1" (#999) and no
+  yellow banner (workspace.rs, surgical); the Part Studio toolbar row becomes the white "Versions are
+  view only. Viewing V1." bar with [Custom features] [Return to Main] (?) (`render_version_bar`).
+  Custom features lists the version's features (Onshape's Select Feature Studio dialog not built).
+  A plain history microversion still shows "History" + VIEWING HISTORY (not captured live).
+- **Configurations (j, 433–447)**: input ⋯ in live order incl. **Edit FeatureScript IDs…** (new
+  `config_ids.rs`, the bundle dialog: Input ID / Row IDs tables, FS identifier and keyword validation,
+  duplicate error, the two warnings, "Break references and change ID(s)"; model
+  `Configuration::change_ids` + test) and **Exclude from / Include in properties** (`ConfigInput.excluded`,
+  header icon `configuration-exclude-properties` with tooltip "Excluded from affecting configured
+  properties", `Configuration::for_properties` used by release items); no icons/separators. Panel ⋯ =
+  Copy all inputs | Collapse/Expand (2+ inputs) | Visibility conditions… | Input propagation… (all
+  inputs: one column per input). Checkbox tables "Value" ☐/☑ (false first), default "false"; variables
+  "Len (#Len)" with a **Usages ①** table; two-level column headers (feature over parameter); propagated
+  columns are "Derived 1" / "<input name>". Copy table = the table as shown (dom/config-copy-clipboard).
+  Toasts (green, `flash_success`): "Size copied." / "Inputs copied." / "Size pasted." / "Matching
+  parameters successfully configured.".
+- **Derived (j, l)**: the dialog's Part Studio field is now the shared reference field + Select Part
+  Studio panel (fs agent's `select_item.rs`; inline configuration + Generate there); the value maps to
+  `partStudio`, `parts` (one picked part) and `configuration:<id>` params (`derived_reference_value`,
+  `pick_derived_source`; surgical hook in fs_reference.rs). The dropdown, parts checklist, other-document
+  chooser and in-dialog configuration rows are gone. A second Derived of the same source and
+  configuration fails: "Creating multiple Derived features from the same source and configuration is not
+  allowed. Consider editing the previous Derived feature." Checkbox labels truncate with an ellipsis (no
+  wrap), as live.
+- Open: Edit definition… (configuration variable setup dialog), input ids derived from names, live
+  request psb (10-20 n) for the FS IDs dialog / excluded icon look.
+
+## Pass 12 (20 Oct, user bugs from v0.4.0 via the lead)
+
+- **Variable table "nothing clickable"**: the Part Studio's own table was display-only (static text cells,
+  a static italic "Name" row), not a hitbox problem. Now backed by the studio's Variable features (new
+  model module `variable_table.rs`: rows, create at the rollback bar or an index, rename with every
+  `#name` reference rewritten, type / value / description, move; FS-identifier and duplicate checks;
+  tests). Cells are `cell_input`s (Name, Value, Description), Variable type an `os_ui::select_field`
+  (Length / Angle / Number / Any); row right-click Filter feature list | Delete | Move up | Move down; the
+  italic Name row creates a Length variable "0 <unit>". ui is fixing the separate app-wide "only the
+  inner text of an input takes clicks" bug in the input component; these cells use the standard Input,
+  so they get that fix. Live request psb (10-20 o) for placement and messages.
+- **Hide/show eyes**: (1) the default-geometry eye had no click handler; (2) every hover-revealed control
+  used `invisible()` + group_hover, and gpui registers no mouse listeners for an invisible element, so a
+  click that came before a hover frame (fast clicks, trackpad taps on macOS) fell through to the row.
+  New `ui::hover_reveal` (opacity 0 → 1 on group hover); converted all of them app-wide: feature, part
+  and default-geometry eyes, section eyes, query-chip ✕ in section / draft / flatten tools, assembly
+  instance / folder / mate eyes (asb's files, surgical), keyboard-shortcut edit/reset icons
+  (preferences_window.rs).
+- **Inline variable creation**: `#name` with no such variable adds "(x) New variable…" to the autofill
+  (`var_complete::VarCompletion.new_variable`); Enter / Tab / click opens the "Create variable" popup
+  beside the field (Feature | Configuration, Length | Angle | Number | Any, Name, Value = the default
+  length selected, Description, ✓ ✕; Enter / Esc). ✓ emits `DialogEvent::CreateVariable`: a Variable
+  feature at the edited feature's index (the draft moves after it) or a configuration variable; the
+  dialog's variables get the value so the field resolves. Unresolved values: pink, red underline, tooltip
+  "Enter a valid expression." (no text under the field).
+- **Measure panel (x)**: per row (not areas or %), opens a new Variable feature dialog with the type and
+  value (live behaviour requested, psb 10-20 o).
+
+## From ui (20 Oct): input hit area (lead's high-priority bug)
+- Cause: the kit's input frame (`gpui_base::InputBase`, used by `Input`) draws the border and
+  padding, but only the inner text element (`InputBaseState`'s root) took presses and set the
+  I-beam, so the padding was dead. Fixed at the source in vendor/gpui-base (NOSHAPE PATCH,
+  `src/input/base/frame_hit.rs`): the frame publishes its padding box while it prepaints and the
+  text element takes presses there (focus + caret at the nearest position, drag-select works) and
+  shows the I-beam over the whole frame. Controls drawn over the frame (clear button, app overlays)
+  keep their presses (front-most hitbox check).
+- Our own boxes around an `Input::new(..).appearance(false)` (feature dialog fields, Variable
+  table/Studio cells, sketch dimension box, rename boxes…): wrap the box in
+  `gpui_kit::base::input::input_frame(the_box)`; the whole box is then the hit target. I'm doing
+  the ones in my files and the shared helpers; the Variable table cells are yours (psb): if the
+  table still ignores clicks after this patch, the cause is elsewhere (an overlay above the
+  cells?), tell me if you want me to look.
+
+## From skb (20 Oct): your Input propagation dialog reused by the assembly (surgical edits)
+- `part_studio/input_propagation.rs`: the dialog opening moved into `pub(crate) fn open_propagation_dialog(owner_name,
+  inputs, rows, checked, on_confirm, window, cx)` with `pub(crate) type OnConfirm` / `PropagationRows`; your
+  `open_input_propagation` calls it (no behaviour change). `part_studio/mod.rs`: `mod input_propagation` is now
+  `pub(crate) mod`. The assembly passes instances as rows (row key `FeatureId(instance id)`, opaque to the dialog).
+- The assembly input ⋯ and panel ⋯ now open your `config_visibility::open` (per input / all) and this dialog.

@@ -11,12 +11,12 @@ use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::create::DrawingSource;
 use noshape_model::drawing::templates::DrawingTemplate;
-use noshape_model::drawing::{Projection, SheetSize, TitleBlockStyle};
+use noshape_model::drawing::{DimUnits, Projection, SheetFormat, SheetSize, TitleBlockStyle, ZoneStart};
 use parking_lot::Mutex;
 
 /// A pending "create drawing" request (set by a view, taken by the workspace).
@@ -79,13 +79,13 @@ pub fn template_rows() -> Vec<TemplateRow> {
         file,
         document: "Onshape ANSI Drawing Templates",
         standard: "ANSI",
-        template: DrawingTemplate { name, size, style: TitleBlockStyle::Ansi, inches, projection: Projection::ThirdAngle },
+        template: DrawingTemplate::standard(name, size, TitleBlockStyle::Ansi, inches, Projection::ThirdAngle),
     });
     let iso = ISO.iter().map(|&(file, name, size)| TemplateRow {
         file,
         document: "Onshape ISO Drawing Templates",
         standard: "ISO",
-        template: DrawingTemplate { name, size, style: TitleBlockStyle::Iso, inches: false, projection: Projection::FirstAngle },
+        template: DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle),
     });
     ansi.chain(iso).collect()
 }
@@ -109,11 +109,7 @@ pub struct CreateDrawingDialog {
     selected: usize,
     /// Custom template tab and its choices.
     custom: bool,
-    custom_standard: &'static str,
-    custom_size: usize,
-    custom_inches: bool,
-    custom_first_angle: bool,
-    custom_title_block: bool,
+    ct: CustomTemplate,
     suggested: bool,
     pub focus: FocusHandle,
     /// Template list scrolling (the preselected template is scrolled into view).
@@ -131,10 +127,92 @@ impl Focusable for CreateDrawingDialog {
 /// Sheet sizes of the Custom template tab per standard.
 /// (sheet setup name, size); the size label is the name's last word.
 fn custom_sizes(standard: &str) -> Vec<(&'static str, SheetSize)> {
-    if standard == "ISO" {
-        ISO.iter().map(|&(_, n, s)| (n, s)).collect()
-    } else {
-        ANSI.iter().filter(|a| a.3 && a.2 != SheetSize::AnsiAPortrait).map(|&(_, n, s, _)| (n, s)).collect()
+    match standard {
+        "ISO" => ISO.iter().map(|&(_, n, s)| (n, s)).collect(),
+        "JIS" => JIS_NAMES.iter().zip(ISO.iter()).map(|(&n, &(_, _, s))| (n, s)).collect(),
+        _ => ANSI.iter().filter(|a| a.3 && a.2 != SheetSize::AnsiAPortrait).map(|&(_, n, s, _)| (n, s)).collect(),
+    }
+}
+
+const JIS_NAMES: [&str; 5] = ["JIS A0", "JIS A1", "JIS A2", "JIS A3", "JIS A4"];
+
+/// Custom template › Units (help H:custom_drawing_templates; "Feet and
+/// inches" exists only in drawings).
+const CUSTOM_UNITS: [(DimUnits, &str); 7] = [
+    (DimUnits::Millimeter, "Millimeters"),
+    (DimUnits::Centimeter, "Centimeters"),
+    (DimUnits::Meter, "Meters"),
+    (DimUnits::Inch, "Inches"),
+    (DimUnits::FeetInches, "Feet and inches"),
+    (DimUnits::Foot, "Foot"),
+    (DimUnits::Yard, "Yards"),
+];
+
+/// Title block languages (drw2: the full list is requested, live
+/// REQUESTS.md "drw2 (10-20 a)").
+const LANGUAGES: [&str; 1] = ["English"];
+
+/// Zone counts offered by Horizontal / Vertical zones.
+const ZONE_COUNTS: std::ops::RangeInclusive<u32> = 1..=16;
+
+/// The Custom template tab's choices (live drawing/02).
+#[derive(Clone, Copy, Debug)]
+struct CustomTemplate {
+    standard: &'static str,
+    language: usize,
+    size: usize,
+    units: DimUnits,
+    comma: bool,
+    first_angle: bool,
+    border: bool,
+    zones: [u32; 2],
+    top_left: bool,
+    title_block: bool,
+}
+
+impl CustomTemplate {
+    fn new(metric: bool) -> Self {
+        let mut t = Self { standard: "ANSI", language: 0, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
+        t.set_standard(if metric { "ISO" } else { "ANSI" });
+        t
+    }
+
+    /// Choosing a standard resets the size and its zones, the units and the
+    /// projection to the standard's defaults.
+    fn set_standard(&mut self, standard: &'static str) {
+        self.standard = standard;
+        let ansi = standard == "ANSI";
+        self.units = if ansi { DimUnits::Inch } else { DimUnits::Millimeter };
+        self.first_angle = !ansi;
+        // ANSI A; ISO / JIS A3.
+        self.set_size(if ansi { 0 } else { 3 });
+    }
+
+    fn set_size(&mut self, i: usize) {
+        self.size = i;
+        if let Some((_, size)) = custom_sizes(self.standard).get(i) {
+            self.zones = size.standard_zones().map(|n| n.max(1));
+        }
+    }
+
+    fn template(&self) -> Option<DrawingTemplate> {
+        let (name, size) = *custom_sizes(self.standard).get(self.size)?;
+        let style = if !self.title_block {
+            TitleBlockStyle::None
+        } else if self.standard == "ANSI" {
+            TitleBlockStyle::Ansi
+        } else {
+            TitleBlockStyle::Iso
+        };
+        let projection = if self.first_angle { Projection::FirstAngle } else { Projection::ThirdAngle };
+        let mut t = DrawingTemplate::standard(name, size, style, self.units.imperial(), projection);
+        if !matches!(self.units, DimUnits::Millimeter | DimUnits::Inch) {
+            t.units = Some(self.units);
+        }
+        t.decimal_comma = self.comma;
+        let zones = (self.zones != size.standard_zones()).then_some(self.zones);
+        t.format = SheetFormat { border: self.border, zones, start: if self.top_left { ZoneStart::TopLeft } else { ZoneStart::BottomRight } };
+        Some(t)
     }
 }
 
@@ -154,11 +232,7 @@ impl CreateDrawingDialog {
             standard: "All",
             selected,
             custom: false,
-            custom_standard: if metric { "ISO" } else { "ANSI" },
-            custom_size: if metric { 3 } else { 1 },
-            custom_inches: !metric,
-            custom_first_angle: metric,
-            custom_title_block: true,
+            ct: CustomTemplate::new(metric),
             // Onshape preselects "No views" (the first view follows the cursor).
             suggested: false,
             focus: cx.focus_handle(),
@@ -173,15 +247,7 @@ impl CreateDrawingDialog {
 
     fn template(&self) -> Option<DrawingTemplate> {
         if self.custom {
-            let (name, size) = *custom_sizes(self.custom_standard).get(self.custom_size)?;
-            let style = if !self.custom_title_block {
-                TitleBlockStyle::None
-            } else if self.custom_standard == "ISO" {
-                TitleBlockStyle::Iso
-            } else {
-                TitleBlockStyle::Ansi
-            };
-            return Some(DrawingTemplate { name, size, style, inches: self.custom_inches, projection: if self.custom_first_angle { Projection::FirstAngle } else { Projection::ThirdAngle } });
+            return self.ct.template();
         }
         self.rows.get(self.selected).map(|r| r.template)
     }
@@ -315,43 +381,139 @@ impl CreateDrawingDialog {
     }
 
     fn render_custom(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // Live drawing/02: two columns split by a 1 px `#d0dbe5` rule; labels
+        // right-aligned (14 px, `#333`), 35 px rows; choices are blue
+        // semibold with a 3 px blue underline when chosen, `#666` otherwise;
+        // dropdowns 120 x 24 with blue semibold text.
         let pal = p();
-        let row = |label: &'static str, body: AnyElement| h_flex().gap_3().h(px(32.)).child(div().w(px(150.)).text_size(px(13.)).child(label)).child(body);
-        let seg = |id: &'static str, label: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self)| {
-            Button::new(id).label(label).small().outline().selected(on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                f(this);
-                cx.notify();
-            }))
+        let ct = self.ct;
+        let label = |w: f32, text: &'static str| div().w(px(w)).flex_none().text_right().text_size(px(14.)).line_height(px(22.)).text_color(gpui_kit::rgb(0x333333)).child(text);
+        let row = |w: f32, text: &'static str, body: AnyElement| h_flex().min_h(px(35.)).gap(px(16.)).items_center().child(label(w, text)).child(body);
+        let choice = |id: String, text: &'static str, on: bool, cx: &mut Context<Self>, f: Box<dyn Fn(&mut CustomTemplate)>| {
+            div()
+                .id(SharedString::from(id))
+                .mr(px(15.))
+                .pt(px(2.))
+                .text_size(px(14.))
+                .cursor_pointer()
+                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).text_color(pal.accent).pb(px(1.)).border_b(px(3.)).border_color(pal.accent))
+                .when(!on, |d| d.text_color(gpui_kit::rgb(0x666666)).pb(px(4.)))
+                .child(text)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    f(&mut this.ct);
+                    cx.notify();
+                }))
         };
-        let std = self.custom_standard;
-        let mut sizes = h_flex().gap_1();
-        for (i, (name, _)) in custom_sizes(std).into_iter().enumerate() {
-            let label = name.rsplit(' ').next().unwrap_or(name);
-            let on = i == self.custom_size;
-            sizes = sizes.child(Button::new(SharedString::from(format!("cd-size-{i}"))).label(label).small().outline().selected(on).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.custom_size = i;
-                cx.notify();
-            })));
-        }
-        v_flex()
+        let entity = cx.entity().downgrade();
+        let drop = |id: &'static str, options: Vec<String>, current: usize, f: fn(&mut CustomTemplate, usize)| {
+            let entity = entity.clone();
+            let label = options.get(current).cloned().unwrap_or_default();
+            let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+            let probe = bounds.clone();
+            div()
+                .id(id)
+                .relative()
+                .w(px(120.))
+                .h(px(24.))
+                .flex()
+                .items_center()
+                .pl(px(10.))
+                .pr(px(6.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0x888888))
+                .bg(gpui_kit::rgb(0xffffff))
+                .cursor_pointer()
+                .text_size(px(14.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(pal.accent)
+                .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                .child(div().flex_1().truncate().child(label))
+                .child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0x777777)))
+                .on_click(move |_, window, cx| {
+                    let (options, b, entity) = (options.clone(), bounds.get(), entity.clone());
+                    let width = f32::from(b.size.width);
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        m = m.select_list(width);
+                        for (i, o) in options.iter().enumerate() {
+                            let entity = entity.clone();
+                            m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).on_click(move |_, window, cx| {
+                                let _ = entity.update(cx, |this, cx| {
+                                    f(&mut this.ct, i);
+                                    cx.notify();
+                                });
+                                window.refresh();
+                            }));
+                        }
+                        m
+                    });
+                    crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
+                })
+        };
+        let tile = |id: &'static str, text: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, first: bool| {
+            v_flex()
+                .id(id)
+                .w(px(140.))
+                .h(px(90.))
+                .items_center()
+                .justify_center()
+                .gap_1()
+                .rounded(px(4.))
+                .text_size(px(12.))
+                .bg(if on { gpui_kit::rgb(0x90cef1) } else { pal.panel })
+                .when(on, |d| d.border_b(px(3.)).border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
+                .when(!on, |d| d.border_1().border_color(gpui_kit::rgb(0xaaaaaa)).text_color(gpui_kit::rgb(0x333333)))
+                .cursor_pointer()
+                .child(div().when(!on, |d| d.opacity(0.6)).child(crate::assets::icon(&crate::assets::icon_path(icon), 64., cx)))
+                .child(text)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.ct.first_angle = first;
+                    cx.notify();
+                }))
+        };
+        let standards = ["ANSI", "ISO", "JIS"].into_iter().fold(h_flex(), |r, s| r.child(choice(format!("cd-cs-{s}"), s, ct.standard == s, cx, Box::new(move |t| t.set_standard(s)))));
+        let sizes: Vec<String> = custom_sizes(ct.standard).iter().map(|(n, _)| n.rsplit(' ').next().unwrap_or(n).to_string()).collect();
+        let units = CUSTOM_UNITS.iter().position(|(u, _)| *u == ct.units).unwrap_or(0);
+        let zones: Vec<String> = ZONE_COUNTS.map(|n| n.to_string()).collect();
+        let zone_at = |n: u32| ZONE_COUNTS.clone().position(|z| z == n).unwrap_or(0);
+        let left = v_flex()
+            .w(px(440.))
+            .flex_none()
+            .pr(px(6.))
+            .child(row(133., "Standard", standards.into_any_element()))
+            .child(row(133., "Language", drop("cd-lang", LANGUAGES.iter().map(|s| s.to_string()).collect(), ct.language, |t, i| t.language = i).into_any_element()))
+            .child(row(133., "Size", drop("cd-size", sizes, ct.size, |t, i| t.set_size(i)).into_any_element()))
+            .child(row(133., "Units", drop("cd-units", CUSTOM_UNITS.iter().map(|(_, n)| n.to_string()).collect(), units, |t, i| t.units = CUSTOM_UNITS[i].0).into_any_element()))
+            .child(
+                h_flex()
+                    .min_h(px(45.))
+                    .gap(px(16.))
+                    .items_center()
+                    .child(div().w(px(133.)).flex_none().text_right().text_size(px(14.)).line_height(px(22.)).text_color(gpui_kit::rgb(0x333333)).child("Decimal").child(div().child("separator")))
+                    .child(h_flex().child(choice("cd-dec-period".into(), "Period (12.34)", !ct.comma, cx, Box::new(|t| t.comma = false))).child(choice("cd-dec-comma".into(), "Comma (12,34)", ct.comma, cx, Box::new(|t| t.comma = true)))),
+            )
+            .child(
+                h_flex()
+                    .mt(px(4.))
+                    .gap(px(16.))
+                    .items_start()
+                    .child(label(133., "Projection").mt(px(10.)))
+                    .child(h_flex().gap(px(5.)).child(tile("cd-proj-3", "Third angle (ANSI)", "projection-third-angle", !ct.first_angle, cx, false)).child(tile("cd-proj-1", "First angle (ISO)", "projection-first-angle", ct.first_angle, cx, true))),
+            );
+        let right = v_flex()
             .flex_1()
-            .p_3()
-            .gap_1()
-            .child(row("Standard", h_flex().gap_1().child(seg("cd-cs-ansi", "ANSI", std == "ANSI", cx, |t| {
-                // The standard sets the default units and projection.
-                t.custom_standard = "ANSI";
-                t.custom_inches = true;
-                t.custom_first_angle = false;
-            })).child(seg("cd-cs-iso", "ISO", std == "ISO", cx, |t| {
-                t.custom_standard = "ISO";
-                t.custom_inches = false;
-                t.custom_first_angle = true;
-            })).into_any_element()))
-            .child(row("Size", sizes.into_any_element()))
-            .child(row("Units", h_flex().gap_1().child(seg("cd-cu-mm", "Millimeters", !self.custom_inches, cx, |t| t.custom_inches = false)).child(seg("cd-cu-in", "Inches", self.custom_inches, cx, |t| t.custom_inches = true)).into_any_element()))
-            .child(row("Projection", h_flex().gap_1().child(seg("cd-cp-3", "Third angle", !self.custom_first_angle, cx, |t| t.custom_first_angle = false)).child(seg("cd-cp-1", "First angle", self.custom_first_angle, cx, |t| t.custom_first_angle = true)).into_any_element()))
-            .child(row("Titleblock", h_flex().gap_1().child(seg("cd-ct-on", "Include", self.custom_title_block, cx, |t| t.custom_title_block = true)).child(seg("cd-ct-off", "Omit", !self.custom_title_block, cx, |t| t.custom_title_block = false)).into_any_element()))
-            .child(div().pt_2().text_size(px(12.)).text_color(pal.text_muted).child("Decimal separator, language, border and zones follow the standard."))
+            .pt(px(11.))
+            .child(row(122., "Border", h_flex().child(choice("cd-border-on".into(), "Include", ct.border, cx, Box::new(|t| t.border = true))).child(choice("cd-border-off".into(), "Do not include", !ct.border, cx, Box::new(|t| t.border = false))).into_any_element()))
+            .child(row(122., "Horizontal zones", drop("cd-hzones", zones.clone(), zone_at(ct.zones[0]), |t, i| t.zones[0] = ZONE_COUNTS.start() + i as u32).into_any_element()))
+            .child(row(122., "Vertical zones", drop("cd-vzones", zones, zone_at(ct.zones[1]), |t, i| t.zones[1] = ZONE_COUNTS.start() + i as u32).into_any_element()))
+            .child(row(122., "Start zones", h_flex().child(choice("cd-start-br".into(), "Bottom right", !ct.top_left, cx, Box::new(|t| t.top_left = false))).child(choice("cd-start-tl".into(), "Top left", ct.top_left, cx, Box::new(|t| t.top_left = true))).into_any_element()))
+            .child(row(122., "Titleblock", h_flex().child(choice("cd-tb-on".into(), "Include", ct.title_block, cx, Box::new(|t| t.title_block = true))).child(choice("cd-tb-off".into(), "Do not include", !ct.title_block, cx, Box::new(|t| t.title_block = false))).into_any_element()));
+        h_flex()
+            .flex_1()
+            .items_start()
+            .pt(px(4.))
+            .child(left)
+            .child(div().w(px(1.)).h(px(262.)).flex_none().bg(gpui_kit::rgb(0xd0dbe5)))
+            .child(right)
             .into_any_element()
     }
 }

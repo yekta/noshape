@@ -420,6 +420,9 @@ impl AssemblyView {
         v_flex()
             .id("bom-pane")
             .w(px(712.))
+            // Within its dock (at most half the graphics area): a fixed 712 px
+            // ran under the panel strip and off the window ("Add columns" cut).
+            .max_w_full()
             .h_full()
             .occlude()
             .bg(rgb(0xffffff))

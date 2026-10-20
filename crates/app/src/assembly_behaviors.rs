@@ -262,6 +262,13 @@ pub(crate) struct AsmUi {
     pub cfg_toast: Option<String>,
     pub cfg_edit: Option<super::config_panel::CfgEdit>,
     pub cfg_folded: HashSet<String>,
+    /// Configurations panel: the "Filter inputs" field, the kind toggles
+    /// (List, Checkbox, Configuration variable: show only those) and whether
+    /// the toast is a green success one ("Inputs copied.").
+    pub cfg_filter: Option<Entity<InputState>>,
+    pub cfg_filter_sub: Option<Subscription>,
+    pub cfg_only_kinds: [bool; 3],
+    pub cfg_toast_ok: bool,
     pub cfg_props_tab: bool,
     /// Live mate value being typed (double-click a value label): mate, DOF.
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
@@ -278,6 +285,14 @@ pub(crate) struct AsmUi {
     /// Reflection analysis: the open dialog, the accepted settings, the last
     /// environment used, the uploaded environment and the picker preview.
     pub reflection_dialog: Option<super::reflection::ReflectionDialog>,
+    /// Exploded views pane: the selected row (view, step) and the views
+    /// expanded with their › expander.
+    pub explode_sel: Option<(usize, Option<usize>)>,
+    pub explode_open: HashSet<usize>,
+    /// Width of the docked right pane (with its strip), set each render.
+    pub dock_w: f32,
+    /// The info notice whose fade-out is scheduled.
+    pub msg_fading: Option<String>,
     /// Interference detection dialog.
     pub interference: Option<super::interference::InterferenceDialog>,
     pub reflection: Option<crate::part_studio::reflection::ReflectionSettings>,
@@ -1233,12 +1248,12 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(false, window, cx))),
                         ),
                 )
                 // Live: a 214 px white field with a 1 px `#1651b0` border, 3 px in.
-                .child(div().m(px(3.)).h(px(30.)).px(px(4.)).flex().items_center().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)).child(Input::new(&d.input).appearance(false).text_size(px(14.))))
+                .child(gpui_kit::base::input::input_frame(div().m(px(3.)).h(px(30.)).px(px(4.)).flex().items_center().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)).child(Input::new(&d.input).appearance(false).text_size(px(14.)))))
                 .into_any_element(),
         )
     }
@@ -1277,7 +1292,7 @@ impl AssemblyView {
                 None => div().flex_1().truncate().child(format!("{} ({count})", folder.name)).into_any_element(),
             })
             .child(
-                div().when(!hidden, |d| d.invisible().group_hover(SharedString::from(format!("folder-row-{}", id.0)), |d| d.visible())).child(
+                div().when(!hidden, |d| crate::ui::hover_reveal(d, SharedString::from(format!("folder-row-{}", id.0)))).child(
                     Button::new(SharedString::from(format!("feye-{}", id.0))).icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" }))).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         cx.stop_propagation();
                         if mate_folder {
@@ -1642,7 +1657,7 @@ impl AssemblyView {
         }));
         m.push(item("Add exploded view…", |t, _, cx| {
             t.panel = Some(SidePanel::Explode);
-            t.add_exploded_view(false, cx);
+            t.add_exploded_view(cx);
         }));
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
@@ -2597,7 +2612,8 @@ impl AssemblyView {
             format!("{g} - {ax} - {}", m.name)
         };
         let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(div().id("anim-dof-x").child(Icon::new(IconName::Close).with_size(px(12.)).text_color(pal.text_muted))).into_any_element();
-        let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).gap(px(4.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row]));
+        // Live dom dialog-animate: the chip box, 5 px, then 26 px rows.
+        let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row])).child(div().h(px(5.)));
         if dofs.len() > 1 {
             // Several degrees of freedom: pick the one to animate.
             let mut sel = h_flex().gap_1().flex_wrap().px(px(3.));
@@ -2644,7 +2660,7 @@ impl AssemblyView {
                 .hover(|d| d.bg(pal.panel_hover))
                 .when(on, |d| d.bg(pal.panel_active))
                 .tooltip(crate::ui::tooltip(tip))
-                .child(crate::ui::glyph(icon, 16., pal.text))
+                .child(crate::ui::glyph(icon, 22., pal.text))
         };
         body = body
             .child(field("Start value", &a.start))
@@ -2652,11 +2668,11 @@ impl AssemblyView {
             .child(field("Steps", &a.steps))
             .child(
                 h_flex()
-                    .h(px(30.))
+                    .h(px(28.))
                     .pl(px(5.))
                     .gap(px(4.))
                     .child(div().flex_none().whitespace_nowrap().text_size(px(13.33)).text_color(pal.text_muted).child("Playback type"))
-                    .child(div().flex_1().child(playback))
+                    .child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(playback))
                     .child(icon_btn("anim-reverse", "anim-reverse", "Reverse", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(a) = &mut this.anim {
                             a.dir = -a.dir;
@@ -2682,7 +2698,8 @@ impl AssemblyView {
                     .child(div().flex_1())
                     .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
             );
-        Self::panel_frame("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close").into_any_element()
+        // Live dom dialog-animate: 220 px, the plain grey ×.
+        Self::panel_frame_with("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close", true).w(px(220.)).into_any_element()
     }
 }
 
@@ -2715,15 +2732,11 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Toolbar Replace instance: replaces the selected instance.
+    /// Toolbar Replace instance: the Replace instance dialog with the
+    /// selected instances (none: an empty, active field; live 833, no notice).
     pub(super) fn replace_selected(&mut self, cx: &mut Context<Self>) {
-        match self.selected.first().copied() {
-            Some(id) => self.open_replace(id, cx),
-            None => {
-                self.message = Some((false, "Select an instance to replace.".into()));
-                cx.notify();
-            }
-        }
+        let tops: Vec<InstanceId> = self.selected.iter().copied().filter(|id| self.assembly(cx).is_some_and(|a| a.instance(*id).is_some())).collect();
+        self.open_replace_with(tops, cx);
     }
 
     pub(super) fn toggle_display_states(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -3026,7 +3039,7 @@ impl AssemblyView {
                 Some(v) => {
                     this.ui.insert_config.insert(studio, v);
                 }
-                None => this.ui.cfg_toast = Some("Could not find last viewed configuration.".into()),
+                None => this.show_cfg_toast("Could not find last viewed configuration.".into(), false, cx),
             }
             cx.notify();
         };
@@ -3510,6 +3523,7 @@ impl AssemblyView {
                 Measurement::Area(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 2, angle: 0 }), &units),
                 Measurement::Volume(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 3, angle: 0 }), &units),
                 Measurement::Angle(x) => noshape_units::format_quantity(noshape_units::Quantity::radians(*x), &units),
+                Measurement::Percent(x) => format!("{x:.2} %"),
                 Measurement::Point(p) => format!("{}, {}, {}", l(p.x), l(p.y), l(p.z)),
                 Measurement::Distance { distance, dx, dy, dz, .. } => {
                     rows.push(("ΔX / ΔY / ΔZ".into(), format!("{} / {} / {}", l(*dx), l(*dy), l(*dz))));

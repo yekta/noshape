@@ -69,7 +69,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(250.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -106,7 +106,7 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.painter = None;
                                     this.status = None;

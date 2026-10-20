@@ -35,6 +35,7 @@ pub mod select;
 pub mod sheetmetal;
 pub mod sketch_feature;
 pub mod variables;
+pub mod variable_table;
 
 pub use document::{Document, Tab, TabContent, TabId};
 pub use params::{ParamSpec, ParamValue, ParamValues};

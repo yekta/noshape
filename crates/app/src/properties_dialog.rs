@@ -424,7 +424,9 @@ impl Render for MetaForm {
                 })
                 .into_any_element(),
             ));
-        if self.material.is_some() {
+        // Parts (with their material) and assemblies (a computed mass, no
+        // material; live assembly/726) have the Mass row.
+        if self.material.is_some() || self.computed_mass.is_some() {
             let mass_on = self.mass_on;
             let computed = self.computed_mass.clone();
             form = form.child(

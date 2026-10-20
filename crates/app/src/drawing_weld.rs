@@ -368,7 +368,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(WIDTH))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -380,8 +380,8 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Weld symbol"))
-                        .child(div().id("weld-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.opacity(0.3)).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(true, cx)))))
-                        .child(div().id("weld-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(false, cx)))),
+                        .child(div().id("weld-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(true, cx)))))
+                        .child(div().id("weld-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(false, cx)))),
                 )
                 .child(
                     v_flex()

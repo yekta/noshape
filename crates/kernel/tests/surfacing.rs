@@ -171,3 +171,110 @@ fn fit_surface_through_points() {
     assert!(fit_surface(&[DVec3::ZERO, DVec3::X, DVec3::X * 2.0], &[], &SurfaceFitOptions::default()).is_err());
 }
 
+
+/// FeatureScript's `opCreateBSplineSurface` (std's `bSplineSurface` examples,
+/// with their knots padded and control points overlapped as std does).
+#[test]
+fn bspline_surface_from_featurescript_definition() {
+    let inch = 0.0254;
+    let grid = |rows: &[&[[f64; 3]]]| -> (Vec<DVec3>, usize, usize) {
+        let pts = rows.iter().flat_map(|r| r.iter().map(|p| DVec3::from_array(*p) * inch)).collect();
+        (pts, rows.len(), rows[0].len())
+    };
+    // A bump on the XY plane: clamped, degree 2 both ways.
+    let (poles, nu, nv) = grid(&[
+        &[[-2., 2., 0.], [-1., 2., 0.], [0., 2., 0.], [1., 2., 0.], [2., 2., 0.]],
+        &[[-2., 1., 0.], [-1., 1., 0.], [0., 1., 0.], [1., 1., 0.], [2., 1., 0.]],
+        &[[-2., 0., 0.], [-1., 0., 0.], [0., 0., 1.], [1., 0., 0.], [2., 0., 0.]],
+        &[[-2., -2., 0.], [-1., -2., 0.], [0., -2., 0.], [1., -2., 0.], [2., -2., 0.]],
+    ]);
+    let bump = BSplineSurfaceData {
+        poles,
+        nu,
+        nv,
+        weights: None,
+        u_knots: vec![0.0, 0.0, 0.0, 0.1, 1.0, 1.0, 1.0],
+        v_knots: vec![0.0, 0.0, 0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0, 1.0, 1.0],
+        u_degree: 2,
+        v_degree: 2,
+        u_periodic: false,
+        v_periodic: false,
+    };
+    let sheet = make_bspline_surface(&bump, &[], false).unwrap();
+    assert!(sheet.is_valid());
+    assert_eq!((sheet.count(ShapeType::Face), sheet.count(ShapeType::Edge), sheet.count(ShapeType::Solid)), (1, 4, 0));
+    // Clamped: the corners are the corner control points.
+    let b = sheet.bounding_box(true).unwrap();
+    assert!((b.min.x + 2.0 * inch).abs() < 1e-6 && (b.max.y - 2.0 * inch).abs() < 1e-6 && (b.min.y + 2.0 * inch).abs() < 1e-6, "{b:?}");
+    assert!(b.max.z > 0.1 * inch && b.max.z < inch, "{b:?}");
+    let full = area(&sheet);
+
+    // Inside a square loop of four lines in (u, v): a smaller sheet.
+    let line = |a: DVec2, b: DVec2| BSplineCurve2dData { poles: vec![a, b], weights: None, knots: vec![0.0, 0.0, 1.0, 1.0], degree: 1, periodic: false };
+    let (p0, p1, p2, p3) = (DVec2::new(0.25, 0.25), DVec2::new(0.75, 0.25), DVec2::new(0.75, 0.75), DVec2::new(0.25, 0.75));
+    let trimmed = make_bspline_surface(&bump, &[line(p0, p1), line(p1, p2), line(p2, p3), line(p3, p0)], false).unwrap();
+    assert!(trimmed.is_valid());
+    assert_eq!((trimmed.count(ShapeType::Face), trimmed.count(ShapeType::Edge)), (1, 4));
+    let a = area(&trimmed);
+    assert!(a > 0.05 * full && a < 0.6 * full, "{a} of {full}");
+    // An open loop is refused.
+    assert!(make_bspline_surface(&bump, &[line(p0, p1), line(p1, p2), line(p2, p3)], false).is_err());
+    // So are knots that don't fit the control points.
+    let mut bad = bump.clone();
+    bad.u_knots.pop();
+    assert!(make_bspline_surface(&bad, &[], false).is_err());
+
+    // A sheared tube: periodic in u (4 rows + the 2 overlapping ones), linear in v.
+    let (poles, nu, nv) = grid(&[
+        &[[0., 0., 1.], [-1., 0., 0.], [-2., 0., -1.]],
+        &[[1., 1., 1.], [0., 1., 0.], [-1., 1., -1.]],
+        &[[2., 0., 1.], [1., 0., 0.], [0., 0., -1.]],
+        &[[1., -1., 1.], [0., -1., 0.], [-1., -1., -1.]],
+        &[[0., 0., 1.], [-1., 0., 0.], [-2., 0., -1.]],
+        &[[1., 1., 1.], [0., 1., 0.], [-1., 1., -1.]],
+    ]);
+    let tube = BSplineSurfaceData {
+        poles,
+        nu,
+        nv,
+        weights: None,
+        u_knots: vec![-0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
+        v_knots: vec![0.0, 0.0, 0.5, 1.0, 1.0],
+        u_degree: 2,
+        v_degree: 1,
+        u_periodic: true,
+        v_periodic: false,
+    };
+    let t = make_bspline_surface(&tube, &[], true).unwrap();
+    // Closed round u: one face with a seam (two end loops + the seam), and no
+    // solid since its ends are open.
+    assert!(t.is_valid());
+    assert_eq!((t.count(ShapeType::Face), t.count(ShapeType::Edge), t.count(ShapeType::Solid)), (1, 3, 0));
+
+    // A torus-like net periodic both ways (8 x 8 + overlaps): with make_solid, a solid.
+    let (big, small) = (0.03, 0.01);
+    let ring = |i: usize, j: usize| {
+        let (a, b) = (2.0 * PI * (i % 8) as f64 / 8.0, 2.0 * PI * (j % 8) as f64 / 8.0);
+        DVec3::new((big + small * b.cos()) * a.cos(), (big + small * b.cos()) * a.sin(), small * b.sin())
+    };
+    let knots: Vec<f64> = (0..13).map(|i| (i as f64 - 2.0) / 8.0).collect();
+    let torus = BSplineSurfaceData {
+        poles: (0..10).flat_map(|i| (0..10).map(move |j| (i, j))).map(|(i, j)| ring(i, j)).collect(),
+        nu: 10,
+        nv: 10,
+        weights: None,
+        u_knots: knots.clone(),
+        v_knots: knots,
+        u_degree: 2,
+        v_degree: 2,
+        u_periodic: true,
+        v_periodic: true,
+    };
+    let solid = make_bspline_surface(&torus, &[], true).unwrap();
+    assert!(solid.is_valid());
+    assert_eq!(solid.count(ShapeType::Solid), 1);
+    let v = volume_properties(&solid).unwrap().mass;
+    let exact = 2.0 * PI * PI * big * small * small; // the torus through the net (the spline lies inside)
+    assert!(v > 0.6 * exact && v < exact, "{v} vs {exact}");
+    assert_eq!(make_bspline_surface(&torus, &[], false).unwrap().count(ShapeType::Solid), 0);
+}

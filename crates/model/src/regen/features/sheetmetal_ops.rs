@@ -64,6 +64,46 @@ fn wall_plane(body: &Body, w: &Wall) -> Option<(DVec3, DVec3)> {
     plane_of(&body.shape.sub_shape(ShapeType::Face, fi).ok()?)
 }
 
+/// Onshape keeps a bend's side faces apart from its walls' (live G34d: 12
+/// planes and 2 cylinders for two walls and a bend): the side faces are
+/// split where the bend meets the walls, by the radial segments joining the
+/// inner and outer cylinders' corners.
+fn split_bend_sides(ev: &mut EvalCtx, bi: usize, inner: &Name, outer: &Name) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    let (Some(&fi), Some(&fo)) = (faces_named(&body, std::slice::from_ref(inner)).first(), faces_named(&body, std::slice::from_ref(outer)).first()) else {
+        return Ok(());
+    };
+    let (fin, fout) = (body.shape.sub_shape(ShapeType::Face, fi)?, body.shape.sub_shape(ShapeType::Face, fo)?);
+    let k::Surface::Cylinder { origin, axis, .. } = fin.face_surface()? else { return Ok(()) };
+    let axis = axis.normalize();
+    let corners = |f: &Shape| -> Vec<DVec3> { f.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect() };
+    let outs = corners(&fout);
+    let mut segments = Vec::new();
+    for vi in corners(&fin) {
+        let radial = (vi - origin) - axis * (vi - origin).dot(axis);
+        if radial.length() < 1e-12 {
+            continue;
+        }
+        let radial = radial.normalize();
+        if let Some(vo) = outs.iter().find(|&&vo| {
+            let d = vo - vi;
+            d.dot(radial) > 0.0 && (d - radial * d.dot(radial)).length() < 1e-9
+        }) {
+            segments.push(k::make_line(vi, *vo)?);
+        }
+    }
+    if segments.is_empty() {
+        return Ok(());
+    }
+    let res = k::imprint(&body.shape, &segments).map_err(|e| fe(format!("The bend could not be made: {e}")))?;
+    if res.shape.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
+        return Ok(());
+    }
+    let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, res.shape, names);
+    Ok(())
+}
+
 /// Turn the sharp corner between walls `parent` and `child` into a bend.
 pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, parent: usize, child: usize, r: f64, kf: f64) -> FResult<()> {
     let t = data.thickness;
@@ -84,6 +124,7 @@ pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, paren
     ev.replace_body(bi, res.shape, names);
     let inner_name: Name = Arc::new(TopoName::face(ev.feature, Role::Blend(body.edges[ei].clone())));
     let outer_name: Name = Arc::new(TopoName::face(ev.feature, Role::Blend(body.edges[eo].clone())));
+    split_bend_sides(ev, bi, &inner_name, &outer_name)?;
     let nb = ev.ctx.bodies[bi].clone();
     let inner = faces_named(&nb, std::slice::from_ref(&inner_name));
     let Some(&fi) = inner.first() else { return err("The bend faces were not created") };
@@ -118,8 +159,156 @@ pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, paren
     Ok(())
 }
 
-/// Cut a rip (gap `minimal_clearance`) through the corner between two walls.
-pub fn rip_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, wa: usize, wb: usize, style: &str) -> FResult<()> {
+/// One rip to cut: the corner between walls `a` and `b`, EDGE / BUTT (wall
+/// `a` runs through) / BUTT2 (wall `b` runs through).
+pub struct RipCut {
+    pub a: usize,
+    pub b: usize,
+    pub style: String,
+}
+
+/// A wall's frame at a corner: `u` along its reference-side ("definition")
+/// face towards the corner line, `v` through the thickness.
+struct WallFrame {
+    u: DVec3,
+    v: DVec3,
+}
+
+fn wall_frame(body: &Body, w: &Wall) -> Option<(DVec3, DVec3)> {
+    faces_named(body, &w.faces).into_iter().find_map(|fi| plane_of(&body.shape.sub_shape(ShapeType::Face, fi).ok()?))
+}
+
+/// Rip sharp corners between walls the way Onshape's joints do (live G34d).
+/// Each wall is its definition face thickened; the two definition planes
+/// meet in a line E. In a wall's frame, wall A keeps `u <= hi_A`: an edge
+/// joint stops both walls the minimal gap short of E (the outer corner stays
+/// open); a butt joint lets one wall run through, over the other's
+/// thickness, and stops the other the gap short of it. All corners are cut
+/// at once; walls the rips separate become separate parts, each with the
+/// model data of its walls (`data` becomes the first part's).
+pub fn rip_corners(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, cuts: &[RipCut]) -> FResult<()> {
+    if cuts.is_empty() {
+        return Ok(());
+    }
+    let t = data.thickness;
+    let gap = data.minimal_clearance.max(1e-6);
+    let body = ev.ctx.bodies[bi].clone();
+    let feature = ev.feature;
+    let mut tools: Vec<NamedShape> = Vec::new();
+    for (ci, cut) in cuts.iter().enumerate() {
+        let edges = corner_edges(&body, data, cut.a, cut.b);
+        let Some(&(key_edge, _)) = edges.first() else {
+            return err("The walls must meet in a sharp corner to rip");
+        };
+        let (Some((pa, na)), Some((pb, nb))) = (wall_frame(&body, &data.walls[cut.a]), wall_frame(&body, &data.walls[cut.b])) else {
+            return err("Rip walls must be planar");
+        };
+        let ec = na.cross(nb);
+        if ec.length() < 1e-9 {
+            return err("The rip corner is degenerate");
+        }
+        let e = ec.normalize();
+        // The definition planes' common line: a point on both.
+        let (da, db) = (na.dot(pa), nb.dot(pb));
+        let p0 = (nb.cross(ec) * da + ec.cross(na) * db) / na.dot(nb.cross(ec));
+        let frame = |p: DVec3, n: DVec3| {
+            let mut u = e.cross(n).normalize();
+            if (p0 - p).dot(u) < 0.0 {
+                u = -u;
+            }
+            WallFrame { u, v: -n }
+        };
+        let (fa, fb) = (frame(pa, na), frame(pb, nb));
+        // Butt joint Direction 1 lets the wall that comes first in Onshape's
+        // entity order run through (live G34d: the block's top over its +X
+        // face); Direction 2 the other.
+        let a_first = match (data.walls[cut.a].faces.first(), data.walls[cut.b].faces.first()) {
+            (Some(x), Some(y)) => super::detail::face_order(ev, &body, x) <= super::detail::face_order(ev, &body, y),
+            _ => true,
+        };
+        let through_a = (cut.style == "BUTT") == a_first;
+        // Extent along the line: the corner's edges, past each end by T + gap.
+        let (mut s0, mut s1) = (f64::INFINITY, f64::NEG_INFINITY);
+        for &(ei, _) in &edges {
+            let Some((a, b)) = line_of(&body.shape.sub_shape(ShapeType::Edge, ei)?) else { continue };
+            for q in [a, b] {
+                s0 = s0.min((q - p0).dot(e));
+                s1 = s1.max((q - p0).dot(e));
+            }
+        }
+        if s0 > s1 {
+            return err("Rip edges must be linear");
+        }
+        let (s0, s1) = (s0 - t - gap, s1 + t + gap);
+        // How far each wall keeps: hi_A, hi_B.
+        let reach = |over: &WallFrame, of: &WallFrame| t * of.v.dot(over.u).max(0.0);
+        let (hi_a, hi_b) = match cut.style.as_str() {
+            "BUTT" | "BUTT2" if through_a => {
+                let hi_a = reach(&fa, &fb);
+                (hi_a, -gap + t * fa.v.dot(fb.u).min(0.0) + hi_a * fa.u.dot(fb.u).min(0.0))
+            }
+            "BUTT" | "BUTT2" => {
+                let hi_b = reach(&fb, &fa);
+                (-gap + t * fb.v.dot(fa.u).min(0.0) + hi_b * fb.u.dot(fa.u).min(0.0), hi_b)
+            }
+            _ => (-gap, -gap),
+        };
+        let h = 4.0 * (t + gap) + hi_a.abs().max(hi_b.abs());
+        // A slab of a wall's thickness over u (oriented_box spans u × v, ±e).
+        let slab = |f: &WallFrame, u: [f64; 2]| {
+            let z = if f.u.cross(f.v).dot(e) > 0.0 { [s0, s1] } else { [-s1, -s0] };
+            oriented_box(p0, f.u, f.v, u, [0.0, t], z)
+        };
+        let key = body.edges[key_edge].clone();
+        for (k, (cut_of, keep_other)) in [((&fa, hi_a), (&fb, hi_b)), ((&fb, hi_b), (&fa, hi_a))].into_iter().enumerate() {
+            let (f, hi) = cut_of;
+            if hi >= h - 1e-12 {
+                continue;
+            }
+            let remove = slab(f, [hi, h])?;
+            let keep = slab(keep_other.0, [-h, keep_other.1])?;
+            let tool = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&remove), std::slice::from_ref(&keep), &k::BooleanOptions::default())?.shape;
+            if tool.count(ShapeType::Solid) == 0 {
+                continue;
+            }
+            let base = 80 + (ci * 4 + k * 2) as u16;
+            tools.push(tool_named(tool, |i| side_name(feature, &key, base * 16 + i as u16)));
+        }
+    }
+    if tools.is_empty() {
+        return err("The rip could not be made");
+    }
+    let tool_names: Vec<Name> = tools.iter().flat_map(|t| t.names.faces.iter().cloned()).collect();
+    let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &tools)?;
+    for cut in cuts {
+        data.rips.retain(|x| !((x.a == cut.a && x.b == cut.b) || (x.a == cut.b && x.b == cut.a)));
+        data.rips.push(Rip {
+            feature,
+            a: cut.a,
+            b: cut.b,
+            style: if cut.style.is_empty() { "EDGE".into() } else { cut.style.clone() },
+            gap,
+            other: None,
+            faces: tool_names.clone(),
+        });
+    }
+    let pieces = solid_count(&shape).max(1);
+    ev.replace_body(bi, shape, names);
+    let whole = data.clone();
+    for k in 0..pieces {
+        let piece = piece_data(&whole, &ev.ctx.bodies[bi + k]);
+        if k == 0 {
+            *data = piece;
+        } else {
+            put_data(ev, bi + k, piece);
+        }
+    }
+    Ok(())
+}
+
+/// A thin slot (the minimal gap wide) cut diagonally through the corner
+/// between two walls: the seam of a closed sheet metal loft.
+pub fn slot_rip(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, wa: usize, wb: usize, style: &str) -> FResult<()> {
     let t = data.thickness;
     let gap = data.minimal_clearance.max(1e-6);
     let body = ev.ctx.bodies[bi].clone();
@@ -165,8 +354,78 @@ pub fn rip_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, wa: us
         ev.warnings.push("The rip separated the part into several parts".into());
     }
     ev.replace_body(bi, shape, names);
-    data.rips.push(Rip { feature, a: wa, b: wb, style: if style.is_empty() { "EDGE".into() } else { style.to_string() }, gap });
+    data.rips.push(Rip { feature, a: wa, b: wb, style: if style.is_empty() { "EDGE".into() } else { style.to_string() }, gap, other: None, faces: Vec::new() });
     Ok(())
+}
+
+/// The model data of one part of a model that rips split: its walls (and
+/// the bends, rips and flat marks on them, renumbered); a rip to a wall now
+/// in another part names that wall.
+pub fn piece_data(data: &SheetMetalData, body: &Body) -> SheetMetalData {
+    let present = |names: &[Name]| !faces_named(body, names).is_empty();
+    let mut map: Vec<Option<usize>> = Vec::with_capacity(data.walls.len());
+    let mut walls = Vec::new();
+    for w in &data.walls {
+        let keep = present(&w.faces) || present(&w.back);
+        map.push(keep.then_some(walls.len()));
+        if keep {
+            walls.push(w.clone());
+        }
+    }
+    let mut out = data.clone();
+    out.walls = walls;
+    out.bends = data
+        .bends
+        .iter()
+        .filter(|b| present(&b.inner_faces) || present(&b.outer_faces))
+        .filter_map(|b| {
+            let mut b = b.clone();
+            b.parent = map.get(b.parent).copied().flatten()?;
+            b.child = match b.child {
+                Some(c) => Some(map.get(c).copied().flatten()?),
+                None => None,
+            };
+            Some(b)
+        })
+        .collect();
+    let first_face = |w: usize| data.walls.get(w).and_then(|w| w.faces.first().cloned());
+    out.rips = data
+        .rips
+        .iter()
+        .filter_map(|r| {
+            let a = map.get(r.a).copied().flatten();
+            let b = map.get(r.b).copied().flatten();
+            let mut r2 = r.clone();
+            match (a, b) {
+                (Some(a), Some(b)) => {
+                    r2.a = a;
+                    r2.b = b;
+                }
+                (Some(a), None) => {
+                    r2.a = a;
+                    r2.b = usize::MAX;
+                    r2.other = r.other.clone().or_else(|| first_face(r.b));
+                }
+                (None, Some(b)) => {
+                    r2.a = b;
+                    r2.b = usize::MAX;
+                    r2.other = first_face(r.a);
+                }
+                (None, None) => return None,
+            }
+            Some(r2)
+        })
+        .collect();
+    out.marks = data
+        .marks
+        .iter()
+        .filter_map(|m| {
+            let mut m = m.clone();
+            m.wall = map.get(m.wall).copied().flatten()?;
+            Some(m)
+        })
+        .collect();
+    out
 }
 
 /// Remove a bend's faces, restoring the sharp corner between its walls.
@@ -174,10 +433,21 @@ fn unbend(ev: &mut EvalCtx, bi: usize, bend: &Bend) -> FResult<()> {
     let body = ev.ctx.bodies[bi].clone();
     let mut names = bend.inner_faces.clone();
     names.extend(bend.outer_faces.iter().cloned());
-    let faces: Vec<Shape> = faces_named(&body, &names).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
-    if faces.is_empty() {
+    let mut idx = faces_named(&body, &names);
+    if idx.is_empty() {
         return err("The bend faces no longer exist");
     }
+    // The bend's own pieces of the side faces (split_bend_sides): the planar
+    // faces touching both its inner and outer cylinders.
+    let ef = body.shape.edge_faces()?;
+    let (inner, outer) = (faces_named(&body, &bend.inner_faces), faces_named(&body, &bend.outer_faces));
+    let touches = |f: usize, set: &[usize]| ef.iter().any(|fs| fs.contains(&(f as u32)) && fs.iter().any(|g| set.contains(&(*g as usize))));
+    for f in 0..body.faces.len() {
+        if !idx.contains(&f) && touches(f, &inner) && touches(f, &outer) && body.shape.sub_shape(ShapeType::Face, f).is_ok_and(|s| s.is_planar()) {
+            idx.push(f);
+        }
+    }
+    let faces: Vec<Shape> = idx.into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
     let res = k::delete_faces(&body.shape, &faces).map_err(|e| fe(format!("The bend could not be removed: {e}")))?;
     if solid_count(&res.shape) != 1 {
         return err("The bend could not be removed");
@@ -200,6 +470,26 @@ pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities").to_vec();
     if refs.is_empty() {
         return err("Select the sharp edge between two walls");
+    }
+    // Onshape (live G34c, G34d): picks at an existing joint (a rip's cut
+    // faces or their edges, a bend) fail first; then picks on more than one
+    // part.
+    let mut parts: Vec<usize> = Vec::new();
+    for r in &refs {
+        let Some((bi, si, is_face)) = resolve_one(ev, r) else { return err("A selected entity no longer exists") };
+        let body = &ev.ctx.bodies[bi];
+        if let Some(data) = ev.ctx.sheet_metal.get(&body.id) {
+            let faces: Vec<usize> = if is_face { vec![si] } else { body.shape.edge_faces()?.get(si).map(|f| f.iter().map(|&x| x as usize).collect()).unwrap_or_default() };
+            if faces.iter().any(|&f| data.rips.iter().any(|rp| rp.has_face(&body.faces[f])) || data.bend_of_face(&body.faces[f]).is_some()) {
+                return err("An internal edge cannot be used to create a joint.");
+            }
+        }
+        if !parts.contains(&bi) {
+            parts.push(bi);
+        }
+    }
+    if parts.len() > 1 {
+        return err("Cannot connect multiple parts to create a joint.");
     }
     let mut corner: Option<(usize, usize, usize)> = None;
     for r in &refs {
@@ -225,7 +515,7 @@ pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
         bend_corner(ev, bi, &mut data, wa, wb, r, kf)?;
     } else {
         let style = ev.enum_("jointType").to_string();
-        rip_corner(ev, bi, &mut data, wa, wb, &style)?;
+        rip_corners(ev, bi, &mut data, &[RipCut { a: wa, b: wb, style }])?;
     }
     put_data(ev, bi, data);
     Ok(())
@@ -258,7 +548,7 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
                     unbend(ev, bi, &old)?;
                     data.bends.remove(b);
                     let style = ev.enum_("jointStyle").to_string();
-                    rip_corner(ev, bi, &mut data, old.parent, child, &style)?;
+                    rip_corners(ev, bi, &mut data, &[RipCut { a: old.parent, b: child, style }])?;
                 }
                 _ => {
                     if (r_new - old.radius).abs() < 1e-12 {
@@ -283,7 +573,7 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
                         return err("The joint is already a rip");
                     }
                     let style = ev.enum_("jointStyle").to_string();
-                    rip_corner(ev, bi, &mut data, wa, wb, &style)?
+                    rip_corners(ev, bi, &mut data, &[RipCut { a: wa, b: wb, style }])?
                 }
                 _ => return err("Tangent joints are only possible between rolled walls"),
             }

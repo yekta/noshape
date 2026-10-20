@@ -441,6 +441,56 @@ fn import_foreign_brep_file_and_missing_data() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Imports keep the file's part names and colours (Onshape's default
+/// "Import appearances"): per part and per face, through later features.
+#[test]
+fn import_foreign_names_and_colors() {
+    use noshape_model::features::importing::ImportPartInfo;
+    let a = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.01, 0.01).unwrap();
+    let b = noshape_kernel::make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
+    let brep = String::from_utf8(noshape_kernel::Shape::compound(&[a, b.clone()]).to_brep_bytes().unwrap()).unwrap();
+    // Box B's face 0 is red, the part itself blue; box A has only a name.
+    let info = vec![
+        ImportPartInfo { name: Some("Bracket".into()), color: None, faces: Vec::new() },
+        ImportPartInfo { name: None, color: Some([0.0, 0.0, 1.0]), faces: vec![(0, [1.0, 0.0, 0.0])] },
+    ];
+    let json = serde_json::to_string(&info).unwrap();
+    let mut s = Studio::new();
+    let (b2, j2) = (brep.clone(), json.clone());
+    s.add("importForeign", move |p| {
+        p.set("blobData", ParamValue::Text(b2));
+        p.set("partInfo", ParamValue::Text(j2));
+    });
+    let r = s.ok();
+    assert_eq!(r.display.bodies.len(), 2);
+    let named = r.display.bodies.iter().find(|d| d.name == "Bracket").expect("the file's name");
+    let other = r.display.bodies.iter().find(|d| d.name != "Bracket").unwrap();
+    assert!(named.face_colors.is_empty());
+    assert_eq!(other.color, [0.0, 0.0, 1.0, 1.0], "the part's colour, linear");
+    assert_eq!(other.face_colors.iter().filter(|c| c.is_some()).count(), 1);
+    assert!(other.face_colors.contains(&Some([1.0, 0.0, 0.0, 1.0])));
+    // The coloured face keeps its colour after a fillet elsewhere on the part.
+    let bi = r.context.bodies.iter().position(|x| x.name != "Bracket").unwrap();
+    let edge = Reference::Edge((*r.context.bodies[bi].edges[0]).clone());
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("radius", ParamValue::Expr(noshape_units::ExprValue::new("1 mm")));
+    });
+    let r = s.ok();
+    let other = r.display.bodies.iter().find(|d| d.name != "Bracket").unwrap();
+    assert!(other.face_colors.contains(&Some([1.0, 0.0, 0.0, 1.0])));
+    // Without "Import appearances": names only.
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| {
+        p.set("blobData", ParamValue::Text(brep));
+        p.set("partInfo", ParamValue::Text(json));
+        p.set("importAppearances", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    assert!(r.display.bodies.iter().any(|d| d.name == "Bracket"));
+    assert!(r.display.bodies.iter().all(|d| d.face_colors.is_empty() && d.color != [0.0, 0.0, 1.0, 1.0]));
+}
+
 /// Mesh imports (Onshape G22/G27): STL and PVZ parts are mesh parts (one
 /// face, no edges); a PVZ part whose mesh doesn't close (Onshape's loft
 /// sample) becomes a closed composite of its 2 open pieces.

@@ -136,6 +136,8 @@ struct OpOut;
 struct SurfaceInfo;
 struct CurveInfo;
 struct BSplineF;
+struct BSplineSurfF;
+struct BSpline2dF;
 struct Seg2d;
 struct PlaneF;
 struct MeshCounts;
@@ -145,6 +147,7 @@ struct PlaneQ;
 struct Csr;
 struct HlrOut;
 struct StepImport;
+struct AsmNodeF;
 struct BoolOpts;
 struct SweepOpts;
 struct FillOpts;
@@ -317,6 +320,9 @@ std::unique_ptr<OcShape> read_parasolid(rust::Str path);
 StepImport               read_parasolid_parts(rust::Str path);
 StepImport               read_rhino_parts_ffi(rust::Str path);
 StepImport               read_native_parts_ffi(rust::Str path);
+StepImport               read_native_parts_config_ffi(rust::Str path, int32_t config);
+rust::Vec<AsmNodeF>      read_sldasm_tree_ffi(rust::Str path);
+rust::Vec<rust::String>  extract_zip_ffi(rust::Str zip, rust::Str dir);
 StepImport               read_sat_parts_ffi(rust::Str path);
 StepImport               read_jt_parts_ffi(rust::Str path);
 void                     write_acis(const OcShapeList& shapes, rust::Str path);
@@ -336,6 +342,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,
 OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src, const DevSurf& dst,
                     rust::Slice<const double> xf, double tol);
 std::unique_ptr<OcShapeList> isocline_edges(const OcShape& face, P3 dir, double angle, bool extend);
+std::unique_ptr<OcShape> bspline_surface_face(const BSplineSurfF& surface, rust::Slice<const BSpline2dF> boundary, bool make_solid);
 std::unique_ptr<OcShape> bspline_grid_face(const PlaneF& frame, double x0, double dx, double y0, double dy,
                                            rust::Slice<const double> z, uint32_t nx, uint32_t ny,
                                            int32_t deg_max, double tol, rust::Slice<const double> bounds);

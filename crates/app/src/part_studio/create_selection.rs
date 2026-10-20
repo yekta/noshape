@@ -462,6 +462,8 @@ impl PartStudioView {
                                 .text_size(px(13.))
                                 .font_weight(FontWeight::MEDIUM)
                                 .child("Create selection")
+                                // Onshape's panel-dialog header: grab.
+                                .cursor(CursorStyle::OpenHand)
                                 .on_drag(CsMove(grab), |d, offset, _, cx| {
                                     *d.0.lock() = offset;
                                     cx.new(|_| CsMoveGhost)
@@ -476,7 +478,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_create_selection(cx))),
                         ),
                 )

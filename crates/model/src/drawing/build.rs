@@ -41,6 +41,15 @@ pub enum PickTarget {
     Image(u64),
     /// The reference indicator of auxiliary view `0` in its parent.
     AuxIndicator(ViewId),
+    /// An automatic centermark of a view, keyed by its circle's center
+    /// ([`centermark_key`]).
+    AutoCentermark { view: ViewId, center: [i64; 2] },
+}
+
+/// Key of an automatic centermark: its center in view units (meters), to
+/// the nanometer.
+pub fn centermark_key(c: [f64; 2]) -> [i64; 2] {
+    c.map(|x| (x * 1e9).round() as i64)
 }
 
 impl PickTarget {
@@ -567,9 +576,14 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     let radius = radius?;
     let tol = radius * 1e-3 + 1e-7;
     let hole = ctx.holes.iter().find(|h| h.matches_circle(c, radius, tol))?;
-    let same = ctx.holes.iter().filter(|h| h.feature == hole.feature && (h.diameter - hole.diameter).abs() < 1e-9 && h.depth.map(|d| (d * 1e6).round()) == hole.depth.map(|d| (d * 1e6).round())).count();
+    let opts = a.hole.as_deref().cloned().unwrap_or_default();
+    let n = hole_count(ctx, hole, opts.count);
+    // Without "Override precision/tolerance" the hole feature's precision
+    // applies (the callout's units always do).
+    let format = if opts.override_tol { a.format.clone() } else { super::DimFormat { precision: None, tolerance: super::Tolerance::None, ..a.format.clone() } };
+    let a = &Annotation { format, ..a.clone() };
     let len = |m: f64| format::format_len(drawing, &a.format, m);
-    let count = if same > 1 { format!("{same}{} ", drawing.props.hole_indicator) } else { String::new() };
+    let count = if n > 1 { format!("{n}{} ", drawing.props.hole_indicator) } else { String::new() };
     let depth = |d: Option<f64>| match (hole.through, d) {
         (true, _) => " THRU".to_string(),
         (false, Some(d)) => format!(" ↧ {}", len(d)),
@@ -590,12 +604,28 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
             // with the deviations stacked; a precision override of the
             // tolerance applies to the size and the deviations.
             Some(fit) => {
-                let f = super::DimFormat { precision: fit.precision.or(a.format.precision), ..a.format.clone() };
+                let f = super::DimFormat { precision: fit.precision.or(a.format.precision).or(drawing.props.fit_tolerance_precision), ..a.format.clone() };
                 let class = fit.class.as_ref().map(|c| format!(" {c}")).unwrap_or_default();
                 let dev = fit.deviations.map(|(u, l)| format!(" {}", format::stacked(&format::format_deviation(drawing, &f, u, false), &format::format_deviation(drawing, &f, l, true)))).unwrap_or_default();
                 out.push(format!("{count}⌀{}{class}{dev}{}", format::format_len(drawing, &f, hole.diameter), depth(hole.depth)));
             }
-            None => out.push(format!("{count}⌀{}{}", len(hole.diameter), depth(hole.depth))),
+            None => {
+                // An overridden tolerance on the diameter (live drawing/465).
+                let dev = |v: f64, lower: bool| format::format_deviation(drawing, &a.format, v, lower);
+                let tol = match &a.format.tolerance {
+                    super::Tolerance::Symmetric { value } => format!(" ±{}", len(*value)),
+                    super::Tolerance::Deviation { upper, lower } => format!(" {}", format::stacked(&dev(*upper, false), &dev(*lower, true))),
+                    super::Tolerance::Min => " MIN".into(),
+                    super::Tolerance::Max => " MAX".into(),
+                    super::Tolerance::Fit { hole, .. } if !hole.is_empty() => format!(" {hole}"),
+                    _ => String::new(),
+                };
+                let size = match &a.format.tolerance {
+                    super::Tolerance::Limits { upper, lower } => format::stacked(&len(hole.diameter + upper), &len(hole.diameter + lower)),
+                    _ => len(hole.diameter),
+                };
+                out.push(format!("{count}⌀{size}{tol}{}", depth(hole.depth)))
+            }
         },
     }
     if let Some((d, dd)) = hole.cbore {
@@ -604,7 +634,48 @@ fn hole_callout_marked(drawing: &Drawing, sheet: &Sheet, sources: &Sources, a: &
     if let Some((d, ang)) = hole.csink {
         out.push(format!("⌵ ⌀{} X {}°", len(d), format::format_number(ang.to_degrees(), None, 1)));
     }
+    // Prefix / suffix around the callout, reference parentheses, the
+    // lines above and below.
+    let f = &a.format;
+    if let Some(first) = out.first_mut() {
+        *first = format!("{}{}{first}", if f.reference { "(" } else { "" }, f.prefix);
+    }
+    if let Some(last) = out.last_mut() {
+        *last = format!("{last}{}{}", f.suffix, if f.reference { ")" } else { "" });
+    }
+    if !f.above.is_empty() {
+        out.insert(0, f.above.clone());
+    }
+    if !f.below.is_empty() {
+        out.push(f.below.clone());
+    }
     Some(out)
+}
+
+/// The hole count a callout's Count type gives (the panel's "1X").
+pub fn hole_callout_count(sheet: &Sheet, sources: &Sources, a: &Annotation) -> Option<usize> {
+    let (key, _) = views::view_source(sheet, a.kind.view()?)?;
+    let ctx = &sources.get(&key)?.context;
+    let (c, radius) = views::resolve_point3(ctx, &a.refs.iter().find(|r| r.slot == 0)?.point)?;
+    let radius = radius?;
+    let hole = ctx.holes.iter().find(|h| h.matches_circle(c, radius, radius * 1e-3 + 1e-7))?;
+    Some(hole_count(ctx, hole, a.hole.as_ref().map(|o| o.count).unwrap_or_default()))
+}
+
+/// How many holes a callout counts (its Count type, live drawing/461).
+pub fn hole_count(ctx: &crate::regen::context::Context, hole: &crate::regen::context::HoleRecord, count: super::HoleCount) -> usize {
+    use super::HoleCount as C;
+    let mm = |x: Option<f64>| x.map(|d| (d * 1e6).round() as i64);
+    let pair = |x: Option<(f64, f64)>| x.map(|(p, q)| ((p * 1e6).round() as i64, (q * 1e6).round() as i64));
+    let same_size = |h: &&crate::regen::context::HoleRecord| mm(Some(h.diameter)) == mm(Some(hole.diameter)) && mm(h.depth) == mm(hole.depth) && h.through == hole.through && h.thread == hole.thread && pair(h.cbore) == pair(hole.cbore) && pair(h.csink) == pair(hole.csink);
+    let same_face = |h: &&crate::regen::context::HoleRecord| h.dir.dot(hole.dir) > 1.0 - 1e-9 && (h.start - hole.start).dot(hole.dir).abs() < 1e-7;
+    let holes = ctx.holes.iter().filter(same_size);
+    match count {
+        C::None => 1,
+        C::View | C::Part => holes.count(),
+        C::Pattern => holes.filter(|h| h.feature == hole.feature).count(),
+        C::Face | C::FaceExcludingPatterns => holes.filter(|h| h.feature == hole.feature).filter(same_face).count(),
+    }
 }
 
 struct Env<'a> {
@@ -633,6 +704,8 @@ impl AnnotationEnv for Env<'_> {
         let mut f = a.format.clone();
         f.prefix = self.expand(&f.prefix);
         f.suffix = self.expand(&f.suffix);
+        f.above = self.expand(&f.above);
+        f.below = self.expand(&f.below);
         format::dim_text(self.drawing, &f, value, angular, symbol)
     }
     fn expand(&self, s: &str) -> String {
@@ -644,7 +717,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn sheet_style(&self) -> super::sheet::SheetStyle {
         let p = &self.drawing.props;
-        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45 }
+        super::sheet::SheetStyle { dim_text: p.dim_text_height, dim_arrow: p.dim_arrow, dim_arrow_type: p.dim_arrow_type, dim_color: p.dim_color, ann_text: p.ann_text_height, ann_arrow: p.ann_arrow, ann_arrow_type: p.ann_arrow_type, ann_color: p.ann_color, dim_font: p.dim_font.clone(), ann_font: p.ann_font.clone(), text_gap: p.dim_text_gap, geometry_gap: p.dim_geometry_gap, extension: p.dim_extension, text_horizontal: p.dim_text_horizontal, ann_types: p.ann_types.clone(), datum_size: p.datum_size, callout_justify: p.callout_justify, callout_stack: p.callout_stack, callout_stack_gap: p.callout_stack_gap, target_hatch: p.target_hatch, underline_overridden: p.underline_overridden, lock_jog_45: p.lock_jog_45, ordinate_iso: !self.drawing.ordinate_ansi() }
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
@@ -773,8 +846,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         for pass in 0..3 {
             let mark = g.mark();
             for (i, e) in geo.edges.iter().enumerate() {
+                // Show/hide edges: hidden edges are left out, except while
+                // the dialog is open (thick grey, like occluded edges).
+                let marked = !v.hidden_edges.is_empty()
+                    && e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| v.hidden_edges.iter().any(|(b, n)| *b == me.body && n == &*me.name));
+                if marked && !v.editing_edges {
+                    continue;
+                }
                 let style = match (e.visible, e.class) {
                     (_, EdgeClass::Seam) => continue,
+                    (_, _) if marked => LineStyle::Visible,
+                    (false, EdgeClass::Sharp | EdgeClass::Outline) if v.editing_edges => LineStyle::Hidden,
                     (true, EdgeClass::Smooth) if v.show_tangent_edges && v.tangent_phantom => LineStyle::Phantom,
                     (true, EdgeClass::Smooth) if v.show_tangent_edges => LineStyle::Tangent,
                     (true, EdgeClass::Smooth) => continue,
@@ -792,8 +874,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     continue;
                 }
                 let pick = picks.id(PickTarget::Edge { view: v.id, edge: i as u32 });
+                let l0 = g.lines.len();
                 for piece in map_polyline(&pl, &e.points) {
                     g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
+                }
+                if v.editing_edges && (marked || !e.visible) {
+                    let lines = l0..g.lines.len();
+                    if marked {
+                        g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: 0.7, dashes: Vec::new() });
+                    }
+                    g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb: [170, 170, 170] });
+                    continue;
+                }
+                // Adjust linestyle: this edge's own pen and color.
+                if let Some(es) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| v.edge_styles.iter().find(|s| s.body == me.body && s.name == *me.name)) {
+                    let lines = l0..g.lines.len();
+                    g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: es.thickness, dashes: es.pattern.dashes(es.dashes) });
+                    if let Some(rgb) = es.color {
+                        g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
+                    }
                 }
             }
             match (pass, vt.tangent_color, vt.hidden_color) {
@@ -846,9 +945,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
             let mark = g.mark();
             for (c, r, _) in geo.circles().into_iter().filter(|_| v.show_centerlines) {
-                if in_band(c) {
+                // Deleted one by one (select + Delete).
+                let key = centermark_key(c);
+                if in_band(c) || v.deleted_centermarks.contains(&key) {
                     continue;
                 }
+                let view_pick = picks.id(PickTarget::AutoCentermark { view: v.id, center: key });
                 // Construction geometry › Centermarks: the arms pass the circle by the extension.
                 let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r) * 1.15 + vt.centermark_extension);
                 g.lines.push(Polyline2 { points: vec![[c[0] - ux[0] * r, c[1] - ux[1] * r], [c[0] + ux[0] * r, c[1] + ux[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });

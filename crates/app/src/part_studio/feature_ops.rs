@@ -46,17 +46,6 @@ impl PartStudioView {
         cx.notify();
     }
 
-    pub(super) fn add_to_new_folder(&mut self, ids: Vec<FeatureId>, cx: &mut Context<Self>) {
-        if ids.is_empty() {
-            return;
-        }
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Add to new folder", cx, |ps| {
-                ps.new_folder(&ids, None);
-            });
-        });
-    }
-
     pub(super) fn dissolve_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Remove folder", cx, |ps| ps.dissolve_folder(folder));

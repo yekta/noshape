@@ -10,6 +10,7 @@ use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
+use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::drawing::sheet::format_scale;
 use noshape_model::drawing::views::SourceKey;
 use noshape_model::drawing::*;
@@ -128,7 +129,7 @@ impl DrawingEditor {
             })
             .collect();
         let format_label = cur_tmpl.map(|n| n.replace(' ', "_") + ".dwt").unwrap_or_else(|| "Custom".into());
-        let dwt = Button::new("sp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").into_any_element();
+        let dwt = Button::new("sp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").into_any_element();
         // Size: Onshape lists A, A Portrait, B... for ANSI, A4... for ISO.
         let size_items: Vec<(String, bool, Act)> = SheetSize::STANDARD
             .iter()
@@ -147,10 +148,21 @@ impl DrawingEditor {
             s => s.label().to_string(),
         };
         let reference = self.sheet_reference(&sheet, cx);
-        let ref_label = reference.as_ref().map(|r| r.1.clone()).unwrap_or_else(|| "None".into());
+        // Live 124: "Unassigned" in grey when the sheet has no reference.
+        let unassigned = reference.is_none();
+        let ref_label = reference.as_ref().map(|r| r.1.clone()).unwrap_or_else(|| "Unassigned".into());
         let ref_items: Vec<(String, bool, Act)> = vec![(ref_label.clone(), true, std::rc::Rc::new(|_: &mut DrawingEditor, _: &mut Window, _: &mut Context<DrawingEditor>| {}) as Act)];
-        let link = reference.map(|(tab, _)| {
-            Button::new("sp-ref-link")
+        let link = Some(match reference {
+            None => div()
+                .size(px(26.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui_kit::rgb(0xf0f0f0))
+                .opacity(0.5)
+                .child(crate::assets::icon(&crate::assets::icon_path("link"), 16., cx))
+                .into_any_element(),
+            Some((tab, _)) => Button::new("sp-ref-link")
                 .ghost()
                 .small()
                 .w(px(26.))
@@ -159,7 +171,7 @@ impl DrawingEditor {
                 .child(crate::assets::icon(&crate::assets::icon_path("link"), 16., cx))
                 .tooltip("Switch to reference")
                 .on_click(move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx))
-                .into_any_element()
+                .into_any_element(),
         });
         Some(
             v_flex()
@@ -169,7 +181,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(299.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -202,7 +214,7 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.sheet_props = None;
                                     cx.notify();
@@ -215,7 +227,7 @@ impl DrawingEditor {
                         .child(row("Scale", scale_field, None))
                         .child(row("Format", dropdown("sp-format", format_label, format_items).into_any_element(), Some(dwt)))
                         .child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None))
-                        .child(row("Reference", dropdown("sp-ref", ref_label, ref_items).into_any_element(), link)),
+                        .child(row("Reference", div().when(unassigned, |d| d.text_color(gpui_kit::rgb(0xaaaaaa))).child(dropdown("sp-ref", ref_label, ref_items)).into_any_element(), link)),
                 )
                 .into_any_element(),
         )

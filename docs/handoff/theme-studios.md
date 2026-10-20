@@ -116,6 +116,57 @@ Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side
   selected on open. Note for screenshots on Xvfb: without a window manager the window is never active,
   so carets/selections don't paint until `xdotool windowfocus <win>`.
 
+**Round 5 (20 Oct ~06:00–, lead: drawing dialogs/panels pixel pass, visual only in asb's files):**
+- Sheets panel (drawing_extra.rs): tree indents as live 281 (sheet chevron 18 px in, refs 34, views 75),
+  18 px dark page icon, blue bar 3 px in, tab row 29 px; the sheet chips now hide under *every* tool
+  dialog (`covered` lists all dialog states).
+- All drawing tool dialogs: `DIALOG_TOP` 0 (live: flush with the drawing area top, over the chips);
+  new `drawing_chrome.rs` (main.rs `mod`): ✕ `#dd5228` (`drawing-cancel.svg`; the Part Studio's stays
+  `#bd3039`), disabled ✓ = white check on `#cae8ca` (was the whole cell at 0.2/0.3), and the XeDialog
+  shadow `0 0 4px rgba(154,165,175,.7)` (`dialog_shadow()`, 24 dialogs).
+- Drawing properties (drawing_drawprops.rs): no ×, centred 18.67 px title, 38 px tab cells with
+  `#adadad` rules / `#f4f5f6` (active white, open below), 8 new tab icons `dp-*.svg` (our drawings of
+  live 341's), white 30 px section titles 16 px/500, group headers / labels per the DOM.
+- GD&T dialog (drawing_gdt.rs): live 200 / dom drawing-gdt-dialog-empty layout: underlined Upper / Lower
+  text with italic placeholders, 69x34 cells with underlined slots, 221x34 tolerance cell (2 px
+  `#abcbff` active), separators, 50x30 bordered Type / + / leader / Ø buttons, header rule, 9 px body.
+- Table properties (drawing_move_sheet.rs, live 550): 200 px, 13.33 px label, 26 px corner buttons
+  50 px apart (active `#e6e6e6` + blue rule); shared header 500 weight + rule.
+- Detail view (drawing_detail.rs, dom drawing-detail-dialog): 200 px, 26 px rows, underlined fields
+  106/110/117 px, "Create circle" prompt field (other shapes requested, REQUESTS.md ui2 07:20).
+- Sheet properties: "Unassigned" grey + disabled link button when no reference (live 124); bordered
+  DWT button.
+- Table tool dialog (asb's new drawing_table_tool.rs, live 530): 200 px, underlined Rows / Columns
+  fields, corner buttons as Table properties; it now also hides the sheet chips (they drew over its
+  header). `dialog_left` is 0 / 258 (dialogs flush with the drawing area / the Sheets panel).
+- **Not restyled — needs asb first:** double-click on a dimension opens our "Dimension properties" form;
+  Onshape opens the dimension *palette* (live 15, dom drawing-dimension-edit-dialog: above / below
+  text, prefix, value ▾, precision, units, suffix, symbol row). Parity rows D31–D38 in
+  docs/parity/drawing.md. Drawing properties › Units and precision lacks "Fit class tolerance
+  precision", the Dual group and the footer (Update properties from a template… / Lock drawing
+  properties), live 341.
+- Section dialog icons (cutting line / flip) differ from live 494; icon agent.
+- For asb (behaviour, seen in this pass): Table tool opens with ✓ enabled and Rows not focused (live
+  530: ✓ disabled until placed, Rows focused with "2" selected); Detail view's View scale is blank in
+  live 127 until placed (ours shows 2:1); GD&T row 1 Type shows ⊕ (Position) by default in live 200.
+- 09:30: the drawing toolbar was moved out of drawing_ui.rs into grouped dropdowns (someone's in-progress
+  work); at 1920 px live shows every tool ungrouped (live 494 etc.).
+- All checked in the app side by side: /tmp/ui2-shots/final-drawing-{sheets-panel,properties,gdt,
+  section,detail,sheet-properties,table-tool}.png (live left/top).
+
+**Round 6 (20 Oct ~11:00–, lead: Section icons, assembly dialogs pass, later the dimension palette):**
+- Section dialog buttons: own icons `section-cut-line.svg` / `section-flip.svg` (icons README lists all
+  my dialog icons); `no_onshape_assets` green (2 passed).
+- Assembly, visual only in skb's files: left dialog column at the viewport's top left (live x 246,
+  y 79: insert, mate, mate connector, Animate, Mass), Insert search 30 px, mate dialog Solve 52x21
+  (`#aaa`, 12.25 px) and ▶ never dimmed, `panel_frame` header white + `#d7d7d7` rule and
+  `panel_frame_with(.., plain_close)` (grey × at 50 % for Animate, 220 px, 26 px rows, underlined
+  Playback), `os::param_row` 26 px, `os::query_box` empty 26 px, Configure Assembly button 35 px /
+  white / radius 5.25 and live's 14 px help text breaks, Named positions info box flush left, Mass
+  properties row pitches (Mass 29, CoM 30, XYZ 31, inertia 28, two 22 px help rows).
+- Checked equal already: BOM panel, Exploded views list (closed state), Named positions empty table.
+- Dimension palette: waiting for asb's model support (lead forwarded).
+
 **Left / known differences:**
 - Assembly ≡ button inert; tab manager ? button inert; ISO A4/A2/A1/A0 zone counts guessed — all waiting
   for live answers (REQUESTS.md ui2 13:58 / 14:05 / 14:30, still open on 20 Oct 03:30).

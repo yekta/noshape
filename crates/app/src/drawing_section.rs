@@ -36,6 +36,8 @@ pub struct SectionDlg {
     pub opposite: bool,
     /// Flip: look the other way across the cutting line.
     pub flip: bool,
+    /// "Cut from section" (sectioning a section view; live default on).
+    pub cut_from: bool,
 }
 
 /// "10 mm", "0.5 in", "12" (drawing units) → meters.
@@ -63,7 +65,7 @@ impl DrawingEditor {
             (None, true) => {
                 let next = self.current_sheet().next_label();
                 let label = cx.new(|cx| InputState::new(window, cx).placeholder("Section id").default_value(next));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
@@ -116,6 +118,13 @@ impl DrawingEditor {
             v.section_depth = d.depth.as_ref().and(d.depth_value).filter(|_| !d.up_to);
             v.section_depth_ref = d.depth_ref.clone().filter(|_| d.up_to && d.depth.is_some());
             v.exclude_from_cut = d.exclude.clone();
+            // Live drawing/505: ☑ Cut from section by default, only when
+            // sectioning a section view.
+            v.cut_from_section = d.cut_from
+                && match v.kind {
+                    noshape_model::drawing::ViewKind::Section { parent, .. } => self.current_sheet().view(parent).is_some_and(|p| matches!(p.kind, noshape_model::drawing::ViewKind::Section { .. })),
+                    _ => false,
+                };
         }
     }
 
@@ -205,6 +214,11 @@ impl DrawingEditor {
             _ => self.current_sheet().views.iter().any(|v| noshape_model::drawing::views::view_source(self.current_sheet(), v.id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly)),
         };
         let line_done = matches!(self.tool, Tool::Section { line: Some(_), .. });
+        // "Cut from section": sectioning a section view (not a broken-out one).
+        let of_section = match &self.tool {
+            Tool::Section { parent: Some(p), .. } => self.current_sheet().view(*p).is_some_and(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Section { .. }) && v.broken_out.is_empty()),
+            _ => false,
+        };
         let tab = |id: &'static str, label: &'static str, m: u8, cx: &mut Context<Self>| {
             let on = mode == m;
             div()
@@ -229,7 +243,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(200.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -241,7 +255,7 @@ impl DrawingEditor {
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Section view"))
                         // ✓ is enabled once the section view can be placed.
-                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!line_done, |d| d.opacity(0.2)).child(crate::ui::glyph("check", 18., gpui_kit::white())))
+                        .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!line_done, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())))
                         .child(
                             div()
                                 .id("ds-cancel")
@@ -251,7 +265,7 @@ impl DrawingEditor {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("close", 14., pal.cancel))
+                                .child(crate::drawing_chrome::cancel_x(cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                         ),
                 )
@@ -259,10 +273,10 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(h_flex().child(tab("ds-vert", "Vertical", 0, cx)).child(tab("ds-horiz", "Horizontal", 1, cx)).child(tab("ds-ang", "Angular", 2, cx)))
-                        .child(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small()))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(26.)).flex().items_end().border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
                         .child(
                             h_flex()
-                                .mt(px(3.))
+                                .mt(px(5.))
                                 .h(px(30.))
                                 .child(
                                     // The cutting line pick (active until the line is placed; click to pick again).
@@ -278,7 +292,7 @@ impl DrawingEditor {
                                         .when(!line_done, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
                                         .cursor_pointer()
                                         .tooltip(crate::ui::tooltip("Cutting line"))
-                                        .child(crate::assets::icon(&crate::assets::icon_path("section-view"), 20., cx))
+                                        .child(crate::assets::icon("section-cut-line", 20., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                             let m = this.section_dlg.as_ref().map(|d| d.mode).unwrap_or(0);
                                             this.set_section_mode(m, cx);
@@ -297,7 +311,7 @@ impl DrawingEditor {
                                         .when(flip, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
                                         .cursor_pointer()
                                         .tooltip(crate::ui::tooltip("Flip direction"))
-                                        .child(crate::assets::icon(&crate::assets::icon_path("flip"), 18., cx))
+                                        .child(crate::assets::icon("section-flip", 20., cx))
                                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                             if let Some(d) = &mut this.section_dlg {
                                                 d.flip = !d.flip;
@@ -345,6 +359,15 @@ impl DrawingEditor {
                             this.update_preview(cx);
                             cx.notify();
                         }))))
+                        .when(of_section, |e| {
+                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-cut-from").label("Cut from section").small().checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                if let Some(d) = &mut this.section_dlg {
+                                    d.cut_from = *v;
+                                }
+                                this.update_preview(cx);
+                                cx.notify();
+                            }))))
+                        })
                         .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("ds-depth").label("Section depth").small().checked(d.depth.is_some()).on_click(cx.listener(|this, v: &bool, w, cx| this.toggle_section_depth(*v, w, cx)))))
                         .when(d.depth.is_some(), |e| {
                             let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {

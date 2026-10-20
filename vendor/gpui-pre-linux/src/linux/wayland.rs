@@ -18,11 +18,10 @@ use gpui::CursorStyle;
 /// NOSHAPE PATCH: the cursor-shape-v1 shape of a CSS standard cursor name.
 pub(super) fn css_to_shape(css: &str) -> Option<Shape> {
     Some(match css {
-        "move" => Shape::Move,
+        // Chrome shows all-scroll for `move` (Blink doesn't tell them apart).
+        "move" => Shape::AllScroll,
         "zoom-in" => Shape::ZoomIn,
         "no-drop" => Shape::NoDrop,
-        "wait" => Shape::Wait,
-        "help" => Shape::Help,
         _ => return None,
     })
 }
@@ -30,11 +29,9 @@ pub(super) fn css_to_shape(css: &str) -> Option<Shape> {
 /// NOSHAPE PATCH: cursor theme names of a CSS standard cursor name.
 pub(super) fn css_icon_names(css: &str) -> &'static [&'static str] {
     match css {
-        "move" => &["move", "fleur", "all-scroll", "size_all"],
+        "move" => &["all-scroll", "fleur", "size_all"],
         "zoom-in" => &["zoom-in"],
         "no-drop" => &["no-drop", "dnd-no-drop", "not-allowed", "crossed_circle"],
-        "wait" => &["wait", "watch"],
-        "help" => &["help", "question_arrow", "left_ptr_help"],
         _ => &["default"],
     }
 }

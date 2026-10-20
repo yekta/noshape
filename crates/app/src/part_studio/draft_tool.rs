@@ -199,8 +199,8 @@ impl PartStudioView {
                         .child(
                             div()
                                 .id(SharedString::from(format!("dr-{idx}-x-{i}")))
-                                .invisible()
-                                .group_hover("drrow", |d| d.visible())
+                                .opacity(0.)
+                                .group_hover("drrow", |d| d.opacity(1.))
                                 .cursor_pointer()
                                 .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -261,7 +261,7 @@ impl PartStudioView {
                                 })),
                         ),
                 )
-                .child(h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Minimum draft angle")).child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&d.angle_input).appearance(false).xsmall().text_right())))
+                .child(h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Minimum draft angle")).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&d.angle_input).appearance(false).xsmall().text_right()))))
                 .child(field(1, "Entities to check", d.parts.clone(), cx))
                 .child(Checkbox::new("dr-undercut").label("Show undercut regions").checked(d.undercut).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(d) = &mut this.ui.draft {

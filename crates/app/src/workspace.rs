@@ -51,6 +51,10 @@ pub struct Workspace {
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
     /// Pictures for the tab hover card.
     tab_thumbs: Entity<crate::tab_thumbs::TabThumbs>,
+    /// The pointer is over the navbar, which shows Onshape's selection-count
+    /// cursor too (`.navbar` gets the canvas's selection cursor).
+    navbar_hovered: bool,
+    cursor_sync: crate::cursor::CursorSync,
     /// Left rail › Document notes or Performance.
     doc_panel: Option<(DocPanel, Vec<Subscription>)>,
     /// Tab being renamed (tab › Rename, double-click).
@@ -102,7 +106,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -397,6 +401,7 @@ impl Workspace {
         let doc = self.doc.read(cx);
         let name = doc.name();
         let read_only = doc.session.read_only();
+        let viewing_version = doc.session.viewing_version();
         // The current branch (Onshape shows the workspace name, e.g. "Main").
         let branch_name = doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
         TitleBar::new()
@@ -405,10 +410,21 @@ impl Workspace {
             .border_b_0()
             .child(
                 h_flex()
+                    .id("navbar")
                     .w_full()
                     .h_full()
                     .pr_2()
                     .gap(px(4.))
+                    .on_hover(cx.listener(|this, h: &bool, _, cx| {
+                        this.navbar_hovered = *h;
+                        cx.notify();
+                    }))
+                    // Over its links and buttons their own cursor shows.
+                    .on_mouse_move(cx.listener(|this, _: &MouseMoveEvent, _, cx| {
+                        if this.navbar_hovered && this.selection_cursor_count(cx) > 0 {
+                            cx.notify();
+                        }
+                    }))
                     .child(
                         // Onshape: the logo block ends at x 139, the logo 14 px in
                         // (the title bar already pads 12 px on the left).
@@ -438,15 +454,31 @@ impl Workspace {
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().child(name))
-                    // Live: on the name's baseline, 11 px after it.
-                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).child(if read_only { "History".to_string() } else { branch_name }))
-                    .when(read_only, |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
+                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(name))
+                    // Live: on the name's baseline, 11 px after it. The name and this
+                    // label show the I-beam (dom/cursors-controls.json).
+                    // Live (navigation/301): a version shows its name ("V1", #999) in the
+                    // branch's place and no banner (its view-only bar is in the toolbar row).
+                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().child(match (&viewing_version, read_only) {
+                        (Some(v), _) => v.clone(),
+                        (None, true) => "History".to_string(),
+                        (None, false) => branch_name,
+                    }))
+                    .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
                     .children(self.render_notices_button(cx))
                     .child(self.render_help_menu(cx)),
             )
             .into_any_element()
+    }
+
+    /// The active Part Studio's or Assembly's selection-count cursor number.
+    fn selection_cursor_count(&self, cx: &App) -> usize {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::PartStudio(v)) => v.read(cx).selection_cursor_count(cx),
+            Some(TabView::Assembly(v)) => v.read(cx).selection_cursor_count(cx),
+            _ => 0,
+        }
     }
 
     /// Help ▾ at the right of the navbar (Onshape's `?▾`).
@@ -853,7 +885,8 @@ impl Workspace {
                     .rounded_b(px(5.))
                     .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.12), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
                     .text_size(px(14.))
-                    .cursor_pointer()
+                    // Live: inactive tabs pointer, the active tab default.
+                    .when(!active, |d| d.cursor_pointer())
                     .bg(if active { pal.panel } else { pal.tab_inactive })
                     .text_color(if active { pal.text } else { pal.text_muted })
                     .child(crate::assets::icon(tab_icon(kind), 20., cx))
@@ -1094,6 +1127,9 @@ impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         crate::assets::set_scale_factor(_window.scale_factor());
+        let count = self.selection_cursor_count(cx);
+        let want = (self.navbar_hovered && count > 0 && _window.hovered_cursor_style().is_none()).then(|| crate::cursor::AppCursor::count(count));
+        crate::cursor::CursorSync::sync(self, want, _window, cx, |w| &mut w.cursor_sync);
         let title = self.render_title_bar(cx);
         let (tab_list, tabs) = self.render_tab_bar(cx);
         let rail = self.render_rail(tab_list, cx);
@@ -1643,7 +1679,16 @@ pub(crate) fn import_names(path: &std::path::Path) -> (String, String) {
 
 /// Read a CAD or mesh file as BREP text. Mesh files carry no unit: they are
 /// read in the document's length unit.
-pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPrefs) -> anyhow::Result<String> {
+/// A translated CAD file: its shapes as BREP text (a compound, one child per
+/// part when `parts` is set) and what the file says about each part (JSON
+/// list of `ImportPartInfo`, empty when the format names none).
+#[derive(Clone)]
+pub(crate) struct Foreign {
+    pub brep: String,
+    pub parts: String,
+}
+
+pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPrefs) -> anyhow::Result<Foreign> {
     use noshape_kernel as k;
     let mesh_unit = {
         use noshape_units::LengthUnit as U;
@@ -1657,12 +1702,14 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
         }
     };
     let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-    let compound = |parts: Vec<k::ImportedShape>| k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
+    // Parts with names and colours: one compound child each, described in `info`.
+    let mut info: Vec<noshape_model::features::importing::ImportPartInfo> = Vec::new();
+    let mut compound = |parts: Vec<k::ImportedShape>| {
+        info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, faces: p.face_colors.clone() }).collect();
+        k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
+    };
     let shape = match ext.as_str() {
-        "step" | "stp" => {
-            let parts = k::read_step(path, k::LengthUnit::Meter)?;
-            k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
-        }
+        "step" | "stp" => compound(k::read_step(path, k::LengthUnit::Meter)?),
         "iges" | "igs" => k::read_iges(path, k::LengthUnit::Meter)?,
         "brep" => k::read_brep(path)?,
         // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres).
@@ -1678,16 +1725,18 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
         "sldprt" | "par" | "psm" | "prt" | "ipt" => compound(k::read_native_parts(path, k::LengthUnit::Meter)?),
         other => anyhow::bail!("Unsupported file type .{other}"),
     };
-    Ok(String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string())
+    let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
+    Ok(Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts })
 }
 
 /// Append an Import feature ("Import N") holding `brep` to `ps`.
-pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str, brep: String, units: &noshape_units::UnitPrefs) {
+pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str, foreign: Foreign, units: &noshape_units::UnitPrefs) {
     if let Some(mut f) = ps.new_feature("importForeign", units) {
         // Live (documents/64-import-feature-dialog.png): the feature is
         // numbered like any other ("Import 1") and allows faulty parts.
         f.params.set("allowFaultyParts", noshape_model::ParamValue::Bool(true));
-        f.params.set("blobData", noshape_model::ParamValue::Text(brep));
+        f.params.set("blobData", noshape_model::ParamValue::Text(foreign.brep));
+        f.params.set("partInfo", noshape_model::ParamValue::Text(foreign.parts));
         f.params.set("foreignId", noshape_model::ParamValue::Text(file.to_string()));
         ps.insert_at_rollback(f);
     }

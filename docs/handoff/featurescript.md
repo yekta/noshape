@@ -5,7 +5,7 @@ FeatureScript run in Part Studios. Replaces the Rhai custom features (`crates/mo
 
 ## Status (19 Oct ~18:00)
 
-Build only in /root/target-shared (TEAM-RULES "Build"); prefer `cargo check` / single tests. Green:
+Build only in /root/target-engine (engine group, TEAM-RULES "Build"); prefer `cargo check` / single tests. Green:
 `cargo test -p noshape-featurescript` (29), `cargo test -p noshape-model --test custom_features` (14 + 1
 ignored y_threads, kernel sweep), clippy `-p noshape-model -p noshape-featurescript --all-targets`.
 
@@ -276,8 +276,54 @@ found by scanning the local library once per unknown id) and loaded through
    definition fields often differ from the feature's param ids (checked: opModifyFillet and opEnclose match;
    opFillSurface, opFaceBlend, opBoundarySurface, opRuledSurface, opExtendSheetBody do NOT) → add a field
    rename/translation per op before registering them.
-4. opExtractSurface ignores `tangentPropagation`; skConicSegment ignores low/highParameter; opMoveFace always
-   moves rigidly (Onshape offsets planar faces moved along their normal, like our Move face feature).
+4. (done 20 Oct) opExtractSurface `tangentPropagation` (smooth edges), skConicSegment low/highParameter
+   (blossomed sub-conic), opMoveFace offsets planar faces translated along their normal (rigid otherwise).
+   Also new: opEditCurve, evMaxPathDeviation, opModifyCompositePart (open composites; closed ones can only
+   grow), evEdgeCurvatureDerivatives (central differences of the exact tangent), evPointsDeviation,
+   evMeshPoints (+ opConstrainedSurface fits mesh points, interpolates picked ones), evRuledSurfaceBases,
+   opFullRoundFillet (Fillet FULL_ROUND), opCreateCurvesOnFace (Isoparametric curve; DIR*_ISO curves under
+   `id + name`). **Fix:** host `rename_created` dropped `Body::composite`, so composites made from
+   FeatureScript were plain bodies. The panel lists a Part Studio's sketches after its parts (picture seen
+   normal to the sketch plane; picking one gives a Sketch query). kern has the B-spline surface request
+   (opCreateBSplineSurface). Still missing (34): sheet metal internals, tolerances, opHole, opWrap-free
+   ones like opOffsetWire / opEdgeChange / opMoveCurveBoundary / opCreateOutline / opBooleanedPattern /
+   opTessellatedLoft / opDerip / opImportForeign / opSplitBySelfShadow, evFaceCurvatureDerivatives,
+   evOffsetDetection, evFaults, unpackQuery (Onshape's compressed query format is unknown).
+   **20 Oct, round 5:** `@opHole` native (host/hole.rs): hole cylinder entrances/exits by rays on the axis
+   and around the largest profile radius, profiles placed against AXIS_POINT / TARGET_START /
+   LAST_TARGET_START / LAST_TARGET_END / UP_TO_NEXT / UP_TO_ENTITY / LAST_TARGET_START_IN_DEPTH (matched
+   profiles: root start, *_END root end), identical neighbours collapsed, targetMustDifferFromPrevious /
+   notApplicableForFirstTarget, subtract / keepTools / targetsToExcludeFromSubtraction; tool faces named
+   `Side(Index(hole << 16 | faceIndex))` so `qOpHoleFace` / `qOpHoleProfile` (by name, by identity) work
+   (CtxState.holes). Guesses to confirm with live (REQUESTS "fs (09:10)", requests-fs/fs-ophole.fs): radius
+   of the "hole cylinder", holeDepth origin, errors when every hole fails (HOLE_TARGETS_DO_NOT_DIFFER /
+   HOLE_NO_HITS). `@opOffsetWire` (ops.rs) = the Thin wall builder (thin.rs) with offset1/offset2/flip;
+   open chains flipped when `normal` opposes the builder's plane normal; makeRegions → sheet bodies, else
+   wire bodies of the offset curves. Live probes pending: evOffsetDetection + packed queries ("fs (08:00)"),
+   sheet metal definition bodies + SMAttributes ("fs (09:40)", requests-fs/fs-smprobe.fs) before
+   updateSheetMetalGeometry & co.
+   **Round 5b (live answers in):** opHole matched to dom/fs-ophole.txt: depth extremes on the smallest
+   (shaft) radius, each reference's root range on the largest radius of its profiles, entrances clamped at
+   0, holeDepth = 0 when the last profile references AXIS_POINT / TARGET_START else (last profile with a
+   radius) − first entrance, profile edges = edges between the two hole faces around the profile (cap
+   gone → no edge), errors carry faultyParameters [targets] (`code_error_faulty`). Open: live 6b
+   (LAST_TARGET_START_IN_DEPTH + notApplicableForFirstTarget, single part) threw HOLE_NO_HITS, probably the
+   probe's tangent 2 mm cylinder; we skip the profiles (hole.fs relies on that).
+   `@evOffsetDetection` (host/offsets.rs) from dom/fs-offset-detect.txt: thickness = smallest offset pair of
+   the first body; every body's pairs at that thickness, connected pairs grouped, side0 = earlier face.
+   `@unpackQuery` (host/packed.rs) — format decoded from Show code (dom/fs-packed-query.txt): `%`+typed
+   values (M/A/S/D/F/T, B/C type names, R value refs, string pieces `<len>`/`-<ref>`), `&<hexlen>$base64(zlib)`;
+   root Id prefixes every Id. DUMMY queries for Top/Front/Right/Origin resolve. Unknown: number format
+   beyond `D1`. New dep: miniz_oxide in crates/model. **FS language:** `?:` is left-associative (live) —
+   parser fixed, error text "First operand of logical or conditional operator must be boolean".
+   Sheet metal: the definition body is hidden from qEverything; part entities link to it by association
+   attributes (dom/fs-smprobe-*.txt). Probe 2 for the definition body + SMAttributes: REQUESTS "fs (10:30)".
+   **App (qa4):** Feature Studio shortcuts ctrl/cmd+shift+O (Module outline), ctrl/cmd+[ / ] (Back / Forward
+   reference) bound, also over the code editor (kit's outdent/indent give way, as Onshape's are locked);
+   verified on :108. Module outline popover was drawn at the window's top-left (anchor cell recreated each
+   render) — fixed. "New feature" + ctrl+z could NOT be reproduced (focused / unfocused editor, new studio,
+   toolbar Undo: one step removes the block); live ground truth requested ("fs (10:50)"). Back/forward only
+   record outline / notices jumps; Onshape's ctrl+click go-to-definition is still missing.
 5. Verify in the app (Xvfb :108): Feature Studio editor notices (error/warning/info), FeatureScript notices
    panel with a monitored Part Studio running the FS probe (compare live part-studio/405, document/75),
    Ctrl+Shift+F symbol search/rename. Side-by-side screenshots for the lead.
@@ -359,3 +405,18 @@ schema. 44 of 65 are identical (pinned in the test). Built-in deviations found (
   `crates/featurescript/std/LICENSE` must stay next to the sources. The README has no third-party
   notices section; if one is added, list the FeatureScript Standard Library (MIT, PTC) there.
 - Drawing custom tables (docs/parity/drawing.md TB25/TB26) need FeatureScript table support (`defineTable`, as in Onshape). Add it after the core plan; asb hooks the drawing side.
+
+## From kern (2026-10-20): `opCreateBSplineSurface` kernel function ready
+- `noshape_kernel::make_bspline_surface(&BSplineSurfaceData, boundary: &[BSplineCurve2dData], make_solid) -> Result<Shape>`
+  (docs/kernel-api.md › surfacing; test `kernel/tests/surfacing.rs::bspline_surface_from_featurescript_definition`,
+  std's two `bSplineSurface` doc examples + a boundary loop + a closed torus net).
+- Pass std's `BSplineSurface` as `bSplineSurface()` returns it: `poles[i * nv + j]` = `controlPoints[i][j]` (row i along
+  u), `weights` = the flattened `weights` matrix or `None`, `u_knots` / `v_knots` = the full (padded) knot arrays, the
+  overlapped rows/columns of a periodic direction included, degrees and periodic flags as given. Lengths in metres.
+- `boundaryBSplineCurves` → `BSplineCurve2dData { poles (u, v), weights, knots (full), degree, periodic }` each; they
+  must form one closed loop (else `KernelError::Invalid`). No boundary = the whole parameter range.
+- `makeSolid` → `make_solid`: a solid when the sheet closes (both ways periodic, or closed with collapsed ends), else
+  the sheet. The result is one face (sheet) or one solid; give it your feature's naming/history.
+- Errors are `KernelError::Invalid` with a message (bad knot count, decreasing knots, multiplicity > degree + 1,
+  degree outside 1..25, non-positive weights). Onshape's own error text for these is not captured; map them to
+  Onshape's message where you know it.

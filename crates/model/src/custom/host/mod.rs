@@ -15,6 +15,9 @@
 mod builtin;
 pub(crate) mod convert;
 mod evaluate;
+pub mod hole;
+mod offsets;
+mod packed;
 mod ops;
 mod pattern;
 pub mod query;
@@ -108,6 +111,8 @@ pub struct CtxState {
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
     pub sketch_names: sketch::SketchNames,
+    /// Holes built by each `opHole` (`qOpHoleFace` / `qOpHoleProfile`).
+    pub holes: HashMap<FsId, Vec<hole::HoleRecord>>,
 }
 
 /// The `Context` builtin.
@@ -159,6 +164,7 @@ impl FsContext {
                 debug_entities: Vec::new(),
                 sketches: HashMap::new(),
                 sketch_names: HashMap::new(),
+                holes: HashMap::new(),
             }),
         })
     }
@@ -329,6 +335,11 @@ pub fn rename_created(ctx: &mut Context, marker: FeatureId, feature: FeatureId) 
         let faces: Vec<Arc<TopoName>> = b.faces.iter().map(|f| wrap_name(f, marker, feature)).collect();
         let id = wrap_body_id(&b.id, marker, feature);
         let mut nb = Body::new(id, b.name.clone(), b.kind, b.shape.clone(), faces, b.color, feature);
+        // Keep what the operation made it (a composite part's members).
+        nb.composite = b.composite.clone().map(|mut c| {
+            c.members = c.members.iter().map(|m| wrap_body_id(m, marker, feature)).collect();
+            c
+        });
         if b.faces.is_empty() {
             nb.edges = b.edges.iter().map(|e| wrap_name(e, marker, feature)).collect();
             nb.vertices = b.vertices.iter().map(|e| wrap_name(e, marker, feature)).collect();
@@ -363,6 +374,9 @@ pub fn register() {
         all.extend_from_slice(status::NATIVES);
         all.extend_from_slice(query::NATIVES);
         all.extend_from_slice(evaluate::NATIVES);
+        all.extend_from_slice(hole::NATIVES);
+        all.extend_from_slice(offsets::NATIVES);
+        all.extend_from_slice(packed::NATIVES);
         all.extend_from_slice(ops::NATIVES);
         all.extend_from_slice(sketch::NATIVES);
         all.extend_from_slice(pattern::NATIVES);
@@ -428,14 +442,18 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
         Err(e) => {
             st.ctx = snapshot;
             // `code_error`: a specific ErrorStringEnum member.
-            let (code, msg) = match e.message.strip_prefix('\u{1}') {
-                Some(c) => (c.to_string(), error_text(c)),
-                None => (failure.to_string(), e.message.clone()),
+            let (code, msg, faulty) = match e.message.strip_prefix('\u{1}') {
+                Some(c) => {
+                    let (c, faulty) = c.split_once('\u{2}').unwrap_or((c, ""));
+                    (c.to_string(), error_text(c), faulty.split(',').filter(|f| !f.is_empty()).map(str::to_string).collect::<Vec<_>>())
+                }
+                None => (failure.to_string(), e.message.clone(), Vec::new()),
             };
             st.status.insert(id.to_vec(), status::status_map("ERROR", &code, Some(&msg)));
             drop(st);
             log::debug!("FeatureScript operation {} failed: {msg}", id.join("."));
-            Err(raise_error(i, &code, (code == "CUSTOM_ERROR").then_some(msg.as_str())))
+            let faulty: Vec<&str> = faulty.iter().map(String::as_str).collect();
+            Err(raise_with(i, &code, (code == "CUSTOM_ERROR").then_some(msg.as_str()), &faulty))
         }
     }
 }
@@ -443,6 +461,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
 /// An operation failure reported as a specific `ErrorStringEnum` member.
 pub fn code_error(code: &str) -> FeatureError {
     FeatureError::new(format!("\u{1}{code}"))
+}
+
+/// [`code_error`] naming the definition fields at fault (`faultyParameters`).
+pub fn code_error_faulty(code: &str, faulty: &[&str]) -> FeatureError {
+    FeatureError::new(format!("\u{1}{code}\u{2}{}", faulty.join(",")))
 }
 
 /// Raise `{ "message" : ErrorStringEnum.<name> }` (or a custom message).

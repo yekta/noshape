@@ -232,12 +232,17 @@ impl StatefulInteractiveElement for InputBase {}
 impl RenderOnce for InputBase {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
         let style = self.resolved_style();
-        self.base
-            .when_some(self.role.resolve(|| Role::TextInput), |this, role| {
-                this.role(role)
-            })
-            .children(self.children)
-            .refine_style(&style)
+        // NOSHAPE PATCH: the frame publishes its box to the text element
+        // inside, which makes all of it the input's hit target (see
+        // `frame_hit`).
+        super::frame_hit::input_frame(
+            self.base
+                .when_some(self.role.resolve(|| Role::TextInput), |this, role| {
+                    this.role(role)
+                })
+                .children(self.children)
+                .refine_style(&style),
+        )
     }
 }
 

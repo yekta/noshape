@@ -393,6 +393,9 @@ fn bend_feature_keeps_flat_length() {
 
 #[test]
 fn convert_box_with_bends_and_joints() {
+    // An open box (top excluded) converted with its front and back bottom
+    // edges as bends: walls outward (live G34d), every other corner an
+    // edge-joint rip, so the left and right walls come off as their own parts.
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 50.0), (0.0, 50.0)], true);
@@ -407,32 +410,31 @@ fn convert_box_with_bends_and_joints() {
     let body = r.context.bodies[0].id.clone();
     let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
     let front_edge = edge_at(&r, 0, DVec3::new(mm(50.0), 0.0, 0.0));
+    let back_edge = edge_at(&r, 0, DVec3::new(mm(50.0), mm(50.0), 0.0));
     s.add("sheetMetalStart", move |p| {
         p.set("process", en("CONVERT"));
         p.set("partToConvert", ParamValue::Query(vec![Reference::Body(body)]));
         p.set("facesToExclude", ParamValue::Query(vec![top]));
-        p.set("bends", ParamValue::Query(vec![front_edge]));
+        p.set("bends", ParamValue::Query(vec![front_edge, back_edge]));
         set_model(p, "2 mm", "3 mm");
     });
     let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
-    assert_eq!(data.walls.len(), 5, "bottom + 4 sides");
-    assert_eq!(data.bends.len(), 1);
-    // Make joint: the back bottom edge becomes a bend too.
-    let back_edge = edge_at(&r, 0, DVec3::new(mm(50.0), mm(50.0), 0.0));
-    s.add("sheetMetalMakeJoint", move |p| {
-        p.set("entities", ParamValue::Query(vec![back_edge]));
-        p.set("joint", en("BEND"));
-    });
-    let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
-    assert_eq!(data.bends.len(), 2);
-    let fp = flat(&r, 0);
+    assert_eq!(r.context.bodies.len(), 3, "bottom with front and back; left; right");
+    let main = (0..3).find(|&i| r.context.sheet_metal.get(&r.context.bodies[i].id).unwrap().bends.len() == 2).expect("the bent part");
+    let data = r.context.sheet_metal.get(&r.context.bodies[main].id).unwrap().clone();
+    assert_eq!(data.walls.len(), 3, "bottom, front, back");
+    // Rips to the left and right walls: at the bottom and both side walls.
+    assert_eq!(data.rips.len(), 6);
+    assert!(data.rips.iter().all(|x| x.b == usize::MAX && x.other.is_some()));
+    for i in 0..3 {
+        let d = r.context.sheet_metal.get(&r.context.bodies[i].id).unwrap();
+        assert!(!d.walls.is_empty() && d.rips.iter().all(|x| x.a < d.walls.len()), "part {i}");
+    }
+    let fp = flat(&r, main);
     assert_eq!(fp.bend_lines.len(), 2);
-    let bottom_len = mm(50.0) - 2.0 * mm(5.0);
-    let side = mm(25.0) - mm(5.0);
-    let expected = bottom_len + 2.0 * ba(PI / 2.0, mm(3.0), 0.45, mm(2.0)) + 2.0 * side;
-    // The three bent walls lie along one strip across the bends.
+    // The walls' definition faces are the box's: bends of inner radius 3 at
+    // its edges.
+    let expected = mm(50.0 - 2.0 * 3.0) + 2.0 * ba(PI / 2.0, mm(3.0), 0.45, mm(2.0)) + 2.0 * mm(25.0 - 3.0);
     let along = fp.bend_lines.iter().map(|b| (b.b - b.a).normalize()).next().unwrap();
     let perp = DVec2::new(-along.y, along.x);
     let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -441,7 +443,7 @@ fn convert_box_with_bends_and_joints() {
         lo = lo.min(d);
         hi = hi.max(d);
     }
-    assert!(hi - lo >= expected - 1e-7, "strip {} vs {expected}", hi - lo);
+    assert!(near(hi - lo, expected, 1e-7), "strip {} vs {expected}", hi - lo);
     // Modify joint: change the radius of the second bend.
     let bend_face = data.bends[1].inner_faces[0].clone();
     s.add("sheetMetalJoint", move |p| {
@@ -451,19 +453,21 @@ fn convert_box_with_bends_and_joints() {
         p.set("radius", expr("5 mm"));
     });
     let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
-    assert_eq!(data.bends.len(), 2);
+    let main = (0..3).find(|&i| r.context.sheet_metal.get(&r.context.bodies[i].id).unwrap().bends.len() == 2).expect("the bent part");
+    let data = r.context.sheet_metal.get(&r.context.bodies[main].id).unwrap().clone();
     assert!(data.bends.iter().any(|b| near(b.radius, mm(5.0), 1e-12)));
-    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Solid), 1);
-    // Rip a vertical corner.
-    let corner = edge_at(&r, 0, DVec3::new(mm(100.0), 0.0, mm(15.0)));
+    assert_eq!(r.context.bodies[main].shape.count(noshape_kernel::ShapeType::Solid), 1);
+    // Make joint where the front wall meets the right wall: they already
+    // meet at a rip.
+    let b = &r.context.bodies[main];
+    let rip_face = b.faces.iter().position(|n| data.rips.iter().any(|x| x.has_face(n))).expect("a rip face on the bent part");
+    let pick = Reference::Face((*b.faces[rip_face]).clone());
     s.add("sheetMetalMakeJoint", move |p| {
-        p.set("entities", ParamValue::Query(vec![corner]));
-        p.set("joint", en("RIP"));
+        p.set("entities", ParamValue::Query(vec![pick]));
+        p.set("joint", en("BEND"));
     });
-    let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
-    assert_eq!(data.rips.len(), 1);
+    let (st, msg) = s.last_status();
+    assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "An internal edge cannot be used to create a joint."));
 }
 
 #[test]
@@ -811,4 +815,93 @@ fn frame_sketch_profile_tangent_merge_and_limit_ends() {
     let total: f64 = (0..4).map(|i| volume(&r, i)).sum();
     let area = mm(60.0) * mm(40.0) - mm(54.0) * mm(34.0);
     assert!(near(total, area * mm(600.0), 1e-12), "pinwheel volume {total}");
+}
+
+/// Convert like Onshape (live G34d): the top and +X faces of a 40 x 30 x 20
+/// block (the other four excluded), 1 mm thick, bend radius 1 mm, minimal gap
+/// 0.02 mm. Walls are built outward from the faces; with no bend edges they
+/// meet at an edge-joint rip (each stops 0.02 short of the other's face, the
+/// outer corner open) and become two parts.
+#[test]
+fn convert_rips_and_bends_like_onshape() {
+    let block = |bend: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 30.0), (0.0, 30.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = s.regen();
+        let key = r.display.sketches[0].regions[0].key.clone();
+        s.add("extrude", move |p| {
+            p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+            p.set("depth", expr("20 mm"));
+        });
+        let r = s.ok();
+        let body = r.context.bodies[0].id.clone();
+        let exclude: Vec<Reference> = [(20.0, 15.0, 0.0), (0.0, 15.0, 10.0), (20.0, 0.0, 10.0), (20.0, 30.0, 10.0)]
+            .iter()
+            .map(|&(x, y, z)| face_at(&r, 0, DVec3::new(mm(x), mm(y), mm(z))))
+            .collect();
+        let bends = if bend { vec![edge_at(&r, 0, DVec3::new(mm(40.0), mm(15.0), mm(20.0)))] } else { Vec::new() };
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("CONVERT"));
+            p.set("partToConvert", ParamValue::Query(vec![Reference::Body(body)]));
+            p.set("facesToExclude", ParamValue::Query(exclude));
+            p.set("bends", ParamValue::Query(bends));
+            set_model(p, "1 mm", "1 mm");
+        });
+        s
+    };
+    let bbox = |r: &RegenResult, bi: usize| r.context.bodies[bi].shape.bounding_box(true).unwrap();
+    let mm3 = |v: f64| v * 1e9;
+    // Find the body whose box starts at x = 0 (the top wall) and the other.
+    let walls = |r: &RegenResult| {
+        assert_eq!(r.context.bodies.len(), 2, "two parts");
+        if bbox(r, 0).min.x < mm(1.0) { (0, 1) } else { (1, 0) }
+    };
+
+    // No bends: an edge-joint rip, two parts.
+    let mut s = block(false);
+    let r = s.ok();
+    let (top, side) = walls(&r);
+    assert!(near(mm3(volume(&r, top)), 1199.4, 1e-6) && near(mm3(volume(&r, side)), 599.4, 1e-6), "{} {}", mm3(volume(&r, top)), mm3(volume(&r, side)));
+    let (bt, bs) = (bbox(&r, top), bbox(&r, side));
+    assert!(near(bt.max.x, mm(39.98), 1e-6) && near(bt.min.z, mm(20.0), 1e-6) && near(bt.max.z, mm(21.0), 1e-6), "{bt:?}");
+    assert!(near(bs.min.x, mm(40.0), 1e-6) && near(bs.max.x, mm(41.0), 1e-6) && near(bs.max.z, mm(19.98), 1e-6), "{bs:?}");
+    for bi in [top, side] {
+        assert!(r.context.sheet_metal.contains_key(&r.context.bodies[bi].id), "both parts are sheet metal");
+    }
+    // Make joint on the walls' facing ends: they already meet at a joint.
+    let end_top = face_at(&r, top, DVec3::new(mm(39.98), mm(15.0), mm(20.5)));
+    let end_side = face_at(&r, side, DVec3::new(mm(40.5), mm(15.0), mm(19.98)));
+    s.add("sheetMetalMakeJoint", move |p| {
+        p.set("entities", ParamValue::Query(vec![end_top, end_side]));
+        p.set("joint", en("BEND"));
+    });
+    let (st, msg) = s.last_status();
+    assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "An internal edge cannot be used to create a joint."));
+
+    // The edge as a bend: one part (Onshape 1810.6858347057712, 14 faces).
+    let mut s = block(true);
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    assert!(near(mm3(volume(&r, 0)), 1810.6858347057712, 1e-6), "{}", mm3(volume(&r, 0)));
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 14);
+    // The bend changed to a rip (Joint): edge joint, butt joint either way.
+    for (style, total, top_x, side_z) in [("EDGE", 1798.8, 39.98, 19.98), ("BUTT", 1829.4, 41.0, 19.98), ("BUTT2", 1829.4, 39.98, 21.0)] {
+        let mut s2 = block(true);
+        let r = s2.ok();
+        let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap().clone();
+        let bf = data.bends[0].inner_faces[0].clone();
+        s2.add("sheetMetalJoint", move |p| {
+            p.set("entity", ParamValue::Query(vec![Reference::Face((*bf).clone())]));
+            p.set("jointType", en("RIP"));
+            p.set("hasStyle", ParamValue::Bool(true));
+            p.set("jointStyle", en(style));
+        });
+        let r = s2.ok();
+        let (top, side) = walls(&r);
+        let v = mm3(volume(&r, top) + volume(&r, side));
+        assert!(near(v, total, 1e-6), "{style}: {v}");
+        assert!(near(bbox(&r, top).max.x, mm(top_x), 1e-6) && near(bbox(&r, side).max.z, mm(side_z), 1e-6), "{style}: {:?} {:?}", bbox(&r, top), bbox(&r, side));
+    }
 }

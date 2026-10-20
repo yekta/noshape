@@ -142,9 +142,9 @@ impl Render for ReleasePrefsView {
                             )
                             .when(self.scheme_open, |d| d.child(v_flex().border_1().border_color(rgb(0x767676)).bg(rgb(0xffffff)).children(options))),
                     )
-                    .when(custom, |d| d.child(label("Custom revisions")).child(div().w(px(600.)).border_1().rounded(px(4.)).border_color(rgb(0xcccccc)).px(px(6.)).child(Input::new(&self.custom).appearance(false))))
+                    .when(custom, |d| d.child(label("Custom revisions")).child(gpui_kit::base::input::input_frame(div().w(px(600.)).border_1().rounded(px(4.)).border_color(rgb(0xcccccc)).px(px(6.)).child(Input::new(&self.custom).appearance(false)))))
                     .child(label("Unreleased revision suffix:"))
-                    .child(div().w(px(188.)).border_1().rounded(px(4.)).border_color(rgb(0xcccccc)).px(px(6.)).child(Input::new(&self.suffix).appearance(false)))
+                    .child(gpui_kit::base::input::input_frame(div().w(px(188.)).border_1().rounded(px(4.)).border_color(rgb(0xcccccc)).px(px(6.)).child(Input::new(&self.suffix).appearance(false))))
                     .child(
                         h_flex().mt(px(20.)).child(
                             div()

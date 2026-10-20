@@ -149,40 +149,51 @@ impl DrawingEditor {
             MenuEntry::Submenu(
                 "Remove".into(),
                 vec![
-                    edit("Rows", Box::new(move |t| {
-                        for r in (r0..=r1).rev() {
-                            t.delete_row(r);
-                        }
-                    })),
                     edit("Columns", Box::new(move |t| {
                         for c in (c0..=c1).rev() {
                             t.delete_col(c);
                         }
                     })),
+                    edit("Rows", Box::new(move |t| {
+                        for r in (r0..=r1).rev() {
+                            t.delete_row(r);
+                        }
+                    })),
                 ],
             ),
-            MenuEntry::Submenu("Duplicate".into(), vec![edit("Rows", Box::new(move |t| t.duplicate_rows(r0, r1))), edit("Columns", Box::new(move |t| t.duplicate_cols(c0, c1)))]),
+            MenuEntry::Submenu("Duplicate".into(), vec![edit("Columns", Box::new(move |t| t.duplicate_cols(c0, c1))), edit("Rows", Box::new(move |t| t.duplicate_rows(r0, r1)))]),
             MenuEntry::Separator,
         ];
-        let mut size = self.size_entries(t, cs, "Resize…");
+        let mut size = self.size_entries(t, cs, "Resize...");
         let resize = size.pop();
         out.extend(size);
         out.push(MenuEntry::Separator);
+        // Live drawing/538: Merge ▸ All / Horizontal / Vertical (greyed for
+        // one cell); a block has no Resize….
         let multi = r1 > r0 || c1 > c0;
-        out.push(MenuEntry::Submenu("Merge".into(), vec![edit("Merge cells", Box::new(move |t| {
-            t.merge_cells((r0, c0), (r1, c1));
-        }))]));
-        if !multi {
-            // One cell: nothing to merge (live: greyed).
-            if let Some(MenuEntry::Submenu(_, items)) = out.last_mut() {
-                for i in items.iter_mut() {
-                    *i = std::mem::replace(i, MenuEntry::Separator).disabled(true);
+        let merge = vec![
+            edit("All", Box::new(move |t| {
+                t.merge_cells((r0, c0), (r1, c1));
+            })),
+            edit("Horizontal", Box::new(move |t| {
+                for r in r0..=r1 {
+                    t.merge_cells((r, c0), (r, c1));
                 }
-            }
-        }
+            })),
+            edit("Vertical", Box::new(move |t| {
+                for c in c0..=c1 {
+                    t.merge_cells((r0, c), (r1, c));
+                }
+            })),
+        ]
+        .into_iter()
+        .map(|e| e.disabled(!multi))
+        .collect();
+        out.push(MenuEntry::Submenu("Merge".into(), merge));
         out.push(edit("Unmerge", Box::new(move |t| {
             t.unmerge(r0, c0);
         })).disabled(t.merge_at(r0, c0).is_none()));
+        let resize = resize.filter(|_| !multi);
         out.extend(resize);
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Copy", |ed, _, cx| {
@@ -333,7 +344,7 @@ impl DrawingEditor {
                 .w(px(210.))
                 .pb(px(6.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
                 .text_size(px(12.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -349,7 +360,7 @@ impl DrawingEditor {
                             (false, true) => "Cut list table properties",
                         }))
                         .when(editing, |h| h.child(div().id("table-dlg-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_dlg(true, cx)))))
-                        .child(div().id("table-dlg-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_dlg(false, cx)))),
+                        .child(div().id("table-dlg-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_dlg(false, cx)))),
                 )
                 // Properties: the Reference link to the source tab (help TB18);
                 // inserting: Insert + the drawing's suitable sources.

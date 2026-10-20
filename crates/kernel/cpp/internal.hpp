@@ -163,6 +163,8 @@ struct XtPart
   std::string           name;
   std::array<double, 3> colour{0, 0, 0};
   bool                  has_colour = false;
+  // Colours of single faces: (index in TopExp::MapShapes order, sRGB).
+  std::vector<std::pair<int, std::array<double, 3>>> face_colours;
 };
 std::vector<XtPart> read_xt_parts(const std::string& path);
 // The same from a transmit file's bytes (or a bare binary stream "PS\0\0…").
@@ -178,7 +180,23 @@ std::vector<XtPart> read_sat_data(std::string data);
 std::vector<XtPart> read_jt_parts(const std::string& path);
 // Native CAD import (native.cpp): the Parasolid geometry a SolidWorks (OLE2),
 // Solid Edge or NX part file embeds, read as above.
-std::vector<XtPart> read_native_parts(const std::string& path);
+// A SOLIDWORKS assembly's components (native.cpp): the active configuration's
+// tree, flattened; `parent` indexes the list (-1 = top level). Transforms are
+// row-vector 4x4 matrices as the file stores them (p' = p M, metres).
+struct AsmNode
+{
+  int                    parent = -1;
+  std::string            name, file, configuration;
+  int                    config_id = -1, number = 1;
+  std::array<double, 16> m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+  bool                   suppressed = false, hidden = false, exclude_bom = false, assembly = false;
+};
+std::vector<AsmNode> read_sldasm_tree(const std::string& path);
+// Extract a zip's top-level files into `dir` (folders are listed, not
+// extracted); returns every entry name.
+std::vector<std::string> extract_zip(const std::string& zip, const std::string& dir);
+// `config`: a SOLIDWORKS configuration id (an assembly's reference), -1 = the default.
+std::vector<XtPart> read_native_parts(const std::string& path, int config = -1);
 // Rhino import (rhino_read.cpp, openNURBS): every object, placed, metres.
 std::vector<XtPart> read_rhino_parts(const std::string& path);
 

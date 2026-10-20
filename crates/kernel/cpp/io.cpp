@@ -86,6 +86,8 @@ struct Leaf
   std::string    name;
   bool           hasColor = false;
   Quantity_Color color;
+  // Faces with their own colour (TopExp::MapShapes order).
+  std::vector<std::pair<int, Quantity_Color>> faceColors;
 };
 
 void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc_ColorTool>& ct,
@@ -139,6 +141,18 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
   }
   leaf.hasColor = hasColor;
   leaf.color    = c;
+  // Face colours sit on the prototype's sub-shapes; a placed copy keeps
+  // their order.
+  {
+    ShapeIMap faces;
+    TopExp::MapShapes(s, TopAbs_FACE, faces);
+    for (int i = 1; i <= faces.Extent(); ++i)
+    {
+      Quantity_Color fc;
+      if (ct->GetColor(faces(i), XCAFDoc_ColorSurf, fc) || ct->GetColor(faces(i), XCAFDoc_ColorGen, fc))
+        leaf.faceColors.emplace_back(i - 1, fc);
+    }
+  }
   out.push_back(leaf);
 }
 
@@ -264,6 +278,16 @@ StepImport read_step(rust::Str path)
         out.colors.push_back((float)g_);
         out.colors.push_back((float)b_);
         out.has_color.push_back(l.hasColor);
+        for (const auto& [face, fc] : l.faceColors)
+        {
+          double fr, fg, fb;
+          fc.Values(fr, fg, fb, Quantity_TOC_sRGB);
+          out.face_part.push_back((uint32_t)(out.names.size() - 1));
+          out.face_index.push_back((uint32_t)face);
+          out.face_colors.push_back((float)fr);
+          out.face_colors.push_back((float)fg);
+          out.face_colors.push_back((float)fb);
+        }
       }
       cafOk = !leaves.empty();
     }

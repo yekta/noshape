@@ -389,7 +389,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
 /// the first profile segment, the start cap, the end cap, then the other sides
 /// in profile order (G30's block drawn (0,0)→(40,0)→(40,20)→(0,20): front,
 /// bottom, top, right, back, left). Other faces follow in name order.
-fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
+pub(crate) fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
     let crate::reference::TopoName::Face { feature, role } = face.root() else { return (usize::MAX, 4, face.clone()) };
     let position = ev.features.iter().position(|f| f.id == *feature).unwrap_or(usize::MAX);
     let first_side = || {

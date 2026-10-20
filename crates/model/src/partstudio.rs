@@ -49,6 +49,10 @@ pub struct Folder {
     /// Enclosing folder (folders nest).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<u32>,
+    /// An empty folder's place: listed after this feature (None: first).
+    /// Folders with features are placed by them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<FeatureId>,
 }
 
 /// Appearance of a part (linear RGBA).
@@ -380,7 +384,10 @@ impl PartStudio {
         // A folder made from features of one folder nests inside it.
         let first_folder = ids.first().and_then(|i| self.feature(*i)).and_then(|f| f.folder);
         let parent = first_folder.filter(|p| ids.iter().all(|i| self.feature(*i).is_some_and(|f| f.folder == Some(*p))));
-        self.folders.push(Folder { id, name, collapsed: false, parent });
+        // Live (part-studio/587–590): a new folder is collapsed; an empty one
+        // sits at the rollback bar.
+        let after = if ids.is_empty() { self.rollback_index().checked_sub(1).and_then(|i| self.features.get(i)).map(|f| f.id) } else { None };
+        self.folders.push(Folder { id, name, collapsed: !ids.is_empty(), parent, after });
         // Folders hold a contiguous run: gather members after the first one.
         let mut idx: Vec<usize> = ids.iter().filter_map(|i| self.index_of(*i)).collect();
         idx.sort_unstable();
@@ -392,6 +399,16 @@ impl PartStudio {
             }
         }
         id
+    }
+
+    /// Features directly in a folder (the "(n)" after its name in the list).
+    pub fn folder_count(&self, folder: u32) -> usize {
+        self.features.iter().filter(|f| f.folder == Some(folder)).count()
+    }
+
+    /// Empty folders listed after feature `after` (None: before the first).
+    pub fn empty_folders_after(&self, after: Option<FeatureId>) -> Vec<&Folder> {
+        self.folders.iter().filter(|fd| fd.after == after && self.folder_count(fd.id) == 0 && !self.folders.iter().any(|c| c.parent == Some(fd.id))).collect()
     }
 
     /// Remove a folder (its features stay in place).

@@ -605,7 +605,7 @@ impl PartStudioView {
             return col.into_any_element();
         }
         let query = add.search.read(cx).value().trim().to_lowercase();
-        col = col.child(h_flex().h(px(38.)).flex_none().px(px(6.)).child(div().flex_1().h(px(28.)).rounded(px(3.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&add.search).appearance(false).cleanable(true).text_size(px(12.)).h(px(26.)))));
+        col = col.child(h_flex().h(px(38.)).flex_none().px(px(6.)).child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).rounded(px(3.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&add.search).appearance(false).cleanable(true).text_size(px(12.)).h(px(26.))))));
         let mut rows = v_flex().id("cta-list").flex_1().min_h_0().overflow_y_scroll();
         if d.changes > 0 {
             let n = d.changes;

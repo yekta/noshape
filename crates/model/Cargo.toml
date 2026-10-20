@@ -24,6 +24,8 @@ smallvec.workspace = true
 nalgebra.workspace = true
 # DWG / DWT and DXF 2000+ drawing export (MPL-2.0).
 acadrust = "0.6.5"
+# zlib of packed queries (qCompressed, @unpackQuery).
+miniz_oxide = "0.8"
 
 [dev-dependencies]
 env_logger.workspace = true

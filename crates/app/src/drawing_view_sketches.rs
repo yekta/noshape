@@ -73,7 +73,7 @@ impl DrawingEditor {
                 .justify_center()
                 .cursor_pointer()
                 .when(accept, |e| e.bg(gpui_kit::rgb(0x009500)).child(crate::ui::glyph("check", 18., gpui_kit::white())))
-                .when(!accept, |e| e.child(crate::ui::glyph("close", 14., pal.cancel)))
+                .when(!accept, |e| e.child(crate::drawing_chrome::cancel_x(cx)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.close_view_sketches(accept, cx)))
         };
         Some(
@@ -84,7 +84,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(240.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())

@@ -1222,14 +1222,15 @@ export const showStudio = defineFeature(function(context is Context, id is Id, d
     );
     let fx = Fixture::new(&src);
     let mut source = PartStudio::new();
-    source.configuration.inputs.push(ConfigInput { id: "len1".into(), name: "Len".into(), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None });
+    source.configuration.inputs.push(ConfigInput { id: "len1".into(), name: "Len".into(), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None, excluded: false });
     source.configuration.inputs.push(ConfigInput {
         id: "size1".into(),
         name: "Size".into(),
         kind: ConfigInputKind::List { options: vec![ListOption { id: "s".into(), name: "Small".into() }, ListOption { id: "l".into(), name: "Large".into() }], default: "s".into() },
         visible_when: None,
+        excluded: false,
     });
-    source.configuration.inputs.push(ConfigInput { id: "hole1".into(), name: "Hole".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None });
+    source.configuration.inputs.push(ConfigInput { id: "hole1".into(), name: "Hole".into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false });
     let mut f = source.new_feature(&fx.ty("boxAndPin"), &fx.units).unwrap();
     f.params.set("size", expr("#Len"));
     f.params.set("radius", expr("4 mm"));

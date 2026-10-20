@@ -86,6 +86,7 @@ impl DrawingEditor {
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
         self.woken_centers.clear();
+        self.datum_target_letter = None;
         // Clicking the active tool's button again exits it.
         // Dimension tools exit only when the same kind is chosen again.
         let same_dim = matches!((&tool, &self.tool), (Tool::Dimension { kind: a, .. }, Tool::Dimension { kind: b, .. }) if a == b)
@@ -160,6 +161,34 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        if self.linestyle.is_some() {
+            self.close_linestyle(false, cx);
+            return;
+        }
+        if self.hide_edges.is_some() {
+            self.close_hide_edges(false, cx);
+            return;
+        }
+        if self.section_edit.is_some() {
+            self.close_section_edit(false, cx);
+            return;
+        }
+        if self.replicate_dlg.is_some() {
+            self.close_replicate(false, cx);
+            return;
+        }
+        if self.palette.is_some() {
+            self.close_palette(false, cx);
+            return;
+        }
+        if self.move_sheet.take().is_some() {
+            cx.notify();
+            return;
+        }
+        if self.table_props.is_some() {
+            self.close_table_props(false, cx);
+            return;
+        }
         if self.table_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
             self.close_table_dlg(false, cx);
             return;
@@ -226,6 +255,12 @@ impl DrawingEditor {
                     }
                     Sel::Hatch(h) => s.sketch.hatches.retain(|x| x.id != *h),
                     Sel::Image(i) => s.images.retain(|x| x.id != *i),
+                    // Automatic centermarks are deleted one at a time (help H:creating_a_drawing).
+                    Sel::AutoCentermark(v, c) => {
+                        if let Some(v) = s.view_mut(*v) {
+                            v.deleted_centermarks.push(*c);
+                        }
+                    }
                     Sel::Break(..) => {}
                 }
             }
@@ -273,6 +308,9 @@ impl DrawingEditor {
             Tool::CircleCenterline { .. } => "Select a point on the circle",
             Tool::VirtualSharp { first: None } => "Select the first straight edge",
             Tool::VirtualSharp { .. } => "Select the second straight edge",
+            Tool::Dimension { kind: DimTool::Point2, picks } if picks.len() < 2 => "Select two points",
+            Tool::Dimension { kind: DimTool::PointLine, picks } if picks.len() < 2 => "Select a point and a line",
+            Tool::Dimension { kind: DimTool::LineLine, picks } if picks.len() < 2 => "Select two parallel lines",
             Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.is_empty() => "Select the chamfer edge",
             Tool::Dimension { kind: DimTool::Chamfer, picks } if picks.len() == 1 => "Select the adjacent edge",
             Tool::Dimension { kind: DimTool::ArcLength, picks } if picks.is_empty() => "Select an arc",
@@ -502,7 +540,10 @@ impl DrawingEditor {
             return Some(a);
         }
         match &self.tool {
-            Tool::Dimension { kind: DimTool::Linear, picks } => {
+            Tool::Dimension { kind, picks } if kind.linear() => {
+                if *kind != DimTool::Linear && picks.len() < 2 {
+                    return None;
+                }
                 let (a, b) = match picks.as_slice() {
                     [Pick::Line { a, b }] => (a.clone(), b.clone()),
                     [Pick::Point(a), Pick::Point(b)] if a.view == b.view => (a.clone(), b.clone()),
@@ -526,7 +567,7 @@ impl DrawingEditor {
                 let [Pick::Circle { view, center, radius, r }] = picks.as_slice() else { return None };
                 let cs = self.placement(*view)?.to_sheet(*center);
                 let d = sub(c, cs);
-                Some(ann(AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter: *kind == DimTool::Diameter, angle: d[1].atan2(d[0]) }, vec![(0, r.clone())]))
+                Some(ann(AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter: *kind == DimTool::Diameter, angle: d[1].atan2(d[0]), dim_line: *kind == DimTool::Diameter && self.drawing.radial_dim_lines() }, vec![(0, r.clone())]))
             }
             Tool::Dimension { kind: DimTool::Angle3, picks } => {
                 let [Pick::Point(v), Pick::Point(pa), Pick::Point(pb)] = picks.as_slice() else { return None };
@@ -656,7 +697,7 @@ impl DrawingEditor {
                 let n = [-e[1], e[0]];
                 let t = dot(sub(c, parent.position), n);
                 let pos = [parent.position[0] + n[0] * t, parent.position[1] + n[1] * t];
-                let mut v = mk(ViewKind::Section { parent: *pid, line: vec![*a, *b], label: sheet.next_label() }, pos, Some(parent));
+                let mut v = mk(ViewKind::Section { parent: *pid, line: vec![*a, *b], label: sheet.next_label(), cuts: Vec::new() }, pos, Some(parent));
                 v.style = RenderStyle::HiddenLinesRemoved;
                 v.partial = matches!(self.tool, Tool::Section { partial: true, .. });
                 // Section view dialog: Show cut geometry only, Section depth.
@@ -680,7 +721,7 @@ impl DrawingEditor {
         let mut overlay = Overlay::default();
         let c = self.cursor;
         let snap = match &self.tool {
-            Tool::Dimension { kind: DimTool::Linear | DimTool::Angle3 | DimTool::MaxMin | DimTool::Foreshorten, .. }
+            Tool::Dimension { kind: DimTool::Linear | DimTool::Point2 | DimTool::PointLine | DimTool::Angle3 | DimTool::MaxMin | DimTool::Foreshorten, .. }
             | Tool::BrokenOut { .. }
             | Tool::CropPoly { .. }
             | Tool::DatumTarget { anchor: None }
@@ -724,6 +765,8 @@ impl DrawingEditor {
             // Shape-coded orange snap marker (live: drawing/10).
             overlay.marks.push((p, crate::drawing_scene::SnapMark::of(s.r.as_ref()), self.tol_mm(9.0)));
         }
+        self.section_edit_overlay(&mut overlay);
+        self.table_tool_overlay(&mut overlay, cx);
         let mut preview: Option<Drawing> = None;
         match &self.tool {
             Tool::Dimension { picks, .. } => {
@@ -871,7 +914,7 @@ impl DrawingEditor {
         if matches!(self.tool, Tool::Detail { .. }) && self.detail_click(cx) {
             return;
         }
-        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.gdt_click(cx) {
+        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.table_tool_click(cx) || self.gdt_click(cx) {
             return;
         }
         if self.extra_tool_click(window, cx) {
@@ -896,11 +939,21 @@ impl DrawingEditor {
             }
             Tool::Projected { parent: None } => {
                 if let Some(v) = self.view_at(c) {
-                    self.tool = Tool::Projected { parent: Some(v) };
+                    // Help H:projected_view: not from detail views.
+                    if self.current_sheet().view(v).is_some_and(|x| matches!(x.kind, ViewKind::Detail { .. })) {
+                        self.status = Some("Projected views can't be created from detail views".into());
+                    } else {
+                        self.status = None;
+                        self.tool = Tool::Projected { parent: Some(v) };
+                    }
                 }
             }
             Tool::Projected { parent: Some(_) } | Tool::Auxiliary { parent: Some(_) } => {
-                if let Some(v) = self.pending_view() {
+                if let Some(mut v) = self.pending_view() {
+                    // Shift+click: the projected view keeps the parent section's cut.
+                    if matches!(self.tool, Tool::Projected { .. }) && window.modifiers().shift {
+                        v.cut_from_section = true;
+                    }
                     let name = if matches!(self.tool, Tool::Auxiliary { .. }) { "Auxiliary view" } else { "Projected view" };
                     self.edit_sheet(name, cx, |s| s.views.push(v));
                     if matches!(self.tool, Tool::Auxiliary { .. }) {
@@ -993,7 +1046,11 @@ impl DrawingEditor {
             Tool::Dimension { kind, mut picks } => {
                 // Smart Dimension: a click on another entity adds it (a second
                 // pick) instead of placing; on a picked edge it deselects it.
-                let more = kind == DimTool::Linear && picks.len() == 1 && self.smart_takes(c, &picks[0]);
+                let more = match kind {
+                    DimTool::Linear => picks.len() == 1 && self.smart_takes(c, &picks[0]),
+                    k if k.linear() => picks.len() < 2,
+                    _ => false,
+                };
                 if !more && let Some(a) = self.pending_annotation() {
                     // Chamfer, Dimensions style: the two legs as linear dimensions.
                     let anns = self.chamfer_as_dimensions(&a).unwrap_or_else(|| vec![a]);
@@ -1022,6 +1079,7 @@ impl DrawingEditor {
                                 picks.push(Pick::Point(p));
                             }
                         }
+                        DimTool::Point2 | DimTool::PointLine | DimTool::LineLine => self.typed_linear_click(kind, c, &mut picks),
                         _ => self.smart_click(c, &mut picks),
                     }
                     self.tool = Tool::Dimension { kind, picks };
@@ -1239,7 +1297,7 @@ impl DrawingEditor {
             return;
         }
         if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) {
-            self.double_click(window, cx);
+            self.double_click(e.click_count >= 3, window, cx);
             return;
         }
         if e.button == MouseButton::Left && matches!(self.tool, Tool::Select) && self.flip_node_click(cx) {
@@ -1326,6 +1384,7 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
+            Drag::SelectCells { .. } => self.update_preview(cx),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
@@ -1355,6 +1414,14 @@ impl DrawingEditor {
                     && let Some(x) = s.annotations.iter_mut().find(|x| x.id == a.id)
                 {
                     *x = a;
+                }
+                self.set_preview(Some(dr), cx);
+            }
+            Drag::CentermarkArm { orig, k } => {
+                let a = self.dragged_centermark(&orig, k, e.modifiers.shift);
+                let mut dr = self.drawing.clone();
+                if let Some(x) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|x| x.id == a.id)) {
+                    x.kind = a.kind;
                 }
                 self.set_preview(Some(dr), cx);
             }
@@ -1522,9 +1589,14 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
-            Drag::Jog { .. } | Drag::Reattach { .. } => {
+            Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } => {
                 if let Some(p) = self.preview.take() {
-                    self.commit(if matches!(drag, Drag::Jog { .. }) { "Move jog" } else { "Re-attach dimension" }, p, cx);
+                    let name = match drag {
+                        Drag::Jog { .. } => "Move jog",
+                        Drag::Reattach { .. } => "Re-attach dimension",
+                        _ => "Resize centermark",
+                    };
+                    self.commit(name, p, cx);
                 }
             }
             Drag::MoveInspection(id) => self.drop_inspection(id, cx),
@@ -1533,6 +1605,7 @@ impl DrawingEditor {
                     self.commit(if matches!(drag, Drag::MoveImage { .. }) { "Move image" } else { "Move sketch" }, p, cx);
                 }
             }
+            Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::NoteGrip { .. } => {
                 let name = match drag {
                     Drag::MoveTable { .. } => "Move table",
@@ -1642,6 +1715,14 @@ impl DrawingEditor {
     }
 
     fn select_click(&mut self, pick: Option<u32>, m: Modifiers, cx: &mut Context<Self>) {
+        if self.linestyle_click(cx) || self.hide_edges_click(cx) || self.section_edit_click(cx) || self.replicate_click(cx) {
+            return;
+        }
+        // A click on the sheet keeps the palette's changes.
+        if self.palette.is_some() {
+            self.close_palette(true, cx);
+            return;
+        }
         if self.place_paste_table(cx) {
             return;
         }
@@ -1691,7 +1772,7 @@ impl DrawingEditor {
                     });
                 }
             }
-            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) => {}
+            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) => {}
         }
     }
 
@@ -1710,6 +1791,9 @@ impl DrawingEditor {
         }
         if let Some((orig, k)) = self.attach_grip_at(start) {
             return Drag::Reattach { orig, k };
+        }
+        if let Some((orig, k)) = self.centermark_grip_at(start) {
+            return Drag::CentermarkArm { orig, k };
         }
         let Some(sel) = self.sel_at(pick, start) else { return Drag::None };
         if !self.selection.contains(&sel) {
@@ -1746,7 +1830,7 @@ impl DrawingEditor {
                 Some(im) => Drag::MoveImage { id, start, orig: im.pos },
                 None => Drag::None,
             },
-            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) => Drag::None,
+            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) => Drag::None,
         }
     }
 
@@ -1835,7 +1919,9 @@ impl DrawingEditor {
         a
     }
 
-    fn double_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// A double click opens what's under the pointer; a triple click on a
+    /// note opens it with all its text selected (help H:note).
+    fn double_click(&mut self, triple: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.update_hover(cx);
         let Some(h) = self.hover else { return };
         match self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned() {
@@ -1844,7 +1930,12 @@ impl DrawingEditor {
             Some(PickTarget::Annotation(id)) => {
                 let note = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 match note {
-                    Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => self.open_note_panel(Some(id), position, window, cx),
+                    Some(Annotation { kind: AnnotationKind::Note { .. }, position, .. }) => {
+                        self.open_note_panel(Some(id), position, window, cx);
+                        if triple && let Some(Panel::Note { input, .. }) = &self.panel {
+                            input.update(cx, |s, cx| s.select_all(window, cx));
+                        }
+                    }
                     Some(Annotation { kind: AnnotationKind::Weld { .. }, .. }) => self.open_weld_edit(id, window, cx),
                     Some(a) => self.open_annotation_panel(&a, window, cx),
                     None => {}
@@ -1883,6 +1974,7 @@ impl DrawingEditor {
             self.selection = vec![s];
             self.redraw(cx);
         }
+        self.menu_at = self.local(position);
         let entries = self.context_entries(sel, cx);
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
@@ -1913,19 +2005,39 @@ impl DrawingEditor {
                 }),
             ];
         }
+        // Several entities selected (live drawing/291).
+        if self.selection.len() > 1 && sel.is_some_and(|s| self.selection.contains(&s)) {
+            return self.multi_selection_entries();
+        }
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::Annotation(id)) => {
                 // Linear dimensions: Onshape's own menu.
-                if let Some(entries) = self.dimension_entries(id, cx) {
+                if let Some(entries) = self.dimension_entries(id) {
                     return entries;
+                }
+                // Centermarks (live drawing/487): Paste as table, Align
+                // centermark | Clear selection, Zoom to fit.
+                if self.current_sheet().annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. })) {
+                    return vec![
+                        MenuEntry::item("Paste as table", |t, _, cx| {
+                            t.start_paste_table(cx);
+                        }),
+                        MenuEntry::item("Align centermark", move |t, _, cx| t.start_align_centermark(id, cx)),
+                        MenuEntry::Separator,
+                        MenuEntry::item("Clear selection", |t, _, cx| {
+                            t.selection.clear();
+                            t.redraw(cx);
+                        }),
+                        MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+                    ];
                 }
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
                 if let Some(a) = &a {
                     out.extend(self.inspection_entries(a));
                     if let AnnotationKind::Note { .. } = a.kind {
                         let pos = a.position;
-                        out.push(MenuEntry::item("Edit note…", move |t, w, cx| t.open_note_panel(Some(id), pos, w, cx)));
+                        out.push(MenuEntry::item("Edit note...", move |t, w, cx| t.open_note_panel(Some(id), pos, w, cx)));
                     }
                     if let AnnotationKind::LinearDimension { orientation, .. } = a.kind {
                         for (label, o) in [("Horizontal", DimOrientation::Horizontal), ("Vertical", DimOrientation::Vertical), ("Aligned", DimOrientation::Aligned)] {
@@ -2004,17 +2116,10 @@ impl DrawingEditor {
                             })
                         }));
                     }
-                    // GD&T frames: Paste / Paste as table (help geometric_tolerance).
-                    if matches!(a.kind, AnnotationKind::Gdt { .. }) {
-                        if crate::drawing_props::view_clipboard(cx).is_some() {
-                            out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)));
-                        }
-                        if self.clipboard_cells(cx).is_some() {
-                            out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                                t.start_paste_table(cx);
-                            }));
-                        }
-                    }
+                    // Paste as table is in every drawing menu (live drawing/290).
+                    out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                        t.start_paste_table(cx);
+                    }));
                     out.push(MenuEntry::Separator);
                 }
                 // Onshape's menus end with Clear selection, Zoom to fit, Delete.
@@ -2031,8 +2136,20 @@ impl DrawingEditor {
             Some(Sel::Table(id)) => out.extend(self.table_entries(id, cx)),
             Some(Sel::Sketch(id)) => out.extend(self.sketch_entries(id)),
             Some(Sel::Image(id)) => out.extend(self.image_entries(id)),
+            // Live 483–493: an automatic centermark's menu.
+            Some(Sel::AutoCentermark(..)) => {
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                    t.start_paste_table(cx);
+                }));
+                out.push(MenuEntry::Separator);
+                out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+                    t.selection.clear();
+                    t.redraw(cx);
+                }));
+                out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+            }
             Some(Sel::Hatch(id)) => {
-                out.push(MenuEntry::item("Edit hatch", move |t, _, cx| t.open_hatch_dialog(Some(id), cx)));
+                out.push(MenuEntry::item("Edit hatch", move |t, w, cx| t.open_hatch_dialog(Some(id), w, cx)));
                 out.push(MenuEntry::Separator);
                 out.push(MenuEntry::item("Delete", move |t, _, cx| {
                     t.selection.clear();
@@ -2041,39 +2158,19 @@ impl DrawingEditor {
             }
             Some(Sel::Break(view, index)) => out.extend(self.break_entries(view, index)),
             None => {
-                // Onshape's empty-sheet menu: (Paste) | Sheet properties…, Drawing
-                // properties… | Zoom to fit, Zoom to window, Zoom to sheet; then
-                // noshape's sheet setup shortcuts.
-                if crate::drawing_props::view_clipboard(cx).is_some() {
-                    out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)));
-                }
-                if self.clipboard_cells(cx).is_some() {
-                    out.push(MenuEntry::item("Paste as table", |t, _, cx| {
-                        t.start_paste_table(cx);
-                    }));
-                }
+                // Onshape's empty-sheet menu (live drawing/290): Paste as
+                // table | Sheet properties…, Drawing properties… | Zoom to
+                // fit, Zoom to window, Zoom to sheet.
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                    t.start_paste_table(cx);
+                }));
                 let si = self.sheet;
-                out.push(MenuEntry::item("Sheet properties…", move |t, w, cx| t.open_sheet_props(si, w, cx)));
-                out.push(MenuEntry::item("Drawing properties…", |t, _, cx| t.open_drawing_props(cx)));
+                out.push(MenuEntry::item("Sheet properties...", move |t, w, cx| t.open_sheet_props(si, w, cx)));
+                out.push(MenuEntry::item("Drawing properties...", |t, _, cx| t.open_drawing_props(cx)));
                 out.push(MenuEntry::Separator);
                 out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
                 out.push(MenuEntry::item("Zoom to window", |t, _, cx| t.start_zoom_window(cx)));
                 out.push(MenuEntry::item("Zoom to sheet", |t, _, cx| t.zoom_to_fit(cx)));
-                out.push(MenuEntry::Separator);
-                out.push(MenuEntry::item("Update drawing", |t, _, cx| t.update_drawing(cx)));
-                out.push(MenuEntry::item("Insert note", |t, _, cx| t.set_tool(Tool::Note, cx)));
-                out.push(MenuEntry::item("Edit title block…", |t, w, cx| t.open_title_panel(w, cx)));
-                out.push(MenuEntry::Submenu("Sheet size".into(), self.sheet_size_entries()));
-                out.push(MenuEntry::Submenu("Template".into(), self.template_entries()));
-                out.push(MenuEntry::Submenu("Title block".into(), self.title_style_entries()));
-                out.push(MenuEntry::item("Sheet scale…", |t, w, cx| t.open_scale_panel(None, w, cx)));
-                out.push(MenuEntry::Separator);
-                out.push(MenuEntry::item("Insert table", |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)));
-                if self.has_revision_table() {
-                    let rev = self.latest_revision();
-                    out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: rev.clone() }, cx)));
-                }
-                out.push(MenuEntry::item("Add sheet", move |t, _, cx| t.add_sheet_after(si, cx)));
             }
         }
         out
@@ -2085,20 +2182,6 @@ impl DrawingEditor {
                 f(v);
             }
         });
-    }
-
-    pub fn sheet_size_entries(&self) -> Vec<MenuEntry> {
-        let cur = self.current_sheet().size;
-        SheetSize::STANDARD
-            .into_iter()
-            .map(|s| {
-                let (w, h) = s.size_mm();
-                MenuEntry::check(format!("{s:?}  ({w} × {h} mm)"), s == cur, move |t, _, cx| {
-                    t.edit_sheet("Sheet size", cx, |sh| sh.size = s);
-                    t.fitted = false;
-                })
-            })
-            .collect()
     }
 }
 

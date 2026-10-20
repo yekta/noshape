@@ -82,3 +82,11 @@ New in this pass: `composite-part`, `cube`, `decal`, `derived-mirror`, `f-sphere
 - Colors and mask-safety follow the set above. Outline is `#333333` and accent `#1651B0`. Light tints are `#333` (or `#219DE3`) with opacity, and there is no white paint. Hidden geometry and white details (cut-outs, arrow halos, hollow sketch endpoints) are `<mask>` knockouts.
 - Bodies use Onshape's oblique view, with the depth going up and to the left. Affected faces are `#999`. Sheet-metal faces are light gray with `#999` bend zones. Sketch endpoints are hollow blue rings, and the geometry underneath them is masked out.
 - The generator and comparison sheets live outside the repo, in `/tmp/icons-ps/`.
+
+## Drawing dialog icons (agent ui2, drawn from scratch)
+
+`dp-units`, `dp-dimensions`, `dp-annotations`, `dp-views`, `dp-construction`, `dp-formats`, `dp-tables`,
+`dp-inspection` (Drawing properties tabs), `drawing-cancel` (drawing dialogs' ✕, `#dd5228`),
+`section-cut-line`, `section-flip` (Section view dialog buttons). Full color, 24-unit viewBox.
+`projection-third-angle`, `projection-first-angle` (Create Drawing › Custom template › Projection tiles; agent drw2,
+drawn from scratch on the ISO 128 projection symbols).

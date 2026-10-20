@@ -230,8 +230,9 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
 /// (underlined, right-aligned number) at the right, 26 px tall (§3.9).
 pub fn param_row(label: impl Into<SharedString>, field: impl IntoElement) -> Div {
     let pal = p();
+    // Live (dom dialog-animate): 26 px rows, the label 5 px in.
     h_flex()
-        .h(px(30.))
+        .h(px(26.))
         .pl(px(5.))
         .pr(px(3.))
         .gap(px(6.))
@@ -256,7 +257,9 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
         .child(
             div()
                 .px(px(6.))
-                .when(empty, |d| d.py(px(5.)).text_size(px(12.)))
+                // Live (dom dialog-mate-connector): `pad 6px 6px 5px` on a
+                // 13.33 px line, 26 px with the border.
+                .when(empty, |d| d.pt(px(6.)).pb(px(5.)).line_height(px(13.33)).text_size(px(12.)))
                 .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
                 .text_color(rgb(0x555555))
                 .child(label.into()),

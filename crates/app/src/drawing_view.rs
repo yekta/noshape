@@ -48,12 +48,26 @@ pub enum DimTool {
     MaxMin,
     /// Foreshortened (half) diameter from an axis.
     Foreshorten,
+    /// 2 point linear: two points only (help H:drawing_-_2_point_linear_dimension).
+    Point2,
+    /// Point to line: one point and one line.
+    PointLine,
+    /// Line to line: two parallel lines.
+    LineLine,
 }
 
 impl DimTool {
+    /// The linear dimension tools (smart Dimension and the typed ones).
+    pub fn linear(self) -> bool {
+        matches!(self, DimTool::Linear | DimTool::Point2 | DimTool::PointLine | DimTool::LineLine)
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             DimTool::Linear => "Linear dimension",
+            DimTool::Point2 => "2 point linear dimension",
+            DimTool::PointLine => "Point to line dimension",
+            DimTool::LineLine => "Line to line dimension",
             DimTool::Radius => "Radial dimension",
             DimTool::Diameter => "Diameter dimension",
             DimTool::Angle => "Angular dimension",
@@ -103,8 +117,9 @@ pub type EdgeRef = (noshape_model::BodyId, noshape_model::reference::TopoName);
 /// Uploaded meshes with their linear colors.
 pub type ColoredHandles = Vec<(MeshHandle, [f32; 4])>;
 
-/// Top of the drawing tool dialogs (below the sheet chips).
-pub const DIALOG_TOP: f32 = 28.;
+/// Top of the drawing tool dialogs: flush with the drawing area's top, over
+/// the sheet chips (live drawing/122, 124, 127, 180, 200, 468, 494: y 76).
+pub const DIALOG_TOP: f32 = 0.;
 
 #[derive(Clone, Debug)]
 pub enum Tool {
@@ -225,6 +240,8 @@ pub enum Sel {
     Hatch(u64),
     /// An inserted image.
     Image(u64),
+    /// An automatic centermark of a view (`build::centermark_key`).
+    AutoCentermark(ViewId, [i64; 2]),
 }
 
 #[derive(Clone, Debug)]
@@ -242,7 +259,12 @@ pub enum Drag {
     /// An attachment point (end `k`) of a linear dimension dragged to
     /// another edge, point or center (re-attaches that end).
     Reattach { orig: Annotation, k: usize },
+    /// An arm end of a centermark.
+    CentermarkArm { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
+    /// Drag-select table cells: a rubber band from `start` (help H:table:
+    /// the cells it touches are selected on release).
+    SelectCells { id: u64, start: [f64; 2] },
     /// Resize a table from its free corner (scales column widths and rows).
     ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
     /// A table divider: column boundary `col` or row boundary `row` (index
@@ -269,15 +291,12 @@ pub enum Drag {
 pub enum Panel {
     Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
     /// Dimension properties (precision, units, tolerance, texts).
-    Dimension { id: u64, angular: bool, units: Option<DimUnits>, show_units: bool, tol: usize, precision: Entity<InputState>, upper: Entity<InputState>, lower: Entity<InputState>, hole: Entity<InputState>, shaft: Entity<InputState>, prefix: Entity<InputState>, suffix: Entity<InputState>, text: Option<Entity<InputState>> },
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
     Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState> },
     SheetName { index: usize, input: Entity<InputState> },
     Rotation { view: ViewId, input: Entity<InputState> },
-    NewTable { pos: [f64; 2], rows: Entity<InputState>, cols: Entity<InputState>, title: Entity<InputState>, header: bool },
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
-    Scale { view: Option<ViewId>, input: Entity<InputState> },
     /// Depth of a new (`edit` None) or existing broken-out section.
     BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, depth: Entity<InputState>, depth_ref: Option<PointRef> },
     /// Angle of a straight cutting line.
@@ -482,6 +501,23 @@ pub struct DrawingEditor {
     /// Dimension tool: circle centers woken by hovering their edges (view,
     /// view point); shown until the tool changes (help drawing_dimensions).
     pub woken_centers: Vec<(ViewId, [f64; 2])>,
+    /// Datum target tool: the letter of the set being placed (A1, A2…; a
+    /// new run of the tool starts the next letter's set).
+    pub datum_target_letter: Option<char>,
+    /// Where the last right-click menu opened (editor px), and the small
+    /// dialogs opened from it.
+    pub menu_at: [f64; 2],
+    pub move_sheet: Option<crate::drawing_move_sheet::MoveSheetDlg>,
+    pub table_props: Option<crate::drawing_move_sheet::TablePropsDlg>,
+    pub linestyle: Option<crate::drawing_linestyle::LinestyleDlg>,
+    pub hide_edges: Option<crate::drawing_hide_edges::HideEdgesDlg>,
+    pub section_edit: Option<crate::drawing_section_edit::SectionEdit>,
+    /// Select for replication / the Replicate region dialog.
+    pub replication: Option<crate::drawing_replicate::Replication>,
+    pub replicate_dlg: Option<crate::drawing_replicate::ReplicateDlg>,
+    /// The dimension palette / hole callout panel (double-click).
+    pub palette: Option<crate::drawing_palette::PaletteDlg>,
+    pub table_tool: Option<crate::drawing_table_tool::TableToolDlg>,
     /// Show/hide parts dialog (drawing_hide_parts.rs).
     pub hide_parts: Option<crate::drawing_hide_parts::HidePartsDlg>,
     pub detail_label: String,
@@ -501,6 +537,8 @@ pub struct DrawingEditor {
     /// Right-side panels (Inspection table, Styles, MBD status; see
     /// `drawing_panels`) and the item a panel row cross-highlights.
     pub right_panel: Option<crate::drawing_panels::RightPanel>,
+    /// MBD status panel › Model (0 Current sheet, 1 All models, then the parts).
+    pub mbd_model: usize,
     pub panel_highlight: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
@@ -623,6 +661,17 @@ impl DrawingEditor {
             gdt_dlg: None,
             custom_tables: Default::default(),
             woken_centers: Vec::new(),
+            datum_target_letter: None,
+            menu_at: [0.0; 2],
+            move_sheet: None,
+            table_props: None,
+            linestyle: None,
+            hide_edges: None,
+            section_edit: None,
+            replication: None,
+            replicate_dlg: None,
+            palette: None,
+            table_tool: None,
             note_leader: None,
             cell_sel: None,
             ref_manager: None,
@@ -646,6 +695,7 @@ impl DrawingEditor {
             glyph_entity: None,
             image_cache: Default::default(),
             right_panel: None,
+            mbd_model: 0,
             panel_highlight: None,
             insp_table: Default::default(),
             measure: None,
@@ -693,6 +743,7 @@ impl DrawingEditor {
             Sel::Sketch(e) => sheet.sketch.sketch.entity(noshape_sketch::EntityId(*e)).is_some(),
             Sel::Hatch(h) => sheet.sketch.hatches.iter().any(|x| x.id == *h),
             Sel::Image(i) => sheet.images.iter().any(|x| x.id == *i),
+            Sel::AutoCentermark(v, c) => sheet.view(*v).is_some_and(|v| !v.deleted_centermarks.contains(c)),
         });
         self.ensure_sources(false, cx);
         self.refresh(cx);
@@ -1031,6 +1082,7 @@ impl DrawingEditor {
                 (Sel::Sketch(a), PickTarget::SketchEntity(b)) => a == *b,
                 (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
                 (Sel::Image(a), PickTarget::Image(b)) => a == *b,
+                (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -1048,6 +1100,7 @@ impl DrawingEditor {
             PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),
             PickTarget::Image(id) => Some(Sel::Image(*id)),
             PickTarget::AuxIndicator(v) => Some(Sel::View(*v)),
+            PickTarget::AutoCentermark { view, center } => Some(Sel::AutoCentermark(*view, *center)),
             _ => None,
         }
     }
@@ -1107,13 +1160,10 @@ impl DrawingEditor {
                     }
                 }
             }
-            // A hovered BOM row's callouts.
-            for p in self.table_row_highlight() {
-                scene.add_flag(p, state::ACCENT);
-            }
             // The hovered / selected annotations' referenced edges (blue) and
             // group members (yellow).
             self.push_related_highlights(&mut scene);
+            self.push_replicate_overlay(&mut scene);
         }
         scene
     }
@@ -1211,6 +1261,9 @@ impl DrawingEditor {
         style.background_bottom = bg;
         style.hover_color = crate::theme::lin(crate::theme::viewport::PREHIGHLIGHT);
         style.select_color = crate::theme::lin(crate::theme::viewport::SELECTION);
+        // Other members of a hovered / selected annotation group (live
+        // drawing/423: #EBEB92).
+        style.accent_color = crate::theme::lin(0xebeb92);
         style.show_edges = false;
         self.seq += 1;
         self.gpu.submit(RenderJob {
@@ -1260,6 +1313,8 @@ impl DrawingEditor {
         let tol = self.tol_mm(5.0);
         let hover = self.built.as_ref().and_then(|b| b.hit(self.cursor, tol));
         let hover = match (&self.tool, hover) {
+            // 2 point linear takes points only: no edge highlight.
+            (Tool::Dimension { kind: DimTool::Point2, .. }, _) => None,
             // Dimension-like tools only care about view edges.
             (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => {
                 match self.built.as_ref().and_then(|b| b.picks.get(h as usize)) {
@@ -1302,6 +1357,9 @@ impl DrawingEditor {
         if hover != self.hover {
             self.hover = hover;
             self.redraw(cx);
+        } else if self.replicate_dlg.is_some() {
+            // The Replicate region box follows the pointer.
+            self.redraw(cx);
         }
     }
 
@@ -1336,6 +1394,7 @@ impl Render for DrawingEditor {
         self.sync_callout_dlg(window, cx);
         self.sync_table_dlg();
         self.sync_custom_dlg(cx);
+        self.sync_table_tool(window, cx);
         self.sync_gdt_dlg(window, cx);
         // The label typed in the Auxiliary view dialog (pending_view has no cx).
         if let Some(d) = &self.aux_dlg {
@@ -1350,12 +1409,13 @@ impl Render for DrawingEditor {
         if self.geometry_dirty || self.frame_dirty {
             self.submit(window);
         }
-        let want = self.canvas_hovered.then(|| match self.tool {
+        let want = match self.tool {
+            _ if !self.canvas_hovered => None,
             Tool::Select => None,
             Tool::Centermark => Some(crate::cursor::AppCursor::CrosshairBox),
             _ => Some(crate::cursor::AppCursor::Crosshair),
-        });
-        crate::cursor::CursorSync::sync(self, want.flatten(), window, cx, |v| &mut v.cursor_sync);
+        };
+        crate::cursor::CursorSync::sync(self, want, window, cx, |v| &mut v.cursor_sync);
         let pal = p();
         let entity = cx.entity();
         let image = self.image.clone();
@@ -1393,6 +1453,7 @@ impl Render for DrawingEditor {
                 .size_full(),
             )
             .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
+            .child(self.sheets_toggle(0., cx))
             .child(status)
             .children(panel)
             .children(self.render_view_props(cx))
@@ -1412,6 +1473,14 @@ impl Render for DrawingEditor {
             .children(self.render_stack_dlg(cx))
             .children(self.render_table_dlg(cx))
             .children(self.render_custom_dlg(cx))
+            .children(self.render_move_sheet(cx))
+            .children(self.render_table_props(cx))
+            .children(self.render_linestyle(cx))
+            .children(self.render_hide_edges(cx))
+            .children(self.render_section_edit(cx))
+            .children(self.render_replicate_dlg(cx))
+            .children(self.render_palette(cx))
+            .children(self.render_table_tool(cx))
             .children(self.render_gdt_dlg(cx))
             .children(self.render_stack_banner(cx))
             .children(self.render_view_sketches(cx))
@@ -1480,6 +1549,12 @@ impl Render for DrawingEditor {
             .on_action(cx.listener(|this, _: &TogglePlanes, _, cx| this.set_tool(Tool::Projected { parent: None }, cx)))
             .on_key_down(cx.listener(Self::on_key))
             .child(toolbar)
-            .child(gpui_kit::component::h_flex().flex_1().min_h_0().relative().child(canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border)).child(sheet_bar))
+            .child({
+                // The open Sheets panel pushes the canvas (live drawing/30);
+                // the closed one's sheet tabs float over it.
+                let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
+                let row = gpui_kit::component::h_flex().flex_1().min_h_0().relative();
+                if self.sheets_open { row.child(sheet_bar).child(canvas_el) } else { row.child(canvas_el).child(sheet_bar) }
+            })
     }
 }

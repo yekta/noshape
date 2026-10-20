@@ -38,11 +38,14 @@ pub struct InsertViewState {
     /// The chooser picks a replacement for this source (Sheets panel ›
     /// BOM › Replace): its views (and so its BOM) switch to the choice.
     pub replace: Option<TabId>,
+    /// Sheets panel › reference › Replace...: the replaced reference's part
+    /// (`None` inside: the whole source); its views on every sheet switch.
+    pub replace_part: Option<Option<noshape_model::BodyId>>,
 }
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None }
     }
 }
 
@@ -125,6 +128,23 @@ impl DrawingEditor {
 
     fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
+        if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
+            // Sheets panel reference › Replace: on every sheet (help H:sheets).
+            self.insert.replace = None;
+            self.edit("Replace", cx, |d| {
+                for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+                    if let ViewKind::Base { source: src, part: p, .. } = &mut v.kind
+                        && *src == old
+                        && *p == old_part
+                    {
+                        *src = source;
+                        *p = part.clone();
+                    }
+                }
+            });
+            self.ensure_sources(false, cx);
+            return;
+        }
         if let Some(old) = self.insert.replace.take() {
             // Replace: every base view of the old source shows the new one.
             self.edit_sheet("Replace", cx, |s| {
@@ -251,7 +271,7 @@ impl DrawingEditor {
                 .left(px(self.dialog_left()))
                 .w(px(247.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -260,7 +280,7 @@ impl DrawingEditor {
                         .h(px(28.))
                         .pl(px(6.))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Insert view"))
-                        .child(Button::new("div-close").ghost().child(crate::ui::glyph("close", 14., pal.cancel)).w(px(28.)).h(px(28.)).p_0().tooltip("Cancel (Esc)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(Button::new("div-close").ghost().child(crate::drawing_chrome::cancel_x(cx)).w(px(28.)).h(px(28.)).p_0().tooltip("Cancel (Esc)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.insert.chooser = None;
                             this.cancel(cx);
                         }))),

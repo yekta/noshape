@@ -34,14 +34,14 @@ pub struct DrawingPropsUi {
 
 /// Onshape's tabs (tooltip, icon).
 const TABS: [(&str, &str); 8] = [
-    ("Units and precision", "linear-dim"),
-    ("Dimensions", "dimension"),
-    ("Annotations", "text"),
-    ("Views", "base-view"),
-    ("Construction geometry", "centerline"),
-    ("Formats", "title-block"),
-    ("Tables", "table"),
-    ("Inspection", "measure"),
+    ("Units and precision", "dp-units"),
+    ("Dimensions", "dp-dimensions"),
+    ("Annotations", "dp-annotations"),
+    ("Views", "dp-views"),
+    ("Construction geometry", "dp-construction"),
+    ("Formats", "dp-formats"),
+    ("Tables", "dp-tables"),
+    ("Inspection", "dp-inspection"),
 ];
 
 /// Drawing color choices (None = black, the default ink).
@@ -92,9 +92,6 @@ const TYPE_IDS: [[&str; 4]; 9] = [
     ["dp-t7-font", "dp-t7-b", "dp-t7-i", "dp-t7-color"],
     ["dp-t8-font", "dp-t8-b", "dp-t8-i", "dp-t8-color"],
 ];
-
-/// Datums › Target hatch pattern: the ANSI list's names.
-const TARGET_ANSI: [&str; 8] = ["ANSI31 general", "ANSI32 steel", "ANSI33 bronze/ brass/ copper", "ANSI34 rubber/ plastic", "ANSI35", "ANSI36", "ANSI37 lead/ alloys", "ANSI38 aluminium"];
 
 /// Hole/thread callouts › Indicator choices (the count's sign: "4X").
 const HOLE_INDICATORS: [&str; 3] = ["X", "x", "-"];
@@ -213,10 +210,16 @@ impl DrawingEditor {
 
     fn set_drawing_prop(&mut self, f: &dyn Fn(&mut DrawingProps), cx: &mut Context<Self>) {
         self.edit("Drawing properties", cx, |d| {
+            // ☑ Lock drawing properties: only the lock itself changes.
+            let before = d.props.clone();
             f(&mut d.props);
+            if before.locked && d.props.locked {
+                d.props = before;
+                return;
+            }
             // Keep the metric flag in step with the chosen units.
             if let Some(u) = d.props.units {
-                d.units_mm = !matches!(u, DimUnits::Inch | DimUnits::Foot);
+                d.units_mm = !u.imperial();
             }
         });
     }
@@ -318,8 +321,10 @@ impl DrawingEditor {
                 .child(toggle(id.2, "I", i, |f| f.italic = !f.italic, cx))
                 .into_any_element()
         };
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).px(px(12.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child(label)).child(body).into_any_element();
-        let section = |title: &'static str| div().h(px(30.)).px(px(12.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(pal.border).text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(title).into_any_element();
+        // Live dom drawing-properties-*: labels 14 px in, 13.33 px #666; group
+        // headers 30 px `#efefef` with a `#ddd` rule, 500 #333.
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).pl(px(14.)).pr(px(12.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(body).into_any_element();
+        let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mb(px(9.)).child(title).into_any_element();
         let precision_items = |cur: Option<u8>, max: usize, set: fn(&mut DrawingProps, Option<u8>)| -> Vec<(String, bool, Act)> {
             (0..=max).map(|k| (precision_label(k), cur == Some(k as u8), std::rc::Rc::new(move |p: &mut DrawingProps| set(p, Some(k as u8))) as Act)).collect()
         };
@@ -329,13 +334,7 @@ impl DrawingEditor {
             let unit_items: Vec<(String, bool, Act)> = DimUnits::ALL
                 .iter()
                 .map(|&u| {
-                    let label = match u {
-                        DimUnits::Millimeter => "Millimeters",
-                        DimUnits::Centimeter => "Centimeters",
-                        DimUnits::Meter => "Meters",
-                        DimUnits::Inch => "Inches",
-                        DimUnits::Foot => "Feet",
-                    };
+                    let label = u.name();
                     (label.to_string(), u == units, std::rc::Rc::new(move |p: &mut DrawingProps| p.units = Some(u)) as Act)
                 })
                 .collect();
@@ -351,7 +350,7 @@ impl DrawingEditor {
                 })))
             };
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Units and precision"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Units and precision"))
                 .child(section("Primary"))
                 .child(row("Units", select("dp-units", unit_label, unit_items)))
                 .child(row("Decimal separator", select("dp-sep", if props.decimal_comma { "Comma".into() } else { "Period".into() }, sep_items)))
@@ -359,6 +358,15 @@ impl DrawingEditor {
                 .child(row("Tolerance precision", select("dp-tprec", shown(props.tolerance_precision.or(props.precision), default_digits(units)), precision_items(props.tolerance_precision, 6, |p, v| p.tolerance_precision = v))))
                 .child(row("Angular precision", select("dp-aprec", shown(props.angular_precision, 2), precision_items(props.angular_precision, 4, |p, v| p.angular_precision = v))))
                 .child(row("Angular tolerance precision", select("dp-atprec", shown(props.angular_tolerance_precision, 2), precision_items(props.angular_tolerance_precision, 4, |p, v| p.angular_tolerance_precision = v))))
+                .child(row("Fit class tolerance precision", select("dp-fprec", shown(props.fit_tolerance_precision, 4), precision_items(props.fit_tolerance_precision, 6, |p, v| p.fit_tolerance_precision = v))))
+                .child(section("Dual"))
+                .child(check("dp-dual", "Show dual dimensions", props.dual.show, |p, v| p.dual.show = v, cx))
+                .child(check("dp-dual-unit", "Show dual unit", props.dual.show_unit, |p, v| p.dual.show_unit = v, cx))
+                .child(row("Dimension location", select("dp-dual-dloc", props.dual.dim_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.dim_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.dim_location = l) as Act)).collect())))
+                .child(row("Hole/thread callout location", select("dp-dual-hloc", props.dual.hole_location.name().into(), noshape_model::drawing::DualLocation::ALL.iter().map(|&l| (l.name().to_string(), l == props.dual.hole_location, std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.hole_location = l) as Act)).collect())))
+                .child(row("Units", select("dp-dual-units", props.dual.units_for(self.drawing.units_mm).name().into(), DimUnits::ALL.iter().map(|&u| (u.name().to_string(), u == props.dual.units_for(self.drawing.units_mm), std::rc::Rc::new(move |p: &mut DrawingProps| p.dual.units = Some(u)) as Act)).collect())))
+                .child(row("Precision", select("dp-dual-prec", shown(props.dual.precision, 2), precision_items(props.dual.precision, 6, |p, v| p.dual.precision = v))))
+                .child(row("Tolerance precision", select("dp-dual-tprec", shown(props.dual.tolerance_precision, 2), precision_items(props.dual.tolerance_precision, 6, |p, v| p.dual.tolerance_precision = v))))
                 .child(section("Leading and trailing zeros"))
                 .child(check("dp-lz", "Length leading zeros", props.leading_zeros, |p, v| p.leading_zeros = v, cx))
                 .child(check("dp-tz", "Length trailing zeros", props.trailing_zeros, |p, v| p.trailing_zeros = v, cx))
@@ -394,7 +402,7 @@ impl DrawingEditor {
             };
             let std_name = |ansi: bool| if ansi { "ANSI".to_string() } else { "ISO".to_string() };
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Dimensions"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Dimensions"))
                 .child(section("All dimensions"))
                 .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
                 .child(row("Text height", field(0)))
@@ -453,7 +461,7 @@ impl DrawingEditor {
                 all.iter().map(|&v| (name(v).to_string(), v == cur, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
             }
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Annotations"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Annotations"))
                 .child(section("All annotations"))
                 .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-aarrow", props.ann_arrow_type.name().into(), arrow_items)).into_any_element()));
             for (i, t) in AnnType::ALL.iter().copied().enumerate() {
@@ -496,13 +504,13 @@ impl DrawingEditor {
                             .child(row("Diameter size", field(3 + AnnType::ALL.len())));
                     }
                     AnnType::Datums => {
-                        use noshape_model::drawing::sheet_sketch::HATCH_PATTERNS;
+                        use noshape_model::drawing::hatch_pat::{GROUPS, display_order, pattern};
                         let (std, pat) = props.target_hatch;
-                        let stds: Vec<(String, bool, Act)> = HATCH_PATTERNS.iter().enumerate().map(|(k, (n, _))| (n.to_string(), k == std, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch = (k, 0)) as Act)).collect();
-                        // The ANSI patterns go by their target-hatch names.
-                        let name = |s: usize, k: usize| if s == 0 { TARGET_ANSI.get(k).copied() } else { HATCH_PATTERNS.get(s).and_then(|p| p.1.get(k)).copied() };
-                        let pats: Vec<(String, bool, Act)> = (0..HATCH_PATTERNS.get(std).map(|s| s.1.len()).unwrap_or(0)).filter_map(|k| Some((name(std, k)?.to_string(), k == pat, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch.1 = k) as Act))).collect();
-                        let std_name = HATCH_PATTERNS.get(std).map(|s| s.0).unwrap_or("ANSI");
+                        let stds: Vec<(String, bool, Act)> = GROUPS.iter().enumerate().map(|(k, (n, _))| (n.to_string(), k == std, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch = (k, display_order(k)[0])) as Act)).collect();
+                        // ANSI: the eight patterns, without the dialog's "(drawing)" one.
+                        let name = |s: usize, k: usize| pattern(s, k).map(|p| p.name).filter(|_| s != 0 || k < 8);
+                        let pats: Vec<(String, bool, Act)> = display_order(std).into_iter().filter_map(|k| Some((name(std, k)?.to_string(), k == pat, std::rc::Rc::new(move |p: &mut DrawingProps| p.target_hatch.1 = k) as Act))).collect();
+                        let std_name = GROUPS.get(std).map(|s| s.0).unwrap_or("ANSI");
                         let pat_name = name(std, pat).unwrap_or("");
                         body = body
                             .child(row("Target hatch pattern", select("dp-th-std", std_name.into(), stds)))
@@ -552,7 +560,7 @@ impl DrawingEditor {
             ];
             let tangent_items: Vec<(String, bool, Act)> = ["Hidden", "Solid", "Phantom"].iter().enumerate().map(|(i, n)| (n.to_string(), vd.tangent == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.tangent = i as u8) as Act)).collect();
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Views"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Views"))
                 .child(section("All views"))
                 .child(row("Projection angle", proj_btn))
                 .child(section("Insert view defaults"))
@@ -613,7 +621,7 @@ impl DrawingEditor {
                 None => div().into_any_element(),
             };
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Construction geometry"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Construction geometry"))
                 .child(section("Centermarks"))
                 .child(row("Color", swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(row("Mark size", field(0)))
@@ -623,7 +631,7 @@ impl DrawingEditor {
             let color_select = |id: &'static str, cur: Option<[u8; 3]>, set: fn(&mut DrawingProps, Option<[u8; 3]>)| swatch(id, cur, std::rc::Rc::new(move |p: &mut DrawingProps, c| set(p, c)));
             let locked = props.formats_locked;
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Formats"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
                 .child(div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-flock").label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| p.formats_locked = v, cx);
@@ -640,7 +648,7 @@ impl DrawingEditor {
                 None => div().into_any_element(),
             };
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Tables"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Tables"))
                 .child(section("All tables"))
                 .child(row("Horizontal padding", field(0)))
                 .child(row("Vertical padding", field(1)));
@@ -661,7 +669,7 @@ impl DrawingEditor {
                 None => div().into_any_element(),
             };
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child("Inspection"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Inspection"))
                 .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
                 .child(section("Text"))
                 .child(row("Font", font_row(FontOf::Inspection, props.inspection_font.clone(), cx)))
@@ -678,24 +686,27 @@ impl DrawingEditor {
                 .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
         } else {
             body = body
-                .child(div().h(px(32.)).px(px(12.)).flex().items_center().text_size(px(14.67)).font_weight(FontWeight::SEMIBOLD).child(TABS[self.drawing_props.tab].0))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child(TABS[self.drawing_props.tab].0))
                 .child(div().px(px(12.)).py_2().text_size(px(12.)).text_color(pal.text_muted).child("These properties are set per item for now (select a dimension, note or table)."));
         }
-        let mut tabs = h_flex().px(px(8.)).gap(px(1.));
+        // Live drawing/341: 38 px cells flush left, `#adadad` rules, `#f4f5f6`;
+        // the active one white and open to the white section below.
+        let mut tabs = h_flex().h(px(38.)).flex_none().mb(px(1.));
         for (i, (tip, icon)) in TABS.iter().enumerate() {
             let on = i == self.drawing_props.tab;
             tabs = tabs.child(
                 div()
                     .id(("dr-dprops-tab", i))
-                    .size(px(32.))
+                    .size(px(38.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border_1()
-                    .border_color(pal.border)
+                    .border_t_1()
+                    .border_r_1()
+                    .border_color(gpui_kit::rgb(0xadadad))
                     .cursor_pointer()
-                    .when(on, |d| d.bg(gpui_kit::white()).border_b_2().border_color(pal.accent))
-                    .when(!on, |d| d.bg(gpui_kit::rgb(0xf2f2f2)).hover(|d| d.bg(pal.panel_hover)))
+                    .when(on, |d| d.bg(gpui_kit::white()))
+                    .when(!on, |d| d.bg(gpui_kit::rgb(0xf4f5f6)).border_b_1().hover(|d| d.bg(gpui_kit::rgb(0xe8e9ea))))
                     .tooltip(crate::ui::tooltip(*tip))
                     .child(crate::assets::icon(&crate::assets::icon_path(icon), 20., cx))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -719,20 +730,46 @@ impl DrawingEditor {
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(
-                    h_flex()
-                        .h(px(40.))
-                        .px(px(8.))
-                        .child(div().flex_1().text_center().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.accent).child("Drawing properties"))
-                        .child(Button::new("dp-close").ghost().child(crate::ui::glyph("close", 14., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.drawing_props.open = false;
-                            cx.notify();
-                        }))),
-                )
+                // Live: the title centred, 18.67 px / 500 `#1b5faa` on a 25 px line
+                // 5 px down, no close button (the right strip toggles the panel).
+                .child(div().h(px(43.)).flex_none().pt(px(5.)).flex().justify_center().child(div().h(px(25.)).line_height(px(25.)).text_size(px(18.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x1b5faa)).child("Drawing properties")))
                 .child(tabs)
                 .child(body)
+                .child(self.drawing_props_footer(cx))
                 .into_any_element(),
         )
+    }
+}
+
+impl DrawingEditor {
+    /// The panel's footer (live drawing/18): "Update properties from a
+    /// template…" with the DWT button (the standard templates), and
+    /// ☐ Lock drawing properties.
+    fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
+        let ed = cx.entity();
+        let locked = self.drawing.props.locked;
+        let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
+            for row in crate::drawing_create::template_rows() {
+                let e = ed.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| {
+                        let props = noshape_model::drawing::templates::template_props(&row.template, row.file);
+                        t.set_drawing_prop(&move |p| *p = props.clone(), cx)
+                    })
+                }));
+            }
+            m
+        });
+        v_flex()
+            .flex_none()
+            .border_t_1()
+            .border_color(gpui_kit::rgb(0xdddddd))
+            .child(h_flex().h(px(36.)).px(px(10.)).gap(px(8.)).child(div().flex_1().text_size(px(13.)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…")).child(dwt))
+            .child(div().h(px(32.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-lock").label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                let v = *v;
+                this.set_drawing_prop(&move |p| p.locked = v, cx)
+            }))))
+            .into_any_element()
     }
 }
 

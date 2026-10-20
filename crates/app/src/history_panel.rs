@@ -1220,8 +1220,18 @@ impl Render for HistoryPanel {
                     }))
                     .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
                     .child(crate::ui::icon_button("hist-compare", "compare", 30., false, cx).tooltip("Compare with the workspace").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(r) = this.graph(cx).versions.last().map(|v| (v.microversion, v.name.clone())) {
-                            this.compare_with_current(r.0, r.1, cx);
+                        // The viewed version (or history point), else the latest
+                        // version, else Start: with only Start it did nothing.
+                        let viewing = this.doc.read(cx).session.viewing;
+                        let g = this.graph(cx);
+                        let root = g.microversions.iter().find(|m| m.parents.is_empty()).map(|m| (m.id, "Start".to_string()));
+                        let name_of = |mv: MicroversionId| g.versions.iter().find(|v| v.microversion == mv).map(|v| v.name.clone()).or_else(|| root.as_ref().filter(|r| r.0 == mv).map(|r| r.1.clone()));
+                        let target = match viewing {
+                            Some(mv) => Some((mv, name_of(mv).unwrap_or_else(|| "History".to_string()))),
+                            None => g.versions.last().map(|v| (v.microversion, v.name.clone())).or(root.clone()),
+                        };
+                        if let Some((mv, name)) = target {
+                            this.compare_with_current(mv, name, cx);
                         }
                     })))
                     .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),

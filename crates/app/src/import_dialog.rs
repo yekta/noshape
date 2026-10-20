@@ -6,6 +6,9 @@
 //! assemblies"), then ☑ Import appearances, ☐ Orient imported models with Y
 //! Axis Up, ☐ Create a composite part when importing multiple or non-solid
 //! bodies, ☐ Join adjacent surfaces (each with a ? tooltip); Import / Cancel.
+//! Native part files (SOLIDWORKS, Solid Edge, NX, Inventor; live G38b,
+//! dom/dialog-import-sldprt.txt, dialog-import-nxhub.txt): no tiles, and ☐
+//! Import material density after Import appearances.
 
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
@@ -19,10 +22,14 @@ use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+/// Native part files (their own dialog variant).
+const NATIVE_PARTS: &[&str] = &["sldprt", "par", "psm", "prt", "ipt"];
+
 #[derive(Clone, Copy, Default)]
 struct Choice {
     combine: bool,
     appearances: bool,
+    density: bool,
     y_up: bool,
     composite: bool,
     join: bool,
@@ -34,6 +41,8 @@ struct Choice {
 /// not when translating an existing file tab).
 pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let choice = Rc::new(Cell::new(Choice { appearances: true, ..Default::default() }));
+    // Native part files get Onshape's five-checkbox variant.
+    let native = !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| NATIVE_PARTS.contains(&e.to_string_lossy().to_lowercase().as_str())));
     let opened = Rc::new(opened);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
@@ -126,9 +135,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                 os::modal_body()
                     .pt(px(4.))
                     .gap(px(8.))
-                    .child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone())))
+                    .when(!native, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
                     // Live document/77: the checkbox rows are 34 px apart.
                     .child(v_flex().gap(px(13.)).child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone()))
+                    .when(native, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
                     .child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone()))
                     .child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))),
@@ -149,12 +159,12 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
 /// Translate the files and add their Part Studio tab(s).
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
     let units = doc.read(cx).session.doc.settings.units;
-    let mut read: Vec<(String, String, String)> = Vec::new();
+    let mut read: Vec<(String, String, crate::workspace::Foreign)> = Vec::new();
     for path in paths {
         match crate::workspace::read_foreign(path, &units) {
-            Ok(brep) => {
+            Ok(foreign) => {
                 let (name, file) = crate::workspace::import_names(path);
-                read.push((name, file, brep));
+                read.push((name, file, foreign));
             }
             Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
         }
@@ -178,14 +188,16 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
                     crate::file_tab_view::add_file_tab(d, f, Some(folder), None);
                 }
             }
-            let groups: Vec<Vec<&(String, String, String)>> = if c.combine { vec![read.iter().collect()] } else { read.iter().map(|r| vec![r]).collect() };
+            let groups: Vec<Vec<&(String, String, crate::workspace::Foreign)>> = if c.combine { vec![read.iter().collect()] } else { read.iter().map(|r| vec![r]).collect() };
             let mut at = after;
             for g in groups {
                 let mut ps = PartStudio::new();
-                for (_, file, brep) in &g {
-                    crate::workspace::add_import_feature(&mut ps, file, brep.clone(), &units);
+                for (_, file, foreign) in &g {
+                    crate::workspace::add_import_feature(&mut ps, file, foreign.clone(), &units);
                     if let Some(f) = ps.features.last_mut() {
                         f.params.set("importAppearances", noshape_model::ParamValue::Bool(c.appearances));
+                        f.params.set("specifyMaterialData", noshape_model::ParamValue::Bool(c.density));
+                        f.params.set("importMaterialDensity", noshape_model::ParamValue::Bool(c.density));
                         f.params.set("yAxisIsUp", noshape_model::ParamValue::Bool(c.y_up));
                         f.params.set("createComposite", noshape_model::ParamValue::Bool(c.composite));
                         f.params.set("joinAdjacentSurfaces", noshape_model::ParamValue::Bool(c.join));

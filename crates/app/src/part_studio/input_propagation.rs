@@ -46,6 +46,37 @@ impl PartStudioView {
         })
     }
 
+    /// Where a configuration variable is used (the Usages table, live 433):
+    /// "<feature> <parameter>" for every parameter whose expression names
+    /// `#<name>`.
+    pub(super) fn variable_usages(&self, name: &str, cx: &App) -> Vec<String> {
+        let Some(studio) = self.studio(cx) else { return Vec::new() };
+        let needle = format!("#{name}");
+        let mut out = Vec::new();
+        for f in &studio.features {
+            let Some(ty) = f.feature_type() else { continue };
+            for (id, v) in f.params.0.iter() {
+                if let ParamValue::Expr(e) = v
+                    && e.text.split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '#')).any(|w| w == needle)
+                {
+                    let label = ty.param(id).map(|p| p.label.to_string()).unwrap_or_else(|| id.to_string());
+                    out.push(format!("{} {label}", f.name));
+                }
+            }
+        }
+        out
+    }
+
+    /// A propagated column's parameter header: the source input's name
+    /// (live 444: "Derived 1" / "Size").
+    pub(super) fn derived_input_name(&self, feature: FeatureId, input: &str, cx: &App) -> String {
+        self.studio(cx)
+            .and_then(|s| s.feature(feature))
+            .and_then(|f| self.source_input(f.params.text("partStudio"), input, cx))
+            .map(|i| i.name)
+            .unwrap_or_else(|| input.to_string())
+    }
+
     /// Derived features whose source has an input with this input's id and kind.
     pub(super) fn propagation_candidates(&self, input: &str, cx: &App) -> Vec<Candidate> {
         let Some(studio) = self.studio(cx) else { return Vec::new() };
@@ -72,8 +103,8 @@ impl PartStudioView {
         let columns: Vec<&ConfiguredParam> = studio.configuration.configured.iter().filter(|c| c.input == input).collect();
         let fname = |c: &ConfiguredParam| studio.feature(c.feature).map(|f| f.name.clone()).unwrap_or_default();
         let plabel = |c: &ConfiguredParam| {
-            if c.param.starts_with(DERIVED_CONFIG_PREFIX) {
-                return "Configuration".to_string();
+            if let Some(id) = c.param.strip_prefix(DERIVED_CONFIG_PREFIX) {
+                return self.derived_input_name(c.feature, id, cx);
             }
             if c.param == noshape_model::configuration::SUPPRESSED_PARAM {
                 return "Suppressed".to_string();
@@ -87,23 +118,31 @@ impl PartStudioView {
             Some(ParamValue::Query(q)) => format!("{} selection{}", q.len(), if q.len() == 1 { "" } else { "s" }),
             _ => String::new(),
         };
+        // Live (dom/config-copy-clipboard.txt): the table as shown — a list's
+        // Name column ("Name\nSmall\nLarge"), a checkbox's Value column
+        // ("Value\nfalse\ntrue"), with a feature-name row and parameter
+        // headers once features are configured ("\tDerived 1\nName\tSize…");
+        // a variable's usages ("Extrude 1 Depth"); nothing for a text input.
         let mut lines = Vec::new();
         match &inp.kind {
-            ConfigInputKind::Variable { default, .. } => {
-                lines.push("Name\tDefault value".to_string());
-                lines.push(format!("#{}\t{}", inp.name, default.text));
-            }
+            ConfigInputKind::Variable { .. } => lines.extend(self.variable_usages(&inp.name, cx)),
+            ConfigInputKind::Text { .. } => return,
             _ => {
-                lines.push(std::iter::once(String::new()).chain(columns.iter().map(|c| fname(c))).collect::<Vec<_>>().join("\t"));
-                lines.push(std::iter::once("Name".to_string()).chain(columns.iter().map(|c| plabel(c))).collect::<Vec<_>>().join("\t"));
-                let names: Vec<(String, String)> = match &inp.kind {
-                    ConfigInputKind::List { options, .. } => options.iter().map(|o| (o.id.clone(), o.name.clone())).collect(),
-                    _ => vec![("true".into(), "Checked".into()), ("false".into(), "Unchecked".into())],
+                let (head, rows): (&str, Vec<(String, String)>) = match &inp.kind {
+                    ConfigInputKind::List { options, .. } => ("Name", options.iter().map(|o| (o.id.clone(), o.name.clone())).collect()),
+                    _ => ("Value", vec![("false".into(), "false".into()), ("true".into(), "true".into())]),
                 };
-                for (k, n) in names {
+                if !columns.is_empty() {
+                    lines.push(std::iter::once(String::new()).chain(columns.iter().map(|c| fname(c))).collect::<Vec<_>>().join("\t"));
+                }
+                lines.push(std::iter::once(head.to_string()).chain(columns.iter().map(|c| plabel(c))).collect::<Vec<_>>().join("\t"));
+                for (k, n) in rows {
                     lines.push(std::iter::once(n).chain(columns.iter().map(|c| cell(c.values.get(&k)))).collect::<Vec<_>>().join("\t"));
                 }
             }
+        }
+        if lines.is_empty() {
+            return;
         }
         cx.write_to_clipboard(ClipboardItem::new_string(lines.join("\n")));
     }
@@ -111,8 +150,14 @@ impl PartStudioView {
     /// Copy input (one) / Copy all inputs (`None`).
     pub(super) fn copy_config_inputs(&mut self, input: Option<&str>, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
-        let inputs = studio.configuration.inputs.iter().filter(|i| input.is_none_or(|id| i.id == id)).cloned().collect();
+        let inputs: Vec<ConfigInput> = studio.configuration.inputs.iter().filter(|i| input.is_none_or(|id| i.id == id)).cloned().collect();
+        // Live: "Size copied." / "Inputs copied." (Onshape's own clipboard).
+        let toast = match (input, inputs.as_slice()) {
+            (Some(_), [one]) => format!("{} copied.", one.name),
+            _ => "Inputs copied.".to_string(),
+        };
         crate::config_visibility::copy_inputs(inputs);
+        self.flash_success(toast, cx);
     }
 
     /// Paste inputs: the copied inputs whose ids this studio doesn't have
@@ -120,10 +165,12 @@ impl PartStudioView {
     pub(super) fn paste_config_inputs(&mut self, cx: &mut Context<Self>) {
         let copied = crate::config_visibility::copied_inputs();
         let mut repaired = false;
+        let mut pasted: Vec<String> = Vec::new();
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Paste configuration inputs", cx, |ps| {
                 for i in copied {
                     if !ps.configuration.inputs.iter().any(|x| x.id == i.id) {
+                        pasted.push(i.name.clone());
                         ps.configuration.inputs.push(i);
                     }
                 }
@@ -132,6 +179,9 @@ impl PartStudioView {
         });
         if repaired {
             self.flash_info("Visibility conditions for pasted inputs were updated.".into(), cx);
+        } else if !pasted.is_empty() {
+            // Live 439: "Size pasted."
+            self.flash_success(if pasted.len() == 1 { format!("{} pasted.", pasted[0]) } else { "Inputs pasted.".into() }, cx);
         }
         self.config_dirty(cx);
     }
@@ -148,81 +198,152 @@ impl PartStudioView {
         });
     }
 
-    /// The "Input propagation for <studio>" dialog.
-    pub(super) fn open_input_propagation(&mut self, input: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let rows = self.propagation_candidates(input, cx);
-        if rows.is_empty() {
+    /// The "Input propagation for <studio>" dialog for one input (its ⋯) or
+    /// every list / checkbox input (the panel's ⋯).
+    pub(super) fn open_input_propagation(&mut self, input: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx).cloned() else { return };
+        let inputs: Vec<(String, String)> = studio
+            .configuration
+            .inputs
+            .iter()
+            .filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }))
+            .filter(|i| input.is_none_or(|id| i.id == id))
+            .map(|i| (i.id.clone(), i.name.clone()))
+            .collect();
+        if inputs.is_empty() {
             return;
         }
+        // Rows: every Derived feature some input can propagate to; a cell per
+        // input (None: that source has no such input).
+        let mut rows: Vec<(FeatureId, String, Vec<Option<bool>>)> = Vec::new();
+        for (k, (id, _)) in inputs.iter().enumerate() {
+            for c in self.propagation_candidates(id, cx) {
+                let at = match rows.iter().position(|r| r.0 == c.feature) {
+                    Some(at) => at,
+                    None => {
+                        rows.push((c.feature, c.name.clone(), vec![None; inputs.len()]));
+                        rows.len() - 1
+                    }
+                };
+                rows[at].2[k] = Some(c.done);
+            }
+        }
+        let checked = rows.iter().map(|r| r.2.iter().map(|c| c.unwrap_or(false)).collect()).collect();
         let studio_name = self.studio_name(cx);
         let view = cx.entity().downgrade();
-        let input = input.to_string();
-        let on_confirm: OnConfirm = std::rc::Rc::new(move |features: Vec<FeatureId>, _: &mut Window, cx: &mut App| {
-            let input = input.clone();
-            let _ = view.update(cx, |this, cx| this.propagate_input(&input, &features, cx));
+        let ids: Vec<String> = inputs.iter().map(|i| i.0.clone()).collect();
+        let on_confirm: OnConfirm = std::rc::Rc::new(move |picked: Vec<(usize, FeatureId)>, _: &mut Window, cx: &mut App| {
+            let ids = ids.clone();
+            let _ = view.update(cx, |this, cx| this.propagate_inputs(&ids, &picked, cx));
         });
-        let dialog = cx.new(|_| PropagationDialog { studio_name, checked: rows.iter().map(|r| r.done).collect(), rows, on_confirm });
-        window.open_dialog(cx, move |d, _, _| d.w(px(620.)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));
+        open_propagation_dialog(studio_name, inputs, rows, checked, on_confirm, window, cx);
     }
 
-    /// Configure the Derived features' source configuration with this input.
-    fn propagate_input(&mut self, input: &str, features: &[FeatureId], cx: &mut Context<Self>) {
-        let Some(own) = self.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input).cloned()) else { return };
-        let keys = row_keys(&own);
-        let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
-        let (input, features) = (input.to_string(), features.to_vec());
+    /// Configure the Derived features' source configuration with the inputs
+    /// (`picked`: input index, feature).
+    fn propagate_inputs(&mut self, ids: &[String], picked: &[(usize, FeatureId)], cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx).cloned() else { return };
+        let picked: Vec<(String, Vec<String>, FeatureId)> = picked
+            .iter()
+            .filter_map(|(k, f)| {
+                let input = studio.configuration.inputs.iter().find(|i| i.id == ids[*k])?;
+                Some((input.id.clone(), row_keys(input), *f))
+            })
+            .collect();
         self.edit_config("Input propagation", cx, |ps| {
-            for f in features {
+            for (input, keys, f) in picked {
+                let param = format!("{DERIVED_CONFIG_PREFIX}{input}");
                 if ps.configuration.configured.iter().any(|c| c.feature == f && c.param == param) {
                     continue;
                 }
                 let values = keys.iter().map(|k| (k.clone(), ParamValue::Text(k.clone()))).collect();
-                ps.configuration.configured.push(ConfiguredParam { input: input.clone(), feature: f, param: param.clone(), values });
+                ps.configuration.configured.push(ConfiguredParam { input: input.clone(), feature: f, param, values });
             }
         });
         self.config_dirty(cx);
+        self.flash_success("Matching parameters successfully configured.".into(), cx);
     }
 }
 
-type OnConfirm = std::rc::Rc<dyn Fn(Vec<FeatureId>, &mut Window, &mut App)>;
+pub(crate) type OnConfirm = std::rc::Rc<dyn Fn(Vec<(usize, FeatureId)>, &mut Window, &mut App)>;
 
-/// The dialog's state: references and their Propagate checkboxes.
+/// Rows of the Input propagation dialog: (row key, reference name, per
+/// input: None = can't propagate, Some(already propagated)).
+pub(crate) type PropagationRows = Vec<(FeatureId, String, Vec<Option<bool>>)>;
+
+/// Open the Input propagation dialog (live 443) for `owner_name`'s inputs
+/// (id, name) over `rows`; ✓ hands the newly ticked (input index, row key)
+/// to `on_confirm`. Shared with the assembly (skb: rows are instances, the
+/// key their id).
+pub(crate) fn open_propagation_dialog(owner_name: String, inputs: Vec<(String, String)>, rows: PropagationRows, checked: Vec<Vec<bool>>, on_confirm: OnConfirm, window: &mut Window, cx: &mut App) {
+    let width = 320. + 300. * inputs.len() as f32;
+    let dialog = cx.new(|_| PropagationDialog { studio_name: owner_name, inputs, rows, checked, on_confirm });
+    window.open_dialog(cx, move |d, _, _| d.w(px(width)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));
+}
+
+/// The dialog's state: references (rows), inputs (columns) and the
+/// Propagate checkboxes (already propagated ones stay ticked).
 struct PropagationDialog {
     studio_name: String,
-    rows: Vec<Candidate>,
-    checked: Vec<bool>,
+    /// (id, name) per column; the header shows the name (live 443: "Size").
+    inputs: Vec<(String, String)>,
+    /// (feature, name, per input: None = can't propagate, Some(done)).
+    rows: Vec<(FeatureId, String, Vec<Option<bool>>)>,
+    checked: Vec<Vec<bool>>,
     on_confirm: OnConfirm,
 }
 
 impl PropagationDialog {
-    fn new_count(&self) -> usize {
-        self.rows.iter().zip(&self.checked).filter(|(r, c)| **c && !r.done).count()
+    /// Ticked cells not propagated yet.
+    fn picked(&self) -> Vec<(usize, FeatureId)> {
+        let mut out = Vec::new();
+        for (r, row) in self.rows.iter().enumerate() {
+            for (k, cell) in row.2.iter().enumerate() {
+                if *cell == Some(false) && self.checked[r][k] {
+                    out.push((k, row.0));
+                }
+            }
+        }
+        out
     }
 
-    /// The header checkboxes: tick or untick every row (done rows stay ticked).
-    fn toggle_all(cx: &mut Context<Self>) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static + use<> {
-        let view = cx.entity().downgrade();
-        move |_, _, cx| {
-            let _ = view.update(cx, |this, cx| {
-                let on = !this.checked.iter().all(|c| *c);
-                for (c, r) in this.checked.iter_mut().zip(&this.rows) {
-                    *c = on || r.done;
+    /// Set the cells `which` (row, column) selects; done cells stay ticked.
+    fn set(&mut self, which: &dyn Fn(usize, usize) -> bool, on: bool) {
+        for (r, row) in self.rows.iter().enumerate() {
+            for (k, cell) in row.2.iter().enumerate() {
+                if which(r, k) && *cell == Some(false) {
+                    self.checked[r][k] = on;
                 }
-                cx.notify();
-            });
+            }
         }
     }
 
-    /// A row's checkboxes (rows already propagated stay ticked).
-    fn toggle_row(k: usize, done: bool, cx: &mut Context<Self>) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static + use<> {
+    /// All cells `which` selects that can change are ticked.
+    fn all(&self, which: &dyn Fn(usize, usize) -> bool) -> bool {
+        let mut any = false;
+        for (r, row) in self.rows.iter().enumerate() {
+            for (k, cell) in row.2.iter().enumerate() {
+                if which(r, k) && cell.is_some() {
+                    any = true;
+                    if !self.checked[r][k] {
+                        return false;
+                    }
+                }
+            }
+        }
+        any
+    }
+
+    /// A header / row checkbox: tick or untick the cells it covers.
+    fn toggler(which: std::rc::Rc<dyn Fn(usize, usize) -> bool>, cx: &mut Context<Self>) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static + use<> {
         let view = cx.entity().downgrade();
         move |_, _, cx| {
-            if !done {
-                let _ = view.update(cx, |this, cx| {
-                    this.checked[k] = !this.checked[k];
-                    cx.notify();
-                });
-            }
+            let which = which.clone();
+            let _ = view.update(cx, |this, cx| {
+                let on = !this.all(&*which);
+                this.set(&*which, on);
+                cx.notify();
+            });
         }
     }
 }
@@ -231,24 +352,46 @@ impl Render for PropagationDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let grid = gpui_kit::rgb(0xaaaaaa);
-        let all = self.checked.iter().all(|c| *c);
         let cell = |w: f32| h_flex().w(px(w)).h(px(36.)).px(px(4.)).border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text);
-        let toggle_all = Self::toggle_all;
-        let mut table = v_flex().mx(px(10.)).border_l_1().border_t_1().border_color(grid).child(
-            h_flex()
-                .bg(gpui_kit::rgb(0xeaeaea))
-                .child(cell(298.).justify_center().font_weight(FontWeight::BOLD).relative().child("References").child(div().absolute().right(px(8.)).child(crate::ui::os_checkbox("prop-all-refs", "", all).on_click(toggle_all(cx)))))
-                .child(cell(298.).justify_center().font_weight(FontWeight::BOLD).relative().child(div().absolute().left(px(8.)).child(crate::ui::os_checkbox("prop-all-cfg", "", all).on_click(toggle_all(cx)))).child("Configuration")),
+        let everything: std::rc::Rc<dyn Fn(usize, usize) -> bool> = std::rc::Rc::new(|_, _| true);
+        let mut head = h_flex().bg(gpui_kit::rgb(0xeaeaea)).child(
+            cell(298.)
+                .justify_center()
+                .font_weight(FontWeight::BOLD)
+                .relative()
+                .child("References")
+                .child(div().absolute().right(px(8.)).child(crate::ui::os_checkbox("prop-all-refs", "", self.all(&*everything)).on_click(Self::toggler(everything.clone(), cx)))),
         );
-        for (k, r) in self.rows.iter().enumerate() {
-            let on = self.checked[k];
-            let done = r.done;
-            let toggle = move |cx: &mut Context<Self>| Self::toggle_row(k, done, cx);
-            table = table.child(
-                h_flex()
-                    .child(cell(298.).justify_between().child(r.name.clone()).child(crate::ui::os_checkbox(("prop-ref", k), "", on).on_click(toggle(cx))))
-                    .child(cell(298.).child(crate::ui::os_checkbox(("prop-cfg", k), "Propagate", on).on_click(toggle(cx)))),
+        for (k, (_, name)) in self.inputs.iter().enumerate() {
+            let column: std::rc::Rc<dyn Fn(usize, usize) -> bool> = std::rc::Rc::new(move |_, c| c == k);
+            head = head.child(
+                cell(298.)
+                    .justify_center()
+                    .font_weight(FontWeight::BOLD)
+                    .relative()
+                    .child(div().absolute().left(px(8.)).child(crate::ui::os_checkbox(("prop-col", k), "", self.all(&*column)).on_click(Self::toggler(column.clone(), cx))))
+                    .child(name.clone()),
             );
+        }
+        let mut table = v_flex().mx(px(10.)).border_l_1().border_t_1().border_color(grid).child(head);
+        for (r, row) in self.rows.iter().enumerate() {
+            let this_row: std::rc::Rc<dyn Fn(usize, usize) -> bool> = std::rc::Rc::new(move |rr, _| rr == r);
+            // Live 443: the reference cells are grey.
+            let mut line = h_flex().child(
+                cell(298.)
+                    .bg(gpui_kit::rgb(0xeaeaea))
+                    .justify_between()
+                    .child(row.1.clone())
+                    .child(crate::ui::os_checkbox(("prop-ref", r), "", self.all(&*this_row)).on_click(Self::toggler(this_row.clone(), cx))),
+            );
+            for (k, c) in row.2.iter().enumerate() {
+                let one: std::rc::Rc<dyn Fn(usize, usize) -> bool> = std::rc::Rc::new(move |rr, cc| rr == r && cc == k);
+                line = line.child(match c {
+                    Some(_) => cell(298.).child(crate::ui::os_checkbox(("prop-cfg", r * 64 + k), "Propagate", self.checked[r][k]).on_click(Self::toggler(one, cx))),
+                    None => cell(298.),
+                });
+            }
+            table = table.child(line);
         }
         v_flex()
             .w_full()
@@ -274,8 +417,8 @@ impl PropagationDialog {
     fn render_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         use gpui_kit::component::Disableable as _;
         let pal = p();
-        let n = self.new_count();
-        let picked: Vec<FeatureId> = self.rows.iter().zip(&self.checked).filter(|(r, c)| **c && !r.done).map(|(r, _)| r.feature).collect();
+        let picked = self.picked();
+        let n = picked.len();
         let on_confirm = self.on_confirm.clone();
         h_flex()
             .h(px(60.))

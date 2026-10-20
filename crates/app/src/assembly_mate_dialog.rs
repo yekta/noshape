@@ -495,43 +495,64 @@ impl Render for MateDialog {
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
-        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)));
         let mut offset_rows = v_flex();
         if self.use_offset {
+            // Live (dom/dialog-mate-fastened-offset.txt): per axis a 26 px
+            // "along X/Y/Z" icon and a 168 px quantity field; then the
+            // "Rotate about X ▾" select (tooltip "Rotation axis") and the
+            // "Rotation angle" row (12 px #666 label, 108 px field).
+            let axis_row = |icon: &'static str, st: &Entity<InputState>, cx: &App| {
+                h_flex()
+                    .w(px(194.))
+                    .h(px(29.))
+                    .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
+                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))))
+            };
             if ox {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, field("X offset", &self.offsets[0]), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], cx), cx));
             }
             if oy {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Y, field("Y offset", &self.offsets[1]), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Y, axis_row("xyz-along-y", &self.offsets[1], cx), cx));
             }
             if oz {
-                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Z, field("Z offset", &self.offsets[2]), cx));
+                offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_Z, axis_row("xyz-along-z", &self.offsets[2], cx), cx));
             }
             if orot {
                 let ax = self.rotation_axis;
-                let mut axes = h_flex().gap(px(2.));
-                for (k, label) in ["X", "Y", "Z"].into_iter().enumerate() {
-                    let k = k as u8;
-                    // Onshape's enum underline tabs: the selected one bold with a blue underline.
-                    axes = axes.child(
-                        div()
-                            .id(SharedString::from(format!("mate-rot-ax-{k}")))
-                            .px(px(6.))
-                            .py(px(3.))
-                            .cursor_pointer()
-                            .text_size(px(13.33))
-                            .text_color(pal.text_muted)
-                            .when(ax == k, |d| d.font_weight(FontWeight::SEMIBOLD).text_color(pal.text).border_b_2().border_color(pal.accent))
-                            .tooltip(crate::ui::tooltip(format!("Rotate about {label}")))
-                            .child(label)
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.rotation_axis = k;
-                                cx.emit(MateDialogEvent::Changed);
-                                cx.notify();
-                            })),
-                    );
-                }
-                offset_rows = offset_rows.child(h_flex().h(px(30.)).pl(px(5.)).gap(px(6.)).child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child("Rotation axis")).child(axes)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, field("Rotation", &self.offsets[3]), cx));
+                let label = ["Rotate about X", "Rotate about Y", "Rotate about Z"][ax.min(2) as usize];
+                let view = cx.entity();
+                let select = div()
+                    .id("mate-rot-axis")
+                    .w(px(194.))
+                    .h(px(26.))
+                    .pl(px(6.))
+                    .pr(px(6.))
+                    .flex()
+                    .items_center()
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .cursor_pointer()
+                    .tooltip(crate::ui::tooltip("Rotation axis"))
+                    .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(label)).child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0x333333))))
+                    .os_dropdown_menu("mate-rot-axis-dd", true, move |mut menu, _, _| {
+                        for (k, l) in ["Rotate about X", "Rotate about Y", "Rotate about Z"].into_iter().enumerate() {
+                            let v = view.clone();
+                            menu = menu.item(OsMenuItem::new(l).on_click(move |_, _, cx| {
+                                v.update(cx, |this, cx| {
+                                    this.rotation_axis = k as u8;
+                                    cx.emit(MateDialogEvent::Changed);
+                                    cx.notify();
+                                })
+                            }));
+                        }
+                        menu
+                    });
+                let angle = h_flex()
+                    .w(px(194.))
+                    .h(px(26.))
+                    .child(div().w(px(86.)).h_full().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Rotation angle"))
+                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))));
+                offset_rows = offset_rows.child(div().py(px(1.5)).child(select)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
             }
         }
         let mut limit_rows = v_flex();
@@ -559,7 +580,7 @@ impl Render for MateDialog {
                     .tooltip(crate::ui::tooltip(format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key))))
                     .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(letter))
                     .child(crate::assets::icon(&icon_path(icon), 18., cx))
-                    .child(div().flex_1().ml(px(6.)).border_b_1().border_color(pal.border).child(Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.))))
+                    .child(gpui_kit::base::input::input_frame(div().flex_1().ml(px(6.)).border_b_1().border_color(pal.border).child(Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))))
             };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];
@@ -639,7 +660,7 @@ impl Render for MateDialog {
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .tooltip(crate::ui::tooltip("Cancel (Esc)"))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Cancel))),
                     ),
             )
@@ -694,7 +715,6 @@ impl Render for MateDialog {
                                 d.child(
                                     div()
                                         .id("mate-animate")
-                                        .when(!can, |d| d.opacity(0.4))
                                         .size(px(26.))
                                         .flex()
                                         .items_center()
@@ -716,10 +736,23 @@ impl Render for MateDialog {
                                 )
                             })
                             .child(
-                                os::secondary_button("mate-solve", "Solve", cx)
-                                    .h(px(24.))
-                                    .px(px(8.))
-                                    .tooltip("Solve all mates including this one")
+                                // Live dom dialog-mate-fastened-filled: 52 x 21, 1 px
+                                // `#aaa`, radius 3.5, 12.25 px.
+                                div()
+                                    .id("mate-solve")
+                                    .h(px(21.))
+                                    .px(px(10.))
+                                    .flex()
+                                    .items_center()
+                                    .bg(gpui_kit::white())
+                                    .border_1()
+                                    .border_color(gpui_kit::rgb(0xaaaaaa))
+                                    .rounded(px(3.5))
+                                    .text_size(px(12.25))
+                                    .cursor_pointer()
+                                    .hover(|d| d.bg(gpui_kit::rgb(0xe6e6e6)))
+                                    .child("Solve")
+                                    .tooltip(crate::ui::tooltip("Solve all mates including this one"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
                             )
                             .child(div().flex_1())

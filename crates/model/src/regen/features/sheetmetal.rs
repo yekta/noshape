@@ -8,6 +8,7 @@
 
 use crate::display::BodyKind;
 use super::sheetmetal_util::{faces_named, model_from_params, put_data};
+use crate::naming::Name;
 use crate::reference::{FeatureId, Role, Source, TopoName};
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, Profile, err, kernel_plane, sweep_names};
 use crate::sheetmetal::{Bend, BendKind, SheetMetalData, Wall};
@@ -504,8 +505,10 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
         let (shape, names) = match body.kind {
             BodyKind::Solid => {
                 let faces: Vec<k::Shape> = exclude.iter().filter(|(b, _)| *b == bi).map(|&(b, f)| ev.face_shape(b, f)).collect::<FResult<_>>()?;
-                let sidek = if flip { k::ShellSide::Outside } else { k::ShellSide::Inside };
-                let res = k::shell(&body.shape, &faces, t, sidek, k::JoinType::Arc)?;
+                // Walls are built outward from the part's faces, inward when
+                // flipped (live G34d).
+                let sidek = if flip { k::ShellSide::Inside } else { k::ShellSide::Outside };
+                let res = k::shell_solid(&body.shape, &faces, t, sidek, k::ShellMethod::Auto)?;
                 let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&|n| Role::Offset(n.clone())));
                 (res.shape, names)
             }
@@ -526,7 +529,7 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
             let mut data = model;
             data.walls = convert_walls(&ev.ctx.bodies[nbi], ev.feature);
             put_data(ev, nbi, data);
-            bend_edges(ev, nbi)?;
+            convert_joints(ev, nbi)?;
         } else {
             ev.replace_body(bi, shape, names);
             if body.kind == BodyKind::Surface {
@@ -537,7 +540,68 @@ fn convert(ev: &mut EvalCtx, t: f64) -> FResult<()> {
             let mut data = model;
             data.walls = convert_walls(&ev.ctx.bodies[bi], ev.feature);
             put_data(ev, bi, data);
-            bend_edges(ev, bi)?;
+            convert_joints(ev, bi)?;
+        }
+    }
+    Ok(())
+}
+
+/// Convert's joints (live G34d): the corners of the selected bend edges
+/// become bends, every other sharp corner between walls an edge-joint rip.
+/// The rips go first (walls stop the gap short of each other, so a bend
+/// spans only its own walls), and walls they separate become separate parts;
+/// each bend is then made in the part holding its two walls.
+fn convert_joints(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    let Some(d) = ev.ctx.sheet_metal.get(&body.id) else { return Ok(()) };
+    let mut data = (**d).clone();
+    let refs = ev.query("bends").to_vec();
+    let mut bend_pairs: Vec<(usize, usize)> = Vec::new();
+    for r in &refs {
+        if let crate::reference::Reference::Edge(n) = r {
+            for ei in body.find_edges(n) {
+                if let Some((a, b)) = super::sheetmetal_ops::walls_at_edge(&body, &data, ei) {
+                    let c = (a.min(b), a.max(b));
+                    if !bend_pairs.contains(&c) {
+                        bend_pairs.push(c);
+                    }
+                }
+            }
+        }
+    }
+    if !refs.is_empty() && bend_pairs.is_empty() {
+        ev.warnings.push("Selected bend edges are not sharp corners between walls".into());
+    }
+    let mut cuts: Vec<super::sheetmetal_ops::RipCut> = Vec::new();
+    for ei in 0..body.edges.len() {
+        let Some((a, b)) = super::sheetmetal_ops::walls_at_edge(&body, &data, ei) else { continue };
+        let (a, b) = (a.min(b), a.max(b));
+        if bend_pairs.contains(&(a, b)) || cuts.iter().any(|c| c.a == a && c.b == b) || super::sheetmetal_ops::corner_edges(&body, &data, a, b).is_empty() {
+            continue;
+        }
+        cuts.push(super::sheetmetal_ops::RipCut { a, b, style: "EDGE".into() });
+    }
+    // The bends by their walls' reference faces: the rips renumber walls.
+    let bends: Vec<(Name, Name)> = bend_pairs.iter().filter_map(|&(a, b)| Some((data.walls[a].faces.first()?.clone(), data.walls[b].faces.first()?.clone()))).collect();
+    let (r, kf) = (data.radius, data.k_factor);
+    let before = ev.ctx.bodies.len();
+    if !cuts.is_empty() {
+        super::sheetmetal_ops::rip_corners(ev, bi, &mut data, &cuts)?;
+    }
+    put_data(ev, bi, data);
+    for pb in bi..=bi + (ev.ctx.bodies.len() - before) {
+        let Some(d) = ev.ctx.sheet_metal.get(&ev.ctx.bodies[pb].id) else { continue };
+        let mut pdata = (**d).clone();
+        let mut bent = false;
+        for (na, nb) in &bends {
+            let wall = |n: &Name| pdata.walls.iter().position(|w| w.faces.first() == Some(n));
+            if let (Some(a), Some(b)) = (wall(na), wall(nb)) {
+                super::sheetmetal_ops::bend_corner(ev, pb, &mut pdata, a, b, r, kf)?;
+                bent = true;
+            }
+        }
+        if bent {
+            put_data(ev, pb, pdata);
         }
     }
     Ok(())

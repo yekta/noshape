@@ -470,22 +470,19 @@ fn parasolid_from_onshape() {
     }
 }
 
-/// Onshape's own Parasolid of three more G38 imports against Onshape's mass
-/// properties of them: thread faces (McMaster), procedural faces (Bell Crank),
-/// planes and cylinders (the bracket: its exact volume, a 40 x 100 x 5 plate,
-/// two r 3.5 holes, r 2 top fillets mitred at the corners, is 19377.869;
-/// Onshape reports 19378.847).
+/// Onshape's own Parasolid of three more G38 imports (live G38b) against
+/// Onshape's mass properties of them, which are approximate: inside the
+/// bounds Onshape reports with each value (live G38c). The bracket is all
+/// planes and cylinders: its exact volume (a 40 x 100 x 5 plate, two r 3.5
+/// holes, r 2 top fillets mitred at the corners) is checked as well.
 #[test]
-#[ignore = "waits for Onshape's mass-property bounds (live G38c): McMaster reads 254.463 from Onshape's XT vs Onshape's 254.404"]
 fn parasolid_from_onshape_mass_bounds() {
     let samples = std::path::Path::new("/root/onshape-research/live/samples");
-    let r = 2.0f64;
-    let bracket = 20000.0 - 2.0 * std::f64::consts::PI * 3.5 * 3.5 * 5.0 - (r * r - std::f64::consts::PI * r * r / 4.0) * 280.0
-        + 4.0 * 2.0 * r.powi(3) * (5.0 / 6.0 - std::f64::consts::PI / 4.0);
-    for (file, faces, want, tol) in [
-        ("g38b-mcmaster-91274A118.x_t", 25, 254.4037797834923, 0.03),
-        ("g38b-psas_Bell_Crank.x_t", 27, 2050.83652761612, 0.05),
-        ("g38b-ktane_Bracket.x_t", 12, bracket, 1e-6),
+    for (file, faces, lo, hi) in [
+        // Thread faces; its 8 helix edges are tolerant (SP-curves only).
+        ("g38b-mcmaster-91274A118.x_t", 25, 248.20339711199576, 260.6041624549888),
+        ("g38b-psas_Bell_Crank.x_t", 27, 2050.432593287002, 2051.240461945237),
+        ("g38b-ktane_Bracket.x_t", 12, 19370.14999307919, 19387.54422567558),
     ] {
         if !samples.join(file).exists() {
             continue;
@@ -496,7 +493,20 @@ fn parasolid_from_onshape_mass_bounds() {
         assert!(s.is_valid(), "{file}: invalid");
         assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, faces), "{file}");
         let v = volume_properties(s).unwrap().mass * 1e9;
-        assert!((v - want).abs() < tol, "{file}: {v} vs {want}");
+        assert!(v > lo && v < hi, "{file}: {v} outside Onshape's [{lo}, {hi}]");
+        if file == "g38b-ktane_Bracket.x_t" {
+            let r = 2.0f64;
+            let exact = 20000.0 - 2.0 * std::f64::consts::PI * 3.5 * 3.5 * 5.0 - (r * r - std::f64::consts::PI * r * r / 4.0) * 280.0
+                + 4.0 * 2.0 * r.powi(3) * (5.0 / 6.0 - std::f64::consts::PI / 4.0);
+            assert!((v - exact).abs() < 1e-4, "bracket: {v} vs {exact}");
+        }
+        // Tessellation of the tolerant thread edges follows the faces (a 3 mm
+        // edge tolerance once gave 451.8 mm² of triangles for 407.6).
+        let area = surface_properties(s).unwrap().mass * 1e6;
+        let t = tessellate(s, 1e-5, 0.5, true).unwrap();
+        let p = |k: u32| DVec3::from_array(t.positions[k as usize].map(f64::from));
+        let mesh_area = t.indices.chunks(3).map(|i| (p(i[1]) - p(i[0])).cross(p(i[2]) - p(i[0])).length() / 2.0).sum::<f64>() * 1e6;
+        assert!((mesh_area - area).abs() < 2e-3 * area, "{file}: mesh {mesh_area} vs {area}");
     }
 }
 
@@ -522,11 +532,77 @@ fn native_cad_parts() {
             continue;
         }
         let parts = read_native_parts(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{file}: {e}"));
-        assert_eq!(parts.len(), 1, "{file}");
-        let s = &parts[0].shape;
+        let solids: Vec<_> = parts.iter().filter(|p| p.shape.count(ShapeType::Face) > 0).collect();
+        assert_eq!(solids.len(), 1, "{file}");
+        let s = &solids[0].shape;
         assert!(s.is_valid(), "{file}: invalid");
         assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, faces), "{file}");
         let v = volume_properties(s).unwrap().mass * 1e9;
         assert!((v - want).abs() < tol, "{file}: {v} vs {want}");
+        // The part's colour as Onshape imports it (live G38).
+        let rgb = |c: [f32; 3]| c.map(|v| (v * 255.0).round() as u8);
+        let colour = [
+            ("sldprt/psas_Bell_Crank", [229, 234, 237]),
+            ("sldprt/fluxpad", [255, 241, 135]),
+            ("sldprt/nist_mtc_91274A118", [255, 242, 232]),
+        ]
+        .iter()
+        .find(|(f, _)| file.starts_with(f))
+        .map(|(_, c)| *c);
+        if let Some(want) = colour {
+            assert_eq!(solids[0].color.map(rgb), Some(want), "{file}: colour");
+        }
+        // SolidWorks curves come from the configuration's ghost partition
+        // (live G38d: the McMaster screw's "Curve 1", a 228.335439 mm helix).
+        let curves: Vec<_> = parts.iter().filter(|p| p.shape.count(ShapeType::Face) == 0).collect();
+        if file.contains("91274A118") {
+            assert_eq!(curves.len(), 1, "{file}");
+            assert_eq!(curves[0].shape.count(ShapeType::Edge), 1);
+            let l = linear_properties(&curves[0].shape).unwrap().mass * 1e3;
+            assert!((l - 228.335439).abs() < 1e-3, "helix {l}");
+        } else if file.starts_with("sldprt/") {
+            assert!(curves.is_empty(), "{file}");
+        }
+    }
+}
+
+/// SOLIDWORKS assemblies (samples outside the repo, skipped when absent):
+/// the component tree of the active configuration with each component's
+/// file, configuration and placement.
+#[test]
+fn native_assembly_tree() {
+    let dir = std::path::Path::new("/root/kern-native-samples");
+    let shaft = dir.join("sldasm/psas_Shaft_With_Plate_Asm.SLDASM");
+    if shaft.exists() {
+        let c = read_native_assembly(&shaft).unwrap();
+        let names: Vec<_> = c.iter().map(|x| (x.name.as_str(), x.number, x.file.as_str(), x.parent)).collect();
+        assert_eq!(names, [("Canard_Shaft_Plate", 1, "Canard_Shaft_Plate.SLDPRT", None), ("Shaft", 1, "Shaft.SLDPRT", None)]);
+        // The shaft's axis (its z) along the assembly's +y; its box then
+        // matches the assembly's (y −46.93..6.23 mm with the plate).
+        let s = &c[1];
+        assert!((s.transform.transform_vector3(DVec3::Z) - DVec3::Y).length() < 1e-12, "{:?}", s.transform);
+        assert!((s.transform.w_axis.truncate() - DVec3::new(0.000107227874821092, -0.04438756908378874, -0.00156579007000346)).length() < 1e-15);
+    }
+    let crada = dir.join("sldasm/nist_mtc_crada_assembly_rev-D.SLDASM");
+    if crada.exists() {
+        let c = read_native_assembly(&crada).unwrap();
+        assert_eq!(c.len(), 36);
+        assert!(c.iter().all(|x| x.parent.is_none() && !x.assembly && !x.suppressed));
+        // Every nut on a cap screw's axis (as the same assembly's JT has them).
+        let centre = |file: &str, config: Option<i32>| {
+            let parts = read_native_parts_configuration(&dir.join(file), LengthUnit::Meter, config).unwrap();
+            let b = parts.iter().find(|p| p.shape.count(ShapeType::Face) > 0).unwrap().shape.bounding_box(true).unwrap();
+            (b.min + b.max) * 0.5
+        };
+        let nut = c.iter().find(|x| x.name.contains("HEX NUT")).unwrap();
+        let screw = c.iter().find(|x| x.name.contains("91274A118")).unwrap();
+        let nut_c = centre("sldprt/nist_mtc_90591A141_ZINC_PLATED_STEEL_HEX_NUT.SLDPRT", nut.configuration_id);
+        let screw_c = centre("sldprt/nist_mtc_91274A118_COATED_ALLOY_STEEL_SOCKET_HEAD_CAP_SCREW.SLDPRT", screw.configuration_id);
+        let screws: Vec<DVec3> = c.iter().filter(|x| x.name.contains("91274A118")).map(|x| x.transform.transform_point3(screw_c)).collect();
+        let nuts: Vec<DVec3> = c.iter().filter(|x| x.name.contains("HEX NUT")).map(|x| x.transform.transform_point3(nut_c)).collect();
+        assert_eq!((nuts.len(), screws.len()), (10, 14));
+        for n in &nuts {
+            assert!(screws.iter().any(|s| (s.x - n.x).hypot(s.y - n.y) < 6e-4), "a nut off every screw at {n:?}");
+        }
     }
 }

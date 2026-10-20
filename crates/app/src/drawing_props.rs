@@ -120,23 +120,40 @@ impl DrawingEditor {
             show.push(MenuEntry::item(if bl { "Hide bend lines" } else { "Show bend lines" }, move |t, _, cx| t.edit_view("Bend lines", id, cx, |v| v.hide_bend_lines = bl)));
             show.push(MenuEntry::item(if bn { "Hide bend notes" } else { "Show bend notes" }, move |t, _, cx| t.edit_view("Bend notes", id, cx, |v| v.hide_bend_notes = bn)));
         }
+        // Live order (dom/drawing-replicate-menu-before.html): hidden lines,
+        // shaded view, threads, faulty parts, sketches…, edges…, auto
+        // centermarks, center of mass.
         show.push(MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_view("Shaded view", id, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })));
         let threads = !v.hide_threads;
         show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
-        let cl = v.show_centerlines;
-        show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| v.show_centerlines = !cl)));
-        let al = v.auto_centerlines.unwrap_or(cl);
-        show.push(MenuEntry::item(if al { "Hide auto centerlines" } else { "Show auto centerlines" }, move |t, _, cx| t.edit_view("Centerlines", id, cx, |v| v.auto_centerlines = Some(!al))));
-        if v.sketch.is_none() {
-            show.push(MenuEntry::item("Show/hide parts", move |t, _, cx| t.open_hide_parts(id, cx)));
-            let com = v.show_com;
-            show.push(MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_view("Center of mass", id, cx, |v| v.show_com = !com)));
-        }
         // Part views (not sketch views): the source's sketches and their points.
         if v.sketch.is_none() && !self.view_sketch_list(id).is_empty() {
-            show.push(MenuEntry::item("Show/hide sketches", move |t, _, cx| t.open_view_sketches(id, cx)));
-            let hp = v.hide_sketch_points;
-            show.push(MenuEntry::item(if hp { "Show sketch points" } else { "Hide sketch points" }, move |t, _, cx| t.edit_view("Sketch points", id, cx, |v| v.hide_sketch_points = !hp)));
+            show.push(MenuEntry::item("Show/hide sketches...", move |t, _, cx| t.open_view_sketches(id, cx)));
+            if !v.shown_sketches.is_empty() {
+                let hp = v.hide_sketch_points;
+                show.push(MenuEntry::item(if hp { "Show sketch points" } else { "Hide sketch points" }, move |t, _, cx| t.edit_view("Sketch points", id, cx, |v| v.hide_sketch_points = !hp)));
+            }
+        }
+        show.push(MenuEntry::item("Show/hide edges...", move |t, _, cx| t.open_hide_edges(id, cx)));
+        let cl = v.show_centerlines;
+        show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| {
+            v.show_centerlines = !cl;
+            v.deleted_centermarks.clear();
+        })));
+        // Automatic centerlines (help: holes, cylinders and spheres seen
+        // from the side): only views that have such axes.
+        if self.geoms.get(&id).is_some_and(|g| !g.axes.is_empty()) {
+            let al = v.auto_centerlines.unwrap_or(cl);
+            show.push(MenuEntry::item(if al { "Hide centerlines" } else { "Show centerlines" }, move |t, _, cx| t.edit_view("Centerlines", id, cx, |v| v.auto_centerlines = Some(!al))));
+        }
+        if v.sketch.is_none() {
+            // Several parts (a whole Part Studio or an assembly; a one-part
+            // view has no Show/hide parts, live).
+            if noshape_model::drawing::views::view_source(sheet, id).is_some_and(|(_, part)| part.is_none()) {
+                show.push(MenuEntry::item("Show/hide parts...", move |t, _, cx| t.open_hide_parts(id, cx)));
+            }
+            let com = v.show_com;
+            show.push(MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_view("Center of mass", id, cx, |v| v.show_com = !com)));
         }
         out.push(MenuEntry::Submenu("Show/hide".into(), show));
         // View orientation ▸ (base views; the current one is checked).
@@ -162,10 +179,13 @@ impl DrawingEditor {
         let tm = TangentMode::of(&v);
         let tangent = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom].into_iter().map(|m| MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| m.apply(v)))).collect();
         out.push(MenuEntry::Submenu("Tangent edges".into(), tangent));
+        out.push(MenuEntry::item("Adjust linestyle...", move |t, w, cx| t.open_linestyle(id, w, cx)));
         // View-type entries (Onshape: Edit / Flip direction / Remove crop ...).
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
             out.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
-            if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
+            if matches!(v.kind, ViewKind::Section { .. }) {
+                out.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+            } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
                 out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }
         }
@@ -173,6 +193,9 @@ impl DrawingEditor {
             out.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
         }
         if !v.broken_out.is_empty() {
+            // Help broken_out_section_view: "Edit section" and "Remove section".
+            let last = v.broken_out.len() - 1;
+            out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
             out.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
         }
         // Configuration / Explode/Position of the source (help: view context menu).
@@ -190,10 +213,10 @@ impl DrawingEditor {
             && let ViewKind::Base { source, .. } = &root.kind
             && let Some(t) = self.doc.read(cx).session.doc.tab(*source).filter(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_)))
         {
-            out.push(MenuEntry::item(format!("Insert custom table of {}…", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx)));
+            out.push(MenuEntry::item(format!("Insert custom table of {}...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx)));
         }
         out.push(MenuEntry::Separator);
-        out.push(MenuEntry::item("View properties…", move |t, w, cx| t.open_view_props(id, w, cx)));
+        out.push(MenuEntry::item("View properties...", move |t, w, cx| t.open_view_props(id, w, cx)));
         out.push(MenuEntry::Submenu(
             "Order".into(),
             vec![
@@ -208,13 +231,6 @@ impl DrawingEditor {
                 MenuEntry::item("Horizontally", move |t, _, cx| t.start_align_views(id, false, cx)),
             ],
         ));
-        // Suppress alignment with parent (derived views that align with it).
-        if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
-            let un = v.unaligned;
-            out.push(MenuEntry::item(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, move |t, _, cx| {
-                t.edit_view(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, id, cx, |v| v.unaligned = !un)
-            }));
-        }
         // Rotate view vertically / horizontally: pick a straight edge (views
         // without a parent or children, like the rotation angle).
         let free = sheet.parent_of(id).is_none() && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
@@ -231,16 +247,21 @@ impl DrawingEditor {
             let tab = *source;
             out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::workspace::request_activate_tab(tab, w, cx)));
         }
-        // Move to sheet ▸ (from the existing entries).
-        for e in self.view_more_entries(id) {
-            if matches!(&e, MenuEntry::Submenu(l, _) if l.as_ref() == "Move to sheet") {
-                out.push(e);
-            }
+        // Live drawing/290: Move to sheet…, Copy, Paste as table (always).
+        out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::View(id), cx)));
+        // Suppress alignment with parent (derived views that align with it;
+        // live drawing/447: after Move to sheet…).
+        if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
+            let un = v.unaligned;
+            out.push(MenuEntry::item(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, move |t, _, cx| {
+                t.edit_view(if un { "Unsuppress alignment with parent" } else { "Suppress alignment with parent" }, id, cx, |v| v.unaligned = !un)
+            }));
         }
         out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
-        if view_clipboard(cx).is_some() {
-            out.push(MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)));
-        }
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        out.extend(self.replication_entries(id));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
             t.selection.clear();
@@ -606,10 +627,11 @@ impl DrawingEditor {
                 .id("dr-view-props")
                 .absolute()
                 .top_2()
-                .left_2()
+                // Beside the Sheets panel when it is open (it opened under it).
+                .left(px(self.dialog_left()))
                 .w(px(300.))
                 .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_size(px(13.))
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -624,7 +646,7 @@ impl DrawingEditor {
                         .border_color(pal.border)
                         .child(div().flex_1().font_weight(FontWeight::MEDIUM).child("View properties"))
                         .child(Button::new("vp-ok").ghost().child(crate::ui::glyph("check", 16., pal.accept)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_view_props(cx))))
-                        .child(Button::new("vp-cancel").ghost().child(crate::ui::glyph("close", 14., pal.cancel)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(Button::new("vp-cancel").ghost().child(crate::drawing_chrome::cancel_x(cx)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.view_props = None;
                             cx.notify();
                         }))),

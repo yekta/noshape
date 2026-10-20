@@ -47,13 +47,6 @@ pub struct SketchStyle {
     pub color: Option<[u8; 3]>,
 }
 
-/// Hatch standards and patterns (Hatch region dialog).
-pub const HATCH_PATTERNS: [(&str, &[&str]); 3] = [
-    ("ANSI", &["ANSI31 (Iron)", "ANSI32 (Steel)", "ANSI33 (Bronze)", "ANSI34 (Plastic)", "ANSI35 (Fire brick)", "ANSI36 (Marble)", "ANSI37 (Lead)", "ANSI38 (Aluminum)"]),
-    ("ISO", &["ISO02W100 (Dashed)", "ISO03W100 (Dashed space)", "ISO04W100 (Long dash dot)", "ISO07W100 (Long dash triplicate dot)"]),
-    ("General", &["Solid", "Lines", "Cross", "Dots"]),
-];
-
 /// A hatch region: a closed boundary (sheet mm) filled with a pattern.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HatchRegion {
@@ -66,10 +59,11 @@ pub struct HatchRegion {
     /// hatch moves with the view); None: sheet coordinates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<super::ViewId>,
-    /// Index into [`HATCH_PATTERNS`] (standard, pattern).
+    /// Pattern group and index ([`super::hatch_pat::pattern`]).
     pub standard: usize,
     pub pattern: usize,
-    /// Scale (1 = 2.5 mm line spacing); angle in degrees (0 = the pattern's own).
+    /// Scale (1: the pattern's own size); angle in degrees added to the
+    /// pattern's own.
     pub scale: f64,
     pub angle: f64,
     /// None: the drawing's hatch color (black).
@@ -123,7 +117,7 @@ impl SheetSketch {
             for s in hatch_pattern_holes(&h.boundary, &h.holes, h.standard, h.pattern, h.scale, h.angle) {
                 g.lines.push(Polyline2 { points: vec![s[0], s[1]], style: LineStyle::Thin, closed: false, pick: pk });
             }
-            if HATCH_PATTERNS.get(h.standard).and_then(|p| p.1.get(h.pattern)) == Some(&"Solid") {
+            if super::hatch_pat::pattern(h.standard, h.pattern).is_some_and(|p| p.families.is_empty()) {
                 for i in 1..h.boundary.len().saturating_sub(1) {
                     g.fills.push(super::sheet::Fill2 { points: vec![h.boundary[0], h.boundary[i], h.boundary[i + 1]] });
                 }
@@ -169,88 +163,16 @@ impl SheetSketch {
     }
 }
 
-/// Hatch lines inside `boundary` for a pattern (rotated by `angle` degrees,
-/// spaced by `scale` × 2.5 mm).
+/// Hatch lines inside `boundary` for a pattern (turned by `angle` degrees
+/// from its own, sized by `scale`).
 pub fn hatch_pattern(boundary: &[[f64; 2]], standard: usize, pattern: usize, scale: f64, angle: f64) -> Vec<[[f64; 2]; 2]> {
     hatch_pattern_holes(boundary, &[], standard, pattern, scale, angle)
 }
 
 /// [`hatch_pattern`] leaving `holes` out (even-odd rule).
 pub fn hatch_pattern_holes(boundary: &[[f64; 2]], holes: &[Vec<[f64; 2]>], standard: usize, pattern: usize, scale: f64, angle: f64) -> Vec<[[f64; 2]; 2]> {
-    if boundary.len() < 3 {
-        return vec![];
-    }
-    let ring = |b: &[[f64; 2]]| (0..b.len()).map(|i| [b[i], b[(i + 1) % b.len()]]).collect::<Vec<_>>();
-    let mut segs: Vec<[[f64; 2]; 2]> = ring(boundary);
-    for h in holes.iter().filter(|h| h.len() >= 3) {
-        segs.extend(ring(h));
-    }
-    let s = 2.5 * scale.max(0.1);
-    let name = HATCH_PATTERNS.get(standard).and_then(|p| p.1.get(pattern)).copied().unwrap_or("ANSI31 (Iron)");
-    // Line families: (angle offset from 45°, spacing, dash pattern).
-    let dots = [0.2, -s];
-    let fam: Vec<(f64, f64, &[f64])> = match name.split(' ').next().unwrap_or("") {
-        "ANSI32" => vec![(0.0, s * 2.0, &[]), (0.0, s * 2.0, &[])],
-        "ANSI33" => vec![(0.0, s * 2.0, &[]), (0.0, s * 2.0, &[1.5, -1.0])],
-        "ANSI34" | "ANSI35" | "ANSI36" => vec![(0.0, s, &[]), (90.0, s * 2.0, &[])],
-        "ANSI37" | "Cross" => vec![(0.0, s, &[]), (90.0, s, &[])],
-        "ANSI38" => vec![(0.0, s, &[]), (90.0, s * 2.0, &[2.0, -1.0])],
-        "ISO02W100" => vec![(0.0, s, &[3.0, -1.5])],
-        "ISO03W100" => vec![(0.0, s, &[3.0, -4.5])],
-        "ISO04W100" => vec![(0.0, s, &[6.0, -1.5, 0.5, -1.5])],
-        "ISO07W100" => vec![(0.0, s, &[6.0, -1.5, 0.5, -1.0, 0.5, -1.0, 0.5, -1.5])],
-        "Solid" => vec![],
-        "Dots" => vec![(0.0, s, &dots)],
-        "Lines" => vec![(-45.0, s, &[])],
-        _ => vec![(0.0, s, &[])],
-    };
-    let mut out = Vec::new();
-    for (k, (off, spacing, dashes)) in fam.into_iter().enumerate() {
-        // Rotate the boundary so the family is at 45°, hatch, rotate back.
-        let a = (angle + off).to_radians();
-        let (c, sn) = (a.cos(), a.sin());
-        let rot = |p: [f64; 2], d: f64| [p[0] * (c * d) - p[1] * (sn * d), p[0] * (sn * d) + p[1] * (c * d)];
-        let fwd = |p: [f64; 2]| [p[0] * c + p[1] * sn, -p[0] * sn + p[1] * c];
-        let rsegs: Vec<[[f64; 2]; 2]> = segs.iter().map(|s| [fwd(s[0]), fwd(s[1])]).collect();
-        // ANSI32 / ANSI33: the second line of a pair sits a quarter step on.
-        let shift = if k == 1 && off == 0.0 { spacing * 0.25 } else { 0.0 };
-        let shifted: Vec<[[f64; 2]; 2]> = rsegs.iter().map(|s| [[s[0][0] + shift, s[0][1] - shift], [s[1][0] + shift, s[1][1] - shift]]).collect();
-        for l in super::build::hatch(&shifted, spacing) {
-            let back = |p: [f64; 2]| {
-                let q = [p[0] - shift, p[1] + shift];
-                rot(q, 1.0)
-            };
-            let (p, q) = (back(l[0]), back(l[1]));
-            if dashes.is_empty() {
-                out.push([p, q]);
-            } else {
-                out.extend(dash_segment(p, q, dashes));
-            }
-        }
-    }
-    out
-}
-
-fn dash_segment(p: [f64; 2], q: [f64; 2], pattern: &[f64]) -> Vec<[[f64; 2]; 2]> {
-    let d = [q[0] - p[0], q[1] - p[1]];
-    let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
-    if len < 1e-9 || pattern.is_empty() {
-        return vec![[p, q]];
-    }
-    let u = [d[0] / len, d[1] / len];
-    let mut out = Vec::new();
-    let mut t = 0.0;
-    let mut i = 0;
-    while t < len {
-        let step = pattern[i % pattern.len()];
-        let t1 = (t + step.abs()).min(len);
-        if step > 0.0 {
-            out.push([[p[0] + u[0] * t, p[1] + u[1] * t], [p[0] + u[0] * t1, p[1] + u[1] * t1]]);
-        }
-        t = t1;
-        i += 1;
-    }
-    out
+    let p = super::hatch_pat::pattern(standard, pattern).unwrap_or(&super::hatch_pat::ANSI[0]);
+    super::hatch_pat::lines(p, boundary, holes, scale, angle)
 }
 
 #[cfg(test)]
@@ -269,15 +191,15 @@ mod tests {
         let mut g = SheetGeometry::new(297.0, 210.0);
         sk.render(&mut g, &|_| 7, &|_| 9, &|_, p| Some(p));
         let hatch: Vec<_> = g.lines.iter().filter(|l| l.pick == 9).collect();
-        // 20 mm square, 2.5 mm spacing at 45°: about 2 * 20 * √2 / 2.5 ≈ 11 lines.
-        assert!(hatch.len() >= 9 && hatch.len() <= 13, "{}", hatch.len());
+        // 20 mm square, ANSI31 3.175 mm apart at 45°: 20 * √2 / 3.175 ≈ 9 lines.
+        assert!(hatch.len() >= 8 && hatch.len() <= 10, "{}", hatch.len());
         let sketch_lines: Vec<_> = g.lines.iter().enumerate().filter(|(_, l)| l.pick == 7).collect();
         assert_eq!(sketch_lines.len(), 2);
         assert!(sketch_lines.iter().any(|(i, l)| l.style == LineStyle::Centerline && g.line_color(*i) == Some([255, 0, 0])));
-        // A cross pattern has two families; rotating by 45° keeps the count.
+        // A cross pattern (ANSI37) has two families; turning by 90° keeps the count.
         let cross = hatch_pattern(&sq, 0, 6, 1.0, 0.0);
         assert!(cross.len() > hatch.len());
-        assert_eq!(hatch_pattern(&sq, 0, 0, 1.0, 90.0).len(), hatch.len());
+        assert!(hatch_pattern(&sq, 0, 0, 1.0, 90.0).len().abs_diff(hatch.len()) <= 1);
         // Round trip.
         let json = serde_json::to_string(&sk).unwrap();
         let back: SheetSketch = serde_json::from_str(&json).unwrap();

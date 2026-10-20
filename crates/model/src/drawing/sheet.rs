@@ -129,6 +129,8 @@ pub struct SheetGeometry {
     /// Elements on a format layer (border frame, zones, title block; last
     /// span wins).
     pub layers: Vec<LayerSpan>,
+    /// Lines drawn with their own pen (Adjust linestyle).
+    pub pens: Vec<PenSpan>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -325,6 +327,9 @@ pub struct SheetStyle {
     pub underline_overridden: bool,
     /// Gaps and extensions › Lock the angle of all jogged dimensions to 45°.
     pub lock_jog_45: bool,
+    /// Ordinate dimensions › Dimension style ISO: a small open circle at the
+    /// end of each ordinate leader (live drawing/382).
+    pub ordinate_iso: bool,
 }
 
 impl SheetStyle {
@@ -336,8 +341,16 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false }
     }
+}
+
+/// Lines drawn with their own width (mm) and dash pattern (last span wins).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PenSpan {
+    pub lines: std::ops::Range<usize>,
+    pub width_mm: f64,
+    pub dashes: Vec<f64>,
 }
 
 /// Lines, texts and fills drawn in a color (index ranges into the
@@ -439,6 +452,14 @@ impl SheetGeometry {
         self.fonts.iter().rev().find(|s| s.texts.contains(&i)).map(|s| &s.font)
     }
 
+    /// Line `i`'s pen: width (mm) and dash pattern.
+    pub fn line_pen(&self, i: usize) -> (f64, Vec<f64>) {
+        match self.pens.iter().rev().find(|s| s.lines.contains(&i)) {
+            Some(p) => (p.width_mm, p.dashes.clone()),
+            None => (self.lines[i].style.width_mm(), self.lines[i].style.dashes().to_vec()),
+        }
+    }
+
     pub fn line_color(&self, i: usize) -> Option<[u8; 3]> {
         self.colors.iter().rev().find(|s| s.lines.contains(&i)).map(|s| s.rgb)
     }
@@ -517,42 +538,10 @@ impl SheetGeometry {
         // drawing/09 ANSI A: 2 x 2, 5 mm labels; drawing/156 ISO A3: 6 x 4,
         // 7 mm labels).
         self.rect(0.0, 0.0, w, h, LineStyle::Thin);
-        self.rect(m, m, w - m, h - m, LineStyle::Border);
-        let ansi = sheet.size.is_ansi();
-        let (nx, ny) = match sheet.size {
-            super::SheetSize::AnsiA | super::SheetSize::AnsiAPortrait => (2, 2),
-            super::SheetSize::AnsiB => (4, 2),
-            super::SheetSize::AnsiC => (4, 4),
-            super::SheetSize::AnsiD | super::SheetSize::AnsiE => (8, 4),
-            super::SheetSize::A4 => (4, 3),
-            super::SheetSize::A3 => (6, 4),
-            super::SheetSize::A2 => (8, 6),
-            super::SheetSize::A1 => (12, 8),
-            super::SheetSize::A0 => (16, 12),
-            _ => (((w - 2.0 * m) / 66.0).round().max(2.0) as usize, ((h - 2.0 * m) / 66.0).round().max(2.0) as usize),
-        };
-        let th = if ansi { 5.0 } else { 7.0 };
-        for i in 1..nx {
-            let x = m + (w - 2.0 * m) * i as f64 / nx as f64;
-            self.line([x, 0.0], [x, m], LineStyle::Thin);
-            self.line([x, h - m], [x, h], LineStyle::Thin);
-        }
-        for i in 0..nx {
-            let x = m + (w - 2.0 * m) * (i as f64 + 0.5) / nx as f64;
-            let n = nx - i;
-            self.text([x, h - m / 2.0], th, n.to_string(), Anchor::Center);
-            self.text([x, m / 2.0], th, n.to_string(), Anchor::Center);
-        }
-        for j in 1..ny {
-            let y = m + (h - 2.0 * m) * j as f64 / ny as f64;
-            self.line([0.0, y], [m, y], LineStyle::Thin);
-            self.line([w - m, y], [w, y], LineStyle::Thin);
-        }
-        for j in 0..ny {
-            let y = m + (h - 2.0 * m) * (j as f64 + 0.5) / ny as f64;
-            let letter = (b'A' + j as u8) as char;
-            self.text([m / 2.0, y], th, letter.to_string(), Anchor::Center);
-            self.text([w - m / 2.0, y], th, letter.to_string(), Anchor::Center);
+        let format = sheet.format;
+        if format.border {
+            self.rect(m, m, w - m, h - m, LineStyle::Border);
+            self.add_zones(sheet, m);
         }
         let value_of = |k: &str, v: &str| -> String {
             match k {
@@ -585,6 +574,40 @@ impl SheetGeometry {
                 }
             }
             style => self.onshape_title_block(sheet, style == TitleBlockStyle::Iso, projection, &value_of),
+        }
+    }
+
+    /// Zone dividers and labels in the band between the sheet edge and the
+    /// frame (`m` wide). Onshape's templates number zones from the right and
+    /// letter them from the bottom (Start zones "Bottom right"); "Top left"
+    /// numbers from the left and letters from the top. Letters skip O (live
+    /// drawing/560: A0 runs A..L with I).
+    fn add_zones(&mut self, sheet: &Sheet, m: f64) {
+        let (w, h) = (self.width, self.height);
+        let [nx, ny] = sheet.format.zone_counts(sheet.size).map(|n| n as usize);
+        let top_left = sheet.format.start == super::ZoneStart::TopLeft;
+        let th = if sheet.size.is_ansi() { 5.0 } else { 7.0 };
+        for i in 1..nx {
+            let x = m + (w - 2.0 * m) * i as f64 / nx as f64;
+            self.line([x, 0.0], [x, m], LineStyle::Thin);
+            self.line([x, h - m], [x, h], LineStyle::Thin);
+        }
+        for i in 0..nx {
+            let x = m + (w - 2.0 * m) * (i as f64 + 0.5) / nx as f64;
+            let n = if top_left { i + 1 } else { nx - i };
+            self.text([x, h - m / 2.0], th, n.to_string(), Anchor::Center);
+            self.text([x, m / 2.0], th, n.to_string(), Anchor::Center);
+        }
+        for j in 1..ny {
+            let y = m + (h - 2.0 * m) * j as f64 / ny as f64;
+            self.line([0.0, y], [m, y], LineStyle::Thin);
+            self.line([w - m, y], [w, y], LineStyle::Thin);
+        }
+        for j in 0..ny {
+            let y = m + (h - 2.0 * m) * (j as f64 + 0.5) / ny as f64;
+            let letter = zone_letter(if top_left { ny - 1 - j } else { j });
+            self.text([m / 2.0, y], th, letter.clone(), Anchor::Center);
+            self.text([w - m / 2.0, y], th, letter, Anchor::Center);
         }
     }
 
@@ -771,6 +794,15 @@ impl SheetGeometry {
 
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
     /// View-relative coordinates are mapped through `env`.
+    /// ISO ordinate leader end: a small open circle (≈1.2 mm).
+    fn ordinate_circle(&mut self, c: [f64; 2], pick: u32) {
+        let points = (0..16).map(|i| {
+            let t = i as f64 / 16.0 * std::f64::consts::TAU;
+            [c[0] + 0.6 * t.cos(), c[1] + 0.6 * t.sin()]
+        }).collect();
+        self.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: true, pick });
+    }
+
     /// Break dimension: where linear dimensions' lines (extension lines and
     /// dimension lines) cross, the first of the two (in sheet order) that is
     /// broken gets a gap; only one of two crossing lines is broken.
@@ -805,11 +837,20 @@ impl SheetGeometry {
         // at the upper left of its text, after the loop).
         let mut starts: Vec<(&Annotation, usize, usize, usize)> = Vec::new();
         self.style = env.sheet_style();
-        let (dh, ah0) = (self.style.dim_text, self.style.ann_text);
         let mut cuts = self.dimension_crossings(sheet, env);
+        let base = self.style.clone();
         for a in &sheet.annotations {
+            // The annotation's own style (Styles panel) over the drawing's.
+            self.style = base.clone();
+            if let Some(st) = &a.style {
+                st.apply(&mut self.style, a.kind.is_dimension());
+            }
+            let (dh, ah0) = (self.style.dim_text, self.style.ann_text);
             let pick = (a.id & 0xFFFF_FFFF) as u32;
-            let ah = self.style.type_style(&a.kind).height.unwrap_or(ah0);
+            let ah = match a.style.as_ref().and_then(|s| s.height) {
+                Some(h) => h,
+                None => self.style.type_style(&a.kind).height.unwrap_or(ah0),
+            };
             starts.push((a, self.texts.len(), self.lines.len(), self.fills.len()));
             self.in_dim = a.kind.is_dimension();
             self.flip_arrows = a.flip_arrows;
@@ -886,7 +927,7 @@ impl SheetGeometry {
                         self.overridden.push(first);
                     }
                 }
-                AnnotationKind::RadialDimension { view, center, radius, diameter, angle } => {
+                AnnotationKind::RadialDimension { view, center, radius, diameter, angle, dim_line } => {
                     let c = env.to_sheet(*view, *center);
                     let r = radius * env.scale(*view);
                     let dir = [angle.cos(), angle.sin()];
@@ -903,12 +944,16 @@ impl SheetGeometry {
                             self.arrow(far, dir, 3.0);
                         }
                     } else {
-                        let start = if *diameter { far } else { c };
+                        // Live drawing/363–368: a diameter has one arrow on the
+                        // near side; with a dimension line the line runs on
+                        // across the circle to the far edge.
+                        let start = match (*diameter, *dim_line) {
+                            (true, true) => far,
+                            (true, false) => tip,
+                            (false, _) => c,
+                        };
                         self.lines.push(Polyline2 { points: vec![start, out], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(tip, dir, 3.0);
-                        if *diameter {
-                            self.arrow(far, [-dir[0], -dir[1]], 3.0);
-                        }
                     }
                     // The flip node near the arrow.
                     self.grips.push(Grip { pick, pos: [tip[0] - dir[0] * 4.0, tip[1] - dir[1] * 4.0], kind: GripKind::Handle });
@@ -965,13 +1010,23 @@ impl SheetGeometry {
                     let t = env.text(a, a1 - a0, true, "");
                     self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
-                AnnotationKind::Centermark { view, center, size, angle } => {
+                AnnotationKind::Centermark { view, center, size, angle, arms } => {
                     let c = env.to_sheet(*view, *center);
-                    let s = size * env.scale(*view);
+                    let k = env.scale(*view);
                     let rot = env.rotation(*view) + angle;
                     let (u, w) = (rotate2([1.0, 0.0], rot), rotate2([0.0, 1.0], rot));
-                    self.lines.push(Polyline2 { points: vec![[c[0] - u[0] * s, c[1] - u[1] * s], [c[0] + u[0] * s, c[1] + u[1] * s]], style: LineStyle::Centerline, closed: false, pick });
-                    self.lines.push(Polyline2 { points: vec![[c[0] - w[0] * s, c[1] - w[1] * s], [c[0] + w[0] * s, c[1] + w[1] * s]], style: LineStyle::Centerline, closed: false, pick });
+                    let end = |d: [f64; 2], i: usize| {
+                        let l = (size + arms[i]) * k;
+                        [c[0] + d[0] * l, c[1] + d[1] * l]
+                    };
+                    let ends = [end(u, 0), end(w, 1), end([-u[0], -u[1]], 2), end([-w[0], -w[1]], 3)];
+                    self.lines.push(Polyline2 { points: vec![ends[2], ends[0]], style: LineStyle::Centerline, closed: false, pick });
+                    self.lines.push(Polyline2 { points: vec![ends[3], ends[1]], style: LineStyle::Centerline, closed: false, pick });
+                    // Selected: orange grips at the arm ends, a blue one at the center.
+                    for e in ends {
+                        self.grips.push(Grip { pick, pos: e, kind: GripKind::Jog });
+                    }
+                    self.grips.push(Grip { pick, pos: c, kind: GripKind::Origin });
                 }
                 AnnotationKind::Centerline { view, a: pa, b: pb } => {
                     let p = env.to_sheet(*view, *pa);
@@ -1058,8 +1113,14 @@ impl SheetGeometry {
                     let tips: Vec<[f64; 2]> = std::iter::once(tip).chain(spec.leaders.iter().map(map)).collect();
                     super::weld::render(self, spec, &tips, a.position, ah * 0.75, !env.weld_ansi(), pick);
                 }
-                AnnotationKind::SurfaceFinish { anchor, value } => {
+                AnnotationKind::SurfaceFinish { anchor, value, leaders } => {
                     let p = *anchor;
+                    // Leaders (Add leader) run from the symbol's point.
+                    for l in leaders {
+                        let t = l.view.map(|v| env.to_sheet(v, l.point)).unwrap_or(l.point);
+                        self.lines.push(Polyline2 { points: vec![p, t], style: LineStyle::Thin, closed: false, pick });
+                        self.arrow(t, [t[0] - p[0], t[1] - p[1]], self.style.ann_arrow);
+                    }
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], p, [p[0] + 6.0, p[1] + 10.0], [p[0] + 14.0, p[1] + 10.0]], style: LineStyle::Thin, closed: false, pick });
                     self.lines.push(Polyline2 { points: vec![[p[0] - 3.0, p[1] + 5.0], [p[0] + 3.0, p[1] + 5.0]], style: LineStyle::Thin, closed: false, pick });
                     self.texts.push(Text2 { pos: [p[0] + 6.5, p[1] + 10.8], height: 2.5, text: env.expand(value), angle: 0.0, anchor: Anchor::BottomLeft, pick });
@@ -1173,6 +1234,9 @@ impl SheetGeometry {
                     let end = e;
                     let pts = if ((end[0] - knee[0]) * n[1] - (end[1] - knee[1]) * n[0]).abs() < 0.05 { vec![start, end] } else { vec![start, knee, [end[0] - n[0] * sg * 2.0, end[1] - n[1] * sg * 2.0], end] };
                     self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    if self.style.ordinate_iso {
+                        self.ordinate_circle(end, pick);
+                    }
                     let mut ang = n[1].atan2(n[0]);
                     let mut halign = if sg > 0.0 { 0.0 } else { 1.0 };
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
@@ -1292,6 +1356,9 @@ impl SheetGeometry {
                             vec![at(s0, l0), at(s0, k1), at(s1, k2), at(s1, level)]
                         };
                         self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                        if self.style.ordinate_iso {
+                            self.ordinate_circle(at(s1, level), pick);
+                        }
                         self.dim_label(at(s1, level + sg * 1.0), ang, halign, true, &t, dh, pick);
                     }
                 }
@@ -1456,6 +1523,7 @@ impl SheetGeometry {
         self.in_dim = false;
         self.flip_arrows = false;
         (self.jogs, self.cuts) = ([None; 2], Vec::new());
+        self.style = base;
         // Dimension and annotation colors (construction geometry keeps ink).
         let end = self.mark();
         for (k, &(a, t0, l0, f0)) in starts.iter().enumerate() {
@@ -1466,12 +1534,13 @@ impl SheetGeometry {
                 ts.color = style.color.or(ts.color);
                 ts.font = style.font.clone().or(ts.font);
             }
-            let c = if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) };
+            let own = a.style.as_deref();
+            let c = own.and_then(|s| s.color).or(if a.kind.is_dimension() { self.style.dim_color } else if construction { None } else { ts.color.or(self.style.ann_color) });
             let (l1, t1, f1) = starts.get(k + 1).map(|s| (s.2, s.1, s.3)).unwrap_or(end);
             if !a.layer.is_drawing() {
                 self.layers.push(LayerSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, layer: a.layer });
             }
-            let font = if a.kind.is_dimension() { self.style.dim_font.clone() } else if construction { None } else { ts.font.or_else(|| self.style.ann_font.clone()) };
+            let font = own.and_then(|s| s.font.clone()).or(if a.kind.is_dimension() { self.style.dim_font.clone() } else if construction { None } else { ts.font.or_else(|| self.style.ann_font.clone()) });
             if let Some(font) = font {
                 self.fonts.push(FontSpan { texts: t0..t1, font });
             }
@@ -1507,6 +1576,7 @@ impl SheetGeometry {
             })
             .collect();
         let m = self.mark();
+        let ah0 = self.style.ann_text;
         for (p, label, pick) in grouped {
             self.revision_callout(p, label, ah0, pick);
         }
@@ -1682,35 +1752,38 @@ impl SheetGeometry {
         }
         // The leader from the first callout to the part: an arrow on an edge,
         // a dot on a face. Border None: a short shoulder at the middle row.
-        if cs.free {
-            return;
-        }
-        let start = if cs.border == B::None {
-            let sx = if leader_left { c[0] - w / 2.0 - h * 0.3 } else { c[0] + w / 2.0 + h * 0.3 };
-            let shoulder = [sx + if leader_left { -h * 1.2 } else { h * 1.2 }, c[1]];
-            self.lines.push(Polyline2 { points: vec![[sx, c[1]], shoulder], style: LineStyle::Thin, closed: false, pick });
-            shoulder
-        } else {
-            let d = [p[0] - c[0], p[1] - c[1]];
-            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-            let u = [d[0] / l, d[1] / l];
-            let r = match cs.border {
-                B::Circle | B::DoubleCircle | B::SplitCircle | B::Octagon | B::Triangle => rx,
-                B::SquareCircle => rx * 1.08 / u[0].abs().max(u[1].abs()).max(1e-9),
-                B::Rectangle | B::Flag | B::Underline => (rx / u[0].abs().max(1e-9)).min(ry / u[1].abs().max(1e-9)),
-                // The ellipse through the shape's extremes.
-                _ => rx * ry / (rx * u[1]).hypot(ry * u[0]).max(1e-9),
+        // Leaders added with Add leader end in an arrow.
+        let main = (!cs.free).then_some((p, cs.on_face));
+        let extra = cs.leaders.iter().map(|l| (l.view.map(|v| env.to_sheet(v, l.point)).unwrap_or(l.point), false));
+        for (p, dot) in main.into_iter().chain(extra) {
+            let left = p[0] < c[0];
+            let start = if cs.border == B::None {
+                let sx = if left { c[0] - w / 2.0 - h * 0.3 } else { c[0] + w / 2.0 + h * 0.3 };
+                let shoulder = [sx + if left { -h * 1.2 } else { h * 1.2 }, c[1]];
+                self.lines.push(Polyline2 { points: vec![[sx, c[1]], shoulder], style: LineStyle::Thin, closed: false, pick });
+                shoulder
+            } else {
+                let d = [p[0] - c[0], p[1] - c[1]];
+                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+                let u = [d[0] / l, d[1] / l];
+                let r = match cs.border {
+                    B::Circle | B::DoubleCircle | B::SplitCircle | B::Octagon | B::Triangle => rx,
+                    B::SquareCircle => rx * 1.08 / u[0].abs().max(u[1].abs()).max(1e-9),
+                    B::Rectangle | B::Flag | B::Underline => (rx / u[0].abs().max(1e-9)).min(ry / u[1].abs().max(1e-9)),
+                    // The ellipse through the shape's extremes.
+                    _ => rx * ry / (rx * u[1]).hypot(ry * u[0]).max(1e-9),
+                };
+                [c[0] + u[0] * r, c[1] + u[1] * r]
             };
-            [c[0] + u[0] * r, c[1] + u[1] * r]
-        };
-        self.lines.push(Polyline2 { points: vec![start, p], style: LineStyle::Thin, closed: false, pick });
-        if cs.on_face {
-            self.fills.push(Fill2 { points: (0..8).map(|i| {
-                let t = i as f64 / 8.0 * std::f64::consts::TAU;
-                [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
-            }).collect() });
-        } else {
-            self.arrow(p, [p[0] - start[0], p[1] - start[1]], self.style.ann_arrow);
+            self.lines.push(Polyline2 { points: vec![start, p], style: LineStyle::Thin, closed: false, pick });
+            if dot {
+                self.fills.push(Fill2 { points: (0..8).map(|i| {
+                    let t = i as f64 / 8.0 * std::f64::consts::TAU;
+                    [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
+                }).collect() });
+            } else {
+                self.arrow(p, [p[0] - start[0], p[1] - start[1]], self.style.ann_arrow);
+            }
         }
     }
 
@@ -1769,6 +1842,30 @@ impl SheetGeometry {
         if t.boxed {
             let (xa, xb, ya, yb) = (x0 - 0.8, x0 + total + 0.8, base - 0.8, base + h + 0.8);
             self.lines.push(Polyline2 { points: vec![loc(xa, ya), loc(xb, ya), loc(xb, yb), loc(xa, yb)], style: LineStyle::Thin, closed: true, pick });
+        }
+        // Above / below text, centred on the value.
+        for (txt, y) in [(&t.above, base + h * 1.5), (&t.below, base - h * 1.5)] {
+            if let Some(txt) = txt {
+                let w = font::text_width(txt, h);
+                self.texts.push(Text2 { pos: loc(x0 + (total - w) / 2.0, y), height: h, text: txt.clone(), angle, anchor: Anchor::BottomLeft, pick });
+            }
+        }
+        // Inspection dimension: an oval (half circles at the ends).
+        if t.oval {
+            let (ya, yb) = (base - 0.8, base + h + 0.8);
+            let r = (yb - ya) / 2.0;
+            let (xa, xb) = (x0 - 0.6, x0 + total + 0.6);
+            let yc = (ya + yb) / 2.0;
+            let mut pts = Vec::new();
+            for i in 0..=12 {
+                let a = -std::f64::consts::FRAC_PI_2 + std::f64::consts::PI * i as f64 / 12.0;
+                pts.push(loc(xb + r * a.cos(), yc + r * a.sin()));
+            }
+            for i in 0..=12 {
+                let a = std::f64::consts::FRAC_PI_2 + std::f64::consts::PI * i as f64 / 12.0;
+                pts.push(loc(xa + r * a.cos(), yc + r * a.sin()));
+            }
+            self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
         }
     }
 
@@ -1835,7 +1932,7 @@ impl SheetGeometry {
             mid = [mid[0] + up[0] * k, mid[1] + up[1] * k];
             angle = 0.0;
         }
-        if text.upper.is_none() && !text.boxed {
+        if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
             self.texts.push(Text2 { pos: mid, height: self.style.dim_text, text: text.main.clone(), angle, anchor: Anchor::BottomCenter, pick });
         } else {
             let mid = if text.boxed { [mid[0] + up[0] * 0.8, mid[1] + up[1] * 0.8] } else { mid };
@@ -2126,4 +2223,12 @@ pub struct InspectionStyle {
     pub color: Option<[u8; 3]>,
     pub solid: bool,
     pub font: Option<TextFont>,
+}
+
+/// The `i`th zone letter (0 = A), skipping O; past Z the letters double
+/// (AA, BB, ...).
+pub fn zone_letter(i: usize) -> String {
+    const LETTERS: &[u8] = b"ABCDEFGHIJKLMNPQRSTUVWXYZ";
+    let c = LETTERS[i % LETTERS.len()] as char;
+    c.to_string().repeat(i / LETTERS.len() + 1)
 }

@@ -259,7 +259,7 @@ impl GraphicsPrefsDialog {
                             .pr(px(4.))
                             .gap(px(6.))
                             .child(div().flex_1().text_size(px(13.33)).text_color(pal.text_muted).child(n.label))
-                            .child(div().w(px(95.)).border_b_1().border_color(pal.border).hover(|d| d.border_color(pal.accent)).child(Input::new(&st).small().appearance(false).text_size(px(14.)).text_align(TextAlign::Right)))
+                            .child(gpui_kit::base::input::input_frame(div().w(px(95.)).border_b_1().border_color(pal.border).hover(|d| d.border_color(pal.accent)).child(Input::new(&st).small().appearance(false).text_size(px(14.)).text_align(TextAlign::Right))))
                             .child(Self::info(n.hint)),
                     )
                     .when(n.slider, |d| d.child(self.slider(n, cx)))
@@ -340,7 +340,7 @@ impl GraphicsPrefsDialog {
                 .rounded(px(4.))
                 .child(div().text_size(px(12.)).text_color(pal.text_muted).child(c.label))
                 .child(div().flex().flex_wrap().gap(px(4.)).children(swatches))
-                .children(self.hex.as_ref().map(|(st, _)| h_flex().gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Hex")).child(div().flex_1().border_b_1().border_color(pal.border).child(Input::new(st).small().appearance(false)))))
+                .children(self.hex.as_ref().map(|(st, _)| h_flex().gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Hex")).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(pal.border).child(Input::new(st).small().appearance(false))))))
                 .into_any_element(),
         )
     }
@@ -439,7 +439,7 @@ impl Render for GraphicsPrefsDialog {
                             .justify_center()
                             .bg(if changed { pal.accept } else { rgb(0xcce9cc) })
                             .cursor_pointer()
-                            .child(crate::assets::icon("dialog-ok", 20., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))),
                     )
                     .child(
@@ -451,7 +451,7 @@ impl Render for GraphicsPrefsDialog {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                     ),
             )
