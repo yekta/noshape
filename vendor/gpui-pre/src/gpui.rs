@@ -68,6 +68,8 @@ mod view;
 mod window;
 // NOSHAPE PATCH (agent perf): application textures composited without a copy.
 mod external_texture;
+// NOSHAPE PATCH (agent perf): draw phase timings.
+mod draw_stats;
 
 #[cfg(any(test, feature = "test-support"))]
 pub use proptest;
@@ -217,6 +219,7 @@ pub use view::*;
 pub use window::*;
 // NOSHAPE PATCH (agent perf)
 pub use external_texture::*;
+pub use draw_stats::{DrawStatsHook, set_draw_stats_hook};
 
 #[cfg(not(target_family = "wasm"))]
 pub use pollster::block_on;

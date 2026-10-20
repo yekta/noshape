@@ -55,6 +55,9 @@ pub fn record_ms(stage: &'static str, ms: f32) {
     if period_due() {
         flush();
     }
+    if let Some(v) = series().lock().get_mut(stage) {
+        v.push(ms);
+    }
     let mut s = stages().lock();
     let st = s.entry(stage).or_default();
     st.samples.push(ms);
@@ -64,6 +67,22 @@ pub fn record_ms(stage: &'static str, ms: f32) {
         drop(s);
         log::info!(target: "perf", "{line}");
     }
+}
+
+fn series() -> &'static Mutex<BTreeMap<&'static str, Vec<f32>>> {
+    static S: OnceLock<Mutex<BTreeMap<&'static str, Vec<f32>>>> = OnceLock::new();
+    S.get_or_init(Default::default)
+}
+
+/// Keep every sample of `stage` from now on (also across the periodic
+/// summaries) until [`series_take`]; e.g. for a benchmark's own statistics.
+pub fn series_start(stage: &'static str) {
+    series().lock().insert(stage, Vec::new());
+}
+
+/// The samples of `stage` since [`series_start`] (stops keeping them).
+pub fn series_take(stage: &'static str) -> Vec<f32> {
+    series().lock().remove(stage).unwrap_or_default()
 }
 
 /// `NOSHAPE_PERF_PERIOD=<seconds>`: also flush all stages periodically (for
@@ -100,11 +119,11 @@ pub fn flush() {
     }
 }
 
-/// Drop the collected per-frame samples (`r.`, `w.`, `g.`, `v.` stages)
-/// without logging them; rare events (scene builds, regens) are kept.
+/// Drop the collected per-frame samples (`r.`, `w.`, `g.`, `v.`, `gpui.`
+/// stages) without logging them; rare events (scene builds, regens) are kept.
 pub fn reset() {
     for (k, st) in stages().lock().iter_mut() {
-        if ["r.", "w.", "g.", "v."].iter().any(|p| k.starts_with(p)) {
+        if ["r.", "w.", "g.", "v.", "gpui."].iter().any(|p| k.starts_with(p)) {
             st.samples.clear();
         }
     }

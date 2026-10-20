@@ -867,6 +867,95 @@ pub struct Renderer {
     pick_pool: Vec<wgpu::Buffer>,
     stamp: u64,
     frames_in_flight: usize,
+    /// `NOSHAPE_PERF` on a device with timestamp queries: GPU time per frame.
+    timer: Option<GpuTimer>,
+}
+
+/// GPU time of color frames (render and ambient occlusion passes), from
+/// timestamp queries, recorded as `r.gpu_ms`. Each frame in flight uses one
+/// slot: two queries and a small readback buffer mapped when the frame is done.
+struct GpuTimer {
+    set: wgpu::QuerySet,
+    resolve: wgpu::Buffer,
+    slots: Vec<TimerSlot>,
+    /// Nanoseconds per timestamp tick.
+    period: f32,
+}
+
+struct TimerSlot {
+    readback: wgpu::Buffer,
+    state: Arc<AtomicU8>,
+    busy: bool,
+}
+
+const TIMER_SLOTS: usize = 8;
+
+impl GpuTimer {
+    fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+        let set = device.create_query_set(&wgpu::QuerySetDescriptor { label: Some("frame-time"), ty: wgpu::QueryType::Timestamp, count: 2 * TIMER_SLOTS as u32 });
+        let resolve = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("frame-time-resolve"),
+            size: wgpu::QUERY_RESOLVE_BUFFER_ALIGNMENT * TIMER_SLOTS as u64,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let slots = (0..TIMER_SLOTS)
+            .map(|_| TimerSlot {
+                readback: device.create_buffer(&wgpu::BufferDescriptor { label: Some("frame-time-read"), size: 16, usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false }),
+                state: Arc::new(AtomicU8::new(MAP_PENDING)),
+                busy: false,
+            })
+            .collect();
+        Self { set, resolve, slots, period: queue.get_timestamp_period() }
+    }
+
+    /// A free slot for the next frame (none while all are in flight).
+    fn free_slot(&self) -> Option<usize> {
+        self.slots.iter().position(|s| !s.busy)
+    }
+
+    /// Timestamp writes of slot `i`: start of the color pass, end of the
+    /// last pass of the frame.
+    fn writes(&self, i: usize, begin: bool, end: bool) -> wgpu::RenderPassTimestampWrites<'_> {
+        let base = 2 * i as u32;
+        wgpu::RenderPassTimestampWrites { query_set: &self.set, beginning_of_pass_write_index: begin.then_some(base), end_of_pass_write_index: end.then_some(base + 1) }
+    }
+
+    /// Copy slot `i`'s timestamps out (after the frame's passes).
+    fn resolve(&self, encoder: &mut wgpu::CommandEncoder, i: usize) {
+        let base = 2 * i as u32;
+        let offset = wgpu::QUERY_RESOLVE_BUFFER_ALIGNMENT * i as u64;
+        encoder.resolve_query_set(&self.set, base..base + 2, &self.resolve, offset);
+        encoder.copy_buffer_to_buffer(&self.resolve, offset, &self.slots[i].readback, 0, 16);
+    }
+
+    /// Map slot `i`'s readback once the submission is done.
+    fn mapped_after_submit(&mut self, i: usize) {
+        let slot = &mut self.slots[i];
+        slot.busy = true;
+        slot.state.store(MAP_PENDING, Ordering::Release);
+        let st = slot.state.clone();
+        slot.readback.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
+    }
+
+    /// Record the GPU time of every finished slot.
+    fn collect(&mut self) {
+        for slot in self.slots.iter_mut().filter(|s| s.busy) {
+            match slot.state.load(Ordering::Acquire) {
+                MAP_PENDING => continue,
+                MAP_OK => {
+                    let data = slot.readback.slice(..).get_mapped_range();
+                    let t = bytemuck::cast_slice::<u8, u64>(&data);
+                    let ms = t[1].saturating_sub(t[0]) as f64 * self.period as f64 / 1e6;
+                    drop(data);
+                    slot.readback.unmap();
+                    perf::record_ms("r.gpu_ms", ms as f32);
+                }
+                _ => {}
+            }
+            slot.busy = false;
+        }
+    }
 }
 
 pub struct RenderParams<'a> {
@@ -885,6 +974,11 @@ impl Renderer {
         pollster::block_on(Self::new_async())
     }
 
+    /// Blocking [`Self::new_preferring`].
+    pub fn new_matching(prefer: impl Fn(&wgpu::AdapterInfo) -> bool) -> Result<Self, RenderError> {
+        pollster::block_on(Self::new_preferring(prefer))
+    }
+
     pub async fn new_async() -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
         let adapter = instance
@@ -895,6 +989,20 @@ impl Renderer {
             })
             .await
             .map_err(|e| RenderError::NoAdapter(e.to_string()))?;
+        Self::on_adapter(adapter).await
+    }
+
+    /// A renderer on the first adapter `prefer` accepts (e.g. the GPU the UI
+    /// toolkit draws with, so frames can be shared), else as [`Self::new`].
+    pub async fn new_preferring(prefer: impl Fn(&wgpu::AdapterInfo) -> bool) -> Result<Self, RenderError> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+        match instance.enumerate_adapters(wgpu::Backends::all()).await.into_iter().find(|a| prefer(&a.get_info())) {
+            Some(adapter) => Self::on_adapter(adapter).await,
+            None => Self::new_async().await,
+        }
+    }
+
+    async fn on_adapter(adapter: wgpu::Adapter) -> Result<Self, RenderError> {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
@@ -910,8 +1018,9 @@ impl Renderer {
     }
 
     /// Optional device features the renderer uses when the device has them
-    /// (float depth with stencil; else 24-bit depth).
-    pub const WANTED_FEATURES: wgpu::Features = wgpu::Features::DEPTH32FLOAT_STENCIL8;
+    /// (float depth with stencil, else 24-bit depth; GPU timestamps for
+    /// `NOSHAPE_PERF`).
+    pub const WANTED_FEATURES: wgpu::Features = wgpu::Features::DEPTH32FLOAT_STENCIL8.union(wgpu::Features::TIMESTAMP_QUERY);
 
     /// A renderer on an existing device, e.g. the UI toolkit's, so its
     /// [`Present::Texture`] frames can be composited without a copy. The
@@ -1037,6 +1146,7 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
+        let timer = (perf::enabled() && device.features().contains(wgpu::Features::TIMESTAMP_QUERY)).then(|| GpuTimer::new(&device, &queue));
         Self {
             device,
             queue,
@@ -1071,6 +1181,7 @@ impl Renderer {
             pick_pool: Vec::new(),
             stamp: 0,
             frames_in_flight,
+            timer,
         }
     }
 
@@ -1472,7 +1583,9 @@ impl Renderer {
         drop(t_prep);
 
         let t_encode = perf::scope("r.encode_submit");
-        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, ao, .. } = self;
+        let Self { device, queue, pipelines, targets, bind_color, bind_inst, pending, ao, timer, .. } = self;
+        let ao_on = ao_strength > 0.001 && ao.is_some();
+        let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
         let ts = targets.get_mut(&target).expect("target");
         if req.invalidate_pick {
@@ -1522,7 +1635,7 @@ impl Renderer {
                     // Section caps count surfaces in the stencil.
                     stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
-                timestamp_writes: None,
+                timestamp_writes: timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, true, !ao_on)),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
@@ -1537,8 +1650,12 @@ impl Renderer {
         if ao_strength > 0.001
             && let Some(ao) = ao.as_ref()
         {
-            let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength };
+            let timestamp_writes = timer.as_ref().zip(timer_slot).map(|(t, i)| t.writes(i, false, true));
+            let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
+        }
+        if let (Some(t), Some(i)) = (timer.as_ref(), timer_slot) {
+            t.resolve(&mut encoder, i);
         }
         if let Some(readback) = &readback {
             encoder.copy_texture_to_buffer(
@@ -1548,6 +1665,9 @@ impl Renderer {
             );
         }
         let submission = queue.submit(Some(encoder.finish()));
+        if let (Some(t), Some(i)) = (timer.as_mut(), timer_slot) {
+            t.mapped_after_submit(i);
+        }
         let state = Arc::new(AtomicU8::new(MAP_PENDING));
         let st = state.clone();
         let kind = match (&readback, present_texture) {
@@ -1789,6 +1909,9 @@ impl Renderer {
         while self.pending.front().is_some_and(|r| r.state.load(Ordering::Acquire) != MAP_PENDING) {
             let r = self.pending.pop_front().expect("front");
             self.finish(r);
+        }
+        if let Some(t) = &mut self.timer {
+            t.collect();
         }
         std::mem::take(&mut self.ready)
     }

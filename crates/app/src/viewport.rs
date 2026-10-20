@@ -885,6 +885,7 @@ impl Viewport {
             }
             log::info!(target: "perf", "orbit bench: start ({} frames, {} instances, {:.0}x{:.0} logical px, scale {})", b.frames, self.scene.instances.len(), f32::from(self.bounds.size.width), f32::from(self.bounds.size.height), self.scale);
             noshape_render::perf::reset();
+            noshape_render::perf::series_start("r.gpu_ms");
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
             b.zoom = std::env::var("NOSHAPE_PERF_BENCH").is_ok_and(|m| m == "zoom");
@@ -901,10 +902,13 @@ impl Viewport {
             let (over60, over120) = (over(1000.0 / 60.0 + 1.0), over(1000.0 / 120.0 + 1.0));
             let iv = noshape_render::perf::Stats::of(&mut b.intervals);
             let ui = noshape_render::perf::Stats::of(&mut b.ui_cpu);
+            let gpu = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.gpu_ms"));
+            // Our GPU time per frame, where the device has timestamp queries.
+            let gpu = if gpu.n > 0 { format!(" | GPU per frame mean {:.2} p95 {:.2} ms", gpu.mean, gpu.p95) } else { String::new() };
             let (w, h) = ((f32::from(self.bounds.size.width) * self.scale).round(), (f32::from(self.bounds.size.height) * self.scale).round());
             log::info!(
                 target: "perf",
-                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms",
+                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms{gpu}",
                 if b.zoom { "zoom" } else { "orbit" },
                 if self.shown_texture.is_some() { "frames on the GPU" } else { "frames read back" },
                 self.scene.instances.len(),

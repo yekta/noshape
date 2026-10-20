@@ -12,13 +12,15 @@ struct AoUniform {
 }
 
 /// The frame an AO pass darkens.
-pub(crate) struct AoFrame {
+pub(crate) struct AoFrame<'a> {
     pub view_proj: Mat4,
     pub width: u32,
     pub height: u32,
     pub dpr: f32,
     /// Graphics preferences "Ambient occlusion", 0..1.
     pub strength: f32,
+    /// GPU timing of the frame (`NOSHAPE_PERF`).
+    pub timestamp_writes: Option<wgpu::RenderPassTimestampWrites<'a>>,
 }
 
 pub(crate) struct AoPass {
@@ -85,7 +87,7 @@ impl AoPass {
             label: Some("ao"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
             depth_stencil_attachment: None,
-            timestamp_writes: None,
+            timestamp_writes: f.timestamp_writes,
             occlusion_query_set: None,
             multiview_mask: None,
         });
