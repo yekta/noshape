@@ -1332,6 +1332,9 @@ pub(super) fn cursor_style_to_icon_names(style: CursorStyle) -> &'static [&'stat
         CursorStyle::DragLink => &["alias"],
         CursorStyle::DragCopy => &["copy"],
         CursorStyle::ContextualMenu => &["context-menu"],
+        // NOSHAPE PATCH: Chrome shows all-scroll for `move`.
+        CursorStyle::Move => &["all-scroll", "fleur", "size_all"],
+        CursorStyle::Wait => &["wait", "watch"],
     }
 }
 

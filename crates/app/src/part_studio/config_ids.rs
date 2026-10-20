@@ -70,7 +70,7 @@ impl PartStudioView {
         // The keyboard moves into the dialog (not a panel cell behind it).
         id.update(cx, |s, cx| s.focus(window, cx));
         let dialog = cx.new(|_| FsIdsDialog { studio_name, input_name: inp.name.clone(), input_id: inp.id.clone(), default_display, others, id, options, on_confirm });
-        window.open_dialog(cx, move |d, _, _| d.w(px(560.)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));
+        window.open_dialog(cx, move |d, _, _| d.w(px(598.)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));
     }
 
     /// Apply new ids: the configuration and the chosen values follow.
@@ -106,7 +106,7 @@ impl FsIdsDialog {
 }
 
 impl Render for FsIdsDialog {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let grid = gpui_kit::rgb(0xaaaaaa);
         let multiple = !self.options.is_empty();
@@ -121,10 +121,13 @@ impl Render for FsIdsDialog {
         let head = |w: f32, t: &str| cell(w).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child(t.to_string());
         // An id cell: editable; while invalid only its tooltip says why (live
         // 10-20 n: no red text or border).
+        // The focused cell has a blue outline (live 524).
         let id_cell = |st: &Entity<InputState>, cx: &App| {
             let value = st.read(cx).value().to_string();
             let err = id_error(&value);
+            let focused = st.read(cx).focus_handle(cx).is_focused(window);
             cell(300.)
+                .when(focused, |d| d.border_1().border_color(pal.accent))
                 .child(div().id(SharedString::from(format!("fsid-{}", st.entity_id()))).flex_1().when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e))).child(Input::new(st).appearance(false).text_size(px(13.33))))
         };
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
@@ -146,7 +149,15 @@ impl Render for FsIdsDialog {
             },
             self.studio_name
         );
-        let warning = |text: String| h_flex().gap(px(8.)).px(px(12.)).py(px(8.)).rounded(px(4.)).bg(pal.warn_fill).border_1().border_color(pal.warn_outline).text_size(px(13.)).text_color(pal.text).child(div().flex_1().min_w_0().child(text));
+        // Live 524: a ⚠ before the text.
+        let warning_text = if can_confirm && id_change {
+            Some(format!("After this change, all assemblies, drawings, and other tabs which reference {0} will revert {0}'s {1} to the default value \"{2}\".", self.studio_name, self.input_name, self.default_display))
+        } else if can_confirm && option_change {
+            Some(format!("This change will break all references to {} in any assemblies, drawings, and other tabs which use a row of {} whose ID has changed.", self.studio_name, self.input_name))
+        } else {
+            None
+        };
+        let warning = warning_text.map(|text| h_flex().gap(px(12.)).px(px(16.)).py(px(14.)).rounded(px(4.)).bg(pal.warn_fill).border_1().border_color(pal.warn_outline).text_size(px(13.)).text_color(pal.text).child(crate::assets::icon("warning", 24., cx)).child(div().flex_1().min_w_0().child(text)));
         let on_confirm = self.on_confirm.clone();
         v_flex()
             .w_full()
@@ -168,15 +179,7 @@ impl Render for FsIdsDialog {
                     .gap(px(8.))
                     .border_t_1()
                     .border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
-                    .when(can_confirm && id_change, |d| {
-                        d.child(warning(format!(
-                            "After this change, all assemblies, drawings, and other tabs which reference {0} will revert {0}'s {1} to the default value \"{2}\".",
-                            self.studio_name, self.input_name, self.default_display
-                        )))
-                    })
-                    .when(can_confirm && !id_change && option_change, |d| {
-                        d.child(warning(format!("This change will break all references to {} in any assemblies, drawings, and other tabs which use a row of {} whose ID has changed.", self.studio_name, self.input_name)))
-                    })
+                    .children(warning)
                     .child(
                         h_flex()
                             .justify_end()

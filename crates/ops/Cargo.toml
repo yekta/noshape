@@ -1,0 +1,24 @@
+[package]
+name = "noshape-ops"
+description = "Headless operations layer shared by the noshape UI, CLI and MCP server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+noshape-units.workspace = true
+noshape-sketch.workspace = true
+noshape-kernel.workspace = true
+noshape-model.workspace = true
+noshape-store.workspace = true
+noshape-render.workspace = true
+noshape-scene.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+glam.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+miniz_oxide = "0.8"

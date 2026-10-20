@@ -642,3 +642,77 @@ pub fn rail_button(id: impl Into<ElementId>, icon: &str, active: bool, indicator
 pub fn hover_reveal<E: InteractiveElement + Styled>(el: E, group: impl Into<SharedString>) -> E {
     el.opacity(0.).group_hover(group, |s| s.opacity(1.))
 }
+
+/// Onshape's panel dialogs (Mass properties, Isolate, Named views, Section
+/// view, Appearance, Material) move by the drag area around their title
+/// (`.ns-drag-area`: `grab`, also while moving; live dom/cursor-rows.json).
+/// The drag carries the panel's key and the last pointer position.
+#[derive(Clone)]
+pub struct PanelMove {
+    key: &'static str,
+    last: std::rc::Rc<std::cell::Cell<Point<Pixels>>>,
+}
+
+struct PanelMoveGhost;
+
+impl Render for PanelMoveGhost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// A panel dialog's title as its drag area.
+pub fn panel_title(key: &'static str, title: Div) -> Stateful<Div> {
+    let last = std::rc::Rc::new(std::cell::Cell::new(Point::default()));
+    let press = last.clone();
+    title
+        .id(SharedString::from(format!("panel-title-{key}")))
+        .cursor(CursorStyle::OpenHand)
+        .on_mouse_down(MouseButton::Left, move |e, _, _| press.set(e.position))
+        .on_drag(PanelMove { key, last }, |_, _, _, cx| cx.new(|_| PanelMoveGhost))
+}
+
+/// How far each open panel dialog was moved from its place. A panel that
+/// closes forgets it (see [`PanelOffsets::retain`]).
+#[derive(Default)]
+pub struct PanelOffsets(std::collections::HashMap<&'static str, Point<Pixels>>);
+
+impl PanelOffsets {
+    pub fn get(&self, key: &'static str) -> Point<Pixels> {
+        self.0.get(key).copied().unwrap_or_default()
+    }
+
+    /// Keeps the offsets of the panels still open.
+    pub fn retain(&mut self, open: impl Fn(&str) -> bool) {
+        self.0.retain(|k, _| open(k));
+    }
+
+    /// Follows a panel drag over `e.bounds` (the graphics area); the
+    /// pointer is held inside it, so the title stays reachable.
+    pub fn drag(&mut self, e: &DragMoveEvent<PanelMove>, cx: &App) {
+        let d = e.drag(cx);
+        let b = e.bounds;
+        let at = point(e.event.position.x.clamp(b.left(), b.right()), e.event.position.y.clamp(b.top(), b.bottom()));
+        let last = d.last.get();
+        let from = point(last.x.clamp(b.left(), b.right()), last.y.clamp(b.top(), b.bottom()));
+        d.last.set(e.event.position);
+        *self.0.entry(d.key).or_default() += at - from;
+    }
+}
+
+/// `panel` moved by `offset` (its own placement stays as is).
+pub fn moved_panel(panel: impl IntoElement, offset: Point<Pixels>) -> AnyElement {
+    if offset == Point::default() {
+        return panel.into_any_element();
+    }
+    div().absolute().left(offset.x).top(offset.y).size_full().child(panel).into_any_element()
+}
+
+/// [`moved_panel`] for a panel laid out in a column (offset relatively,
+/// leaving its place in the column).
+pub fn nudged_panel(panel: impl IntoElement, offset: Point<Pixels>) -> AnyElement {
+    if offset == Point::default() {
+        return panel.into_any_element();
+    }
+    div().relative().left(offset.x).top(offset.y).child(panel).into_any_element()
+}

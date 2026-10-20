@@ -1454,6 +1454,32 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                     }
                 }
                 Some(noshape_kernel::Surface::Sphere { .. }) => refs.push((implicit(on, Inference::Center), None)),
+                // A fillet ring round a hole (torus) or a revolved face: the
+                // centers of its circular edges, Z along the axis. Its
+                // centroid lies off the surface, so a normal there would put
+                // Z sideways.
+                Some(noshape_kernel::Surface::Torus { axis, .. } | noshape_kernel::Surface::Revolution { axis_dir: axis, .. }) => {
+                    let before = refs.len();
+                    if let Reference::Face(n) = on
+                        && let Some(b) = bodies().find(|b| !b.find_faces(n).is_empty())
+                        && let Ok(edge_faces) = b.shape.edge_faces()
+                    {
+                        let fi = b.find_faces(n)[0] as u32;
+                        for (ei, faces) in edge_faces.iter().enumerate() {
+                            // Circles round the axis (not a torus's seam, which crosses it).
+                            let circle = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok().and_then(|e| e.edge_info().ok()).is_some_and(|i| matches!(i.curve, noshape_kernel::Curve::Circle { axis: c, .. } if c.cross(axis).length() < 1e-6));
+                            if faces.contains(&fi)
+                                && circle
+                                && let Some(en) = b.edges.get(ei)
+                            {
+                                refs.push((implicit(&Reference::Edge((**en).clone()), Inference::Center), None));
+                            }
+                        }
+                    }
+                    if refs.len() == before {
+                        refs.push((implicit(on, Inference::Centroid), None));
+                    }
+                }
                 _ => refs.push((implicit(on, Inference::Centroid), None)),
             }
         }

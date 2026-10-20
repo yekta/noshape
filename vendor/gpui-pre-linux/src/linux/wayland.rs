@@ -58,6 +58,9 @@ pub(super) fn to_shape(style: CursorStyle) -> Shape {
         CursorStyle::OperationNotAllowed => Shape::NotAllowed,
         CursorStyle::DragLink => Shape::Alias,
         CursorStyle::DragCopy => Shape::Copy,
+        // NOSHAPE PATCH: Chrome shows all-scroll for `move`.
+        CursorStyle::Move => Shape::AllScroll,
+        CursorStyle::Wait => Shape::Wait,
         CursorStyle::ContextualMenu => Shape::ContextMenu,
     }
 }

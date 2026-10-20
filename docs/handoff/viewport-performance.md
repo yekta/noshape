@@ -49,6 +49,19 @@ command in this file.
 - Keep everything compiling, clippy-clean (`-D warnings`) and the tests green. The lead integrates the shared
   tree; don't commit.
 
+## CI measurement (the reference from 2026-10-20 on)
+`.github/workflows/perf.yml` (branch `perf-ci` until the lead merges it): downloads a release (input `tag`,
+default latest; also after every successful Release run), runs `.github/perf/bench.sh` / `bench.ps1` on
+macOS 15 + 14 (Apple silicon, paravirtualized Metal), Windows (WARP) and Linux (Xvfb, lavapipe) with the
+heavy fixture `tests/perf/nist-mtc-crada-assembly.noshape` (NIST MTC CRADA assembly, public domain,
+36 parts, 670k triangles): orbit + zoom, `NOSHAPE_PRESENT=texture` and `=readback`, screenshots, then
+`.github/perf/analyze.py` (step summary table, `summary.json`; macOS: zero-copy still must match the
+read-back still and not be black; macOS 15: orbit p95 ≤ 16.7 ms gate). Diagnosis: input `variants`, e.g.
+`msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines`.
+Run: `gh workflow run perf.yml --ref perf-ci -f tag=v0.4.2`; results: `gh run download <id>` and
+`python3 .github/perf/analyze.py <dir> <label> --stills`. Runner displays are not Retina (scale 1:
+macOS 14 1920x1080 → 1194x794 px viewport, macOS 15 1024x768 → 778x575, Windows 1024x768).
+
 ## Measuring on a Mac (send the output back)
 Open a heavy document, keep the window still, and run (the orbit starts ~10 s after launch, after a zoom to fit):
 ```
@@ -144,3 +157,51 @@ interval mean/p50/p95/p99/max, frames over 16.7 ms / 8.3 ms, and UI-thread CPU p
    with qa4's slices; then measure orbit UI CPU again.
 5. Intel Macs with two GPUs: GPUI picks the low-power GPU, wgpu the high-performance one → readback there;
    pick the wgpu adapter whose `registryID` matches `gpui::renderer_gpus()`.
+- **2026-10-20 19:00 (perf) CI run 39477961638, v0.4.2:** zero-copy on a real Metal GPU is **correct**
+  (macOS 14/15 and Linux: texture still vs read-back still 0.00% pixels differ, not black; screenshots
+  in the artifacts). Orbit, heavy fixture:
+
+  | runner | path | fps | p95 interval | >16.7 ms | UI CPU/frame (mean, p95) |
+  |---|---|---|---|---|---|
+  | macOS 14, 1194x794 | readback | 15.8 | 73.7 ms | 99% | 6.12, 7.35 ms |
+  | | texture | **27.2** | **44.0 ms** | 99% | 6.51, 9.04 ms |
+  | macOS 15, 778x575 | readback | 27.0 | 44.2 ms | 98% | 6.22, 9.83 ms |
+  | | texture | 27.7 | 43.3 ms | 98% | 6.16, 8.34 ms |
+  | Linux lavapipe, 1194x794 | readback | 1.7 | 699 ms | 100% | 22.1, 29.9 ms |
+  | | texture | 1.8 | 589 ms | 100% | 12.3, 14.0 ms |
+  | Windows WARP, 778x614 | readback | 2.7 | 384 ms | 100% | n/a (no thread clock) |
+
+  The p95 gate (16.7 ms) fails: on the runner's paravirtualized GPU frames take ~37 ms although our GPU
+  work is ~11 ms (`w.gpu_wait`) and UI CPU ~6.5 ms: GPU-bound (our frame + GPUI's window frame on a slow
+  virtual GPU). Diagnosis run with MSAA 1 / no lines / no meshes: 39479898303.
+
+## Item 4 proposal (2026-10-20 19:40, perf → lead → qa4/ui): camera moves without any GPUI layout/paint
+Today an orbit frame re-renders, lays out and paints the Viewport and both overlay slices (they observe the
+viewport), plus their ancestors: 6.4 ms prepaint + 4.5 ms paint on this box, UI CPU p95 9–12 ms on the macOS
+runner, and the runner's frame pacing follows it (37/73 ms = 2/4 refreshes).
+Camera-following content today: view cube (faces, frames, corner pieces, face labels as glyph outlines,
+triad lines, X/Y/Z text labels; arrows static), in-plane plane names (glyph outlines), and situational ones:
+sketch labels, shown dimensions, hole callouts, analysis-tool marks, manipulators/triad.
+**Design:**
+1. Renderer (mine): an overlay layer in the `Scene`, drawn at the end of the frame's MSAA color pass with
+   depth = near (AO skips those pixels, so no halos), never in the pick pass. Primitives:
+   - filled triangle meshes in three spaces: *world* (plane names: glyph outlines laid out once in the
+     plane), *widget* (view cube: cube-local 3D shapes rotated by the frame's camera rotation and drawn
+     orthographically at a fixed screen corner, same math as `cube_shapes`), *screen* (static widget parts);
+   - polylines (triad), with per-vertex color/alpha (hidden axis parts at 30%);
+   - *billboards*: RGBA images anchored at a world point + pixel offset, pixel-snapped (X/Y/Z, dimension
+     and callout labels), rasterized on the UI thread with GPUI's own text system so glyphs are identical.
+   The renderer computes per-frame geometry from the frame's camera, so overlays are in sync with the
+   3D image (today they can lag a frame behind it).
+2. App: the view cube and plane labels become overlay data built when their inputs change (rotation is not
+   an input; hover cell, planes, theme are). Hit testing stays as is (`widget_hit` with the current camera).
+   The Viewport stops notifying on camera changes when the owner reports no remaining GPUI-drawn
+   camera-following overlays (`Viewport::set_camera_overlays(bool)`), so an orbit frame is render +
+   `request_present`. Situational overlays keep today's path until moved in later steps (sketch labels,
+   shown dims, callouts, manipulators).
+3. Look: pixel crops of the cube and plane labels, old (GPUI) vs new (wgpu), at scale 1 and 2, plus live
+   Onshape crops; MSAA 4x in both, so edges should match within a few levels.
+**Needs from qa4/ui:** OK to move the drawing (not the hit testing or the menu button) of `view_cube.rs`
+(`view_cube`, `cube_shapes`, label/axis computation) into overlay builders, and to drop the plane-name
+`paint_paths` from `render_viewport_underlay`; their slices then stop observing the viewport for camera
+changes. I write the renderer part first (my files) and show crops before touching theirs.

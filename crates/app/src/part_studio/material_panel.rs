@@ -35,6 +35,9 @@ struct Entry {
 
 pub struct MaterialPanel {
     pub bodies: Vec<BodyId>,
+    /// Configured properties: the Material cell (part, row) the panel sets
+    /// instead of the parts' own material (live psb 10-20 q, 634).
+    pub cp_cell: Option<(BodyId, usize)>,
     custom: bool,
     /// 0 = Onshape Material Library, then the document's library tabs.
     library: usize,
@@ -151,7 +154,7 @@ impl PartStudioView {
                 }
             }));
         }
-        self.ui.material_panel = Some(MaterialPanel { bodies, custom: false, library: 0, picked: None, list_open: false, active: 0, lib_open: false, search, custom_fields, _subs: subs });
+        self.ui.material_panel = Some(MaterialPanel { bodies, cp_cell: None, custom: false, library: 0, picked: None, list_open: false, active: 0, lib_open: false, search, custom_fields, _subs: subs });
         cx.notify();
     }
 
@@ -169,6 +172,11 @@ impl PartStudioView {
             }
         };
         if name.is_empty() {
+            return;
+        }
+        if let Some((part, row)) = m.cp_cell {
+            self.edit_config("Edit configured properties", cx, |ps| noshape_model::configured_properties::set_cell(ps, &part, row, "Material", &name));
+            self.config_dirty(cx);
             return;
         }
         let bodies = m.bodies.clone();
@@ -444,7 +452,7 @@ impl PartStudioView {
                         .bg(pal.panel)
                         .border_b_1()
                         .border_color(pal.border)
-                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Material"))
+                        .child(crate::ui::panel_title("ps-material", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Material")))
                         .child(
                             div()
                                 .id("mat-ok")

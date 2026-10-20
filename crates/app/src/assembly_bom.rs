@@ -463,7 +463,7 @@ impl AssemblyView {
 /// The typed cell: a bare input filling it.
 fn rows_cell_input(el: &mut Stateful<Div>, st: &Entity<InputState>) {
     let taken = std::mem::replace(el, div().id("bom-placeholder"));
-    *el = taken.child(Input::new(st).appearance(false).text_size(px(14.)));
+    *el = taken.child(Input::new(st).appearance(false).text_size(px(13.33)).pl(px(3.)));
 }
 
 /// Linear → sRGB channel (swatches).

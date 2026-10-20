@@ -288,7 +288,7 @@ impl AssemblyView {
                         .bg(rgb(0xffffff))
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties"))
+                        .child(crate::ui::panel_title("asm-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
                         // Live: the ✓ is pale (op .2) until the Mass override is in play.
                         .child(
                             div()

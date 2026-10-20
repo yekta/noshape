@@ -1070,7 +1070,7 @@ impl PartStudioView {
                     }
                 }
             }
-            return vec![
+            return vec![crate::ui::moved_panel(
                 v_flex()
                     .id("mass-dialog")
                     .occlude()
@@ -1088,14 +1088,14 @@ impl PartStudioView {
                             .bg(pal.panel)
                             .border_b_1()
                             .border_color(pal.border)
-                            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties"))
+                            .child(crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
                             .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx)))
                             .child(close("mass-close", cx)),
                     )
                     .child(body.px(px(0.)).pb(px(4.)))
-                    .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(help()))
-                    .into_any_element(),
-            ];
+                    .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(help())),
+                self.ui.panels.get("ps-mass"),
+            )];
         }
         // Onshape's Measure panel (live, part-studio/82): 220 px, docked at the
         // bottom right; "Measure" + ×; the selection field; Measure type,

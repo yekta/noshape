@@ -95,6 +95,52 @@ Planned (part_studio/mod.rs, ui's file, waiting for the lead to forward to ui):
    (toolbar, view cube, right strip, viewport overlays / labels, Workspace chrome) as **cached child views**
    (`Entity::cached(style)`), each observing the entity it reads (its own notify invalidates it), so a
    keystroke in a field re-renders only the feature list (when the filter changes) or the field itself.
+
+**R4 result (17:00–19:00, shared tree, lead-directed; in v0.4.2 e5e0b4b + a3d3490, the rest uncommitted):**
+- `cached_slice.rs` `Slice<V>`; Part Studio slices: toolbar, **underlay** (list toggle, sketch / plane
+  labels, graphics dialog) and **overlay** (view cube, strip, panels, menus...), with the **feature dialog
+  between them** outside both (typing / blinking in a dialog field leaves them cached; z-order unchanged);
+  the features list split into an uncached **head** (`render_feature_list_head`: config box, contexts, filter
+  row, "Features (N)") and two slices, **rows** (`render_feature_list`) and **parts** (`render_parts_list`,
+  sized `relative(parts_height)` of the panel by the studio, so the separator drag is unchanged). Workspace
+  slices: navbar, tab bar, left rail (ui is adapting the tab-bar scroll arrows to it). Underlay, overlay, rows
+  and parts observe the viewport and the doc; all slices are invalidated by any `cx.notify()` of the studio.
+- The filter's Change handler doesn't notify the studio; it notifies the rows slice only when the set of
+  matching features differs from what the rows last rendered (`filter_rows`), so "e" → "ex" → "ext" …
+  re-renders just the head.
+- Measured (`/root/qa4-scratch/measure2.sh BIN`: perf uprobes on `Window::draw` + UI-thread cpu-clock samples
+  inside each call; one app at a time; dev profile = optimized + debuginfo), UI-thread CPU per frame, median:
+
+| | base (dc0da0a) | v5 (+PS toolbar/overlay, Workspace slices) | v6 (+dialog layer, list slices) | v7 (+filter set check) |
+|---|---|---|---|---|
+| typing, every key changes the filter result (7 / BackSpace ×20) | 15.5 ms | 5.1 | 4.5 | 4.2 (5.0 on the keys that change the rows, 3.1 otherwise) |
+| typing "extrude" and deleting it, twice | 15.2 | – | 3.0 (rows re-rendered on 27 of 61 frames) | **3.2** (rows on 7 of 54 frames, 3.25 on the others) |
+| caret blink (filter focused, idle) | 16.5–19.8 | 6.0 | 2.75 | **2.9** |
+
+  End to end (XTest key → paint on Xvfb) stays llvmpipe-bound: present (`X11Window::draw`) 90–300 ms wall on
+  this loaded machine, only ~3 ms of it UI CPU; meaningless for a Mac. Idle redraws: none after a viewport
+  click (focus leaves the field); with a field focused, 2 Hz caret frames now cost ~3 ms instead of ~17.
+- Left over above 4 ms: a key that changes which features match rebuilds the rows (render 0.8 ms + their
+  layout/paint, ≈ +2 ms; spread over ~10 rows' elements, nothing heavy in particular: filter_features,
+  default_name, rollback bar ~0.01 ms each). Going lower needs each feature row as its own cached view (psb's
+  list code). The ~3 ms floor is gpui's per-frame work (reusing cached views copies their primitives:
+  memmove, BoundsTree inserts, PathVertex clones of the path-drawn labels; taffy for the uncached skeleton).
+- Checked on v6/v7: filter (rows, "Features (1 of 7)", "...", ⊗ clears), editing Extrude 1 (dialog over the
+  list toggle, rows rolled back, header buttons dimmed, Final un-rolls the rows, Depth 25 regenerates), Esc
+  (first Esc reverts the field, second cancels: same on base), parts separator drag, layout identical.
+- Build note for the lead: building a private worktree into target-shared corrupts shared artifacts. Cargo
+  gives the vendored path crates (gpui-pre, gpui-base, …) the same unit hash in every tree, but rustc's crate
+  hash differs per absolute path, so a worktree build overwrites `libgpui_base-*.rlib` / `libgpui-*.rmeta`
+  that the shared tree's build then treats as fresh ("crate `gpui_base` required to be available in rlib
+  format", "cannot find `ExternalTextureId` in `gpui`"). qa4 hit both; fixed by invalidating one fingerprint
+  (`.fingerprint/gpui-base-8030dd…/lib-gpui_base`, original saved in /root/qa4-scratch) and touching
+  `vendor/gpui-pre/src/gpui.rs` (mtime only). /root/noshape-qa4 is deleted; other worktrees on target-shared
+  (lead, ui, asb, drw2) can cause the same.
+- Status 19:10: v7 (`cargo build`) compiled with no warnings in qa4's files. `cargo clippy -p noshape
+  --all-targets` is not run yet: the tree currently fails in drawing_palette.rs (another agent's
+  in-progress borrow errors). Uncommitted from qa4: part_studio/mod.rs `filter_rows` + `filter_rows_changed`
+  set check, behaviors.rs one call, this file. Scripts: /root/qa4-scratch (measure2.sh, ft2.sh, frames.py,
+  flat.py).
 ### R3 (13:10–13:45): retest on v0.4.1 / current tree (0839f5e + 3 uncommitted files), :110
 Method: click a point, wait, type `7`, wait 1 s, crop (script /tmp/qa4/probe.sh; points on every corner, edge,
 padding strip and the text area).

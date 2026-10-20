@@ -175,7 +175,7 @@ impl DrawingEditor {
                         .children(chips),
                 )
                 .child(row("Linestyle", select("ls-pattern", d.pattern.name().into(), 150., patterns).into_any_element()))
-                .child(row("Dashes", div().w(px(150.)).when(solid, |b| b.opacity(0.4)).child(Input::new(&d.dashes).text_size(px(13.33)).small()).into_any_element()))
+                .child(row("Dashes", div().w(px(150.)).when(solid, |b| b.opacity(0.4)).child(Input::new(&d.dashes).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()).into_any_element()))
                 .child(row("Thickness", h_flex().gap(px(6.)).child(select("ls-thick", format!("{:.2} mm", d.thickness), 110., thicknesses)).child(Button::new("ls-color").ghost().xsmall().child(swatch).os_dropdown_menu("ls-color-dd", true, {
                     let ed = ed.clone();
                     move |mut m, _, _| {

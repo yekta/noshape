@@ -140,7 +140,7 @@ impl DrawingEditor {
                 .h(px(28.))
                 .pl(px(10.))
                 .child(div().w(px(67.)).text_size(px(13.33)).child(label))
-                .child(div().w(px(121.)).h(px(26.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).child(Input::new(input).text_size(px(13.33)).appearance(false).small()))
+                .child(div().w(px(121.)).h(px(26.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
                 .into_any_element()
         };
         let (title_row, header_row) = (d.title_row, d.header_row);

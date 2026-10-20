@@ -1526,7 +1526,7 @@ impl Render for DrawingEditor {
             .children(self.render_hide_edges(cx))
             .children(self.render_section_edit(cx))
             .children(self.render_replicate_dlg(cx))
-            .children(self.render_palette(cx))
+            .children(self.render_palette(window, cx))
             .children(self.render_datum_dlg(cx))
             .children(self.render_table_tool(cx))
             .children(self.render_gdt_dlg(cx))

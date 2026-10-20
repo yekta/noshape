@@ -3617,7 +3617,10 @@ impl Window {
         let _foreground_turn = profiler::journal::foreground_turn();
         #[cfg(feature = "profiler")]
         let present_start = Instant::now();
+        // NOSHAPE PATCH (agent perf): phase timings (`draw_stats`).
+        let stats_present = crate::draw_stats::draw_stats_now();
         self.platform_window.draw(&self.rendered_frame.scene);
+        crate::draw_stats::draw_stat("gpui.present", stats_present);
         #[cfg(feature = "profiler")]
         self.window_profiler.record_present(
             present_start,
@@ -3710,8 +3713,12 @@ impl Window {
         let scale_factor = self.scale_factor();
         #[cfg(feature = "profiler")]
         let request_layout_start = Instant::now();
+        // NOSHAPE PATCH (agent perf): phase timings (`draw_stats`).
+        let stats_start = crate::draw_stats::draw_stats_now();
         let mut root_element = self.root.as_ref().unwrap().clone().into_any_element();
         let root_layout_id = root_element.request_layout(self, cx);
+        crate::draw_stats::draw_stat("gpui.request_layout", stats_start);
+        let stats_prepaint = crate::draw_stats::draw_stats_now();
         #[cfg(feature = "profiler")]
         let prepaint_start = Instant::now();
         self.layout_engine
@@ -3753,6 +3760,8 @@ impl Window {
         // Now actually paint the elements.
         #[cfg(feature = "profiler")]
         let paint_start = Instant::now();
+        crate::draw_stats::draw_stat("gpui.prepaint", stats_prepaint);
+        let stats_paint = crate::draw_stats::draw_stats_now();
         self.invalidator.set_phase(DrawPhase::Paint);
         root_element.paint(self, cx);
 
@@ -3771,6 +3780,7 @@ impl Window {
 
         #[cfg(any(feature = "inspector", debug_assertions))]
         self.paint_inspector_hitbox(cx);
+        crate::draw_stats::draw_stat("gpui.paint", stats_paint);
 
         #[cfg(feature = "profiler")]
         self.window_profiler

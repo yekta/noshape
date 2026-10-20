@@ -998,6 +998,16 @@ pub fn connector_reference(index: u64) -> crate::reference::Reference {
     crate::reference::Reference::MateConnector { feature: FeatureId(PART_FEATURE.0 + 1 + index), index: 0 }
 }
 
+/// Whether a picked entity is a planar face (the Insert closest / furthest
+/// buttons want planar faces with holes in them).
+pub fn planar_face(ctx: &Arc<crate::regen::context::Context>, body: Option<&BodyId>, on: &crate::reference::Reference) -> bool {
+    use noshape_kernel::{ShapeType, Surface};
+    let crate::reference::Reference::Face(n) = on else { return false };
+    ctx.bodies.iter().filter(|b| body.is_none_or(|id| &b.id == id)).any(|b| {
+        b.find_faces(n).first().is_some_and(|&fi| matches!(b.shape.sub_shape(ShapeType::Face, fi).ok().and_then(|f| f.face_surface().ok()), Some(Surface::Plane(_))))
+    })
+}
+
 /// Holes to fasten standard content to, from a picked entity (studio
 /// coordinates): a circular edge or cylindrical face gives one hole (the
 /// end whose face points most along `toward`, the viewer), a planar face

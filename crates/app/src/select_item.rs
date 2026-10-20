@@ -975,7 +975,7 @@ impl Render for SelectItemPanel {
                             .rounded(px(3.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xcccccc))
-                            .child(crate::ui::input_with_placeholder(&search, search_placeholder, cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(6.))),
+                            .child(crate::ui::input_with_placeholder(&search, search_placeholder, cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
                     ),
                 );
                 // At a version with later changes: the blue box (live 604, 627b).

@@ -274,6 +274,8 @@ pub(crate) struct AsmUi {
     pub value_edit: Option<(MateId, usize, Entity<InputState>, Subscription)>,
     /// Mass and section properties dialog.
     pub mass: Option<super::mass::AsmMassUi>,
+    /// Where panel dialogs were moved by their title.
+    pub panels: crate::ui::PanelOffsets,
     /// Insert dialog: configuration list selects per (Part Studio, input).
     pub insert_cfg_selects: HashMap<(TabId, String), Entity<crate::os_select::OsSelect>>,
     pub insert_cfg_subs: Vec<Subscription>,
@@ -472,7 +474,7 @@ impl AssemblyView {
                         .h(px(29.))
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
-                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title))
+                        .child(crate::ui::panel_title("asm-isolate", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
                         .child(
                             div()
                                 .id("asm-iso-close")
@@ -1253,7 +1255,7 @@ impl AssemblyView {
                         ),
                 )
                 // Live: a 214 px white field with a 1 px `#1651b0` border, 3 px in.
-                .child(gpui_kit::base::input::input_frame(div().m(px(3.)).h(px(30.)).px(px(4.)).flex().items_center().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)).child(Input::new(&d.input).appearance(false).text_size(px(14.)))))
+                .child(gpui_kit::base::input::input_frame(div().m(px(3.)).h(px(30.)).px(px(4.)).flex().items_center().border_1().border_color(rgb(0x1651b0)).bg(rgb(0xffffff)).child(Input::new(&d.input).appearance(false).text_size(px(13.33)).text_color(rgb(0x000000)).pl(px(2.)))))
                 .into_any_element(),
         )
     }
@@ -3624,7 +3626,7 @@ impl AssemblyView {
                 this.rebuild_scene(false, cx);
                 cx.notify();
             })));
-        Some(Self::panel_frame("Section view", body, cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_section(window, cx)), "asm-sec-close").into_any_element())
+        Some(Self::panel_frame_moving("Section view", body, cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_section(window, cx)), "asm-sec-close", "asm-section").into_any_element())
     }
 
     /// Isolate / Make transparent › Expand: switch distance / connectivity

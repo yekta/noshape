@@ -78,3 +78,15 @@ conversions out (`occ::handle<Base>(x)`). Before you finish C++ kernel changes, 
 - Before you start a build, check `free -g`. If "available" is under 8 GB, wait and retry in a few minutes.
 - /tmp is wiped on reboot. Keep anything you need (plans, patches, scripts) under /root/<agent>-scratch or in
   your handoff file.
+
+## Zero warnings, enforced (2026-10-20)
+CI now builds with `RUSTFLAGS=-D warnings` and runs `cargo clippy --locked --workspace --all-targets -- -D warnings`
+(the app crate and its tests included), and so does the lead's integration. A single warning anywhere blocks
+integration for everyone, so run that clippy command on your crate before you report.
+
+## Never build a private worktree into a shared target dir (2026-10-20)
+Cargo gives the vendored crates the same build ID from every checkout, but rustc's crate ID depends on the
+absolute path. So building /root/noshape-<you> into /root/target-shared (or target-behave or target-engine)
+overwrites artifacts that the shared tree then treats as up to date. Symptoms: "required to be available in
+rlib format", or missing gpui items. A private worktree needs its own CARGO_TARGET_DIR (ask the lead first,
+since it costs disk) or no build at all. Use it only to read and diff.

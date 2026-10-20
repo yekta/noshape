@@ -2962,6 +2962,13 @@ pub enum CursorStyle {
     /// A cursor indicating that the operation will result in a context menu
     /// corresponds to the CSS cursor value `context-menu`
     ContextualMenu,
+
+    /// NOSHAPE PATCH: the CSS cursor value `move` (shown like Chrome: the
+    /// four-way all-scroll cursor).
+    Move,
+
+    /// NOSHAPE PATCH: the CSS cursor value `wait` (busy).
+    Wait,
 }
 
 /// A clipboard item that should be copied to the clipboard

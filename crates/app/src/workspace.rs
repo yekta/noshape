@@ -907,7 +907,7 @@ impl Workspace {
                     .child(crate::assets::icon(tab_icon(kind), 20., cx))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
-                        Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.))).into_any_element(),
+                        Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
                         None => div().truncate().child(name).into_any_element(),
                     })
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
@@ -971,7 +971,7 @@ impl Workspace {
                         // clipboard): point every view at a version of the document.
                         let menu = if kind == "drawing" {
                             let v12 = view.clone();
-                            menu.item(I::new("Change to version…").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
+                            menu.item(I::new("Change to version…").icon_name("version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {
                             menu
                         };
@@ -1512,7 +1512,7 @@ impl Workspace {
             .px(px(10.))
             .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
             .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
-                Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.))).into_any_element(),
+                Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
                 None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(name.clone()).into_any_element(),
             })
             .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, |d, _, _, cx| cx.new(|_| d.clone())))

@@ -553,3 +553,14 @@ Assembly and its "<name> parts" Part Studio: element type BILLOFMATERIALS, named
 Proposal: `TabContent::BillOfMaterials { assembly: TabId }` (serde-compatible addition, no other model change), its
 rows from `assembly::bom`, and a tab view in the app (owner: asb's BOM table code). kern would add the variant and the
 import's tab only; the view is yours. Live capture of the tab's UI is requested (REQUESTS.md "kern G38g").
+
+## From psb (20 Oct): Part Studio configured properties and the assembly BOM
+psb added Configured properties: the model is `noshape_model::configured_properties` and the tables live in
+`PartStudio.property_tables`. Live (psb 10-20 q, part-studio/626–627) shows that **editing a property in an assembly
+BOM, for an instance whose Part Studio part has a configured-properties table containing that property, sets
+it for the instance's configuration and adds that row when it's missing**. The model call for it is
+`configured_properties::set_for_configuration(ps, &part, "Part number", &instance_config, value)`. It
+returns false when the part has no table or no such column; then the BOM should write the part's own
+property as today. For reading, `configured_properties::configured_value(ps, &part, prop, &config)` gives the
+configured value (None = use the part's own). Regeneration already renames parts by a configured Name and
+colours them by a configured Appearance. psb did not touch your files.

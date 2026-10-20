@@ -356,6 +356,9 @@ pub struct FeatureStudioView {
     /// The toolbar's Import panel and the button's bounds (it hangs under it).
     import_panel: Option<(Entity<crate::fs_import::ImportPanel>, Subscription)>,
     import_anchor: BoundsCell,
+    /// The toolbar's fit-to-width stage and its measurements (see
+    /// `toolbar_stage`).
+    tb: ToolbarFit,
     /// The Module outline button's bounds (its popover hangs under it).
     outline_anchor: BoundsCell,
     /// The pointer over the code (the diagnostic tooltip follows it).
@@ -403,7 +406,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -774,6 +777,52 @@ impl FeatureStudioView {
         crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
     }
 
+    /// Compact toolbar: the snippet ▾ is one flat list of all six menus'
+    /// snippets (live 71-compact-snippet-menu); a pick inserts it and becomes
+    /// the button's face.
+    fn open_all_snippets(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+            m = m.snippet_list();
+            for (label, text) in SNIPPET_MENUS.iter().flat_map(|m| m.2.iter()) {
+                let v = view.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(*label).on_click(move |_, w, cx| {
+                    set_snippet_face(label);
+                    v.update(cx, |this, cx| this.insert_snippet(text, w, cx));
+                }));
+            }
+            m
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+
+    /// Compact toolbar: Undo ▾ = Undo / Redo with their shortcut chips (no
+    /// history list); inert while there's nothing to undo or redo.
+    fn open_undo_menu(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let (can_undo, can_redo) = { let d = self.doc.read(cx); (d.session.can_undo(), d.session.can_redo()) };
+        if !can_undo && !can_redo {
+            return;
+        }
+        let (d1, d2) = (self.doc.clone(), self.doc.clone());
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+            m.dropdown()
+                .item(crate::os_menu::OsMenuItem::new("Undo").icon_name("undo").keys(&["cmd", "z"]).disabled(!can_undo).on_click(move |_, _, cx| d1.update(cx, |d, cx| d.undo(cx))))
+                .item(crate::os_menu::OsMenuItem::new("Redo").icon_name("redo").keys(&["ctrl", "y"]).disabled(!can_redo).on_click(move |_, _, cx| d2.update(cx, |d, cx| d.redo(cx))))
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+
+    /// Compact toolbar: Import ▾ = Import | Format Studio.
+    fn open_import_menu(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let (v1, v2) = (cx.entity(), cx.entity());
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+            m.dropdown()
+                .item(crate::os_menu::OsMenuItem::new("Import").icon(os::glyph(os::GLYPH_FS_IMPORT, 20., p().text)).on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_import(w, cx))))
+                .item(crate::os_menu::OsMenuItem::new("Format Studio").icon(os::glyph(os::GLYPH_BRUSH, 20., p().text)).on_click(move |_, w, cx| v2.update(cx, |this, cx| this.format(w, cx))))
+        });
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+
     /// Monitor ▾: Monitor / Profile for each Part Studio and Variable Studio.
     fn open_monitor(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let studios: Vec<(TabId, String)> = self.doc.read(cx).session.doc.ordered_tabs().iter().filter(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::VariableStudio(_))).map(|t| (t.id, t.name.clone())).collect();
@@ -928,6 +977,87 @@ pub fn commit_all(doc: &Entity<DocModel>, cx: &mut App) {
     });
 }
 
+/// Live (behaviours "Feature Studio compact toolbar"): the toolbar collapses
+/// one group at a time to fit the window, in this order, and expands back the
+/// same way: 3 = full; 2 = the six snippet menus and Import / Format become a
+/// split button faced with the last-used snippet and Import ▾; 1 = New
+/// feature loses its label; 0 = Undo / Redo become Undo ▾. Below stage 0 the
+/// row is clipped at the window edge (never wraps or scrolls).
+struct ToolbarFit {
+    stage: u8,
+    /// Probed this frame: the toolbar, its flexible spacer, the last item.
+    toolbar: BoundsCell,
+    spacer: BoundsCell,
+    end: BoundsCell,
+    /// Probed widths of the parts that change, kept from the stage that shows them.
+    undo_full: BoundsCell,
+    undo_compact: BoundsCell,
+    new_label: BoundsCell,
+    snip_full: BoundsCell,
+    snip_compact: BoundsCell,
+    widths: [Option<f32>; 5],
+}
+
+impl Default for ToolbarFit {
+    fn default() -> Self {
+        Self { stage: 3, toolbar: Default::default(), spacer: Default::default(), end: Default::default(), undo_full: Default::default(), undo_compact: Default::default(), new_label: Default::default(), snip_full: Default::default(), snip_compact: Default::default(), widths: [None; 5] }
+    }
+}
+
+impl ToolbarFit {
+    /// Re-picks the stage from last frame's layout; true when it changed.
+    fn refit(&mut self) -> bool {
+        let tb = self.toolbar.get();
+        if tb.size.width <= px(0.) {
+            return false;
+        }
+        let w = |c: &BoundsCell| { let b = c.get(); (b.size.width > px(0.)).then(|| f32::from(b.size.width)) };
+        for (i, c) in [&self.undo_full, &self.undo_compact, &self.new_label, &self.snip_full, &self.snip_compact].into_iter().enumerate() {
+            if let Some(v) = w(c) {
+                self.widths[i] = Some(v);
+            }
+        }
+        let avail = f32::from(tb.size.width);
+        let overflow = (f32::from(self.end.get().right() - tb.right())).max(0.);
+        let natural = avail - f32::from(self.spacer.get().size.width) + overflow;
+        // Width each step adds (estimates until both sides were seen).
+        let [uf, uc, nl, sf, sc] = self.widths;
+        let d = [uf.zip(uc).map_or(16., |(a, b)| a - b), nl.map_or(77., |l| l + 2.), sf.zip(sc).map_or(260., |(a, b)| a - b)];
+        let at = |s: u8| -> f32 {
+            let cur = self.stage;
+            let mut n = natural;
+            for k in (cur + 1)..=s { n += d[k as usize - 1]; }
+            for k in (s + 1)..=cur { n -= d[k as usize - 1]; }
+            n
+        };
+        let best = (0..=3u8).rev().find(|s| at(*s) <= avail + 0.5).unwrap_or(0);
+        for c in [&self.undo_full, &self.undo_compact, &self.new_label, &self.snip_full, &self.snip_compact] {
+            c.set(Bounds::default());
+        }
+        let changed = best != self.stage;
+        self.stage = best;
+        changed
+    }
+}
+
+/// The compact snippet button's face: the last-used snippet (an Onshape
+/// preference that survives reloads), "Length parameter" at first.
+fn snippet_face() -> String {
+    std::fs::read_to_string(crate::files::config_dir().join("feature_studio_snippet.txt")).ok().map(|t| t.trim().to_string()).filter(|t| SNIPPET_MENUS.iter().any(|m| m.2.iter().any(|(l, _)| l == t))).unwrap_or_else(|| "Length parameter".into())
+}
+
+fn set_snippet_face(label: &str) {
+    let p = crate::files::config_dir().join("feature_studio_snippet.txt");
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(p, label);
+}
+
+fn snippet_text(label: &str) -> Option<&'static str> {
+    SNIPPET_MENUS.iter().flat_map(|m| m.2.iter()).find(|(l, _)| *l == label).map(|(_, t)| *t)
+}
+
 fn text_of(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
     match &doc.read(cx).session.doc.tab(tab)?.content {
         TabContent::FeatureStudio(f) => Some(f.text().to_string()),
@@ -950,53 +1080,158 @@ impl Render for FeatureStudioView {
         // Toolbar cells: 32 px, transparent, `#d7d7d7` hover (live toolbar tooltips list).
         let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
         let tools_anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        // Fit-to-width stage, re-picked from the last frame's layout.
+        if self.tb.refit() {
+            cx.notify();
+        }
+        let stage = self.tb.stage;
+        let (can_undo, can_redo) = {
+            let d = self.doc.read(cx);
+            (d.session.can_undo(), d.session.can_redo())
+        };
+        let undo_area: AnyElement = if stage >= 1 {
+            div().flex_none().relative().child(crate::ui::undo_redo(&self.doc, cx)).child(probe(&self.tb.undo_full)).into_any_element()
+        } else {
+            // Undo ▾ (Redo folded in; the ▾ is inert without history).
+            let (anchor, d) = (BoundsCell::default(), self.doc.clone());
+            let a2 = anchor.clone();
+            crate::ui::tool_group(
+                "fs-undo-group",
+                crate::ui::split_tool_button("fs-undo", "undo", false, cx)
+                    .opacity(if can_undo { 1. } else { 0.4 })
+                    .when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed))
+                    .tooltip("Undo (cmd+z/ctrl+z)")
+                    .on_click(move |_, _, cx| {
+                        if can_undo {
+                            d.update(cx, |d, cx| d.undo(cx));
+                        }
+                    }),
+                crate::ui::tool_caret("fs-undo-caret", cx).opacity(if can_undo || can_redo { 1. } else { 0.4 }).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    let b = a2.get();
+                    this.open_undo_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
+                })),
+            )
+            .relative()
+            .child(probe(&anchor))
+            .child(probe(&self.tb.undo_compact))
+            .into_any_element()
+        };
+        let snip_area: AnyElement = if stage >= 3 {
+            let mut area = h_flex().flex_none().relative().gap(px(2.));
+            for (i, (tip, letter, _)) in SNIPPET_MENUS.iter().enumerate() {
+                let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+                let a2 = anchor.clone();
+                area = area.child(
+                    cell(SharedString::from(format!("fs-snip-{i}")))
+                        .w(px(50.))
+                        .tooltip(crate::ui::tooltip(*tip))
+                        // Live document/70: Onshape's 20 px menu icon (letter / glyph and
+                        // the ▸≡ list), then the chevron.
+                        .child(crate::assets::icon(letter, 20., cx))
+                        .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text))
+                        .child(probe(&anchor))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let b = a2.get();
+                            this.open_snippets(i, point(b.left(), b.bottom() + px(2.)), window, cx);
+                        })),
+                );
+            }
+            area.child(crate::ui::tool_separator())
+                .child(
+                    cell("fs-import".into())
+                        .w(px(32.))
+                        .when(self.import_panel.is_some(), |d| d.bg(pal.border))
+                        .tooltip(crate::ui::tooltip("Import"))
+                        .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
+                        .child(probe(&self.import_anchor))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
+                )
+                .child(
+                    cell("fs-format".into())
+                        .w(px(32.))
+                        .tooltip(crate::ui::tooltip("Format Feature Studio"))
+                        .child(os::glyph(os::GLYPH_BRUSH, 20., pal.text))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.format(window, cx))),
+                )
+                .child(probe(&self.tb.snip_full))
+                .into_any_element()
+        } else {
+            // The snippet menus as one split button faced with the last-used
+            // snippet, and Import ▾ (live 71-compact-*).
+            let face = snippet_face();
+            let face_text = snippet_text(&face).unwrap_or_default();
+            let (snip_anchor, import_caret_anchor) = (BoundsCell::default(), BoundsCell::default());
+            let (sa, ia) = (snip_anchor.clone(), import_caret_anchor.clone());
+            h_flex()
+                .flex_none()
+                .relative()
+                .gap(px(2.))
+                .child(
+                    crate::ui::tool_group(
+                        "fs-snip-group",
+                        cell("fs-snip-face".into())
+                            .tooltip(crate::ui::tooltip(face.clone()))
+                            .child(div().text_size(px(14.)).text_color(pal.text).child(face))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.insert_snippet(face_text, window, cx))),
+                        crate::ui::tool_caret("fs-snip-caret", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let b = sa.get();
+                            this.open_all_snippets(point(b.left(), b.bottom() + px(2.)), window, cx);
+                        })),
+                    )
+                    .relative()
+                    .child(probe(&snip_anchor)),
+                )
+                .child(crate::ui::tool_separator())
+                .child(
+                    crate::ui::tool_group(
+                        "fs-import-group",
+                        cell("fs-import".into())
+                            .w(px(32.))
+                            .when(self.import_panel.is_some(), |d| d.bg(pal.border))
+                            .tooltip(crate::ui::tooltip("Import"))
+                            .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
+                            .child(probe(&self.import_anchor))
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
+                        crate::ui::tool_caret("fs-import-caret", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            let b = ia.get();
+                            this.open_import_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
+                        })),
+                    )
+                    .relative()
+                    .child(probe(&import_caret_anchor)),
+                )
+                .child(probe(&self.tb.snip_compact))
+                .into_any_element()
+        };
+        // A resize re-lays the toolbar out without rendering this view: when
+        // its width changes, render again so the stage follows.
+        let (rendered_w, tb_cell, view) = (self.tb.toolbar.get().size.width, self.tb.toolbar.clone(), cx.entity().downgrade());
+        let watch = canvas(|_, _, _| {}, move |_, _, _, cx| {
+            if tb_cell.get().size.width != rendered_w {
+                let view = view.clone();
+                cx.defer(move |cx| {
+                    let _ = view.update(cx, |_, cx| cx.notify());
+                });
+            }
+        })
+        .absolute()
+        .size(px(1.));
         let mut toolbar = crate::ui::toolbar()
-            .child(crate::ui::undo_redo(&self.doc, cx))
+            .relative()
+            .child(probe(&self.tb.toolbar))
+            .child(watch)
+            .child(undo_area)
             .child(crate::ui::tool_separator())
             .child(
                 cell("fs-new".into())
                     .tooltip(crate::ui::tooltip("New feature"))
                     .child(os::glyph(os::GLYPH_NEW_FEATURE, 20., pal.text))
-                    .child(div().text_size(px(14.)).text_color(pal.text).child("New feature"))
+                    .when(stage >= 2, |d| d.child(div().relative().text_size(px(14.)).text_color(pal.text).child("New feature").child(probe(&self.tb.new_label))))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_snippet(NEW_FEATURE, window, cx))),
             )
-            .child(crate::ui::tool_separator());
-        for (i, (tip, letter, _)) in SNIPPET_MENUS.iter().enumerate() {
-            let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
-            let a2 = anchor.clone();
-            toolbar = toolbar.child(
-                cell(SharedString::from(format!("fs-snip-{i}")))
-                    .w(px(50.))
-                    .tooltip(crate::ui::tooltip(*tip))
-                    // Live document/70: Onshape's 20 px menu icon (letter / glyph and
-                    // the ▸≡ list), then the chevron.
-                    .child(crate::assets::icon(letter, 20., cx))
-                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text))
-                    .child(probe(&anchor))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        let b = a2.get();
-                        this.open_snippets(i, point(b.left(), b.bottom() + px(2.)), window, cx);
-                    })),
-            );
-        }
-        toolbar = toolbar
             .child(crate::ui::tool_separator())
-            .child(
-                cell("fs-import".into())
-                    .w(px(32.))
-                    .when(self.import_panel.is_some(), |d| d.bg(pal.border))
-                    .tooltip(crate::ui::tooltip("Import"))
-                    .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
-                    .child(probe(&self.import_anchor))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
-            )
-            .child(
-                cell("fs-format".into())
-                    .w(px(32.))
-                    .tooltip(crate::ui::tooltip("Format Feature Studio"))
-                    .child(os::glyph(os::GLYPH_BRUSH, 20., pal.text))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.format(window, cx))),
-            )
+            .child(snip_area);
+        toolbar = toolbar
             .child(crate::ui::tool_separator())
             .child(self.render_commit(cx))
             .child(
@@ -1011,7 +1246,7 @@ impl Render for FeatureStudioView {
                     })))
                     .child(probe(&tools_anchor)),
             )
-            .child(div().flex_1());
+            .child(div().flex_1().relative().child(probe(&self.tb.spacer)));
         // Right side: Monitor ▾, Module outline ▾, back / forward, Line, Column.
         let d = &self.doc.read(cx).session.doc;
         let monitored = crate::fs_notices::monitored(&self.doc, cx);
@@ -1032,7 +1267,8 @@ impl Render for FeatureStudioView {
                     .relative()
                     .flex_none()
                     .h(px(29.))
-                    .max_w(px(220.))
+                    // Live 70-toolbar-1920: a fixed 247 px; the name truncates.
+                    .w(px(247.))
                     .pl(px(6.))
                     .gap(px(6.))
                     .border_1()
@@ -1088,7 +1324,7 @@ impl Render for FeatureStudioView {
                     )
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
             )
-            .child(div().flex_none().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)));
+            .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)));
         let outline_at = below(&out_anchor);
         let outline = self.render_outline(outline_at, window, cx);
         v_flex()

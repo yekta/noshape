@@ -188,6 +188,31 @@ pub fn set_input_cell(ps: &mut PartStudio, part: &BodyId, row: usize, input: &st
     }
 }
 
+/// Set `prop` of `part` for configuration `config`, adding that row when
+/// the table has none for it (live 626–627: editing the property in an
+/// assembly BOM for an instance in that configuration adds the row). Does
+/// nothing when the part has no table or the table lacks `prop`. Returns
+/// whether it set the value.
+pub fn set_for_configuration(ps: &mut PartStudio, part: &BodyId, prop: &str, config: &ConfigValues, value: &str) -> bool {
+    let (_, effective) = ps.configuration.visibility(config);
+    let cols: Vec<(String, String)> = input_columns(&ps.configuration).iter().map(|i| (i.id.clone(), effective.0.get(&i.id).cloned().unwrap_or_else(|| input_default(i)))).collect();
+    let row = table(ps, part).and_then(|t| t.properties.iter().any(|p| p == prop).then(|| t.rows.iter().position(|r| cols.iter().all(|(id, v)| r.config.0.get(id) == Some(v)))));
+    let Some(row) = row else { return false };
+    let Some(t) = table_mut(ps, part) else { return false };
+    let i = match row {
+        Some(i) => i,
+        None => {
+            // New rows start from the first row's values (the part's own
+            // values when the table was made).
+            let values = t.rows.first().map(|r| r.values.clone()).unwrap_or_default();
+            t.rows.push(PropertyRow { config: ConfigValues(cols.into_iter().collect()), values });
+            t.rows.len() - 1
+        }
+    };
+    t.rows[i].values.insert(prop.to_string(), value.to_string());
+    true
+}
+
 /// The row that applies to configuration `active`.
 pub fn applying_row<'a>(cfg: &Configuration, t: &'a PropertyTable, active: &ConfigValues) -> Option<&'a PropertyRow> {
     let (_, effective) = cfg.visibility(active);
@@ -231,12 +256,38 @@ pub fn copy_table(ps: &PartStudio, part: &BodyId) -> String {
     lines.join("\n")
 }
 
-/// Regeneration: a configured Name renames the part in the Parts list for
-/// configurations that have a row (live 644, 647).
+/// An Appearance cell's text: `#RRGGBB` (sRGB), with a 2-digit alpha when
+/// not opaque.
+pub fn color_text(rgb: [u8; 3], alpha: f32) -> String {
+    let a = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
+    if a == 255 { format!("#{:02X}{:02X}{:02X}", rgb[0], rgb[1], rgb[2]) } else { format!("#{:02X}{:02X}{:02X}{a:02X}", rgb[0], rgb[1], rgb[2]) }
+}
+
+/// An Appearance cell's color as linear RGBA.
+pub fn parse_color(text: &str) -> Option<[f32; 4]> {
+    let h = text.trim().strip_prefix('#')?;
+    if !(h.len() == 6 || h.len() == 8) || !h.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let byte = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).ok();
+    let lin = |c: u8| {
+        let c = c as f32 / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let a = if h.len() == 8 { byte(6)? as f32 / 255.0 } else { 1.0 };
+    Some([lin(byte(0)?), lin(byte(2)?), lin(byte(4)?), a])
+}
+
+/// Regeneration: a configured Name renames the part in the Parts list and
+/// a configured Appearance colors it, for configurations that have a row
+/// (live 644, 647).
 pub fn apply_names(display: &mut crate::display::StudioDisplay, ps: &PartStudio, active: &ConfigValues) {
     for b in &mut display.bodies {
         if let Some(n) = configured_value(ps, &b.id, "Name", active).filter(|n| !n.trim().is_empty()) {
             b.name = n;
+        }
+        if let Some(c) = configured_value(ps, &b.id, "Appearance", active).and_then(|v| parse_color(&v)) {
+            b.color = c;
         }
     }
 }
@@ -292,6 +343,17 @@ mod tests {
         // Excluding it from properties makes the row apply again.
         ps.configuration.inputs[2].excluded = true;
         assert_eq!(configured_value(&ps, &part, "Part number", &cv(&[("Size", "Large")])).as_deref(), Some("PN-LA"));
+        // A BOM edit for another configuration adds its row.
+        assert!(set_for_configuration(&mut ps, &part, "Part number", &cv(&[("Size", "Small"), ("Shape", "B")]), "PN-SB"));
+        assert_eq!(table(&ps, &part).unwrap().rows.len(), 2);
+        assert_eq!(configured_value(&ps, &part, "Part number", &cv(&[("Size", "Small"), ("Shape", "B")])).as_deref(), Some("PN-SB"));
+        assert!(!set_for_configuration(&mut ps, &part, "Vendor", &cv(&[("Size", "Small")]), "x"));
+        // Appearance cells hold "#RRGGBB[AA]".
+        assert_eq!(color_text([157, 207, 237], 1.0), "#9DCFED");
+        assert_eq!(color_text([255, 0, 0], 0.5), "#FF000080");
+        let c = parse_color("#FF000080").unwrap();
+        assert!((c[0] - 1.0).abs() < 1e-6 && c[1] == 0.0 && (c[3] - 128.0 / 255.0).abs() < 1e-6);
+        assert!(parse_color("Default").is_none());
         delete_column(&mut ps, &part, "Part number");
         assert_eq!(table(&ps, &part).unwrap().columns(), ["Name", "Description"]);
         delete_table(&mut ps, &part);

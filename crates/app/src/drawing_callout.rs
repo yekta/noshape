@@ -261,7 +261,7 @@ impl DrawingEditor {
                             h_flex()
                                 .gap(px(4.))
                                 .child(symbols)
-                                .child(div().w(px(70.)).child(Input::new(&inputs[HEIGHT]).text_size(px(13.33)).xsmall()))
+                                .child(div().w(px(70.)).child(Input::new(&inputs[HEIGHT]).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall()))
                                 .child(select("callout-border", style.border.name().into(), 110., borders))
                                 .child(select("callout-size", size_label.into(), 116., sizes)),
                         ),

@@ -402,7 +402,7 @@ impl DrawingEditor {
                 .w(px(188.))
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
-                .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).appearance(false).xsmall()))
+                .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()))
                 .child(Button::new(id).ghost().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                     for v in &items {
                         let (e, st, v) = (ed.clone(), input2.clone(), v.clone());

@@ -1595,7 +1595,7 @@ impl AssemblyView {
                 let row_sel = sel == Some((i, None));
                 let name_el: AnyElement = match self.rename_input(RenameTarget::Explode(i), cx) {
                     Some(inp) => inp,
-                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).child(v.name.clone()).into_any_element(),
+                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).when(active, |d| d.font_weight(FontWeight::MEDIUM)).child(v.name.clone()).into_any_element(),
                 };
                 let name = v.name.clone();
                 tree = tree.child(
@@ -1604,8 +1604,9 @@ impl AssemblyView {
                         .h(px(26.))
                         .border_l(px(5.))
                         .border_color(if active { blue.into() } else { gpui_kit::transparent_black() })
-                        .when(row_sel, |d| d.bg(pal.accent_soft))
-                        .when(!row_sel, |d| d.hover(|d| d.bg(pal.row_hover)))
+                        // Live 819: the view in explode mode shows only blue text and the bar.
+                        .when(row_sel && !active, |d| d.bg(pal.accent_soft))
+                        .when(!row_sel && !active, |d| d.hover(|d| d.bg(pal.row_hover)))
                         .child(
                             div()
                                 .id(SharedString::from(format!("ex-exp-{i}")))
@@ -1678,7 +1679,9 @@ impl AssemblyView {
                 if !open {
                     continue;
                 }
-                // Steps, then the rollback bar after the steps in effect.
+                // Steps, then the rollback bar after the steps in effect, on a
+                // grey tree guide under the chevron (live 819).
+                let mut steps = v_flex().relative();
                 let n = v.steps.len();
                 let upto = if active { self.explode_progress.map(|p| p.round() as usize).unwrap_or(n).min(n) } else { n };
                 let bar = |id: SharedString, _: &mut Context<Self>| {
@@ -1697,7 +1700,7 @@ impl AssemblyView {
                 };
                 for (k, st) in v.steps.iter().enumerate() {
                     if active && k == upto {
-                        tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
+                        steps = steps.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                     }
                     let rotation = st.rotation_axis.is_some();
                     let step_sel = sel == Some((i, Some(k)));
@@ -1711,7 +1714,7 @@ impl AssemblyView {
                         // Live 821: rolled-back steps are italic grey.
                         None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).when(rolled_back, |d| d.italic().text_color(pal.text_faint)).child(label.clone()).into_any_element(),
                     };
-                    tree = tree.child(
+                    steps = steps.child(
                         h_flex()
                             .id(SharedString::from(format!("ex-step-{i}-{k}")))
                             .h(px(26.))
@@ -1779,8 +1782,9 @@ impl AssemblyView {
                 // The rollback bar only in explode mode (live 816: after Done
                 // the view is plain).
                 if active && upto >= n {
-                    tree = tree.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
+                    steps = steps.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                 }
+                tree = tree.child(steps.when(n > 0, |d| d.child(div().absolute().left(px(14.)).top_0().bottom(px(-6.)).w(px(1.)).bg(rgb(0xd7d7d7)))));
             }
             pane = pane.child(tree);
             // The how-to box: one view, gone after its first step (live 805).
@@ -3117,7 +3121,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .relative()
-                        .child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).pl(px(8.))),
+                        .child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).text_size(px(12.)).pl(px(5.))),
                 )
                 .into_any_element(),
         )

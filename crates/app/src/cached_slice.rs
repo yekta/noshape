@@ -10,6 +10,8 @@
 //! [`Slice::observing`]); a child's notification that only marks the parent
 //! dirty leaves it cached.
 
+use std::rc::Rc;
+
 use gpui_kit::*;
 
 /// Renders a part of `V`.
@@ -17,7 +19,7 @@ pub type SliceRender<V> = fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement
 
 pub struct Slice<V: 'static> {
     parent: WeakEntity<V>,
-    render: SliceRender<V>,
+    render: Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement>,
     subs: Vec<Subscription>,
 }
 
@@ -25,9 +27,15 @@ impl<V: 'static> Slice<V> {
     /// A slice of `parent` drawn by `render`, invalidated by the parent's
     /// own notifications.
     pub fn new(parent: &Entity<V>, render: SliceRender<V>, cx: &mut App) -> Entity<Self> {
+        Self::with(parent, render, cx)
+    }
+
+    /// Like [`Slice::new`] with a closure, e.g. one row of a list keyed by
+    /// what it captures.
+    pub fn with(parent: &Entity<V>, render: impl Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement + 'static, cx: &mut App) -> Entity<Self> {
         cx.new(|cx| {
             let sub = cx.observe(parent, |_, _, cx| cx.notify());
-            Self { parent: parent.downgrade(), render, subs: vec![sub] }
+            Self { parent: parent.downgrade(), render: Rc::new(render), subs: vec![sub] }
         })
     }
 
@@ -43,7 +51,7 @@ impl<V: 'static> Slice<V> {
 
 impl<V: 'static> Render for Slice<V> {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let render = self.render;
+        let render = self.render.clone();
         self.parent.update(cx, |parent, cx| render(parent, window, cx)).unwrap_or_else(|_| div().into_any_element())
     }
 }

@@ -88,9 +88,10 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
 | psb: Part Studio behaviour (+ release workflow, materials) | 76bd77b6-fcaf-41ed-a850-3e55a5059984 | Yekta / Opus 5.5 | :102, target-behave | `docs/handoff/part-studio-behaviour.md` |
 | skb: assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-behave | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
-| asb: PAUSED (OOM 10-20) — drawing behaviour | 330203cf-d732-49b9-b81c-cf46fabfc5d6 | Motile / Opus 5.5 | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
+| asb: drawing behaviour | 330203cf-d732-49b9-b81c-cf46fabfc5d6 | Motile / Opus 5.5 | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
 | kern: PAUSED (OOM 10-20) — kernel robustness + import/export | 1d8d27a8-3e1e-408a-9059-12bf7ecef977 | Yekta / Opus 5.5 | :106, target-engine | `docs/handoff/kernel-robustness.md` |
+| api: agent API — CLI + MCP server (all app features usable by agents) | a96efc40-80f0-47b9-abea-5100e6b0b648 | Motile / Opus 5.5 | target-engine | `docs/handoff/agent-api.md` |
 | perf: viewport performance (60/120 fps at Retina; zero-copy presentation) | b16dc34d-5789-4fb1-b97d-de6fd94b84c8 | Unbind / Opus 5.5 | :113, target-engine | `docs/handoff/viewport-performance.md` |
 | fs: PAUSED (OOM 10-20) — FeatureScript language + std library (resumed 08:20; first: green tests + model clippy) | 80461700-2f11-4bd2-afd0-170152385f77 | Ngyekta / Opus 5.5 | :108, target-engine | `docs/handoff/featurescript.md` |
 

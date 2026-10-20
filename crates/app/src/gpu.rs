@@ -113,6 +113,10 @@ impl Gpu {
         };
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         gpui_wgpu::request_device_features(noshape_render::Renderer::WANTED_FEATURES);
+        if noshape_render::perf::enabled() {
+            // GPUI's draw phases (render + layout requests, prepaint, paint, present).
+            gpui_kit::set_draw_stats_hook(noshape_render::perf::record);
+        }
         std::thread::Builder::new().name("noshape-gpu-init".into()).spawn(move || {
             let worker = spawn_worker(on_done);
             match &worker {
@@ -290,9 +294,22 @@ fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderW
     #[cfg(target_os = "macos")]
     if forced.as_deref() != Some("readback") {
         // GPUI (Metal) samples the renderer's textures directly when both
-        // draw with the same GPU (always on Apple silicon; see
-        // `compositor_shares_gpu`).
-        let renderer = noshape_render::Renderer::new().map_err(|e| e.to_string())?;
+        // draw with the same GPU (`compositor_shares_gpu`). Apple silicon has
+        // one; on Intel Macs with two, GPUI draws with the integrated one, so
+        // render on the GPU GPUI reports when its first window opens.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let gpui_gpu = loop {
+            match gpui_kit::renderer_gpus().first() {
+                Some(id) => break Some(*id),
+                None if std::time::Instant::now() >= deadline => break None,
+                None => std::thread::sleep(std::time::Duration::from_millis(5)),
+            }
+        };
+        let renderer = match gpui_gpu.and_then(metal::device_name) {
+            Some(name) => noshape_render::Renderer::new_matching(|info| info.backend == noshape_render::wgpu::Backend::Metal && info.name == name),
+            None => noshape_render::Renderer::new(),
+        }
+        .map_err(|e| e.to_string())?;
         if let Some(id) = metal::registry_id(renderer.device()) {
             let _ = metal::RENDERER_GPU.set(id);
             return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Texture));
@@ -330,6 +347,12 @@ mod metal {
 
     /// `registryID` of the renderer's Metal device.
     pub static RENDERER_GPU: OnceLock<u64> = OnceLock::new();
+
+    /// The name of the Metal device with `registryID` `id` (what wgpu calls
+    /// its adapter).
+    pub fn device_name(id: u64) -> Option<String> {
+        objc2_metal::MTLCopyAllDevices().iter().find(|d| d.registryID() == id).map(|d| d.name().to_string())
+    }
 
     pub fn registry_id(device: &wgpu::Device) -> Option<u64> {
         // SAFETY: only reads the device's identity.

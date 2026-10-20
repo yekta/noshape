@@ -1074,6 +1074,7 @@ impl PartStudioView {
                     s.select_all(window, cx);
                 });
                 self.dim_input = Some((cid, state, sub));
+                self.ui.dim_box_offset = Point::default();
             }
             None => self.dim_input = None,
         }
@@ -2538,12 +2539,14 @@ impl PartStudioView {
                     // The box is centered on the label position (live sketch/12-13).
                     v_flex()
                         .absolute()
-                        .left(px(x - 104.0))
-                        .top(px(y - 30.0))
+                        .left(px(x - 104.0) + self.ui.dim_box_offset.x)
+                        .top(px(y - 30.0) + self.ui.dim_box_offset.y)
                         .w(px(209.))
                         .occlude()
                         .child(
+                            // `.dimension-dialog-drag { cursor: move }`: dragging it moves the box.
                             div()
+                                .id("dim-box-drag")
                                 .h(px(13.))
                                 .flex()
                                 .items_center()
@@ -2553,7 +2556,18 @@ impl PartStudioView {
                                 .border_color(rgb(0xcccccc))
                                 .text_size(px(9.33))
                                 .text_color(pal.text)
-                                .child("◻◻◻"),
+                                .cursor(CursorStyle::Move)
+                                .child("◻◻◻")
+                                .on_drag(DimBoxMove(Default::default()), |d, offset, _, cx| {
+                                    *d.0.lock() = offset;
+                                    cx.new(|_| DimBoxGhost)
+                                })
+                                .on_drag_move(cx.listener(|this, e: &DragMoveEvent<DimBoxMove>, _, cx| {
+                                    let grab = *e.drag(cx).0.lock();
+                                    let delta = e.event.position - grab - e.bounds.origin;
+                                    this.ui.dim_box_offset = this.ui.dim_box_offset + delta;
+                                    cx.notify();
+                                })),
                         )
                         .child(
                             h_flex()
@@ -2931,7 +2945,9 @@ impl PartStudioView {
                         .on_action(cx.listener(|this, _: &SketchEntryNext, window, cx| this.otf_switch(1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryPrev, window, cx| this.otf_switch(-1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
-                        .child(Input::new(st).xsmall())
+                        // Live (inputs/6_on-the-fly_dimension_box): 13.33 px right-aligned, pl/pr 3,
+                        // a blue bottom border on a transparent box.
+                        .child(div().border_b_1().border_color(p().accent).child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))))
                         .into_any_element(),
                 );
                 continue;
@@ -3005,7 +3021,7 @@ impl PartStudioView {
                         window.focus(&this.focus, cx);
                         this.refresh_scene(false, cx);
                     }))
-                    .child(Input::new(&st).xsmall())
+                    .child(div().border_b_1().border_color(p().accent).child(Input::new(&st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))))
                     .into_any_element(),
             );
         }
@@ -3730,5 +3746,17 @@ mod tests {
             assert!(seen.insert(format!("{t:?}")), "{t:?} twice");
         }
         assert!(tools.contains(&Tool::InsertDxf) && tools.contains(&Tool::Chamfer) && tools.contains(&Tool::SplinePoint));
+    }
+}
+
+/// Dragging the sketch dimension box by its strip (the grab point in it).
+#[derive(Clone)]
+pub(super) struct DimBoxMove(std::sync::Arc<parking_lot::Mutex<Point<Pixels>>>);
+
+struct DimBoxGhost;
+
+impl Render for DimBoxGhost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
     }
 }

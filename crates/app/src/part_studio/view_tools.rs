@@ -280,7 +280,7 @@ impl PartStudioView {
                                 .rounded(px(2.))
                                 .border_1()
                                 .border_color(pal.focus)
-                                .child(crate::ui::input_with_placeholder(&st, "Search tools", cx).appearance(false).cleanable(true).text_size(px(14.)).pl(px(8.))),
+                                .child(crate::ui::input_with_placeholder(&st, "Search tools", cx).appearance(false).cleanable(true).text_size(px(14.)).pl(px(5.))),
                         ),
                 )
                 .when(self.palette_query.trim().is_empty(), |d| {
@@ -690,7 +690,7 @@ impl PartStudioView {
                         .h(px(29.))
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
-                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Named views"))
+                        .child(crate::ui::panel_title("ps-named-views", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Named views")))
                         .child(
                             div()
                                 .id("nv-close")

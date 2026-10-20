@@ -130,7 +130,7 @@ impl DrawingEditor {
                         .p(px(3.))
                         .child(h_flex().child(tab("brk-h", "Horizontal", !vertical, false, cx)).child(tab("brk-v", "Vertical", vertical, true, cx)))
                         .child(row("Break line", styles.into_any_element()))
-                        .child(row("Gap distance", div().w(px(130.)).child(Input::new(&d.gap_input).small()).into_any_element()))
+                        .child(row("Gap distance", div().w(px(130.)).child(Input::new(&d.gap_input).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(2.))).into_any_element()))
                         .child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click in the view to place the two break lines")),
                 )
                 .into_any_element(),

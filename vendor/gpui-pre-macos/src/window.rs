@@ -2572,6 +2572,16 @@ extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
             CursorStyle::DragLink => msg_send![class!(NSCursor), dragLinkCursor],
             CursorStyle::DragCopy => msg_send![class!(NSCursor), dragCopyCursor],
             CursorStyle::ContextualMenu => msg_send![class!(NSCursor), contextualMenuCursor],
+            // NOSHAPE PATCH: Chrome's `move` / `wait` on macOS: AppKit's private
+            // move and busy cursors when present, else the open hand / arrow.
+            CursorStyle::Move => {
+                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(_moveCursor)];
+                if responds == YES { msg_send![class!(NSCursor), _moveCursor] } else { msg_send![class!(NSCursor), openHandCursor] }
+            }
+            CursorStyle::Wait => {
+                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(busyButClickableCursor)];
+                if responds == YES { msg_send![class!(NSCursor), busyButClickableCursor] } else { msg_send![class!(NSCursor), arrowCursor] }
+            }
         };
 
         let bounds = NSView::bounds(this as *const Object as id);

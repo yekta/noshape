@@ -798,6 +798,30 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   8/8). qa4's latency work addresses it.
 - Feature Studio toolbar clipping at 1280/1440: waiting for the live capture (REQUESTS.md, 20 Oct).
 
+## Round 14 (2026-10-20 night, typography, tab bar, FS toolbar, select style)
+
+- **Placeholders**: Roboto Light Italic bundled (assets/fonts/Roboto-LightItalic.ttf, v2.138 hinted, same
+  source as the other faces, Apache 2.0); `PlaceholderStyle` = italic, weight 300, `#666` (live
+  dom/caret-inputs.json).
+- **Input text sizes** per live/dom: audit in /root/ui-scratch/input-sizes.md (188 sites: 36 OK, 48
+  changed, 104 unknown → REQUESTS.md "input font sizes"). Note: theme rem = 14 px, so the kit presets are
+  12.25 px (default/small) and 10.5 px (xsmall); a parent's `text_size` doesn't reach the input: set it on
+  the `Input`. Applied with /root/ui-scratch/tools/apply_sizes.py.
+- **Tab bar scroll buttons** verified at 1280 (/root/ui-scratch/tools/tabtest.sh): with the tab bar a
+  cached slice (qa4), the bar row needs `w_full()` (else the strip sizes to its content and never
+  overflows), and a watcher canvas re-renders the slice when overflow / ends change after layout.
+- **Feature Studio toolbar** (feature_studio.rs `ToolbarFit`): fit-to-width stages like live (3 full; 2
+  snippets → "<last snippet> ▾" split + Import ▾; 1 New feature icon-only; 0 Undo ▾), measured from the
+  last layout with probes, re-rendered on resize by a watcher; clipped below stage 0. Snippet ▾ = flat list
+  of all 70 snippets, a pick inserts and becomes the face (config_dir/feature_studio_snippet.txt); Undo ▾ =
+  Undo / Redo with key chips; Import ▾ = Import / Format Studio. Monitor a fixed 247 px (live). Onshape's
+  breakpoints also count the Co-complete toggle (an AI Labs feature, not in noshape).
+- **Native select** (`os_ui::select_field`, a Bootstrap form-control `<select>`): the list is Chrome's
+  (`os_menu::native_select`, highlight `#1967d2`, was `#1e63d0`), the field gets the 2 px `#3e94ff` ring
+  while open (`OsMenu::focus_ring`, drawn by the menu host), caret `#777`. Checked against live 182.
+- Tools: /root/ui-scratch/tools (a subagent once deleted that folder while cleaning up: tell subagents not
+  to delete anything outside their own files).
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting

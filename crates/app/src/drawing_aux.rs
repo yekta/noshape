@@ -39,7 +39,7 @@ impl DrawingEditor {
         match (self.aux_dlg.is_some(), active) {
             (false, true) => {
                 let next = self.current_sheet().next_label();
-                let label = cx.new(|cx| InputState::new(window, cx).default_value(next));
+                let label = cx.new(|cx| InputState::new(window, cx).placeholder("Auxiliary id").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: false, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x999999).into()) }).default_value(next));
                 self.aux_dlg = Some(AuxDlg { mode: 0, label, reverse: false, show_ref: true, anchor: None });
             }
             (true, false) => self.aux_dlg = None,
@@ -116,7 +116,7 @@ impl DrawingEditor {
     pub fn edit_aux_view(&mut self, id: noshape_model::drawing::ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(v) = self.current_sheet().view(id).cloned() else { return };
         let r = v.aux_ref.clone();
-        let label = cx.new(|cx| InputState::new(window, cx).default_value(r.as_ref().map(|r| r.letter.clone()).unwrap_or_default()));
+        let label = cx.new(|cx| InputState::new(window, cx).placeholder("Auxiliary id").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: false, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x999999).into()) }).default_value(r.as_ref().map(|r| r.letter.clone()).unwrap_or_default()));
         self.aux_edit = Some((id, AuxDlg { mode: 0, label, reverse: v.flip, show_ref: r.as_ref().is_none_or(|r| r.show), anchor: r.map(|r| r.anchor) }));
         cx.notify();
     }
@@ -165,7 +165,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(3.)))))
                         .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(Checkbox::new("auxe-rev").label("Reverse").small().checked(reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some((_, d)) = &mut this.aux_edit {
                                 d.reverse = *v;
@@ -253,7 +253,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(3.)))))
                         .child(h_flex().mt(px(3.)).child(tab("aux-normal", "Normal", 0, cx)).child(tab("aux-inline", "In line", 1, cx)).child(tab("aux-axis", "Axis", 2, cx)))
                         .child(
                             h_flex()

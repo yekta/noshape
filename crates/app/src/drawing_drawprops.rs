@@ -375,7 +375,7 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 1 {
             // Dimensions › All dimensions, Gaps and extensions.
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
@@ -443,7 +443,7 @@ impl DrawingEditor {
             // Annotations, in Onshape's groups: All annotations (Arrowhead),
             // then each type's font, text height and color with its extras.
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
@@ -573,7 +573,7 @@ impl DrawingEditor {
             // Per view type.
             let vt = props.view_tab.clone();
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             let detail_lines: Vec<(String, bool, Act)> = ["Phantom", "Dashed", "Solid"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_line == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_line = i as u8) as Act)).collect();
@@ -617,7 +617,7 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             body = body
@@ -644,7 +644,7 @@ impl DrawingEditor {
                 .child(row("Color", color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)));
         } else if self.drawing_props.tab == 6 {
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             body = body
@@ -665,7 +665,7 @@ impl DrawingEditor {
             ];
             let shape_items: Vec<(String, bool, Act)> = InspectionShape::ALL.iter().map(|&s| (s.name().to_string(), s == props.inspection_shape, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_shape = s) as Act)).collect();
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
                 None => div().into_any_element(),
             };
             body = body

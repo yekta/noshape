@@ -633,7 +633,7 @@ impl Render for VariableStudioView {
                             // An inserted studio's title starts with the studio icon (live part-studio/160).
                             .when(in_panel, |r| r.child(crate::assets::icon("variable-studio", 20., cx)))
                             .child(match &self.renaming {
-                                Some(st) => div().w(px(260.)).text_size(px(16.)).child(Input::new(st).h(px(26.)).text_size(px(16.))).into_any_element(),
+                                Some(st) => div().w(px(260.)).text_size(px(16.)).border_b_1().border_color(pal.accent).child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
                                 None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title).into_any_element(),
                             })
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

@@ -111,7 +111,10 @@ impl DrawingEditor {
         let tol_a = self.input(&ta, window, cx);
         let tol_b = self.input(&tb, window, cx);
         // Live: the prefix box has the focus.
-        Self::focus_input(&prefix, window, cx);
+        // Live 15: the prefix box has the focus. Set it after the double
+        // click's own focus handling.
+        let first = prefix.clone();
+        window.defer(cx, move |window, cx| first.update(cx, |s, cx| s.focus(window, cx)));
         let mut subs = Vec::new();
         for (k, st) in [(0u8, &above), (1, &prefix), (2, &suffix), (3, &below), (4, &tol_a), (5, &tol_b), (6, &value)] {
             subs.push(cx.subscribe(st, move |this: &mut Self, _, ev: &InputEvent, cx| match ev {
@@ -228,7 +231,7 @@ impl DrawingEditor {
         [(px_x as f32).clamp(0., (s[0] as f32 - 500.).max(0.)), (px_y as f32 - 30.).clamp(0., (s[1] as f32 - 200.).max(0.))]
     }
 
-    pub fn render_palette(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.palette.as_ref()?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
@@ -244,8 +247,18 @@ impl DrawingEditor {
             Some(u) if u.symbol().is_empty() => "(ft-in)".to_string(),
             Some(u) => format!("({})", u.symbol()),
         };
+        // A focused box: live's 1 px rgba(82,168,236,.8) border with an 8 px
+        // rgba(82,168,236,.6) glow (dom/drawing-dimension-edit-dialog.txt).
+        let focus_id = [&d.above, &d.prefix, &d.value, &d.suffix, &d.below, &d.tol_a, &d.tol_b].into_iter().find(|st| st.read(cx).focus_handle(cx).is_focused(window)).map(|st| st.entity_id());
         let field = |st: &Entity<InputState>, w: Option<f32>, h: f32| {
-            let b = div().h(px(h)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(3.)).child(Input::new(st).text_size(px(14.)).appearance(false).xsmall());
+            let on = focus_id == Some(st.entity_id());
+            let b = div()
+                .h(px(h))
+                .border_1()
+                .border_color(if on { gpui_kit::rgba(0x52a8eccc) } else { gpui_kit::rgba(0xccccccff) })
+                .when(on, |e| e.shadow(vec![BoxShadow { color: hsla(206. / 360., 0.81, 0.62, 0.6), offset: point(px(0.), px(0.)), blur_radius: px(8.), spread_radius: px(0.), inset: false }]))
+                .rounded(px(4.))
+                .bg(gpui_kit::white()).flex().items_center().px(px(3.)).child(Input::new(st).text_size(px(14.)).appearance(false).xsmall());
             match w {
                 Some(w) => b.w(px(w)),
                 None => b.w_full(),

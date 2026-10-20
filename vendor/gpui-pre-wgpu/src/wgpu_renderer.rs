@@ -186,6 +186,11 @@ struct WgpuResources {
     bind_group_layouts: WgpuBindGroupLayouts,
     atlas_sampler: wgpu::Sampler,
     atlas_texture_bind_groups: FxHashMap<AtlasTextureId, CachedTextureBindGroup>,
+    /// NOSHAPE PATCH (agent perf): bind groups of recently shown application
+    /// textures (`gpui::set_external_texture`), newest last: an application
+    /// cycles through a few textures, so their bind groups are reused instead
+    /// of re-created whenever the shown texture changes.
+    external_bind_groups: Vec<(wgpu::TextureView, wgpu::BindGroup)>,
     globals_buffer: wgpu::Buffer,
     globals_bind_group: wgpu::BindGroup,
     path_globals_bind_group: wgpu::BindGroup,
@@ -1345,6 +1350,7 @@ impl WgpuRendererCore {
                 bind_group_layouts,
                 atlas_sampler,
                 atlas_texture_bind_groups: FxHashMap::default(),
+                external_bind_groups: Vec::new(),
                 globals_buffer,
                 globals_bind_group,
                 path_globals_bind_group,
@@ -1720,8 +1726,24 @@ impl WgpuRendererCore {
                 continue;
             }
 
-            let bind_group =
-                self.create_texture_bind_group("atlas_texture_bind_group", &texture_info.view);
+            // NOSHAPE PATCH (agent perf): reuse an application texture's bind group.
+            let external = gpui::ExternalTextureId::from_atlas_texture_id(texture_id).is_some();
+            let cached = external
+                .then(|| self.resources().external_bind_groups.iter().position(|(view, _)| *view == texture_info.view))
+                .flatten()
+                .map(|i| self.resources_mut().external_bind_groups.remove(i).1);
+            let bind_group = cached.unwrap_or_else(|| {
+                self.create_texture_bind_group("atlas_texture_bind_group", &texture_info.view)
+            });
+            if external {
+                // noshape keeps at most 6 frame textures per viewport.
+                const KEEP: usize = 6;
+                let groups = &mut self.resources_mut().external_bind_groups;
+                groups.push((texture_info.view.clone(), bind_group.clone()));
+                if groups.len() > KEEP {
+                    groups.remove(0);
+                }
+            }
             self.resources_mut().atlas_texture_bind_groups.insert(
                 texture_id,
                 CachedTextureBindGroup {

@@ -233,6 +233,9 @@ pub struct StartView {
     view: ViewMode,
     sort: SortKey,
     descending: bool,
+    /// The sort arrow shows once a header was clicked this session (live
+    /// documents/20, 80: the default order is unmarked).
+    sort_shown: bool,
     search: Entity<InputState>,
     query: String,
     selected: Option<PathBuf>,
@@ -361,6 +364,7 @@ impl StartView {
             view: prefs.view,
             sort: prefs.sort,
             descending: prefs.descending,
+            sort_shown: false,
             search,
             query: String::new(),
             selected: None,
@@ -514,6 +518,7 @@ impl StartView {
     }
 
     fn set_sort(&mut self, key: SortKey, cx: &mut Context<Self>) {
+        self.sort_shown = true;
         if self.sort == key {
             self.descending = !self.descending;
         } else {
@@ -812,7 +817,7 @@ impl StartView {
             let pal = p();
             let (view, path, name) = (view.clone(), path.clone(), name.clone());
             let s2 = shown.clone();
-            os::modal(dialog, "Send to trash", 598.)
+            os::modal_doc_page(dialog, "Send to trash", 598.)
                 .child(
                     os::modal_body()
                         .child(
@@ -908,7 +913,7 @@ impl StartView {
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
             let (view, id, name) = (view.clone(), id.clone(), item.name.clone());
-            os::modal(dialog, "Delete forever?", 598.)
+            os::modal_doc_page(dialog, "Delete forever?", 598.)
                 .child(
                     os::modal_body()
                         .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("1 selection will be permanently deleted from your trash; you can't undo this action."))
@@ -940,7 +945,7 @@ impl StartView {
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
             let view = view.clone();
-            os::modal(dialog, "Empty trash?", 598.)
+            os::modal_doc_page(dialog, "Empty trash?", 598.)
                 .child(os::modal_body().child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("This will permanently delete all items from your trash; you can't undo this action.")))
                 .footer(os::modal_footer().child(os::modal_ok(os::danger_button("ok", "Empty trash", cx))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
@@ -1078,7 +1083,7 @@ impl StartView {
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, f) = (location.clone(), view.clone(), f.clone());
-            os::modal(dialog, "Move to", 460.)
+            os::modal_doc_page(dialog, "Move to", 460.)
                 .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
@@ -1156,7 +1161,7 @@ impl StartView {
         window.open_dialog(cx, move |dialog, _, cx| {
             let labels = view.read(cx).labels.clone();
             let body = Self::label_checklist(&view, &d.path, &search, &labels, cx);
-            os::modal(dialog, "Labels", 400.)
+            os::modal_doc_page(dialog, "Labels", 400.)
                 .child(os::modal_body().child(body))
                 .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
         });
@@ -1182,7 +1187,7 @@ impl StartView {
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
                 .bg(rgb(0xffffff))
-                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.))),
+                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.)).pl(px(9.))),
         );
         if labels.labels.is_empty() {
             col = col.child(div().pt(px(6.)).pb(px(34.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
@@ -1643,7 +1648,7 @@ impl StartView {
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, d) = (location.clone(), view.clone(), d.clone());
-            os::modal(dialog, "Move to", 460.)
+            os::modal_doc_page(dialog, "Move to", 460.)
                 .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
@@ -1858,11 +1863,11 @@ impl StartView {
             .os_dropdown_menu("create-dd", false, move |menu, _, _| {
                 // Onshape (live documents/41): Document…, Folder… | Import
                 // files…, Import from ▸ (cloud drives, not offered locally),
-                // Label…, with 16 px icons.
+                // Label…. Live dom documents-create-menu: a Bootstrap
+                // dropdown, 20 px `#555` icons 20 px in, 14 px `#555` text.
                 let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
-                let pal = p();
-                let item = |g: &'static [u8], label: &'static str| OsMenuItem::new(label).icon(os::glyph(g, 16., pal.text));
-                menu.item(item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
+                let item = |g: &'static [u8], label: &'static str| OsMenuItem::new(label).icon(os::glyph(g, 20., rgb(0x555555)));
+                menu.dropdown().item(item(os::GLYPH_DOCUMENT, "Document…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.new_document(window, cx))))
                     .item(item(os::GLYPH_FOLDER, "Folder…").on_click(move |_, window, cx| v2.update(cx, |t, cx| t.new_folder(window, cx))))
                     .separator()
                     .item(item(os::GLYPH_OPEN, "Import files…").on_click(move |_, window, cx| v3.update(cx, |t, cx| t.import_files(window, cx))))
@@ -2055,11 +2060,14 @@ impl StartView {
                         }
                         cx.notify();
                     }))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
-                        this.selected = Some(f2.clone());
-                        cx.notify();
-                    }))
-                    .os_context_menu(move |menu, _, _| Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu)),
+                    // Right-click selects too (the menu's handler stops propagation).
+                    .os_context_menu(move |menu, _, cx| {
+                        view.update(cx, |this, cx| {
+                            this.selected = Some(f2.clone());
+                            cx.notify();
+                        });
+                        Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu)
+                    }),
             );
         }
         // Inside a folder the caption is the folder's name (live dom/documents-folder-row).
@@ -2140,7 +2148,8 @@ impl StartView {
                                 }),
                             )
                         })
-                        .child(div().absolute().left_0().right_0().top(px(4.)).h(px(1.)).bg(pal.tooltip))
+                        // Live 90: a 2 px `#d0dbe5` rule.
+                        .child(div().absolute().left_0().right_0().top(px(4.)).h(px(2.)).bg(pal.tooltip))
                         .child(
                             div().absolute().left_0().right_0().top_0().flex().justify_center().child(
                                 div()
@@ -2239,11 +2248,14 @@ impl StartView {
                         }
                         cx.notify();
                     }))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| {
-                        this.selected = Some(f2.clone());
-                        cx.notify();
-                    }))
-                    .os_context_menu(move |menu, _, _| Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu)),
+                    // Right-click selects too (the menu's handler stops propagation).
+                    .os_context_menu(move |menu, _, cx| {
+                        v.update(cx, |this, cx| {
+                            this.selected = Some(f2.clone());
+                            cx.notify();
+                        });
+                        Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu)
+                    }),
             );
         }
         div().px(px(10.)).pb(px(10.)).child(rows).into_any_element()
@@ -2284,7 +2296,11 @@ impl StartView {
                     .child(div().w(px(82.)).h(px(54.)).flex_none().rounded(px(4.)).bg(rgb(0xf5f5f5)).flex().items_center().justify_center().child(self.thumbnail(&d, 76., 48., false)))
                     .child(div().flex_1().min_w_0().truncate().child(d.name.clone()))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
-                    .os_context_menu(move |menu, _, _| Self::doc_menu(v.clone(), d2.clone(), menu)),
+                    .os_context_menu(move |menu, _, cx| {
+                        let path = d2.path.clone();
+                        v.update(cx, |this, cx| this.select(&path, cx));
+                        Self::doc_menu(v.clone(), d2.clone(), menu)
+                    }),
             );
         }
         Some(
@@ -2401,7 +2417,7 @@ impl StartView {
     /// its right edge; sortable columns show ▲/▼.
     fn list_header_cell(&self, id: &'static str, label: &'static str, key: Option<SortKey>, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
-        let active = key == Some(self.sort);
+        let active = self.sort_shown && key == Some(self.sort);
         h_flex()
             .id(id)
             .h_full()
@@ -2474,7 +2490,7 @@ impl StartView {
                     this.save_prefs();
                     cx.notify();
                 })))
-                .child(div().w(px(142.)).child(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)).h(px(32.)).text_size(px(14.)))),
+                .child(div().w(px(142.)).child(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)).h(px(32.)).text_size(px(14.)).pl(px(7.)))),
         );
         for (i, (c, shown)) in self.columns.clone().into_iter().enumerate() {
             if !q.is_empty() && !c.label().to_lowercase().contains(&q) {
@@ -2624,8 +2640,12 @@ impl StartView {
                         )
                     })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
-                    .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.select(&p1, cx)))
-                    .os_context_menu(move |menu, _, _| Self::doc_menu(v2.clone(), d2.clone(), menu))
+                    // Right-click selects the row too (live documents/25); the
+                    // menu's own handler stops propagation, so select here.
+                    .os_context_menu(move |menu, _, cx| {
+                        v2.update(cx, |this, cx| this.select(&p1, cx));
+                        Self::doc_menu(v2.clone(), d2.clone(), menu)
+                    })
                     .into_any_element()
             })
             .collect();
@@ -2697,11 +2717,12 @@ impl StartView {
             }
         };
         let _ = cx;
+        // Live documents/90–92: centred in the list area, both ways.
         v_flex()
             .flex_1()
             .w_full()
             .items_center()
-            .pt(px(60.))
+            .justify_center()
             .gap(px(20.))
             .child(os::glyph(os::GLYPH_EMPTY, 150., rgb(0xd7d7d7)))
             .child(div().max_w(px(520.)).text_center().text_size(px(14.)).text_color(pal.text).child(text))
@@ -3053,12 +3074,12 @@ impl Location {
                     .gap(px(12.))
                     .border_b_1()
                     .border_color(rgb(os::MODAL_DIVIDER))
-                    .child(div().id("loc-home").cursor_pointer().child(os::glyph(os::GLYPH_HOME, 20., pal.text_muted)).on_click(go(self.root.clone())))
+                    .child(div().id("loc-home").cursor_pointer().child(os::glyph(os::GLYPH_HOME, 20., pal.text)).on_click(go(self.root.clone())))
                     .child(
                         div()
                             .id("loc-back")
                             .when(!at_root, |d| d.cursor_pointer().on_click(go(parent)))
-                            .child(os::glyph(os::GLYPH_BACK, 18., if at_root { pal.text_faint } else { pal.text_muted })),
+                            .child(os::glyph(os::GLYPH_BACK, 18., pal.text)),
                     )
                     .child(
                         h_flex()
@@ -3131,7 +3152,7 @@ impl LabelPick {
                     })),
             );
         }
-        field = field.child(div().flex_1().min_w(px(120.)).child(Input::new(search).appearance(false).disabled(none).h(px(30.)).text_size(px(14.))));
+        field = field.child(div().flex_1().min_w(px(120.)).child(Input::new(search).appearance(false).disabled(none).h(px(30.)).text_size(px(14.)).pl(px(8.))));
         let matches: Vec<String> = self.all.iter().filter(|l| !chosen.contains(l) && (query.is_empty() || l.to_lowercase().contains(&query))).cloned().collect();
         let mut col = v_flex().relative().child(field);
         if focused && !none {
@@ -3171,7 +3192,7 @@ impl LabelPick {
 /// close the dialog.
 fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl Fn(String, &mut Window, &mut App) -> bool + 'static) {
     let NamePrompt { title, ok_label, label, default, hint, location, labels } = prompt;
-    let label_search = labels.as_ref().map(|_| cx.new(|cx| InputState::new(window, cx).placeholder("Search labels")));
+    let label_search = labels.as_ref().map(|_| cx.new(|cx| InputState::new(window, cx).placeholder("Search labels").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x333333).into()) })));
     if let Some(st) = &label_search {
         window
             .subscribe(st, cx, |_, ev: &InputEvent, window, _| {
@@ -3216,14 +3237,17 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
     window.open_dialog(cx, move |dialog, window, cx| {
         let st = state.clone();
         let then = then.clone();
-        os::modal(dialog, title, if location.is_some() { 598. } else { 460. })
+        os::modal_doc_page(dialog, title, if location.is_some() { 598. } else { 460. })
             .child(
+                // Live documents/10: the first label right under the header,
+                // 6 px between a field and the next label.
                 os::modal_body()
+                    .pt(px(0.))
                     .child(os::field_label(label))
                     .child(Input::new(&state).h(px(32.)).text_size(px(14.)))
                     .when_some(hint.clone(), |d, h| d.child(div().text_size(px(12.)).text_color(p().text_muted).child(h)))
-                    .when_some(labels.clone().zip(label_search.clone()), |d, (l, st)| d.child(div().pt(px(10.)).child(os::field_label("Document labels"))).child(l.render(&st, window, cx)))
-                    .when_some(location.clone(), |d, loc| d.child(div().pt(px(10.)).child(os::field_label(loc.0))).child(loc.1.render())),
+                    .when_some(labels.clone().zip(label_search.clone()), |d, (l, st)| d.child(div().pt(px(6.)).child(os::field_label("Document labels"))).child(l.render(&st, window, cx)))
+                    .when_some(location.clone(), |d, loc| d.child(div().pt(px(6.)).child(os::field_label(loc.0))).child(loc.1.render())),
             )
             .footer(
                 os::modal_footer()

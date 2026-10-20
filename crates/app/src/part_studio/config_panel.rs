@@ -136,6 +136,13 @@ impl PartStudioView {
                 if last.as_deref() != Some(v.as_str()) {
                     commit(this, v, cx);
                 }
+                // Configured properties: Enter moves to the cell below.
+                if matches!(ev, InputEvent::PressEnter { .. })
+                    && let Some(next) = this.cp_neighbour(&k, 1, 0)
+                {
+                    next.update(cx, |s, cx| s.focus(window, cx));
+                    return;
+                }
                 // Enter hands the keyboard back to the Part Studio (its
                 // shortcuts work again), like Onshape.
                 if matches!(ev, InputEvent::PressEnter { .. }) {
@@ -446,7 +453,8 @@ impl PartStudioView {
             // Measured / From import: the evaluated value, or "Not set", and
             // a ✎ that opens the feature (live 559).
             let value_cell = if matches!(r.kind.as_str(), "MEASURED" | "TABLE") {
-                let shown = self.display.variables.get(&r.name).map(|q| q.to_string()).unwrap_or_else(|| "Not set".into());
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let shown = self.display.variables.get(&r.name).map(|q| noshape_units::format_quantity(*q, &units)).unwrap_or_else(|| "Not set".into());
                 h_flex()
                     .w(px(140.))
                     .h(px(34.))
@@ -661,7 +669,7 @@ impl PartStudioView {
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                     for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
                         let v = v.clone();
-                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
+                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                     }
                     // Help config-paste-inputs: Paste inputs once something was copied.
                     if !crate::config_visibility::copied_inputs().is_empty() {
@@ -981,6 +989,7 @@ impl PartStudioView {
                 let index = studio.configuration.inputs.iter().position(|i| i.id == iid).unwrap_or(0);
                 let count = studio.configuration.inputs.len();
                 let excluded = input.excluded;
+                let is_variable = matches!(input.kind, ConfigInputKind::Variable { .. });
                 div()
                     .id(SharedString::from(format!("cfg-more-{iid}")))
                     .size(px(25.))
@@ -1017,6 +1026,11 @@ impl PartStudioView {
                                 this.ui.cfg_editing_focus = true;
                                 cx.notify();
                             })));
+                            // A variable input: Edit definition… after Rename (live 710).
+                            if is_variable {
+                                let i11 = id.clone();
+                                m = m.item(item("Edit definition…", Box::new(move |this, window, cx| this.open_variable_input(Some(i11.clone()), window, cx))));
+                            }
                             // Live (434): Edit FeatureScript IDs…, Exclude from /
                             // Include in properties (bundle `setIsCosmetic`).
                             let i9 = id.clone();
@@ -1270,7 +1284,7 @@ impl PartStudioView {
                         cx.notify();
                     }
                 }))
-                .child(Input::new(&st).appearance(false).text_size(size).font_weight(weight))
+                .child(Input::new(&st).appearance(false).text_size(size).font_weight(weight).pl(px(3.)))
                 .into_any_element();
         }
         div()
@@ -1421,10 +1435,14 @@ impl PartStudioView {
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
         };
+        // Add property ▾ drops below the button, right-aligned (live 534).
         let add_menu = {
             let (view, part, name) = (view.clone(), part.clone(), part_name.clone());
+            let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+            let probe = bounds.clone();
             h_flex()
                 .id("cp-add-property")
+                .relative()
                 .h(px(24.))
                 .px(px(10.))
                 .gap(px(14.))
@@ -1437,7 +1455,8 @@ impl PartStudioView {
                 .text_color(pal.text)
                 .child("Add property")
                 .child(crate::ui::glyph("ui-caret-down", 8., pal.text))
-                .on_click(move |e: &ClickEvent, window, cx| {
+                .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                .on_click(move |_: &ClickEvent, window, cx| {
                     let (view, part, name) = (view.clone(), part.clone(), name.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                         for prop in cp::PROPERTIES {
@@ -1452,7 +1471,7 @@ impl PartStudioView {
                         }
                         m
                     });
-                    crate::os_menu::open(e.position(), menu, window, cx);
+                    crate::os_menu::open_anchored(bounds.get().bottom_right(), Anchor::TopRight, menu, window, cx);
                 })
         };
         // ⋯ (with a table): Copy table | Delete table for <part> (live 603).
@@ -1567,6 +1586,16 @@ impl PartStudioView {
             head = head.child(delete_column(h, prop));
         }
         let mut rows: Vec<AnyElement> = Vec::new();
+        self.ui.cp_grid = table
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(ri, _)| {
+                let ins = inputs.iter().map(|i| matches!(i.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. }).then(|| format!("cp-in-{ri}-{}", i.id)));
+                let ps = props.iter().map(|p| matches!(cp::cell_kind(p), cp::CellKind::Text | cp::CellKind::Mass).then(|| format!("cp-{ri}-{p}")));
+                ins.chain(ps).collect()
+            })
+            .collect();
         for (ri, row) in table.rows.iter().enumerate() {
             let mut r = h_flex().border_l_1().border_color(grid);
             for i in &inputs {
@@ -1609,10 +1638,36 @@ impl PartStudioView {
                         let sel = crate::os_ui::select_field(SharedString::from(format!("cp-sel-{ri}-{prop}")), options.iter().map(|o| o.to_string()).collect(), current, move |k, _, cx| set(options[k].to_string(), cx)).h(px(32.)).border_0().rounded(px(0.));
                         cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).px_0().child(sel)
                     }
-                    // Appearance / Material: the part's value as text ("Default",
-                    // "- None -" when unset).
-                    cp::CellKind::Appearance => cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).child(if value.is_empty() { "Default".to_string() } else { value.clone() }),
-                    cp::CellKind::Material => cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).child(if value.is_empty() { "- None -".to_string() } else { value.clone() }),
+                    // Appearance / Material: "Default" / "- None -" until set;
+                    // a click opens the Appearance or Material popup for the
+                    // cell (live 634).
+                    cp::CellKind::Appearance => {
+                        let swatch = cp::parse_color(&value).map(|c| {
+                            let s = |x: f32| if x <= 0.003_130_8 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 };
+                            div().size(px(14.)).flex_none().border_1().border_color(grid).bg(gpui_kit::Rgba { r: s(c[0]), g: s(c[1]), b: s(c[2]), a: c[3] })
+                        });
+                        let part2 = part.clone();
+                        cell()
+                            .id(SharedString::from(format!("cp-cell-{ri}-{prop}")))
+                            .gap(px(6.))
+                            .cursor_pointer()
+                            .children(swatch)
+                            .child(div().min_w_0().truncate().child(if value.is_empty() { "Default".to_string() } else { value.clone() }))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_appearance(super::appearance::EditTarget::ConfiguredCell(part2.clone(), ri), window, cx)))
+                    }
+                    cp::CellKind::Material => {
+                        let part2 = part.clone();
+                        cell()
+                            .id(SharedString::from(format!("cp-cell-{ri}-{prop}")))
+                            .cursor_pointer()
+                            .child(div().min_w_0().truncate().child(if value.is_empty() { "- None -".to_string() } else { value.clone() }))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                this.open_material_panel(vec![part2.clone()], window, cx);
+                                if let Some(m) = &mut this.ui.material_panel {
+                                    m.cp_cell = Some((part2.clone(), ri));
+                                }
+                            }))
+                    }
                     kind => {
                         // Text cells; Mass reads a grey italic "Computed" while
                         // empty and a bare number takes the mass unit (live 637).
@@ -1645,6 +1700,33 @@ impl PartStudioView {
                 div()
                     .id("cp-table")
                     .track_focus(&focus)
+                    // Tab moves right; a multi-line paste on a property cell
+                    // fills the column downward, existing rows only (live
+                    // 10-20 q). Both arrive as the cell input's actions.
+                    .capture_action(cx.listener(|this, _: &gpui_kit::component::input::IndentInline, window, cx| {
+                        let Some(key) = this.cp_focused_cell(window, cx) else { return };
+                        if let Some(next) = this.cp_neighbour(&key, 0, 1) {
+                            cx.stop_propagation();
+                            // The cell commits on its Blur.
+                            next.update(cx, |s, cx| s.focus(window, cx));
+                        }
+                    }))
+                    .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Paste, window, cx| {
+                        let Some(key) = this.cp_focused_cell(window, cx).filter(|k| !k.starts_with("cp-in-")) else { return };
+                        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
+                        let lines: Vec<String> = text.lines().map(|l| l.split('\t').next().unwrap_or("").to_string()).collect();
+                        if lines.len() < 2 {
+                            return;
+                        }
+                        cx.stop_propagation();
+                        this.cp_paste_column(&key, &lines, cx);
+                        // The focused cell shows its line at once.
+                        if let Some((st, last)) = this.panel_inputs.get_mut(&key) {
+                            last.clone_from(&lines[0]);
+                            let (st, v) = (st.clone(), lines[0].clone());
+                            st.update(cx, |s, cx| s.set_value(v, window, cx));
+                        }
+                    }))
                     // Space toggles the selected checkbox cell.
                     .on_key_down(cx.listener(move |this, e: &KeyDownEvent, _, cx| {
                         let Some((row, key)) = this.ui.cp_selected.clone().filter(|_| e.keystroke.key == "space") else { return };
@@ -1662,6 +1744,36 @@ impl PartStudioView {
                     .child(v_flex().child(head).children(rows)),
             )
             .into_any_element()
+    }
+
+    /// The Configured properties cell `dr` rows down and `dc` columns right
+    /// of cell `key`, if it is an input cell.
+    fn cp_neighbour(&self, key: &str, dr: usize, dc: usize) -> Option<Entity<InputState>> {
+        let (r, c) = self.ui.cp_grid.iter().enumerate().find_map(|(r, row)| row.iter().position(|k| k.as_deref() == Some(key)).map(|c| (r, c)))?;
+        let next = if dc > 0 { self.ui.cp_grid.get(r)?.iter().skip(c + dc).flatten().next()? } else { self.ui.cp_grid.get(r + dr)?.get(c)?.as_ref()? };
+        self.panel_inputs.get(next).map(|(st, _)| st.clone())
+    }
+
+    /// The Configured properties input cell that has the keyboard.
+    fn cp_focused_cell(&self, window: &Window, cx: &App) -> Option<String> {
+        self.ui.cp_grid.iter().flatten().flatten().find(|k| self.panel_inputs.get(*k).is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window))).cloned()
+    }
+
+    /// Paste `lines` down a property column from cell `key` (`cp-<row>-<prop>`).
+    fn cp_paste_column(&mut self, key: &str, lines: &[String], cx: &mut Context<Self>) {
+        use noshape_model::configured_properties as cp;
+        let Some(rest) = key.strip_prefix("cp-") else { return };
+        let Some((row, prop)) = rest.split_once('-') else { return };
+        let Ok(row) = row.parse::<usize>() else { return };
+        let Some(part) = self.ui.cp_part.clone().or_else(|| self.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.id.clone())) else { return };
+        let (prop, lines) = (prop.to_string(), lines.to_vec());
+        self.edit_config("Paste configured properties", cx, |ps| {
+            let n = cp::table(ps, &part).map(|t| t.rows.len()).unwrap_or(0);
+            for (i, v) in lines.iter().enumerate().take(n.saturating_sub(row)) {
+                cp::set_cell(ps, &part, row + i, &prop, v);
+            }
+        });
+        self.config_dirty(cx);
     }
 
     /// A checkbox cell of the Configured properties table at (row, input id
@@ -1757,7 +1869,7 @@ impl PartStudioView {
                         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                             for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
                                 let v = v.clone();
-                                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
+                                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                             }
                             // Help config-paste-inputs: Paste inputs once something was copied.
                             if !crate::config_visibility::copied_inputs().is_empty() {
@@ -1813,7 +1925,25 @@ impl PartStudioView {
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_config_value(&iid, (!on).to_string(), window, cx)))
                         .into_any_element()
                 }
-                ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => div().text_size(px(14.)).text_color(pal.text).child(current).into_any_element(),
+                // Variables and texts are typed in the box; a variable outside
+                // its range turns pink with the reason (live psb/s-716–717).
+                ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => match self.panel_inputs.get(&format!("cfgbox-val-{}", input.id)) {
+                    Some((st, _)) => {
+                        let err = config_value_error(input, &st.read(cx).value(), &self.doc.read(cx).session.doc.settings.units);
+                        div()
+                            .id(SharedString::from(format!("cfgbox-val-{}", input.id)))
+                            .child(gpui_kit::base::input::input_frame(
+                                div()
+                                    .border_b_1()
+                                    .border_color(if err.is_some() { gpui_kit::rgb(0xbd3039) } else { gpui_kit::rgb(0xd7d7d7) })
+                                    .when(err.is_some(), |d| d.bg(gpui_kit::rgb(0xf9ebec)))
+                                    .child(Input::new(st).small().appearance(false).text_size(px(14.))),
+                            ))
+                            .when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e)))
+                            .into_any_element()
+                    }
+                    None => div().text_size(px(14.)).text_color(pal.text).child(current).into_any_element(),
+                },
             };
             col = col.child(
                 h_flex()
@@ -1985,7 +2115,7 @@ impl PartStudioView {
             .items_center()
             .justify_center()
             .cursor_pointer()
-            .child(crate::ui::glyph("ui-caret-down", 8., pal.text))
+            .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
             .on_click(move |e: &ClickEvent, window, cx| {
                 let v = v.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
@@ -2010,12 +2140,12 @@ impl PartStudioView {
             // Esc ends the tool (the studio's Cancel action).
             .child(tool("insp-datum", "datum", "Datum", cx))
             .child(h_flex().child(tool("insp-dimension", "dimension", "Dimension", cx)).child(dim_caret))
-            .child(tool("insp-gtol", "tolerance", "Geometric tolerance", cx))
-            .child(tool("insp-weld", "weld-bead", "Weld symbol", cx))
+            .child(tool("insp-gtol", "insp-gtol", "Geometric tolerance", cx))
+            .child(tool("insp-weld", "insp-weld", "Weld symbol", cx))
             .child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(pal.border))
             .child(tool("insp-coincident", "coincident", "Set coincident", cx))
             .child(tool("insp-parallel", "parallel", "Set parallel", cx))
-            .child(tool("insp-align", "aligned-rectangle", "Set text alignment", cx))
+            .child(tool("insp-align", "insp-text-align", "Set text alignment", cx))
             .into_any_element()
     }
 
@@ -2053,7 +2183,7 @@ impl PartStudioView {
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                     for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
                         let v = v.clone();
-                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_config_input(kind, cx))));
+                        m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                     }
                     // Help config-paste-inputs: Paste inputs once something was copied.
                     if !crate::config_visibility::copied_inputs().is_empty() {
@@ -2089,6 +2219,32 @@ impl PartStudioView {
         crate::release_dialog::note_viewed_config(self.tab, &self.config_values);
         self.schedule_regen(window, cx);
         cx.notify();
+    }
+
+    /// The Configurations box's variable / text value fields. Cell inputs
+    /// need the window and the box renders without it, so `render` makes
+    /// them here.
+    pub(super) fn ensure_config_box_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(cfg) = self.studio(cx).map(|s| s.configuration.clone()) else { return };
+        if cfg.inputs.is_empty() {
+            return;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let (_, effective) = cfg.visibility(&self.config_values);
+        for input in cfg.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. })) {
+            let current = effective.0.get(&input.id).cloned().unwrap_or_default();
+            let i = input.clone();
+            self.cell_input(format!("cfgbox-val-{}", input.id), current, window, cx, move |this, v, cx| {
+                // An invalid value stays in the field and isn't applied.
+                if config_value_error(&i, &v, &units).is_some() {
+                    cx.notify();
+                    return;
+                }
+                this.config_values.0.insert(i.id.clone(), v);
+                crate::release_dialog::note_viewed_config(this.tab, &this.config_values);
+                this.config_dirty(cx);
+            });
+        }
     }
 
     pub(super) fn config_dirty(&mut self, cx: &mut Context<Self>) {
@@ -2177,4 +2333,19 @@ fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid:
         menu = menu.item(edit("Move down", "Move variable", |ps, fid| noshape_model::variable_table::move_row(ps, fid, 1)));
     }
     menu
+}
+
+/// A configuration variable value outside its range (live psb/s-717:
+/// "Enter a value between 0 and 20.0. Current value is 50.", numbers in the
+/// range's unit without it).
+fn config_value_error(input: &ConfigInput, text: &str, units: &noshape_units::UnitPrefs) -> Option<String> {
+    let ConfigInputKind::Variable { kind, min, max, .. } = &input.kind else { return None };
+    let dim = super::config_var_dialog::kind_dim(*kind)?;
+    let eval = |t: &str| noshape_units::evaluate_as(t, dim, units, &noshape_units::EmptyScope).ok().map(|q| q.value / units.si_factor(dim));
+    let v = eval(text)?;
+    let lo = min.as_ref().and_then(|m| eval(&m.text));
+    let hi = max.as_ref().and_then(|m| eval(&m.text));
+    let fmt = |x: f64| if x.fract() == 0.0 { format!("{x:.0}") } else { format!("{x}") };
+    let out = lo.is_some_and(|l| v < l) || hi.is_some_and(|h| v > h);
+    out.then(|| format!("Enter a value between {} and {}. Current value is {}.", lo.map(fmt).unwrap_or_default(), hi.map(fmt).unwrap_or_default(), fmt(v)))
 }

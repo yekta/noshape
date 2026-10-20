@@ -382,7 +382,7 @@ impl PartStudioView {
                         .bg(pal.panel)
                         .border_b_1()
                         .border_color(pal.border)
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Section view"))
+                        .child(crate::ui::panel_title("ps-section", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Section view")))
                         .child(
                             div()
                                 .id("sec-ok")

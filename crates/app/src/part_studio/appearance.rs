@@ -36,6 +36,8 @@ pub enum EditTarget {
     Faces(Vec<Reference>, Option<usize>),
     /// A feature's faces or a sketch's curves.
     Feature(FeatureId, Option<usize>),
+    /// Configured properties: a part's Appearance cell (part, row).
+    ConfiguredCell(BodyId, usize),
 }
 
 pub struct AppearanceEdit {
@@ -165,12 +167,20 @@ impl PartStudioView {
                 (c, props.and_then(|p| p.tessellation).unwrap_or(TessQuality::Auto))
             }
             (EditTarget::Faces(_, Some(i)) | EditTarget::Feature(_, Some(i)), Some(s)) => (s.appearances.get(*i).map(|a| a.color).unwrap_or([0.8, 0.3, 0.2, 1.0]), TessQuality::Auto),
+            // The cell's color, else the part's current one.
+            (EditTarget::ConfiguredCell(b, row), Some(s)) => {
+                let cell = noshape_model::configured_properties::table(s, b).and_then(|t| t.rows.get(*row)).and_then(|r| r.values.get("Appearance")).and_then(|v| noshape_model::configured_properties::parse_color(v));
+                (cell.or_else(|| self.display.body(b).map(|d| d.color)).unwrap_or([0.7, 0.7, 0.7, 1.0]), TessQuality::Auto)
+            }
             _ => ([0.831, 0.44, 0.007, 1.0], TessQuality::Auto),
         };
         let rgb = [lin_to_srgb(color[0]), lin_to_srgb(color[1]), lin_to_srgb(color[2])];
         let transparency = 1.0 - color[3].clamp(0.0, 1.0);
         let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_of(rgb)));
-        let slider = cx.new(|_| SliderState::new().min(0.0).max(1.0).step(0.01).default_value(transparency));
+        // A configured Appearance cell's slider is the alpha ("A"), the
+        // part editor's the transparency.
+        let alpha = matches!(target, EditTarget::ConfiguredCell(..));
+        let slider = cx.new(|_| SliderState::new().min(0.0).max(1.0).step(0.01).default_value(if alpha { 1.0 - transparency } else { transparency }));
         let s1 = cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
                 && let Some(rgb) = parse_hex(&st.read(cx).value())
@@ -180,10 +190,10 @@ impl PartStudioView {
                 cx.notify();
             }
         });
-        let s2 = cx.subscribe_in(&slider, window, |this: &mut Self, _, ev: &SliderEvent, _, cx| {
+        let s2 = cx.subscribe_in(&slider, window, move |this: &mut Self, _, ev: &SliderEvent, _, cx| {
             let (SliderEvent::Change(v) | SliderEvent::Release(v)) = ev;
             if let Some(e) = &mut this.ui.appearance_edit {
-                e.transparency = v.start();
+                e.transparency = if alpha { 1.0 - v.start() } else { v.start() };
                 cx.notify();
             }
         });
@@ -204,6 +214,13 @@ impl PartStudioView {
         let Some(e) = self.ui.appearance_edit.take() else { return };
         let color = [srgb_to_lin(e.rgb[0]), srgb_to_lin(e.rgb[1]), srgb_to_lin(e.rgb[2]), 1.0 - e.transparency];
         let tess = e.tessellation;
+        if let EditTarget::ConfiguredCell(part, row) = &e.target {
+            let value = noshape_model::configured_properties::color_text(e.rgb, 1.0 - e.transparency);
+            let (part, row) = (part.clone(), *row);
+            self.edit_config("Edit configured properties", cx, |ps| noshape_model::configured_properties::set_cell(ps, &part, row, "Appearance", &value));
+            self.config_dirty(cx);
+            return;
+        }
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Edit appearance", cx, |ps| match &e.target {
                 EditTarget::Parts(bodies) => {
@@ -220,6 +237,7 @@ impl PartStudioView {
                         None => ps.appearances.push(a),
                     }
                 }
+                EditTarget::ConfiguredCell(..) => {}
                 EditTarget::Feature(f, index) => {
                     let a = FaceAppearance { target: AppearanceTarget::Feature(*f), color };
                     match index.or_else(|| ps.appearances.iter().position(|x| x.target == a.target)).and_then(|i| ps.appearances.get_mut(i)) {
@@ -270,7 +288,11 @@ impl PartStudioView {
             EditTarget::Parts(b) => ("Appearance", b.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect::<Vec<_>>().join(", "), true),
             EditTarget::Faces(f, _) => ("Face appearance", format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" }), false),
             EditTarget::Feature(f, _) => ("Appearance", names(&Reference::Feature(*f)), false),
+            EditTarget::ConfiguredCell(b, _) => ("Appearance", self.display.body(b).map(|d| d.name.clone()).unwrap_or_default(), false),
         };
+        // A configured Appearance cell: color and alpha, no tessellation
+        // (live 634: "A 1.00").
+        let is_cell = matches!(e.target, EditTarget::ConfiguredCell(..));
         let is_faces = matches!(e.target, EditTarget::Faces(..));
         let rgb = e.rgb;
         let swatch = |hex: u32, cx: &mut Context<Self>| {
@@ -343,7 +365,7 @@ impl PartStudioView {
                 .child(
                     h_flex()
                         .gap_2()
-                        .child(div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
+                        .child(crate::ui::panel_title("ps-appearance", div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title)))
                         .child(Button::new("ap-ok").icon(IconName::Check).xsmall().ghost().tooltip("Accept").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_appearance(cx))))
                         .child(Button::new("ap-cancel").icon(IconName::Close).xsmall().ghost().tooltip("Cancel").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.appearance_edit = None;
@@ -375,6 +397,14 @@ impl PartStudioView {
                         .child(div().flex_1().child(Input::new(&e.hex).text_size(px(13.)).xsmall())),
                 )
                 .child(v_flex().gap_0p5().child(channel(0, "R", cx)).child(channel(1, "G", cx)).child(channel(2, "B", cx)))
+                .when(is_cell, |d| {
+                    d.child(
+                        v_flex()
+                            .gap_1()
+                            .child(h_flex().justify_between().child(div().text_xs().text_color(pal.text_muted).child("A")).child(div().text_xs().text_color(pal.text).child(format!("{:.2}", 1.0 - e.transparency))))
+                            .child(Slider::new(&e.slider)),
+                    )
+                })
                 .when(is_part, |d| {
                     d.child(
                         v_flex()

@@ -988,6 +988,7 @@ version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0797fb7aeb1406c84efac526901f7ec3ead2124f946b494e72879d4b54704d"
 dependencies = [
+ "anstream",
  "anstyle",
  "clap_lex",
  "strsim",
@@ -4312,6 +4313,7 @@ dependencies = [
  "log",
  "noshape-kernel",
  "noshape-model",
+ "noshape-ops",
  "noshape-render",
  "noshape-sketch",
  "noshape-store",
@@ -4334,6 +4336,17 @@ dependencies = [
  "windows 0.62.2",
  "winresource",
  "x11rb",
+]
+
+[[package]]
+name = "noshape-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "clap",
+ "noshape-ops",
+ "serde_json",
 ]
 
 [[package]]
@@ -4385,6 +4398,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-ops"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "glam 0.34.1",
+ "log",
+ "miniz_oxide 0.8.9",
+ "noshape-kernel",
+ "noshape-model",
+ "noshape-render",
+ "noshape-scene",
+ "noshape-sketch",
+ "noshape-store",
+ "noshape-units",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "noshape-render"
 version = "0.1.0"
 dependencies = [
@@ -4397,6 +4430,22 @@ dependencies = [
  "pollster 1.0.1",
  "thiserror 2.0.21",
  "wgpu",
+]
+
+[[package]]
+name = "noshape-scene"
+version = "0.1.0"
+dependencies = [
+ "dirs 6.0.0",
+ "glam 0.34.1",
+ "image",
+ "log",
+ "noshape-model",
+ "noshape-render",
+ "noshape-sketch",
+ "noshape-units",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

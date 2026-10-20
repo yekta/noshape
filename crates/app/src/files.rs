@@ -115,6 +115,8 @@ pub fn init(cx: &mut App) {
     // Variable Studios inserted from other documents read those documents'
     // versions (cached snapshots).
     noshape_model::variables::set_external_loader(|path, mv| mv.parse().ok().and_then(|mv| crate::derived::external_snapshot(path, mv).ok()));
+    // Feature Studio imports find other documents by id in the document library.
+    noshape_ops::derived::set_document_scanner(|| crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs.into_iter().map(|d| d.path).collect());
     crate::start_window::init(cx);
     cx.on_window_closed(|cx, id| {
         cx.global_mut::<OpenDocs>().0.retain(|_, h| h.window_id() != id);

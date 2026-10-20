@@ -59,7 +59,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let select = |id: &'static str, label: String, icons: bool, items: Vec<(String, bool, HatchEdit, Option<String>)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).label(label).ghost().small().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 if icons {
                     m = m.select_list(160.);
                 }
@@ -187,7 +187,7 @@ impl DrawingEditor {
         // A select: label ▾ with (label, checked, edit) items.
         let select = |id: &'static str, label: String, items: Vec<(String, bool, Edit)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id).label(label).ghost().small().w(px(160.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_styles(f.clone(), cx))));
@@ -256,7 +256,8 @@ impl DrawingEditor {
             .collect();
         let base_type = if dims { props.dim_arrow_type } else { props.ann_arrow_type };
         let type_label = own.arrow_type.map(|t| t.name().to_string()).unwrap_or_else(|| drawing(base_type.name().into(), true));
-        let mut body = v_flex()
+        // Live 474: the rows start 14 px under the header.
+        let mut body = v_flex().pt(px(14.))
             .child(row("Font", select("st-font", font_label, font_items)))
             .child(row("Text height", select("st-height", h_label, presets(own.height, base_h, set_height))))
             .child(row("Color", select("st-color", color_label, colors)))

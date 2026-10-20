@@ -343,7 +343,7 @@ impl AssemblyView {
             let view = cx.entity();
             let name = np.name.clone();
             let name_cell = match editing_cell(r, 0) {
-                Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).child(Input::new(&st).appearance(false).text_size(px(14.))).into_any_element()).into_any_element(),
+                Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
                 None => {
                     let n2 = name.clone();
                     cell(140.)
@@ -360,7 +360,7 @@ impl AssemblyView {
                 let v = np.mate_values.iter().find(|(x, _)| x == m).map(|(_, v)| v[*ix as usize]).unwrap_or(0.0);
                 let text = self.np_value_text(v, *ix, cx);
                 row = row.child(match editing_cell(r, c + 1) {
-                    Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).child(Input::new(&st).appearance(false).text_size(px(14.))).into_any_element()).into_any_element(),
+                    Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
                     None => cell(140.)
                         .id(SharedString::from(format!("np-v-{r}-{c}")))
                         .child(text.clone())
@@ -374,7 +374,7 @@ impl AssemblyView {
         // The italic "Name" add row.
         let n = asm.named_positions.len();
         rows = rows.child(match editing_cell(n, 0) {
-            Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).child(Input::new(&st).appearance(false).text_size(px(14.))).into_any_element()).into_any_element(),
+            Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
             None => cell(140.)
                 .id("np-add-row")
                 .italic()

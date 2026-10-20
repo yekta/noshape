@@ -128,6 +128,16 @@ pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>
 /// below the body. Put the body in `.child(..)` with [`modal_body`] and
 /// the buttons in `.footer(modal_footer()..)`.
 pub fn modal(dialog: Dialog, title: impl Into<SharedString>, width: f32) -> Dialog {
+    modal_with(dialog, title, width, false)
+}
+
+/// [`modal`] as the documents page draws it: the title `#333`, weight 500
+/// (live documents/10, 43, 47), where the document window's is `#666`.
+pub fn modal_doc_page(dialog: Dialog, title: impl Into<SharedString>, width: f32) -> Dialog {
+    modal_with(dialog, title, width, true)
+}
+
+fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: bool) -> Dialog {
     let pal = p();
     let title: SharedString = title.into();
     dialog
@@ -147,7 +157,7 @@ pub fn modal(dialog: Dialog, title: impl Into<SharedString>, width: f32) -> Dial
                 .border_b_1()
                 .border_color(rgb(MODAL_DIVIDER))
                 // Live (document/80, drawing/90, document/23): 18 px `#666`, regular.
-                .child(div().text_size(px(18.)).text_color(pal.text_muted).whitespace_nowrap().child(title))
+                .child(div().text_size(px(18.)).when(dark, |d| d.text_color(rgb(0x333333)).font_weight(FontWeight::MEDIUM)).when(!dark, |d| d.text_color(pal.text_muted)).whitespace_nowrap().child(title))
                 .child(div().flex_1())
                 .child(div().flex_none().child(DialogClose::new().child(
                     div()
@@ -374,7 +384,9 @@ pub fn message_bubble_with_link(
 
 /// Onshape's form select (Bootstrap `form-control` select, live DOM): full
 /// width, 34 px, 1 px `#aaa`, radius 5.25, 14 px text 11 px in, a caret at
-/// the right; opens an `os_menu` select list under it.
+/// the right. A `<select>`, so Chrome's native list opens under it
+/// (`#1967d2` highlight, live assembly/182) and the field shows the 2 px
+/// `#3e94ff` focus ring while it is open.
 pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
@@ -399,12 +411,12 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
         .text_color(pal.text)
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().child(label))
-        .child(glyph(GLYPH_CARET, 8., pal.text))
+        .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
         .on_click(move |_, window, cx| {
             let (options, on_select, b) = (options.clone(), on_select.clone(), bounds.get());
             let width = f32::from(b.size.width);
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                m = m.select_list(width);
+                m = m.native_select(width).focus_ring(b);
                 for (i, o) in options.iter().enumerate() {
                     let f = on_select.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).on_click(move |_, window, cx| {

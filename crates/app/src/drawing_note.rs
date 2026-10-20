@@ -90,7 +90,7 @@ impl DrawingEditor {
         let row1 = h_flex()
             .gap(px(3.))
             .child(select("note-font", 120., font_family, fonts))
-            .child(div().w(px(70.)).child(Input::new(&height).text_size(px(13.33)).xsmall()))
+            .child(div().w(px(70.)).child(Input::new(&height).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall()))
             .child(toggle("note-b", "B", "Bold", bold, |s| {
                 let f = font_mut(s);
                 f.bold = !f.bold;

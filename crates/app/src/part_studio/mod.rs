@@ -13,6 +13,7 @@ mod config_panel;
 mod custom_tables;
 pub(crate) mod input_propagation;
 mod config_ids;
+pub(crate) mod config_var_dialog;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
@@ -236,8 +237,15 @@ pub struct PartStudioView {
     /// Custom features shown in the toolbar (for its width).
     custom_feature_count: usize,
     focus: FocusHandle,
-    /// Cached parts of the window (toolbar, viewport overlay): see `cached_slice`.
+    /// Cached parts of the window (toolbar, viewport overlay, lists): see `cached_slice`.
     slices: Option<PsSlices>,
+    /// The features the list's rows last showed for the filter (None: no
+    /// filter), so a keystroke that keeps them re-renders only the head.
+    filter_rows: Option<std::collections::HashSet<FeatureId>>,
+    /// One cached view per feature row (see `feature_row_view`), and what
+    /// the rows read from the list as a whole, set when the list renders.
+    feature_rows: std::collections::HashMap<FeatureId, Entity<crate::cached_slice::Slice<PartStudioView>>>,
+    row_ctx: RowCtx,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
     /// A sketch cancelled with ✕: its draft, index and whether it was new,
@@ -347,6 +355,9 @@ impl PartStudioView {
             custom_feature_count: 0,
             focus: cx.focus_handle(),
             slices: None,
+            filter_rows: None,
+            feature_rows: std::collections::HashMap::new(),
+            row_ctx: RowCtx::default(),
             fitted_once: false,
             message: None,
             canceled_edit: None,
@@ -546,7 +557,9 @@ impl PartStudioView {
             let refs = p.query("entityCouple").to_vec();
             let units = self.doc.read(cx).session.doc.settings.units;
             let fmt = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
-            let mut out = std::collections::HashMap::new();
+            // The regenerated preview's values too: the title reads
+            // "#d = 95.635 mm" (`measuredValue`).
+            let mut out: std::collections::HashMap<String, String> = self.computed_values(d.feature.id, cx).into_iter().collect();
             let measured = match (refs.as_slice(), &self.context) {
                 ([a, b], Some(ctx)) => noshape_model::regen::measure::entity_distance(ctx, a, b, p.is("minmax", "MAXIMUM")),
                 _ => None,
@@ -771,10 +784,13 @@ impl PartStudioView {
         let (fit_bounds, fit_inset) = (self.zoom_fit_bounds(), self.fit_inset_left());
         // The selection-count cursor: sketch entities while sketching,
         // otherwise the Part Studio selection (not a dialog's picks).
+        // With a feature dialog open, the dialog's picks (live dom/cursors-count:
+        // a new Extrude with 0 / 1 / 2 faces shows default / 1 / 2, Fillet with
+        // 3 edges 3).
         let count = match (&self.sketch, &self.edit) {
             (Some(ed), _) => ed.selection.len(),
             (None, None) => self.selection.len(),
-            _ => 0,
+            (None, Some(e)) => count_picks(&e.dialog.read(cx).feature.params),
         };
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
         self.viewport.update(cx, |vp, cx| {
@@ -1912,7 +1928,10 @@ impl PartStudioView {
     /// the head is `render_feature_list_head`.
     fn render_feature_list(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
+        // The model is only borrowed (not cloned): walk it into what the rows
+        // are, then build them.
+        let Some(studio) = self.studio(cx) else { return div().into_any_element() };
+        let n_features = studio.features.len();
         let rollback = studio.rollback_index();
         // Editing a feature rolls the model to just after it: the rows
         // below show rolled back (Onshape), unless "Final" is on.
@@ -1920,7 +1939,75 @@ impl PartStudioView {
             Some(e) if !e.is_new && !e.dialog.read(cx).show_final => rollback.min(e.index + 1),
             _ => rollback,
         };
-        let filtered = noshape_model::interaction::filter_features(&studio, &self.display, &self.ui.filter_query);
+        let filtered = noshape_model::interaction::filter_features(studio, &self.display, &self.ui.filter_query);
+        let hidden_defaults = studio.hidden_defaults.clone();
+        let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+        let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
+        // The Folder name popup sits beside the first selected feature, or
+        // the rollback bar (live 586, 589).
+        let prompt_anchor = self.folder_prompt.as_ref().map(|(_, ids, _)| ids.first().copied());
+        let mut items: Vec<ListItem> = Vec::new();
+        let mut open_folder: Vec<u32> = Vec::new();
+        if filtered.is_none() {
+            items.extend(studio.empty_folders_after(None).into_iter().map(|fd| ListItem::Folder(0., fd.clone())));
+        }
+        // Filtered (live part-studio/564): each run of hidden features is
+        // one "..." row and the rollback bar keeps its place.
+        let mut in_hidden_run = false;
+        for (i, f) in studio.features.iter().enumerate() {
+            if editing_new_at == Some(i) {
+                items.push(ListItem::Placeholder);
+            }
+            if i == rollback {
+                in_hidden_run = false;
+                items.push(ListItem::Rollback(i));
+            }
+            if filtered.as_ref().is_some_and(|set| !set.contains(&f.id)) {
+                if !std::mem::replace(&mut in_hidden_run, true) {
+                    items.push(ListItem::Ellipsis);
+                }
+                continue;
+            }
+            in_hidden_run = false;
+            // Nested folders: emit headers for folders newly entered, indent
+            // by depth, and hide rows under a collapsed ancestor.
+            let chain = studio.folder_chain(f.folder);
+            let common = open_folder.iter().zip(&chain).take_while(|(a, b)| a == b).count();
+            for (depth, fid) in chain.iter().enumerate().skip(common) {
+                let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !fd.collapsed));
+                if let (Some(fd), true) = (studio.folder(*fid), ancestors_open || filtered.is_some()) {
+                    items.push(ListItem::Folder(12.0 * depth as f32, fd.clone()));
+                }
+            }
+            open_folder = chain.clone();
+            let collapsed = chain.iter().any(|c| studio.folder(*c).is_some_and(|fd| fd.collapsed));
+            if collapsed && editing_id != Some(f.id) && filtered.is_none() {
+                continue;
+            }
+            items.push(ListItem::Feature(12.0 * chain.len() as f32, f.id));
+            if prompt_anchor == Some(Some(f.id)) {
+                items.push(ListItem::Prompt);
+            }
+            if filtered.is_none() {
+                items.extend(studio.empty_folders_after(Some(f.id)).into_iter().map(|fd| ListItem::Folder(0., fd.clone())));
+            }
+        }
+        if editing_new_at.is_some_and(|i| i >= n_features) {
+            items.push(ListItem::Placeholder);
+        }
+        if rollback >= n_features {
+            items.push(ListItem::Rollback(n_features));
+        }
+        if prompt_anchor == Some(None) {
+            items.push(ListItem::Prompt);
+        }
+        // Rows of deleted features go.
+        if self.feature_rows.len() > n_features {
+            let ids: std::collections::HashSet<FeatureId> = studio.features.iter().map(|f| f.id).collect();
+            self.feature_rows.retain(|id, _| ids.contains(id));
+        }
+        self.row_ctx = RowCtx { rollback, editing_id, related: self.related_features(cx) };
+        self.filter_rows.clone_from(&filtered);
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut dg_rows: Vec<AnyElement> = Vec::new();
         // Default geometry.
@@ -1934,7 +2021,7 @@ impl PartStudioView {
                 break;
             }
             let selected = self.selection.contains(&r);
-            let hidden = studio.hidden_defaults.contains(&r);
+            let hidden = hidden_defaults.contains(&r);
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -2086,72 +2173,17 @@ impl PartStudioView {
             }
         }
 
-        let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
-        let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
-        let related = self.related_features(cx);
-        let mut open_folder: Vec<u32> = Vec::new();
-        // The Folder name popup sits beside the first selected feature, or
-        // the rollback bar (live 586, 589).
-        let prompt_anchor = self.folder_prompt.as_ref().map(|(_, ids, _)| ids.first().copied());
-        if filtered.is_none() {
-            for fd in studio.empty_folders_after(None) {
-                rows.push(self.render_folder_row(fd, cx));
-            }
-        }
-        // Filtered (live part-studio/564): each run of hidden features is
-        // one "..." row and the rollback bar keeps its place.
         let ellipsis = || div().h(px(26.)).flex_none().pl(px(5.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element();
-        let mut in_hidden_run = false;
-        for (i, f) in studio.features.iter().enumerate() {
-            if editing_new_at == Some(i) {
-                rows.push(self.render_editing_placeholder(cx));
-            }
-            if i == rollback {
-                in_hidden_run = false;
-                rows.push(self.render_rollback_bar(i, window, cx));
-            }
-            if filtered.as_ref().is_some_and(|set| !set.contains(&f.id)) {
-                if !std::mem::replace(&mut in_hidden_run, true) {
-                    rows.push(ellipsis());
-                }
-                continue;
-            }
-            in_hidden_run = false;
-            // Nested folders: emit headers for folders newly entered, indent
-            // by depth, and hide rows under a collapsed ancestor.
-            let chain = studio.folder_chain(f.folder);
-            let common = open_folder.iter().zip(&chain).take_while(|(a, b)| a == b).count();
-            for (depth, fid) in chain.iter().enumerate().skip(common) {
-                let ancestors_open = chain[..depth].iter().all(|a| studio.folder(*a).is_some_and(|fd| !fd.collapsed));
-                if let (Some(fd), true) = (studio.folder(*fid), ancestors_open || filtered.is_some()) {
-                    let row = self.render_folder_row(fd, cx);
-                    rows.push(div().pl(px(12.0 * depth as f32)).child(row).into_any_element());
-                }
-            }
-            open_folder = chain.clone();
-            let collapsed = chain.iter().any(|c| studio.folder(*c).is_some_and(|fd| fd.collapsed));
-            if collapsed && editing_id != Some(f.id) && filtered.is_none() {
-                continue;
-            }
-            let row = self.render_feature_row(i, f, i >= rollback, editing_id == Some(f.id), related.contains(&f.id), cx);
-            rows.push(if chain.is_empty() { row } else { div().pl(px(12.0 * chain.len() as f32)).child(row).into_any_element() });
-            if prompt_anchor == Some(Some(f.id)) {
-                rows.push(self.render_folder_prompt(cx));
-            }
-            if filtered.is_none() {
-                for fd in studio.empty_folders_after(Some(f.id)) {
-                    rows.push(self.render_folder_row(fd, cx));
-                }
-            }
-        }
-        if editing_new_at.is_some_and(|i| i >= studio.features.len()) {
-            rows.push(self.render_editing_placeholder(cx));
-        }
-        if rollback >= studio.features.len() {
-            rows.push(self.render_rollback_bar(studio.features.len(), window, cx));
-        }
-        if prompt_anchor == Some(None) {
-            rows.push(self.render_folder_prompt(cx));
+        let indent = |indent: f32, row: AnyElement| if indent > 0. { div().pl(px(indent)).child(row).into_any_element() } else { row };
+        for item in items {
+            rows.push(match item {
+                ListItem::Placeholder => self.render_editing_placeholder(cx),
+                ListItem::Rollback(i) => self.render_rollback_bar(i, window, cx),
+                ListItem::Ellipsis => ellipsis(),
+                ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
+                ListItem::Feature(x, id) => indent(x, self.feature_row_view(id, cx).cached(StyleRefinement::default().w_full().h(px(crate::ui::ROW_H)).flex_none()).into_any_element()),
+                ListItem::Prompt => self.render_folder_prompt(cx),
+            });
         }
         v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).size_full().overflow_y_scroll().children(rows).child(
             // Space below the last feature: dropping the rollback bar
@@ -2424,6 +2456,29 @@ impl PartStudioView {
         head
     }
 
+    /// The cached view of one feature's row: it re-renders when the studio
+    /// notifies (or the doc / viewport), not when the list around it changes
+    /// (filtering, a row above added).
+    fn feature_row_view(&mut self, id: FeatureId, cx: &mut Context<Self>) -> Entity<crate::cached_slice::Slice<PartStudioView>> {
+        if let Some(v) = self.feature_rows.get(&id) {
+            return v.clone();
+        }
+        use crate::cached_slice::Slice;
+        let v = Slice::with(&cx.entity(), move |this: &mut Self, _, cx| this.render_feature_row_view(id, cx), cx);
+        Slice::observing(&v, &self.viewport, cx);
+        Slice::observing(&v, &self.doc, cx);
+        self.feature_rows.insert(id, v.clone());
+        v
+    }
+
+    fn render_feature_row_view(&mut self, id: FeatureId, cx: &mut Context<Self>) -> AnyElement {
+        let Some((i, f)) = self.studio(cx).and_then(|s| s.features.iter().position(|f| f.id == id).map(|i| (i, s.features[i].clone()))) else {
+            return div().into_any_element();
+        };
+        let (rolled_back, editing, related) = (i >= self.row_ctx.rollback, self.row_ctx.editing_id == Some(id), self.row_ctx.related.contains(&id));
+        self.render_feature_row(i, &f, rolled_back, editing, related, cx)
+    }
+
     /// A row of the parts list: click selects (or feeds a dialog's part
     /// field), hover highlights the part, the eye hides or shows it, and the
     /// context menu has Onshape's part commands.
@@ -2691,7 +2746,7 @@ impl PartStudioView {
                         cx.notify();
                     }))),
             )
-            .child(div().m(px(6.)).border_b_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(st).small().appearance(false).text_size(px(13.33))));
+            .child(div().m(px(6.)).border_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(st).small().appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x000000)).pl(px(6.))));
         // A zero-height box under the anchor row; the popup rises beside it.
         div().relative().w_full().h_0().child(div().absolute().left_full().top(px(-26.)).size_0().child(deferred(anchored().snap_to_window().child(popup)).with_priority(5))).into_any_element()
     }
@@ -2706,7 +2761,7 @@ impl PartStudioView {
             .child(crate::ui::caret(!collapsed))
             .child(crate::ui::tree_icon("folder", false, cx))
             .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
-                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
+                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
                 // Live 587, 590: "New folder (0)" — the name and its feature count.
                 None => div().flex_1().truncate().child(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))).into_any_element(),
             })
@@ -2950,7 +3005,7 @@ impl PartStudioView {
                     .when(underdefined, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).w(px(8.)).h(px(4.)).bg(pal.accent))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
-                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall()).into_any_element(),
+                Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
                 None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(name.clone()).into_any_element(),
             })
             // In-context arrow (features referencing an Assembly context).
@@ -3241,7 +3296,7 @@ impl PartStudioView {
         // View cube / quick views.
         out.push(self.render_view_controls(cx));
         if let Some(nv) = self.render_named_views(cx) {
-            out.push(nv);
+            out.push(crate::ui::moved_panel(nv, self.ui.panels.get("ps-named-views")));
         }
         // Message toast.
         // The tool-miss toast belongs to the open Remove / Intersect dialog.
@@ -3528,6 +3583,26 @@ pub(super) fn paint_paths(polys: Vec<Vec<Point<Pixels>>>, color: Hsla) -> AnyEle
     .into_any_element()
 }
 
+/// What the features list shows, in order (`render_feature_list`).
+enum ListItem {
+    Placeholder,
+    Rollback(usize),
+    Ellipsis,
+    /// Indent, folder.
+    Folder(f32, noshape_model::partstudio::Folder),
+    /// Indent, feature.
+    Feature(f32, FeatureId),
+    Prompt,
+}
+
+/// What a feature row reads from the list as a whole.
+#[derive(Default)]
+struct RowCtx {
+    rollback: usize,
+    editing_id: Option<FeatureId>,
+    related: std::collections::HashSet<FeatureId>,
+}
+
 /// The Part Studio's cached slices (see `crate::cached_slice`): a keystroke
 /// or a caret blink in a field re-renders the studio but reuses these.
 #[derive(Clone)]
@@ -3571,10 +3646,14 @@ impl PartStudioView {
         s
     }
 
-    /// The filter query changed: only the features list's rows show it (the
-    /// head re-renders with the filter box anyway).
-    fn filter_rows_changed(&self, cx: &mut Context<Self>) {
-        if let Some(s) = &self.slices {
+    /// The filter query changed: of the cached slices only the features
+    /// list's rows show it, and only which features match (the head
+    /// re-renders with the filter box anyway).
+    fn filter_rows_changed(&mut self, cx: &mut Context<Self>) {
+        let shown = self.studio(cx).and_then(|s| noshape_model::interaction::filter_features(s, &self.display, &self.ui.filter_query));
+        if shown != self.filter_rows
+            && let Some(s) = &self.slices
+        {
             s.features.update(cx, |_, cx| cx.notify());
         }
     }
@@ -3591,6 +3670,15 @@ impl PartStudioView {
 
     /// What is drawn over the graphics area and the feature dialog.
     fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        // Panel dialogs that closed forget where they were moved.
+        let open = [
+            ("ps-mass", self.show_mass),
+            ("ps-section", self.ui.section_dialog.is_some()),
+            ("ps-appearance", self.ui.appearance_edit.is_some()),
+            ("ps-material", self.ui.material_panel.is_some()),
+            ("ps-named-views", self.named_views.is_some()),
+        ];
+        self.ui.panels.retain(|k| open.iter().any(|(o, on)| *o == k && *on));
         let mut overlay = self.render_viewport_overlay(cx);
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
@@ -3600,14 +3688,15 @@ impl PartStudioView {
         // feature dialog is open.
         overlay.push(self.render_evaluation_tools(cx));
         overlay.extend(self.render_context_menu());
-        overlay.extend(self.render_section_panel(cx));
+        overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
         overlay.extend(self.render_section_value(cx));
         overlay.extend(self.render_palette(window, cx));
         overlay.extend(self.render_shortcut_sheet(cx));
         overlay.extend(self.render_isolate_panel(cx));
-        overlay.extend(self.render_appearance_editor(cx));
+        overlay.extend(self.render_appearance_editor(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-appearance"))));
         overlay.extend(self.render_create_selection(cx));
-        overlay.extend(self.render_material_panel(cx));
+        overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
+        overlay.extend(self.render_variable_input(cx));
         overlay.extend(self.render_dynamic_suppression(cx));
         overlay.extend(self.render_insert_go(cx));
         overlay.extend(self.render_regen_panels(cx));
@@ -3636,6 +3725,7 @@ impl Render for PartStudioView {
             self.apply_named_view(&v, window, cx);
         }
         self.ensure_filter_input(window, cx);
+        self.ensure_config_box_inputs(window, cx);
         // A feature row's context menu closed: drop its highlight.
         if self.ui.list_menu.is_some() && !crate::os_menu::is_open(cx) {
             self.ui.list_menu = None;
@@ -3956,6 +4046,10 @@ impl Render for PartStudioView {
                                 cx.notify();
                             }))
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<create_selection::CsMove>, _, cx| this.cs_drag(e, cx)))
+                            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::PanelMove>, _, cx| {
+                                this.ui.panels.drag(e, cx);
+                                cx.notify();
+                            }))
                             .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::feature_dialog::DialogMove>, _, cx| {
                                 let grab = *e.drag(cx).0.lock();
                                 let p = e.event.position - e.bounds.origin - grab;
@@ -4045,4 +4139,15 @@ fn sketch_entity_kinds(studio: Option<&PartStudio>, display: &StudioDisplay) -> 
         }
     }
     kinds
+}
+
+/// Entities picked in a feature's query parameters (array items included).
+fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
+    p.0.values()
+        .map(|v| match v {
+            noshape_model::params::ParamValue::Query(q) => q.len(),
+            noshape_model::params::ParamValue::Array(items) => items.iter().map(count_picks).sum(),
+            _ => 0,
+        })
+        .sum()
 }

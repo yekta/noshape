@@ -1,0 +1,259 @@
+name: Viewport performance
+
+# Viewport benchmarks (viewport.rs `OrbitBench`, docs/ARCHITECTURE.md
+# "Measuring") of a release, or of any ref built from source, on real runners:
+# macOS (Apple silicon, paravirtualized Metal: the reference), Windows (WARP)
+# and Linux (Xvfb, lavapipe) smoke tests. Logs, screenshots and summary.json
+# are uploaded; the summary table goes to the run page.
+#
+# Gates (.github/perf/analyze.py), chosen to carry over to real Macs rather than
+# measure the runner's virtual GPU:
+#   correctness  zero-copy frames equal read-back frames and are not black;
+#   UI CPU       UI-thread CPU p95 per orbit frame <= UI_CPU_P95_MS (macOS);
+#   GPU          our GPU time per frame (wgpu timestamps) p95 <= GPU_P95_MS
+#                (macOS; builds that report it);
+#   regression   fps, frame-interval p95, UI CPU p95 and GPU p95 at most 10%
+#                worse than the last successful run of this workflow on main.
+#
+# Releases are published by release.yml with GITHUB_TOKEN, which does not
+# trigger `release: published` workflows, so this runs when Release completes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to measure (default: the latest release)'
+        required: false
+      ref:
+        description: 'Build this branch/commit from source instead of a release'
+        required: false
+      frames:
+        description: Frames per benchmark run
+        required: false
+        default: '300'
+      variants:
+        description: 'Extra texture orbit runs on macOS, e.g. msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines'
+        required: false
+        default: ''
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  FIXTURE: tests/perf/nist-mtc-crada-assembly.noshape
+  UI_CPU_P95_MS: '4'
+  GPU_P95_MS: '6'
+  MAX_REGRESSION: '0.10'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  bench:
+    name: ${{ matrix.name }}
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS 15 (Apple silicon)
+            os: macos-15
+            asset: macos-arm64.dmg
+            modes: texture readback
+            gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+          - name: macOS 14 (Apple silicon)
+            os: macos-14
+            asset: macos-arm64.dmg
+            modes: texture readback
+            gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+          - name: Windows (WARP)
+            os: windows-latest
+            asset: windows-x86_64.zip
+            modes: readback
+            gates: ''
+          - name: Linux (Xvfb, lavapipe)
+            os: ubuntu-24.04
+            asset: linux-x86_64.tar.gz
+            modes: texture readback
+            gates: --stills
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FRAMES: ${{ inputs.frames || '300' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # ---------------------------------------------------------------- the build
+      - name: Release
+        if: inputs.ref == ''
+        shell: bash
+        run: |
+          tag="${{ inputs.tag }}"
+          [[ -n "$tag" ]] || tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "BUILD=$tag" >> "$GITHUB_ENV"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "*-${{ matrix.asset }}" --dir "$RUNNER_TEMP/release"
+
+      - name: Source
+        if: inputs.ref != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          path: src
+
+      - name: Build dependencies (Linux)
+        if: inputs.ref != '' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+
+      - name: Build dependencies (macOS)
+        if: inputs.ref != '' && runner.os == 'macOS'
+        run: |
+          brew install ninja || true
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+      - name: MSVC developer environment (Windows)
+        if: inputs.ref != '' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: OpenCascade
+        if: inputs.ref != ''
+        uses: ./src/.github/actions/setup-occt
+
+      - name: openNURBS
+        if: inputs.ref != ''
+        uses: ./src/.github/actions/setup-opennurbs
+
+      - name: Rust toolchain
+        if: inputs.ref != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        if: inputs.ref != ''
+        with:
+          workspaces: src
+          key: occt-V8_0_1
+
+      - name: Build (release)
+        if: inputs.ref != ''
+        shell: bash
+        run: |
+          cd src
+          cargo build --release --locked -p noshape
+          echo "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/built"
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            # Bundled like the release (an unbundled binary is not a regular app).
+            app="$RUNNER_TEMP/noshape.app"
+            mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+            cp target/release/noshape "$app/Contents/MacOS/noshape"
+            cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
+            sed "s/@VERSION@/0.0.0/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+            codesign --force --deep --sign - "$app"
+            echo "BIN=$app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
+          elif [[ "$RUNNER_OS" == Windows ]]; then
+            cp target/release/noshape.exe "$RUNNER_TEMP/built/"
+            echo "BIN=$RUNNER_TEMP/built/noshape.exe" >> "$GITHUB_ENV"
+          else
+            cp target/release/noshape "$RUNNER_TEMP/built/"
+            echo "BIN=$RUNNER_TEMP/built/noshape" >> "$GITHUB_ENV"
+          fi
+
+      # ------------------------------------------------------------ the runner
+      - name: Install (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [[ -z "${BIN:-}" ]]; then
+            hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$RUNNER_TEMP"/release/*.dmg
+            cp -R "$RUNNER_TEMP/dmg/noshape.app" "$RUNNER_TEMP/noshape.app"
+            hdiutil detach "$RUNNER_TEMP/dmg"
+            echo "BIN=$RUNNER_TEMP/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
+          fi
+          echo "DELAY=60" >> "$GITHUB_ENV"
+          system_profiler SPDisplaysDataType | sed -n 1,40p
+          python3 -m pip install --quiet --break-system-packages pillow || python3 -m pip install --quiet --user pillow
+
+      - name: Install (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb imagemagick mesa-vulkan-drivers libvulkan1 \
+            libxkbcommon-x11-0 libxcb-xkb1 libx11-xcb1 libfontconfig1 python3-pil
+          if [[ -z "${BIN:-}" ]]; then
+            tar xzf "$RUNNER_TEMP"/release/*.tar.gz -C "$RUNNER_TEMP"
+            echo "BIN=$(ls -d "$RUNNER_TEMP"/noshape-*/)noshape" >> "$GITHUB_ENV"
+          fi
+          echo "DELAY=120" >> "$GITHUB_ENV"
+          echo "FRAMES=60" >> "$GITHUB_ENV"
+          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not $env:BIN) {
+            Expand-Archive (Get-ChildItem "$env:RUNNER_TEMP\release\*.zip").FullName -DestinationPath "$env:RUNNER_TEMP"
+            "BIN=$((Get-ChildItem "$env:RUNNER_TEMP\noshape-*\noshape.exe").FullName)" >> $env:GITHUB_ENV
+          }
+          "DELAY=150" >> $env:GITHUB_ENV
+          "FRAMES=60" >> $env:GITHUB_ENV
+          python -m pip install --quiet pillow
+
+      # --------------------------------------------------------------- the runs
+      - name: Benchmarks
+        if: runner.os != 'Windows'
+        env:
+          VARIANTS: ${{ runner.os == 'macOS' && inputs.variants || '' }}
+        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ matrix.modes }}
+
+      - name: Benchmarks (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ matrix.modes }}
+
+      - name: Baseline (last successful run on main)
+        continue-on-error: true
+        shell: bash
+        run: |
+          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow perf.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [[ -n "$id" && "$id" != "${{ github.run_id }}" ]]; then
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "perf-${{ matrix.os }}" --dir "$RUNNER_TEMP/baseline" && echo "baseline: run $id"
+          else
+            echo "no baseline yet"
+          fi
+
+      - name: Summary and gates
+        id: analyze
+        shell: bash
+        run: |
+          gates="${{ matrix.gates }}"
+          gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//GPU/$GPU_P95_MS}"
+          set +e
+          python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD)" $gates \
+            --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION"
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-${{ matrix.os }}
+          path: ${{ runner.temp }}/perf
+          if-no-files-found: warn
+
+      - name: Gates
+        if: steps.analyze.outputs.status != '0'
+        run: exit 1

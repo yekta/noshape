@@ -1,0 +1,168 @@
+//! Part Studio edits, shared by the Part Studio view and the agent API. Each
+//! function is what one UI command does to the model; the caller commits it
+//! as one microversion with the matching description.
+
+use noshape_model::configuration::ConfigValues;
+use noshape_model::partstudio::{Feature, PartStudio};
+use noshape_model::reference::{BodyId, FeatureId, Reference};
+
+/// "Insert feature : Extrude 1".
+pub fn insert_description(name: &str) -> String {
+    format!("Insert feature : {name}")
+}
+
+/// "Edit : Extrude 1".
+pub fn edit_description(name: &str) -> String {
+    format!("Edit : {name}")
+}
+
+/// Accept a new feature's dialog: insert it at `index` (the rollback bar
+/// when it opened), advance the bar, and hide the sketch it consumes (Onshape
+/// hides the sketch a new feature uses). Returns where it went.
+pub fn insert_feature(ps: &mut PartStudio, feature: Feature, index: usize) -> usize {
+    if let Some(sid) = noshape_model::interaction::source_sketch(&ps.features, &feature)
+        && let Some(sk) = ps.feature_mut(sid)
+    {
+        sk.hidden = true;
+    }
+    let at = index.min(ps.features.len());
+    ps.features.insert(at, feature);
+    if let Some(r) = ps.rollback {
+        ps.rollback = Some(r + 1);
+    }
+    at
+}
+
+/// Accept an edited feature's dialog: configured parameters go to the active
+/// configuration's row, the rest to the feature.
+pub fn edit_feature(ps: &mut PartStudio, index: usize, feature: Feature, config: &ConfigValues) {
+    let PartStudio { features, configuration, .. } = ps;
+    if let Some(slot) = features.get_mut(index) {
+        let mut feature = feature;
+        configuration.store_edit(slot, &mut feature, config);
+        *slot = feature;
+    }
+}
+
+/// "Delete : Extrude 1, Fillet 1".
+pub fn delete_description(ps: &PartStudio, ids: &[FeatureId]) -> String {
+    let names: Vec<String> = ids.iter().filter_map(|id| ps.feature(*id).map(|f| f.name.clone())).collect();
+    format!("Delete : {}", names.join(", "))
+}
+
+pub fn delete_features(ps: &mut PartStudio, ids: &[FeatureId]) {
+    for id in ids {
+        ps.remove(*id);
+    }
+}
+
+/// "Suppress" / "Unsuppress".
+pub fn suppress_description(suppressed: bool) -> &'static str {
+    if suppressed { "Suppress" } else { "Unsuppress" }
+}
+
+pub fn set_suppressed(ps: &mut PartStudio, ids: &[FeatureId], suppressed: bool) {
+    for id in ids {
+        if let Some(f) = ps.feature_mut(*id) {
+            f.suppressed = suppressed;
+        }
+    }
+}
+
+pub const ROLLBACK_DESCRIPTION: &str = "Move rollback bar";
+
+/// Rollback bar after `index` features (None: at the end).
+pub fn set_rollback(ps: &mut PartStudio, index: Option<usize>) {
+    ps.rollback = index.filter(|i| *i < ps.features.len());
+}
+
+/// "Rename : <new name>".
+pub fn rename_description(name: &str) -> String {
+    format!("Rename : {name}")
+}
+
+pub fn rename_feature(ps: &mut PartStudio, id: FeatureId, name: &str) {
+    if let Some(f) = ps.feature_mut(id) {
+        f.name = name.trim().to_string();
+        f.custom_name = true;
+    }
+}
+
+/// What Hide / Show changes: parts, features (sketches, planes, mate
+/// connectors) and default geometry.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct VisibilityTargets {
+    pub bodies: Vec<BodyId>,
+    pub features: Vec<FeatureId>,
+    pub defaults: Vec<Reference>,
+}
+
+impl VisibilityTargets {
+    pub fn is_empty(&self) -> bool {
+        self.bodies.is_empty() && self.features.is_empty() && self.defaults.is_empty()
+    }
+}
+
+/// Sort selected references into visibility targets. `made_by` lists the
+/// parts a feature made (a feature that made parts hides its parts;
+/// sketches, planes and connectors hide themselves); `body_of` finds the
+/// part a face, edge or vertex belongs to.
+pub fn visibility_targets(targets: &[Reference], made_by: impl Fn(FeatureId) -> Vec<BodyId>, body_of: impl Fn(&Reference) -> Option<BodyId>) -> VisibilityTargets {
+    let mut t = VisibilityTargets::default();
+    for r in targets {
+        match r {
+            Reference::Origin | Reference::Plane(_) => t.defaults.push(r.clone()),
+            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => t.features.push(*sketch),
+            Reference::FeaturePlane(f) | Reference::MateConnector { feature: f, .. } => t.features.push(*f),
+            Reference::Feature(f) => {
+                let made = made_by(*f);
+                if made.is_empty() {
+                    t.features.push(*f);
+                } else {
+                    t.bodies.extend(made);
+                }
+            }
+            r => {
+                if let Some(b) = body_of(r) {
+                    t.bodies.push(b);
+                }
+            }
+        }
+    }
+    t
+}
+
+/// "Hide" / "Show".
+pub fn visibility_description(hidden: bool) -> &'static str {
+    if hidden { "Hide" } else { "Show" }
+}
+
+pub fn set_visibility(ps: &mut PartStudio, t: &VisibilityTargets, hidden: bool) {
+    for b in &t.bodies {
+        ps.part_properties.entry(b.clone()).or_default().hidden = hidden;
+    }
+    for f in &t.features {
+        if let Some(f) = ps.feature_mut(*f) {
+            f.hidden = hidden;
+        }
+    }
+    for d in &t.defaults {
+        ps.hidden_defaults.retain(|x| x != d);
+        if hidden {
+            ps.hidden_defaults.push(d.clone());
+        }
+    }
+}
+
+pub const SHOW_ALL_DESCRIPTION: &str = "Show all";
+
+/// Context menu "Show all": parts, sketches, planes and default geometry.
+pub fn show_all(ps: &mut PartStudio) {
+    for p in ps.part_properties.values_mut() {
+        p.hidden = false;
+    }
+    for f in &mut ps.features {
+        f.hidden = false;
+    }
+    ps.hidden_defaults.clear();
+}

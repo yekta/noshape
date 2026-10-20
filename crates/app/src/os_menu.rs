@@ -146,8 +146,8 @@ pub struct OsMenu {
     /// `#1651b0` with white text.
     select: Option<f32>,
     /// With `select`: a browser `<select>` list instead (the account pages,
-    /// live preferences 62): 27 px rows, 14 px `#333` text, `#1e63d0`
-    /// highlight, 1 px `#767676` border, no shadow.
+    /// live preferences 62, assembly/182): 27 px rows, 14 px `#333` text,
+    /// `#1967d2` highlight, 1 px `#767676` border, no shadow.
     native: bool,
     /// Onshape's drawing toolbar lists: 26 px rows, 18 px icons 4 px in,
     /// 13.33 px text 30 px in.
@@ -161,6 +161,10 @@ pub struct OsMenu {
     /// One-shot Esc handler: the first Esc runs it and the menu stays open
     /// (a sketch tool's menu: Esc exits the tool), the next one dismisses.
     on_escape: Option<EscapeHandler>,
+    /// A native `<select>`'s field while its list is open: Chrome draws it
+    /// with a 2 px `#3e94ff` focus ring (live assembly/182, navigation/62).
+    /// Drawn by the menu host, so it shows exactly while the list is open.
+    ring: Option<Bounds<Pixels>>,
 }
 
 /// An `OsMenu`'s one-shot Esc handler.
@@ -177,7 +181,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, camera: false, on_escape: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, camera: false, on_escape: None, ring: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -192,6 +196,13 @@ impl OsMenu {
     pub fn native_select(mut self, width: f32) -> Self {
         self.select = Some(width);
         self.native = true;
+        self
+    }
+
+    /// Ring `field` (window coordinates) while the list is open (a native
+    /// `<select>`'s focus ring).
+    pub fn focus_ring(mut self, field: Bounds<Pixels>) -> Self {
+        self.ring = Some(field);
         self
     }
 
@@ -449,7 +460,7 @@ impl Render for OsMenu {
                     OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
-                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1e63d0 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
+                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
@@ -583,13 +594,19 @@ pub fn is_open(cx: &App) -> bool {
 
 /// The menu open in `window`, drawn on top of everything. Windows opened
 /// with [`open_window`] draw it themselves.
-fn render_host(window: &Window, cx: &App) -> Option<AnyElement> {
-    let (id, pos, anchor, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+fn render_host(window: &Window, cx: &App) -> Vec<AnyElement> {
+    let Some((id, pos, anchor, menu, _)) = cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()) else { return Vec::new() };
     if *id != window.window_handle().window_id() {
-        return None;
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    if let Some(b) = menu.read(cx).ring {
+        let ring = div().w(b.size.width).h(b.size.height).rounded(px(5.25)).border_2().border_color(gpui_kit::rgb(0x3e94ff));
+        out.push(deferred(anchored().position(b.origin).child(ring)).with_priority(POPUP_PRIORITY).into_any_element());
     }
     // Live: a menu that doesn't fit below the pointer opens above it.
-    Some(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element())
+    out.push(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
+    out
 }
 
 /// The layer every app window's content sits in: the content plus the

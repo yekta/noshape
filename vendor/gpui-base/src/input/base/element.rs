@@ -2753,7 +2753,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let mut run_font = style.font();
         let mut text_color = text_color;
         if is_empty
-            && let Some(ps) = cx.try_global::<crate::input::PlaceholderStyle>()
+            && let Some(ps) = state
+                .placeholder_style
+                .or_else(|| cx.try_global::<crate::input::PlaceholderStyle>().copied())
         {
             if ps.italic {
                 run_font.style = gpui::FontStyle::Italic;

@@ -1,0 +1,19 @@
+[package]
+name = "noshape-cli"
+description = "noshape's command line and MCP server for agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "noshape-cli"
+path = "src/main.rs"
+
+[dependencies]
+noshape-ops.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+clap = { version = "4", features = ["string"] }
+base64 = "0.22"

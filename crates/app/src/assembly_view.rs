@@ -769,6 +769,7 @@ impl AssemblyView {
         if let Some(m) = &self.ui.measure {
             h.selected_entities = m.clone();
         }
+        h.selected_entities.extend(self.std_picked_entities());
         self.interference_highlights(&mut h);
         // The instances to analyze show selected while the dialog is open;
         // around red overlaps they are see-through and neutral (live 736).
@@ -923,8 +924,10 @@ impl AssemblyView {
         self.overlay_sig = sig;
         let scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
         // Onshape's cursors (docs/parity/cursors.md): the selection count,
-        // and the snap-mate cursor while a drag snaps to a mate connector.
-        let (count, snapping, fixed_drag) = (self.selected.len(), self.snap_drag.is_some(), self.ui.fixed_drag.is_some());
+        // and the snap-mate cursor while a drag is snapped to a target
+        // connector (Onshape: alignSnapData with target data shows it,
+        // clearTargetSnapData removes it).
+        let (count, snapping, fixed_drag) = (self.selected.len(), self.snap_drag.as_ref().is_some_and(|s| s.target.is_some()), self.ui.fixed_drag.is_some());
         self.viewport.update(cx, |vp, cx| {
             vp.selection_count = count;
             vp.tool_cursor = if fixed_drag {
@@ -1770,7 +1773,7 @@ impl AssemblyView {
 
     /// What viewport clicks currently feed (a dialog's connector field, snap mode...).
     fn pick_mode(&self, cx: &App) -> Option<PickMode> {
-        if self.std_auto_size_active() {
+        if self.std_auto_size_active() || self.std_picking() {
             return Some(PickMode::Entity);
         }
         if let Some(s) = &self.mate {
@@ -2060,6 +2063,13 @@ impl AssemblyView {
                     // Auto-size fastener: the clicked hole sizes the part.
                     if let Some(t) = self.pick(*pick) {
                         self.std_pick_hole(t, cx);
+                    }
+                    return;
+                }
+                if self.std_picking() {
+                    // Standard content tab: faces and edges are pre-selected for Insert.
+                    if let Some(t) = self.pick(*pick) {
+                        self.std_pick(t, cx);
                     }
                     return;
                 }
@@ -2715,8 +2725,13 @@ impl AssemblyView {
         };
         // Docked pane open: the strip sits at the pane's left edge (live 181,
         // part-studio/77).
-        let right = if self.pane_docked() { 711. } else { -1. };
+        let docked = self.pane_docked();
+        let right = if docked { 711. } else { -1. };
         div()
+            // A new id when the strip moves: gpui keeps an element's tooltip
+            // while it is painted, so the button that docked the pane would
+            // keep its tooltip at the pointer after the strip moved away.
+            .id(if docked { "rail-docked" } else { "rail" })
             .absolute()
             .top_0()
             .bottom_0()
@@ -3373,7 +3388,17 @@ impl AssemblyView {
     /// `panel_frame`; `plain_close`: Onshape's grey × at 50 % (`btn-close`,
     /// live dom dialog-animate) instead of the red cancel ✕.
     pub(super) fn panel_frame_with(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool) -> Div {
+        Self::panel_frame_full(title, body, close, id, plain_close, None)
+    }
+
+    /// `panel_frame` whose title moves the panel (`crate::ui::panel_title`).
+    pub(super) fn panel_frame_moving(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, drag: &'static str) -> Div {
+        Self::panel_frame_full(title, body, close, id, false, Some(drag))
+    }
+
+    fn panel_frame_full(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool, drag: Option<&'static str>) -> Div {
         let pal = p();
+        let title = div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string());
         // Onshape dialog frame: white at 95%, no border or radius, 28 px header (§3.9).
         v_flex()
             .w(px(280.))
@@ -3390,7 +3415,10 @@ impl AssemblyView {
                     .bg(gpui_kit::white())
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string()))
+                    .child(match drag {
+                        Some(key) => crate::ui::panel_title(key, title).into_any_element(),
+                        None => title.into_any_element(),
+                    })
                     .child(if plain_close {
                         Button::new(id).ghost().child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x333333))).opacity(0.5).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
                     } else {
@@ -3818,7 +3846,7 @@ impl AssemblyView {
             .flex_none()
             // Live 610–611: no count on Other documents' category list (612:
             // shown again once a document is open).
-            .when(!(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none()), |d| d.child(h_flex().h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}"))))
+            .when(!(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none()) && self.ui.insert_source != 2, |d| d.child(h_flex().h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}"))))
             .when(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none(), |d| d.child(div().h(px(22.))))
             .child(
                 h_flex()
@@ -4143,7 +4171,7 @@ impl AssemblyView {
         if self.ui.mass.is_some() {
             let mut els = self.render_mass_dialog(cx).into_iter();
             if let Some(dialog) = els.next() {
-                left = left.child(dialog);
+                left = left.child(crate::ui::nudged_panel(dialog, self.ui.panels.get("asm-mass")));
                 any_left = true;
             }
             out.extend(els);
@@ -4193,11 +4221,11 @@ impl AssemblyView {
             any_left = true;
         }
         if let Some(el) = self.render_section(cx) {
-            left = left.child(el);
+            left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-section")));
             any_left = true;
         }
         if let Some(el) = self.render_isolate_panel(cx) {
-            left = left.child(el);
+            left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-isolate")));
             any_left = true;
         }
         if any_left {
@@ -4424,6 +4452,13 @@ impl Render for AssemblyView {
         let toolbar = self.render_toolbar(cx);
         let tb_panel = self.render_tb_custom_panel(cx);
         let list = self.render_list(cx);
+        // Panel dialogs that closed forget where they were moved.
+        let open = [
+            ("asm-mass", self.ui.mass.is_some()),
+            ("asm-section", self.ui.section.is_some()),
+            ("asm-isolate", self.isolate.is_some() || self.ui.transparent.is_some()),
+        ];
+        self.ui.panels.retain(|k| open.iter().any(|(o, on)| *o == k && *on));
         let overlay = self.render_overlay(cx);
         let rail = self.render_panel_rail(cx);
         v_flex()
@@ -4631,6 +4666,10 @@ impl Render for AssemblyView {
                             .h_full()
                             .relative()
                             .bg(pal.app_bg)
+                            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::PanelMove>, _, cx| {
+                                this.ui.panels.drag(e, cx);
+                                cx.notify();
+                            }))
                             // A docked 712 px pane narrows the graphics area (live
                             // 181: the canvas, its fit and its bottom-right tools end
                             // at the pane).

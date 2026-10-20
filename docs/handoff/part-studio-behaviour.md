@@ -443,17 +443,15 @@ Include associated drawings.
    Thickness and Flatten surfaces (`part_studio/flatten_tool.rs`, `model::flatten`) are done
    too, as are Interference detection (`model::interference`), the curvature color map on the
    shared color bar (`thickness.rs::render_color_bar(Bar)`, `model::analysis::principal_curvatures`)
-   and the Draft analysis dialog (`part_studio/draft_tool.rs`). Flatten can't export Parasolid
-   (no writer). The environment maps are our own procedural ones modeled on Onshape's
-   (live/env-maps is reference only, never commit those images). Still to do: verify Draft
-   analysis and Interference detection in the app (needs two overlapping parts), and align the
-   Interference dialog with the live capture once REQUESTS.md is answered.
-2. Remaining ❌ rows in the checklist (Highlight boundary edges, Graphics preferences…, region
-   New sketch/Offset plane, multi-feature Section view…, Create Drawing of Sketch,
-   sketch-curve midpoints, :partnumber/:revision filters, FeatureScript search, fit tolerances).
-3. Tell the lead: the tab context menu doesn't match live (Delete | Open in new browser tab,
-   Rename, Properties…, Show code | Duplicate, Copy to clipboard | Select as document
-   thumbnail | Move to document…, Export…).
+   and the Draft analysis dialog (`part_studio/draft_tool.rs`). Flatten exports Parasolid (kernel writer).
+   The environment maps are our own procedural ones modeled on Onshape's
+   (live/env-maps is reference only, never commit those images). The Interference dialog follows
+   the live capture (Pass 9, "psb 10-19 i"). Still to do: verify Draft analysis in the app.
+2. The checklist has no ❌ rows left (20 Oct). The old list here (boundary edges, Graphics
+   preferences…, region plane tools, multi-feature Section view…, Create Drawing of Sketch,
+   sketch-curve midpoints, :partnumber/:revision, fit tolerances) is done. Open: Inspection
+   tool flows (psb 10-20 r), Configuration variable dialog / Edit definition… (psb 10-20 s).
+3. (Done elsewhere: the tab context menu now follows live; "Open in new browser tab" is web-only.)
 
 ## How to test
 
@@ -746,9 +744,17 @@ new render flags into `DrawMode` rather than new arguments.
     values can be viewed in the configured properties table.", and saving leaves the part's own value
     alone. This needed a surgical addition to the shared properties_dialog.rs:
     `open_part_properties_configured` and `MetaForm.configured`.
-  - Still to do: the Appearance / Material cell popups (cells show "Default" / "- None -"); Enter moving
-    down and Tab moving right between cells; Ctrl+V pasting down a column; BOM edits adding rows
-    (assembly side, asb).
+  - Appearance cell: opens the Appearance editor (`EditTarget::ConfiguredCell`) on the cell's or the
+    part's colour (live 634: `#9DCFED`, R 157 G 207 B 237), with an alpha slider "A" instead of
+    tessellation. ✓ writes `#RRGGBB[AA]`, the cell shows a swatch and the hex, and regeneration colours
+    the part in that configuration.
+  - Material cell: opens the Material panel (`MaterialPanel.cp_cell`) and ✓ writes the name.
+  - Tab moves right and Enter moves down (`ui.cp_grid`). Tab and Ctrl+V reach the table as the input's
+    `IndentInline` / `Paste` actions, caught with `capture_action`. A multi-line paste on a property cell
+    fills the column down the existing rows.
+  - BOM edits adding rows: the model helper is `set_for_configuration`; asb has a note in
+    assembly-behaviour.md ("From psb").
+  - Add property ▾ drops below the button, right-aligned (live 534).
 - **Variable table › Description › Convert to expression / Convert to text** (live 652–656):
   - The text becomes the literal `"text"` (`toggle_description_expr`). The cell shows a literal's text,
     with the expression as tooltip.
@@ -761,8 +767,29 @@ new render flags into `DrawMode` rather than new arguments.
   - The filtered list with ⊗ clear.
   - Esc ends an Inspection tool.
   - Description Convert to expression / text.
-  - Not tried yet: Edit FeatureScript IDs, the popup's pale ✓ and refocus, Measured `#name = value`, the
-    bubble with a right panel open.
+  - Later the same evening, also verified:
+    - Edit FeatureScript IDs: tooltip only for a bad id, a duplicate only disables the button, spaces
+      are refused, and the warning box gained ⚠ in the 598 px dialog.
+    - The popup's pale ✓, its name and value errors, and the refocused `#nv` with "= 12 mm".
+    - `#d = 95.635 mm` in the list.
+    - The bubble inside the graphics area with a right panel open.
+    - Configured Appearance / Material popups, and Tab from Description to Part number.
+    - Fixed along the way: a Measured row's value is formatted in document units (it showed raw
+      meters); the dialog title takes the measured value; Inspection icons are our own drawings closer
+      to live (`insp-gtol`, `insp-weld`, `insp-text-align`; Dimension split chevron).
+- **Configuration variable dialog** (live psb 10-20 s, psb/s-700–717; `part_studio/config_var_dialog.rs`):
+  - Add configuration input ▲ › Configuration variable opens "Variable input" (220 px, top right of the
+    graphics area beside the panel): Name (required: italic placeholder, error look while empty), tabs
+    Length | Angle | Integer | Real | Text, Default / Minimum / Maximum prefilled 1 / 0 / 100000 in the
+    workspace unit (Text: Default only).
+  - Range errors come from the shared `config_var_dialog::range_error`, which the Create variable popup
+    uses too: pink, red underline, the message only in the tooltip, red title and ✓ disabled. Enter
+    commits, Esc does nothing, ✕ cancels.
+  - Variable ⋯ › Edit definition… (after Rename) opens "Edit <name>" with Default / Min / Max only.
+  - The Configurations box now types variable and text values (`ensure_config_box_inputs`, called from
+    `render` because the box renders without the window). A value outside the range stays in the field,
+    pink, with "Enter a value between 0 and 20. Current value is 50.", and isn't applied.
+  - Live printed the maximum as "20.0"; ours prints "20". The number formatting rule is unknown.
 - **Still open (mine)**:
   - The Variable Studio (variable_studio.rs, ui2's) should also turn a bare `5` into `5 mm`. The rule is
     now the shared `variable_table::with_workspace_unit`; the request is in theme-studios.md under "From

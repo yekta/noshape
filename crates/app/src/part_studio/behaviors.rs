@@ -118,6 +118,12 @@ pub struct UiState {
     pub cp_part: Option<noshape_model::BodyId>,
     pub cp_selected: Option<(usize, String)>,
     pub cp_focus: Option<FocusHandle>,
+    /// The table's input cells by row and column (`cell_input` keys; `None`
+    /// for read-only cells): Enter moves down, Tab right (live 10-20 q).
+    pub cp_grid: Vec<Vec<Option<String>>>,
+    /// The "Variable input" / "Edit <name>" dialog of a configuration
+    /// variable.
+    pub var_input: Option<super::config_var_dialog::VarInputDialog>,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
@@ -142,6 +148,8 @@ pub struct UiState {
     pub high_quality: bool,
     /// Parts list › Assign material…: the Material panel.
     pub material_panel: Option<super::material_panel::MaterialPanel>,
+    /// Where panel dialogs were moved by their title.
+    pub panels: crate::ui::PanelOffsets,
     /// The Create selection dialog.
     pub create_selection: Option<super::create_selection::CreateSelection>,
     /// Where the last context menu opened (window coordinates).
@@ -220,6 +228,8 @@ pub struct UiState {
     pub query_hover: Option<Reference>,
     /// The pointer is over the manipulator arrow (drawn outlined).
     pub manip_hover: bool,
+    /// The sketch dimension box moved by its drag strip (reset when a box opens).
+    pub dim_box_offset: Point<Pixels>,
     /// The translate triad's hovered handle and running drag (triad.rs).
     pub triad_hover: Option<usize>,
     pub triad_drag: Option<super::triad::TriadDrag>,
@@ -308,6 +318,8 @@ impl UiState {
             cp_part: None,
             cp_selected: None,
             cp_focus: None,
+            cp_grid: Vec::new(),
+            var_input: None,
             inspection_tool: None,
             inspection_more: false,
             ct: Default::default(),
@@ -322,6 +334,7 @@ impl UiState {
             high_quality: false,
             create_selection: None,
             material_panel: None,
+            panels: Default::default(),
             menu_pos: Point::default(),
             regen_paused: None,
             force_regen: false,
@@ -363,6 +376,7 @@ impl UiState {
             shown_dims: None,
             query_hover: None,
             manip_hover: false,
+            dim_box_offset: Point::default(),
             triad_hover: None,
             triad_drag: None,
             transform_ghost: Vec::new(),

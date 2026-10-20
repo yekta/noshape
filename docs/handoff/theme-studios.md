@@ -181,6 +181,36 @@ Scratch now in /root/ui2-scratch (binary, `bin/shot.sh out.png [window]`, build.
   pencil, the line-drawing preview, and the two icon buttons beside Insert (capture requested,
   REQUESTS ui2 18:10). Other documents' category icons are filled in live (icon agent).
 
+- Document-source icons redrawn filled as live (own artwork, 20-unit grid): `src-owned` (ring + filled
+  person), `src-recent` (one-hand clock), `src-created` (heavy page, cut corner), `src-shared` (page +
+  filled person), `src-public` (globe, filled land). Shared by Insert › Other documents, Create Drawing,
+  Release add-source, select_item and Custom tables, all of which use the same icons in live (drawing/01).
+  `no_onshape_assets` green; checked in the app against live 610.
+- BOM type select open (live 182): same apart from the select popup's highlight `#1967d2`-ish and the
+  select's blue focus border while open (os_menu select style, ui's); "Structured" greyed is behaviour.
+
+**Round 8 (20 Oct ~19:00–, lead: full pixel pass, drawing studio + documents page):**
+- Documents page (start_window.rs, os_ui.rs): no sort arrow until a header is clicked (`sort_shown`;
+  live 20/80); right-click selects the row / tile / folder like live 25 (selection moved into the menu
+  builders: `os_context_menu` stops propagation, so the old `on_mouse_down(Right)` never ran);
+  documents-page modals use `os::modal_doc_page` (title `#333` / 500, live 10/43/47; the document
+  window keeps `#666`); name prompt spacing (body pt 0, 6 px before labels) and dark home / back icons
+  in the location header (live 10); empty states centred vertically (live 90–92); the Folders
+  divider 2 px (live 90); Create menu icons 20 px `#555`.
+- Drawing: tab menu "Change to version…" has the version icon (live 292, workspace.rs surgical);
+  Styles panel (asb's drawing_styles.rs, visual): 14 px top padding, `small` selects.
+- **Other agents' items found:**
+  - ui (os_menu): the Create menu is a Bootstrap dropdown 150 px wide with 29 px rows (dom
+    documents-create-menu); `dropdown()` forces min 253 px and 27 px rows. Input focus ring (live: 2 px,
+    glow) in the New document / folder name field.
+  - asb: sheet chip / Sheets-tree sheet menu lacks "Properties…" (dom context-menus-drawing-sheets:
+    Rename… | Properties… | Duplicate | Copy); Inspection table structure (live 95/98, dom
+    drawing-panel-inspection-table: "View:" bordered select, collapsible Datums section with its info
+    box, Characteristics section); Styles panel content (live 474: plain values without "(Drawing)",
+    unit combos "0.1200 ▾ in", colour swatch, arrowhead picker inline instead of an Arrowhead type
+    row, Text gap spinbox); toolbar groups (already sent); title block templates (live 156/164).
+  - Capture requested: the location box's ↓≡ sort button (REQUESTS ui2 19:20).
+
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
 Not committed, in the shared tree (all mine, all complete edits; none half done):

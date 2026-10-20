@@ -94,31 +94,35 @@ impl CreateVar {
         (!noshape_model::variable_table::is_identifier(n)).then_some("Variable name must be a letter followed by a string of letters or numbers.")
     }
 
+    /// Quantity fields that don't evaluate (Value / Default, Minimum,
+    /// Maximum): the bundle's quantity parameter errors, which disable save.
+    fn value_errors(&self, units: &noshape_units::UnitPrefs, vars: &dyn noshape_units::VariableScope, cx: &App) -> [bool; 3] {
+        let kind = if self.configuration { CREATE_CONFIG_KINDS[self.config_kind].0 } else { CREATE_VAR_KINDS[self.kind].0 };
+        let dim = match kind {
+            "LENGTH" => noshape_units::Dim::LENGTH,
+            "ANGLE" => noshape_units::Dim::ANGLE,
+            "NUMBER" | "INTEGER" | "REAL" => noshape_units::Dim::UNITLESS,
+            _ => return [false; 3],
+        };
+        let bad = |st: &Entity<InputState>| noshape_units::evaluate_as(&st.read(cx).value(), dim, units, vars).is_err();
+        if self.configuration { [bad(&self.value), bad(&self.min), bad(&self.max)] } else { [bad(&self.value), false, false] }
+    }
+
     /// A configuration variable's range error and the fields it marks
-    /// (default, minimum, maximum) (bundle `validateRange`).
+    /// (default, minimum, maximum) (bundle `validateRange`; shared with the
+    /// Configurations panel's "Variable input" dialog).
     fn range_error(&self, units: &noshape_units::UnitPrefs, cx: &App) -> Option<(&'static str, [bool; 3])> {
-        if !self.configuration || CREATE_CONFIG_KINDS[self.config_kind].0 == "TEXT" {
+        if !self.configuration {
             return None;
         }
         let dim = match CREATE_CONFIG_KINDS[self.config_kind].0 {
             "LENGTH" => noshape_units::Dim::LENGTH,
             "ANGLE" => noshape_units::Dim::ANGLE,
+            "TEXT" => return None,
             _ => noshape_units::Dim::UNITLESS,
         };
-        let unit_of = |st: &Entity<InputState>| st.read(cx).value().split_whitespace().nth(1).map(str::to_string);
-        let val = |st: &Entity<InputState>| noshape_units::evaluate_as(&st.read(cx).value(), dim, units, &noshape_units::EmptyScope).ok().map(|q| q.value);
-        let (Some(d), Some(lo), Some(hi)) = (val(&self.value), val(&self.min), val(&self.max)) else { return None };
-        if unit_of(&self.value) != unit_of(&self.min) || unit_of(&self.min) != unit_of(&self.max) {
-            Some(("The default value, minimum, and maximum must all be in the same units.", [true, true, true]))
-        } else if lo > d {
-            Some(("The default value must be greater or equal to the minimum.", [true, true, false]))
-        } else if hi < d {
-            Some(("The default value must be less than or equal to the maximum.", [true, false, true]))
-        } else if lo >= hi {
-            Some(("The minimum must be less than the maximum.", [false, true, true]))
-        } else {
-            None
-        }
+        let t = [&self.value, &self.min, &self.max].map(|st| st.read(cx).value().to_string());
+        crate::part_studio::config_var_dialog::range_error(Some(dim), [t[0].as_str(), t[1].as_str(), t[2].as_str()], units)
     }
 }
 
@@ -1100,15 +1104,16 @@ impl FeatureDialog {
         };
         let name_err = c.name_error(cx);
         let range = c.range_error(&self.units, cx);
-        let marked = |i: usize| range.and_then(|(e, m)| m[i].then_some(e));
+        let invalid = c.value_errors(&self.units, &self.variables, cx);
+        let marked = |i: usize| if invalid[i] { Some("Enter a valid expression.") } else { range.and_then(|(e, m)| m[i].then_some(e)) };
         // Save is disabled while a field is in error (bundle `disableSave`),
         // pale like a feature dialog's ✓.
-        let blocked = name_err.is_some() || range.is_some();
+        let blocked = name_err.is_some() || range.is_some() || invalid.contains(&true);
         let text = c.configuration && CREATE_CONFIG_KINDS[c.config_kind].0 == "TEXT";
         let fields = if c.configuration {
             v_flex().child(row("Name", &c.name, name_err)).child(row("Default", &c.value, marked(0))).when(!text, |d| d.child(row("Minimum", &c.min, marked(1))).child(row("Maximum", &c.max, marked(2))))
         } else {
-            v_flex().child(row("Name", &c.name, name_err)).child(row("Value", &c.value, None)).child(row("Description", &c.description, None))
+            v_flex().child(row("Name", &c.name, name_err)).child(row("Value", &c.value, marked(0))).child(row("Description", &c.description, None))
         };
         let popup = v_flex()
             .id("create-variable")
@@ -1161,7 +1166,7 @@ impl FeatureDialog {
 
     fn commit_create_variable(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // ✓ does nothing while a field is in error (bundle `disableSave`).
-        if self.create_var.as_ref().is_some_and(|c| c.name_error(cx).is_some() || c.range_error(&self.units, cx).is_some()) {
+        if self.create_var.as_ref().is_some_and(|c| c.name_error(cx).is_some() || c.range_error(&self.units, cx).is_some() || c.value_errors(&self.units, &self.variables, cx).contains(&true)) {
             return;
         }
         let Some(c) = self.create_var.take() else { return };

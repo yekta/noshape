@@ -329,7 +329,7 @@ impl DrawingEditor {
                     e.child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child("Create circle"))
                 })
                 .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
-                .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).appearance(false).small()).into_any_element()).into_any_element())))
+                .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))
                 .child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx))
                 .child(check("det-clip", "Clip border to geometry", clip, |d, v| d.clip_border = v, cx))

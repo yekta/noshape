@@ -185,7 +185,7 @@ impl AssemblyView {
         let Some(_) = &self.ui.tb_custom else { return h_flex().children(tools).into_any_element() };
         let mut row = h_flex();
         for (el, id) in tools.into_iter().zip(ids) {
-            row = row.child(div().id(SharedString::from(format!("tbc-{id}"))).cursor_move().on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())).child(el));
+            row = row.child(div().id(SharedString::from(format!("tbc-{id}"))).cursor(CursorStyle::Move).on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())).child(el));
         }
         v_flex()
             .id(SharedString::from(format!("tbset-{set}")))
@@ -200,7 +200,7 @@ impl AssemblyView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .cursor_move()
+                    .cursor(CursorStyle::Move)
                     .text_size(px(10.))
                     .font_weight(FontWeight::BOLD)
                     .line_height(px(10.))
@@ -250,7 +250,7 @@ impl AssemblyView {
                     .px(px(8.))
                     .gap(px(6.))
                     .when(in_bar, |d| d.opacity(0.4))
-                    .when(!in_bar, |d| d.cursor_move().on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())))
+                    .when(!in_bar, |d| d.cursor(CursorStyle::Move).on_drag(ToolDrag { id }, |d, _, _, cx| cx.new(|_| d.clone())))
                     .child(crate::assets::icon(icon, 20., cx))
                     .child(div().truncate().text_size(px(13.)).text_color(pal.text).child(label)),
             );
@@ -297,7 +297,7 @@ impl AssemblyView {
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
                         .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::BOLD).child("Tools"))
-                        .child(div().w(px(198.)).child(Input::new(&c.search).small())),
+                        .child(div().w(px(198.)).child(Input::new(&c.search).small().text_size(px(14.)).pl(px(5.)))),
                 )
                 .child(
                     v_flex()

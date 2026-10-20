@@ -21,7 +21,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::{Document, TabContent, TabId};
 use noshape_store::MicroversionId;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const BLUE: u32 = 0x1651b0;
 const LINE: u32 = 0xeeeeee;
@@ -62,10 +62,7 @@ impl Kind {
 }
 
 /// A document's id in import paths: its first microversion.
-pub fn document_id(path: &Path) -> Option<MicroversionId> {
-    let store = noshape_store::Document::open_read_only(path).ok()?;
-    store.graph().ok()?.microversions.iter().find(|m| m.parents.is_empty()).map(|m| m.id)
-}
+pub use noshape_ops::derived::document_id;
 
 /// A microversion as an import version string (32 hex digits).
 fn version_text(mv: MicroversionId) -> String {
@@ -458,7 +455,7 @@ impl Render for ImportPanel {
             );
         }
         body.child(kinds)
-            .child(div().px(px(6.)).pt(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.))))))
+            .child(div().px(px(6.)).pt(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).pl(px(5.))))))
             .child(div().h(px(6.)).flex_none())
             .child(list)
             .into_any_element()

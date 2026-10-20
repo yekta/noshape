@@ -511,6 +511,9 @@ pub struct InputBaseState<M: InputModeKind> {
     /// its default mask when the user has not made an explicit choice.
     pub(super) mask_pattern_set: bool,
     pub(super) placeholder: SharedString,
+    /// NOSHAPE PATCH: this input's own placeholder style, over the app's
+    /// [`crate::input::PlaceholderStyle`] global.
+    pub(crate) placeholder_style: Option<crate::input::PlaceholderStyle>,
 
     /// Diagnostic currently requested by pointer hover; applications render it.
     pub(super) diagnostic_popover: Option<Rc<crate::input::DiagnosticEntry>>,
@@ -870,6 +873,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             editor_paddings: Edges::default(),
             deferred_scroll_offset: None,
             placeholder: SharedString::default(),
+            placeholder_style: None,
             mask_pattern: MaskPattern::default(),
             mask_pattern_set: false,
             editor_style: InputEditorStyle::default(),
@@ -914,6 +918,14 @@ impl<M: InputModeKind> InputBaseState<M> {
     /// Set placeholder
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
+        self
+    }
+
+    /// NOSHAPE PATCH: draws this input's placeholder in `style` instead of
+    /// the app's [`crate::input::PlaceholderStyle`] (a few Onshape fields
+    /// keep the browser's upright placeholder).
+    pub fn placeholder_style(mut self, style: crate::input::PlaceholderStyle) -> Self {
+        self.placeholder_style = Some(style);
         self
     }
 

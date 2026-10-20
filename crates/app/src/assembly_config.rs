@@ -216,7 +216,7 @@ impl AssemblyView {
 
     fn cfg_cell_text(&mut self, key: String, text: String, (size, weight): (Pixels, FontWeight), double: bool, commit: CfgCommit, cx: &mut Context<Self>) -> AnyElement {
         if let Some(e) = self.ui.cfg_edit.as_ref().filter(|e| e.key == key) {
-            return div().flex_1().min_w_0().child(Input::new(&e.input).appearance(false).text_size(size).font_weight(weight)).into_any_element();
+            return div().flex_1().min_w_0().child(Input::new(&e.input).appearance(false).text_size(size).font_weight(weight).pl(px(3.))).into_any_element();
         }
         div()
             .id(SharedString::from(format!("acfg-{key}")))
@@ -625,7 +625,7 @@ impl AssemblyView {
                         }
                     });
                 });
-                let value = self.cfg_cell_text(format!("var-def-{iid}"), default.text.clone(), (px(14.), FontWeight::NORMAL), false, commit, cx);
+                let value = self.cfg_cell_text(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                 section = section.child(h_flex().border_l_1().border_color(grid).child(head(NAME_W).child("Name")).child(head(COL_W).child("Default value")));
                 section = section.child(h_flex().border_l_1().border_color(grid).child(cell(NAME_W).child(format!("#{}", input.name))).child(cell(COL_W).child(value)));
             }
@@ -671,7 +671,7 @@ impl AssemblyView {
                                 }
                             });
                         });
-                        self.cfg_cell_text(format!("opt-{iid}-{rk}"), rname.clone(), (px(14.), FontWeight::NORMAL), true, commit, cx)
+                        self.cfg_cell_text(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), true, commit, cx)
                     } else {
                         rname.clone().into_any_element()
                     };
@@ -736,7 +736,7 @@ impl AssemblyView {
                         this.edit("Add configuration", cx, |asm| asm.add_config_row(&a, &name, format!("opt{}", rand_id())));
                     });
                     let editing = self.ui.cfg_edit.as_ref().is_some_and(|e| e.key == key);
-                    let el = self.cfg_cell_text(key, String::new(), (px(14.), FontWeight::NORMAL), false, commit, cx);
+                    let el = self.cfg_cell_text(key, String::new(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(NAME_W)
@@ -824,7 +824,7 @@ impl AssemblyView {
             let kk = kk.clone();
             this.edit("Edit configured value", cx, |a| a.set_config_cell(ci, &kk, ParamValue::Expr(ExprValue::new(v.trim()))));
         });
-        self.cfg_cell_text(format!("cv-{ci}-{key}"), text, (px(14.), FontWeight::NORMAL), false, commit, cx)
+        self.cfg_cell_text(format!("cv-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), false, commit, cx)
     }
 
     fn copy_config_table(&mut self, input: &str, cx: &mut Context<Self>) {

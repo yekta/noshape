@@ -201,7 +201,7 @@ impl DrawingEditor {
                     .gap(px(6.))
                     .child(div().size(px(28.)).bg(rgba(color)).border_1().border_color(gpui_kit::rgb(0x999999)))
                     .child(div().text_size(px(12.)).child("Hex"))
-                    .child(div().w(px(80.)).child(Input::new(&d.hex).xsmall()))
+                    .child(div().w(px(80.)).child(Input::new(&d.hex).xsmall().text_size(px(13.)).text_color(gpui_kit::rgb(0x000000)).pl(px(2.))))
                     .child(div().text_size(px(12.)).child("R"))
                     .child(div().w(px(40.)).child(Input::new(&d.rgb[0]).xsmall()))
                     .child(div().text_size(px(12.)).child("G"))

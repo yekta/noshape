@@ -1683,6 +1683,24 @@ fn inference_points_match_onshape() {
 }
 
 #[test]
+fn torus_face_inferences_lie_on_the_axis() {
+    use super::eval::inference_candidates;
+    // A fillet ring (pin with a 2 mm fillet on its top edge): the centers of
+    // its two circular edges, Z along the pin's axis, never sideways.
+    let filleted = with_feature(pin_studio(), "fillet", |f, r| {
+        f.params.set("entities", ParamValue::Query(edges_with(r, "CapEnd")));
+        f.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    });
+    let f = doc_with(vec![filleted]);
+    let mut ev = AssemblyEvaluator::new();
+    let (pin, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let torus = face_of_kind(&r, |s| matches!(s, noshape_kernel::Surface::Torus { .. }));
+    let pts = inference_candidates(&r.context, Some(&pin), &torus, &UnitPrefs::default());
+    assert_eq!(pts.len(), 2, "{:#?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    assert!(pts.iter().all(|p| p.frame.z().cross(DVec3::Z).length() < 1e-9 && p.frame.origin.truncate().length() < 1e-9), "{:#?}", pts.iter().map(|p| (p.frame.origin, p.frame.z())).collect::<Vec<_>>());
+}
+
+#[test]
 fn mate_reset_and_apply_limit_position() {
     let f = doc_with(vec![block_studio()]);
     let mut ev = AssemblyEvaluator::new();
