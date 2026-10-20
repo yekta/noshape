@@ -1032,6 +1032,7 @@ fn mirror_mesh(m: &MeshBuffers, p: DVec3, n: DVec3) -> MeshBuffers {
         face_ranges: m.face_ranges.clone(),
         edges: m.edges.iter().map(|pl| pl.iter().map(rp).collect()).collect(),
         vertices: m.vertices.iter().map(rp).collect(),
+        mesh_lines: m.mesh_lines.iter().map(rp).collect(),
     }
 }
 

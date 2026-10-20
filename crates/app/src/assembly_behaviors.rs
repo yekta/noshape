@@ -2055,13 +2055,11 @@ impl AssemblyView {
 
     /// Filter box with its colon-command dropdown (top of the instance list).
     pub(super) fn render_list_filter(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let Some(st) = self.ui.filter_input.clone() else { return div().into_any_element() };
         let view = cx.entity();
         let current = self.ui.filter.clone();
         // Onshape filter row (live assembly/10): funnel, a 30 px "Filter by name"
         // box (1 px #aaa, radius 3, italic gray placeholder), then the ≡ list button.
-        let empty = st.read(cx).value().is_empty();
         h_flex()
             .h(px(30.))
             .mt(px(7.))
@@ -2102,8 +2100,7 @@ impl AssemblyView {
                     .border_1()
                     .border_color(gpui_kit::rgb(0xaaaaaa))
                     .rounded(px(3.))
-                    .child(Input::new(&st).appearance(false).text_size(px(14.)))
-                    .when(empty, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter by name"))),
+                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(14.)).pl(px(5.))),
             )
             .child(div().flex_1())
             .child(crate::assets::icon("instance-list-view", 20., cx))

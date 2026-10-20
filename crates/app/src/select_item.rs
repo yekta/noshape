@@ -747,8 +747,7 @@ impl SelectItemPanel {
                         .rounded_l(px(3.))
                         .border_1()
                         .border_color(gpui_kit::rgb(0xcccccc))
-                        .child(Input::new(&url).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)))
-                        .when(url_empty, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(12.)).italic().text_color(pal.text_faint).child(placeholder))),
+                        .child(crate::ui::input_with_placeholder(&url, placeholder, cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(6.))),
                 )
                 .child(
                     div()
@@ -921,7 +920,6 @@ impl Render for SelectItemPanel {
         let pal = p();
         let (other, graph, mode) = (self.other_documents, self.graph, self.mode);
         let search = self.search.clone();
-        let typed = !search.read(cx).value().is_empty();
         let query = search.read(cx).value().trim().to_lowercase();
         let (title, search_placeholder, none) = texts(mode);
         let import_file = matches!(mode, PanelMode::Reference(ReferenceKind::Csv | ReferenceKind::Image));
@@ -977,8 +975,7 @@ impl Render for SelectItemPanel {
                             .rounded(px(3.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xcccccc))
-                            .child(Input::new(&search).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)))
-                            .when(!typed, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(12.)).italic().text_color(pal.text_faint).child(search_placeholder))),
+                            .child(crate::ui::input_with_placeholder(&search, search_placeholder, cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(6.))),
                     ),
                 );
                 // At a version with later changes: the blue box (live 604, 627b).

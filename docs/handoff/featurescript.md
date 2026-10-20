@@ -439,3 +439,38 @@ Order: (1) hidden definition bodies + association attributes in host (getSMDefin
 (2) updateSheetMetalGeometry for walls + BEND joints (sm1, sm2 exact face areas as tests);
 (3) RIP / corners / reliefs; (4) flat ops. Reuse sheetmetal_util / flange kernels where possible (kern's files: coordinate).
 Test fixtures: sm1 6 faces (800/800/80/80/40/40), sm2 14 faces (760,760,38,38,80,280,280,14,14,80, cyl 188.4956 r3, 62.8319 r1, 6.2832 x2).
+
+**Status (20 Oct, after v0.4.1):** steps (1)+(2) done. `@updateSheetMetalGeometry` (custom/host/sheetmetal.rs):
+rebuilds each MODEL-attributed definition sheet's part (walls pulled back R·tan(θ/2) from BEND edges, R = inner
+radius + thickness on the concave side; bends = wall thickness revolved about the bend axis; fuse without unify,
+so side / bend-end faces stay separate as live), copies association attributes onto every part face/edge/vertex
+(walls→caps, free edges→sides & cap edges, bends→cylinders & tangent lines, vertices→corners/bend ends), reuses
+the previous part's BodyId, hides the definition sheet. Hidden bodies + FS attributes now persist between
+features: `Context.fs_hidden_bodies` / `Context.fs_attributes` (restored in `FsContext::new`, saved by
+`FsContext::take_context`); `QueryCx::all` skips hidden bodies, ATTRIBUTE_FILTER sees them. opExtrude of
+connected curves now gives ONE sheet (sewn) facing `tangent × direction` (live sm3). Test:
+tests/fs/sm_harness.fs (`std_sheet_metal_matches_onshape`): std sheetMetalStart THICKEN (sm1) and EXTRUDE of an L
+(sm3) give live's exact face areas and sm3's live face→definition mapping (4 faces / 8 edges / 2 vertices).
+Next: RIP joints, corners & bend reliefs (live probes), std Flange/Hem/Tab (their internals), flat ops; and
+`ctx.sheet_metal` for std-made parts so our flat pattern / bend table see them.
+
+## PAUSED (20 Oct ~16:55, lead: server OOM + reboot) — exact state
+- **Integrated (dc0da0a):** opHole (+qOpHoleFace/Profile, live-matched), opOffsetWire, evOffsetDetection, unpackQuery /
+  qCompressed (+miniz_oxide), `?:` left-associative, updateSheetMetalGeometry + hidden definition bodies +
+  `Context.fs_attributes` / `fs_hidden_bodies`, opExtrude of connected curves = one sewn sheet facing tangent×dir,
+  Feature Studio shortcuts (ctrl+shift+O, ctrl+[ / ]), Module outline anchor fix, nav history with labels
+  ("L, C" / "Symbol - name" / "Use - name"), ctrl+click go-to-definition (same studio), ▾ history menus.
+- **Uncommitted, mine:** crates/model/tests/custom_features.rs (+1 expected line) and tests/fs/sm_harness.fs
+  (+11 lines): sm3 face→definition check ("sm3 definitions { EDGE : 8 , FACE : 4 , NONE : 0 , VERTEX : 2 }",
+  matches live). Last run green (custom_features 23/23, host units 6/6). Not mine: tests/features_b.rs.
+- **Verification state:** model crate clippy clean for my files (run with `-A clippy::chunks_exact_to_as_chunks`
+  only because of the foreign error at src/display.rs:50); featurescript clippy clean. App: NOT yet built with the
+  nav changes on my side (3 attempts killed by OOM); the ctrl+click / history ▾ / outline-pick history are
+  untested in the app. ctrl+shift+O, ctrl+[ / ], outline anchor and New feature + ctrl+z (not reproducible) were
+  verified on :108 before.
+- **Next on RESUME:** (1) build app (target-engine), copy to /tmp/fs/noshape, Xvfb :108 (recreate /tmp/fs —
+  wiped), test: ctrl+click a call → definition, ctrl+[ back, ▾ lists "<tab>: …" most recent first, outline pick
+  adds "Symbol - name(params)". (2) ctrl+click on a std symbol (live: opens std source read-only in a new tab at
+  the export line) — not done. (3) Sheet metal next steps (see Status above): RIP joints, corners / bend reliefs
+  (need live probes), std Flange/Hem/Tab internals, flat ops, `ctx.sheet_metal` for std-made parts.
+- /tmp/fs-backup recreated (b<MMDDHHMM>) with my current files; plan text lives in this file (section above).

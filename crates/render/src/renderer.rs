@@ -8,6 +8,12 @@
 //! the geometry or camera changed, and only the queried rectangles are copied
 //! back ([`Renderer::submit_picks`]). [`Renderer::render`] is a synchronous
 //! convenience wrapper (tests, tools).
+//!
+//! A target's color frames reach the screen in one of two ways
+//! ([`Present`]): read back to the CPU as BGRA bytes (thumbnails, tests,
+//! drawings), or left on the GPU in a small ring of textures
+//! ([`PresentTexture`]) that the UI composites directly when it shares this
+//! renderer's GPU device ([`Renderer::with_device`]): no readback, no copy.
 
 use crate::camera::{Camera, Projection};
 use crate::perf;
@@ -48,6 +54,13 @@ const PICK_PRIORITY_DEPTH_BIAS: wgpu::DepthBiasState = wgpu::DepthBiasState { co
 /// Upper bound of color frames one target may have in flight (rendering or
 /// being read back); see [`Renderer::frames_in_flight`].
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
+/// Upper bound of a [`Present::Texture`] target's textures: frames in flight,
+/// the one on screen, and the ones the compositor may still be sampling.
+const MAX_PRESENT_TEXTURES: usize = 6;
+/// Format of [`PresentTexture`]s: plain BGRA8, so a compositor sampling it
+/// gets the sRGB-encoded bytes unchanged (as from a readback). Rendering goes
+/// through a [`COLOR_FORMAT`] view of it.
+pub const PRESENT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 /// Targets kept alive before the least recently used one is evicted.
 const MAX_TARGETS: usize = 8;
 /// Target id used by the synchronous [`Renderer::render`].
@@ -148,12 +161,39 @@ struct InstUniform {
     _pad: [f32; 20],
 }
 
-/// A rendered frame. `bgra` is tightly packed sRGB BGRA8, row-major, top row first.
+/// How a target's color frames are delivered (see the module docs).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Present {
+    /// Read back to the CPU ([`Frame::bgra`]).
+    #[default]
+    Readback,
+    /// Left on the GPU ([`Frame::texture`]).
+    Texture,
+}
+
+/// A color frame left on the GPU ([`Present::Texture`]): [`PRESENT_FORMAT`],
+/// sRGB-encoded. The renderer renders into it again only once every clone of
+/// the `Arc` holding it is dropped, so whoever shows it keeps it until the
+/// compositor's GPU work sampling it has finished.
+pub struct PresentTexture {
+    pub texture: wgpu::Texture,
+    /// The whole texture as [`PRESENT_FORMAT`] (what a compositor samples).
+    pub view: wgpu::TextureView,
+    /// The render attachment ([`COLOR_FORMAT`] view).
+    target_view: wgpu::TextureView,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// A rendered frame. `bgra` is tightly packed sRGB BGRA8, row-major, top row
+/// first; empty when the frame stayed on the GPU (`texture`).
 #[derive(Clone)]
 pub struct Frame {
     pub width: u32,
     pub height: u32,
     pub bgra: Vec<u8>,
+    /// The frame's texture ([`Present::Texture`] targets).
+    pub texture: Option<Arc<PresentTexture>>,
     /// Pick ids of the whole frame (only from the synchronous [`Renderer::render`]
     /// with `pick: true`; the render worker answers pick queries separately).
     pub pick: Option<Arc<PickBuffer>>,
@@ -372,8 +412,12 @@ struct FrameState {
 #[derive(Default)]
 struct TargetState {
     tex: Option<Textures>,
+    present: Present,
     /// Free color readback buffers of the current size.
     spare: Vec<wgpu::Buffer>,
+    /// [`Present::Texture`]: the textures of the current size; one is free
+    /// when the ring holds the only reference.
+    ring: Vec<Arc<PresentTexture>>,
     /// Parameters of the newest submitted frame (for lazy pick rendering).
     last: Option<FrameState>,
     /// The pick texture matches `last`.
@@ -404,13 +448,16 @@ struct RegionRead {
 
 enum ReadKind {
     Frame { seq: u64, width: u32, height: u32, padded_row: u32 },
+    /// A [`Present::Texture`] frame: nothing to read, done when the GPU is.
+    Texture { seq: u64, texture: Arc<PresentTexture> },
     Pick { regions: Vec<RegionRead> },
 }
 
 struct PendingRead {
     target: u64,
     kind: ReadKind,
-    buffer: wgpu::Buffer,
+    /// The readback buffer (none for [`ReadKind::Texture`]).
+    buffer: Option<wgpu::Buffer>,
     submission: wgpu::SubmissionIndex,
     state: Arc<AtomicU8>,
 }
@@ -848,15 +895,10 @@ impl Renderer {
             })
             .await
             .map_err(|e| RenderError::NoAdapter(e.to_string()))?;
-        let adapter_info = adapter.get_info();
-        let frames_in_flight = frames_in_flight_for(&adapter_info);
-        log::info!("noshape renderer using {:?} ({:?})", adapter_info.name, adapter_info.backend);
-        let float_stencil = adapter.features().contains(wgpu::Features::DEPTH32FLOAT_STENCIL8);
-        DEPTH_FORMAT_CHOICE.get_or_init(|| if float_stencil { wgpu::TextureFormat::Depth32FloatStencil8 } else { wgpu::TextureFormat::Depth24PlusStencil8 });
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("noshape"),
-                required_features: if depth_format() == wgpu::TextureFormat::Depth32FloatStencil8 { wgpu::Features::DEPTH32FLOAT_STENCIL8 } else { wgpu::Features::empty() },
+                required_features: adapter.features() & Self::WANTED_FEATURES,
                 required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
@@ -864,6 +906,23 @@ impl Renderer {
             })
             .await
             .map_err(|e| RenderError::Device(e.to_string()))?;
+        Ok(Self::with_device(&adapter, device, queue))
+    }
+
+    /// Optional device features the renderer uses when the device has them
+    /// (float depth with stencil; else 24-bit depth).
+    pub const WANTED_FEATURES: wgpu::Features = wgpu::Features::DEPTH32FLOAT_STENCIL8;
+
+    /// A renderer on an existing device, e.g. the UI toolkit's, so its
+    /// [`Present::Texture`] frames can be composited without a copy. The
+    /// device should have [`Self::WANTED_FEATURES`] where the adapter has
+    /// them and at least downlevel limits.
+    pub fn with_device(adapter: &wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue) -> Self {
+        let adapter_info = adapter.get_info();
+        let frames_in_flight = frames_in_flight_for(&adapter_info);
+        log::info!("noshape renderer using {:?} ({:?})", adapter_info.name, adapter_info.backend);
+        let float_stencil = device.features().contains(wgpu::Features::DEPTH32FLOAT_STENCIL8);
+        DEPTH_FORMAT_CHOICE.get_or_init(|| if float_stencil { wgpu::TextureFormat::Depth32FloatStencil8 } else { wgpu::TextureFormat::Depth24PlusStencil8 });
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("noshape-shaders"),
@@ -978,7 +1037,7 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        Ok(Self {
+        Self {
             device,
             queue,
             adapter_info,
@@ -1012,7 +1071,12 @@ impl Renderer {
             pick_pool: Vec::new(),
             stamp: 0,
             frames_in_flight,
-        })
+        }
+    }
+
+    /// The GPU device the renderer draws with.
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
     }
 
     pub fn adapter_name(&self) -> String {
@@ -1329,7 +1393,18 @@ impl Renderer {
             ts.spare.clear();
             ts.pick_valid = false;
         }
+        ts.ring.retain(|t| t.width == width && t.height == height);
         ts
+    }
+
+    /// How `target`'s color frames are delivered from now on (default
+    /// [`Present::Readback`]).
+    pub fn set_present(&mut self, target: u64, present: Present) {
+        let ts = self.targets.entry(target).or_default();
+        ts.present = present;
+        if present == Present::Readback {
+            ts.ring.clear();
+        }
     }
 
     /// Create the render pipelines for `msaa` ahead of the first frame
@@ -1353,8 +1428,12 @@ impl Renderer {
     }
 
     /// Whether `target` can accept another frame now (see [`Self::frames_in_flight`]).
+    /// A [`Present::Texture`] target also needs a texture nobody holds any
+    /// more (they are released by dropping the delivered frames).
     pub fn can_submit(&self, target: u64) -> bool {
-        self.targets.get(&target).is_none_or(|t| t.in_flight < self.frames_in_flight)
+        self.targets.get(&target).is_none_or(|t| {
+            t.in_flight < self.frames_in_flight && (t.present == Present::Readback || t.ring.len() < MAX_PRESENT_TEXTURES || t.ring.iter().any(|x| Arc::strong_count(x) == 1))
+        })
     }
 
     /// Whether reads are outstanding (call [`Self::wait_oldest`] / [`Self::collect`]).
@@ -1400,19 +1479,32 @@ impl Renderer {
             ts.pick_valid = false;
         }
         let tex = ts.tex.as_ref().expect("textures");
-        let readback = ts.spare.pop().unwrap_or_else(|| {
-            device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("color-readback"),
-                size: tex.readback_size(),
-                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-                mapped_at_creation: false,
+        // Texture targets render into a free texture of their ring (the
+        // readback path into the target's own color texture).
+        let present_texture = (ts.present == Present::Texture).then(|| match ts.ring.iter().find(|t| Arc::strong_count(t) == 1) {
+            Some(t) => t.clone(),
+            None => {
+                let t = Arc::new(create_present_texture(device, width, height));
+                ts.ring.push(t.clone());
+                t
+            }
+        });
+        let readback = present_texture.is_none().then(|| {
+            ts.spare.pop().unwrap_or_else(|| {
+                device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("color-readback"),
+                    size: tex.readback_size(),
+                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                    mapped_at_creation: false,
+                })
             })
         });
+        let color_view = present_texture.as_ref().map_or(&tex.resolve_view, |t| &t.target_view);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("frame") });
         {
             let (view, resolve) = match &tex.color_msaa {
-                Some(v) => (v, Some(&tex.resolve_view)),
-                None => (&tex.resolve_view, None),
+                Some(v) => (v, Some(color_view)),
+                None => (color_view, None),
             };
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("color"),
@@ -1446,18 +1538,30 @@ impl Renderer {
             && let Some(ao) = ao.as_ref()
         {
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength };
-            ao.encode(device, queue, &mut encoder, &tex.depth_sample, &tex.resolve_view, frame);
+            ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
         }
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: &tex.resolve, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            wgpu::TexelCopyBufferInfo { buffer: &readback, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(tex.padded_row), rows_per_image: Some(height) } },
-            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-        );
+        if let Some(readback) = &readback {
+            encoder.copy_texture_to_buffer(
+                wgpu::TexelCopyTextureInfo { texture: &tex.resolve, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+                wgpu::TexelCopyBufferInfo { buffer: readback, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(tex.padded_row), rows_per_image: Some(height) } },
+                wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            );
+        }
         let submission = queue.submit(Some(encoder.finish()));
         let state = Arc::new(AtomicU8::new(MAP_PENDING));
         let st = state.clone();
-        readback.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
-        pending.push_back(PendingRead { target, kind: ReadKind::Frame { seq, width, height, padded_row: tex.padded_row }, buffer: readback, submission, state });
+        let kind = match (&readback, present_texture) {
+            (Some(readback), _) => {
+                readback.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
+                ReadKind::Frame { seq, width, height, padded_row: tex.padded_row }
+            }
+            (None, Some(texture)) => {
+                queue.on_submitted_work_done(move || st.store(MAP_OK, Ordering::Release));
+                ReadKind::Texture { seq, texture }
+            }
+            (None, None) => unreachable!("a frame either reads back or keeps its texture"),
+        };
+        pending.push_back(PendingRead { target, kind, buffer: readback, submission, state });
         ts.in_flight += 1;
         ts.last = Some(FrameState { scene: req.scene, camera: req.camera, device_pixel_ratio: dpr, style: req.style });
         self.lists = lists;
@@ -1592,7 +1696,7 @@ impl Renderer {
         let state = Arc::new(AtomicU8::new(MAP_PENDING));
         let st = state.clone();
         buffer.slice(..).map_async(wgpu::MapMode::Read, move |r| st.store(if r.is_ok() { MAP_OK } else { MAP_FAILED }, Ordering::Release));
-        self.pending.push_back(PendingRead { target, kind: ReadKind::Pick { regions }, buffer, submission, state });
+        self.pending.push_back(PendingRead { target, kind: ReadKind::Pick { regions }, buffer: Some(buffer), submission, state });
     }
 
     /// Onshape's `DepthSamplingPass`: the pick pass again, into a viewport
@@ -1692,11 +1796,23 @@ impl Renderer {
     fn finish(&mut self, r: PendingRead) {
         let ok = r.state.load(Ordering::Acquire) == MAP_OK;
         match r.kind {
+            ReadKind::Texture { seq, texture } => {
+                let result = if ok {
+                    Ok(Frame { width: texture.width, height: texture.height, bgra: Vec::new(), texture: Some(texture), pick: None, rendered_at: std::time::Instant::now() })
+                } else {
+                    Err(RenderError::Readback("the frame failed on the GPU".into()))
+                };
+                if let Some(ts) = self.targets.get_mut(&r.target) {
+                    ts.in_flight = ts.in_flight.saturating_sub(1);
+                }
+                self.ready.push(Completed::Frame { target: r.target, seq, result });
+            }
             ReadKind::Frame { seq, width, height, padded_row } => {
+                let buffer = r.buffer.expect("frame readback buffer");
                 let result = if ok {
                     let _t = perf::scope("r.readback_copy");
                     let row = (width * 4) as usize;
-                    let data = r.buffer.slice(..).get_mapped_range();
+                    let data = buffer.slice(..).get_mapped_range();
                     let mut bgra = Vec::with_capacity(row * height as usize);
                     if padded_row as usize == row {
                         bgra.extend_from_slice(&data[..row * height as usize]);
@@ -1706,22 +1822,24 @@ impl Renderer {
                         }
                     }
                     drop(data);
-                    r.buffer.unmap();
-                    Ok(Frame { width, height, bgra, pick: None, rendered_at: std::time::Instant::now() })
+                    buffer.unmap();
+                    perf::record_ms("r.readback_copy_mb", (row * height as usize) as f32 / 1e6);
+                    Ok(Frame { width, height, bgra, texture: None, pick: None, rendered_at: std::time::Instant::now() })
                 } else {
                     Err(RenderError::Readback("mapping the frame buffer failed".into()))
                 };
                 if let Some(ts) = self.targets.get_mut(&r.target) {
                     ts.in_flight = ts.in_flight.saturating_sub(1);
-                    if ok && ts.tex.as_ref().is_some_and(|t| t.readback_size() == r.buffer.size()) && ts.spare.len() < MAX_FRAMES_IN_FLIGHT {
-                        ts.spare.push(r.buffer);
+                    if ok && ts.tex.as_ref().is_some_and(|t| t.readback_size() == buffer.size()) && ts.spare.len() < MAX_FRAMES_IN_FLIGHT {
+                        ts.spare.push(buffer);
                     }
                 }
                 self.ready.push(Completed::Frame { target: r.target, seq, result });
             }
             ReadKind::Pick { regions } => {
+                let buffer = r.buffer.expect("pick readback buffer");
                 if ok {
-                    let data = r.buffer.slice(..).get_mapped_range();
+                    let data = buffer.slice(..).get_mapped_range();
                     for g in regions {
                         if let Some(sr) = &g.samples {
                             let block = g.padded_row as usize * g.height as usize;
@@ -1755,9 +1873,9 @@ impl Renderer {
                         self.ready.push(Completed::Pick { target: r.target, token: g.token, result });
                     }
                     drop(data);
-                    r.buffer.unmap();
+                    buffer.unmap();
                     if self.pick_pool.len() < 4 {
-                        self.pick_pool.push(r.buffer);
+                        self.pick_pool.push(buffer);
                     }
                 } else {
                     for g in regions {
@@ -1810,6 +1928,22 @@ impl Renderer {
 fn frames_in_flight_for(info: &wgpu::AdapterInfo) -> usize {
     let default = if info.device_type == wgpu::DeviceType::Cpu { 1 } else { MAX_FRAMES_IN_FLIGHT };
     std::env::var("NOSHAPE_FRAMES_IN_FLIGHT").ok().and_then(|v| v.parse::<usize>().ok()).map_or(default, |n| n.clamp(1, MAX_FRAMES_IN_FLIGHT))
+}
+
+fn create_present_texture(d: &wgpu::Device, width: u32, height: u32) -> PresentTexture {
+    let texture = d.create_texture(&wgpu::TextureDescriptor {
+        label: Some("present"),
+        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: PRESENT_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[COLOR_FORMAT],
+    });
+    let view = texture.create_view(&Default::default());
+    let target_view = texture.create_view(&wgpu::TextureViewDescriptor { format: Some(COLOR_FORMAT), ..Default::default() });
+    PresentTexture { texture, view, target_view, width, height }
 }
 
 fn create_textures(d: &wgpu::Device, width: u32, height: u32, msaa: u32) -> Textures {

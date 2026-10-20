@@ -53,5 +53,16 @@ export const smHarness = defineFeature(function(context is Context, id is Id, de
                         "endBound" : SMExtrudeBoundingType.BLIND, "depth" : 15 * mm, "oppositeExtrudeDirection" : false, "symmetric" : false, "hasSecondDirection" : false,
                         "thickness" : 1.5 * mm, "radius" : 2 * mm }));
         println("parts " ~ size(evaluateQuery(context, qAllModifiableSolidBodies())));
+        // What sm3's part faces come from (live: 4 walls, 8 edges incl. both bend cylinders, 2 vertices).
+        const part3 = qBodyType(qCreatedBy(id + "sm3", EntityType.BODY), BodyType.SOLID);
+        var kinds = { "FACE" : 0, "EDGE" : 0, "VERTEX" : 0, "NONE" : 0 };
+        for (var f in evaluateQuery(context, qOwnedByBody(part3, EntityType.FACE)))
+        {
+            const d = getSMDefinitionEntities(context, f);
+            const k = size(d) != 1 ? "NONE" : size(evaluateQuery(context, qEntityFilter(d[0], EntityType.FACE))) == 1 ? "FACE" :
+                    (size(evaluateQuery(context, qEntityFilter(d[0], EntityType.EDGE))) == 1 ? "EDGE" : "VERTEX");
+            kinds[k] += 1;
+        }
+        println("sm3 definitions " ~ toString(kinds));
         println("done");
     });

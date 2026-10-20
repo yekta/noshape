@@ -25,9 +25,42 @@ pub struct MeshBuffers {
     /// Per edge: polyline.
     pub edges: Vec<Vec<[f32; 3]>>,
     pub vertices: Vec<[f32; 3]>,
+    /// Mesh faces' triangle sides as segments (pairs of points): Onshape
+    /// draws every triangle edge of a mesh part as a thin dark-grey line, at
+    /// every zoom (live G35).
+    pub mesh_lines: Vec<[f32; 3]>,
 }
 
 impl MeshBuffers {
+    /// Fill [`Self::mesh_lines`] from the mesh faces of `shape` (the shape
+    /// this mesh tessellates; its faces in `face_ranges` order).
+    pub fn with_mesh_lines(mut self, shape: &noshape_kernel::Shape) -> Self {
+        use noshape_kernel::ShapeType;
+        self.mesh_lines.clear();
+        if !shape.is_mesh() {
+            return self;
+        }
+        let q = |p: [f32; 3]| p.map(|v| (v as f64 * 1e7).round() as i64);
+        let mut seen = std::collections::HashSet::new();
+        for (fi, &(first, count)) in self.face_ranges.iter().enumerate() {
+            if !shape.sub_shape(ShapeType::Face, fi).is_ok_and(|f| f.is_mesh()) {
+                continue;
+            }
+            let Some(tris) = self.indices.get(first as usize..(first + count) as usize) else { continue };
+            for t in tris.as_chunks::<3>().0 {
+                for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                    let (Some(&pa), Some(&pb)) = (self.positions.get(a as usize), self.positions.get(b as usize)) else { continue };
+                    let (ka, kb) = (q(pa), q(pb));
+                    if seen.insert(if ka <= kb { (ka, kb) } else { (kb, ka) }) {
+                        self.mesh_lines.push(pa);
+                        self.mesh_lines.push(pb);
+                    }
+                }
+            }
+        }
+        self
+    }
+
     /// Per edge: whether its two faces meet tangentially (Onshape's
     /// "tangent edges", e.g. a fillet's boundary). Found from the mesh: a
     /// triangle side lying on the edge in two faces whose normals agree.
@@ -376,6 +409,7 @@ mod tests {
             face_ranges: vec![(0, 6), (6, 6)],
             edges: vec![vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]], vec![[-1.0, 0.0, 0.0], [-1.0, 1.0, 0.0]]],
             vertices: vec![],
+            mesh_lines: vec![],
         }
     }
 

@@ -9,7 +9,7 @@
 
 use crate::camera::Camera;
 use crate::perf;
-use crate::renderer::{Completed, FrameRequest, PickRect, RenderError, Renderer, Uploader};
+use crate::renderer::{Completed, FrameRequest, PickRect, Present, RenderError, Renderer, Uploader};
 use crate::scene::{Scene, Style};
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -35,6 +35,7 @@ pub struct RenderJob {
 enum Msg {
     Render(Box<RenderJob>),
     Pick { target: u64, token: u64, rect: PickRect },
+    SetPresent(u64, Present),
     Drop(u64),
 }
 
@@ -49,7 +50,12 @@ impl RenderWorker {
     /// Spawns the render thread. `on_done` is called on the render thread for
     /// every completed frame and pick read.
     pub fn spawn(on_done: impl Fn(Completed) + Send + 'static) -> Result<Self, RenderError> {
-        let mut renderer = Renderer::new()?;
+        Ok(Self::spawn_with(Renderer::new()?, on_done))
+    }
+
+    /// [`Self::spawn`] with an existing renderer (e.g. one on the UI
+    /// toolkit's device, [`Renderer::with_device`]).
+    pub fn spawn_with(mut renderer: Renderer, on_done: impl Fn(Completed) + Send + 'static) -> Self {
         let uploader = renderer.uploader();
         let adapter = renderer.adapter_name();
         let frames_in_flight = renderer.frames_in_flight();
@@ -61,6 +67,7 @@ impl RenderWorker {
                 let mut jobs: Vec<RenderJob> = Vec::new();
                 let mut picks: Vec<(u64, u64, PickRect)> = Vec::new();
                 let mut connected = true;
+                let mut cpu_at_frame: Option<std::time::Duration> = None;
                 let absorb = |m: Msg, jobs: &mut Vec<RenderJob>, picks: &mut Vec<(u64, u64, PickRect)>, renderer: &mut Renderer| match m {
                     Msg::Render(job) => {
                         let job = *job;
@@ -76,6 +83,7 @@ impl RenderWorker {
                         }
                     }
                     Msg::Pick { target, token, rect } => picks.push((target, token, rect)),
+                    Msg::SetPresent(target, present) => renderer.set_present(target, present),
                     Msg::Drop(target) => {
                         jobs.retain(|j| j.target != target);
                         picks.retain(|p| p.0 != target);
@@ -91,6 +99,15 @@ impl RenderWorker {
                         match rx.recv() {
                             Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer),
                             Err(_) => break,
+                        }
+                    } else if picks.is_empty() && !renderer.has_pending() && !jobs.iter().any(|j| renderer.can_submit(j.target)) {
+                        // Only jobs whose target waits for the UI to release a
+                        // presented texture: nothing signals that, so look
+                        // again shortly (or as soon as a message arrives).
+                        match rx.recv_timeout(std::time::Duration::from_millis(1)) {
+                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer),
+                            Err(mpsc::RecvTimeoutError::Timeout) => {}
+                            Err(mpsc::RecvTimeoutError::Disconnected) => connected = false,
                         }
                     }
                     loop {
@@ -140,7 +157,17 @@ impl RenderWorker {
                     let done = renderer.collect();
                     let delivered = !done.is_empty();
                     for c in done {
+                        let frame = matches!(c, Completed::Frame { .. });
                         on_done(c);
+                        // Render-thread CPU per delivered frame (encoding,
+                        // copy-out and hand-off; the GPU's work is not included).
+                        if frame
+                            && perf::enabled()
+                            && let Some(now) = perf::thread_cpu_time()
+                            && let Some(prev) = cpu_at_frame.replace(now)
+                        {
+                            perf::record("w.cpu_per_frame", now.saturating_sub(prev));
+                        }
                     }
                     if !delivered && renderer.has_pending() {
                         let _t = perf::scope("w.gpu_wait");
@@ -149,7 +176,7 @@ impl RenderWorker {
                 }
             })
             .expect("spawn render thread");
-        Ok(Self { tx, uploader, adapter, frames_in_flight })
+        Self { tx, uploader, adapter, frames_in_flight }
     }
 
     pub fn submit(&self, job: RenderJob) {
@@ -160,6 +187,11 @@ impl RenderWorker {
     /// newest frame; the result is reported with `token`.
     pub fn pick(&self, target: u64, token: u64, rect: PickRect) {
         let _ = self.tx.send(Msg::Pick { target, token, rect });
+    }
+
+    /// How `target`'s frames are delivered (default [`Present::Readback`]).
+    pub fn set_present(&self, target: u64, present: Present) {
+        let _ = self.tx.send(Msg::SetPresent(target, present));
     }
 
     /// Release a target's GPU resources.

@@ -236,6 +236,8 @@ pub struct PartStudioView {
     /// Custom features shown in the toolbar (for its width).
     custom_feature_count: usize,
     focus: FocusHandle,
+    /// Cached parts of the window (toolbar, viewport overlay): see `cached_slice`.
+    slices: Option<PsSlices>,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
     /// A sketch cancelled with ✕: its draft, index and whether it was new,
@@ -344,6 +346,7 @@ impl PartStudioView {
             regen_task: None,
             custom_feature_count: 0,
             focus: cx.focus_handle(),
+            slices: None,
             fitted_once: false,
             message: None,
             canceled_edit: None,
@@ -1230,7 +1233,7 @@ impl PartStudioView {
             DialogEvent::LeaveFocus { forward: true } => window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx),
             DialogEvent::LeaveFocus { forward: false } => window.focus(&this.focus, cx),
             DialogEvent::CreateSelection(field) => this.open_create_selection_for_field(field.clone(), cx),
-            DialogEvent::CreateVariable { name, kind, value, description, configuration, range } => this.create_variable_from_field(name, kind, value, description, *configuration, range.clone(), cx),
+            DialogEvent::CreateVariable(v) => this.create_variable_from_field(v, cx),
             DialogEvent::ImportReference { param, file } => this.import_reference_file(param.clone(), file.clone(), cx),
             // Create version…: this document's dialog, or another document opened in its window.
             DialogEvent::CreateVersion(None) => crate::history_panel::open_create_version_in(this.doc.clone(), window, cx),
@@ -2049,6 +2052,10 @@ impl PartStudioView {
                     .into_any_element(),
             );
         }
+        // Filtered: the folder stays with one "..." child (live 564).
+        if filtered.is_some() {
+            dg_rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element());
+        }
         if !dg_rows.is_empty() {
             // Onshape: a collapsible "Default geometry" folder; children are
             // indented 22 px under a 1 px guide line.
@@ -2089,16 +2096,25 @@ impl PartStudioView {
                 rows.push(self.render_folder_row(fd, cx));
             }
         }
+        // Filtered (live part-studio/564): each run of hidden features is
+        // one "..." row and the rollback bar keeps its place.
+        let ellipsis = || div().h(px(26.)).flex_none().pl(px(5.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element();
+        let mut in_hidden_run = false;
         for (i, f) in studio.features.iter().enumerate() {
             if editing_new_at == Some(i) {
                 rows.push(self.render_editing_placeholder(cx));
             }
-            if i == rollback && filtered.is_none() {
+            if i == rollback {
+                in_hidden_run = false;
                 rows.push(self.render_rollback_bar(i, window, cx));
             }
             if filtered.as_ref().is_some_and(|set| !set.contains(&f.id)) {
+                if !std::mem::replace(&mut in_hidden_run, true) {
+                    rows.push(ellipsis());
+                }
                 continue;
             }
+            in_hidden_run = false;
             // Nested folders: emit headers for folders newly entered, indent
             // by depth, and hide rows under a collapsed ancestor.
             let chain = studio.folder_chain(f.folder);
@@ -2129,14 +2145,11 @@ impl PartStudioView {
         if editing_new_at.is_some_and(|i| i >= studio.features.len()) {
             rows.push(self.render_editing_placeholder(cx));
         }
-        if rollback >= studio.features.len() && filtered.is_none() {
+        if rollback >= studio.features.len() {
             rows.push(self.render_rollback_bar(studio.features.len(), window, cx));
         }
         if prompt_anchor == Some(None) {
             rows.push(self.render_folder_prompt(cx));
-        }
-        if filtered.as_ref().is_some_and(|s| s.is_empty()) {
-            rows.push(div().px_2().py_1().text_xs().text_color(pal.text_faint).child("No matching features").into_any_element());
         }
 
         // Parts list.
@@ -2169,6 +2182,7 @@ impl PartStudioView {
         let dialog_open = self.edit.is_some();
         let viewing_version = self.doc.read(cx).session.viewing_version().is_some();
         let filter_input = self.ui.filter.as_ref().map(|(st, _)| st.clone());
+        let filtered_count = filtered.as_ref().map(|f| f.len());
         let config_box = self.render_config_box(cx);
         let contexts_section = self.render_contexts_section(cx);
 
@@ -2207,7 +2221,8 @@ impl PartStudioView {
                     .pr(px(8.))
                     .gap(px(14.))
                     // Live: the funnel is a button (`os-button os-clear`): pointer.
-                    .child(div().flex_none().cursor_pointer().child(crate::assets::icon("filter", 20., cx)))
+                    // Filtering: a filled blue funnel (live 564).
+                    .child(div().flex_none().cursor_pointer().child(crate::assets::icon(if filtered_count.is_some() { "filter-active" } else { "filter" }, 20., cx)))
                     // Live (part-studio/00): a 30 px box, 1 px #aaa, radius 3; the
                     // placeholder italic gray.
                     .child({
@@ -2224,8 +2239,28 @@ impl PartStudioView {
                                 .border_1()
                                 .border_color(gpui_kit::rgb(0xaaaaaa))
                                 .rounded(px(3.))
-                                .child(gpui_kit::component::input::Input::new(&st).appearance(false).text_size(px(14.)))
-                                .when(empty, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter by name or type"))),
+                                // The input draws its italic placeholder itself, so the caret
+                                // starts on it. Live (dom/caret-inputs.json): border 1 + padding 5,
+                                // the caret 6 px from the box's outer edge (1 + 1 + 4 here).
+                                .child(gpui_kit::component::input::Input::new(&st).appearance(false).text_size(px(14.)).pl(px(4.)))
+                                // A grey ⊗ clears the filter (live 564).
+                                .when(!empty, |d| {
+                                    d.child(
+                                        div()
+                                            .id("filter-clear")
+                                            .size(px(16.))
+                                            .mr(px(4.))
+                                            .flex_none()
+                                            .rounded_full()
+                                            .bg(gpui_kit::rgb(0xdddddd))
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .cursor_pointer()
+                                            .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb(0xffffff)))
+                                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_filter("", window, cx))),
+                                    )
+                                }),
                         )
                     })
             }))
@@ -2255,7 +2290,12 @@ impl PartStudioView {
                         )
                     })
                     // (Chrome keeps the space before the ellipsis.)
-                    .child(div().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(if errors > 0 { "Features …".to_string() } else { format!("Features ({})", studio.features.len() + 4) }))
+                    // Filtered: "Features (k of N)", truncating (live 564).
+                    .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
+                        _ if errors > 0 => "Features …".to_string(),
+                        Some(k) => format!("Features ({k} of {})", studio.features.len() + 4),
+                        None => format!("Features ({})", studio.features.len() + 4),
+                    }))
                     .child(div().flex_1())
                     // Live (navigation/301): a version keeps only the timer.
                     .when(!viewing_version, |d| d.child(
@@ -3228,7 +3268,10 @@ impl PartStudioView {
                 crate::os_ui::message_bubble("toast", kind, msg, close, cx)
             };
             // Live document/01: centered on the window, not the graphics area.
-            let left = crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W };
+            // With a right panel open the graphics area is too narrow for
+            // that, so the bubble centres on it instead of running under the
+            // feature list.
+            let left = if self.right_panel.is_some() { 0. } else { crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::LEFT_PANEL_W } };
             out.push(div().absolute().top(px(8.)).left_0().right_0().pr(px(left)).flex().justify_center().child(bubble).into_any_element());
         }
         out
@@ -3480,26 +3523,38 @@ pub(super) fn paint_paths(polys: Vec<Vec<Point<Pixels>>>, color: Hsla) -> AnyEle
     .into_any_element()
 }
 
-impl Render for PartStudioView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        if let Some(v) = self.pending_named_view.take() {
-            self.apply_named_view(&v, window, cx);
+/// The Part Studio's cached slices (see `crate::cached_slice`): a keystroke
+/// or a caret blink in a field re-renders the studio but reuses these.
+#[derive(Clone)]
+struct PsSlices {
+    toolbar: Entity<crate::cached_slice::Slice<PartStudioView>>,
+    overlay: Entity<crate::cached_slice::Slice<PartStudioView>>,
+}
+
+impl PartStudioView {
+    fn slices(&mut self, cx: &mut Context<Self>) -> PsSlices {
+        if let Some(s) = &self.slices {
+            return s.clone();
         }
-        self.ensure_filter_input(window, cx);
-        // A feature row's context menu closed: drop its highlight.
-        if self.ui.list_menu.is_some() && !crate::os_menu::is_open(cx) {
-            self.ui.list_menu = None;
-            self.refresh_scene(false, cx);
-        }
-        let viewport_w = f32::from(window.viewport_size().width);
-        let toolbar = if self.sketch.is_some() { self.render_sketch_toolbar(viewport_w, cx) } else { self.render_toolbar(viewport_w, cx) };
-        let list = self.render_feature_list(window, cx);
-        if self.needs_regen {
-            self.needs_regen = false;
-            self.schedule_regen(window, cx);
-        }
-        let right = self.render_right_panel(window, cx);
+        use crate::cached_slice::Slice;
+        let me = cx.entity();
+        let toolbar = Slice::new(&me, |this, window, cx| {
+            let viewport_w = f32::from(window.viewport_size().width);
+            if this.sketch.is_some() { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
+        }, cx);
+        let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
+        // Labels, the view cube and manipulators follow the camera.
+        Slice::observing(&overlay, &self.viewport, cx);
+        // Both read the document (undo state, features) besides the studio.
+        Slice::observing(&toolbar, &self.doc, cx);
+        Slice::observing(&overlay, &self.doc, cx);
+        let s = PsSlices { toolbar, overlay };
+        self.slices = Some(s.clone());
+        s
+    }
+
+    /// Everything drawn over the graphics area.
+    fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let mut overlay = self.render_viewport_overlay(cx);
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
@@ -3540,6 +3595,29 @@ impl Render for PartStudioView {
         overlay.extend(self.render_select_other(cx));
         overlay.extend(self.render_mini_toolbar(cx));
         overlay.extend(self.render_context_banner(cx));
+        div().size_full().relative().children(overlay).into_any_element()
+    }
+}
+
+impl Render for PartStudioView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        if let Some(v) = self.pending_named_view.take() {
+            self.apply_named_view(&v, window, cx);
+        }
+        self.ensure_filter_input(window, cx);
+        // A feature row's context menu closed: drop its highlight.
+        if self.ui.list_menu.is_some() && !crate::os_menu::is_open(cx) {
+            self.ui.list_menu = None;
+            self.refresh_scene(false, cx);
+        }
+        let slices = self.slices(cx);
+        let list = self.render_feature_list(window, cx);
+        if self.needs_regen {
+            self.needs_regen = false;
+            self.schedule_regen(window, cx);
+        }
+        let right = self.render_right_panel(window, cx);
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()
@@ -3595,6 +3673,11 @@ impl Render for PartStudioView {
                     return;
                 }
                 if this.close_insert_go(cx) {
+                    return;
+                }
+                // An active Inspection panel tool ends.
+                if this.ui.inspection_tool.take().is_some() {
+                    cx.notify();
                     return;
                 }
                 if this.hide_dimensions(window, cx) {
@@ -3766,7 +3849,7 @@ impl Render for PartStudioView {
                     this.set_rollback(if r + 1 >= n { None } else { Some(r + 1) }, cx);
                 }
             }))
-            .child(toolbar)
+            .child(slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()))
             .child(
                 h_flex()
                     .flex_1()
@@ -3825,7 +3908,7 @@ impl Render for PartStudioView {
                                 cx.notify();
                             }))
                             .child(self.viewport.clone())
-                            .children(overlay),
+                            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
                     )
                     .children(right),
             );

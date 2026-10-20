@@ -976,8 +976,7 @@ impl AssemblyView {
                             .rounded(px(2.))
                             .flex()
                             .items_center()
-                            .child(Input::new(f).appearance(false).small().text_size(px(13.)))
-                            .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().italic().text_size(px(13.)).text_color(pal.text_faint).child("Filter inputs"))),
+                            .child(crate::ui::input_with_placeholder(f, "Filter inputs", cx).appearance(false).small().text_size(px(13.)).pl(px(6.))),
                     ))
                     .into_any_element(),
                 None => div().flex_1().into_any_element(),

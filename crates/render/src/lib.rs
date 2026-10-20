@@ -13,5 +13,7 @@ pub mod scene;
 pub mod worker;
 
 pub use camera::{Camera, Projection, StandardView};
-pub use renderer::{Completed, DepthSample, Frame, FrameRequest, PickBuffer, PickRect, RenderError, RenderParams, Renderer};
+pub use renderer::{Completed, DepthSample, Frame, FrameRequest, PickBuffer, PickRect, Present, PresentTexture, RenderError, RenderParams, Renderer};
 pub use scene::*;
+/// The wgpu the renderer uses (for platform interop, e.g. zero-copy presentation).
+pub use wgpu;

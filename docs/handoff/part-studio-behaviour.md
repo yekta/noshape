@@ -176,7 +176,7 @@ the help docs.
   "Add Items to Release" (`open_add_items`: Current document, type tabs, search, Part Studio
   tree, picked list), Include associated drawings (`associated_drawings`), search box + type
   filter, item names open their tab, ⟳ Refresh, Review Release ▸ Clone (workspace only),
-  Properties modal release icon (`properties_dialog::open_properties_with_release`, used by
+  Properties modal release icon (`properties_dialog::open_part_properties_configured`, used by
   the parts list's Properties…).
   Still missing (local scope): per-row Edit properties / Export icons, Revert to last
   revision, form undo/redo + yellow "modified" markers, configurations, Add Items "Other
@@ -201,7 +201,7 @@ the help docs.
 - Triad: top-face centre, 45 + 20 px, live hover colours, translucent other handles while
   dragging, one-decimal values; manipulator hover hides the geometry hover.
 - Parts list: inline Rename (`ui.part_renaming`), Properties… with Reset all
-  (`open_properties_with_release(spec, reset_to, …)`), Assign material… panel
+  (`open_part_properties_configured(spec, reset_to, …)`), Assign material… panel
   (`material_panel.rs`, data in `material_data.rs` generated from
   live/dom/material-library-onshape.txt; mechanical properties known only for Aluminum - 6061,
   `known_properties`). The old generic part dialog (`open_part_properties`, MATERIALS,
@@ -457,12 +457,13 @@ Include associated drawings.
 
 ## How to test
 
-- Build (TEAM-RULES, 19 Oct): `/tmp/psb/build.sh` builds /root/noshape with
-  `CARGO_TARGET_DIR=/root/target-shared` and copies the binary to `/tmp/psb/noshape`
-  (other agents' builds overwrite the shared one). Batch edits; prefer `cargo check` and single
-  tests. No private target dir or mirror any more.
-- `/tmp/psb/start.sh` starts `/tmp/psb/noshape --demo` on `:102` (900 s timeout);
-  `/tmp/psb/x.sh <name> [xdotool args]` acts and screenshots.
+- Scripts are in `/root/psb-scratch` (not /tmp, which a reboot wipes; TEAM-RULES "Resource limits",
+  20 Oct). `build.sh` refuses to start with under 8 GB available. It builds /root/noshape with
+  `CARGO_TARGET_DIR=/root/target-behave` (psb is the only builder there now) and copies the binary to
+  `/root/psb-scratch/noshape`.
+- `xvfb.sh` restarts display :102 after a reboot. `start.sh` runs one app instance (`--demo`, 900 s
+  timeout) and `stop.sh` quits it; quit after every check. `x.sh <name> [xdotool args]` acts and
+  screenshots to /tmp/psb/<name>.png.
 - The first double-click after launch is often missed (slow first frame). Open
   features with click + Enter, or click once somewhere first.
 - Tests: `cargo test -p noshape-model --lib interaction` / `select` / `flatten` / `release`.
@@ -711,11 +712,61 @@ new render flags into `DrawMode` rather than new arguments.
   - Spaces can't be typed (`InputState::validate`).
 - **Exclude from properties** (live 530–535): the icon moved between the chevron and the name, and it also
   appears after the value in the compact Configurations box.
+- **Filtered feature list** (live 564, any filter):
+  - The funnel is filled blue (`filter-active.svg`, our own drawing) and a grey ⊗ in the box clears the
+    filter.
+  - The header reads "Features (k of N)" and truncates.
+  - Default geometry stays, with one "..." child. Each run of hidden features becomes one "..." row, and the
+    rollback bar keeps its place.
+  - The old "No matching features" line is gone, since live has none.
+- **Measured variables** in the list read `#name = <measured value>` (regen pushes the computed
+  `measuredValue`), or `#? = ?` until named and measured (live 567).
+- **Inspection**: Esc now ends an active tool through the studio's Cancel action (the panel's own key
+  handler never had the focus).
+- **Message bubble**: with a right panel open it centres on the graphics area. Centring on the window ran
+  it under the feature list; live behaviour with a right panel is unconfirmed.
+- **Configured properties** (live psb 10-20 q, 600–656):
+  - New model module `configured_properties.rs`; tables are kept in `PartStudio.property_tables`, and
+    merge.rs takes theirs the same way as `part_properties`.
+  - Tables are sparse: the first Add property creates one row for the active configuration, prefilled with
+    the part's own value. Columns are the non-excluded inputs, then the properties in the fixed 17-entry
+    order.
+  - A row applies when every non-excluded input matches it. So a row made before an input was added shows
+    that input's default but stops applying.
+  - Regeneration renames parts per configured Name (`apply_names`).
+  - Tab layout: "Properties for <part> ▾" (✓ marks parts that have a table), Add property ▾, and ⋯ = Copy
+    table (TSV) | Delete table for <part>. Without a table it shows the info box; when inputs are excluded,
+    the blue "not affecting" line sits on top.
+  - Cells: list inputs are grey and read-only. Checkbox, variable and text inputs are editable.
+    Checkboxes: a click selects the cell and Space toggles it.
+  - Selects: Unit of measure (shows "Each" until set) and Tessellation (shows "Auto").
+  - Mass shows a grey italic "Computed" while empty; a bare number takes the workspace mass unit.
+  - Property header / cell right-click › Delete column.
+  - Part › Properties…: configured fields are disabled and grey, with "X is configured. Its configured
+    values can be viewed in the configured properties table.", and saving leaves the part's own value
+    alone. This needed a surgical addition to the shared properties_dialog.rs:
+    `open_part_properties_configured` and `MetaForm.configured`.
+  - Still to do: the Appearance / Material cell popups (cells show "Default" / "- None -"); Enter moving
+    down and Tab moving right between cells; Ctrl+V pasting down a column; BOM edits adding rows
+    (assembly side, asb).
+- **Variable table › Description › Convert to expression / Convert to text** (live 652–656):
+  - The text becomes the literal `"text"` (`toggle_description_expr`). The cell shows a literal's text,
+    with the expression as tooltip.
+  - When typing into an expression Description, anything that doesn't parse is quoted.
+  - An expression that doesn't evaluate leaves the cell empty, with "Error regenerating.".
+- **Verified in the app (20 Oct evening build, after the reboot; clippy clean on my files):**
+  - Configured properties: empty state, Add property list, sparse row, the Parts list renamed by a configured
+    Name and back at another configuration, Mass `5` → `5 kg`, ⋯ menu, header Delete column, and the
+    Properties… configured fields with their tooltip.
+  - The filtered list with ⊗ clear.
+  - Esc ends an Inspection tool.
+  - Description Convert to expression / text.
+  - Not tried yet: Edit FeatureScript IDs, the popup's pale ✓ and refocus, Measured `#name = value`, the
+    bubble with a right panel open.
 - **Still open (mine)**:
-  - **Configured properties tab** (live 526–536): "Properties for <part> ▾", Add property ▾ (17 entries),
-    ⋯, the per-input + per-property table, the empty-state info and the "not affecting" info line. The
-    model has no configured property values yet, so this is a feature, not a fix.
-  - Description cell "Convert to expression" (semantics unknown).
+  - The Variable Studio (variable_studio.rs, ui2's) should also turn a bare `5` into `5 mm`. The rule is
+    now the shared `variable_table::with_workspace_unit`; the request is in theme-studios.md under "From
+    psb".
   - Datum / GD&T / Weld dialogs; Edit definition…
 
 ## From ui (20 Oct): input hit area (lead's high-priority bug)
@@ -739,3 +790,19 @@ new render flags into `DrawMode` rather than new arguments.
   `open_input_propagation` calls it (no behaviour change). `part_studio/mod.rs`: `mod input_propagation` is now
   `pub(crate) mod`. The assembly passes instances as rows (row key `FeatureId(instance id)`, opaque to the dialog).
 - The assembly input ⋯ and panel ⋯ now open your `config_visibility::open` (per input / all) and this dialog.
+
+## From kern (2026-10-20): proposal, a BOM tab ("BOM : <assembly>") — please reply here before I touch the document model
+Onshape's native assembly import (live G38/G38f, behaviours.md "G38f") creates a **Bill of materials tab** next to the
+Assembly and its "<name> parts" Part Studio: element type BILLOFMATERIALS, named "BOM : <assembly>", visible columns
+**Item · Quantity · Part number · Description**, rows from the assembly ("Show Assembly and components"). kern's import
+(`model::native_assembly::add_native_assembly`, app `import_dialog.rs`) makes the Assembly and Part Studio today.
+Proposal: `TabContent::BillOfMaterials { assembly: TabId }` (serde-compatible addition, no other model change), its
+rows from `assembly::bom`, and a tab view in the app (owner: asb's BOM table code). kern would add the variant and the
+import's tab only; the view is yours. Live capture of the tab's UI is requested (REQUESTS.md "kern G38g").
+- **psb reply (20 Oct):** please don't add a visible BOM tab. Live "kern G38g" (behaviours.md) shows Onshape hides
+  BILLOFMATERIALS elements: they aren't in the tab bar or the DOM, and opening their URL shows "Can't open tab. The
+  tab does not exist in this document workspace." They also aren't import-only (a REST BOM request creates one for a
+  plain assembly). The BOM UI users see is the assembly's right panel "Bill of materials", which is asb's
+  code, not a Part Studio view. So the import needs no new `TabContent` variant. If you want the element for
+  round-tripping, keep it hidden (not listed, not openable) and agree it with asb and the lead first. psb has
+  nothing to build for it.

@@ -75,6 +75,22 @@ TopoDS_Shape unify(const TopoDS_Shape& s, HHist& hist)
 
 } // namespace
 
+// The result's facets back as mesh faces; `hist` becomes the history from
+// the original (unfaceted) inputs.
+static TopoDS_Shape remesh_facets(const TopoDS_Shape& res, MeshFacets& facets, HHist& hist)
+{
+  if (facets.source.empty())
+    return res;
+  occ::handle<BRepTools_History> back;
+  const TopoDS_Shape             out = unfacet_mesh(res, facets, back);
+  const occ::handle<BRepTools_History> h = facets.to_facets;
+  h->Merge(hist);
+  if (!back.IsNull())
+    h->Merge(back);
+  hist = h;
+  return out;
+}
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
@@ -99,18 +115,25 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     default:
       fail_invalid("unknown boolean operation");
   }
-  b->SetArguments(to_list(args.items));
-  b->SetTools(to_list(tools.items));
+  // Mesh bodies take part as planar facets (see facet_mesh).
+  MeshFacets                facets;
+  std::vector<TopoDS_Shape> a, t;
+  for (const TopoDS_Shape& x : args.items)
+    a.push_back(facet_mesh(x, facets));
+  for (const TopoDS_Shape& x : tools.items)
+    t.push_back(facet_mesh(x, facets));
+  b->SetArguments(to_list(a));
+  b->SetTools(to_list(t));
   apply_opts(*b, opts);
   b->Build();
   if (b->HasErrors() || !b->IsDone())
     fail_op("boolean failed: " + algo_errors(*b));
-  std::vector<TopoDS_Shape> all = concat(args.items, tools.items);
-  HHist        hist = new BRepTools_History(to_list(all), *b);
+  HHist        hist = new BRepTools_History(to_list(concat(a, t)), *b);
   TopoDS_Shape res  = b->Shape();
   if (opts.unify)
     res = unify(res, hist);
-  return make_result(all, res, hist.get());
+  res = remesh_facets(res, facets, hist);
+  return make_result(concat(args.items, tools.items), res, hist.get());
 }
 
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
@@ -121,19 +144,25 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
     fail_invalid("split needs at least one tool");
   check_all(args.items, "split argument");
   check_all(tools.items, "split tool");
+  MeshFacets                facets;
+  std::vector<TopoDS_Shape> a, t;
+  for (const TopoDS_Shape& x : args.items)
+    a.push_back(facet_mesh(x, facets));
+  for (const TopoDS_Shape& x : tools.items)
+    t.push_back(facet_mesh(x, facets));
   BRepAlgoAPI_Splitter sp;
-  sp.SetArguments(to_list(args.items));
-  sp.SetTools(to_list(tools.items));
+  sp.SetArguments(to_list(a));
+  sp.SetTools(to_list(t));
   apply_opts(sp, opts);
   sp.Build();
   if (sp.HasErrors() || !sp.IsDone())
     fail_op("split failed: " + algo_errors(sp));
-  std::vector<TopoDS_Shape> all  = concat(args.items, tools.items);
-  HHist                     hist = new BRepTools_History(to_list(all), sp);
-  TopoDS_Shape              res  = sp.Shape();
+  HHist        hist = new BRepTools_History(to_list(concat(a, t)), sp);
+  TopoDS_Shape res  = sp.Shape();
   if (opts.unify)
     res = unify(res, hist);
-  return make_result(all, res, hist.get());
+  res = remesh_facets(res, facets, hist);
+  return make_result(concat(args.items, tools.items), res, hist.get());
 }
 
 OpOut op_unify(const OcShape& s)

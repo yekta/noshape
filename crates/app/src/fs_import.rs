@@ -338,7 +338,7 @@ impl Render for ImportPanel {
                         .on_click(cx.listener(move |t, _: &ClickEvent, _, cx| t.open_other(path.clone(), cx))),
                 );
             }
-            return body.child(div().px(px(6.)).pt(px(6.)).pb(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic())))).child(list).into_any_element();
+            return body.child(div().px(px(6.)).pt(px(6.)).pb(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)))))).child(list).into_any_element();
         }
 
         // The document header: name, workspace / version, buttons.
@@ -458,7 +458,7 @@ impl Render for ImportPanel {
             );
         }
         body.child(kinds)
-            .child(div().px(px(6.)).pt(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))))
+            .child(div().px(px(6.)).pt(px(6.)).flex_none().child(gpui_kit::base::input::input_frame(div().h(px(30.)).border_1().border_color(rgb(0xaaaaaa)).rounded(px(3.)).child(Input::new(&self.search).appearance(false).text_size(px(14.))))))
             .child(div().h(px(6.)).flex_none())
             .child(list)
             .into_any_element()

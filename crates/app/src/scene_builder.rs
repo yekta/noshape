@@ -96,6 +96,8 @@ struct CachedBody {
     mesh: MeshHandle,
     edges: LinesHandle,
     vertices: PointsHandle,
+    /// Mesh faces' triangle sides (live G35), when the body has mesh faces.
+    mesh_lines: Option<LinesHandle>,
 }
 
 /// GPU caches that survive across rebuilds.
@@ -213,6 +215,8 @@ pub struct BuiltScene {
 }
 
 const EDGE_COLOR: u32 = theme::viewport::EDGE;
+/// Mesh parts' triangle lines (live G35, part-studio/551).
+const MESH_LINE_COLOR: u32 = 0x464646;
 
 /// Pick base of display-only bodies: beyond any scene's pick ids.
 const DISPLAY_ONLY_PICK_BASE: u32 = 1 << 30;
@@ -302,6 +306,13 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
             _ => theme::lin(EDGE_COLOR),
         };
+        // A mesh part's triangle sides: thin dark-grey lines at every zoom
+        // (live G35, part-studio/551: #464646, 1 px), like edges hidden in
+        // plain Shaded mode.
+        if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
+            let l = Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().line_scale(opts.graphics.line_width).layer(1);
+            scene.instances.push(if opts.section_skip.contains(&b.id) { l.ignore_clip() } else { l });
+        }
         let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
         let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
         // Shaded mode hides edges visually but keeps them pickable.
@@ -609,7 +620,15 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),
     };
-    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points) }
+    let mesh_lines = (!m.mesh_lines.is_empty()).then(|| {
+        let mut l = LineData::default();
+        l.segments.reserve(m.mesh_lines.len() / 2);
+        for s in m.mesh_lines.as_chunks::<2>().0 {
+            l.push_polyline(s, [0, 0, 0, 255], 0, 1.0, 0);
+        }
+        up.upload_lines(&l)
+    });
+    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines }
 }
 
 /// Apply hover/selection state and rebuild highlight overlays for pick-only

@@ -996,6 +996,18 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.mode.diagnostics_mut()
     }
 
+    /// NOSHAPE PATCH: the placeholder shown while the input is empty.
+    pub fn placeholder_text(&self) -> &SharedString {
+        &self.placeholder
+    }
+
+    /// NOSHAPE PATCH: [`Self::set_placeholder`] without a window (it needs
+    /// none), for views that set it while rendering.
+    pub fn put_placeholder(&mut self, placeholder: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder.into();
+        cx.notify();
+    }
+
     /// Set placeholder
     pub fn set_placeholder(
         &mut self,

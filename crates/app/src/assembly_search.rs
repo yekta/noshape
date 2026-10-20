@@ -244,8 +244,7 @@ impl AssemblyView {
                             .rounded(px(2.))
                             .border_1()
                             .border_color(pal.focus)
-                            .child(Input::new(&st).appearance(false).cleanable(true).text_size(px(14.)))
-                            .when(self.ui.tool_query.is_empty(), |d| d.child(div().absolute().left(px(8.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Search tools"))),
+                            .child(crate::ui::input_with_placeholder(&st, "Search tools", cx).appearance(false).cleanable(true).text_size(px(14.)).pl(px(8.))),
                     ),
                 )
                 .when(self.ui.tool_query.trim().is_empty(), |d| d.child(div().h(px(42.)).flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Start typing to search tools")))

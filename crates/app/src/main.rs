@@ -7,6 +7,7 @@ mod assembly_mate_dialog;
 mod assembly_scene;
 mod assembly_view;
 mod assets;
+mod cached_slice;
 mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
@@ -53,6 +54,7 @@ mod drawing_related;
 mod drawing_move_sheet;
 mod drawing_styles;
 mod drawing_hide_edges;
+mod drawing_inplace;
 mod drawing_linestyle;
 mod drawing_section_edit;
 mod drawing_replicate;
@@ -135,6 +137,11 @@ fn load_fonts(cx: &mut App) {
     if let Err(e) = cx.text_system().add_fonts(fonts) {
         log::warn!("could not load the UI font: {e:#}");
     }
+    // The drawing fonts, for notes and table cells edited in place.
+    let drawing: Vec<std::borrow::Cow<'static, [u8]>> = noshape_sketch::text::font_files().map(std::borrow::Cow::Borrowed).collect();
+    if let Err(e) = cx.text_system().add_fonts(drawing) {
+        log::warn!("could not load the drawing fonts: {e:#}");
+    }
 }
 
 /// Onshape's light theme (colors from `theme.rs`, which cites the tokens).
@@ -147,6 +154,9 @@ fn apply_theme(cx: &mut App) {
     // `#3367d1` with white text; code editors keep `t.selection` below
     // (patched gpui-base, vendor/gpui-base).
     cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb(0x3367d1).into(), foreground: white });
+    // Onshape: `input::placeholder { font-style: italic; font-weight: 300 }`
+    // (we ship no light Roboto face, so the italic regular), `#999`.
+    cx.set_global(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: None, color: Some(gpui_kit::rgb(0x999999).into()) });
     // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit
     // line counts, numbers 21 px in, a 14 px fold column, the code 4 px after it,
     // the current line's cell #dcdcdc (patched gpui-base).

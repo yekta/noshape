@@ -1253,7 +1253,7 @@ impl Render for HistoryPanel {
                             .border_1()
                             .border_color(rgb(0xaaaaaa))
                             .rounded_l(px(4.))
-                            .child(div().flex_1().child(Input::new(&self.search).appearance(false).text_size(px(14.)).italic()))
+                            .child(div().flex_1().child(Input::new(&self.search).appearance(false).text_size(px(14.))))
                             .child(
                                 div()
                                     .id("hist-filter-caret")

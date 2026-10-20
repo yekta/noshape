@@ -6,6 +6,7 @@
 
 #include <BRepTools_History.hxx>
 #include <GProp_GProps.hxx>
+#include <Geom_Surface.hxx>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
@@ -25,6 +26,7 @@
 #include <gp_GTrsf.hxx>
 
 #include <array>
+#include <map>
 #include <functional>
 #include <string>
 #include <sstream>
@@ -140,6 +142,17 @@ bool has_mesh_faces(const TopoDS_Shape& s);
 bool mesh_valid(const TopoDS_Shape& s);
 TopoDS_Shape transform_mesh(const TopoDS_Shape& s, const gp_Trsf& t, BRepTools_History& h);
 TopoDS_Shape gtransform_mesh(const TopoDS_Shape& s, const gp_GTrsf& g, BRepTools_History& h);
+// Booleans and splits with mesh bodies (mesh_body.cpp): mesh faces as planar
+// facets for OCCT (`source`: each facet's plane -> its mesh face;
+// `to_facets`: mesh faces -> facets), then the result's facets back as one
+// mesh face per shell (`h`: that step's history).
+struct MeshFacets
+{
+  std::map<const Geom_Surface*, TopoDS_Face> source;
+  occ::handle<BRepTools_History>             to_facets = new BRepTools_History;
+};
+TopoDS_Shape facet_mesh(const TopoDS_Shape& s, MeshFacets& m);
+TopoDS_Shape unfacet_mesh(const TopoDS_Shape& s, const MeshFacets& m, occ::handle<BRepTools_History>& h);
 // One mesh face per connected piece of the welded triangles, and whether
 // the piece is closed (every edge used equally often each way).
 struct MeshPiece

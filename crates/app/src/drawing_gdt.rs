@@ -451,14 +451,12 @@ impl DrawingEditor {
         // Upper / Lower text: a 28 px underlined field, its placeholder italic
         // `#999` (live 200).
         let text_box = |which: usize, input: &Entity<InputState>, placeholder: &'static str, cx: &mut Context<Self>| {
-            let empty = input.read(cx).value().is_empty();
             div()
                 .relative()
                 .h(px(28.))
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0x999999))
                 .text_size(px(14.))
-                .when(empty, |d| d.child(div().absolute().left(px(4.)).top_0().bottom_0().flex().items_center().italic().text_size(px(14.67)).text_color(gpui_kit::rgb(0x999999)).child(placeholder)))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _: &MouseDownEvent, _, cx| {
@@ -468,7 +466,7 @@ impl DrawingEditor {
                         cx.notify();
                     }),
                 )
-                .child(Input::new(input).appearance(false).small())
+                .child(crate::ui::input_with_placeholder(input, placeholder, cx).appearance(false).small().pl(px(4.)))
         };
         let can_accept = entered && editing;
         Some(

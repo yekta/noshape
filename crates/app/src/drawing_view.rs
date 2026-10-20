@@ -546,6 +546,10 @@ pub struct DrawingEditor {
     pub mbd_model: usize,
     /// Selected rows of the Sheets panel (sheet indices).
     pub sheet_rows: Vec<usize>,
+    /// The note edited in place (its sheet text is hidden under the editor).
+    pub inplace_hidden: Option<u64>,
+    /// The general table cell edited in place (table, row, column).
+    pub inplace_cell: Option<(u64, usize, usize)>,
     pub panel_highlight: Option<Sel>,
     pub insp_table: crate::drawing_panels::InspectionTableUi,
     /// Inserted image textures (see `drawing_images`).
@@ -706,6 +710,8 @@ impl DrawingEditor {
             right_panel: None,
             mbd_model: 0,
             sheet_rows: Vec::new(),
+            inplace_hidden: None,
+            inplace_cell: None,
             panel_highlight: None,
             insp_table: Default::default(),
             measure: None,
@@ -891,8 +897,20 @@ impl DrawingEditor {
     /// reassemble the sheet.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
         self.ensure_custom_tables(cx);
-        let d = self.display().clone();
+        let mut d = self.display().clone();
         let si = self.sheet.min(d.sheets.len().saturating_sub(1));
+        // A note edited in place: the editor shows its text.
+        if let Some(id) = self.inplace_hidden
+            && let Some(AnnotationKind::Note { text, .. }) = d.sheets.get_mut(si).and_then(|s| s.annotations.iter_mut().find(|a| a.id == id)).map(|a| &mut a.kind)
+        {
+            text.clear();
+        }
+        if let Some((id, r, c)) = self.inplace_cell
+            && let Some(TableKind::General { cells, .. }) = d.sheets.get_mut(si).and_then(|s| s.tables.iter_mut().find(|t| t.id == id)).map(|t| &mut t.kind)
+            && let Some(cell) = cells.get_mut(r).and_then(|row| row.get_mut(c))
+        {
+            cell.clear();
+        }
         let Some(sheet) = d.sheets.get(si) else { return };
         let interactive = self.preview.is_some();
         let mut geoms = HashMap::new();
@@ -1434,6 +1452,20 @@ impl Render for DrawingEditor {
         let image = self.image.clone();
         let toolbar = self.render_toolbar(window, cx);
         let status = self.render_status(cx);
+        // The note edited in place hides its sheet text while its editor is open.
+        let editing = match &self.panel {
+            Some(Panel::Note { edit, .. }) => *edit,
+            _ => None,
+        };
+        let cell = match &self.panel {
+            Some(Panel::Cell { table, row, col, .. }) if self.current_sheet().table(*table).is_some_and(|t| matches!(t.kind, TableKind::General { .. })) => Some((*table, *row, *col)),
+            _ => None,
+        };
+        if editing != self.inplace_hidden || cell != self.inplace_cell {
+            self.inplace_hidden = editing;
+            self.inplace_cell = cell;
+            self.refresh(cx);
+        }
         let sheet_bar = self.render_sheet_bar(cx);
         let panel = self.render_panel(cx);
         let canvas_el = div()
@@ -1468,6 +1500,8 @@ impl Render for DrawingEditor {
             .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
             .child(self.sheets_toggle(0., cx))
             .child(status)
+            .children(self.render_note_inplace(cx))
+            .children(self.render_cell_inplace(cx))
             .children(panel)
             .children(self.render_view_props(cx))
             .children(self.render_zoom_window())

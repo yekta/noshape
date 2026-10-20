@@ -289,8 +289,8 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 |---|---|---|---|
 | 12.1 | Variable table panel on the right | variable_table | ✅ |
 | 12.2 | Configuration panel and configuration selectors | configurations | ✅ |
-| 12.3 | `#variable` in any numeric field; :variable filter finds users | variable_table; features_and_parts_lists | 🔧 (filter) |
-| 12.4 | Hover a variable highlights the features that use it; right-click > Filter feature list | variable_table | 🔧 |
+| 12.3 | `#variable` in any numeric field; :variable filter finds users | variable_table; features_and_parts_lists | ✅ (quoted = exact) |
+| 12.4 | Hover a variable highlights the features that use it; right-click > Filter feature list | variable_table | ✅ (`:variable "name"`, live 564) |
 
 ### Found in the live capture
 
@@ -329,6 +329,12 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 13.30 | Input propagation…: "Input propagation for <Part Studio>" dialog, References / Configuration table with header and row checkboxes ("Propagate"), "N new inputs to propagate", Confirm; confirming adds a "<Derived> / Configuration" column mapping each option to the same option (cells are option selects) | Help PartStudio__input_propagation | ✅ (verified in the app; live DOM requested, psb 10-20 j) |
 | 13.31 | Export of parts (parts list › Export…, release rows of this or another document/version): File name "<Part Studio> - <Part>" for one part, Format, Export models oriented Y axis up, Version / Use latest version, Options; no "Export unique parts as individual files" / "Include hidden instances in export" (those are the tab export's) | live (lead's round 3 comparison) | ✅ (verified in the app from the parts list, a workspace release row and a V1 release row, which opens the read-only version window first) |
 | 13.32 | Search tools popover: 600 px, 10 px under the toolbar at the window's right edge, drawn over the feature list and any open right panel | live menus/tool-search-* | ✅ (was clipped under the feature list while a right panel was open) |
+| 13.33 | Variable table editing (live 550–565): add row at the rollback bar with focus to the next Name row; a taken name → `name_0` + "Renamed some new variables to avoid name conflicts."; invalid name pink `#f9ebec`/`#bd3039` with tooltip, Enter does nothing, Esc clears; rename to a taken name reverts; only variables before the rollback bar; types Length/Angle/Number/Any/Measured/From import ("Not set" ✎); row menu without Move up/down at the ends; Description adds Copy; ⋯ = Copy table; a bare number takes the workspace unit | live psb 10-20 o, qa4 13:30, 652–656 | ✅ (incl. Description Convert to expression / text) |
+| 13.34 | Measure panel (x) "Add variable for this measurement" on distance rows only; opens a Measured Variable (Distance Min/Max, Along X/Y/Z, Length, Diameter) with the picks, Name empty; panel closes | live 566–572 | ✅ |
+| 13.35 | Create variable popup: Value / Default = the field's previous value, type tab from the field; Configuration tab Length/Angle/Integer/Real/Text with Name, Default, Minimum 0, Maximum 100000; name / range errors disable ✓; ✓ keeps `#name` in the focused field, ✕ selects it | live 577–584, bundle CreateVariable | ✅ |
+| 13.36 | Filtered feature list: blue funnel, ⊗ clear, "Features (k of N)", Default geometry with "...", one "..." per hidden run, rollback bar kept | live 564 | ✅ |
+| 13.37 | Edit FeatureScript IDs: invalid id = tooltip only, duplicate = disabled button only, no spaces; excluded icon between chevron and name and after the value in the Configurations box | live 520–535 | ✅ |
+| 13.38 | Configured properties tab: Properties for ▾, Add property ▾, ⋯, per-input + property table, empty-state and "not affecting" info lines | live 526–536, 600–656 | 🔧 (Appearance / Material cell popups, Enter/Tab cell moves, paste, BOM-made rows open) |
 
 ## Not applicable to a local app
 

@@ -433,6 +433,8 @@ impl DrawingEditor {
             || self.hide_edges.is_some()
             || self.section_edit.is_some()
             || self.replicate_dlg.is_some()
+            || self.datum_dlg.is_some()
+            || self.palette.is_some()
             || self.view_sketches.is_some()
             || self.hide_parts.is_some()
             || self.panel.is_some();
@@ -1727,9 +1729,9 @@ impl DrawingEditor {
     }
 
 
-    /// Double-click / "Edit cell…" on a general table: edit the cell under the cursor.
-    /// Apply the edited cell and edit the next (`step` 1) or previous (-1)
-    /// cell of a general table, row by row.
+    /// Apply the edited cell of a general table and edit the next (`step`
+    /// 1, row by row), the previous (-1) or the one below (2). Past the
+    /// last cell editing ends (live: Enter in the last cell, no row added).
     pub fn cell_step(&mut self, step: i32, window: &mut Window, cx: &mut Context<Self>) {
         let Some(Panel::Cell { table, row, col, .. }) = &self.panel else { return };
         let (table, row, col) = (*table, *row, *col);
@@ -1737,7 +1739,7 @@ impl DrawingEditor {
         let Some(TableKind::General { cells, .. }) = self.current_sheet().table(table).map(|t| t.kind.clone()) else { return };
         let ncols = cells.iter().map(|r| r.len()).max().unwrap_or(1).max(1);
         let nrows = cells.len().max(1);
-        let at = (row * ncols + col) as i64 + step as i64;
+        let at = (row * ncols + col) as i64 + if step == 2 { ncols as i64 } else { step as i64 };
         if at < 0 || at >= (nrows * ncols) as i64 {
             return;
         }

@@ -71,6 +71,9 @@ impl DrawingEditor {
     // ------------------------------------------------------------ panels
 
     pub fn render_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if matches!(self.panel, Some(Panel::Note { .. })) || self.cell_inplace_box().is_some() {
+            return self.render_note_panel(cx);
+        }
         let pal = p();
         let panel = self.panel.as_ref()?;
         let (title, rows): (&str, Vec<AnyElement>) = match panel {
@@ -118,6 +121,46 @@ impl DrawingEditor {
                         })))
                         .child(Button::new("dr-panel-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx)))),
                 )
+                .into_any_element(),
+        )
+    }
+
+    /// The floating "Note" ✓ ✕ panel just above the note (live drawing/225)
+    /// or the table cell (live 741) edited in place.
+    fn render_note_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let pal = p();
+        let (b, rows, above) = match self.cell_inplace_box() {
+            Some(b) => (b, Vec::new(), 0.0),
+            None => (self.note_inplace_box(cx)?, self.note_panel_rows(cx), 27.0),
+        };
+        // Above the text (and the note's ruler).
+        let bottom = (self.size_px()[1] - (b.text_top.min(b.top) - above) + 6.0) as f32;
+        let left = (b.left - 3.0).max(4.0) as f32;
+        Some(
+            v_flex()
+                .id("dr-note-panel")
+                .absolute()
+                .left(px(left))
+                .bottom(px(bottom))
+                .bg(pal.dialog_bg)
+                .shadow(crate::drawing_chrome::dialog_shadow())
+                .text_color(gpui_kit::rgb(0x333333))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    h_flex()
+                        .h(px(28.))
+                        .pl(px(11.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Note"))
+                        .child(div().id("note-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
+                        .child(div().id("note-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.panel = None;
+                            cx.notify();
+                        }))),
+                )
+                .child(v_flex().p(px(4.)).gap(px(3.)).text_size(px(12.)).children(rows))
                 .into_any_element(),
         )
     }

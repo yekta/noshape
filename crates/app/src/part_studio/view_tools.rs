@@ -280,10 +280,7 @@ impl PartStudioView {
                                 .rounded(px(2.))
                                 .border_1()
                                 .border_color(pal.focus)
-                                .child(Input::new(&st).appearance(false).cleanable(true).text_size(px(14.)))
-                                .when(self.palette_query.is_empty(), |d| {
-                                    d.child(div().absolute().left(px(8.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Search tools"))
-                                }),
+                                .child(crate::ui::input_with_placeholder(&st, "Search tools", cx).appearance(false).cleanable(true).text_size(px(14.)).pl(px(8.))),
                         ),
                 )
                 .when(self.palette_query.trim().is_empty(), |d| {
@@ -722,8 +719,7 @@ impl PartStudioView {
                                 .pt(px(3.))
                                 .border_b_1()
                                 .border_color(pal.accent)
-                                .child(Input::new(&st).appearance(false).small().text_size(px(13.33)))
-                                .when(empty_name, |d| d.child(div().absolute().left(px(3.)).top_0().bottom_0().pt(px(3.)).flex().items_center().text_size(px(13.33)).italic().text_color(pal.text_faint).child("New view name")))
+                                .child(crate::ui::input_with_placeholder(&st, "New view name", cx).appearance(false).small().text_size(px(13.33)).pl(px(3.)))
                                 .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)),
                         )
                         .child(square("nv-add", "add-button", add_color).tooltip(crate::ui::tooltip("Add view")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {

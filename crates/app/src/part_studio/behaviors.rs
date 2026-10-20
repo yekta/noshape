@@ -113,6 +113,11 @@ pub struct UiState {
     /// The Variable table's add row takes the focus on the next render
     /// (after a variable was added from it).
     pub var_focus_new: bool,
+    /// Configured properties: the part shown ("Properties for ▾"), the
+    /// selected cell (row, input id or property) and the table's focus.
+    pub cp_part: Option<noshape_model::BodyId>,
+    pub cp_selected: Option<(usize, String)>,
+    pub cp_focus: Option<FocusHandle>,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
@@ -300,6 +305,9 @@ impl UiState {
             var_hover: None,
             var_folded: false,
             var_focus_new: false,
+            cp_part: None,
+            cp_selected: None,
+            cp_focus: None,
             inspection_tool: None,
             inspection_more: false,
             ct: Default::default(),
@@ -2577,11 +2585,13 @@ impl PartStudioView {
         if self.ui.filter.is_some() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx));
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name or type"));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
+                // No `cx.notify()`: the field's own notification already
+                // re-renders the Part Studio (its ancestor) with the new query,
+                // and leaves its cached slices (toolbar, overlay) alone.
                 this.ui.filter_query = st.read(cx).value().to_string();
-                cx.notify();
             }
             InputEvent::PressEnter { .. } => window.focus(&this.focus, cx),
             _ => {}

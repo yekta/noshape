@@ -211,22 +211,22 @@ impl DrawingEditor {
         true
     }
 
-    fn datum_preview(&mut self, cx: &mut Context<Self>) {
-        let Some(d) = &self.datum_dlg else { return };
-        if d.rows.is_empty() {
-            self.set_preview(None, cx);
-            cx.notify();
-            return;
-        }
+    /// The drawing with the dialog's pending targets (None: no targets).
+    pub fn datum_rows_drawing(&self) -> Option<noshape_model::drawing::Drawing> {
+        let d = self.datum_dlg.as_ref().filter(|d| !d.rows.is_empty())?;
         let mut dr = self.drawing.clone();
-        let mut next = dr.sheets[self.sheet].next_annotation_id();
-        for r in &d.rows {
+        let first = dr.sheets[self.sheet].next_annotation_id();
+        for (r, id) in d.rows.iter().zip(first..) {
             let mut a = r.ann.clone();
-            a.id = next;
-            next += 1;
+            a.id = id;
             dr.sheets[self.sheet].annotations.push(a);
         }
-        self.set_preview(Some(dr), cx);
+        Some(dr)
+    }
+
+    fn datum_preview(&mut self, cx: &mut Context<Self>) {
+        let dr = self.datum_rows_drawing();
+        self.set_preview(dr, cx);
         cx.notify();
     }
 

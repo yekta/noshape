@@ -193,6 +193,10 @@ pub struct PartStudio {
     /// Stored as a list of pairs: JSON map keys must be strings.
     #[serde(default, with = "body_map")]
     pub part_properties: BTreeMap<BodyId, PartProperties>,
+    /// Configured properties tables, one per part (Configurations panel ›
+    /// Configured properties).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub property_tables: Vec<crate::configured_properties::PropertyTable>,
     #[serde(default)]
     pub next_folder_id: u32,
     /// Saved camera views (Shift+V).

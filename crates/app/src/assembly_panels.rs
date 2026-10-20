@@ -2727,8 +2727,6 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
-    /// The 220 px "Explode step" dialog (live 805 / 810 / 813,
-    /// dom/explode-step-dialog-edit.html).
     /// Click on a step dialog field: it becomes the one picks go to.
     fn step_edit_activate(k: u8, cx: &mut Context<Self>) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
         cx.listener(move |this: &mut Self, _: &ClickEvent, _, cx| {
@@ -2739,6 +2737,8 @@ impl AssemblyView {
         })
     }
 
+    /// The 220 px "Explode step" dialog (live 805 / 810 / 813,
+    /// dom/explode-step-dialog-edit.html).
     pub(super) fn render_step_edit(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.step_edit else { return div().into_any_element() };
@@ -2868,7 +2868,7 @@ impl AssemblyView {
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red.into() } else { pal.text }).child(title))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).child(title))
                     .child(
                         div()
                             .id("se-ok")
@@ -3099,9 +3099,8 @@ impl AssemblyView {
 
     /// The Insert dialog's "Search Part Studios" / "Search Assemblies" box;
     /// the placeholder is italic (live 320, 612).
-    pub(super) fn insert_search_box(&self, cx: &App) -> Option<AnyElement> {
+    pub(super) fn insert_search_box(&self, cx: &mut App) -> Option<AnyElement> {
         let st = self.ui.insert_search.as_ref()?;
-        let empty = st.read(cx).value().is_empty();
         // Live 841: the replacement picker's box reads "Search entities or features".
         let ph = if self.picking_replacement() {
             "Search entities or features"
@@ -3118,8 +3117,7 @@ impl AssemblyView {
                 .child(
                     div()
                         .relative()
-                        .child(Input::new(st).h(px(30.)).cleanable(true))
-                        .when(empty, |d| d.child(div().absolute().left(px(9.)).top_0().bottom_0().flex().items_center().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child(ph))),
+                        .child(crate::ui::input_with_placeholder(st, ph, cx).h(px(30.)).cleanable(true).pl(px(8.))),
                 )
                 .into_any_element(),
         )
@@ -3418,8 +3416,7 @@ impl AssemblyView {
                         .border_1()
                         .border_color(rgb(0xcccccc))
                         .relative()
-                        .children(self.ui.insert_url.as_ref().map(|st| Input::new(st).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.))))
-                        .when(!has_text, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().text_size(px(13.33)).italic().text_color(rgb(0x999999)).child(self.ui.insert_url_ph.clone()))),
+                        .children(self.ui.insert_url.clone().map(|st| crate::ui::input_with_placeholder(&st, self.ui.insert_url_ph.clone(), cx).appearance(false).cleanable(true).text_size(px(13.33)).h(px(28.)).pl(px(7.)))),
                 )
                 .child(
                     div()

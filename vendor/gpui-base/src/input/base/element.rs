@@ -2749,9 +2749,25 @@ impl<M: InputModeKind> Element for TextElement<M> {
             content_width: bounds.size.width,
         };
 
+        // NOSHAPE PATCH: the app's placeholder style (see `PlaceholderStyle`).
+        let mut run_font = style.font();
+        let mut text_color = text_color;
+        if is_empty
+            && let Some(ps) = cx.try_global::<crate::input::PlaceholderStyle>()
+        {
+            if ps.italic {
+                run_font.style = gpui::FontStyle::Italic;
+            }
+            if let Some(weight) = ps.weight {
+                run_font.weight = weight;
+            }
+            if let Some(color) = ps.color {
+                text_color = dim(color);
+            }
+        }
         let run = TextRun {
             len: display_text.len(),
-            font: style.font(),
+            font: run_font,
             color: text_color,
             background_color: None,
             underline: None,

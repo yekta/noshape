@@ -442,10 +442,18 @@ impl Render for VariableStudioView {
                     }
                 })
             });
+            // Live (qa4 10-20): a bare number gets the workspace unit of a Length
+            // / Angle variable ("5" → "5 mm"), as in the Part Studio table.
+            let cell_units = units;
             let expr = self.cell(format!("e{i}"), v.expr.text.clone(), window, cx, move |this, val, cx| {
                 this.edit("Edit variable", cx, |s| {
                     if let Some(v) = s.variables.get_mut(i) {
-                        v.expr = ExprValue::new(val);
+                        let kind = match v.kind {
+                            Some(VarKind::Length) => "LENGTH",
+                            Some(VarKind::Angle) => "ANGLE",
+                            _ => "",
+                        };
+                        v.expr = ExprValue::new(noshape_model::variable_table::with_workspace_unit(kind, &val, &cell_units));
                     }
                 })
             });
@@ -592,7 +600,9 @@ impl Render for VariableStudioView {
             this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), import: None }));
         });
         if std::mem::take(&mut self.focus_add_row) {
-            new_name.update(cx, |s, cx| s.focus(window, cx));
+            // After this frame, once the new row's input is laid out.
+            let st = new_name.clone();
+            window.defer(cx, move |window, cx| st.update(cx, |s, cx| s.focus(window, cx)));
         }
         let collapsed = self.collapsed;
         let more_view = view.clone();
@@ -682,7 +692,7 @@ impl Render for VariableStudioView {
                         .children(["Name", "Variable type", "Value", "Description"].map(|h| cell_div().justify_center().child(h))),
                 )
                 .children(rows)
-                .when(only.is_none(), |t| t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().italic().child(cell_input(&new_name))))))
+                .when(only.is_none(), |t| t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().child(cell_input(&new_name))))))
             });
         if self.host.is_some() {
             return v_flex().track_focus(&self.focus).child(table).into_any_element();

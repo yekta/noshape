@@ -74,6 +74,9 @@ gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 # that calls `prevent_default` on a touch's Started event claims the touch
 # from the portable recognizer (src/window.rs `dispatch_touch_event`,
 # src/interactive.rs). Examples and tests of the published crate are left out.
+# NOSHAPE PATCH (agent perf): application textures composited without a
+# copy (new src/external_texture.rs; `Window::paint_external_texture` and
+# `Window::request_present` in src/window.rs, used by the 3D viewport).
 gpui-pre = { path = "vendor/gpui-pre" }
 # NOSHAPE PATCH (agent nav): gpui's Windows platform turns touch-screen (and
 # pen) pointer messages into raw touches instead of emulated mouse input
@@ -100,3 +103,18 @@ gpui-base = { path = "vendor/gpui-base" }
 # `not-allowed` when disabled, like Onshape's buttons in Chrome (only the
 # lines marked "NOSHAPE PATCH" in src/button/button.rs differ from 0.7.3).
 gpui-component = { path = "vendor/gpui-component" }
+# NOSHAPE PATCH (agent perf): gpui's wgpu renderer (Linux) shares its GPU
+# context with the app (`shared_context`, `wait_for_shared_context`, optional
+# device features via `request_device_features`) and draws application
+# textures registered with gpui-pre's `set_external_texture` (src/wgpu_atlas.rs
+# `get_texture_info`), so the 3D viewport is composited without a readback.
+# Only the lines marked "NOSHAPE PATCH" in src/wgpu_context.rs and
+# src/wgpu_atlas.rs differ from 0.3.9.
+gpui-pre-wgpu = { path = "vendor/gpui-pre-wgpu" }
+# NOSHAPE PATCH (agent perf): gpui's Metal renderer (macOS) draws application
+# textures registered with gpui-pre's `set_external_texture` (an `MTLTexture`;
+# src/metal_atlas.rs `metal_texture`), reports its GPU (`note_renderer_gpu`)
+# and when each frame finished on the GPU (`gpu_frame_completed`, so a
+# texture is only rendered into again once no frame samples it; src/
+# metal_renderer.rs). Only the lines marked "NOSHAPE PATCH" differ from 0.3.9.
+gpui-pre-apple = { path = "vendor/gpui-pre-apple" }

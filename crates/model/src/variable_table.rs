@@ -19,7 +19,10 @@ pub struct VarRow {
     pub kind: String,
     /// The value expression as typed.
     pub value: String,
+    /// The Description as typed; an expression after "Convert to
+    /// expression" (a text becomes the literal `"text"`).
     pub description: String,
+    pub description_expr: bool,
 }
 
 /// Why a name was refused.
@@ -89,7 +92,12 @@ pub fn rows(ps: &PartStudio) -> Vec<VarRow> {
             let name = f.params.text("name").trim().trim_start_matches('#').to_string();
             is_identifier(&name).then(|| {
                 let kind = kind_of(f);
-                VarRow { feature: f.id, value: value_text(f, &kind), description: f.params.text("description").to_string(), name, kind }
+                let (description, description_expr) = match f.params.get("description") {
+                    Some(ParamValue::Expr(e)) => (e.text.clone(), true),
+                    Some(ParamValue::Text(t)) => (t.clone(), false),
+                    _ => (String::new(), false),
+                };
+                VarRow { feature: f.id, value: value_text(f, &kind), description, description_expr, name, kind }
             })
         })
         .collect()
@@ -241,20 +249,56 @@ pub fn set_kind(ps: &mut PartStudio, feature: FeatureId, kind: &str, units: &Uni
 pub fn set_value(ps: &mut PartStudio, feature: FeatureId, value: &str, units: &UnitPrefs) {
     if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
         let kind = kind_of(f);
-        let bare = value.trim().parse::<f64>().is_ok();
-        let value = match kind.as_str() {
-            "LENGTH" if bare => format!("{} {}", value.trim(), units.length.symbol()),
-            "ANGLE" if bare => format!("{} {}", value.trim(), units.angle.symbol()),
-            _ => value.to_string(),
-        };
+        let value = with_workspace_unit(&kind, value, units);
         set_value_param(f, &kind, &value);
     }
 }
 
-/// The Description cell.
+/// A value committed in a Variable table (Part Studio or Variable Studio):
+/// a bare number in a `LENGTH` / `ANGLE` variable gets the workspace unit
+/// (live qa4 10-20 13:30: `5` + Enter → `5 mm`); anything else is kept.
+pub fn with_workspace_unit(kind: &str, value: &str, units: &UnitPrefs) -> String {
+    let bare = value.trim().parse::<f64>().is_ok();
+    match kind {
+        "LENGTH" if bare => format!("{} {}", value.trim(), units.length.symbol()),
+        "ANGLE" if bare => format!("{} {}", value.trim(), units.angle.symbol()),
+        _ => value.to_string(),
+    }
+}
+
+/// The Description cell. An expression Description takes what parses as
+/// an expression and quotes anything else.
 pub fn set_description(ps: &mut PartStudio, feature: FeatureId, text: &str) {
     if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
-        f.params.set("description", ParamValue::Text(text.to_string()));
+        let v = match f.params.get("description") {
+            Some(ParamValue::Expr(_)) => ParamValue::Expr(ExprValue::new(as_expression(text))),
+            _ => ParamValue::Text(text.to_string()),
+        };
+        f.params.set("description", v);
+    }
+}
+
+fn as_expression(text: &str) -> String {
+    let t = text.trim();
+    if t.is_empty() || (t.starts_with('"') && t.ends_with('"') && t.len() >= 2) || noshape_units::parse(t).is_ok() { t.to_string() } else { format!("\"{t}\"") }
+}
+
+/// The text of a string literal (`"half of 10"` → `half of 10`).
+pub fn string_literal(text: &str) -> Option<&str> {
+    let t = text.trim();
+    (t.len() >= 2 && t.starts_with('"') && t.ends_with('"')).then(|| &t[1..t.len() - 1])
+}
+
+/// Description right-click › Convert to expression / Convert to text (live
+/// 652–656): the text becomes the string literal `"text"` and back.
+pub fn toggle_description_expr(ps: &mut PartStudio, feature: FeatureId) {
+    if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
+        let v = match f.params.get("description") {
+            Some(ParamValue::Expr(e)) => ParamValue::Text(string_literal(&e.text).map(str::to_string).unwrap_or_else(|| e.text.clone())),
+            Some(ParamValue::Text(t)) => ParamValue::Expr(ExprValue::new(if t.trim().is_empty() { String::new() } else { format!("\"{t}\"") })),
+            _ => ParamValue::Expr(ExprValue::new("")),
+        };
+        f.params.set("description", v);
     }
 }
 
@@ -327,6 +371,24 @@ mod tests {
         assert_eq!(rows(&ps)[1].kind, "MEASURED");
         set_kind(&mut ps, a, "NUMBER", &mm());
         assert_eq!((rows(&ps)[1].kind.as_str(), rows(&ps)[1].value.as_str()), ("NUMBER", "5"));
+    }
+
+    #[test]
+    fn description_converts_to_an_expression_and_back() {
+        let mut ps = studio();
+        let a = create(&mut ps, "w", "LENGTH", "1 mm", "half of 10", None, &mm()).unwrap();
+        toggle_description_expr(&mut ps, a);
+        let r = &rows(&ps)[0];
+        assert!(r.description_expr);
+        assert_eq!(r.description, "\"half of 10\"");
+        assert_eq!(string_literal(&r.description), Some("half of 10"));
+        // Typing keeps it an expression: plain words are quoted.
+        set_description(&mut ps, a, "#w * 2");
+        assert_eq!(rows(&ps)[0].description, "#w * 2");
+        set_description(&mut ps, a, "two widths");
+        assert_eq!(rows(&ps)[0].description, "\"two widths\"");
+        toggle_description_expr(&mut ps, a);
+        assert_eq!((rows(&ps)[0].description.as_str(), rows(&ps)[0].description_expr), ("two widths", false));
     }
 
     #[test]

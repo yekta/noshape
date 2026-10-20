@@ -68,3 +68,13 @@ The release runners use Ubuntu 24.04 (GCC 13); this machine has GCC 15, which ac
 conversions out (`occ::handle<Base>(x)`). Before you finish C++ kernel changes, syntax-check them with
 `g++-13 -std=c++17 -fsyntax-only -w -Icpp -I/root/occt/include/opencascade -I<out>/cxxbridge/include -I<out>/cxxbridge/crate <file>`
 (`<out>` = your target dir's `debug/build/noshape-kernel-*/out`).
+
+## Resource limits (2026-10-20, after the server ran out of memory and rebooted)
+- Only the agents the lead lists as active may build or run the app. Paused agents run no cargo and no app at all.
+- Compiles of the big crates are capped at 3 machine-wide (rustc-throttle), and every cargo run at `jobs = 6`
+  (~/.cargo/config.toml). Don't override either one.
+- At most **one** app instance per agent. Quit it as soon as your check is done; don't leave apps running.
+- No extra target dirs. Use your group's dir. A cross-target check dir is OK only if you delete it right after.
+- Before you start a build, check `free -g`. If "available" is under 8 GB, wait and retry in a few minutes.
+- /tmp is wiped on reboot. Keep anything you need (plans, patches, scripts) under /root/<agent>-scratch or in
+  your handoff file.

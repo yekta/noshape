@@ -727,3 +727,77 @@ fn offset_curve_move_boundary_mutual_trim() {
     let front_y = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(a, 0.03 * 0.03 * 2.0, 1e-8), "trimmed area {a} {front_y:?}");
 }
+
+/// Mesh parts in booleans and splits (live G35/G35-retry): a split by a plane
+/// gives two MIXED parts (the mesh face plus a planar cap), a translation
+/// keeps an all-mesh part, a union with a B-rep part gives one MIXED part.
+#[test]
+fn mesh_parts_split_transform_union() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-meshops-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    // 20 x 20 x 30 mm, centred on the Right plane (x = 0).
+    let bx = noshape_kernel::make_box_corners(DVec3::new(-0.01, 0.0, 0.0), DVec3::new(0.01, 0.02, 0.03)).unwrap();
+    noshape_kernel::write_stl(&bx, &path, 1e-4, noshape_kernel::StlFormat::Binary).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let mesh_brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    let mm3 = |v: f64| v * 1e9;
+    let studio = || {
+        let mut s = Studio::new();
+        let b = mesh_brep.clone();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(b)));
+        let r = s.ok();
+        let id = r.context.bodies[0].id.clone();
+        (s, id)
+    };
+    let mixed = |b: &noshape_model::regen::context::Body| {
+        let faces = b.shape.faces();
+        (faces.iter().filter(|f| f.is_mesh()).count(), faces.iter().filter(|f| !f.is_mesh()).count())
+    };
+
+    // Split by the Right plane.
+    let (mut s, id) = studio();
+    s.add("splitPart", move |p| {
+        p.set("targets", ParamValue::Query(vec![Reference::Body(id)]));
+        p.set("tool", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    for b in r.context.bodies.iter() {
+        assert_eq!(mixed(b), (1, 1), "{}: one mesh face and its planar cap", b.name);
+        assert!((mm3(b.shape.volume().unwrap()) - 6000.0).abs() < 1e-3, "{}: {}", b.name, mm3(b.shape.volume().unwrap()));
+        assert!(r.display.bodies.iter().find(|d| d.id == b.id).is_some_and(|d| d.is_mesh));
+    }
+
+    // Translate by XYZ: still all mesh.
+    let (mut s, id) = studio();
+    s.add("transform", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Body(id)]));
+        p.set("transformType", ParamValue::Enum("TRANSLATION_3D".into()));
+        p.set("dx", expr("10 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    assert_eq!(mixed(b), (1, 0));
+    let bb = b.shape.bounding_box(true).unwrap();
+    assert!((bb.min.x - 0.0).abs() < 1e-6 && (bb.max.x - 0.02).abs() < 1e-6, "{bb:?}");
+
+    // Union with an overlapping B-rep box (x 0..20 mm): one MIXED part.
+    let (mut s, id) = studio();
+    let block = String::from_utf8(noshape_kernel::make_box_corners(DVec3::new(0.0, 0.0, 0.0), DVec3::new(0.02, 0.02, 0.01)).unwrap().to_brep_bytes().unwrap()).unwrap();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(block)));
+    let r = s.ok();
+    let other = r.context.bodies.iter().find(|b| b.id != id).unwrap().id.clone();
+    s.add("booleanBodies", move |p| {
+        p.set("operationType", ParamValue::Enum("UNION".into()));
+        p.set("tools", ParamValue::Query(vec![Reference::Body(id), Reference::Body(other)]));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let b = &r.context.bodies[0];
+    let (m, planes) = mixed(b);
+    assert!(m == 1 && planes > 0, "MIXED: {m} mesh, {planes} B-rep faces");
+    // 12000 + 2000 (the block's half outside the mesh box).
+    assert!((mm3(b.shape.volume().unwrap()) - 14000.0).abs() < 1e-3, "{}", mm3(b.shape.volume().unwrap()));
+}

@@ -92,6 +92,8 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
             }
         };
         ev.ctx.variables.insert(name, noshape_units::Quantity::new(value, Dim::LENGTH));
+        // The list name shows the measured value ("#d = 95.635 mm").
+        ev.computed.push(("measuredValue".into(), crate::display::ComputedValue::Length(value)));
         return Ok(());
     }
     if ev.is("mode", "TABLE") {

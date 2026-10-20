@@ -75,6 +75,9 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
     if ours.part_properties == base.part_properties && theirs.part_properties != base.part_properties {
         result.part_properties = theirs.part_properties.clone();
     }
+    if ours.property_tables == base.property_tables && theirs.property_tables != base.property_tables {
+        result.property_tables = theirs.property_tables.clone();
+    }
     result.rollback = None;
     (result, report)
 }

@@ -2594,8 +2594,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-apple"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b52f58893fe1a0836464428dfad2b5eaf42c9c303a9638f4c2aced5a69072a15"
 dependencies = [
  "anyhow",
  "async-task",
@@ -2926,8 +2924,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-wgpu"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b1cdb26c1503bf9662ee8fbc5ab0b44b2deeee4b5c12dc67491ba6fb5fc544b"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -4310,6 +4306,7 @@ dependencies = [
  "gpui-kit",
  "gpui-pre-linux",
  "gpui-pre-macos",
+ "gpui-pre-wgpu",
  "gpui-pre-windows",
  "image",
  "log",
@@ -4322,6 +4319,7 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "objc2-metal 0.3.2",
  "open",
  "parking_lot",
  "raw-window-handle",
@@ -4393,6 +4391,7 @@ dependencies = [
  "bytemuck",
  "glam 0.34.1",
  "image",
+ "libc",
  "log",
  "parking_lot",
  "pollster 1.0.1",

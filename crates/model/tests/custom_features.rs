@@ -1271,7 +1271,7 @@ fn std_sheet_metal_matches_onshape() {
     let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
     println!("{}\n{}", out.output, notices.join("\n"));
     // Face areas (mm², largest first) of the live parts.
-    let want = ["sm1 parts 1 areas [ 800 , 800 , 80 , 80 , 40 , 40 ]", "sm3 parts 1 areas [ 420 , 420 , 270 , 270 , 82.4668 , 47.1239 , 42 , 42 , 27 , 27 , 22.5 , 22.5 , 6.4795 , 6.4795 ]", "parts 2"];
+    let want = ["sm1 parts 1 areas [ 800 , 800 , 80 , 80 , 40 , 40 ]", "sm3 parts 1 areas [ 420 , 420 , 270 , 270 , 82.4668 , 47.1239 , 42 , 42 , 27 , 27 , 22.5 , 22.5 , 6.4795 , 6.4795 ]", "parts 2", "sm3 definitions { EDGE : 8 , FACE : 4 , NONE : 0 , VERTEX : 2 }"];
     let lines: Vec<&str> = out.output.lines().collect();
     assert!(want.iter().all(|w| lines.contains(w)), "{}\n{}", out.output, notices.join("\n"));
 }

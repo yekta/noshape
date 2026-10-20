@@ -5182,6 +5182,45 @@ impl Window {
         });
     }
 
+    /// NOSHAPE PATCH (agent perf): paint the application texture registered
+    /// under `id` ([`crate::set_external_texture`]) into `bounds`, scaled to
+    /// fit. Nothing is painted while no texture is registered. The texture is
+    /// looked up when the frame is drawn, so a newly registered texture shows
+    /// on the next present without painting again.
+    ///
+    /// This method should only be called as part of the paint phase of element drawing.
+    pub fn paint_external_texture(&mut self, bounds: Bounds<Pixels>, id: crate::ExternalTextureId) {
+        self.invalidator.debug_assert_paint();
+        let Some(tile) = crate::external_texture::external_texture_tile(id) else {
+            return;
+        };
+        if bounds.size.width <= Pixels::ZERO || bounds.size.height <= Pixels::ZERO {
+            return;
+        }
+        let bounds = self.snap_bounds(bounds);
+        let content_mask = self.snapped_content_mask();
+        let opacity = self.element_opacity();
+        self.next_frame.scene.insert_primitive(PolychromeSprite {
+            order: 0,
+            pad: 0,
+            grayscale: false.into(),
+            bounds,
+            content_mask,
+            corner_radii: Default::default(),
+            tile,
+            opacity,
+        });
+    }
+
+    /// NOSHAPE PATCH (agent perf): present the last drawn frame again on the
+    /// next frame request, without re-rendering any view: for when only the
+    /// pixels of external textures ([`Self::paint_external_texture`]) changed.
+    pub fn request_present(&self) {
+        self.needs_present.set(true);
+        self.platform_window.schedule_frame();
+        self.invalidator.wake_platform();
+    }
+
     /// Removes an image from the sprite atlas.
     pub fn drop_image(&mut self, data: Arc<RenderImage>) -> Result<()> {
         for frame_index in 0..data.frame_count() {

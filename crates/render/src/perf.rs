@@ -110,12 +110,63 @@ pub fn reset() {
     }
 }
 
+/// Unit of a stage's samples: `*_mb` stages count megabytes, `*_count`
+/// stages plain numbers, everything else milliseconds.
+fn unit_of(stage: &str) -> &'static str {
+    if stage.ends_with("_mb") {
+        "MB"
+    } else if stage.ends_with("_count") || stage.ends_with("instances") {
+        ""
+    } else {
+        "ms"
+    }
+}
+
 fn summarize(stage: &str, v: &mut [f32]) -> String {
-    v.sort_by(|a, b| a.total_cmp(b));
-    let n = v.len();
-    let mean = v.iter().sum::<f32>() / n as f32;
-    let q = |p: f32| v[((n as f32 - 1.0) * p).round() as usize];
-    format!("{stage:<22} n={n:<4} mean {mean:7.2}  p50 {:7.2}  p95 {:7.2}  max {:7.2} ms", q(0.5), q(0.95), v[n - 1])
+    let s = Stats::of(v);
+    format!("{stage:<22} n={:<4} mean {:7.2}  p50 {:7.2}  p95 {:7.2}  max {:7.2} {}", s.n, s.mean, s.p50, s.p95, s.max, unit_of(stage))
+}
+
+/// Mean and percentiles of a set of samples.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Stats {
+    pub n: usize,
+    pub mean: f32,
+    pub p50: f32,
+    pub p95: f32,
+    pub p99: f32,
+    pub max: f32,
+}
+
+impl Stats {
+    /// Statistics of `v` (sorted in place); all zero when `v` is empty.
+    pub fn of(v: &mut [f32]) -> Self {
+        let n = v.len();
+        if n == 0 {
+            return Self::default();
+        }
+        v.sort_by(|a, b| a.total_cmp(b));
+        let q = |p: f32| v[((n as f32 - 1.0) * p).round() as usize];
+        Self { n, mean: v.iter().sum::<f32>() / n as f32, p50: q(0.5), p95: q(0.95), p99: q(0.99), max: v[n - 1] }
+    }
+}
+
+/// CPU time consumed by the calling thread so far (`None` where the platform
+/// has no per-thread clock). Unlike wall time it does not grow while the
+/// thread waits or is preempted, so it measures the work itself on a busy
+/// machine.
+pub fn thread_cpu_time() -> Option<Duration> {
+    #[cfg(unix)]
+    {
+        let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+        // SAFETY: `ts` is a valid, writable timespec.
+        let r = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+        (r == 0).then(|| Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32))
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
 }
 
 /// Scoped timer: records on drop (no-op when disabled).

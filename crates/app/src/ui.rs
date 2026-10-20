@@ -552,6 +552,23 @@ pub fn tree_icon(name: &str, dim: bool, cx: &App) -> Div {
 }
 
 /// Collapsible caret (▾/▸) in a 16 px column (§4.11).
+/// Gives an input its placeholder (set once). The input draws it itself,
+/// in gpui-base's app-wide `PlaceholderStyle` (Onshape's italic), so it
+/// starts exactly where typed text and the caret do; never draw a
+/// placeholder over an input yourself.
+pub fn ensure_placeholder(st: &Entity<gpui_kit::component::input::InputState>, text: &str, cx: &mut App) {
+    if st.read(cx).placeholder_text().as_ref() != text {
+        let text = SharedString::from(text.to_string());
+        st.update(cx, |s, cx| s.put_placeholder(text, cx));
+    }
+}
+
+/// `Input::new(st)` with its placeholder set (see [`ensure_placeholder`]).
+pub fn input_with_placeholder(st: &Entity<gpui_kit::component::input::InputState>, text: impl AsRef<str>, cx: &mut App) -> gpui_kit::component::input::Input {
+    ensure_placeholder(st, text.as_ref(), cx);
+    gpui_kit::component::input::Input::new(st)
+}
+
 pub fn caret(open: bool) -> Div {
     // Live (Parts / Default geometry headers): a thin 12 x 6 `#666` chevron.
     div()

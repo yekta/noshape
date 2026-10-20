@@ -555,7 +555,7 @@ impl DrawingEditor {
         // Onshape's select: white, 120 x 25, a #ddd bottom line, ▾ at the right.
         let select = |id: &'static str, current: String, items: Vec<(String, bool, PropsAct)>, enabled: bool| {
             let view = view.clone();
-            let b = Button::new(id).label(current).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).dropdown_caret(true);
+            let b = Button::new(id).label(current).ghost().xsmall().w_full().h(px(25.)).rounded(px(0.)).border_b_1().border_color(line).text_color(field_ink).text_size(px(13.33)).dropdown_caret(true);
             if !enabled {
                 return div().opacity(0.5).child(b).into_any_element();
             }
@@ -575,7 +575,7 @@ impl DrawingEditor {
             })
             .into_any_element()
         };
-        let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall()).into_any_element();
+        let field = |input: &Entity<InputState>| div().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Input::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
         // Reference block.
         let reference = h_flex()
             .gap(px(3.))
@@ -639,7 +639,7 @@ impl DrawingEditor {
                 menu
             })
         };
-        rows.push(row("Scale", h_flex().h(px(26.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(&props.scale_input).appearance(false).xsmall())).child(scale_menu).into_any_element()));
+        rows.push(row("Scale", h_flex().h(px(26.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(&props.scale_input).appearance(false).xsmall().text_size(px(13.33)))).child(scale_menu).into_any_element()));
         let check = |id: &'static str, t: &'static str, on: bool, f: fn(&mut ViewProps, bool), cx: &mut Context<Self>| {
             // A rotated view can't be re-aligned with its parent (help H:views).
             let locked = id == "vp-unaligned" && on && v.rotation.abs() > 1e-9;

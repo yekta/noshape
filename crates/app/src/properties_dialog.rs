@@ -80,6 +80,9 @@ pub struct MetaForm {
     /// dom/dialog-partstudio-part-properties.txt; absent for assembly parts).
     reset_to: Option<MetaValues>,
     spec_category: &'static str,
+    /// Part Studio parts: fields with a configured value in the active
+    /// configuration ("Name", "Part number"…; Configured properties).
+    configured: Vec<&'static str>,
     material: Option<String>,
     computed_mass: Option<String>,
     bom_options: Option<Vec<String>>,
@@ -156,6 +159,7 @@ impl MetaForm {
         Self {
             on_release: None,
             reset_to: None,
+            configured: Vec::new(),
             spec_category: spec.category,
             material: spec.material,
             computed_mass: spec.computed_mass,
@@ -313,6 +317,19 @@ fn text_field(st: &Entity<InputState>) -> AnyElement {
     Input::new(st).h(px(34.)).text_size(px(14.)).into_any_element()
 }
 
+/// A configured field: disabled, grey, with the hover note (live psb
+/// 10-20 q, 645–646).
+fn configured_box(field: &'static str, value: String) -> AnyElement {
+    div().id(SharedString::from(format!("meta-configured-{field}"))).w_full().child(gray_box(value, false)).tooltip(crate::ui::tooltip(format!("{field} is configured. Its configured values can be viewed in the configured properties table."))).into_any_element()
+}
+
+impl MetaForm {
+    /// A text field, or its configured box.
+    fn field(&self, name: &'static str, st: &Entity<InputState>, cx: &App) -> AnyElement {
+        if self.configured.contains(&name) { configured_box(name, st.read(cx).value().to_string()) } else { text_field(st) }
+    }
+}
+
 /// A Bootstrap checkbox row ("☐ Not revision managed").
 fn check_row(id: &'static str, text: &'static str, on: bool) -> Stateful<Div> {
     h_flex()
@@ -386,23 +403,30 @@ impl Render for MetaForm {
             .w_full()
             .gap(px(15.))
             .children(release)
-            .child(group(label("Name", true), text_field(&self.name)))
-            .child(group(label("Description", false), Textarea::new(&self.description).h(px(56.)).text_size(px(14.)).into_any_element()))
+            .child(group(label("Name", true), self.field("Name", &self.name, cx)))
+            .child(group(
+                label("Description", false),
+                if self.configured.contains(&"Description") {
+                    configured_box("Description", self.description.read(cx).value().to_string())
+                } else {
+                    Textarea::new(&self.description).h(px(56.)).text_size(px(14.)).into_any_element()
+                },
+            ))
             .child(group(label("Category", false), gray_box(self.spec_category.to_string(), true).into_any_element()))
-            .child(group(label("Part number", false), text_field(&self.part_number)))
-            .child(group(label("Revision", false), text_field(&self.revision)))
+            .child(group(label("Part number", false), self.field("Part number", &self.part_number, cx)))
+            .child(group(label("Revision", false), self.field("Revision", &self.revision, cx)))
             // State is set by the release workflow (a greyed select).
             .child(group(label("State", true), gray_box(RELEASE_STATES[state_ix].to_string(), true).into_any_element()))
-            .child(group(label("Vendor", false), text_field(&self.vendor)))
-            .child(group(label("Project", false), text_field(&self.project)))
-            .child(group(label("Product line", false), text_field(&self.product_line)));
+            .child(group(label("Vendor", false), self.field("Vendor", &self.vendor, cx)))
+            .child(group(label("Project", false), self.field("Project", &self.project, cx)))
+            .child(group(label("Product line", false), self.field("Product line", &self.product_line, cx)));
         if let Some(m) = self.material.clone() {
             form = form.child(group(label("Material", false), gray_box(m, false).into_any_element()));
         }
         form = form
-            .child(group(label("Title 1", false), text_field(&self.titles[0])))
-            .child(group(label("Title 2", false), text_field(&self.titles[1])))
-            .child(group(label("Title 3", false), text_field(&self.titles[2])))
+            .child(group(label("Title 1", false), self.field("Title 1", &self.titles[0], cx)))
+            .child(group(label("Title 2", false), self.field("Title 2", &self.titles[1], cx)))
+            .child(group(label("Title 3", false), self.field("Title 3", &self.titles[2], cx)))
             .child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.not_revision_managed = !this.not_revision_managed;
                 this.changed(cx);
@@ -583,15 +607,19 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
     window.open_dialog(cx, move |dialog, _, _| bootstrap_modal(dialog, "Properties", 800., 15.).child(form.clone()));
 }
 
-/// [`open_properties`] with the release-create icon (`on_release` opens the
-/// Create Release candidate dialog for the item).
-pub fn open_properties_with_release(spec: MetaSpec, reset_to: Option<MetaValues>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+/// [`open_properties`] for a Part Studio part, with the release-create icon
+/// (`on_release` opens the Create Release candidate dialog) and Reset all
+/// (`reset_to`). Its `configured` fields have configured values in the
+/// active configuration: they show those values, disabled (Configured
+/// properties).
+pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValues>, configured: Vec<&'static str>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, on_release: impl Fn(&mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
     let on_release: ReleaseFn = Rc::new(on_release);
     let form = cx.new(|cx| {
         let mut f = MetaForm::new(spec, on_save, window, cx);
         f.on_release = Some(on_release);
         f.reset_to = reset_to;
+        f.configured = configured;
         f
     });
     window.open_dialog(cx, move |dialog, _, _| bootstrap_modal(dialog, "Properties", 800., 15.).child(form.clone()));

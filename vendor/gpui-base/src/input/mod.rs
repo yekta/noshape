@@ -23,6 +23,20 @@ pub struct PlainSelectionColors {
 
 impl gpui::Global for PlainSelectionColors {}
 
+/// NOSHAPE PATCH: how inputs draw their placeholder when an app sets this
+/// global (Onshape: `input::placeholder { font-style: italic; font-weight:
+/// 300 }` everywhere). Only the placeholder takes it; typed text keeps the
+/// input's own style. Drawn by the input itself, the placeholder starts
+/// exactly where typed text and the caret do.
+#[derive(Clone, Copy, Debug)]
+pub struct PlaceholderStyle {
+    pub italic: bool,
+    pub weight: Option<gpui::FontWeight>,
+    pub color: Option<gpui::Hsla>,
+}
+
+impl gpui::Global for PlaceholderStyle {}
+
 /// NOSHAPE PATCH: code editor gutter metrics. When an app sets this global,
 /// code editors lay out their gutter with it instead of the crate's own
 /// constants (3-digit minimum, 6 px margin, 18 px fold column), e.g. to match

@@ -252,9 +252,27 @@ impl DrawingEditor {
             }
         };
         type Act = std::rc::Rc<dyn Fn(&mut PaletteDlg)>;
-        let menu = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| -> AnyElement {
+        // Live 463, 466: a white combo, 1 px `#ccc`, radius 4: the value and a
+        // 20 px caret cell with its own left rule (`h` 28, or the hole
+        // callout's 54 px count / units).
+        let combo = |id: &'static str, label: AnyElement, w: f32, h: f32, items: Vec<(String, bool, Act)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).ghost().xsmall().w(px(w)).h(px(28.)).dropdown_caret(true).child(label).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            Button::new(id)
+                .ghost()
+                .w(px(w))
+                .h(px(h))
+                .p_0()
+                .bg(gpui_kit::white())
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .rounded(px(4.))
+                .child(
+                    h_flex()
+                        .size_full()
+                        .child(div().flex_1().min_w_0().flex().justify_center().child(label))
+                        .child(div().w(px(20.)).h_full().flex_none().flex().items_center().justify_center().border_l_1().border_color(gpui_kit::rgb(0xcccccc)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000)))),
+                )
+                .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_palette(|d| f(d), cx))));
@@ -263,6 +281,8 @@ impl DrawingEditor {
             })
             .into_any_element()
         };
+        let menu = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 28., items);
+        let menu_tall = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 54., items);
         let toggle = |id: &'static str, label: &'static str, tip: &'static str, on: bool, f: fn(&mut PaletteDlg), cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -298,7 +318,7 @@ impl DrawingEditor {
         let tol_items: Vec<(String, bool, Act)> = tol_list.iter().map(|&l| (l.to_string(), tol == l, std::rc::Rc::new(move |d: &mut PaletteDlg| d.tol = l) as Act)).collect();
         let symbols = {
             let ed = ed.clone();
-            Button::new("dp-sym").ghost().w(px(45.)).h(px(30.)).p_0().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).dropdown_caret(true).child(div().text_size(px(16.)).child("Ø")).os_dropdown_menu("dp-sym-dd", true, move |mut m, _, _| {
+            Button::new("dp-sym").ghost().w(px(45.)).h(px(30.)).p_0().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).child(h_flex().gap(px(5.)).child(div().text_size(px(20.)).text_color(ink).child("Ø")).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000)))).os_dropdown_menu("dp-sym-dd", true, move |mut m, _, _| {
                 for s in SYMBOLS {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(s).on_click(move |_, window, cx| {
@@ -336,8 +356,8 @@ impl DrawingEditor {
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .when(right, |b| b.rounded_r(px(4.)).rounded_l(px(0.)))
                 .when(!right, |b| b.rounded(px(4.)))
-                .dropdown_caret(true)
-                .child(content)
+                // Live: the content and an 8 x 4 black caret.
+                .child(h_flex().gap(px(3.)).child(content).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb(0x000000))))
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                     for (l, on, f) in &items {
                         let (e, f) = (ed.clone(), f.clone());
@@ -374,9 +394,9 @@ impl DrawingEditor {
                 .gap(px(4.))
                 .h(px(54.))
                 .child(field(&d.prefix, Some(80.), 54.))
-                .child(menu("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts))
+                .child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts))
                 .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview.into_iter().map(|l| div().child(l))))
-                .child(menu("dp-units", small(unit_label), 58., unit_items))
+                .child(menu_tall("dp-units", small(unit_label), 58., unit_items))
                 .child(field(&d.suffix, Some(80.), 54.))
         } else {
             // Live drawing/15 (dom/drawing-dimension-edit-dialog.txt): prefix
@@ -385,7 +405,7 @@ impl DrawingEditor {
             let value_combo = h_flex()
                 .h(px(30.))
                 .ml(px(10.))
-                .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(6.)).text_color(gpui_kit::rgb(0x555555)).child(Input::new(&d.value).appearance(false).xsmall()))
+                .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(6.)).text_color(gpui_kit::rgb(0x555555)).child(Input::new(&d.value).appearance(false).xsmall().text_size(px(13.33)).text_center()))
                 .child(pbutton("dp-prec", div().into_any_element(), 20., prec_items.clone(), true));
             let tol_icon = v_flex()
                 .items_center()
@@ -419,9 +439,9 @@ impl DrawingEditor {
             // radius / diameter toggle on radial dimensions.
             let blue = gpui_kit::rgb(0x1b72c4);
             let reset = h_flex().gap(px(1.)).child(div().text_size(px(9.)).text_color(blue).child("←")).child(div().text_size(px(13.)).text_color(ink).child("X")).child(div().text_size(px(9.)).text_color(blue).child("→")).into_any_element();
-            let parens = div().text_size(px(13.)).text_color(ink).child("(XX)").into_any_element();
+            let parens = h_flex().text_size(px(13.)).child(div().text_color(blue).child("(")).child(div().text_color(ink).child("XX")).child(div().text_color(blue).child(")")).into_any_element();
             let oval = div().px(px(3.)).rounded_full().border_1().border_color(blue).text_size(px(11.)).text_color(ink).child("XX").into_any_element();
-            let dual = v_flex().items_center().line_height(px(10.)).child(div().text_size(px(10.)).text_color(blue).child("[XX]")).child(div().text_size(px(8.)).text_color(ink).child("x.xx")).into_any_element();
+            let dual = v_flex().items_center().line_height(px(11.)).child(div().text_size(px(12.)).text_color(blue).child("[XX]")).child(div().text_size(px(8.)).text_color(ink).child("x.xx")).into_any_element();
             toggles = toggles
                 .child(icon_toggle("dp-reset", reset, "Reset text position", false, |d| {
                     if let AnnotationKind::RadialDimension { angle, .. } = &mut d.cur.kind {
@@ -525,7 +545,10 @@ impl DrawingEditor {
                 .p(px(if hole { 3. } else { 1. }))
                 .gap(px(if hole { 3. } else { 2. }))
                 .bg(pal.dialog_bg)
-                .rounded(px(3.))
+                // Live 15: 6 px corners, 1 px grey border.
+                .rounded(px(6.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xbbbbbb))
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())

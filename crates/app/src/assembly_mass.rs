@@ -212,7 +212,8 @@ impl AssemblyView {
                 .child(div().size(px(12.)).rounded(px(3.)).when(enabled, |d| d.bg(rgb(0xffffff)).border_1().border_color(rgb(0x888888))).when(!enabled, |d| d.bg(rgb(0x999999))))
                 .child("Override")
         };
-        let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).text_size(px(12.)).text_color(rgb(c)).child(l).child(glyph);
+        // Live 737: a grey letter (14 px) with the axis-coloured arrow.
+        let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).child(div().text_size(px(14.)).text_color(rgb(0x999999)).child(l)).child(div().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(rgb(c)).child(glyph));
         let mut body = v_flex().w_full().child(h_flex().w_full().child(tab("amass-tab-part", "Part", false, cx)).child(tab("amass-tab-face", "Face", true, cx)));
         body = body
             .child(field(if faces { "Faces to measure" } else { "Instances to measure" }, names, true, missing))

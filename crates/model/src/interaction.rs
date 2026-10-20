@@ -476,11 +476,17 @@ pub fn display_name_computed(f: &Feature, shown: &dyn Fn(&str) -> Option<String>
         return f.name.clone();
     }
     let name = f.params.text("name");
-    let value = match f.params.get("variableType") {
+    // Measured / From import: the evaluated value, "?" until there is one
+    // (live: a new Measured variable reads "#? = ?").
+    let value = if f.params.is("mode", "MEASURED") || f.params.is("mode", "TABLE") {
+        Some(shown("measuredValue").unwrap_or_else(|| "?".into()))
+    } else {
+        match f.params.get("variableType") {
         Some(ParamValue::Enum(k)) if k == "ANGLE" => f.params.expr("angleValue").map(|e| e.text.clone()),
         Some(ParamValue::Enum(k)) if k == "NUMBER" => f.params.expr("numberValue").map(|e| e.text.clone()),
         Some(ParamValue::Enum(k)) if k == "ANY" => Some(f.params.text("anyValue").to_string()),
-        _ => f.params.expr("lengthValue").map(|e| e.text.clone()),
+            _ => f.params.expr("lengthValue").map(|e| e.text.clone()),
+        }
     }
     .unwrap_or_default();
     format!("#{} = {}", if name.trim().is_empty() { "?" } else { name.trim() }, value.trim())
@@ -859,6 +865,7 @@ mod tests {
             face_ranges: vec![(0, 6), (6, 6)],
             edges: vec![vec![[-1.0, 0.0, 1.0], [1.0, 0.0, 1.0]]],
             vertices: vec![],
+            mesh_lines: vec![],
         };
         let face = |s: u32| Reference::Face(TopoName::face(FeatureId(1), Role::New(s)));
         let edge = Reference::Edge(TopoName::edge(std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(1))), std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(2))), 0));

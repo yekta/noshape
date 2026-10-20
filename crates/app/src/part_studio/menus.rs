@@ -520,19 +520,68 @@ impl PartStudioView {
         // Reset all: the regenerated name, no metadata.
         let default_name = self.context.as_ref().and_then(|c| c.bodies.iter().find(|x| x.id == body).map(|x| x.name.clone())).unwrap_or_else(|| spec.values.name.clone());
         let reset_to = MetaValues { name: default_name, ..MetaValues::default() };
-        crate::properties_dialog::open_properties_with_release(
+        // Fields configured for the active configuration show that value,
+        // disabled, and saving leaves the part's own value alone (live psb
+        // 10-20 q, 645–646).
+        const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
+        let mut spec = spec;
+        let mut configured: Vec<&'static str> = Vec::new();
+        if let Some(ps) = self.studio(cx) {
+            for f in FIELDS {
+                let Some(v) = noshape_model::configured_properties::configured_value(ps, &body, f, &self.config_values) else { continue };
+                configured.push(f);
+                let m = &mut spec.values;
+                match f {
+                    "Name" => m.name = v,
+                    "Description" => m.description = v,
+                    "Part number" => m.part_number = v,
+                    "Revision" => m.revision = v,
+                    "Vendor" => m.meta.vendor = Some(v),
+                    "Project" => m.meta.project = Some(v),
+                    "Product line" => m.meta.product_line = Some(v),
+                    "Title 1" => m.meta.title1 = Some(v),
+                    "Title 2" => m.meta.title2 = Some(v),
+                    _ => m.meta.title3 = Some(v),
+                }
+            }
+        }
+        let kept = configured.clone();
+        crate::properties_dialog::open_part_properties_configured(
             spec,
             Some(reset_to),
+            configured,
             move |v, _, cx| {
                 let body = body.clone();
+                let has = |f: &str| kept.contains(&f);
                 doc.update(cx, |d, cx| {
                     d.edit_studio(tab, &format!("Properties : {}", v.name), cx, |ps| {
                         let p = ps.part_properties.entry(body).or_default();
-                        p.name = Some(v.name.clone());
-                        p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
-                        p.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
-                        p.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+                        let old = p.meta.clone();
+                        if !has("Name") {
+                            p.name = Some(v.name.clone());
+                        }
+                        if !has("Description") {
+                            p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+                        }
+                        if !has("Part number") {
+                            p.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
+                        }
+                        if !has("Revision") {
+                            p.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+                        }
                         p.meta = v.meta.clone();
+                        for (f, new, was) in [
+                            ("Vendor", &mut p.meta.vendor, old.vendor),
+                            ("Project", &mut p.meta.project, old.project),
+                            ("Product line", &mut p.meta.product_line, old.product_line),
+                            ("Title 1", &mut p.meta.title1, old.title1),
+                            ("Title 2", &mut p.meta.title2, old.title2),
+                            ("Title 3", &mut p.meta.title3, old.title3),
+                        ] {
+                            if has(f) {
+                                *new = was;
+                            }
+                        }
                         p.mass_override = v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass);
                     });
                 });

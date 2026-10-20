@@ -11,7 +11,7 @@ use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, Textarea};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -123,14 +123,9 @@ impl DrawingEditor {
             .child(select("note-list", 130., st.list.name().into(), lists))
             .child(div().text_size(px(11.)).text_color(pal.text_muted).child("Note order"))
             .child(select("note-order", 110., if st.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, order));
-        // The formatting ruler over the text (the laid-out box width).
-        let h = height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().unwrap_or(3.5);
-        let text_w = {
-            let l = noshape_model::drawing::note::layout(&noshape_model::drawing::note::fractions(&input.read(cx).value()), h, &st, [0.0, 0.0]);
-            l.bbox[2] - l.bbox[0]
-        };
-        let ruler = self.note_ruler(&st, text_w, cx);
-        let mut rows = vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element(), ruler, Textarea::new(&input).w(px(420.)).into_any_element()];
+        // The text and its ruler are edited in place on the sheet
+        // (`render_note_inplace`).
+        let mut rows = vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element()];
         // Flag notes: per list item, with the flag type and size.
         if st.list != NoteList::None {
             let text = input.read(cx).value().to_string();

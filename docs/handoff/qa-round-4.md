@@ -12,6 +12,13 @@ State 11:10: integration still not landed (the lead's run fails on asb's in-prog
 shared tree; redo the three user reports once it lands. Verifying the input-padding fix proposal on a private
 copy (/root/noshape-qa4; delete it after).
 ### R4 (14:00–): Part Studio typing latency (lead's task)
+**For perf (b16dc34d, owns viewport.rs presentation / frame pacing, crates/render, gpu.rs):** qa4 changed
+`crates/app/src/viewport.rs` once (in the shared tree, uncommitted, lead-approved): a `scene_bounds:
+Option<(Vec3, Vec3)>` field computed in `set_scene`, replacing the 5 `self.scene.bounds()` calls
+(`scene_radius` used by `project`, fit, zoom bounds). Reason: `project()` rescanned every vertex per projected
+point (the in-plane labels project hundreds of points per frame). No further viewport.rs edits from qa4
+without the lead. Tools you may reuse: /tmp/qa4/ft2.sh (perf uprobes on `Window::draw` / `X11Window::draw` +
+UI-thread CPU per call), /tmp/qa4/tools/keylat.c (XTest key → XGetImage until the region changes).
 Measured on the v0.4.1-era build (/tmp/qa4/noshape-r3), Xvfb :110, filter box, XTest key → XGetImage polling
 (/tmp/qa4/tools/keylat.c, /tmp/qa4/lat.sh): **median 358 ms** (15 samples, 31–584).
 Profile (`perf record` on the whole process, then the main thread alone, while typing):
@@ -42,6 +49,44 @@ Baseline (0839f5e-era binary): typing 10×(7, BackSpace) → Window::draw **medi
 The shared tree doesn't compile (assembly_panels.rs, drawing_datum.rs, drawing_more.rs, model drawing/mod.rs,
 other agents, since ~13:50), so before/after are built in a private worktree /root/noshape-qa4 at HEAD 53feac6:
 `noshape-base` = HEAD, `noshape-v1` = HEAD + /tmp/qa4/mine.patch (only qa4's hunks).
+Metric: /tmp/qa4/ft2.sh adds cpu-clock samples on the UI thread inside each probed call (CPU time, independent
+of the machine's load, which was 30–55 from other agents' builds).
+| (UI-thread CPU, 20 keystrokes) | before | after (1)+(2) |
+|---|---|---|
+| Window::draw per frame | 17.5 ms (p90 20.0) | 17.8 ms (p90 20.0) |
+| └ render_viewport_overlay | 2.0 | 0.8 |
+| └ render_toolbar | 2.0 | 2.2 |
+| └ render_feature_list | 0.8 | 1.0 |
+| X11Window::draw (present; wall ~330–360 ms on llvmpipe) | 3.5 | 3.5 |
+| idle 12 s after a viewport click: draws | **24** (2 Hz caret) | **2** (the click) |
+End-to-end keystroke (wall, llvmpipe-bound, load-dependent): 304–507 ms before, 452 ms after; meaningless
+for a Mac. Behaviour checked on noshape-v1: Shift+E after a viewport click opens Extrude (filter keeps its
+text); dialog Depth typed then viewport click commits "30 mm", Esc still cancels; editing Extrude 1 Depth →
+viewport click → Enter commits (part regenerates, Undo enabled). `cargo clippy -p noshape --all-targets` on
+HEAD + patch: no warnings.
+Conclusion: (1)+(2) remove the idle redraw and ~1.2 ms of overlay work, but a keystroke still costs ~18 ms of
+UI CPU because gpui re-lays-out and re-paints the whole window (~12 ms of the 18 ms is layout/prepaint/paint,
+~5 ms is the Part Studio's element building). Only (3), cached child views, cuts that.
+(3) prototype, private worktree only (no shared-tree edits until ui answers): `crates/app/src/cached_slice.rs`
+(`Slice<V>`: renders a part of V through a fn pointer; observes V and optional other entities; inserted with
+`Entity::cached(style)`), Part Studio slices `toolbar` (w_full × 36 px) and `overlay` (absolute, full size,
+also observes the viewport). Step 2 of the prototype: the filter's Change handler drops its explicit
+`cx.notify()` (the input's own notify already re-renders the Part Studio, its ancestor, with the new query,
+leaving the slices cached).
+Prototype results (UI-thread CPU per `Window::draw`, same scripts, back to back):
+| | v1 = HEAD+(1)+(2) | v2 = + cached toolbar & overlay | v3 = + filter handler without notify |
+|---|---|---|---|
+| typing in the filter (20 keys) | 16.8 ms (p90 19.2) | 15.8 ms | **8.2 ms** (p90 10.0) |
+| caret blink frame (field focused, idle) | 18.9 ms | 8.0 ms | **8.2 ms** |
+| render_toolbar / render_viewport_overlay calls per typing frame | every frame | only on filter changes | **none** |
+Functional checks on v3: Undo enables after Suppress and greys out again after Ctrl+Z (Redo enables); Shift+E
+opens the Extrude dialog (overlay); arrow-key rotation moves the in-plane labels and the view cube (overlay
+observes the viewport); Appearances panel opens and the strip moves; Sketch switches the toolbar to sketch
+tools; toolbar hover highlight and the rich tooltip appear; the filter still filters. Esc not closing a sketch
+after its plane is picked is the same on HEAD (not a regression). Also added after the measurement: both slices
+observe the doc. Full patch (incl. (1)+(2)): /tmp/qa4/proto-slices.patch (HEAD 53feac6).
+Next slices once ui agrees: the feature list's non-filter parts / parts list, the right strip and panels, and
+the Workspace chrome (navbar, tab bar, left rail), which also re-render on every keystroke.
 Planned (part_studio/mod.rs, ui's file, waiting for the lead to forward to ui):
 1. `on_viewport_event`: a press in the graphics takes focus from any field (not sketch mode, which does its
    own), so the caret stops and shortcuts work.

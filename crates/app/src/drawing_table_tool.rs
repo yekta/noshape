@@ -84,13 +84,16 @@ impl DrawingEditor {
         true
     }
 
-    fn close_table_tool(&mut self, accept: bool, cx: &mut Context<Self>) {
+    fn close_table_tool(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let placed = self.table_tool.as_ref().and_then(|d| d.placed);
         if accept && let Some(at) = placed && let Some(mut t) = self.table_tool_table(at, cx) {
             let id = self.current_sheet().next_table_id();
             t.id = id;
             self.edit_sheet("Table", cx, |s| s.tables.push(t));
             self.selection = vec![Sel::Table(id)];
+            // Live 741: ✓ starts typing in the first cell.
+            let input = self.textarea("", 1, window, cx);
+            self.panel = Some(Panel::Cell { table: id, row: 0, col: 0, input });
         }
         self.table_tool = None;
         self.tool = Tool::Select;
@@ -162,13 +165,13 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Table"))
-                        .child(div().id("tt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if placed { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).when(placed, |e| e.cursor_pointer()).child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .child(div().id("tt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if placed { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).when(placed, |e| e.cursor_pointer()).child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             // ✓ stays disabled until the table is placed (live 530).
                             if placed {
-                                this.close_table_tool(true, cx)
+                                this.close_table_tool(true, window, cx)
                             }
                         })))
-                        .child(div().id("tt-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_table_tool(false, cx)))),
+                        .child(div().id("tt-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_table_tool(false, window, cx)))),
                 )
                 .child(div().h(px(4.)))
                 .child(row("Rows", &d.rows))

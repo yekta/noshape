@@ -757,6 +757,35 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
 - Open: the funnel's filter dropdown (Onshape opens a feature-type filter menu) isn't
   implemented.
 
+## Round 13 (2026-10-20 evening, user's caret bug, tab bar)
+
+- **Caret in empty inputs** (user, Retina Mac): the caret sat a few px right of the placeholder's
+  first glyph. Cause: about 16 inputs drew their own italic placeholder as an absolute overlay at
+  Onshape's text position, while the kit input's real text origin was further in (the kit frame keeps
+  its own `input_px` padding, 4–12 px, even with `appearance(false)`). **Rule now: never draw a
+  placeholder over an input.** Give the state its placeholder (`InputState::placeholder(..)` at
+  creation, or `ui::input_with_placeholder(st, text, cx)` / `ui::ensure_placeholder`); the input
+  draws it from the same origin as typed text and the caret, in the app-wide
+  `gpui_base::input::PlaceholderStyle` (NOSHAPE PATCH: italic, #999, set in main.rs; Onshape's
+  `input::placeholder { font-style: italic; font-weight: 300 }`, we ship no light Roboto face).
+  Place the text origin with `.pl(px(..))` on the `Input` (it overrides the kit padding). Don't put
+  `.italic()` on an input or its box: typed text is upright in Onshape. Converted: Part Studio and
+  assembly filters, Variable table / Configurations "Name" rows and "Filter inputs", Search tools
+  (Part Studio + assembly), New view name, Insert dialog searches, GD&T upper/lower text, select-item
+  URL / search; italic removed from the documents search, advanced search, tab manager, FS import,
+  FS notices, history search and the Variable Studio add row. Crops before/after at scale 1 and 2
+  (:113, GPUI_X11_SCALE_FACTOR=2): /tmp/ui-shots/final-caret-1x.png, final-caret-2x.png
+  (/tmp/ui-tools/caretcrops.sh, caretsheet.py).
+- **Tab bar scroll buttons** (workspace.rs `render_tab_scroll_buttons`, `scroll_tabs`): ‹ › 24x30 at
+  the right end only on overflow, dimmed at the ends, a press scrolls a page, a right press to the
+  first/last tab, tooltips as live; the active tab scrolls into view on activation and when the Tab
+  manager opens; the wheel already scrolls the strip (GPUI maps vertical wheel to x). Not yet
+  verified at 1280 px.
+- **"Missed clicks" in input text** (qa4): not lost; at startup under load the app processes the
+  press and the keys late (a capture 0.6 s after typing missed the text, 3 s later it was there,
+  8/8). qa4's latency work addresses it.
+- Feature Studio toolbar clipping at 1280/1440: waiting for the live capture (REQUESTS.md, 20 Oct).
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting

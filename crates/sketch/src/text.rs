@@ -69,6 +69,12 @@ static MONO: [&[u8]; 4] = [
     include_bytes!("../fonts/LiberationMono-BoldItalic.ttf"),
 ];
 
+/// Every bundled font file (Noto Sans and the Liberation families), e.g. for
+/// registering them with the UI so text edited in place uses the same font.
+pub fn font_files() -> impl Iterator<Item = &'static [u8]> {
+    NOTO_SANS.iter().chain(SANS.iter()).chain(SERIF.iter()).chain(MONO.iter()).copied()
+}
+
 fn font_data(font: &str, bold: bool, italic: bool) -> &'static [u8] {
     let f = font.to_ascii_lowercase();
     let family = if f.contains("noto") {

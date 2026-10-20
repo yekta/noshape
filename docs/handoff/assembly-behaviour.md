@@ -494,9 +494,8 @@ State: run 5's edits were complete (no half-done code found); everything below b
   - Replace instance: no "Select an instance to replace." notice; the toolbar opens the 220 px "Replace instance"
     ✓ ✕ dialog (live 833–836): Instances to replace (active; clicks in the graphics / list add or remove, its picks
     are the selection), the part-icon "Select replacement component" field (title and field red once an instance is
-    picked without a replacement), ☐ Replace all instances, ?; Esc cancels, empty clicks don't. The field opens this
-    document's Part Studios / parts beside the dialog; the real Onshape picker is asked live (REQUESTS "skb
-    (10-20 replace instance picker)").
+    picked without a replacement), ☐ Replace all instances, ?; Esc cancels, empty clicks don't. The field opens the
+    Insert panel in picking mode beside the dialog (live 840–841, see "After v0.4.1" below).
   - Notices: assembly info notices (`message`, non-error) and the configuration toasts (`show_cfg_toast`) fade
     after 4 s like the Part Studio's info / success bubbles, and Esc dismisses an info notice; errors stay until ×.
     The move triad is hidden while the Replace / Interference dialogs take instance picks.
@@ -510,6 +509,22 @@ State: run 5's edits were complete (no half-done code found); everything below b
     through `explode_view`), `accept_step_edit`, `cancel_step_edit`, `step_edit_pick`, `render_step_edit`); model
     `ExplodeStep::{name, lines, line_refs, display_name}`; tree, menus and clicks per live 805–826 (see G5).
   - Replace picker = the Insert panel in `picking_replacement` mode (see T5).
+  - **State at the lead's PAUSE (20 Oct, after the OOM reboot):** the GO code is in dc0da0a. Uncommitted
+    since then in assembly_panels.rs (mine, compile-checked before the reboot):
+    `step_edit_activate(k, cx)` replaces the `set_active` closure in `render_step_edit` (fixes E0500), the doc
+    comment moved back onto `render_step_edit`, and line 2871's `red.into()` → `red` (clippy
+    `useless_conversion`). The other hunks in that file (`insert_search_box` taking `&mut App`,
+    `crate::ui::input_with_placeholder` in the search / URL boxes) are another agent's placeholder sweep, not mine.
+    Not done yet: (1) clippy `-p noshape -D warnings` after the 2871 fix: stopped by the reboot / PAUSE, so the
+    app crate is unconfirmed warning-free (clippy on the model crate stops first on someone else's uncommitted
+    `display.rs:50` `chunks_exact_to_as_chunks`; I ran with that lint allowed to reach the app); (2) build
+    (bld.sh) and copy to /tmp/skb/noshape (gone with /tmp); (3) GUI checks on :103 of the three GO items:
+    mate alignment default (bottom → top stacks upright, rim → rim coincide), the Explode step dialog against
+    live 805 (drag opens it, Instances / Specify / Distance / Explode lines / line refs, live preview, ✕ removes a
+    new step, menus, rename, double click), the Replace picker (Insert panel in picking mode, the pick fills the
+    field, ✓ replaces). Xvfb :103 was restarted after the reboot (no app on it). Still open afterwards: the
+    replacement's in-place orange preview and red mates, the picker's four filters, name keeping on replace,
+    the Face tab and reference connector in the Mass dialog.
 
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 
@@ -529,3 +544,12 @@ State: run 5's edits were complete (no half-done code found); everything below b
 * (psb, user bug) Hover-revealed eyes on instance, folder and mate rows now use `ui::hover_reveal`
   (opacity, not `invisible()`): an invisible element has no mouse listeners in gpui, so quick clicks fell
   through to the row. Please use `hover_reveal` for new hover-only controls.
+
+## From kern (2026-10-20): proposal, a BOM tab ("BOM : <assembly>") — please reply here before I touch the document model
+Onshape's native assembly import (live G38/G38f, behaviours.md "G38f") creates a **Bill of materials tab** next to the
+Assembly and its "<name> parts" Part Studio: element type BILLOFMATERIALS, named "BOM : <assembly>", visible columns
+**Item · Quantity · Part number · Description**, rows from the assembly ("Show Assembly and components"). kern's import
+(`model::native_assembly::add_native_assembly`, app `import_dialog.rs`) makes the Assembly and Part Studio today.
+Proposal: `TabContent::BillOfMaterials { assembly: TabId }` (serde-compatible addition, no other model change), its
+rows from `assembly::bom`, and a tab view in the app (owner: asb's BOM table code). kern would add the variant and the
+import's tab only; the view is yours. Live capture of the tab's UI is requested (REQUESTS.md "kern G38g").

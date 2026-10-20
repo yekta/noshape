@@ -1,8 +1,15 @@
 //! Process-wide GPU access: one render worker thread and device shared by all
 //! viewports, so uploaded meshes can be reused across tabs and windows.
+//!
+//! Where GPUI renders with wgpu on a real GPU API (Linux: Vulkan), the
+//! renderer runs on GPUI's own device and 3D viewport frames stay on the GPU
+//! ([`FrameImage::Texture`]): GPUI composites them directly
+//! (`Window::paint_external_texture`, a vendored GPUI patch), with no readback
+//! and no upload. Elsewhere (or with `NOSHAPE_PRESENT=readback`) frames are
+//! read back and shown as images.
 
 use gpui_kit::RenderImage;
-use noshape_render::{Camera, Completed, Frame, PickBuffer, PickRect, Scene, Style, worker::{RenderJob, RenderWorker}, renderer::Uploader};
+use noshape_render::{Camera, Completed, Frame, PickBuffer, PickRect, Present, PresentTexture, Scene, Style, worker::{RenderJob, RenderWorker}, renderer::Uploader};
 use parking_lot::Mutex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, OnceLock};
@@ -10,11 +17,22 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 pub type FrameResult = (u64, Result<(Frame, Arc<RenderImage>), String>, f32);
+/// A 3D viewport's frame ([`Gpu::register_target_with_picks`]).
+pub type ViewportFrameResult = (u64, Result<(Frame, FrameImage), String>, f32);
+
+/// How a viewport frame is shown.
+pub enum FrameImage {
+    /// Read back to the CPU; GPUI uploads the image into its atlas.
+    Image(Arc<RenderImage>),
+    /// Left on the GPU; GPUI samples the texture (see the module docs).
+    Texture(Arc<PresentTexture>),
+}
 /// Answer to [`Gpu::pick`]: (token, pick ids of the requested rectangle).
 pub type PickResult = (u64, Result<Arc<PickBuffer>, String>);
 
 struct Routes {
     senders: HashMap<u64, async_channel::Sender<FrameResult>>,
+    viewport_senders: HashMap<u64, async_channel::Sender<ViewportFrameResult>>,
     pick_senders: HashMap<u64, async_channel::Sender<PickResult>>,
     /// Submission times per target, oldest first (coalesced jobs never
     /// complete, so a frame retires every older entry too).
@@ -31,16 +49,16 @@ pub struct Gpu {
     /// Created on a background thread at startup (adapter/device creation and
     /// pipeline compilation take 0.1-2 s) while GPUI opens the window; the
     /// first use waits for it.
-    worker: Arc<OnceLock<Result<RenderWorker, String>>>,
+    worker: Arc<OnceLock<Result<(RenderWorker, Present), String>>>,
     routes: Arc<Mutex<Routes>>,
     next_target: Arc<AtomicU64>,
 }
 
 impl Gpu {
     pub fn new() -> anyhow::Result<Self> {
-        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
+        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
         let r2 = routes.clone();
-        let cell: Arc<OnceLock<Result<RenderWorker, String>>> = Arc::new(OnceLock::new());
+        let cell: Arc<OnceLock<Result<(RenderWorker, Present), String>>> = Arc::new(OnceLock::new());
         let cell2 = cell.clone();
         let on_done = move |done: Completed| {
             let (target, seq, result) = match done {
@@ -72,24 +90,33 @@ impl Gpu {
             };
             let ms = started.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(0.0);
             noshape_render::perf::record_ms("g.submit_to_frame", ms);
-            let _t_img = noshape_render::perf::scope("g.image");
+            let viewport = r2.lock().viewport_senders.get(&target).cloned();
+            if let Some(tx) = viewport {
+                let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
+                    let image = match frame.texture.take() {
+                        Some(texture) => FrameImage::Texture(texture),
+                        None => FrameImage::Image(frame_image(&mut frame)?),
+                    };
+                    Ok((frame, image))
+                });
+                let _ = tx.try_send((seq, result, ms));
+                return;
+            }
             let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
-                let bgra = std::mem::take(&mut frame.bgra);
-                let buf = image::RgbaImage::from_raw(frame.width, frame.height, bgra)
-                    .ok_or_else(|| "frame size mismatch".to_string())?;
-                let image = Arc::new(RenderImage::new(vec![image::Frame::new(buf)]));
+                let image = frame_image(&mut frame)?;
                 Ok((frame, image))
             });
-            drop(_t_img);
             let sender = r2.lock().senders.get(&target).cloned();
             if let Some(tx) = sender {
                 let _ = tx.try_send((seq, result, ms));
             }
         };
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+        gpui_wgpu::request_device_features(noshape_render::Renderer::WANTED_FEATURES);
         std::thread::Builder::new().name("noshape-gpu-init".into()).spawn(move || {
-            let worker = RenderWorker::spawn(on_done).map_err(|e| e.to_string());
+            let worker = spawn_worker(on_done);
             match &worker {
-                Ok(w) => log::info!("GPU: {}", w.adapter_name()),
+                Ok((w, present)) => log::info!("GPU: {} (viewport frames: {present:?})", w.adapter_name()),
                 Err(e) => log::error!("GPU initialization failed: {e}"),
             }
             noshape_render::perf::milestone("GPU initialized");
@@ -100,13 +127,13 @@ impl Gpu {
 
     /// The GPU adapter ("name (Backend)") once the renderer is up.
     pub fn adapter_name(&self) -> Option<String> {
-        self.worker.get().and_then(|w| w.as_ref().ok()).map(|w| w.adapter_name().to_string())
+        self.worker.get().and_then(|w| w.as_ref().ok()).map(|w| w.0.adapter_name().to_string())
     }
 
     /// The render worker, waiting for its initialization if needed.
     fn worker(&self) -> &RenderWorker {
         match self.worker.wait() {
-            Ok(w) => w,
+            Ok((w, _)) => w,
             Err(e) => panic!("noshape needs a GPU (Vulkan, Metal or DirectX 12): {e}"),
         }
     }
@@ -119,17 +146,43 @@ impl Gpu {
         (id, rx)
     }
 
-    /// Register a render target that also answers pick queries ([`Gpu::pick`]).
-    pub fn register_target_with_picks(&self) -> (u64, async_channel::Receiver<FrameResult>, async_channel::Receiver<PickResult>) {
-        let (id, rx) = self.register_target();
-        let (tx, prx) = async_channel::unbounded();
-        self.routes.lock().pick_senders.insert(id, tx);
+    /// Register a 3D viewport's target: it also answers pick queries
+    /// ([`Gpu::pick`]), and its frames stay on the GPU where GPUI can
+    /// composite them ([`FrameImage::Texture`]).
+    pub fn register_target_with_picks(&self) -> (u64, async_channel::Receiver<ViewportFrameResult>, async_channel::Receiver<PickResult>) {
+        let id = self.next_target.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = async_channel::unbounded();
+        let (ptx, prx) = async_channel::unbounded();
+        {
+            let mut routes = self.routes.lock();
+            routes.viewport_senders.insert(id, tx);
+            routes.pick_senders.insert(id, ptx);
+        }
+        if let Ok((worker, Present::Texture)) = self.worker.wait()
+            && compositor_shares_gpu()
+        {
+            worker.set_present(id, Present::Texture);
+        }
         (id, rx, prx)
+    }
+
+    /// What GPUI's renderer samples for a [`FrameImage::Texture`] frame
+    /// (`gpui::set_external_texture`): the texture's view on GPUI's device.
+    pub fn compositor_texture(texture: &PresentTexture) -> Arc<dyn std::any::Any + Send + Sync> {
+        #[cfg(target_os = "macos")]
+        {
+            metal::texture(texture)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Arc::new(texture.view.clone())
+        }
     }
 
     pub fn unregister_target(&self, id: u64) {
         let mut r = self.routes.lock();
         r.senders.remove(&id);
+        r.viewport_senders.remove(&id);
         r.pick_senders.remove(&id);
         r.submitted.remove(&id);
         drop(r);
@@ -199,6 +252,103 @@ impl Gpu {
     /// Frames a viewport should keep in flight.
     pub fn frames_in_flight(&self) -> usize {
         self.worker().frames_in_flight()
+    }
+}
+
+/// A read-back frame as a GPUI image (the pixels move, no copy).
+fn frame_image(frame: &mut Frame) -> Result<Arc<RenderImage>, String> {
+    let _t = noshape_render::perf::scope("g.image");
+    let bgra = std::mem::take(&mut frame.bgra);
+    let buf = image::RgbaImage::from_raw(frame.width, frame.height, bgra).ok_or_else(|| "frame size mismatch".to_string())?;
+    Ok(Arc::new(RenderImage::new(vec![image::Frame::new(buf)])))
+}
+
+/// Start the render thread: on GPUI's own device with frames left on the
+/// GPU where GPUI can composite them, else on a device of its own with
+/// frames read back (see the module docs).
+fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderWorker, Present), String> {
+    // `NOSHAPE_PRESENT=readback|texture` overrides the choice (benchmarks).
+    let forced = std::env::var("NOSHAPE_PRESENT").ok();
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    if forced.as_deref() != Some("readback") {
+        // GPUI creates its context with the first window, right after start.
+        // On a CPU rasterizer (llvmpipe) sharing GPUI's queue serializes our
+        // frames behind GPUI's own software rendering, so frames are read
+        // back there unless texture presentation is forced.
+        match gpui_wgpu::wait_for_shared_context(std::time::Duration::from_secs(20)) {
+            Some(ctx)
+                if ctx.adapter.get_info().backend == gpui_wgpu::wgpu::Backend::Vulkan
+                    && (ctx.adapter.get_info().device_type != gpui_wgpu::wgpu::DeviceType::Cpu || forced.as_deref() == Some("texture")) =>
+            {
+                let renderer = noshape_render::Renderer::with_device(&ctx.adapter, (*ctx.device).clone(), (*ctx.queue).clone());
+                return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Texture));
+            }
+            Some(ctx) => log::info!("GPUI renders with {:?} on a {:?} adapter: viewport frames are read back", ctx.adapter.get_info().backend, ctx.adapter.get_info().device_type),
+            None => log::warn!("GPUI's GPU context did not appear: viewport frames are read back"),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    if forced.as_deref() != Some("readback") {
+        // GPUI (Metal) samples the renderer's textures directly when both
+        // draw with the same GPU (always on Apple silicon; see
+        // `compositor_shares_gpu`).
+        let renderer = noshape_render::Renderer::new().map_err(|e| e.to_string())?;
+        if let Some(id) = metal::registry_id(renderer.device()) {
+            let _ = metal::RENDERER_GPU.set(id);
+            return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Texture));
+        }
+        return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Readback));
+    }
+    let _ = forced;
+    RenderWorker::spawn(on_done).map(|w| (w, Present::Readback)).map_err(|e| e.to_string())
+}
+
+/// Whether GPUI's window renderer draws with the GPU the viewport renders on,
+/// so it can sample the viewport's textures.
+fn compositor_shares_gpu() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        metal::RENDERER_GPU.get().is_some_and(|id| gpui_kit::renderer_gpus().contains(id))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+/// Metal access for zero-copy presentation (macOS).
+#[cfg(target_os = "macos")]
+mod metal {
+    use noshape_render::{PresentTexture, wgpu};
+    use objc2::Message as _;
+    use objc2::rc::Retained;
+    use objc2::runtime::ProtocolObject;
+    use objc2_metal::{MTLDevice, MTLTexture};
+    use std::ffi::c_void;
+    use std::ptr::NonNull;
+    use std::sync::{Arc, OnceLock};
+
+    /// `registryID` of the renderer's Metal device.
+    pub static RENDERER_GPU: OnceLock<u64> = OnceLock::new();
+
+    pub fn registry_id(device: &wgpu::Device) -> Option<u64> {
+        // SAFETY: only reads the device's identity.
+        let hal = unsafe { device.as_hal::<wgpu::hal::api::Metal>() }?;
+        Some(hal.raw_device().registryID())
+    }
+
+    /// The frame's `MTLTexture`, what gpui's Metal renderer samples.
+    pub fn texture(texture: &PresentTexture) -> Arc<dyn std::any::Any + Send + Sync> {
+        // SAFETY: the raw texture is only retained, not used here.
+        let hal = unsafe { texture.texture.as_hal::<wgpu::hal::api::Metal>() }.expect("a Metal texture");
+        let raw: Retained<ProtocolObject<dyn MTLTexture>> = hal.raw_handle().retain();
+        unsafe fn release(ptr: NonNull<c_void>) {
+            // SAFETY: `ptr` came from `Retained::into_raw` below.
+            drop(unsafe { Retained::from_raw(ptr.as_ptr().cast::<ProtocolObject<dyn MTLTexture>>()) });
+        }
+        let ptr = NonNull::new(Retained::into_raw(raw).cast::<c_void>()).expect("a retained texture");
+        // SAFETY: the handle takes over the reference `into_raw` gave up.
+        Arc::new(unsafe { gpui_kit::NativeTextureHandle::new(ptr, release) })
     }
 }
 

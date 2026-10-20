@@ -46,14 +46,30 @@ pub enum DialogEvent {
     LeaveFocus { forward: bool },
     /// The "Create variable" popup's ✓ (live part-studio/153): a Variable
     /// feature (or, `configuration`, a configuration variable) named `name`.
-    /// `range`: a configuration variable's (minimum, maximum).
-    CreateVariable { name: String, kind: &'static str, value: String, description: String, configuration: bool, range: Option<(String, String)> },
+    CreateVariable(NewVariable),
+}
+
+/// What the "Create variable" popup's ✓ creates.
+#[derive(Clone, Debug)]
+pub struct NewVariable {
+    pub name: String,
+    /// Feature: LENGTH, ANGLE, NUMBER, ANY; configuration: LENGTH, ANGLE,
+    /// INTEGER, REAL, TEXT.
+    pub kind: &'static str,
+    pub value: String,
+    pub description: String,
+    /// A configuration variable instead of a Variable feature.
+    pub configuration: bool,
+    /// A configuration variable's (minimum, maximum).
+    pub range: Option<(String, String)>,
 }
 
 /// The "Create variable" popup of a numeric field (live
 /// dom/dialog-create-variable-popup.txt).
 struct CreateVar {
     path: String,
+    /// The name typed in the field (`#initial`), replaced by the final one.
+    initial: String,
     configuration: bool,
     /// Feature tab: LENGTH, ANGLE, NUMBER, ANY.
     kind: usize,
@@ -994,6 +1010,7 @@ impl FeatureDialog {
         let value_text = self.baselines.get(&path).filter(|b| !b.trim().starts_with('#')).cloned().unwrap_or(fallback);
         let bound = |n: &str| unit.map(|u| format!("{n} {u}")).unwrap_or_else(|| n.to_string());
         let (lo, hi) = (bound("0"), bound("100000"));
+        let initial = name.clone();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let value = cx.new(|cx| InputState::new(window, cx).default_value(value_text));
         let description = cx.new(|cx| InputState::new(window, cx));
@@ -1003,7 +1020,7 @@ impl FeatureDialog {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
-        self.create_var = Some(CreateVar { path, configuration: false, kind: k, config_kind: ck, name, value, description, min, max });
+        self.create_var = Some(CreateVar { path, initial, configuration: false, kind: k, config_kind: ck, name, value, description, min, max });
     }
 
     /// The "Create variable" popup (live part-studio/153, dom/dialog-create-
@@ -1084,6 +1101,9 @@ impl FeatureDialog {
         let name_err = c.name_error(cx);
         let range = c.range_error(&self.units, cx);
         let marked = |i: usize| range.and_then(|(e, m)| m[i].then_some(e));
+        // Save is disabled while a field is in error (bundle `disableSave`),
+        // pale like a feature dialog's ✓.
+        let blocked = name_err.is_some() || range.is_some();
         let text = c.configuration && CREATE_CONFIG_KINDS[c.config_kind].0 == "TEXT";
         let fields = if c.configuration {
             v_flex().child(row("Name", &c.name, name_err)).child(row("Default", &c.value, marked(0))).when(!text, |d| d.child(row("Minimum", &c.min, marked(1))).child(row("Maximum", &c.max, marked(2))))
@@ -1098,15 +1118,14 @@ impl FeatureDialog {
             .shadow_md()
             .text_color(pal.text)
             // Enter commits, Esc cancels (like a feature dialog).
-            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| match e.keystroke.key.as_str() {
+            .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| match e.keystroke.key.as_str() {
                 "enter" => {
                     cx.stop_propagation();
-                    this.commit_create_variable(cx);
+                    this.commit_create_variable(window, cx);
                 }
                 "escape" => {
                     cx.stop_propagation();
-                    this.create_var = None;
-                    cx.notify();
+                    this.cancel_create_variable(window, cx);
                 }
                 _ => {}
             }))
@@ -1116,11 +1135,8 @@ impl FeatureDialog {
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Create variable"))
-                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009400)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_create_variable(cx))))
-                    .child(div().id("cv-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.create_var = None;
-                        cx.notify();
-                    }))),
+                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(if blocked { gpui_kit::rgb(0xcce9cc) } else { pal.accept }).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_create_variable(window, cx))))
+                    .child(div().id("cv-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.cancel_create_variable(window, cx)))),
             )
             .child(target)
             .child(kinds)
@@ -1130,7 +1146,20 @@ impl FeatureDialog {
     }
 
     /// ✓: create the variable; the field then resolves.
-    fn commit_create_variable(&mut self, cx: &mut Context<Self>) {
+    /// ✕ / Esc: back to the field with its text selected (bundle
+    /// `focusControlAndSelectValue`).
+    fn cancel_create_variable(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.create_var.take() else { return };
+        if let Some(st) = self.inputs.get(&c.path).cloned() {
+            st.update(cx, |s, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
+        }
+        cx.notify();
+    }
+
+    fn commit_create_variable(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // ✓ does nothing while a field is in error (bundle `disableSave`).
         if self.create_var.as_ref().is_some_and(|c| c.name_error(cx).is_some() || c.range_error(&self.units, cx).is_some()) {
             return;
@@ -1149,7 +1178,18 @@ impl FeatureDialog {
             self.variables.insert(name.clone(), q);
         }
         let range = (c.configuration && kind != "TEXT").then(|| (c.min.read(cx).value().to_string(), c.max.read(cx).value().to_string()));
-        cx.emit(DialogEvent::CreateVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration, range });
+        // The field keeps `#name` (renamed when the popup's name changed) and
+        // gets the focus back (bundle `insertVariableName`).
+        if let Some(st) = self.inputs.get(&c.path).cloned() {
+            let text = st.read(cx).value().to_string();
+            let text = noshape_model::variable_table::rename_in_expr(&text, &c.initial, &name);
+            st.update(cx, |s, cx| {
+                s.set_value(text.clone(), window, cx);
+                s.focus(window, cx);
+            });
+            self.on_text_changed(&c.path, text, cx);
+        }
+        cx.emit(DialogEvent::CreateVariable(NewVariable { name, kind, value, description: c.description.read(cx).value().to_string(), configuration: c.configuration, range }));
         cx.emit(DialogEvent::Changed);
         cx.notify();
     }
@@ -2451,14 +2491,16 @@ impl FeatureDialog {
                         // The input stays in the tree (so clicks and Tab can
                         // focus it); unfocused, the converted value covers it.
                         .relative()
-                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(14.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
+                        // Live (dom/caret-inputs.json): `.os-param-number` / `.os-param-text` pad 3 px
+                        // at the sides (numbers end 3 px from the right edge).
+                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(14.)).px(px(3.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
                         .when_some(converted, |d, c| {
                             d.child(
                                 div()
                                     .id(SharedString::from(format!("numv-{path}")))
                                     .absolute()
                                     .inset_0()
-                                    .px_1()
+                                    .px(px(3.))
                                     .flex()
                                     .items_center()
                                     // Onshape right-aligns numbers.

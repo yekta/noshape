@@ -114,6 +114,9 @@ pub fn entity_points(sk: &noshape_sketch::Sketch, id: EntityId) -> Vec<EntityId>
     }
 }
 
+/// A point aligned with woken endpoints, and the inference lines (from, to).
+type Aligned = ([f64; 2], Vec<([f64; 2], [f64; 2])>);
+
 impl DrawingEditor {
     pub fn sketch(&self) -> &SheetSketch {
         &self.drawing.sheets[self.sheet].sketch
@@ -172,7 +175,7 @@ impl DrawingEditor {
     /// The cursor aligned with woken endpoints (SK8, live: hovering an
     /// endpoint shows a red dotted horizontal or vertical inference line;
     /// no constraint is added), with the inference lines (from, to).
-    pub fn sketch_aligned(&self, c: [f64; 2]) -> ([f64; 2], Vec<([f64; 2], [f64; 2])>) {
+    pub fn sketch_aligned(&self, c: [f64; 2]) -> Aligned {
         let tol = self.tol_mm(4.0);
         let mut p = c;
         let (mut vx, mut vy) = (None, None);
@@ -565,12 +568,6 @@ impl DrawingEditor {
 }
 
 impl DrawingEditor {
-    /// Sheet point → editor-local pixels.
-    fn sheet_to_local(&self, p: [f64; 2]) -> [f64; 2] {
-        let s = self.size_px();
-        [(p[0] - self.center[0]) * self.zoom + s[0] / 2.0, s[1] / 2.0 - (p[1] - self.center[1]) * self.zoom]
-    }
-
     /// Where an entity's constraint glyphs start (sheet mm).
     fn glyph_anchor(&self, id: EntityId) -> Option<[f64; 2]> {
         let sk = &self.sketch().sketch;

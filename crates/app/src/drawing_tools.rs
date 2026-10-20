@@ -862,6 +862,8 @@ impl DrawingEditor {
             Tool::Detail { center: None, .. } if self.detail_dlg.as_ref().is_some_and(|d| d.shape != 0) => self.detail_overlay(&mut overlay),
             _ => self.extra_overlay(&mut overlay),
         }
+        // The Datum dialog's targets show until ✓ (under the pending one).
+        let base = self.datum_rows_drawing();
         if let Some(v) = self.pending_view() {
             let mut d = self.drawing.clone();
             if let Some(s) = d.sheets.get_mut(self.sheet) {
@@ -869,13 +871,15 @@ impl DrawingEditor {
             }
             preview = Some(d);
         } else if let Some(a) = self.pending_annotation() {
-            let mut d = self.drawing.clone();
+            let mut d = base.clone().unwrap_or_else(|| self.drawing.clone());
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 s.annotations.push(a);
             }
             preview = Some(d);
+        } else if base.is_some() {
+            preview = base;
         }
-        overlay.infer = self.infer_lines.clone();
+        overlay.infer.extend(self.infer_lines.iter().cloned());
         for (c, r) in self.centermark_overlay() {
             overlay.circle(c, r, false);
         }
@@ -1269,6 +1273,12 @@ impl DrawingEditor {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         window.focus(&self.focus, cx);
+        // A note edited in place: a click away commits it (live).
+        if e.button == MouseButton::Left && (matches!(self.panel, Some(Panel::Note { .. })) || self.cell_inplace_box().is_some()) {
+            self.apply_panel(cx);
+            cx.stop_propagation();
+            return;
+        }
         if self.shortcut_toolbar.take().is_some() {
             cx.notify();
         }

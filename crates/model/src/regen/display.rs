@@ -42,14 +42,18 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
     let lin = (diag * defaults.relative_deflection * quality).max(1e-6);
     let ang = defaults.angular_deflection * quality.clamp(0.4, 1.0);
     let t = noshape_kernel::tessellate(shape, lin, ang, true).ok()?;
-    Some(MeshBuffers {
-        face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
-        edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
-        positions: t.positions,
-        normals: t.normals,
-        indices: t.indices,
-        vertices: t.vertices,
-    })
+    Some(
+        MeshBuffers {
+            face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
+            edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
+            positions: t.positions,
+            normals: t.normals,
+            indices: t.indices,
+            vertices: t.vertices,
+            mesh_lines: Vec::new(),
+        }
+        .with_mesh_lines(shape),
+    )
 }
 
 /// Build the display; returns whether any body only has a preview mesh.
@@ -90,14 +94,18 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                     log::debug!("tessellate {}: {:?} (linear {lin:.2e})", b.name, tt.elapsed());
                 }
                 let m = match tess {
-                    Ok(t) => Arc::new(MeshBuffers {
-                        face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
-                        edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
-                        positions: t.positions,
-                        normals: t.normals,
-                        indices: t.indices,
-                        vertices: t.vertices,
-                    }),
+                    Ok(t) => Arc::new(
+                        MeshBuffers {
+                            face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
+                            edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
+                            positions: t.positions,
+                            normals: t.normals,
+                            indices: t.indices,
+                            vertices: t.vertices,
+                            mesh_lines: Vec::new(),
+                        }
+                        .with_mesh_lines(&b.shape),
+                    ),
                     Err(e) => {
                         log::warn!("tessellation failed for {}: {e}", b.name);
                         Arc::new(MeshBuffers::default())

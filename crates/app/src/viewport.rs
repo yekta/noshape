@@ -9,12 +9,12 @@
 //! right-click opens the context menu; left-click selects and left-drag on
 //! empty space box-selects (left→right = window, right→left = crossing).
 
-use crate::gpu::Gpu;
+use crate::gpu::{FrameImage, Gpu};
 use crate::navigation::{self as nav, Buttons, Inertia, Keys, Mode, ModeResolver, MouseControls, RotateDir, RotationSpeed, StepRotation, Zoom};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use glam::{DVec2, DVec3};
-use noshape_render::{Camera, Frame, PickBuffer, PickRect, Projection, Scene, StandardView, Style, worker::RenderJob};
+use noshape_render::{Camera, Frame, PickBuffer, PickRect, PresentTexture, Projection, Scene, StandardView, Style, worker::RenderJob};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -95,6 +95,17 @@ pub struct Viewport {
     scene_bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub style: Style,
     image: Option<Arc<RenderImage>>,
+    /// Frames left on the GPU ([`FrameImage::Texture`]): the id GPUI looks
+    /// the shown frame's texture up by, the texture shown, and replaced ones
+    /// with the GPU frame count when they were replaced (GPUI may still be
+    /// sampling them until those frames finish).
+    texture_id: ExternalTextureId,
+    shown_texture: Option<Arc<PresentTexture>>,
+    retired_textures: Vec<(Arc<PresentTexture>, u64)>,
+    /// The camera and frame texture size of the last render: a new frame
+    /// texture of that size for that camera needs no re-render (overlays
+    /// such as the view cube follow the camera), only a present.
+    rendered: Option<(Camera, (u32, u32))>,
     /// Newest pick-buffer rectangle read back (around the cursor or a box),
     /// valid while `pick_epoch` is unchanged.
     pick_cache: Option<Arc<PickBuffer>>,
@@ -236,6 +247,13 @@ struct OrbitBench {
     ticks: u64,
     /// GPUI renders of the viewport (window re-renders) during the run.
     renders: u64,
+    /// Wall time between presented frames (ms).
+    intervals: Vec<f32>,
+    /// UI-thread CPU time between presented frames (ms).
+    ui_cpu: Vec<f32>,
+    cpu_at_present: Option<Duration>,
+    /// The camera was fitted to the model before the run.
+    fitted: bool,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -245,7 +263,7 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
     if BENCH_CLAIMED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         return None;
     }
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0 })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, zoom: false, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, fitted: false })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -299,6 +317,10 @@ impl Viewport {
             scene_bounds: None,
             style: Style::default(),
             image: None,
+            texture_id: ExternalTextureId::new(),
+            shown_texture: None,
+            retired_textures: Vec::new(),
+            rendered: None,
             pick_cache: None,
             pick_epoch: 0,
             next_pick_token: 1,
@@ -770,7 +792,7 @@ impl Viewport {
         .detach();
     }
 
-    fn present(&mut self, seq: u64, result: Result<(Frame, Arc<RenderImage>), String>, window: &mut Window, cx: &mut Context<Self>) {
+    fn present(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
         // Frames up to `seq` are done (older ones may have been coalesced away).
         while self.in_flight.front().is_some_and(|(s, _)| *s <= seq) {
             let (s, t) = self.in_flight.pop_front().expect("front");
@@ -791,8 +813,13 @@ impl Viewport {
                     noshape_render::perf::record("v.frame_to_present", frame.rendered_at.elapsed());
                     self.presented_at = Some(Instant::now());
                 }
-                if let Some(old) = self.image.replace(image) {
-                    let _ = window.drop_image(old);
+                match image {
+                    FrameImage::Image(image) => {
+                        if let Some(old) = self.image.replace(image) {
+                            let _ = window.drop_image(old);
+                        }
+                    }
+                    FrameImage::Texture(texture) => self.show_texture(texture),
                 }
                 self.frames_presented += 1;
             }
@@ -800,7 +827,27 @@ impl Viewport {
         }
         self.bench_presented();
         self.submit_if_ready(cx);
-        cx.notify();
+        // A frame texture only needs GPUI to present again (it samples the
+        // texture registered under `texture_id`), unless the camera moved
+        // since the last render (camera-following overlays) or the texture
+        // size changed.
+        let shown = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
+        if self.image.is_none() && shown.is_some() && shown == self.rendered {
+            window.request_present();
+        } else {
+            cx.notify();
+        }
+    }
+
+    /// Show a frame texture: register it for GPUI and keep the replaced one
+    /// until the GPU frames that may sample it have finished.
+    fn show_texture(&mut self, texture: Arc<PresentTexture>) {
+        let size = size(DevicePixels(texture.width as i32), DevicePixels(texture.height as i32));
+        set_external_texture(self.texture_id, Some((Gpu::compositor_texture(&texture), size)));
+        if let Some(old) = self.shown_texture.replace(texture) {
+            self.retired_textures.push((old, gpu_frames_submitted()));
+        }
+        self.retired_textures.retain(|(_, frame)| !gpu_frames_completed_through(*frame));
     }
 
     /// Record presentation stats of the running orbit benchmark.
@@ -812,6 +859,12 @@ impl Viewport {
         let now = Instant::now();
         if let Some(t) = b.last_present.replace(now) {
             noshape_render::perf::record("v.frame_interval", now - t);
+            b.intervals.push((now - t).as_secs_f32() * 1000.0);
+        }
+        if let Some(cpu) = noshape_render::perf::thread_cpu_time()
+            && let Some(prev) = b.cpu_at_present.replace(cpu)
+        {
+            b.ui_cpu.push(cpu.saturating_sub(prev).as_secs_f32() * 1000.0);
         }
     }
 
@@ -820,6 +873,13 @@ impl Viewport {
         let Some(b) = &mut self.bench else { return false };
         if b.started.is_none() {
             if self.scene.instances.is_empty() || self.bounds.size.width <= px(1.0) {
+                return true;
+            }
+            if !b.fitted {
+                // Frame the model first, as after opening it (the default
+                // view may show it small behind the default planes).
+                b.fitted = true;
+                self.zoom_to_fit(false, cx);
                 return true;
             }
             log::info!(target: "perf", "orbit bench: start ({} frames, {} instances, {:.0}x{:.0} logical px, scale {})", b.frames, self.scene.instances.len(), f32::from(self.bounds.size.width), f32::from(self.bounds.size.height), self.scale);
@@ -836,6 +896,24 @@ impl Viewport {
             let el = b.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(1.0);
             log::info!(target: "perf", "orbit bench: {presented} frames in {:.0} ms = {:.1} fps", el * 1000.0, presented as f64 / el);
             log::info!(target: "perf", "orbit bench: {} window renders for {presented} presented frames", b.renders);
+            let over = |ms: f32| b.intervals.iter().filter(|&&i| i > ms).count();
+            let (over60, over120) = (over(1000.0 / 60.0 + 1.0), over(1000.0 / 120.0 + 1.0));
+            let iv = noshape_render::perf::Stats::of(&mut b.intervals);
+            let ui = noshape_render::perf::Stats::of(&mut b.ui_cpu);
+            let (w, h) = ((f32::from(self.bounds.size.width) * self.scale).round(), (f32::from(self.bounds.size.height) * self.scale).round());
+            log::info!(
+                target: "perf",
+                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms",
+                if b.zoom { "zoom" } else { "orbit" },
+                if self.shown_texture.is_some() { "frames on the GPU" } else { "frames read back" },
+                self.scene.instances.len(),
+                presented as f64 / el,
+                b.renders,
+                iv.mean, iv.p50, iv.p95, iv.p99, iv.max,
+                100.0 * over60 as f32 / iv.n.max(1) as f32,
+                100.0 * over120 as f32 / iv.n.max(1) as f32,
+                ui.mean, ui.p95,
+            );
             noshape_render::perf::flush();
             self.bench = None;
             self.drag = Drag::None;
@@ -1447,6 +1525,7 @@ fn box_ids(buf: &PickBuffer, a: DVec2, b: DVec2, s: f64, crossing: bool) -> Vec<
 impl Drop for Viewport {
     fn drop(&mut self) {
         self.gpu.unregister_target(self.target_id);
+        set_external_texture(self.texture_id, None);
     }
 }
 
@@ -1511,6 +1590,8 @@ impl Render for Viewport {
         let entity = cx.entity();
         let box_rect = self.box_rect;
         let image = self.image.clone();
+        let texture_id = self.texture_id;
+        self.rendered = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));
         self.sync_cursor(window, cx);
         div()
             .id("viewport")
@@ -1537,7 +1618,9 @@ impl Render for Viewport {
                     },
                     {
                         let entity = cx.entity();
-                        move |_, hitbox: Hitbox, window: &mut Window, _cx: &mut App| {
+                        move |bounds, hitbox: Hitbox, window: &mut Window, _cx: &mut App| {
+                            // The frame texture, if frames stay on the GPU.
+                            window.paint_external_texture(bounds, texture_id);
                             // Touchscreen: raw touches that start on this
                             // viewport (nothing in front of it) are claimed
                             // from gpui's portable recognizer.

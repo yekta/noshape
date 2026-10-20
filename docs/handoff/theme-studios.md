@@ -167,6 +167,45 @@ Build dir /root/target-shared (binary copy /tmp/ui2/noshape), display :105. Side
 - Checked equal already: BOM panel, Exploded views list (closed state), Named positions empty table.
 - Dimension palette: waiting for asb's model support (lead forwarded).
 
+## PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
+
+Not committed, in the shared tree (all mine, all complete edits; none half done):
+- `crates/app/src/variable_studio.rs`: Enter in the Name row focuses the next empty Name row
+  (`focus_add_row` + `window.defer` focus). **Built and verified in the app** (a ⏎ b ⏎ adds both).
+- `crates/app/src/assembly_mass.rs`: query fields 5 px apart / 8 px to the checkbox, grey X/Y/Z letters
+  with coloured arrows. Spacing verified in the app; the X/Y/Z colour change compiled but **not seen**.
+- `crates/app/src/drawing_palette.rs` (`render_palette` only): small black carets, centred value,
+  blue parentheses, 6 px corners + border — **verified in the app**. Then (last edit, **compiled? not
+  yet** — the build was killed by the pause): the `menu` helper became `combo` (white, `#ccc`,
+  radius 4, a 20 px caret cell with a left rule; live 463/466) with `menu` = 28 px and `menu_tall` =
+  54 px (hole callout count / units). Next step on RESUME: build, then check the fit row (a Ø dimension
+  with a Fit tolerance, e.g. "Ø24 H7" in `--demo-drawing-full`) and a hole callout against live
+  drawing/463 and 466; if the build fails in drawing_palette.rs, that edit is the cause.
+- /tmp was wiped by the reboot: recreate /tmp/ui2 (binary copy, `bin/shot.sh`), Xvfb :105 is running.
+  Test docs: `noshape --demo-drawing-full /tmp/ui2/dr.noshape` (drawing), `--demo` (assembly).
+- Still on the queue after that: assembly states (named positions with rows / driver column live 154,
+  BOM structured 356–357), Insert's Other documents / Standard content tabs, exploded editing note for
+  skb (above).
+
+**Round 7 (20 Oct after v0.4.1, GO):**
+- Checked in the app (release build): Insert search, Animate rows, Mate connector box, Configure Assembly,
+  Named positions now match live. Mass properties: query fields 5 px apart, 8 px to the checkbox (dom
+  dialog-mass-properties), grey X/Y/Z letters with coloured arrows (live 737).
+- qa4: Variable Studio Name row — Enter adds the variable and focuses the next (empty) Name row
+  (`focus_add_row`, focus deferred to after the frame because the add row's input is recreated).
+  Verified: a ⏎ b ⏎ adds both, caret in the new Name row. psb's Part Studio Variable table is their own
+  component (config_panel only embeds VariableStudioView for *inserted* studios); same pattern applies
+  there: set a flag on Enter, `window.defer(.. focus ..)` the rebuilt add-row input.
+- Dimension palette (`render_palette`, asb's drawing_palette.rs, the look is mine): 6 px corners + 1 px
+  grey border, small black 8x4 carets (live `span.caret`) instead of the kit's ▼, centred 13.33 px
+  value, blue ( ) around XX, 20 px Ø. Not mine: live opens with the prefix field focused (blue glow).
+- For skb: exploded view in editing — the active Explode row shows the selection fill after the double
+  click; live 819 shows no fill (blue text, 5 px bar only).
+
+- 20 Oct 16:52 reboot wiped /tmp: the /tmp/ui2-shots/final-* side-by-side shots listed above are gone
+  (re-take when needed). Test documents: `noshape --demo-drawing-full <file>` (drawing with views,
+  dimensions, hole table), `--demo` (Part Studio, Assembly, Feature Studio).
+
 **Left / known differences:**
 - Assembly ≡ button inert; tab manager ? button inert; ISO A4/A2/A1/A0 zone counts guessed — all waiting
   for live answers (REQUESTS.md ui2 13:58 / 14:05 / 14:30, still open on 20 Oct 03:30).
@@ -712,3 +751,13 @@ Shots: /tmp/ui2-shots/documents-page.png, /tmp/ui2-shots/new-document-dialog.png
   msg-error (.svg in crates/app/assets/icons).
 - Verified only in my sandbox worktree `/root/noshape-ui2` (the shared tree had other agents' half-done
   edits); the shared tree has all my changes. The worktree can be removed when the lead no longer needs it.
+
+## From psb (20 Oct): bare numbers in the Variable Studio Value cell (lead's request, live qa4 10-20 13:30)
+Live: a bare `5` typed into a Length variable's Value + Enter becomes `5 mm` (the workspace length unit),
+in a Variable Studio and in a Variable Studio table inserted in a Part Studio (it writes back to the studio).
+Angle likewise gets the angle unit; anything else is kept as typed. The Part Studio Variable table does this
+through the shared model helper
+`noshape_model::variable_table::with_workspace_unit(kind, value, &units)` (kind "LENGTH" / "ANGLE" /
+anything else). Please call it in `variable_studio.rs`'s Value cell commit (`v.expr = ExprValue::new(val)`,
+around line 448), passing "LENGTH" for `VarKind::Length` and "ANGLE" for `VarKind::Angle`. psb didn't edit
+your file.

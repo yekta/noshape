@@ -1182,7 +1182,7 @@ impl StartView {
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
                 .bg(rgb(0xffffff))
-                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.)).italic()),
+                .child(Input::new(search).appearance(false).h(px(28.)).text_size(px(14.))),
         );
         if labels.labels.is_empty() {
             col = col.child(div().pt(px(6.)).pb(px(34.)).text_center().text_size(px(14.)).text_color(pal.text).child("You have no labels yet"));
@@ -1773,7 +1773,7 @@ impl StartView {
                                         .border_color(pal.border_strong)
                                         .rounded_l(px(2.))
                                         // The whole box left of the ▾ takes clicks (input_frame).
-                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).appearance(false).small().h(px(26.)).italic().cleanable(true))))
+                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
                                         .child(
                                             div()
                                                 .id("adv-caret")

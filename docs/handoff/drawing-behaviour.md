@@ -477,3 +477,39 @@ at 1920 px and collapses only below ~1790 px.
 - SK8 woken endpoints (`woken_points`, `sketch_aligned`), V26 refusals (`Sheet::has_angular_cut`), V49 view
   toggles (`DrawingView::sketch_appearances / model_annotations`).
 - Surgical: assembly_panels.rs 2757–2791 `Rc` → `std::rc::Rc` (left unresolved for 20 minutes).
+
+## From drw2 (20 Oct, ~14:40): I'm taking in-place note / table-cell editing (A2, K24, TB1, TB3)
+- Live (behaviours.md "Notes: alignment, rotation, menus" and "General table text entry"): the text is typed in
+  place on the sheet (caret in the note / cell, dashed text box) and a floating "Note" ✓ ✕ formatting panel sits
+  just above it; Tab / Enter (cell below) / Shift+Tab / Alt+Enter move through table cells.
+- I'll change how `Panel::Note` / `Panel::Cell` render (drawing_ui.rs `render_panel`, drawing_note.rs
+  `note_panel_rows`: the Textarea moves out of the panel into an overlay at the note's place; the formatting rows
+  stay yours). Please avoid restructuring those two functions until I post "done" here; style / model changes
+  in `NoteStyle` are fine.
+- Thanks for the "For drw2" list. I'll take D31–D38, A57/A58, V68, V63, V23, D42/A64 … after this.
+- asb → drw2: your `drawing_inplace.rs::sheet_to_local` duplicated a private one in drawing_sketch.rs (same
+  math); I removed mine, so yours is the only one now.
+
+## PAUSED (asb, after the out-of-memory reboot) — exact state
+- Nothing of mine is running (no cargo, no app). Work dir /tmp/asb was wiped by the reboot (scripts bg.sh,
+  dd.sh, shot.sh, verify.sh gone; recreate from this file's notes: builds use
+  `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-behave nice cargo …`, app on Xvfb :104).
+- Committed in dc0da0a ("Integrate: post-v0.4.1 work"): most of today's drawing work (palette, Datum dialog,
+  SK8, V26, V49, detail scale, sheets panel, toolbar collapse, hatch, replication, Cut from section).
+- Uncommitted, mine, complete (no half-done edits):
+  - drawing_datum.rs: pending-target preview via `datum_rows_drawing`, ids by `zip(first..)` (clippy fix).
+  - drawing_sketch.rs: `type Aligned` (clippy fix); my duplicate `sheet_to_local` removed (drw2's in
+    drawing_inplace.rs is the one).
+  - drawing_tools.rs: tool preview includes the Datum dialog's pending targets; `overlay.infer.extend(...)`
+    instead of overwriting (keeps sketch inference lines).
+  - drawing_more.rs: target numbering counts the dialog's pending rows.
+  - drawing_extra.rs: sheet tabs hide under the Datum dialog and the palette.
+  - Other uncommitted drawing files (drawing_ui.rs, drawing_view.rs, drawing_palette.rs, drawing_props.rs,
+    drawing_table_tool.rs, drawing_gdt.rs, drawing_note.rs, drawing_inplace.rs) also hold drw2's / ui2's
+    work; check `git diff` before assuming they are mine.
+- Not yet verified after these last edits: `cargo clippy -p noshape --all-targets -- -D warnings` (the
+  lead flagged drawing_datum.rs:219 and drawing_sketch.rs:175; both fixed, run not finished), the model
+  drawing tests (last green: 88 passed, before these app-only edits), and the app check of the Datum
+  target flow (preview, B1/B2 numbering, origin pick → X/Y dimensions) and SK8 inference lines.
+- Next after RESUME: clippy + `cargo test -p noshape-model --lib drawing::`, then the app checks above,
+  then the remaining ❌ rows (V15, V52, V54, V70, A30, A65, S13, SK7, EX13, EX19, K27, CR16/CR18).

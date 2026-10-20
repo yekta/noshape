@@ -460,6 +460,60 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
 - **Colours / names on import**: `app/src/workspace.rs::read_foreign` flattens parts to one compound, so file
   colours and names are lost (Onshape: "Import appearances" on by default). Needs the import feature to carry them.
 
+### Round 9 (2026-10-20 afternoon): import names/colours, native dialog, wire bodies, native assemblies, mesh ops
+- **Imports keep names and colours** (Onshape's "Import appearances"): readers return part name, colour, opacity and
+  face colours (`ImportedShape`; STEP via XCAF face colours, XT via face SDL/TYSA_COLOUR); the app writes them as the
+  Import feature's hidden `partInfo` JSON (`features::importing::ImportPartInfo`, one per compound child in
+  `blobData`); `regen/features/importing.rs` names the parts and stores `Context::part_appearance` (by BodyId) and
+  `face_appearance` (BodyId + face name; descendants keep it); display: `BodyDisplay::face_colors`, the app paints them
+  under user face appearances. Test `features_b::import_foreign_names_and_colors`.
+- **Native colours as Onshape (live G38/G38e)**: SOLIDWORKS = the configuration stream's first `moVisualProperties_c`
+  (RGB after the tag; a named appearance "ff fe ff n UTF-16 02 RGB" overrides; opacity = 1 − the 5th double after the
+  material strings: polycarb 223/255); Solid Edge = "Model Default" style's diffuse in `Display/Styles/Library0`; native
+  partitions' face colours are dropped (Onshape: no face of a native import has its own colour). Test
+  `export::native_part_appearances`. **Not yet**: NX names/colours (NX object data), Inventor names ("Srf1",
+  "Solid1": PmBrowserSegment) and which bodies Onshape keeps (respira_back: only "Srf1"), NX curves ("Curve 1…8").
+- **Import dialog**: native part files (sldprt/par/psm/prt/ipt) get the five-checkbox variant without tiles (live
+  G38b); `specifyMaterialData`/`importMaterialDensity` set (density itself is not read yet). Verified in the app.
+- **SOLIDWORKS wire bodies**: `Config-<n>-GhostPartition` wire bodies with edges become "Curve N" (points and sheets
+  skipped; live G38d/G38e: McMaster and blue screw helices); the Import feature keeps faceless bodies as wires.
+- **Native assemblies (live G38/G38f)**: kernel `read_native_assembly` (SLDASM `swXmlContents/COMPINSTANCETREE` XML,
+  OLE `__ZLB` or 2015+ section; active configuration, row-vector transforms), `extract_zip`,
+  `read_native_parts_configuration`; model `native_assembly::add_native_assembly` (Assembly "<root>" first, then
+  Part Studio "<root> parts" with one Import feature, parts "<component>-<n>" at their own origins in zip order,
+  instances "<part> <k>" placed, not fixed, no mates); app: `.zip` import (`workspace::read_assembly_zip`, Onshape's
+  errors "Root assembly file not found…" / "Imported file contains no translatable geometry"). Tests
+  `export::native_assembly_tree` (NIST crada: nuts on screw axes), `native_assembly::shaft_with_plate_assembly`
+  (G38f names, volumes, colours, placements). Verified in the app. **Open**: BOM tab (proposal in psb's and asb's
+  handoffs; live G38g asked), sub-assemblies (flattened; no ground truth), NX/Inventor/Solid Edge assemblies.
+- **Mesh bodies (live G35)**: triangle sides drawn as 1 px #464646 lines (`MeshBuffers::mesh_lines`, scene_builder;
+  Part Studio only — assembly_scene not yet); booleans/splits with mesh parts (`mesh_body.cpp` facet_mesh /
+  unfacet_mesh, used by `op_boolean`/`op_split`): mesh faces become planar facets for OCCT, the result's facets one
+  mesh face again → MIXED parts (mesh face + planar caps), history composed; bounding boxes include mesh nodes.
+  Test `features_b::mesh_parts_split_transform_union`. **Open**: triangle lines across section caps, assembly view.
+
+## PAUSED 2026-10-20 ~16:55 (lead: OOM reboot) — exact state
+Committed in dc0da0a: native assemblies (kernel tree/zip/configs, model `native_assembly.rs`, app zip import),
+native colours/opacity/Solid Edge colour, import names/colours, native dialog, ghost-partition curves.
+**Uncommitted, mine (all compile; status of each):**
+- Mesh booleans/splits → MIXED parts: `kernel/cpp/mesh_body.cpp` (facet_mesh / unfacet_mesh), `cpp/boolean.cpp`
+  (op_boolean / op_split use them, `remesh_facets`), `cpp/internal.hpp` (MeshFacets; `#include <Geom_Surface.hxx>`),
+  `cpp/geom.cpp` (bounding boxes include mesh nodes). Tested: `features_b` 18/18 incl.
+  `mesh_parts_split_transform_union`; kernel `mesh_import` 4/4, `export` 14/14 (1 ignored). GCC 13 syntax-checked.
+- Mesh triangle lines: `model/src/display.rs` (`MeshBuffers::mesh_lines`, `with_mesh_lines`), `model/src/regen/display.rs`,
+  `model/src/assembly/eval.rs` + `interaction.rs` (field added), `app/src/scene_builder.rs` (drawn #464646 1 px). Built and
+  verified in the app on Onshape's G35 STL (matches part-studio/551).
+- STL/OBJ import dialog variant (no tiles; Y-up, composite, **Units** select defaulting to the document unit; chosen unit
+  used to read the mesh): `app/src/import_dialog.rs`. `cargo check -p noshape` clean; **not yet built/verified in the
+  app, clippy not yet run** on this last change. Units options order assumed (Onshape's export list) — live G35b asked.
+- Test file `model/tests/features_b.rs` (mesh ops test), handoff (this file).
+**Not run since the last edits**: `cargo clippy -p noshape-kernel -p noshape-model -p noshape --all-targets -D warnings`.
+**Lost with /tmp**: only copies (app binary, screenshots, test binaries, /tmp/kern/imp test files). The assembly test
+zip is also in /root/kern-scratch/sldasm/zip; scratch tools are in /root/kern-scratch (kept).
+**Next on RESUME**: clippy the three crates; build the app; verify the STL dialog; then (5) section-cap triangle lines
+and the assembly view's mesh lines (asb's assembly_scene.rs), (4) BOM tab once psb/asb answer, NX/Inventor/SE
+assemblies; open live requests G38g, G38h, G35b.
+
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,
 shell.rs), `noshape-model` (kernel_robustness.rs 14/14), `noshape` app (`cargo check` clean). Nothing half-done;

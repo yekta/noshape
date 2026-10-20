@@ -256,6 +256,7 @@ impl Regenerator {
         }
         self.entries.retain(|id, _| live.contains(id));
         let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
+        crate::configured_properties::apply_names(&mut display, studio, config);
         // The shown Assembly context: its bodies, translucent and pickable.
         if let Some(active) = studio.active_context
             && let Some(c) = studio.contexts.iter().find(|c| c.id == active)

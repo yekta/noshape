@@ -24,6 +24,18 @@ use std::rc::Rc;
 
 /// Native part files (their own dialog variant).
 const NATIVE_PARTS: &[&str] = &["sldprt", "par", "psm", "prt", "ipt"];
+/// Mesh files without units: Onshape asks for them (live G35,
+/// dom/dialog-import-stl.txt: Y-up, composite and a Units select, no tiles).
+const MESH_FILES: &[&str] = &["stl", "obj"];
+/// The Units select, as Onshape lists units in its STL dialogs.
+const MESH_UNITS: [(&str, noshape_units::LengthUnit); 6] = [
+    ("Centimeter", noshape_units::LengthUnit::Centimeter),
+    ("Foot", noshape_units::LengthUnit::Foot),
+    ("Inch", noshape_units::LengthUnit::Inch),
+    ("Meter", noshape_units::LengthUnit::Meter),
+    ("Millimeter", noshape_units::LengthUnit::Millimeter),
+    ("Yard", noshape_units::LengthUnit::Yard),
+];
 
 #[derive(Clone, Copy, Default)]
 struct Choice {
@@ -31,6 +43,8 @@ struct Choice {
     appearances: bool,
     density: bool,
     y_up: bool,
+    /// Mesh files: index into [`MESH_UNITS`].
+    unit: usize,
     composite: bool,
     join: bool,
 }
@@ -40,9 +54,13 @@ struct Choice {
 /// `keep_files`: also keep each file as a file tab in "CAD Imports" (Import;
 /// not when translating an existing file tab).
 pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    let choice = Rc::new(Cell::new(Choice { appearances: true, ..Default::default() }));
-    // Native part files get Onshape's five-checkbox variant.
-    let native = !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| NATIVE_PARTS.contains(&e.to_string_lossy().to_lowercase().as_str())));
+    // Native part files get Onshape's five-checkbox variant, mesh files the
+    // one with Units.
+    let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
+    let (native, mesh) = (all_of(NATIVE_PARTS), all_of(MESH_FILES));
+    let doc_unit = doc.read(cx).session.doc.settings.units.length;
+    let unit = MESH_UNITS.iter().position(|(_, u)| *u == doc_unit).unwrap_or(4);
+    let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
     let opened = Rc::new(opened);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
@@ -135,13 +153,25 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                 os::modal_body()
                     .pt(px(4.))
                     .gap(px(8.))
-                    .when(!native, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
+                    .when(!native && !mesh, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
                     // Live document/77: the checkbox rows are 34 px apart.
-                    .child(v_flex().gap(px(13.)).child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone()))
+                    .child(v_flex().gap(px(13.)).when(!mesh, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
                     .when(native, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
                     .child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone()))
-                    .child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))),
+                    .when(!mesh, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
+                    // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
+                    .when(mesh, |d| {
+                        let ch = choice.clone();
+                        d.child(
+                            v_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Units")).child(div().w(px(212.)).child(crate::os_ui::select_field(
+                                "imp-units",
+                                MESH_UNITS.iter().map(|(n, _)| n.to_string()).collect(),
+                                c.unit,
+                                move |i, _, _| ch.set(Choice { unit: i, ..ch.get() }),
+                            ))),
+                        )
+                    }),
             )
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
@@ -170,6 +200,8 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
             }
             continue;
         }
+        // Mesh files in the unit chosen in the dialog.
+        let units = if MESH_FILES.iter().any(|e| path.extension().is_some_and(|x| x.eq_ignore_ascii_case(e))) { noshape_units::UnitPrefs { length: MESH_UNITS[c.unit.min(MESH_UNITS.len() - 1)].1, ..units } } else { units };
         match crate::workspace::read_foreign(path, &units) {
             Ok(foreign) => {
                 let (name, file) = crate::workspace::import_names(path);

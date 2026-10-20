@@ -258,9 +258,10 @@ impl PartStudioView {
     /// The "Create variable" popup's ✓ (live part-studio/153): a Variable
     /// feature placed before the feature being edited (new or existing), or
     /// a configuration variable.
-    pub(super) fn create_variable_from_field(&mut self, name: &str, kind: &str, value: &str, description: &str, configuration: bool, range: Option<(String, String)>, cx: &mut Context<Self>) {
+    pub(super) fn create_variable_from_field(&mut self, v: &crate::feature_dialog::NewVariable, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
-        if configuration {
+        let (name, kind, value, description) = (v.name.as_str(), v.kind, v.value.as_str(), v.description.as_str());
+        if v.configuration {
             let vkind = match kind {
                 "ANGLE" => VariableKind::Angle,
                 "INTEGER" => VariableKind::Integer,
@@ -269,7 +270,7 @@ impl PartStudioView {
                 _ => VariableKind::Length,
             };
             let (name, value) = (name.to_string(), value.to_string());
-            let (min, max) = match range {
+            let (min, max) = match v.range.clone() {
                 Some((lo, hi)) => (Some(ExprValue::new(lo)), Some(ExprValue::new(hi))),
                 None => (None, None),
             };
@@ -386,7 +387,7 @@ impl PartStudioView {
         // Only the variables before the rollback bar (live 10-20 o).
         let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
-        let input_cell = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(13.33))));
+        let input_cell = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(13.33)).pl(px(4.))));
         // A Name cell holding an invalid name: pink with a red border and the
         // reason as tooltip (live part-studio/554–555).
         let name_cell = |st: &Entity<InputState>, cx: &App| {
@@ -417,7 +418,12 @@ impl PartStudioView {
                 this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_value(ps, fid, &v, &units));
                 this.config_dirty(cx);
             });
-            let desc_st = self.cell_input(format!("pvar-desc-{fid}"), r.description.clone(), window, cx, move |this, v, cx| {
+            // An expression Description (live 652–656) shows a string
+            // literal's text, other expressions as typed, and nothing with
+            // the tooltip "Error regenerating." when it doesn't evaluate.
+            let desc_error = r.description_expr && noshape_model::variable_table::string_literal(&r.description).is_none() && !r.description.trim().is_empty() && noshape_units::evaluate(&r.description, &self.display.variables).is_err();
+            let desc_shown = if desc_error { String::new() } else { noshape_model::variable_table::string_literal(&r.description).filter(|_| r.description_expr).map(str::to_string).unwrap_or_else(|| r.description.clone()) };
+            let desc_st = self.cell_input(format!("pvar-desc-{fid}"), desc_shown, window, cx, move |this, v, cx| {
                 this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_description(ps, fid, &v));
             });
             // Live part-studio/558.
@@ -454,7 +460,7 @@ impl PartStudioView {
                         div()
                             .id(SharedString::from(format!("pvar-pencil-{fid}")))
                             .cursor_pointer()
-                            .child(crate::ui::glyph("pencil", 12., pal.text_muted))
+                            .child(crate::ui::glyph("edit", 14., pal.text_muted))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_feature(fid, window, cx))),
                     )
                     .into_any_element()
@@ -484,13 +490,26 @@ impl PartStudioView {
                             .child(value_cell)
                             .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count)),
                     )
-                    // Right-clicking the Description adds Copy (live 563).
+                    // Right-clicking the Description adds Copy | Convert to
+                    // expression (or text) (live 563, 652–656).
                     .child({
-                        let (view, text) = (cx.entity(), r.description.clone());
-                        div().child(input_cell(&desc_st)).os_context_menu_over_inputs(move |menu, _, _| {
-                            let text = text.clone();
-                            var_row_menu(menu, view.clone(), fid, &name, k, count).item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
-                        })
+                        let (view, text, expr) = (cx.entity(), r.description.clone(), r.description_expr);
+                        let tip = if desc_error { Some("Error regenerating.".to_string()) } else { r.description_expr.then(|| r.description.clone()).filter(|d| !d.is_empty()) };
+                        div()
+                            .id(SharedString::from(format!("pvar-desc-cell-{fid}")))
+                            .child(input_cell(&desc_st))
+                            .when_some(tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
+                            .os_context_menu_over_inputs(move |menu, _, _| {
+                                let (text, v) = (text.clone(), view.clone());
+                                var_row_menu(menu, view.clone(), fid, &name, k, count)
+                                    .item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
+                                    .item(crate::os_menu::OsMenuItem::new(if expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
+                                        v.update(cx, |this, cx| {
+                                            this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::toggle_description_expr(ps, fid));
+                                            this.config_dirty(cx);
+                                        })
+                                    }))
+                            })
                     })
                     .into_any_element(),
             );
@@ -522,7 +541,8 @@ impl PartStudioView {
         if std::mem::take(&mut self.ui.var_focus_new) {
             new_st.update(cx, |s, cx| s.focus(window, cx));
         }
-        let new_empty = new_st.read(cx).value().is_empty();
+        // The input draws the italic "Name" itself, so the caret starts on it.
+        crate::ui::ensure_placeholder(&new_st, "Name", cx);
         let new_row = h_flex().border_l_1().border_color(grid).child(
             div()
                 .relative()
@@ -535,8 +555,7 @@ impl PartStudioView {
                             st.update(cx, |s, cx| s.set_value("", window, cx));
                         }
                     }
-                })
-                .when(new_empty, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().italic().text_size(px(13.33)).text_color(pal.text_faint).child("Name"))),
+                }),
         );
         // Variable Studio tables inserted here (Onshape: below the Part
         // Studio's own table; same-document ones are editable).
@@ -701,7 +720,7 @@ impl PartStudioView {
             return self.render_configurations_empty(cx);
         }
         if self.ui.cfg_properties_tab {
-            return self.render_configured_properties();
+            return self.render_configured_properties(window, cx);
         }
         let grid = gpui_kit::rgb(0xaaaaaa);
         let filter = match &self.ui.cfg_filter {
@@ -767,8 +786,7 @@ impl PartStudioView {
                         .rounded(px(2.))
                         .flex()
                         .items_center()
-                        .child(Input::new(&filter).appearance(false).small().text_size(px(14.)))
-                        .when(query.is_empty(), |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().text_size(px(14.)).italic().text_color(pal.text_faint).child("Filter inputs"))),
+                        .child(crate::ui::input_with_placeholder(&filter, "Filter inputs", cx).appearance(false).small().text_size(px(14.)).pl(px(6.))),
                 )
                 .child(toggles)
                 .child({
@@ -1190,13 +1208,11 @@ impl PartStudioView {
                             }
                         });
                     });
-                    let empty = st.read(cx).value().is_empty();
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(NAME_W)
                                 .relative()
-                                .child(Input::new(&st).appearance(false).text_size(px(14.)))
-                                .when(empty, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().italic().text_size(px(14.)).text_color(pal.text_faint).child("Name"))),
+                                .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(14.)).pl(px(3.))),
                         ),
                     );
                 }
@@ -1358,18 +1374,335 @@ impl PartStudioView {
         })
     }
 
-    /// "Configured properties" tab: per configuration, the parts and their
-    /// names in that configuration.
-    fn render_configured_properties(&self) -> AnyElement {
+    /// "Configured properties" tab (Help PartStudio__configured_properties;
+    /// live psb 10-20 q, part-studio/600–656): "Properties for <part> ▾",
+    /// Add property ▾ and ⋯ over the part's sparse table, or a blue info box
+    /// while it has none; a blue line on top when inputs are excluded.
+    fn render_configured_properties(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::configured_properties as cp;
         let pal = p();
         let grid = gpui_kit::rgb(0xaaaaaa);
-        let parts: Vec<String> = self.display.bodies.iter().filter(|b| b.kind != noshape_model::display::BodyKind::Wire).map(|b| b.name.clone()).collect();
-        let cell = |w: f32| div().w(px(w)).h(px(34.)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
-        let mut col = v_flex().pt(px(6.)).child(h_flex().border_l_1().border_t_1().border_color(grid).child(cell(180.).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child("Part")).child(cell(180.).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child("Name")));
-        for name in parts {
-            col = col.child(h_flex().border_l_1().border_color(grid).child(cell(180.).child(name.clone())).child(cell(180.).text_color(pal.text_muted).child(name)));
+        let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
+        let parts: Vec<(noshape_model::BodyId, String)> = self.display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone())).collect();
+        let part = self.ui.cp_part.clone().filter(|p| parts.iter().any(|(id, _)| id == p)).or_else(|| parts.first().map(|(id, _)| id.clone()));
+        let Some(part) = part else { return div().into_any_element() };
+        let part_name = parts.iter().find(|(id, _)| *id == part).map(|(_, n)| n.clone()).unwrap_or_default();
+        let table = cp::table(&studio, &part).cloned();
+        let view = cx.entity();
+        // "Properties for Part 1 ▾": the part list, ✓ before parts with a
+        // table (live 618).
+        let part_menu = {
+            let (view, parts) = (view.clone(), parts.clone());
+            let with_table: Vec<noshape_model::BodyId> = studio.property_tables.iter().map(|t| t.part.clone()).collect();
+            div()
+                .id("cp-part")
+                .flex()
+                .items_center()
+                .gap(px(2.))
+                .cursor_pointer()
+                .text_color(gpui_kit::rgb(0x6b7b8c))
+                .child(part_name.clone())
+                .child(crate::ui::glyph("ui-caret-down", 8., gpui_kit::rgb(0x6b7b8c)))
+                .on_click(move |e: &ClickEvent, window, cx| {
+                    let (view, parts, with_table) = (view.clone(), parts.clone(), with_table.clone());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        for (id, name) in &parts {
+                            let (v, id2) = (view.clone(), id.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).checked(with_table.contains(id)).on_click(move |_, _, cx| {
+                                v.update(cx, |this, cx| {
+                                    this.ui.cp_part = Some(id2.clone());
+                                    this.ui.cp_selected = None;
+                                    cx.notify();
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    crate::os_menu::open(e.position(), menu, window, cx);
+                })
+        };
+        let add_menu = {
+            let (view, part, name) = (view.clone(), part.clone(), part_name.clone());
+            h_flex()
+                .id("cp-add-property")
+                .h(px(24.))
+                .px(px(10.))
+                .gap(px(14.))
+                .bg(gpui_kit::rgb(0xffffff))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xbbbbbb))
+                .rounded(px(3.))
+                .cursor_pointer()
+                .text_size(px(13.33))
+                .text_color(pal.text)
+                .child("Add property")
+                .child(crate::ui::glyph("ui-caret-down", 8., pal.text))
+                .on_click(move |e: &ClickEvent, window, cx| {
+                    let (view, part, name) = (view.clone(), part.clone(), name.clone());
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        for prop in cp::PROPERTIES {
+                            let (v, part, name) = (view.clone(), part.clone(), name.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new(prop).on_click(move |_, _, cx| {
+                                v.update(cx, |this, cx| {
+                                    let active = this.config_values.clone();
+                                    this.edit_config("Add configured property", cx, |ps| cp::add_property(ps, &part, prop, &active, &name));
+                                    this.config_dirty(cx);
+                                })
+                            }));
+                        }
+                        m
+                    });
+                    crate::os_menu::open(e.position(), menu, window, cx);
+                })
+        };
+        // ⋯ (with a table): Copy table | Delete table for <part> (live 603).
+        let more = table.is_some().then(|| {
+            let (view, part, name) = (view.clone(), part.clone(), part_name.clone());
+            div().id("cp-more").cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                let (v1, v2, p1, p2, name) = (view.clone(), view.clone(), part.clone(), part.clone(), name.clone());
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    let (v1, v2, p1, p2) = (v1.clone(), v2.clone(), p1.clone(), p2.clone());
+                    m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| {
+                        let text = v1.read(cx).studio(cx).map(|ps| cp::copy_table(ps, &p1)).unwrap_or_default();
+                        cx.write_to_clipboard(ClipboardItem::new_string(text));
+                    }))
+                    .item(crate::os_menu::OsMenuItem::new(format!("Delete table for {name}")).on_click(move |_, _, cx| {
+                        v2.update(cx, |this, cx| {
+                            this.edit_config("Delete configured properties table", cx, |ps| cp::delete_table(ps, &p2));
+                            this.ui.cp_selected = None;
+                            this.config_dirty(cx);
+                        })
+                    }))
+                });
+                crate::os_menu::open(e.position(), menu, window, cx);
+            })
+        });
+        let header = h_flex()
+            .h(px(34.))
+            .pl(px(9.))
+            .pr(px(4.))
+            .gap(px(8.))
+            .bg(gpui_kit::rgb(0xeaeaea))
+            .border_1()
+            .border_color(gpui_kit::rgb(0xcccccc))
+            .child(h_flex().flex_1().min_w_0().gap(px(4.)).text_size(px(16.)).font_weight(FontWeight::MEDIUM).child(div().text_color(pal.text).child("Properties for")).child(part_menu))
+            .child(add_menu)
+            .children(more);
+        // Live 535: excluded inputs are called out above the header.
+        let excluded_note = studio.configuration.inputs.iter().any(|i| i.excluded).then(|| {
+            h_flex()
+                .mb(px(6.))
+                .px(px(10.))
+                .py(px(10.))
+                .gap(px(6.))
+                .rounded(px(3.))
+                .bg(pal.info_fill)
+                .border_1()
+                .border_color(pal.info_outline)
+                .text_size(px(14.))
+                .text_color(pal.info_text)
+                .child(crate::assets::icon("configuration-exclude-properties", 20., cx))
+                .child(div().flex_1().child("Some configuration inputs are marked as not affecting configured properties. ").child(div().font_weight(FontWeight::BOLD).underline().child("Learn more")))
+        });
+        let Some(table) = table else {
+            // Live 600: the empty state.
+            return v_flex()
+                .mx(px(-5.))
+                .children(excluded_note)
+                .child(header)
+                .child(
+                    v_flex()
+                        .mt(px(6.))
+                        .px(px(14.))
+                        .py(px(12.))
+                        .gap(px(4.))
+                        .rounded(px(3.))
+                        .bg(pal.info_fill)
+                        .border_1()
+                        .border_color(pal.info_outline)
+                        .text_size(px(14.))
+                        .text_color(pal.info_text)
+                        .child(div().font_weight(FontWeight::BOLD).child(format!("{part_name} has no configured part properties.")))
+                        .child("Properties which are different in different configurations should be set here. Properties shared by all configurations should be set by right-clicking the part and assigning properties, material, or appearance."),
+                )
+                .into_any_element();
+        };
+        // Columns: the non-excluded inputs, then the properties in their
+        // fixed order; 140 px each, scrolling sideways (live 602, 637).
+        let cfg = studio.configuration.clone();
+        let inputs: Vec<ConfigInput> = cp::input_columns(&cfg).into_iter().cloned().collect();
+        let props = table.columns();
+        // The workspace mass unit (Workspace units › Mass).
+        let mass_unit = match self.doc.read(cx).session.doc.settings.units.other_unit_name(2) {
+            "Gram" => "g",
+            "Pound" => "lb",
+            "Ounce" => "oz",
+            _ => "kg",
+        };
+        let cell = || div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(5.)).border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).overflow_hidden();
+        let focus = self.ui.cp_focus.get_or_insert_with(|| cx.focus_handle()).clone();
+        let space_part = part.clone();
+        // A property cell or header: right-click › Delete column (live 605, 606).
+        let delete_column = |el: Stateful<Div>, prop: &'static str| {
+            let (view, part) = (view.clone(), part.clone());
+            el.os_context_menu(move |m, _, _| {
+                let (v, part) = (view.clone(), part.clone());
+                m.item(crate::os_menu::OsMenuItem::new("Delete column").on_click(move |_, _, cx| {
+                    v.update(cx, |this, cx| {
+                        this.edit_config("Delete configured property", cx, |ps| cp::delete_column(ps, &part, prop));
+                        this.config_dirty(cx);
+                    })
+                }))
+            })
+        };
+        let mut head = h_flex().border_l_1().border_color(grid);
+        for i in &inputs {
+            head = head.child(cell().justify_center().bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).child(div().truncate().child(i.name.clone())));
         }
-        col.into_any_element()
+        for prop in &props {
+            let prop = *prop;
+            let h = cell().id(SharedString::from(format!("cp-head-{prop}"))).justify_center().gap(px(3.)).bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).child(div().truncate().child(prop))
+                // Live 637: "Mass ƒ", the value is otherwise computed.
+                .when(prop == "Mass", |d| d.child(div().italic().font_weight(FontWeight::NORMAL).child("ƒ")));
+            head = head.child(delete_column(h, prop));
+        }
+        let mut rows: Vec<AnyElement> = Vec::new();
+        for (ri, row) in table.rows.iter().enumerate() {
+            let mut r = h_flex().border_l_1().border_color(grid);
+            for i in &inputs {
+                let value = cp::row_input_value(&cfg, row, &i.id);
+                let iid = i.id.clone();
+                let el: AnyElement = match &i.kind {
+                    // List inputs are read-only, grey, the option name.
+                    ConfigInputKind::List { options, .. } => cell().bg(gpui_kit::rgb(0xf5f5f5)).child(options.iter().find(|o| o.id == value).map(|o| o.name.clone()).unwrap_or(value)).into_any_element(),
+                    ConfigInputKind::Checkbox { .. } => self.cp_check_cell((ri, &iid), value == "true", cx),
+                    _ => {
+                        let (part2, iid2) = (part.clone(), iid.clone());
+                        let st = self.cell_input(format!("cp-in-{ri}-{iid}"), value, window, cx, move |this, v, cx| {
+                            let (part2, iid2) = (part2.clone(), iid2.clone());
+                            this.edit_config("Edit configured properties", cx, |ps| cp::set_input_cell(ps, &part2, ri, &iid2, &v));
+                            this.config_dirty(cx);
+                        });
+                        cell().px(px(2.)).child(Input::new(&st).appearance(false).text_size(px(14.))).into_any_element()
+                    }
+                };
+                r = r.child(el);
+            }
+            for prop in &props {
+                let prop = *prop;
+                let value = row.values.get(prop).cloned().unwrap_or_default();
+                let (part2, view2) = (part.clone(), view.clone());
+                let set = move |v: String, cx: &mut App| {
+                    let part2 = part2.clone();
+                    view2.update(cx, |this, cx| {
+                        this.edit_config("Edit configured properties", cx, |ps| cp::set_cell(ps, &part2, ri, prop, &v));
+                        this.config_dirty(cx);
+                    })
+                };
+                let el: Stateful<Div> = match cp::cell_kind(prop) {
+                    cp::CellKind::Check => div().id(SharedString::from(format!("cp-cellwrap-{ri}-{prop}"))).child(self.cp_check_cell((ri, prop), value == "true", cx)),
+                    cp::CellKind::Select(options) => {
+                        // Unit of measure shows "Each", tessellation "Auto"
+                        // until set (live 636).
+                        let shown = if value.is_empty() { if prop == "Unit of measure" { "Each".to_string() } else { "Auto".to_string() } } else { value.clone() };
+                        let current = options.iter().position(|o| *o == shown).unwrap_or(0);
+                        let sel = crate::os_ui::select_field(SharedString::from(format!("cp-sel-{ri}-{prop}")), options.iter().map(|o| o.to_string()).collect(), current, move |k, _, cx| set(options[k].to_string(), cx)).h(px(32.)).border_0().rounded(px(0.));
+                        cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).px_0().child(sel)
+                    }
+                    // Appearance / Material: the part's value as text ("Default",
+                    // "- None -" when unset).
+                    cp::CellKind::Appearance => cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).child(if value.is_empty() { "Default".to_string() } else { value.clone() }),
+                    cp::CellKind::Material => cell().id(SharedString::from(format!("cp-cell-{ri}-{prop}"))).child(if value.is_empty() { "- None -".to_string() } else { value.clone() }),
+                    kind => {
+                        // Text cells; Mass reads a grey italic "Computed" while
+                        // empty and a bare number takes the mass unit (live 637).
+                        let mass = kind == cp::CellKind::Mass;
+                        let part3 = part.clone();
+                        let st = self.cell_input(format!("cp-{ri}-{prop}"), value.clone(), window, cx, move |this, v, cx| {
+                            let v = if mass && v.trim().parse::<f64>().is_ok() { format!("{} {mass_unit}", v.trim()) } else { v };
+                            let part3 = part3.clone();
+                            this.edit_config("Edit configured properties", cx, |ps| cp::set_cell(ps, &part3, ri, prop, &v));
+                            this.config_dirty(cx);
+                        });
+                        let empty = st.read(cx).value().is_empty();
+                        cell()
+                            .id(SharedString::from(format!("cp-cell-{ri}-{prop}")))
+                            .relative()
+                            .px(px(2.))
+                            .child(Input::new(&st).appearance(false).text_size(px(14.)))
+                            .when(mass && empty, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().italic().text_color(pal.text_faint).child("Computed")))
+                    }
+                };
+                r = r.child(delete_column(el, prop));
+            }
+            rows.push(r.into_any_element());
+        }
+        v_flex()
+            .mx(px(-5.))
+            .children(excluded_note)
+            .child(header)
+            .child(
+                div()
+                    .id("cp-table")
+                    .track_focus(&focus)
+                    // Space toggles the selected checkbox cell.
+                    .on_key_down(cx.listener(move |this, e: &KeyDownEvent, _, cx| {
+                        let Some((row, key)) = this.ui.cp_selected.clone().filter(|_| e.keystroke.key == "space") else { return };
+                        let Some(ps) = this.studio(cx) else { return };
+                        let Some(r) = cp::table(ps, &space_part).and_then(|t| t.rows.get(row)) else { return };
+                        let input = ps.configuration.inputs.iter().any(|i| i.id == key);
+                        let on = if input { cp::row_input_value(&ps.configuration, r, &key) } else { r.values.get(&key).cloned().unwrap_or_default() } == "true";
+                        let v = (!on).to_string();
+                        let part = space_part.clone();
+                        cx.stop_propagation();
+                        this.edit_config("Edit configured properties", cx, |ps| if input { cp::set_input_cell(ps, &part, row, &key, &v) } else { cp::set_cell(ps, &part, row, &key, &v) });
+                        this.config_dirty(cx);
+                    }))
+                    .overflow_x_scroll()
+                    .child(v_flex().child(head).children(rows)),
+            )
+            .into_any_element()
+    }
+
+    /// A checkbox cell of the Configured properties table at (row, input id
+    /// or property): a click selects it (blue outline) and Space toggles it
+    /// (live 10-20 q; the table handles the key).
+    fn cp_check_cell(&self, at: (usize, &str), on: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let (row, key) = at;
+        let is_sel = self.ui.cp_selected.as_ref().is_some_and(|(r, k)| *r == row && k == key);
+        let Some(focus) = self.ui.cp_focus.clone() else { return div().into_any_element() };
+        let key2 = key.to_string();
+        div()
+            .id(SharedString::from(format!("cp-check-{row}-{key}")))
+            .w(px(140.))
+            .h(px(34.))
+            .flex_none()
+            .flex()
+            .items_center()
+            .px(px(5.))
+            .border_r_1()
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xaaaaaa))
+            .when(is_sel, |d| d.border_2().border_color(pal.accent))
+            .child(
+                div()
+                    .size(px(13.))
+                    .rounded(px(2.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0x888888))
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(pal.text))),
+            )
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                this.ui.cp_selected = Some((row, key2.clone()));
+                window.focus(&focus, cx);
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// The "Configurations" box at the top of the feature list of a
@@ -1674,12 +2007,7 @@ impl PartStudioView {
             .px(px(6.))
             .gap(px(4.))
             .bg(gpui_kit::rgb(0xf5f5f5))
-            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
-                if e.keystroke.key == "escape" && this.ui.inspection_tool.is_some() {
-                    this.ui.inspection_tool = None;
-                    cx.notify();
-                }
-            }))
+            // Esc ends the tool (the studio's Cancel action).
             .child(tool("insp-datum", "datum", "Datum", cx))
             .child(h_flex().child(tool("insp-dimension", "dimension", "Dimension", cx)).child(dim_caret))
             .child(tool("insp-gtol", "tolerance", "Geometric tolerance", cx))

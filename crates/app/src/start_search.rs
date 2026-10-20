@@ -318,7 +318,7 @@ impl Render for AdvancedSearch {
         let pal = p();
         let view = cx.entity();
         let row = |label: &'static str, field: AnyElement| h_flex().h(px(40.)).px(px(4.)).child(div().w(px(100.)).flex_none().text_size(px(12.)).text_color(pal.text).child(label)).child(field);
-        let input = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(field_box(SharedString::from(format!("adv-{}", st.entity_id()))).child(Input::new(st).appearance(false).text_size(px(12.)).italic()).into_any_element()).into_any_element();
+        let input = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(field_box(SharedString::from(format!("adv-{}", st.entity_id()))).child(Input::new(st).appearance(false).text_size(px(12.))).into_any_element()).into_any_element();
         // Select lists hang under their field: each field records its bounds.
         let anchors: Vec<Rc<Cell<Bounds<Pixels>>>> = (0..5).map(|_| Rc::default()).collect();
         let under = |a: &Rc<Cell<Bounds<Pixels>>>| {

@@ -1,5 +1,6 @@
 // Geometry queries, mass properties, measurement.
 #include "internal.hpp"
+#include <Poly_Triangulation.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -406,6 +407,15 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
     BRepBndLib::AddOptimal(s.shape, b, false, false);
   else
     BRepBndLib::Add(s.shape, b, false);
+  // Mesh faces have no surface: their triangulation's nodes.
+  for (TopExp_Explorer e(s.shape, TopAbs_FACE); e.More(); e.Next())
+    if (is_mesh_face(TopoDS::Face(e.Current())))
+    {
+      TopLoc_Location                       l;
+      const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(TopoDS::Face(e.Current()), l);
+      for (int i = 1; i <= t->NbNodes(); ++i)
+        b.Add(t->Node(i).Transformed(l.Transformation()));
+    }
   if (b.IsVoid())
     fail_invalid("shape has no geometry (void bounding box)");
   double x0, y0, z0, x1, y1, z1;
