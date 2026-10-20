@@ -163,7 +163,7 @@ impl DrawingEditor {
             }
             menu
         });
-        let scale_field = h_flex().border_b_1().border_color(pal.accent).child(div().flex_1().child(Input::new(&st.scale).appearance(false).small())).child(scale_menu).into_any_element();
+        let scale_field = h_flex().border_b_1().border_color(pal.accent).child(div().flex_1().child(Input::new(&st.scale).text_size(px(13.33)).appearance(false).small())).child(scale_menu).into_any_element();
         // Format: Onshape's template (DWT) names; "Custom" when none matches.
         let tmpl = templates::standard_templates();
         let cur_tmpl = tmpl.iter().find(|t| t.size == sheet.size && t.style == sheet.title_style && t.inches != self.drawing.units_mm).map(|t| t.name);
@@ -247,7 +247,7 @@ impl DrawingEditor {
                 .collect();
             let start_label = if format.start == ZoneStart::TopLeft { "Start from top left" } else { "Start from bottom right" };
             let icon = |name: &str, cx: &App| div().flex_none().child(crate::assets::icon(name, 24., cx));
-            let len_field = |input: &Entity<InputState>| div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(input).appearance(false).small()).into_any_element();
+            let len_field = |input: &Entity<InputState>| div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(input).text_size(px(13.33)).appearance(false).small()).into_any_element();
             let border = format.border;
             vec![
                 row("", h_flex().gap(px(4.)).child(icon("sheet-width", cx)).child(len_field(&st.width)).child(icon("sheet-height", cx)).child(len_field(&st.height)).into_any_element(), None).into_any_element(),

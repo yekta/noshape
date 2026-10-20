@@ -786,7 +786,7 @@ impl PartStudioView {
                         .rounded(px(2.))
                         .flex()
                         .items_center()
-                        .child(crate::ui::input_with_placeholder(&filter, "Filter inputs", cx).appearance(false).small().text_size(px(14.)).pl(px(6.))),
+                        .child(crate::ui::input_with_placeholder(&filter, "Filter inputs", cx).appearance(false).small().text_size(px(13.33)).pl(px(6.))),
                 )
                 .child(toggles)
                 .child({
@@ -1067,7 +1067,7 @@ impl PartStudioView {
         match &input.kind {
             ConfigInputKind::Variable { default, .. } => {
                 let a = iid.clone();
-                let value = self.config_name_cell(format!("var-def-{iid}"), default.text.clone(), (px(14.), FontWeight::NORMAL), window, cx, move |this, v, cx| {
+                let value = self.config_name_cell(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
                     let a = a.clone();
                     this.edit_config("Edit configuration variable", cx, |ps| {
                         if let Some(ConfigInput { kind: ConfigInputKind::Variable { default, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a) {
@@ -1121,7 +1121,7 @@ impl PartStudioView {
                     let (ia, rka) = (iid.clone(), rk.clone());
                     let name_el: AnyElement = if matches!(input.kind, ConfigInputKind::List { .. }) {
                         let (a, b) = (iid.clone(), rk.clone());
-                        self.config_name_cell(format!("opt-{iid}-{rk}"), rname.clone(), (px(14.), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), window, cx, move |this, v, cx| {
+                        self.config_name_cell(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), window, cx, move |this, v, cx| {
                             let (a, b) = (a.clone(), b.clone());
                             this.edit_config("Rename configuration", cx, |ps| {
                                 if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a)
@@ -1212,7 +1212,7 @@ impl PartStudioView {
                         h_flex().border_l_1().border_color(grid).child(
                             cell(NAME_W)
                                 .relative()
-                                .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(14.)).pl(px(3.))),
+                                .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(13.33)).pl(px(3.))),
                         ),
                     );
                 }
@@ -1359,7 +1359,7 @@ impl PartStudioView {
             Some(ParamValue::Enum(s)) | Some(ParamValue::Text(s)) => s.clone(),
             _ => String::new(),
         };
-        self.config_name_cell(format!("cp-{ci}-{key}"), text, (px(14.), FontWeight::NORMAL), window, cx, move |this, v, cx| {
+        self.config_name_cell(format!("cp-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
             let kk = kk.clone();
             this.edit_config("Edit configured value", cx, |ps| {
                 if let Some(cp) = ps.configuration.configured.get_mut(ci) {
@@ -1583,7 +1583,7 @@ impl PartStudioView {
                             this.edit_config("Edit configured properties", cx, |ps| cp::set_input_cell(ps, &part2, ri, &iid2, &v));
                             this.config_dirty(cx);
                         });
-                        cell().px(px(2.)).child(Input::new(&st).appearance(false).text_size(px(14.))).into_any_element()
+                        cell().px(px(2.)).child(Input::new(&st).appearance(false).text_size(px(13.33))).into_any_element()
                     }
                 };
                 r = r.child(el);
@@ -1629,7 +1629,7 @@ impl PartStudioView {
                             .id(SharedString::from(format!("cp-cell-{ri}-{prop}")))
                             .relative()
                             .px(px(2.))
-                            .child(Input::new(&st).appearance(false).text_size(px(14.)))
+                            .child(Input::new(&st).appearance(false).text_size(px(13.33)))
                             .when(mass && empty, |d| d.child(div().absolute().left(px(7.)).top_0().bottom_0().flex().items_center().italic().text_color(pal.text_faint).child("Computed")))
                     }
                 };

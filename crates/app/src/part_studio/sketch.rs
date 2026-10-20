@@ -1919,7 +1919,7 @@ impl PartStudioView {
                     })))))
             .child(v_flex().p_3().gap_2().child(style)
                 .child(div().p_2().min_h(px(50.)).bg(pal.panel_hover).text_sm().child(preview))
-                .child(Input::new(&input))
+                .child(Input::new(&input).text_size(px(18.67)))
                 .child(h_flex().justify_between()
                     .child(div().text_xs().text_color(if count > 250 { rgb(0xaa252d) } else { pal.text_muted }).child(format!("{count}/250 characters")))
                     // Convert to expression / Convert to text (Onshape: text field context menu).

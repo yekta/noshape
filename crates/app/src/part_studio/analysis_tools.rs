@@ -941,7 +941,7 @@ impl PartStudioView {
                             .gap_2()
                             .text_size(px(12.))
                             .child(div().text_color(pal.text_muted).child("Stripe count"))
-                            .child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7))),
+                            .child(div().flex_1().child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7))),
                     );
                 }
                 body = body
@@ -980,7 +980,7 @@ impl PartStudioView {
                             .gap_2()
                             .text_size(px(12.))
                             .child(div().text_color(pal.text_muted).child("Rotation angle"))
-                            .child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                            .child(div().flex_1().child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
                             .child(
                                 div()
                                     .id("at-rot-opp")

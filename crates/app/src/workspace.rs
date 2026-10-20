@@ -1047,7 +1047,24 @@ impl Workspace {
             );
         }
         let arrows = self.render_tab_scroll_buttons(cx);
-        (tab_list.into_any_element(), h_flex().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).into_any_element())
+        // The strip's overflow is known only after layout, and the bar is a
+        // cached slice: when it differs from what this render assumed (tabs
+        // added, window resized, wheel-scrolled to an end), render again.
+        let rendered = tab_scroll_state(&self.tab_scroll);
+        let (handle, ws) = (self.tab_scroll.clone(), cx.entity().downgrade());
+        let watch = canvas(|_, _, _| {}, move |_, _, _, cx| {
+            if tab_scroll_state(&handle) != rendered {
+                let ws = ws.clone();
+                cx.defer(move |cx| {
+                    let _ = ws.update(cx, |_, cx| cx.notify());
+                });
+            }
+        })
+        .absolute()
+        .size(px(1.));
+        // Full width: inside the cached slice nothing stretches the row, and
+        // the strip must overflow (and scroll) within the window.
+        (tab_list.into_any_element(), h_flex().w_full().min_w_0().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).child(watch).into_any_element())
     }
 
     /// Live (behaviours "Document tab bar scroll buttons"): ‹ › at the right
@@ -1055,8 +1072,8 @@ impl Workspace {
     /// an end dimmed to 0.4. A press scrolls about a page, a right press to
     /// the first / last tab. (The wheel scrolls the strip already.)
     fn render_tab_scroll_buttons(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (off, max) = (self.tab_scroll.offset().x, self.tab_scroll.max_offset().x);
-        if max <= px(0.5) {
+        let (overflow, at_first, at_last) = tab_scroll_state(&self.tab_scroll);
+        if !overflow {
             return None;
         }
         let button = |left: bool, enabled: bool, cx: &mut Context<Self>| {
@@ -1074,7 +1091,7 @@ impl Workspace {
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.scroll_tabs(left, false, cx)))
                 .on_mouse_down(MouseButton::Right, cx.listener(move |this, _: &MouseDownEvent, _, cx| this.scroll_tabs(left, true, cx)))
         };
-        Some(h_flex().flex_none().child(button(true, off < px(-0.5), cx)).child(button(false, off > -max + px(0.5), cx)).into_any_element())
+        Some(h_flex().flex_none().child(button(true, !at_first, cx)).child(button(false, !at_last, cx)).into_any_element())
     }
 
     /// Scrolls the tab strip a page (about the visible width less one tab),
@@ -1179,6 +1196,12 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::MaterialLibrary(_) => "materiallibrary",
         TabContent::File(f) => crate::file_tab_view::file_icon(f),
     }
+}
+
+/// Whether the tab strip overflows, and is scrolled to its first / last tab.
+fn tab_scroll_state(h: &ScrollHandle) -> (bool, bool, bool) {
+    let (off, max) = (h.offset().x, h.max_offset().x);
+    (max > px(0.5), off > px(-0.5), off < -max + px(0.5))
 }
 
 /// The workspace's cached chrome (see `crate::cached_slice`).

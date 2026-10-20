@@ -1174,8 +1174,8 @@ impl AssemblyView {
             PatternDialogKind::Linear | PatternDialogKind::Circular => {
                 let label = if kind == PatternDialogKind::Linear { "Distance" } else { "Angle" };
                 body = body
-                    .child(field_row(label, Input::new(&s.distance).xsmall()))
-                    .child(field_row("Instance count", Input::new(&s.count).xsmall()))
+                    .child(field_row(label, Input::new(&s.distance).text_size(px(13.33)).xsmall()))
+                    .child(field_row("Instance count", Input::new(&s.count).text_size(px(13.33)).xsmall()))
                     .child(Checkbox::new("pat-opp").label("Opposite direction").checked(opposite).on_click(cx.listener(|this, v: &bool, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.opposite = *v;
@@ -1208,8 +1208,8 @@ impl AssemblyView {
                         let opp2 = s.opposite2;
                         body = body
                             .child(f2)
-                            .child(field_row("Distance", Input::new(&s.distance2).xsmall()))
-                            .child(field_row("Instance count", Input::new(&s.count2).xsmall()))
+                            .child(field_row("Distance", Input::new(&s.distance2).text_size(px(13.33)).xsmall()))
+                            .child(field_row("Instance count", Input::new(&s.count2).text_size(px(13.33)).xsmall()))
                             .child(Checkbox::new("pat-opp2").label("Opposite direction").checked(opp2).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(p) = &mut this.pattern {
                                     p.opposite2 = *v;
@@ -3446,6 +3446,8 @@ impl AssemblyView {
                 col = col.child(
                     h_flex()
                         .id(SharedString::from(format!("ins-other-cat-{i}")))
+                        // Live 610: the list starts 9 px lower.
+                        .when(i == 0, |d| d.mt(px(9.)))
                         .h(px(32.))
                         .pl(px(16.))
                         .gap(px(6.))

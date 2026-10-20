@@ -298,7 +298,7 @@ impl DrawingEditor {
                         cx.notify();
                     }),
                 )
-                .child(Input::new(input).appearance(false).small())
+                .child(Input::new(input).text_size(px(21.)).appearance(false).small())
         };
         // A 69 x 34 cell: 1 px `#ccc`, radius 4, the slot 6 px in.
         let cell = |row: usize, slot: usize, input: &Entity<InputState>, cx: &mut Context<Self>| div().w(px(69.)).h(px(34.)).flex_none().px(px(6.)).pt(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).child(slot_box(row, slot, input, 55., cx));

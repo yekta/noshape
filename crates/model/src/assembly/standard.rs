@@ -38,6 +38,7 @@ pub fn part_body(r: &RegenResult) -> Option<BodyId> {
 /// Which standard content item an instance is, with its size (and length
 /// for bolts, screws and pins). Strings are catalogue names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "SpecFile")]
 pub struct StandardSpec {
     pub standard: String,
     pub category: String,
@@ -46,6 +47,61 @@ pub struct StandardSpec {
     pub size: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub length: Option<String>,
+    /// Head slot (components with the option; None = the default, on).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_slot: Option<bool>,
+    /// Material and Finish (None = the defaults, [`MATERIALS`][0] and [`FINISHES`][0]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finish: Option<String>,
+}
+
+/// A spec as stored; documents saved before the catalogue took Onshape's
+/// names ("ANSI", "Bolts & Screws", sizes "1/4", lengths "1 1/4 in") load
+/// with today's names.
+#[derive(Deserialize)]
+struct SpecFile {
+    standard: String,
+    category: String,
+    class: String,
+    component: String,
+    size: String,
+    #[serde(default)]
+    length: Option<String>,
+    #[serde(default)]
+    head_slot: Option<bool>,
+    #[serde(default)]
+    material: Option<String>,
+    #[serde(default)]
+    finish: Option<String>,
+}
+
+impl From<SpecFile> for StandardSpec {
+    fn from(f: SpecFile) -> Self {
+        let rename = |s: String| match s.as_str() {
+            "ANSI" => ANSI.to_string(),
+            "Bolts & Screws" => BOLTS.to_string(),
+            "Pins & Studs" => ANSI_PINS.to_string(),
+            _ => s,
+        };
+        let mut spec = StandardSpec { standard: rename(f.standard), category: rename(f.category), class: f.class, component: f.component, size: f.size, length: f.length, head_slot: f.head_slot, material: f.material, finish: f.finish };
+        if let Some(c) = component(&spec)
+            && c.inch
+        {
+            // "1/4" → "1/4-20" (the thread designation of the size).
+            if c.size(&spec.size).is_none()
+                && let Some(s) = c.sizes.iter().find(|s| s.name.split('-').next() == Some(spec.size.as_str()))
+            {
+                spec.size = s.name.to_string();
+            }
+            // "1 1/4 in" → "1.25" (the nearest of the offered lengths).
+            if let Some(v) = spec.length.as_deref().filter(|l| l.ends_with(" in")).and_then(length_value) {
+                spec.length = INCH_LENGTHS.iter().min_by(|a, b| (c.length_m(a).unwrap_or(0.0) - v).abs().total_cmp(&(c.length_m(b).unwrap_or(0.0) - v).abs())).map(|l| l.to_string());
+            }
+        }
+        spec
+    }
 }
 
 /// Geometry family of a component (one script feature each).
@@ -113,6 +169,10 @@ pub struct Component {
     pub shape: Shape,
     pub inch: bool,
     pub sizes: &'static [Size],
+    /// Offers the Head slot option (slotted head instead of a socket).
+    pub head_slot: bool,
+    /// Shows the Thread length row.
+    pub thread_length: bool,
 }
 
 impl Component {
@@ -128,28 +188,7 @@ impl Component {
             return Vec::new();
         }
         if self.inch {
-            const L: [(&str, f64); 18] = [
-                ("1/4", 0.25),
-                ("3/8", 0.375),
-                ("1/2", 0.5),
-                ("5/8", 0.625),
-                ("3/4", 0.75),
-                ("7/8", 0.875),
-                ("1", 1.0),
-                ("1 1/4", 1.25),
-                ("1 1/2", 1.5),
-                ("1 3/4", 1.75),
-                ("2", 2.0),
-                ("2 1/4", 2.25),
-                ("2 1/2", 2.5),
-                ("3", 3.0),
-                ("3 1/2", 3.5),
-                ("4", 4.0),
-                ("5", 5.0),
-                ("6", 6.0),
-            ];
-            let (lo, hi) = self.length_range(size);
-            L.iter().filter(|(_, v)| *v >= lo - 1e-9 && *v <= hi + 1e-9).map(|(n, _)| format!("{n} in")).collect()
+            INCH_LENGTHS.iter().map(|l| l.to_string()).collect()
         } else {
             const L: [f64; 30] = [3., 4., 5., 6., 8., 10., 12., 14., 16., 20., 25., 30., 35., 40., 45., 50., 55., 60., 65., 70., 75., 80., 90., 100., 110., 120., 130., 140., 150., 160.];
             let (lo, hi) = self.length_range(size);
@@ -165,12 +204,35 @@ impl Component {
             _ => (1.25 * s.d, 12.0 * s.d),
         }
     }
-    /// Default length for a size: about three diameters.
+    /// Default length for a size: ANSI inch the first (live assembly/70),
+    /// metric about three diameters.
     pub fn default_length(&self, size: &Size) -> Option<String> {
         let all = self.lengths(size);
+        if self.inch {
+            return all.first().cloned();
+        }
         let target = 3.0 * size.d;
-        let value = |n: &str| length_value(n).map(|m| m * 1000.0 / self.unit()).unwrap_or(0.0);
+        let value = |n: &str| self.length_m(n).map(|m| m * 1000.0 / self.unit()).unwrap_or(0.0);
         all.iter().min_by(|a, b| (value(a) - target).abs().total_cmp(&(value(b) - target).abs())).cloned()
+    }
+    /// A length name in meters: "20 mm", "1 1/4 in", or a bare number in
+    /// the component's unit (ANSI inch "0.25").
+    pub fn length_m(&self, name: &str) -> Option<f64> {
+        length_value(name).or_else(|| name.trim().parse::<f64>().ok().map(|v| v * self.unit() * 1e-3))
+    }
+    /// Thread length offered for a size and length (components with the
+    /// row): ASME B18.2.1, 2D + 1/4 in, never longer than the bolt.
+    pub fn thread_length(&self, size: &Size, length: &str) -> Option<String> {
+        if !self.thread_length {
+            return None;
+        }
+        let l = self.length_m(length)?;
+        let t = (2.0 * size.d + 0.25) * self.unit() * 1e-3;
+        if t >= l - 1e-9 {
+            return Some(length.to_string());
+        }
+        let v = t * 1e3 / self.unit();
+        Some(format!("{}", (v * 1e4).round() / 1e4))
     }
     /// Nominal diameter in meters.
     pub fn diameter_m(&self, size: &Size) -> f64 {
@@ -311,38 +373,107 @@ const ISO_PIN: &[Size] = &[
     sz("20", 20., 0., 0., 0.),
 ];
 
-// ANSI inch tables (inches).
+/// ANSI inch lengths, as live lists them (assembly/70, dom/ui2-standard-content-panel.html).
+pub const INCH_LENGTHS: [&str; 23] = ["0.25", "0.3125", "0.375", "0.4375", "0.5", "0.5625", "0.625", "0.75", "0.88", "1", "1.125", "1.25", "1.5", "1.75", "2", "2.25", "2.5", "2.75", "3", "3.25", "3.5", "3.75", "4"];
+
+/// Material and Finish options (live assembly/70, the first is the default).
+pub const MATERIALS: [&str; 37] = [
+    "Stainless Steel",
+    "Stainless Steel 18-8",
+    "Stainless Steel 304",
+    "Stainless Steel 316",
+    "A2 Stainless Steel",
+    "A4 Stainless Steel",
+    "Steel",
+    "Steel ASTM A194 Grade 2H",
+    "Steel ASTM A285 Grade C",
+    "Steel ASTM A325 Type 1",
+    "Steel ASTM A490 Type 1",
+    "Steel ASTM A490 Type 3",
+    "Steel ASTM A563 Grade A",
+    "Steel ASTM A563 Grade DH",
+    "Steel ASTM A36",
+    "Steel Class 12.9",
+    "Steel Class 10.9",
+    "Steel Class 8.8",
+    "Steel Class 5.8",
+    "Steel Class 4.8",
+    "Steel Grade 2",
+    "Steel Grade 5",
+    "Steel Grade 8",
+    "Titanium",
+    "Titanium Grade 2",
+    "Titanium Grade 5",
+    "Titanium Grade 7",
+    "Aluminum",
+    "Brass",
+    "Carbon Steel",
+    "Hardened Alloy Steel",
+    "Hardened Carbon Steel",
+    "Hardened Stainless Steel",
+    "Phosphor Bronze 510",
+    "300 Series Stainless Steel",
+    "400 Series Stainless Steel",
+    "Nylon",
+];
+pub const FINISHES: [&str; 7] = ["Plain", "Black", "Zinc", "Chrome", "Galvanized", "Cadmium", "Black Zinc"];
+
+// ANSI inch tables (inches); bolt, screw and nut sizes are named by their
+// thread ("1/4-20"), like live.
 const ANSI_HEX: &[Size] = &[
-    sz("1/4", 0.25, 0.4375, 0.171875, 0.),
-    sz("5/16", 0.3125, 0.5, 0.21875, 0.),
-    sz("3/8", 0.375, 0.5625, 0.25, 0.),
-    sz("7/16", 0.4375, 0.625, 0.296875, 0.),
-    sz("1/2", 0.5, 0.75, 0.34375, 0.),
-    sz("5/8", 0.625, 0.9375, 0.421875, 0.),
-    sz("3/4", 0.75, 1.125, 0.5, 0.),
-    sz("1", 1.0, 1.5, 0.671875, 0.),
+    sz("1/4-20", 0.25, 0.4375, 0.171875, 0.),
+    sz("5/16-18", 0.3125, 0.5, 0.21875, 0.),
+    sz("3/8-16", 0.375, 0.5625, 0.25, 0.),
+    sz("7/16-14", 0.4375, 0.625, 0.296875, 0.),
+    sz("1/2-13", 0.5, 0.75, 0.34375, 0.),
+    sz("5/8-11", 0.625, 0.9375, 0.421875, 0.),
+    sz("3/4-10", 0.75, 1.125, 0.5, 0.),
+    sz("1-8", 1.0, 1.5, 0.671875, 0.),
 ];
 const ANSI_SHCS: &[Size] = &[
-    sz("#4", 0.112, 0.183, 0.112, 0.09375),
-    sz("#6", 0.138, 0.226, 0.138, 0.109375),
-    sz("#8", 0.164, 0.27, 0.164, 0.140625),
-    sz("#10", 0.19, 0.312, 0.19, 0.15625),
-    sz("1/4", 0.25, 0.375, 0.25, 0.1875),
-    sz("5/16", 0.3125, 0.469, 0.3125, 0.25),
-    sz("3/8", 0.375, 0.5625, 0.375, 0.3125),
-    sz("1/2", 0.5, 0.75, 0.5, 0.375),
-    sz("5/8", 0.625, 0.9375, 0.625, 0.5),
-    sz("3/4", 0.75, 1.125, 0.75, 0.625),
+    sz("#4-40", 0.112, 0.183, 0.112, 0.09375),
+    sz("#6-32", 0.138, 0.226, 0.138, 0.109375),
+    sz("#8-32", 0.164, 0.27, 0.164, 0.140625),
+    sz("#10-24", 0.19, 0.312, 0.19, 0.15625),
+    sz("1/4-20", 0.25, 0.375, 0.25, 0.1875),
+    sz("5/16-18", 0.3125, 0.469, 0.3125, 0.25),
+    sz("3/8-16", 0.375, 0.5625, 0.375, 0.3125),
+    sz("1/2-13", 0.5, 0.75, 0.5, 0.375),
+    sz("5/8-11", 0.625, 0.9375, 0.625, 0.5),
+    sz("3/4-10", 0.75, 1.125, 0.75, 0.625),
+];
+/// Countersunk bolts (live's sizes, UNC and UNF): head diameter `a`, slot width `c`.
+const ANSI_CSK_BOLT: &[Size] = &[
+    sz("#10-24", 0.19, 0.385, 0.0975, 0.06),
+    sz("#10-32", 0.19, 0.385, 0.0975, 0.06),
+    sz("1/4-20", 0.25, 0.507, 0.1285, 0.075),
+    sz("1/4-28", 0.25, 0.507, 0.1285, 0.075),
+    sz("5/16-18", 0.3125, 0.635, 0.1615, 0.084),
+    sz("5/16-24", 0.3125, 0.635, 0.1615, 0.084),
+    sz("3/8-16", 0.375, 0.762, 0.1935, 0.094),
+    sz("3/8-24", 0.375, 0.762, 0.1935, 0.094),
+    sz("7/16-14", 0.4375, 0.812, 0.1875, 0.094),
+    sz("7/16-20", 0.4375, 0.812, 0.1875, 0.094),
+    sz("1/2-13", 0.5, 0.875, 0.1875, 0.106),
+    sz("1/2-20", 0.5, 0.875, 0.1875, 0.106),
+    sz("5/8-11", 0.625, 1.125, 0.25, 0.133),
+    sz("5/8-18", 0.625, 1.125, 0.25, 0.133),
+    sz("3/4-10", 0.75, 1.375, 0.3125, 0.149),
+    sz("3/4-16", 0.75, 1.375, 0.3125, 0.149),
+    sz("7/8-9", 0.875, 1.625, 0.375, 0.167),
+    sz("7/8-14", 0.875, 1.625, 0.375, 0.167),
+    sz("1-8", 1.0, 1.875, 0.4375, 0.188),
+    sz("1-12", 1.0, 1.875, 0.4375, 0.188),
 ];
 const ANSI_NUT: &[Size] = &[
-    sz("1/4", 0.25, 0.4375, 0.21875, 0.),
-    sz("5/16", 0.3125, 0.5, 0.265625, 0.),
-    sz("3/8", 0.375, 0.5625, 0.328125, 0.),
-    sz("7/16", 0.4375, 0.6875, 0.375, 0.),
-    sz("1/2", 0.5, 0.75, 0.4375, 0.),
-    sz("5/8", 0.625, 0.9375, 0.546875, 0.),
-    sz("3/4", 0.75, 1.125, 0.640625, 0.),
-    sz("1", 1.0, 1.5, 0.859375, 0.),
+    sz("1/4-20", 0.25, 0.4375, 0.21875, 0.),
+    sz("5/16-18", 0.3125, 0.5, 0.265625, 0.),
+    sz("3/8-16", 0.375, 0.5625, 0.328125, 0.),
+    sz("7/16-14", 0.4375, 0.6875, 0.375, 0.),
+    sz("1/2-13", 0.5, 0.75, 0.4375, 0.),
+    sz("5/8-11", 0.625, 0.9375, 0.546875, 0.),
+    sz("3/4-10", 0.75, 1.125, 0.640625, 0.),
+    sz("1-8", 1.0, 1.5, 0.859375, 0.),
 ];
 const ANSI_WASHER: &[Size] = &[
     sz("1/4", 0.281, 0.625, 0.065, 0.),
@@ -365,21 +496,25 @@ const ANSI_PIN: &[Size] = &[
     sz("1/2", 0.5, 0., 0., 0.),
 ];
 
-const BOLTS: &str = "Bolts & Screws";
+// Live's names (assembly/70).
+const ANSI: &str = "ANSI inch";
+const BOLTS: &str = "Bolts & screws";
 const NUTS: &str = "Nuts";
 const WASHERS: &str = "Washers";
 const PINS: &str = "Pins";
+const ANSI_PINS: &str = "Pins & studs";
 
 const fn c(standard: &'static str, category: &'static str, class: &'static str, name: &'static str, shape: Shape, sizes: &'static [Size]) -> Component {
-    Component { standard, category, class, name, shape, inch: false, sizes }
+    Component { standard, category, class, name, shape, inch: false, sizes, head_slot: false, thread_length: false }
 }
 
 const fn ci(category: &'static str, class: &'static str, name: &'static str, shape: Shape, sizes: &'static [Size]) -> Component {
-    Component { standard: "ANSI", category, class, name, shape, inch: true, sizes }
+    Component { standard: ANSI, category, class, name, shape, inch: true, sizes, head_slot: false, thread_length: false }
 }
 
-/// The catalogue in Onshape's order of standards (ANSI, DIN, ISO).
+/// The catalogue. The pickers list every level alphabetically, like live.
 pub static CATALOGUE: &[Component] = &[
+    Component { standard: ANSI, category: BOLTS, class: "Countersunk bolts", name: "Countersunk bolt", shape: Shape::Countersunk, inch: true, sizes: ANSI_CSK_BOLT, head_slot: true, thread_length: true },
     ci(BOLTS, "Hex bolts", "Hex bolt", Shape::HexBolt, ANSI_HEX),
     ci(BOLTS, "Hex bolts", "Hex cap screw", Shape::HexBolt, ANSI_HEX),
     ci(BOLTS, "Socket head screws", "Socket head cap screw", Shape::SocketHead, ANSI_SHCS),
@@ -389,7 +524,7 @@ pub static CATALOGUE: &[Component] = &[
     ci(NUTS, "Hex nuts", "Hex nut", Shape::HexNut, ANSI_NUT),
     ci(NUTS, "Hex nuts", "Hex jam nut", Shape::HexNut, ANSI_NUT),
     ci(WASHERS, "Type A plain washers", "Type A flat washer", Shape::Washer, ANSI_WASHER),
-    ci("Pins & Studs", "Dowel & straight pins", "Ground dowel pin", Shape::Pin, ANSI_PIN),
+    ci(ANSI_PINS, "Dowel & straight pins", "Ground dowel pin", Shape::Pin, ANSI_PIN),
     c("DIN", BOLTS, "Hex head bolts & screws", "Hex head screw grade A & B DIN EN 24017", Shape::HexBolt, ISO_HEX),
     c("DIN", BOLTS, "Hex head bolts & screws", "Hex head bolt grade A & B DIN EN 24014", Shape::HexBolt, ISO_HEX),
     c("DIN", BOLTS, "Socket head screws", "Hex socket head cap screw DIN 912", Shape::SocketHead, ISO_SHCS),
@@ -410,6 +545,7 @@ pub static CATALOGUE: &[Component] = &[
     c("ISO", WASHERS, "Plain washers", "Plain washer large grade A ISO 7093-1", Shape::Washer, ISO_WASHER_LARGE),
 ];
 
+/// Distinct names, sorted like live's pickers (alphabetical, ignoring case).
 fn uniq(it: impl Iterator<Item = &'static str>) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
     for s in it {
@@ -417,7 +553,17 @@ fn uniq(it: impl Iterator<Item = &'static str>) -> Vec<&'static str> {
             out.push(s);
         }
     }
+    out.sort_by_key(|s| s.to_lowercase());
     out
+}
+
+/// The component the tab starts with: the first of every picker
+/// ("ANSI inch › Bolts & screws › Countersunk bolts › Countersunk bolt").
+pub fn default_component() -> &'static Component {
+    let standard = standards()[0];
+    let category = categories(standard)[0];
+    let class = classes(standard, category)[0];
+    components(standard, category, class)[0]
 }
 
 /// Standards in catalogue order.
@@ -434,7 +580,9 @@ pub fn classes(standard: &str, category: &str) -> Vec<&'static str> {
 }
 
 pub fn components(standard: &str, category: &str, class: &str) -> Vec<&'static Component> {
-    CATALOGUE.iter().filter(|c| c.standard == standard && c.category == category && c.class == class).collect()
+    let mut out: Vec<&'static Component> = CATALOGUE.iter().filter(|c| c.standard == standard && c.category == category && c.class == class).collect();
+    out.sort_by_key(|c| c.name.to_lowercase());
+    out
 }
 
 /// The catalogue entry of a spec.
@@ -443,9 +591,10 @@ pub fn component(spec: &StandardSpec) -> Option<&'static Component> {
 }
 
 impl StandardSpec {
-    /// A spec for a component with its default size (the middle one) and length.
+    /// A spec for a component with its default size (ANSI inch the first,
+    /// like live; metric the middle one) and length.
     pub fn new(c: &Component) -> Self {
-        let size = &c.sizes[c.sizes.len().saturating_sub(1) / 2];
+        let size = if c.inch { &c.sizes[0] } else { &c.sizes[c.sizes.len().saturating_sub(1) / 2] };
         StandardSpec {
             standard: c.standard.into(),
             category: c.category.into(),
@@ -453,16 +602,51 @@ impl StandardSpec {
             component: c.name.into(),
             size: size.name.into(),
             length: c.default_length(size),
+            head_slot: None,
+            material: None,
+            finish: None,
         }
     }
 
     /// Instance name, like Onshape's "<component> - <size> x <length>".
     pub fn part_name(&self) -> String {
-        let size = if component(self).is_some_and(|c| c.inch) { format!("{} in", self.size) } else { self.size.clone() };
         match &self.length {
-            Some(l) => format!("{} - {size} x {l}", self.component),
-            None => format!("{} - {size}", self.component),
+            Some(l) => format!("{} - {} x {l}", self.component, self.size),
+            None => format!("{} - {}", self.component, self.size),
         }
+    }
+
+    pub fn material(&self) -> &str {
+        self.material.as_deref().unwrap_or(MATERIALS[0])
+    }
+
+    pub fn finish(&self) -> &str {
+        self.finish.as_deref().unwrap_or(FINISHES[0])
+    }
+
+    /// Head slot on (components offering it).
+    pub fn slotted(&self) -> bool {
+        component(self).is_some_and(|c| c.head_slot) && self.head_slot != Some(false)
+    }
+
+    /// The Description field and BOM column, like live's "Countersunk Bolt
+    /// #10-24 x 0.25 Stainless Steel " (words capitalised, the length
+    /// without its unit, the finish unless Plain).
+    pub fn description(&self) -> String {
+        let name: Vec<String> = self
+            .component
+            .split(' ')
+            .map(|w| {
+                let mut c = w.chars();
+                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+            })
+            .collect();
+        let finish = if self.finish() == FINISHES[0] { "" } else { self.finish() };
+        let size = match &self.length {
+            Some(l) => format!("{} x {}", self.size, l.trim_end_matches(" mm").trim_end_matches(" in")),
+            None => self.size.clone(),
+        };
+        format!("{} {size} {} {finish}", name.join(" "), self.material())
     }
 
     /// Change the size, keeping the length when it is still offered.
@@ -513,7 +697,7 @@ fn nominal_m(c: &Component, s: &Size) -> f64 {
         return mm * 1e-3;
     }
     if c.inch
-        && let Some(v) = length_value(&format!("{} in", s.name))
+        && let Some(v) = s.name.split('-').next().and_then(|n| length_value(&format!("{n} in")))
     {
         return v;
     }
@@ -536,14 +720,15 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     let units = UnitPrefs::default();
     scripts();
     let mut ps = PartStudio::new();
-    let mut f = ps.new_feature(&crate::custom::type_id(STANDARD_TAB, c.shape.feature()), &units)?;
+    let feature = if spec.slotted() { "countersunkSlotted" } else { c.shape.feature() };
+    let mut f = ps.new_feature(&crate::custom::type_id(STANDARD_TAB, feature), &units)?;
     f.id = PART_FEATURE;
     f.name = spec.part_name();
     f.params.set("d", mm(s.d * u));
     f.params.set("a", mm(s.a * u));
     f.params.set("b", mm(s.b * u));
     f.params.set("c", mm(s.c * u));
-    let len = spec.length.as_deref().and_then(length_value).unwrap_or(3.0 * s.d * u * 1e-3);
+    let len = spec.length.as_deref().and_then(|l| c.length_m(l)).unwrap_or(3.0 * s.d * u * 1e-3);
     f.params.set("l", mm(len * 1e3));
     ps.features.push(f);
     // Explicit mate connectors with the primary axis out of the contact
@@ -745,6 +930,20 @@ export const countersunkScrew = defineFeature(function(context is Context, id is
         const k = (definition.a - definition.d) / 2;
         const head = revolveZ(context, id + "head", [vector(Z, Z), vector(definition.a / 2, Z), vector(definition.d / 2, -k), vector(Z, -k)]);
         subtract(context, id + "socketCut", head, hexPrism(context, id + "socket", -k * 0.8, k, definition.c));
+        withShank(context, id, head, -k, definition.d, definition.l - k);
+    });
+
+annotation { "Feature Type Name" : "Slotted countersunk bolt" }
+export const countersunkSlotted = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        fastenerParameters(definition);
+    }
+    {
+        const k = (definition.a - definition.d) / 2;
+        const head = revolveZ(context, id + "head", [vector(Z, Z), vector(definition.a / 2, Z), vector(definition.d / 2, -k), vector(Z, -k)]);
+        fCuboid(context, id + "slot", { "corner1" : vector(-definition.a, -definition.c / 2, -k * 0.5), "corner2" : vector(definition.a, definition.c / 2, k) });
+        subtract(context, id + "slotCut", head, qCreatedBy(id + "slot", EntityType.BODY));
         withShank(context, id, head, -k, definition.d, definition.l - k);
     });
 

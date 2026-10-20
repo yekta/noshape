@@ -796,3 +796,60 @@ fn srgb_lin(c: u8) -> f32 {
     let c = c as f32 / 255.0;
     if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
 }
+
+#[test]
+fn texture_frames_stay_on_the_gpu_and_textures_are_reused_once_released() {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, -0.01], [0.01, 0.01, 0.01], 1));
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(mesh)));
+    let scene = std::sync::Arc::new(scene);
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.0175, 4.0 / 3.0);
+    let req = || FrameRequest { scene: scene.clone(), camera: cam, width: 320, height: 240, device_pixel_ratio: 1.0, style: Style::default(), invalidate_pick: false };
+    r.set_present(9, Present::Texture);
+    let frame_of = |r: &mut Renderer, seq: u64| {
+        assert!(r.can_submit(9), "frame {seq} could not be submitted");
+        r.submit_frame(9, seq, req()).unwrap();
+        loop {
+            r.wait_oldest();
+            if let Some(Completed::Frame { result, .. }) = r.collect().into_iter().next() {
+                return result.unwrap();
+            }
+        }
+    };
+    // Every frame the UI still holds keeps its texture; the renderer stops
+    // accepting frames once all of a target's textures are held.
+    let mut held = Vec::new();
+    let mut seq = 0;
+    while r.can_submit(9) {
+        seq += 1;
+        let f = frame_of(&mut r, seq);
+        assert!(f.bgra.is_empty(), "a texture frame is not read back");
+        let t = f.texture.clone().expect("the frame's texture");
+        assert_eq!((t.width, t.height), (320, 240));
+        assert!(held.iter().all(|h: &Frame| !std::sync::Arc::ptr_eq(h.texture.as_ref().unwrap(), &t)), "a held texture was rendered into again");
+        held.push(f);
+        assert!(seq < 32, "texture frames never stop");
+    }
+    assert!(seq >= 3, "only {seq} textures");
+    // Releasing one frame frees its texture for the next frame.
+    let released = held.remove(0).texture.unwrap();
+    let released_ptr = std::sync::Arc::as_ptr(&released);
+    drop(released);
+    let f = frame_of(&mut r, seq + 1);
+    assert_eq!(std::sync::Arc::as_ptr(f.texture.as_ref().unwrap()), released_ptr);
+    // Back to read-back frames.
+    drop(held);
+    drop(f);
+    r.set_present(9, Present::Readback);
+    let f = frame_of(&mut r, seq + 2);
+    assert!(f.texture.is_none());
+    assert_eq!(f.bgra.len(), 320 * 240 * 4);
+}

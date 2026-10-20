@@ -449,7 +449,7 @@ impl PartStudioView {
             }))
         };
         let number = |label: &'static str, st: &Entity<InputState>| {
-            h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child(label)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(st).appearance(false).xsmall().text_right())))
+            h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child(label)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right())))
         };
         let inputs: Vec<Entity<InputState>> = s.inputs.iter().map(|(st, _)| st.clone()).collect();
         let (faces, rips) = (s.faces.clone(), s.rips.clone());

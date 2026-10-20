@@ -133,6 +133,8 @@ fn load_fonts(cx: &mut App) {
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-SemiBold.ttf")),
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Bold.ttf")),
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Italic.ttf")),
+        // Placeholders (Onshape: `input::placeholder { font-style: italic; font-weight: 300 }`).
+        std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-LightItalic.ttf")),
     ];
     if let Err(e) = cx.text_system().add_fonts(fonts) {
         log::warn!("could not load the UI font: {e:#}");
@@ -154,9 +156,9 @@ fn apply_theme(cx: &mut App) {
     // `#3367d1` with white text; code editors keep `t.selection` below
     // (patched gpui-base, vendor/gpui-base).
     cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb(0x3367d1).into(), foreground: white });
-    // Onshape: `input::placeholder { font-style: italic; font-weight: 300 }`
-    // (we ship no light Roboto face, so the italic regular), `#999`.
-    cx.set_global(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: None, color: Some(gpui_kit::rgb(0x999999).into()) });
+    // Onshape (live dom/caret-inputs.json): `input::placeholder { font-style:
+    // italic; font-weight: 300 }` in `rgb(102, 102, 102)`.
+    cx.set_global(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x666666).into()) });
     // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit
     // line counts, numbers 21 px in, a 14 px fold column, the code 4 px after it,
     // the current line's cell #dcdcdc (patched gpui-base).

@@ -308,7 +308,7 @@ impl DrawingEditor {
         };
         let mut body = v_flex();
         if tab == 0 {
-            body = body.child(h_flex().h(px(30.)).px(px(8.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&d.label).appearance(false).xsmall())));
+            body = body.child(h_flex().h(px(30.)).px(px(8.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&d.label).text_size(px(13.33)).appearance(false).xsmall())));
         } else {
             let areas: Vec<(String, String, bool, Act)> = AREAS.iter().enumerate().map(|(i, (n, g))| (g.to_string(), n.to_string(), d.area == i, std::rc::Rc::new(move |d: &mut DatumDlg| d.area = i) as Act)).collect();
             let styles: Vec<(String, String, bool, Act)> = TargetStyle::ALL
@@ -329,8 +329,8 @@ impl DrawingEditor {
                             let v = *v;
                             this.edit_datum(|d| d.area_size = v, cx)
                         })))
-                        .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "Ø" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).appearance(false).xsmall())))
-                        .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).appearance(false).xsmall()))),
+                        .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "Ø" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).text_size(px(13.33)).appearance(false).xsmall())))
+                        .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).appearance(false).xsmall()))),
                 );
             // The Targets list.
             let mut list = v_flex()
@@ -433,7 +433,7 @@ impl DrawingEditor {
                     list = list.child(
                         v_flex()
                             .pl(px(10.))
-                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&r.label).appearance(false).xsmall())))
+                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&r.label).text_size(px(13.33)).appearance(false).xsmall())))
                             .child(div().border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(mode_btn))
                             .child(field_box(("dt-origin", k), "Origin", opts.origin.map(|_| "Point".to_string()), picking).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.datum_dlg {
@@ -444,10 +444,10 @@ impl DrawingEditor {
                             .child(field_box(("dt-loc", k), "Target location", Some("Point".into()), false))
                             .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("X position")))
                             .child(field_box(("dt-xdir", k), "X direction", None, false))
-                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).appearance(false).xsmall())))
+                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).appearance(false).xsmall())))
                             .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
                             .child(field_box(("dt-ydir", k), "Y direction", None, false))
-                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).appearance(false).xsmall())))
+                            .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).appearance(false).xsmall())))
                             .child(h_flex().gap(px(8.)).pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx))),
                     );
                 }

@@ -3724,7 +3724,7 @@ impl AssemblyView {
         };
         let mut body = v_flex().id("insert-body").flex_1().min_h_0().overflow_y_scroll();
         if source == 2 {
-            body = body.child(div().p_2().child(self.render_standard_content(false, cx)));
+            body = body.child(div().pt(px(1.)).child(self.render_standard_content(false, cx)));
         } else if source == 1 {
             body = body.child(self.render_insert_other(cx));
         } else if tab == 0 {
@@ -3816,7 +3816,10 @@ impl AssemblyView {
         let inserted = self.inserted_count(cx);
         let footer = v_flex()
             .flex_none()
-            .child(h_flex().h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}")))
+            // Live 610–611: no count on Other documents' category list (612:
+            // shown again once a document is open).
+            .when(!(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none()), |d| d.child(h_flex().h(px(22.)).pr(px(4.)).justify_end().text_size(px(13.33)).font_weight(FontWeight::SEMIBOLD).child(format!("Inserted: {inserted}"))))
+            .when(self.ui.insert_source == 1 && self.ui.insert_other_doc.is_none(), |d| d.child(div().h(px(22.))))
             .child(
                 h_flex()
                     .h(px(28.))
@@ -3977,7 +3980,7 @@ impl AssemblyView {
             .child(div().text_xs().text_color(pal.text_muted).child(lb))
             .child(picker(1, r.b))
             .child(div().text_xs().text_color(pal.text_muted).child(lr))
-            .child(Input::new(&r.ratio).xsmall())
+            .child(Input::new(&r.ratio).text_size(px(13.33)).xsmall())
             .child(Checkbox::new("rel-rev").label("Reverse direction").checked(r.reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
                 if let Some(r) = &mut this.relation {
                     r.reverse = *v;

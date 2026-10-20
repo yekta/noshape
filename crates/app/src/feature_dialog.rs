@@ -614,7 +614,7 @@ impl FeatureDialog {
                 h_flex()
                     .h(px(28.))
                     .child(div().px(px(5.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(label))
-                    .child(div().flex_1().min_w_0().child(Input::new(&st).xsmall())),
+                    .child(div().flex_1().min_w_0().child(Input::new(&st).text_size(px(13.33)).xsmall())),
             );
         }
         // Fit: Standard ▸ Fit type ▸ Hole class ▸ Shaft class.
@@ -2493,7 +2493,7 @@ impl FeatureDialog {
                         .relative()
                         // Live (dom/caret-inputs.json): `.os-param-number` / `.os-param-text` pad 3 px
                         // at the sides (numbers end 3 px from the right edge).
-                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(14.)).px(px(3.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
+                        .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(13.33)).px(px(3.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
                         .when_some(converted, |d, c| {
                             d.child(
                                 div()
@@ -2505,7 +2505,7 @@ impl FeatureDialog {
                                     .items_center()
                                     // Onshape right-aligns numbers.
                                     .justify_end()
-                                    .text_size(px(14.))
+                                    .text_size(px(13.33))
                                     .text_color(pal.text)
                                     .cursor_text()
                                     .child(c)

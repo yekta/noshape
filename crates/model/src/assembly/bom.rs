@@ -593,7 +593,7 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
             }
         }
         BomSource::Standard(spec) => match col {
-            BomColumn::Description => BomCell::Text(spec.part_name()),
+            BomColumn::Description => BomCell::Text(spec.description()),
             BomColumn::State => BomCell::Text(RELEASE_STATES[0].into()),
             BomColumn::UnitOfMeasure => BomCell::Text(DEFAULT_UNIT_OF_MEASURE.into()),
             _ => BomCell::Text(String::new()),

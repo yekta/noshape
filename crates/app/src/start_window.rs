@@ -1773,7 +1773,7 @@ impl StartView {
                                         .border_color(pal.border_strong)
                                         .rounded_l(px(2.))
                                         // The whole box left of the ▾ takes clicks (input_frame).
-                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
+                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
                                         .child(
                                             div()
                                                 .id("adv-caret")

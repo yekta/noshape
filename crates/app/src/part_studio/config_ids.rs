@@ -125,7 +125,7 @@ impl Render for FsIdsDialog {
             let value = st.read(cx).value().to_string();
             let err = id_error(&value);
             cell(300.)
-                .child(div().id(SharedString::from(format!("fsid-{}", st.entity_id()))).flex_1().when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e))).child(Input::new(st).appearance(false).text_size(px(14.))))
+                .child(div().id(SharedString::from(format!("fsid-{}", st.entity_id()))).flex_1().when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e))).child(Input::new(st).appearance(false).text_size(px(13.33))))
         };
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
             let mut t = v_flex().border_l_1().border_t_1().border_color(grid).child(h_flex().child(head(200., name_head)).child(head(300., "Internal FeatureScript ID")));

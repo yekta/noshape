@@ -172,6 +172,15 @@ live 466; fit-row widths trimmed to fit 405 px: 98/58/58/110/58, rebuild pending
 Studio Value cell now runs `variable_table::with_workspace_unit` ("5" → "5 mm", checked in the app).
 Scratch now in /root/ui2-scratch (binary, `bin/shot.sh out.png [window]`, build.log); one app at a time.
 
+- 18:00–: Named positions with rows checked (= live 150/154). Insert › Other documents: list 9 px lower,
+  no "Inserted: N" on the category list (live 610/611; shown once a document is open, 612). Insert ›
+  Standard content (assembly_standard.rs, visual): live 70 rows (90 px label column, underlined selects,
+  rules between groups), read-only Description, outlined centred Insert, no extra padding (assembly_view
+  3727 `pt(1)`). **For skb (behaviour/data, live 70):** Standard names "ANSI inch" / "Bolts & screws"
+  (ours "ANSI" / "Bolts & Screws"), Head slot ☑ and Thread length rows, Part number field with the edit
+  pencil, the line-drawing preview, and the two icon buttons beside Insert (capture requested,
+  REQUESTS ui2 18:10). Other documents' category icons are filled in live (icon agent).
+
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
 Not committed, in the shared tree (all mine, all complete edits; none half done):

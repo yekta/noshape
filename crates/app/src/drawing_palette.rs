@@ -245,7 +245,7 @@ impl DrawingEditor {
             Some(u) => format!("({})", u.symbol()),
         };
         let field = |st: &Entity<InputState>, w: Option<f32>, h: f32| {
-            let b = div().h(px(h)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(3.)).child(Input::new(st).appearance(false).xsmall());
+            let b = div().h(px(h)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(3.)).child(Input::new(st).text_size(px(14.)).appearance(false).xsmall());
             match w {
                 Some(w) => b.w(px(w)),
                 None => b.w_full(),
@@ -405,7 +405,7 @@ impl DrawingEditor {
             let value_combo = h_flex()
                 .h(px(30.))
                 .ml(px(10.))
-                .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(6.)).text_color(gpui_kit::rgb(0x555555)).child(Input::new(&d.value).appearance(false).xsmall().text_size(px(13.33)).text_center()))
+                .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::white()).flex().items_center().px(px(6.)).text_color(gpui_kit::rgb(0x555555)).child(Input::new(&d.value).appearance(false).xsmall().text_size(px(14.)).text_center()))
                 .child(pbutton("dp-prec", div().into_any_element(), 20., prec_items.clone(), true));
             let tol_icon = v_flex()
                 .items_center()

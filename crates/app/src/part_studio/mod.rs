@@ -1908,6 +1908,8 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// The features list's rows, in their own cached slice (see `PsSlices`);
+    /// the head is `render_feature_list_head`.
     fn render_feature_list(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(studio) = self.studio(cx).cloned() else { return div().into_any_element() };
@@ -2151,7 +2153,32 @@ impl PartStudioView {
         if prompt_anchor == Some(None) {
             rows.push(self.render_folder_prompt(cx));
         }
+        v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).size_full().overflow_y_scroll().children(rows).child(
+            // Space below the last feature: dropping the rollback bar
+            // here rolls it to the end (otherwise it could only be
+            // dragged up, and back down to above the last feature).
+            div()
+                .id("feature-list-end")
+                .flex_1()
+                .min_h(px(32.))
+                .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
+                .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(None, cx)))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Clicking empty list space clears the feature selection.
+                    if !this.selected_features.is_empty() {
+                        this.selected_features.clear();
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }
+                })),
+        )
+        .into_any_element()
+    }
 
+    /// The parts list under the features, in its own cached slice (see
+    /// `PsSlices`).
+    fn render_parts_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
         // Parts list.
         // Parts list sections by body kind (Onshape: Parts, Surfaces, Curves).
         use noshape_model::display::BodyKind;
@@ -2174,6 +2201,73 @@ impl PartStudioView {
             })
             .filter(|(key, _, rows, _)| *key == "Parts" || !rows.is_empty())
             .collect();
+        let mut col = v_flex().size_full().id("parts-area").overflow_y_scroll();
+        let show_props = self.ui.show_part_props;
+        for (title, key, rows, ids) in sections {
+            let collapsed = self.ui.collapsed_sections.contains(key);
+            let n = rows.len();
+            let all_hidden = !ids.is_empty() && ids.iter().all(|b| self.display.body(b).is_some_and(|d| d.hidden));
+            let view = cx.entity();
+            let ids2 = ids.clone();
+            col = col
+                .child(
+                    crate::ui::tree_row(SharedString::from(format!("{key}-folder")), false)
+                        .group("section-head")
+                        .child(crate::ui::caret(!collapsed))
+                        .child(div().flex_1().child(format!("{title} ({n})")))
+                        // Eye on hover: hide or show every item of the section.
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("{key}-eye")))
+                                .opacity(0.)
+                                .group_hover("section-head", |d| d.opacity(1.))
+                                .cursor_pointer()
+                                .child(svg().path(icon_path(if all_hidden { "eye-off" } else { "eye" })).size_3p5().text_color(pal.text_faint))
+                                .tooltip(crate::ui::tooltip(format!("{} all {}", if all_hidden { "Show" } else { "Hide" }, title.to_lowercase())))
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
+                                    this.set_visibility(&t, !all_hidden, cx);
+                                })),
+                        )
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if !this.ui.collapsed_sections.remove(key) {
+                                this.ui.collapsed_sections.insert(key);
+                            }
+                            cx.notify();
+                        }))
+                        .os_context_menu(move |m, _, _| {
+                            let (v1, v2) = (view.clone(), view.clone());
+                            let ids = ids2.clone();
+                            m.item(crate::os_menu::OsMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
+                                v1.update(cx, |this, cx| {
+                                    this.ui.show_part_props = !this.ui.show_part_props;
+                                    // The same setting as Preferences › Display parts list properties.
+                                    crate::preferences_window::set_parts_list_properties(this.ui.show_part_props);
+                                    cx.notify();
+                                })
+                            }))
+                            .item(crate::os_menu::OsMenuItem::new(format!("Hide all {}", title.to_lowercase())).on_click(move |_, _, cx| {
+                                let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
+                                v2.update(cx, |this, cx| this.set_visibility(&t, true, cx))
+                            }))
+                        }),
+                )
+                .when(!collapsed, |d| d.child(v_flex().pb(px(4.)).children(rows)));
+        }
+        col.into_any_element()
+    }
+
+    /// The head of the features list: configurations, contexts, the filter
+    /// box and the "Features (N)" row. Rendered with the studio, outside the
+    /// list's cached slices, so the filter box's keystrokes and caret blinks
+    /// leave the rows cached.
+    fn render_feature_list_head(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+        let Some(studio) = self.studio(cx) else { return Vec::new() };
+        let filtered = noshape_model::interaction::filter_features(studio, &self.display, &self.ui.filter_query);
+        let n_features = studio.features.len();
         let failed = |id: noshape_model::FeatureId| self.display.feature_state(id).is_some_and(|s| s.status == FeatureStatus::Error);
         // The open dialog counts when it can't regenerate (a new feature
         // isn't in the list yet).
@@ -2203,232 +2297,131 @@ impl PartStudioView {
                 .hover(|d| d.bg(pal.panel_hover))
                 .child(crate::assets::icon(icon, 20., cx))
         };
-        v_flex()
-            .size_full()
-            .bg(pal.panel)
-            .border_r_1()
-            .border_t_1()
-            .border_b_1()
-            .border_color(pal.border)
-            .children(config_box)
-            .children(contexts_section)
-            .children(filter_input.map(|st| {
-                h_flex()
-                    .h(px(30.))
-                    .mt(px(7.))
-                    .flex_none()
-                    .pl(px(5.))
-                    .pr(px(8.))
-                    .gap(px(14.))
-                    // Live: the funnel is a button (`os-button os-clear`): pointer.
-                    // Filtering: a filled blue funnel (live 564).
-                    .child(div().flex_none().cursor_pointer().child(crate::assets::icon(if filtered_count.is_some() { "filter-active" } else { "filter" }, 20., cx)))
-                    // Live (part-studio/00): a 30 px box, 1 px #aaa, radius 3; the
-                    // placeholder italic gray.
-                    .child({
-                        let empty = st.read(cx).value().is_empty();
-                        // The whole box takes clicks and shows the I-beam.
-                        gpui_kit::base::input::input_frame(
-                            div()
-                                .flex_1()
-                                .relative()
-                                .h(px(30.))
-                                .px(px(1.))
-                                .flex()
-                                .items_center()
-                                .border_1()
-                                .border_color(gpui_kit::rgb(0xaaaaaa))
-                                .rounded(px(3.))
-                                // The input draws its italic placeholder itself, so the caret
-                                // starts on it. Live (dom/caret-inputs.json): border 1 + padding 5,
-                                // the caret 6 px from the box's outer edge (1 + 1 + 4 here).
-                                .child(gpui_kit::component::input::Input::new(&st).appearance(false).text_size(px(14.)).pl(px(4.)))
-                                // A grey ⊗ clears the filter (live 564).
-                                .when(!empty, |d| {
-                                    d.child(
-                                        div()
-                                            .id("filter-clear")
-                                            .size(px(16.))
-                                            .mr(px(4.))
-                                            .flex_none()
-                                            .rounded_full()
-                                            .bg(gpui_kit::rgb(0xdddddd))
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .cursor_pointer()
-                                            .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb(0xffffff)))
-                                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_filter("", window, cx))),
-                                    )
-                                }),
-                        )
-                    })
-            }))
-            .child(
-                h_flex()
-                    .h(px(30.))
-                    .flex_none()
-                    .pl(px(4.))
-                    .pr(px(15.))
-                    // Live (part-studio/94, 570): with failed features a red
-                    // icon comes first (click: show only them) and the title
-                    // truncates to "Features …".
-                    .when(errors > 0, |d| {
-                        d.child(
-                            div()
-                                .id("feature-errors")
-                                .size(px(20.))
-                                .mr(px(8.))
-                                .flex_none()
-                                .cursor_pointer()
-                                .child(crate::assets::icon("regen-error", 20., cx))
-                                .tip(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" }), crate::ui::TipSide::Right)
-                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                    let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors" };
-                                    this.set_filter(next, window, cx);
-                                })),
-                        )
-                    })
-                    // (Chrome keeps the space before the ellipsis.)
-                    // Filtered: "Features (k of N)", truncating (live 564).
-                    .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
-                        _ if errors > 0 => "Features …".to_string(),
-                        Some(k) => format!("Features ({k} of {})", studio.features.len() + 4),
-                        None => format!("Features ({})", studio.features.len() + 4),
-                    }))
-                    .child(div().flex_1())
-                    // Live (navigation/301): a version keeps only the timer.
-                    .when(!viewing_version, |d| d.child(
-                        // Live (570): new folder and pause are disabled while a
-                        // feature dialog is open.
-                        header_btn("new-folder-btn", "new-folder", false, cx)
-                            .when(dialog_open, |d| d.opacity(0.4).cursor_default())
-                            // Live (585–590): "New folder", always enabled; the
-                            // "Folder name" popup comes first.
-                            .tooltip(crate::ui::tooltip("New folder"))
+        let mut head: Vec<AnyElement> = config_box.into_iter().chain(contexts_section).collect();
+        head.extend(filter_input.map(|st| {
+            h_flex()
+                .h(px(30.))
+                .mt(px(7.))
+                .flex_none()
+                .pl(px(5.))
+                .pr(px(8.))
+                .gap(px(14.))
+                // Live: the funnel is a button (`os-button os-clear`): pointer.
+                // Filtering: a filled blue funnel (live 564).
+                .child(div().flex_none().cursor_pointer().child(crate::assets::icon(if filtered_count.is_some() { "filter-active" } else { "filter" }, 20., cx)))
+                // Live (part-studio/00): a 30 px box, 1 px #aaa, radius 3; the
+                // placeholder italic gray.
+                .child({
+                    let empty = st.read(cx).value().is_empty();
+                    // The whole box takes clicks and shows the I-beam.
+                    gpui_kit::base::input::input_frame(
+                        div()
+                            .flex_1()
+                            .relative()
+                            .h(px(30.))
+                            .px(px(1.))
+                            .flex()
+                            .items_center()
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xaaaaaa))
+                            .rounded(px(3.))
+                            // The input draws its italic placeholder itself, so the caret
+                            // starts on it. Live (dom/caret-inputs.json): border 1 + padding 5,
+                            // the caret 6 px from the box's outer edge (1 + 1 + 4 here).
+                            .child(gpui_kit::component::input::Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(4.)))
+                            // A grey ⊗ clears the filter (live 564).
+                            .when(!empty, |d| {
+                                d.child(
+                                    div()
+                                        .id("filter-clear")
+                                        .size(px(16.))
+                                        .mr(px(4.))
+                                        .flex_none()
+                                        .rounded_full()
+                                        .bg(gpui_kit::rgb(0xdddddd))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .cursor_pointer()
+                                        .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb(0xffffff)))
+                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_filter("", window, cx))),
+                                )
+                            }),
+                    )
+                })
+                .into_any_element()
+        }));
+        head.push(
+            h_flex()
+                .h(px(30.))
+                .flex_none()
+                .pl(px(4.))
+                .pr(px(15.))
+                // Live (part-studio/94, 570): with failed features a red
+                // icon comes first (click: show only them) and the title
+                // truncates to "Features …".
+                .when(errors > 0, |d| {
+                    d.child(
+                        div()
+                            .id("feature-errors")
+                            .size(px(20.))
+                            .mr(px(8.))
+                            .flex_none()
+                            .cursor_pointer()
+                            .child(crate::assets::icon("regen-error", 20., cx))
+                            .tip(format!("{errors} feature{} failed to regenerate", if errors == 1 { "" } else { "s" }), crate::ui::TipSide::Right)
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                if this.edit.is_some() {
-                                    return;
-                                }
-                                let ids = this.selected_features.clone();
-                                this.open_folder_prompt(ids, window, cx)
+                                let next = if this.ui.filter_query.trim() == ":errors" { "" } else { ":errors" };
+                                this.set_filter(next, window, cx);
                             })),
                     )
-                    .child(
-                        header_btn("pause-regen-btn", "pause-regen", self.ui.regen_paused.is_some(), cx)
-                            .when(dialog_open, |d| d.opacity(0.4).cursor_default())
-                            .tooltip(crate::ui::tooltip("Pause regeneration"))
-                            .on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
-                                if this.edit.is_none() {
-                                    this.toggle_pause_regen(w, cx)
-                                }
-                            })),
-                    ))
-                    .child(
-                        header_btn("regen-times-btn", "regen-timer", self.ui.show_regen_times, cx)
-                            .tooltip(crate::ui::tooltip("Show regeneration times"))
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.ui.show_regen_times = !this.ui.show_regen_times;
-                                cx.notify();
-                            })),
-                    ),
-            )
-            .child(
-                v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).flex_1().overflow_y_scroll().children(rows).child(
-                    // Space below the last feature: dropping the rollback bar
-                    // here rolls it to the end (otherwise it could only be
-                    // dragged up, and back down to above the last feature).
-                    div()
-                        .id("feature-list-end")
-                        .flex_1()
-                        .min_h(px(32.))
-                        .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
-                        .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(None, cx)))
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            // Clicking empty list space clears the feature selection.
-                            if !this.selected_features.is_empty() {
-                                this.selected_features.clear();
-                                this.refresh_scene(false, cx);
-                                cx.notify();
+                })
+                // (Chrome keeps the space before the ellipsis.)
+                // Filtered: "Features (k of N)", truncating (live 564).
+                .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
+                    _ if errors > 0 => "Features …".to_string(),
+                    Some(k) => format!("Features ({k} of {})", n_features + 4),
+                    None => format!("Features ({})", n_features + 4),
+                }))
+                .child(div().flex_1())
+                // Live (navigation/301): a version keeps only the timer.
+                .when(!viewing_version, |d| d.child(
+                    // Live (570): new folder and pause are disabled while a
+                    // feature dialog is open.
+                    header_btn("new-folder-btn", "new-folder", false, cx)
+                        .when(dialog_open, |d| d.opacity(0.4).cursor_default())
+                        // Live (585–590): "New folder", always enabled; the
+                        // "Folder name" popup comes first.
+                        .tooltip(crate::ui::tooltip("New folder"))
+                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            if this.edit.is_some() {
+                                return;
+                            }
+                            let ids = this.selected_features.clone();
+                            this.open_folder_prompt(ids, window, cx)
+                        })),
+                )
+                .child(
+                    header_btn("pause-regen-btn", "pause-regen", self.ui.regen_paused.is_some(), cx)
+                        .when(dialog_open, |d| d.opacity(0.4).cursor_default())
+                        .tooltip(crate::ui::tooltip("Pause regeneration"))
+                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| {
+                            if this.edit.is_none() {
+                                this.toggle_pause_regen(w, cx)
                             }
                         })),
-                ),
-            )
-            // Drag the separator to share space between features and parts.
-            .child(
-                div()
-                    .id("parts-separator")
-                    .h(px(5.))
-                    .flex_none()
-                    // Live: `div.os-splitter` is row-resize.
-                    .cursor(CursorStyle::ResizeRow)
-                    .border_t_1()
-                    .border_color(pal.border)
-                    .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
-            )
-            .child({
-                // Live (part-studio/00, 220): the parts take the lower 35% of the
-                // panel until the separator is dragged. A share of the panel, so
-                // both sections keep room when the panel gets shorter (the
-                // FeatureScript notices panel under the tab bar).
-                let parts_share = self.ui.parts_height.unwrap_or(0.35);
-                let mut col = v_flex().h(relative(parts_share)).min_h(px(30.)).flex_none().id("parts-area").overflow_y_scroll();
-                let show_props = self.ui.show_part_props;
-                for (title, key, rows, ids) in sections {
-                    let collapsed = self.ui.collapsed_sections.contains(key);
-                    let n = rows.len();
-                    let all_hidden = !ids.is_empty() && ids.iter().all(|b| self.display.body(b).is_some_and(|d| d.hidden));
-                    let view = cx.entity();
-                    let ids2 = ids.clone();
-                    col = col
-                        .child(
-                            crate::ui::tree_row(SharedString::from(format!("{key}-folder")), false)
-                                .group("section-head")
-                                .child(crate::ui::caret(!collapsed))
-                                .child(div().flex_1().child(format!("{title} ({n})")))
-                                // Eye on hover: hide or show every item of the section.
-                                .child(
-                                    div()
-                                        .id(SharedString::from(format!("{key}-eye")))
-                                        .opacity(0.)
-                                        .group_hover("section-head", |d| d.opacity(1.))
-                                        .cursor_pointer()
-                                        .child(svg().path(icon_path(if all_hidden { "eye-off" } else { "eye" })).size_3p5().text_color(pal.text_faint))
-                                        .tooltip(crate::ui::tooltip(format!("{} all {}", if all_hidden { "Show" } else { "Hide" }, title.to_lowercase())))
-                                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                            cx.stop_propagation();
-                                            let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
-                                            this.set_visibility(&t, !all_hidden, cx);
-                                        })),
-                                )
-                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    if !this.ui.collapsed_sections.remove(key) {
-                                        this.ui.collapsed_sections.insert(key);
-                                    }
-                                    cx.notify();
-                                }))
-                                .os_context_menu(move |m, _, _| {
-                                    let (v1, v2) = (view.clone(), view.clone());
-                                    let ids = ids2.clone();
-                                    m.item(crate::os_menu::OsMenuItem::new(if show_props { "Hide parts list properties" } else { "Show parts list properties" }).on_click(move |_, _, cx| {
-                                        v1.update(cx, |this, cx| {
-                                            this.ui.show_part_props = !this.ui.show_part_props;
-                                            // The same setting as Preferences › Display parts list properties.
-                                            crate::preferences_window::set_parts_list_properties(this.ui.show_part_props);
-                                            cx.notify();
-                                        })
-                                    }))
-                                    .item(crate::os_menu::OsMenuItem::new(format!("Hide all {}", title.to_lowercase())).on_click(move |_, _, cx| {
-                                        let t: Vec<Reference> = ids.iter().cloned().map(Reference::Body).collect();
-                                        v2.update(cx, |this, cx| this.set_visibility(&t, true, cx))
-                                    }))
-                                }),
-                        )
-                        .when(!collapsed, |d| d.child(v_flex().pb(px(4.)).children(rows)));
-                }
-                col
-            })
-            .into_any_element()
+                ))
+                .child(
+                    header_btn("regen-times-btn", "regen-timer", self.ui.show_regen_times, cx)
+                        .tooltip(crate::ui::tooltip("Show regeneration times"))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.ui.show_regen_times = !this.ui.show_regen_times;
+                            cx.notify();
+                        })),
+                )
+                .into_any_element(),
+        );
+        head
     }
 
     /// A row of the parts list: click selects (or feeds a dialog's part
@@ -3198,7 +3191,9 @@ impl PartStudioView {
         .into_any_element()
     }
 
-    fn render_viewport_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    /// What the feature dialog covers: plane names and the graphics
+    /// preferences dialog.
+    fn render_viewport_underlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
         // Plane labels: Onshape draws the name *in the plane* (blue, at the
@@ -3222,17 +3217,27 @@ impl PartStudioView {
         if let Some((d, _)) = &self.ui.graphics_dialog {
             out.push(div().absolute().top(px(3.)).left(px(0.)).child(d.clone()).into_any_element());
         }
-        // Feature dialog.
-        if let Some(e) = &self.edit {
-            // Moved dialogs keep their place (Onshape lets you drag them).
-            let d = div().absolute().child(e.dialog.clone());
-            // Onshape: at the viewport's left edge, 3 px under the toolbar.
-            let d = match self.ui.dialog_pos {
-                Some(p) => d.left(p.x).top(p.y),
-                None => d.top(px(3.)).left(px(0.)),
-            };
-            out.push(d.into_any_element());
-        }
+        out
+    }
+
+    /// The feature dialog. It sits between the two overlay slices rather
+    /// than in one, so a keystroke or caret blink in its fields leaves them
+    /// cached.
+    fn render_dialog_layer(&self) -> Option<AnyElement> {
+        let e = self.edit.as_ref()?;
+        // Moved dialogs keep their place (Onshape lets you drag them).
+        let d = div().absolute().child(e.dialog.clone());
+        // Onshape: at the viewport's left edge, 3 px under the toolbar.
+        let d = match self.ui.dialog_pos {
+            Some(p) => d.left(p.x).top(p.y),
+            None => d.top(px(3.)).left(px(0.)),
+        };
+        Some(d.into_any_element())
+    }
+
+    /// What is drawn over the feature dialog.
+    fn render_viewport_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let mut out = Vec::new();
         // View cube / quick views.
         out.push(self.render_view_controls(cx));
         if let Some(nv) = self.render_named_views(cx) {
@@ -3528,7 +3533,14 @@ pub(super) fn paint_paths(polys: Vec<Vec<Point<Pixels>>>, color: Hsla) -> AnyEle
 #[derive(Clone)]
 struct PsSlices {
     toolbar: Entity<crate::cached_slice::Slice<PartStudioView>>,
+    /// Under the feature dialog.
+    underlay: Entity<crate::cached_slice::Slice<PartStudioView>>,
+    /// Over it.
     overlay: Entity<crate::cached_slice::Slice<PartStudioView>>,
+    /// The features list's rows (the filter notifies it when the query
+    /// changes).
+    features: Entity<crate::cached_slice::Slice<PartStudioView>>,
+    parts: Entity<crate::cached_slice::Slice<PartStudioView>>,
 }
 
 impl PartStudioView {
@@ -3542,29 +3554,47 @@ impl PartStudioView {
             let viewport_w = f32::from(window.viewport_size().width);
             if this.sketch.is_some() { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
         }, cx);
+        let underlay = Slice::new(&me, |this, window, cx| this.render_underlay_slice(window, cx), cx);
         let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
-        // Labels, the view cube and manipulators follow the camera.
-        Slice::observing(&overlay, &self.viewport, cx);
-        // Both read the document (undo state, features) besides the studio.
+        let features = Slice::new(&me, |this, window, cx| this.render_feature_list(window, cx), cx);
+        let parts = Slice::new(&me, |this, _, cx| this.render_parts_list(cx), cx);
+        // Labels, the view cube and manipulators follow the camera, and the
+        // lists the highlights; all read the document (undo state,
+        // features) besides the studio.
+        for s in [&underlay, &overlay, &features, &parts] {
+            Slice::observing(s, &self.viewport, cx);
+            Slice::observing(s, &self.doc, cx);
+        }
         Slice::observing(&toolbar, &self.doc, cx);
-        Slice::observing(&overlay, &self.doc, cx);
-        let s = PsSlices { toolbar, overlay };
+        let s = PsSlices { toolbar, underlay, overlay, features, parts };
         self.slices = Some(s.clone());
         s
     }
 
-    /// Everything drawn over the graphics area.
+    /// The filter query changed: only the features list's rows show it (the
+    /// head re-renders with the filter box anyway).
+    fn filter_rows_changed(&self, cx: &mut Context<Self>) {
+        if let Some(s) = &self.slices {
+            s.features.update(cx, |_, cx| cx.notify());
+        }
+    }
+
+    /// What is drawn over the graphics area under the feature dialog (live:
+    /// the dialog hides sketch names and the list toggle).
+    fn render_underlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        // Live: centered 8 px above the viewport's middle, like the right strip.
+        let mut underlay = vec![div().absolute().top_0().bottom(px(16.)).left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element()];
+        underlay.extend(self.render_sketch_labels(window, cx));
+        underlay.extend(self.render_viewport_underlay(cx));
+        div().size_full().relative().children(underlay).into_any_element()
+    }
+
+    /// What is drawn over the graphics area and the feature dialog.
     fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let mut overlay = self.render_viewport_overlay(cx);
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
         overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
-        // Under everything else, so a feature dialog covers them (live: the
-        // dialog hides sketch names and the list toggle).
-        let labels = self.render_sketch_labels(window, cx);
-        overlay.splice(0..0, labels);
-        // Live: centered 8 px above the viewport's middle, like the right strip.
-        overlay.insert(0, div().absolute().top_0().bottom(px(16.)).left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element());
         overlay.extend(self.render_measure_panel(cx));
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
@@ -3612,7 +3642,7 @@ impl Render for PartStudioView {
             self.refresh_scene(false, cx);
         }
         let slices = self.slices(cx);
-        let list = self.render_feature_list(window, cx);
+        let list_head = self.render_feature_list_head(cx);
         if self.needs_regen {
             self.needs_regen = false;
             self.schedule_regen(window, cx);
@@ -3873,7 +3903,34 @@ impl Render for PartStudioView {
                                     cx.notify();
                                 }
                             }))
-                            .child(list)
+                            .child(
+                                v_flex()
+                                    .size_full()
+                                    .bg(pal.panel)
+                                    .border_r_1()
+                                    .border_t_1()
+                                    .border_b_1()
+                                    .border_color(pal.border)
+                                    .children(list_head)
+                                    .child(slices.features.clone().cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
+                                    // Drag the separator to share space between features and parts.
+                                    .child(
+                                        div()
+                                            .id("parts-separator")
+                                            .h(px(5.))
+                                            .flex_none()
+                                            // Live: `div.os-splitter` is row-resize.
+                                            .cursor(CursorStyle::ResizeRow)
+                                            .border_t_1()
+                                            .border_color(pal.border)
+                                            .on_drag(SeparatorDrag, |_, _, _, cx| cx.new(|_| SeparatorDrag)),
+                                    )
+                                    // Live (part-studio/00, 220): the parts take the lower 35% of the
+                                    // panel until the separator is dragged. A share of the panel, so
+                                    // both sections keep room when the panel gets shorter (the
+                                    // FeatureScript notices panel under the tab bar).
+                                    .child(slices.parts.clone().cached(StyleRefinement::default().w_full().h(relative(self.ui.parts_height.unwrap_or(0.35))).min_h(px(30.)).flex_none())),
+                            )
                             .into_any_element()
                     })
                     .child(
@@ -3908,6 +3965,8 @@ impl Render for PartStudioView {
                                 cx.notify();
                             }))
                             .child(self.viewport.clone())
+                            .child(slices.underlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
+                            .children(self.render_dialog_layer())
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
                     )
                     .children(right),

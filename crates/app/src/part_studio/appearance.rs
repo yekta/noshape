@@ -372,7 +372,7 @@ impl PartStudioView {
                         .gap_2()
                         .child(div().size(px(28.)).rounded_sm().border_1().border_color(pal.border).bg(gpui_kit::Rgba { r: rgb[0] as f32 / 255.0, g: rgb[1] as f32 / 255.0, b: rgb[2] as f32 / 255.0, a: 1.0 }))
                         .child(div().text_xs().text_color(pal.text_muted).child("#"))
-                        .child(div().flex_1().child(Input::new(&e.hex).xsmall())),
+                        .child(div().flex_1().child(Input::new(&e.hex).text_size(px(13.)).xsmall())),
                 )
                 .child(v_flex().gap_0p5().child(channel(0, "R", cx)).child(channel(1, "G", cx)).child(channel(2, "B", cx)))
                 .when(is_part, |d| {

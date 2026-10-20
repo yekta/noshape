@@ -2100,7 +2100,7 @@ impl AssemblyView {
                     .border_1()
                     .border_color(gpui_kit::rgb(0xaaaaaa))
                     .rounded(px(3.))
-                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(14.)).pl(px(5.))),
+                    .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.))),
             )
             .child(div().flex_1())
             .child(crate::assets::icon("instance-list-view", 20., cx))

@@ -87,7 +87,7 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | drw2: PAUSED (OOM 10-20) — verifies/finishes the 🔧 rows of docs/parity/drawing.md | 0885a73c-7226-4028-810b-b15186c9a054 | Motile / Opus 5.5 | :111, target-behave | `docs/handoff/drawing-verify.md` |
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
 | psb: Part Studio behaviour (+ release workflow, materials) | 76bd77b6-fcaf-41ed-a850-3e55a5059984 | Yekta / Opus 5.5 | :102, target-behave | `docs/handoff/part-studio-behaviour.md` |
-| skb: PAUSED (OOM 10-20) — assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-behave | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
+| skb: assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-behave | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
 | asb: PAUSED (OOM 10-20) — drawing behaviour | 330203cf-d732-49b9-b81c-cf46fabfc5d6 | Motile / Opus 5.5 | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
 | kern: PAUSED (OOM 10-20) — kernel robustness + import/export | 1d8d27a8-3e1e-408a-9059-12bf7ecef977 | Yekta / Opus 5.5 | :106, target-engine | `docs/handoff/kernel-robustness.md` |

@@ -1845,7 +1845,7 @@ impl DrawingEditor {
                 ],
             ),
             Panel::SurfaceFinish { input, .. } => ("Surface finish", vec![Self::label_row("Roughness", Input::new(input).small().w(px(160.)).into_any_element())]),
-            Panel::Datum { input, anchor, .. } => (if anchor[0].is_nan() { "Callout text (empty = BOM item)" } else { "Datum" }, vec![Self::label_row("Label", Input::new(input).small().w(px(120.)).into_any_element())]),
+            Panel::Datum { input, anchor, .. } => (if anchor[0].is_nan() { "Callout text (empty = BOM item)" } else { "Datum" }, vec![Self::label_row("Label", Input::new(input).text_size(px(13.33)).small().w(px(120.)).into_any_element())]),
             _ => return None,
         })
     }

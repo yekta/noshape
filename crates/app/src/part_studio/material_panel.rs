@@ -221,7 +221,7 @@ impl PartStudioView {
         let mut body = v_flex();
         if custom {
             for (i, f) in FIELDS.iter().enumerate() {
-                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&custom_fields[i]).appearance(false)))));
+                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&custom_fields[i]).text_size(px(13.33)).appearance(false)))));
             }
         } else {
             // Library select and "+" (Add material library…).
@@ -323,7 +323,7 @@ impl PartStudioView {
                         cx.stop_propagation();
                         cx.notify();
                     }))
-                    .child(div().flex_1().child(Input::new(&search).appearance(false)))
+                    .child(div().flex_1().child(Input::new(&search).text_size(px(14.)).appearance(false)))
                     .when(!query.is_empty(), |d| {
                         d.child(
                             div()

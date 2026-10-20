@@ -264,7 +264,7 @@ impl DrawingEditor {
                 m
             })
         };
-        let boxed = |i: usize| div().w(px(BOX)).h(px(30.)).child(Input::new(&inputs[i]).small());
+        let boxed = |i: usize| div().w(px(BOX)).h(px(30.)).child(Input::new(&inputs[i]).text_size(px(13.33)).small());
         // A labelled row: the label right-aligned before the control.
         let row = |l: &'static str, body: AnyElement| h_flex().h(px(ROW)).child(div().w(px(LABEL_RIGHT)).pr(px(8.)).flex().justify_end().text_size(px(12.)).child(l)).child(body).into_any_element();
         let no_spacer = s.spacer == JointSpacer::None;

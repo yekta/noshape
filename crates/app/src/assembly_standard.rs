@@ -221,7 +221,8 @@ impl AssemblyView {
 
     fn std_dropdown(&self, id: &'static str, current: String, options: Vec<String>, disabled: bool, on_pick: fn(&mut AssemblyView, &str, &mut Context<AssemblyView>), cx: &mut Context<Self>) -> AnyElement {
         let view = cx.entity();
-        let button = Button::new(id).label(current.clone()).outline().small().w_full().disabled(disabled);
+        // Live assembly/70: a borderless select on a `#ddd` underline.
+        let button = Button::new(id).label(current.clone()).ghost().small().w_full().h(px(26.)).rounded(px(0.)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).disabled(disabled);
         if disabled {
             return button.into_any_element();
         }
@@ -243,8 +244,11 @@ impl AssemblyView {
     pub(super) fn render_standard_content(&mut self, editing: bool, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let spec = self.std_spec();
-        let label = |s: &'static str| div().text_xs().text_color(pal.text_muted).child(s);
-        let mut body = v_flex().gap_1();
+        // Live assembly/70: 27 px rows, the label in a 90 px column, the
+        // select filling the rest; a rule between the groups.
+        let row = |name: &'static str, field: AnyElement| h_flex().h(px(27.)).child(div().w(px(90.)).flex_none().pl(px(7.)).text_size(px(12.)).text_color(pal.text).child(name)).child(div().flex_1().min_w_0().pr(px(8.)).child(field)).into_any_element();
+        let rule = || div().h(px(1.)).my(px(3.)).bg(gpui_kit::rgb(0xd7d7d7)).into_any_element();
+        let mut body = v_flex();
         let levels: [(&'static str, &'static str, String, Vec<String>); 4] = [
             ("std-standard", "Standard", spec.standard.clone(), standard::standards().into_iter().map(String::from).collect()),
             ("std-category", "Category", spec.category.clone(), standard::categories(&spec.standard).into_iter().map(String::from).collect()),
@@ -253,8 +257,9 @@ impl AssemblyView {
         ];
         let pickers: [fn(&mut AssemblyView, &str, &mut Context<AssemblyView>); 4] = [|t, v, cx| t.std_choose(0, v, cx), |t, v, cx| t.std_choose(1, v, cx), |t, v, cx| t.std_choose(2, v, cx), |t, v, cx| t.std_choose(3, v, cx)];
         for ((id, name, cur, options), pick) in levels.into_iter().zip(pickers) {
-            body = body.child(label(name)).child(self.std_dropdown(id, cur, options, editing, pick, cx));
+            body = body.child(row(name, self.std_dropdown(id, cur, options, editing, pick, cx)));
         }
+        body = body.child(rule());
         let Some(c) = standard::component(&spec) else { return body.into_any_element() };
         let sizes: Vec<String> = c.sizes.iter().map(|s| s.name.to_string()).collect();
         let size_dd = self.std_dropdown("std-size", spec.size.clone(), sizes, false, |t, v, cx| t.std_set_size(v, cx), cx);
@@ -265,14 +270,17 @@ impl AssemblyView {
             .child(crate::assets::icon(&icon_path("auto-size"), 16., cx))
             .tooltip("Auto-size fastener: select a hole")
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_toggle_auto_size(cx)));
-        body = body.child(label("Size")).child(h_flex().gap_1().child(div().flex_1().child(size_dd)).when(!editing, |d| d.child(auto)));
+        body = body.child(row("Size", h_flex().gap_1().child(div().flex_1().child(size_dd)).when(!editing, |d| d.child(auto)).into_any_element()));
         if let Some(size) = c.size(&spec.size)
             && c.shape.has_length()
         {
             let lengths = c.lengths(size);
             let cur = spec.length.clone().unwrap_or_default();
-            body = body.child(label("Length")).child(self.std_dropdown("std-length", cur, lengths, false, |t, v, cx| t.std_set_length(v, cx), cx));
+            body = body.child(row("Length", self.std_dropdown("std-length", cur, lengths, false, |t, v, cx| t.std_set_length(v, cx), cx)));
         }
+        body = body.child(rule());
+        // Live: the part's Description, read-only grey.
+        body = body.child(row("Description", div().h(px(24.)).px(px(4.)).flex().items_center().bg(gpui_kit::rgb(0xeeeeee)).border_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(spec.part_name()).into_any_element()));
         // Preview: the part's name and a short description.
         body = body.child(
             h_flex()
@@ -284,12 +292,13 @@ impl AssemblyView {
                 .child(v_flex().flex_1().min_w_0().child(div().text_sm().child(spec.part_name())).child(div().text_xs().text_color(pal.text_faint).child(format!("{} › {} › {}", spec.standard, spec.category, spec.class)))),
         );
         let holes = self.ui.std.holes.len();
+        // Live: a white outlined button (radius 3, 30 px), centred under the preview.
         let action = if editing {
-            Button::new("std-update").label("Update").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx)))
+            Button::new("std-update").label("Update").outline().h(px(30.)).px(px(10.)).rounded(px(3.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx)))
         } else {
-            Button::new("std-insert").label(if holes > 1 { format!("Insert ({holes})") } else { "Insert".to_string() }).primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_insert(cx)))
+            Button::new("std-insert").label(if holes > 1 { format!("Insert ({holes})") } else { "Insert".to_string() }).outline().h(px(30.)).px(px(10.)).rounded(px(3.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_insert(cx)))
         };
-        body = body.child(h_flex().justify_end().pt_1().child(action));
+        body = body.child(h_flex().justify_center().pt(px(8.)).child(action));
         body.into_any_element()
     }
 

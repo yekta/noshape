@@ -375,7 +375,7 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 1 {
             // Dimensions › All dimensions, Gaps and extensions.
             let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).small()).into_any_element(),
+                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small()).into_any_element(),
                 None => div().into_any_element(),
             };
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL

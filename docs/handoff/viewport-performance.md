@@ -49,6 +49,16 @@ command in this file.
 - Keep everything compiling, clippy-clean (`-D warnings`) and the tests green. The lead integrates the shared
   tree; don't commit.
 
+## Measuring on a Mac (send the output back)
+Open a heavy document, keep the window still, and run (the orbit starts ~10 s after launch, after a zoom to fit):
+```
+NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT=600 /Applications/noshape.app/Contents/MacOS/noshape \
+  ~/Documents/noshape/<document>.noshape 2>&1 | grep -E "viewport frames|BENCH SUMMARY"
+```
+Compare with the old path: prefix `NOSHAPE_PRESENT=readback`. Zoom instead of orbit: `NOSHAPE_PERF_BENCH=zoom`.
+The `BENCH SUMMARY` line gives the presentation path, device pixels, presented fps, window renders, frame
+interval mean/p50/p95/p99/max, frames over 16.7 ms / 8.3 ms, and UI-thread CPU per frame.
+
 ## Status log
 (append dated entries here)
 - **2026-10-20 15:05 (perf)** Started. Read brief, TEAM-RULES, ARCHITECTURE (Viewport, Performance rules,
@@ -96,3 +106,41 @@ command in this file.
   `/root/target-engine/debug/incremental/noshape-*` dirs are probably corrupt; clear them at a quiet moment.
   Clippy of the app is blocked by `crates/model/src/display.rs:50` (`chunks_exact` with a constant size;
   not mine).
+- **2026-10-20 17:30 (perf) Results (A)+(B), integrated in v0.4.2.** A/B in one binary (`NOSHAPE_PRESENT`),
+  Xvfb :113 + llvmpipe, debug build, orbit bench:
+
+  | case | path | UI-thread CPU/frame (mean, p95) | render-thread CPU/frame | CPU copies/frame |
+  |---|---|---|---|---|
+  | demo part, 1194x794 px (scale 1) | readback | 17.3, 23.2 ms | 1.93 ms | 3 × 3.8 MB |
+  | | GPU texture | **13.8, 15.8 ms** | 1.74 ms | 0 |
+  | linkrods.step (OCCT sample), 2388x1588 px (scale 2) | readback | 32.6, 40.0 ms | 10.7 ms (p95 23.1) | 3 × 15.2 MB |
+  | | GPU texture | **14.8, 17.4 ms** | **2.0 ms** | 0 |
+
+  Zero-copy frames are pixel-identical to readback frames (ImageMagick AE = 0 on full-window screenshots).
+  Hover highlight frames go through `request_present` only (`v.present_only_count`), no window re-render.
+  llvmpipe fps is lower with a shared device (2.9 → 2.0 fps at scale 2): GPUI's queue present on a CPU
+  rasterizer is synchronous, so our submit waits behind it (`r.encode_submit` 0.5 → 150 ms of waiting, CPU
+  unchanged). Real GPUs present asynchronously; CPU adapters now keep readback (`gpu.rs spawn_worker`;
+  `NOSHAPE_PRESENT=texture` forces it for tests here).
+  New test `texture_frames_stay_on_the_gpu_and_textures_are_reused_once_released` (crates/render/tests).
+  macOS: `/root/perf-scratch/macchk/run.sh` type-checks + clippies the Metal patch and gpu.rs's `metal`
+  module for aarch64-apple-darwin (clean). **Not run on a Mac yet**: the Mac numbers must come from the user
+  (command above). If anything looks wrong there, `NOSHAPE_PRESENT=readback` is the escape hatch.
+- **(C) remaining per-frame cost while orbiting** (for qa4): with zero-copy, the ~15 ms UI CPU per orbit frame
+  (debug build, this box) is the window re-render the camera-following overlay forces (overlay slice +
+  PartStudioView + Workspace render bodies, layout, paint). Self-time top items on the UI thread during the
+  bench: memmove ~10%, malloc/realloc ~13%, lyon `FillTessellator` 3–5% (view cube, in-plane plane labels:
+  re-tessellated every frame), taffy flexbox ~5%, `ParamValue::clone` ~3% (model params cloned during
+  render), wgpu descriptor sets ~3.5% (mine, see Next 2).
+
+## Next
+1. Mac numbers from the user (command above); if `BENCH SUMMARY` shows "frames read back" on Apple silicon,
+   the GPU id check in `compositor_shares_gpu` failed: log `gpui::renderer_gpus()` vs `metal::RENDERER_GPU`.
+2. Linux: GPUI re-creates the external texture's bind group whenever the shown texture changes (one cache slot
+   per texture id): key the cache by generation in vendor/gpui-pre-wgpu `prepare_texture_bind_groups`.
+3. Windows: zero-copy needs a D3D12→D3D11 shared texture (wgpu DX12 `CreateSharedHandle`, GPUI D3D11
+   `OpenSharedResource1`) + fence; until then Windows reads back.
+4. Camera-following overlays: cache the view cube / plane-label tessellation (lyon) per camera, coordinate
+   with qa4's slices; then measure orbit UI CPU again.
+5. Intel Macs with two GPUs: GPUI picks the low-power GPU, wgpu the high-performance one → readback there;
+   pick the wgpu adapter whose `registryID` matches `gpui::renderer_gpus()`.

@@ -273,7 +273,7 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(h_flex().child(tab("ds-vert", "Vertical", 0, cx)).child(tab("ds-horiz", "Horizontal", 1, cx)).child(tab("ds-ang", "Angular", 2, cx)))
-                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(26.)).flex().items_end().border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small())))
+                        .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).h(px(26.)).flex().items_end().border_b_1().border_color(pal.accent).child(Input::new(&d.label).text_size(px(13.33)).appearance(false).small())))
                         .child(
                             h_flex()
                                 .mt(px(5.))
@@ -328,7 +328,7 @@ impl DrawingEditor {
                                     .px(px(6.))
                                     .gap(px(6.))
                                     .child(div().text_size(px(12.)).text_color(pal.text_muted).child("Cut angle"))
-                                    .child(div().flex_1().child(Input::new(&st).small()))
+                                    .child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).small()))
                                     .child(
                                         div()
                                             .id("ds-opposite")
@@ -394,7 +394,7 @@ impl DrawingEditor {
                             };
                             e.child(h_flex().px(px(4.)).child(tab("ds-blind", "Blind", !d.up_to, false, cx)).child(tab("ds-upto", "Up to entity", d.up_to, true, cx)))
                         })
-                        .when_some(d.depth.as_ref().map(|x| x.0.clone()).filter(|_| !d.up_to), |e, st| e.child(h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Depth")).child(div().flex_1().child(Input::new(&st).small()))))
+                        .when_some(d.depth.as_ref().map(|x| x.0.clone()).filter(|_| !d.up_to), |e, st| e.child(h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Depth")).child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).small()))))
                         .when(d.depth.is_some() && d.up_to, |e| {
                             let label = if d.depth_ref.is_some() { "1 entity" } else { "Select a vertex" };
                             let on = d.picking == 1;

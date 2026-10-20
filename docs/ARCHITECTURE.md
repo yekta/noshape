@@ -82,11 +82,36 @@ GPUI does not let applications draw into its own GPU passes, so
   arrives), so during navigation GPUI re-renders the UI once per presented
   frame instead of on every mouse event. `Scene::same_as` drops refreshes that
   would render an identical image (same buffers, instances and states).
-* **Presentation.** The resolved `Bgra8UnormSrgb` frame is copied out of the
-  mapped buffer once (row padding removed) and wrapped in a GPUI
-  `RenderImage` without any channel swizzle (GPUI's atlas is BGRA). GPUI then
-  uploads it into its sprite atlas (one more CPU copy and a texture upload
-  inside GPUI; the old image is dropped from the atlas when the next arrives).
+* **Presentation (zero-copy).** Where GPUI can sample the renderer's
+  textures, a viewport target is a `Present::Texture` target: frames render
+  into a small ring of `PresentTexture`s (`Bgra8Unorm`, rendered through an
+  sRGB view, so GPUI samples the same bytes a readback would give) and stay
+  on the GPU. The viewport registers the newest one under a stable
+  `ExternalTextureId` (`gpui::set_external_texture`, vendored gpui-pre patch)
+  and paints the id with `Window::paint_external_texture`; GPUI's renderer
+  looks the texture up when it draws, so a frame that only changes pixels
+  (hover, selection, refinement) needs no window re-render at all, only
+  `Window::request_present` (the viewport notifies only when the camera or
+  the size changed since its last render, for camera-following overlays).
+  A texture is rendered into again only once the UI dropped every `Arc` to
+  it: the viewport keeps replaced textures until GPUI reports that the GPU
+  frames that may sample them finished (`gpu_frames_completed_through`).
+  * Linux (wgpu/Vulkan): the renderer runs on GPUI's own device and queue
+    (gpui-pre-wgpu patch `wait_for_shared_context`; our optional features
+    via `request_device_features`); the external texture is a
+    `wgpu::TextureView`. On CPU rasterizers (llvmpipe) sharing the queue
+    serializes our frames behind GPUI's software rendering, so frames are
+    read back there.
+  * macOS (Metal): same GPU as GPUI's renderer (checked by `registryID`;
+    always on Apple silicon); the texture is wgpu's `MTLTexture` in a
+    `gpui::NativeTextureHandle`; gpui-pre-apple resolves it in
+    `MetalAtlas::metal_texture` and reports frame completion.
+  * Windows (GPUI on D3D11, wgpu on D3D12) and fallbacks: **readback** — the
+    resolved frame is copied to a buffer, copied out once and wrapped in a
+    GPUI `RenderImage` (GPUI then allocates an atlas texture and uploads it:
+    3–4 CPU copies of 4·W·H bytes per frame). Drawings and thumbnails always
+    read back.
+  * `NOSHAPE_PRESENT=readback|texture` overrides the choice.
 * **Picking.** The R32Uint pick-id buffer is rendered lazily: a frame only
   marks it stale (geometry, camera or size changed) and the pick pass runs
   when a pick query arrives, for the scene and camera of the newest frame.
@@ -103,26 +128,6 @@ GPUI does not let applications draw into its own GPU passes, so
   and interleaved straight into mapped buffers; all regions of a sketch share
   one pick mesh (one draw call instead of one per region). Draw calls scale
   with bodies (3 per body), not with features or faces.
-
-**Zero-copy presentation (investigated, not implemented).** GPUI (gpui-pre
-0.3.9, used by gpui-kit 0.7.3) can show a platform surface only on macOS:
-`surface()` / `Window::paint_surface` take a `CVPixelBuffer`. The Metal
-renderer (`gpui-pre-apple/src/metal_renderer.rs`, `draw_surfaces`) asserts that
-the buffer is `kCVPixelFormatType_420YpCbCr8BiPlanarFullRange`, i.e. video
-YCbCr with chroma at half resolution, and converts it to RGB in its shader.
-Rendering wgpu frames into an IOSurface-backed CVPixelBuffer is possible
-(`wgpu::hal::metal::Device::texture_from_raw` on an `MTLTexture` made with
-`newTextureWithDescriptor:iosurface:plane:`, plus a conversion pass writing
-the Y and CbCr planes), but 4:2:0 chroma subsampling and the 8-bit YCbCr
-round trip visibly smear thin colored edges and highlights, so the image
-would not match the readback path. The Linux (wgpu) and Windows (DirectX 11)
-GPUI renderers ignore `PaintSurface` entirely, and GPUI does not expose its
-wgpu device or atlas textures (on Linux it is the same wgpu 29, so a GPU copy
-into the atlas would otherwise be possible). A real zero-copy path needs a GPUI
-change: a BGRA branch in the macOS `draw_surfaces` (single plane, `BGRA8Unorm`
-texture from the CoreVideo texture cache, pass-through fragment shader), or a
-public way to register an external `wgpu::Texture` for an element on
-Linux/Windows. Until then the readback path is used on every platform.
 
 ### Units and expressions
 Every numeric field accepts an expression (`25 mm`, `#width / 2`,
@@ -153,14 +158,19 @@ string plus its evaluated SI value; the document has default units.
 | `v.frame_to_present`, `v.present_to_paint` | until the UI thread takes the frame; until GPUI lays it out |
 | `v.submit_to_present`, `v.pick_latency` | end-to-end frame and pick-query latency |
 | `s.build`, `s.with_highlights`, `ps.apply_display`, `ps.refresh_scene` | scene building on the UI thread |
+| `w.cpu_per_frame`, `r.readback_copy_mb` | render-thread CPU time per delivered frame; MB copied out per read-back frame |
+| `v.render_count`, `v.present_only_count` | viewport renders; frames shown by a present without any re-render |
 
 Regenerations log per-feature times and triangle counts (`regen[...]`), meshing
 logs `tessellate ...` per body, and startup milestones are logged ("GPU
 initialized", "first viewport frame presented"). `NOSHAPE_PERF_PERIOD=<s>`
 flushes all stages periodically. Benchmarks: `NOSHAPE_PERF_ORBIT=<frames>`
 (with `NOSHAPE_PERF_ORBIT_DELAY=<s>`, default 10) rotates the camera every 8 ms
-like a 125 Hz mouse drag and logs the presented fps; with
-`NOSHAPE_PERF_BENCH=zoom` it scroll-zooms instead. GPU cost analysis:
+like a 125 Hz mouse drag (after zooming to fit) and logs the presented fps
+and a `BENCH SUMMARY` line: presentation path, device pixels, presented fps,
+window renders, frame-interval mean/p50/p95/p99/max, frames over 16.7 / 8.3 ms
+and **UI-thread CPU time per frame** (thread CPU clock, so it holds on a busy
+machine); with `NOSHAPE_PERF_BENCH=zoom` it scroll-zooms instead. GPU cost analysis:
 `NOSHAPE_PERF_MSAA=<n>` and `NOSHAPE_PERF_SKIP=lines,meshes`.
 
 ## Application structure (crates/app)

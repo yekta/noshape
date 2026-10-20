@@ -2590,8 +2590,9 @@ impl PartStudioView {
             InputEvent::Change => {
                 // No `cx.notify()`: the field's own notification already
                 // re-renders the Part Studio (its ancestor) with the new query,
-                // and leaves its cached slices (toolbar, overlay) alone.
+                // and of its cached slices only the rows need it.
                 this.ui.filter_query = st.read(cx).value().to_string();
+                this.filter_rows_changed(cx);
             }
             InputEvent::PressEnter { .. } => window.focus(&this.focus, cx),
             _ => {}

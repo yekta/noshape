@@ -202,7 +202,8 @@ fn expression_unit(studio: &VariableStudio, text: &str, depth: usize) -> Option<
 
 /// A borderless input whose text starts 7 px into its cell (Onshape).
 fn cell_input(st: &Entity<InputState>) -> Div {
-    div().flex_1().ml(px(-4.)).child(Input::new(st).appearance(false).text_size(px(14.)))
+    // Live (dom/caret-inputs.json): `os-param-text`, 13.33 px.
+    div().flex_1().ml(px(-4.)).child(Input::new(st).appearance(false).text_size(px(13.33)))
 }
 
 fn cell_div() -> Div {

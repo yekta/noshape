@@ -727,7 +727,7 @@ impl DrawingEditor {
                     vec![
                         Self::label_row("Apply to", Button::new("dr-cf-scope").label(SCOPES[scope]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-cf-scope-dd", true, move |m, w, cx| fill_os_menu(m, &scope_entries, &ed, w, cx)).into_any_element()),
                         Self::label_row("Alignment", h_flex().gap_1().child(align_btn("dr-cf-l", "Left", CellAlign::Left)).child(align_btn("dr-cf-c", "Center", CellAlign::Center)).child(align_btn("dr-cf-r", "Right", CellAlign::Right)).into_any_element()),
-                        Self::label_row("Text height", h_flex().gap_2().child(Input::new(height).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child("mm (empty = table)")).into_any_element()),
+                        Self::label_row("Text height", h_flex().gap_2().child(Input::new(height).text_size(px(13.33)).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child("mm (empty = table)")).into_any_element()),
                         Checkbox::new("dr-cf-bold")
                             .label("Bold")
                             .checked(bold)
@@ -763,12 +763,12 @@ impl DrawingEditor {
                     })
                     .collect();
                 let mut rows = vec![
-                    Self::label_row("Label", Input::new(label).small().w(px(100.)).into_any_element()),
+                    Self::label_row("Label", Input::new(label).text_size(px(13.33)).small().w(px(100.)).into_any_element()),
                     Self::label_row("Target area", Button::new("dr-dt-area").label(AREAS[area]).small().outline().dropdown_caret(true).os_dropdown_menu("dr-dt-area-dd", true, move |m, w, cx| fill_os_menu(m, &entries, &ed, w, cx)).into_any_element()),
                 ];
                 match area {
-                    1 => rows.push(Self::label_row("Diameter", h_flex().gap_2().child(Input::new(width).xsmall().w(px(70.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element())),
-                    2 => rows.push(Self::label_row("Width × height", h_flex().gap_1().child(Input::new(width).xsmall().w(px(60.))).child(Input::new(height).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element())),
+                    1 => rows.push(Self::label_row("Diameter", h_flex().gap_2().child(Input::new(width).text_size(px(13.33)).xsmall().w(px(70.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element())),
+                    2 => rows.push(Self::label_row("Width × height", h_flex().gap_1().child(Input::new(width).text_size(px(13.33)).xsmall().w(px(60.))).child(Input::new(height).text_size(px(13.33)).xsmall().w(px(60.))).child(div().text_xs().text_color(pal.text_faint).child(units)).into_any_element())),
                     _ => {}
                 }
                 ("Datum target", rows)
