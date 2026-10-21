@@ -7,7 +7,9 @@
 //! Steps: every tab of the document and a new one of every kind; a sketch
 //! of the first Part Studio with the Dimension tool started; every GPUI
 //! cursor style and every app cursor through the platform; the main dialogs
-//! and panels opened and closed; the right-click menus; an orbit; quit. Each step logs a
+//! and panels opened and closed; the right-click menus; an orbit; a Part
+//! Studio with 900 parts and then a small one, which must keep presenting
+//! frames (a slow frame once blanked the viewport); quit. Each step logs a
 //! `SMOKE <step>` line to stderr, so a failure shows where it happened.
 
 use crate::actions;
@@ -71,6 +73,56 @@ fn app_cursors() -> Vec<AppCursor> {
         }
     }
     all
+}
+
+/// A Part Studio with `side`² pins: one pin (r 2 mm, 10 mm) and a Part
+/// pattern of it in two directions, new parts.
+fn pins_studio(side: usize) -> noshape_model::partstudio::PartStudio {
+    use noshape_model::params::ParamValue as P;
+    use noshape_model::reference::{BodyId, DatumPlane, Reference};
+    let units = noshape_units::UnitPrefs::default();
+    let mut ps = noshape_model::partstudio::PartStudio::new();
+    let add = |ps: &mut noshape_model::partstudio::PartStudio, ty: &str, params: Vec<(&str, P)>| {
+        let mut f = ps.new_feature(ty, &units).unwrap_or_else(|| fail(&format!("no feature type {ty}")));
+        for (k, v) in params {
+            f.params.set(k, v);
+        }
+        let id = f.id;
+        ps.features.push(f);
+        id
+    };
+    let expr = |s: &str| P::Expr(noshape_units::ExprValue::new(s));
+    let plane = |p| P::Query(vec![Reference::Plane(p)]);
+    let mut sketch = noshape_sketch::Sketch::new();
+    sketch.add_circle(glam::DVec2::ZERO, 0.002);
+    let sk = add(&mut ps, "sketch", vec![("sketchPlane", plane(DatumPlane::Top)), ("sketch", P::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch, ..Default::default() })))]);
+    let regen = noshape_model::regen::Regenerator::new().regenerate(&ps, &noshape_model::configuration::ConfigValues::default(), &units, &noshape_model::regen::RegenOptions::default());
+    let key = regen.display.sketches.iter().find(|d| d.feature == sk).and_then(|d| d.regions.first()).map(|r| r.key.clone()).unwrap_or_else(|| fail("pin sketch has no region"));
+    let pin = add(&mut ps, "extrude", vec![("entities", P::Query(vec![Reference::SketchRegion { sketch: sk, key }])), ("depth", expr("10 mm"))]);
+    let count = side.to_string();
+    add(
+        &mut ps,
+        "linearPattern",
+        vec![
+            ("patternType", P::Enum("PART".into())),
+            ("entities", P::Query(vec![Reference::Body(BodyId { feature: pin, index: 0 })])),
+            ("directionOne", plane(DatumPlane::Right)),
+            ("distance", expr("6 mm")),
+            ("instanceCount", expr(&count)),
+            ("hasSecondDir", P::Bool(true)),
+            ("directionTwo", plane(DatumPlane::Front)),
+            ("distanceTwo", expr("6 mm")),
+            ("instanceCountTwo", expr(&count)),
+            ("operationType", P::Enum("NEW".into())),
+        ],
+    );
+    ps
+}
+
+/// The active Part Studio's viewport frame counts (presented, failed).
+fn frame_counts(w: &Workspace, cx: &App) -> Option<(u64, u64)> {
+    let ps = w.active_part_studio()?;
+    Some(ps.read(cx).viewport_entity().read(cx).frame_counts())
 }
 
 fn fail(msg: &str) -> ! {
@@ -142,6 +194,13 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let _ = cx.update(|window, cx| crate::cursor::set(window, Some(cursor), cx));
             wait(cx, 60).await;
         }
+        // Every cursor image as a .cur file for the Windows check in perf.yml.
+        if let Some(dir) = std::env::var_os("NOSHAPE_CURSOR_DUMP") {
+            match cx.update(|_, cx| crate::cursor::dump(std::path::Path::new(&dir), &app_cursors(), cx)) {
+                Ok(Ok(n)) => step(&format!("cursor files: {n}")),
+                _ => fail("cursor files"),
+            }
+        }
         let _ = cx.update(|window, cx| {
             crate::cursor::set(window, None, cx);
             cx.set_platform_cursor_style(CursorStyle::Arrow);
@@ -202,6 +261,44 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         for a in [Box::new(actions::ToggleProjection) as Box<dyn Action>, Box::new(actions::ZoomToFit), Box::new(actions::ToggleProjection)] {
             let _ = cx.update(|window, cx| window.dispatch_action(a, cx));
             wait(cx, 700).await;
+        }
+
+        // Many parts, then a small studio: frames keep coming, none fails.
+        step("many parts");
+        let ids = |w: &Workspace, cx: &App| w.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| t.id).collect::<Vec<_>>();
+        let before = ws.update(cx, |w, cx| ids(w, cx)).unwrap_or_else(|_| fail("no workspace"));
+        ws.update_in(cx, |w, window, cx| w.add_tab("partstudio", window, cx)).unwrap_or_else(|_| fail("add tab"));
+        wait(cx, 1500).await;
+        let tab = ws.update(cx, |w, cx| ids(w, cx).into_iter().find(|t| !before.contains(t))).ok().flatten().unwrap_or_else(|| fail("no new tab"));
+        let studio = pins_studio(30);
+        ws.update(cx, |w, cx| w.doc.update(cx, |d, cx| d.edit_studio(tab, "Smoke: 900 parts", cx, move |ps| *ps = studio)))
+            .unwrap_or_else(|_| fail("edit studio"));
+        let check = async |cx: &mut AsyncWindowContext, what: &str| {
+            let start = ws.update(cx, |w, cx| frame_counts(w, cx)).ok().flatten().unwrap_or_else(|| fail("no Part Studio viewport"));
+            let mut last = start;
+            for _ in 0..60 {
+                wait(cx, 1000).await;
+                let _ = cx.update(|window, cx| window.dispatch_action(Box::new(actions::RotateLeft), cx));
+                last = ws.update(cx, |w, cx| frame_counts(w, cx)).ok().flatten().unwrap_or(last);
+                if last.1 > start.1 {
+                    fail(&format!("{what}: {} frames failed", last.1 - start.1));
+                }
+                if last.0 >= start.0 + 5 {
+                    break;
+                }
+            }
+            eprintln!("SMOKE {what}: {} frames presented, {} failed", last.0 - start.0, last.1 - start.1);
+            if last.0 < start.0 + 5 {
+                fail(&format!("{what}: only {} frames presented in 60 s", last.0 - start.0));
+            }
+        };
+        wait(cx, 5000).await;
+        check(cx, "900 parts").await;
+        let small = ws.update(cx, |w, cx| w.doc.read(cx).session.doc.ordered_tabs().iter().find(|t| t.id != tab && matches!(&t.content, TabContent::PartStudio(_))).map(|t| t.id)).ok().flatten();
+        if let Some(small) = small {
+            ws.update_in(cx, |w, window, cx| w.activate(small, window, cx)).unwrap_or_else(|_| fail("activate"));
+            wait(cx, 3000).await;
+            check(cx, "small studio after").await;
         }
 
         step("done");

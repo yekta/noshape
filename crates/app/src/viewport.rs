@@ -242,6 +242,8 @@ pub struct Viewport {
     _picks: Task<()>,
     /// Frames presented so far.
     frames_presented: u64,
+    /// Frames the renderer reported failed.
+    frames_failed: u64,
     /// `NOSHAPE_PERF`: when the last frame was presented (paint latency).
     presented_at: Option<Instant>,
     /// `NOSHAPE_PERF_ORBIT`: closed-loop orbit benchmark state.
@@ -406,6 +408,7 @@ impl Viewport {
             _frames: frames,
             _picks: picks,
             frames_presented: 0,
+            frames_failed: 0,
             presented_at: None,
             bench,
         }
@@ -846,7 +849,10 @@ impl Viewport {
                 }
                 self.frames_presented += 1;
             }
-            Err(e) => log::error!("render failed: {e}"),
+            Err(e) => {
+                log::error!("render failed: {e}");
+                self.frames_failed += 1;
+            }
         }
         self.bench_presented();
         self.submit_if_ready(cx);
@@ -907,6 +913,11 @@ impl Viewport {
         self.camera_geometry = geometry.clone();
         self.gpu.set_camera_geometry(self.target_id, geometry);
         self.request_redraw(cx);
+    }
+
+    /// Frames presented and frames failed so far (smoke test).
+    pub fn frame_counts(&self) -> (u64, u64) {
+        (self.frames_presented, self.frames_failed)
     }
 
     /// Whether the owner draws content that follows the camera with GPUI

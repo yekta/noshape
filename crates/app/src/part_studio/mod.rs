@@ -337,6 +337,11 @@ impl Focusable for PartStudioView {
 }
 
 impl PartStudioView {
+    /// The 3D viewport (smoke test).
+    pub(crate) fn viewport_entity(&self) -> Entity<Viewport> {
+        self.viewport.clone()
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();

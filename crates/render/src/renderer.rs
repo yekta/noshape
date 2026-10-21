@@ -877,6 +877,10 @@ pub struct Renderer {
     frames_in_flight: usize,
     /// `NOSHAPE_PERF` on a device with timestamp queries: GPU time per frame.
     timer: Option<GpuTimer>,
+    /// How long one [`Self::wait_oldest`] blocks.
+    wait_slice: std::time::Duration,
+    /// The read a slow-frame warning was logged for (once per frame).
+    slow_warned: usize,
     /// Screen overlay pipelines, created with the first overlay.
     overlay_gpu: Option<crate::overlay_gpu::OverlayGpu>,
     text_shading: crate::overlay::TextShading,
@@ -1193,6 +1197,8 @@ impl Renderer {
             stamp: 0,
             frames_in_flight,
             timer,
+            wait_slice: std::time::Duration::from_secs(10),
+            slow_warned: 0,
             overlay_gpu: None,
             text_shading: Default::default(),
         }
@@ -1949,20 +1955,40 @@ impl Renderer {
         (SampleRead { view_proj }, textures)
     }
 
-    /// Block until the oldest outstanding read is ready (no-op if none).
+    /// Block until the oldest outstanding read is ready (no-op if none), or
+    /// for at most the wait slice ([`Self::set_wait_slice`], 10 s): a frame
+    /// still running then stays pending and the caller waits again. (A slow
+    /// frame, e.g. hundreds of parts on a software rasterizer under load, is
+    /// not a failed one: dropping it while the GPU still works on it made
+    /// every following frame time out behind it too, a blank viewport.)
     pub fn wait_oldest(&mut self) {
         let Some(front) = self.pending.front() else { return };
         if front.state.load(Ordering::Acquire) != MAP_PENDING {
             return;
         }
-        let r = self.device.poll(wgpu::PollType::Wait { submission_index: Some(front.submission.clone()), timeout: Some(std::time::Duration::from_secs(10)) });
-        if let Err(e) = r {
-            // Give up on this read; report it as failed.
-            let front = self.pending.pop_front().expect("front");
-            log::error!("GPU wait failed: {e}");
-            front.state.store(MAP_FAILED, Ordering::Release);
-            self.finish(front);
+        let read = Arc::as_ptr(&front.state) as usize;
+        match self.device.poll(wgpu::PollType::Wait { submission_index: Some(front.submission.clone()), timeout: Some(self.wait_slice) }) {
+            Ok(_) => {}
+            Err(wgpu::PollError::Timeout) => {
+                if self.slow_warned != read {
+                    log::warn!("GPU frame still running after {:?}; waiting", self.wait_slice);
+                    self.slow_warned = read;
+                }
+            }
+            Err(e) => {
+                // Not a submission of this device: report the read as failed.
+                let front = self.pending.pop_front().expect("front");
+                log::error!("GPU wait failed: {e}");
+                front.state.store(MAP_FAILED, Ordering::Release);
+                self.finish(front);
+            }
         }
+    }
+
+    /// How long one [`Self::wait_oldest`] blocks before returning to its
+    /// caller with the frame still pending (default 10 s).
+    pub fn set_wait_slice(&mut self, slice: std::time::Duration) {
+        self.wait_slice = slice;
     }
 
     /// Deliver every completed read (in submission order) without blocking.
