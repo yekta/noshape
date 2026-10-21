@@ -125,6 +125,9 @@ fn frame_counts(w: &Workspace, cx: &App) -> Option<(u64, u64)> {
     Some(ps.read(cx).viewport_entity().read(cx).frame_counts())
 }
 
+/// A dialog or panel: its name, the action opening it, the one closing it.
+type OpenClose = (&'static str, Box<dyn Action>, Box<dyn Action>);
+
 fn fail(msg: &str) -> ! {
     eprintln!("SMOKE FAIL: {msg}");
     std::process::exit(4);
@@ -204,7 +207,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         }
 
         step("dialogs");
-        let open_close: [(&str, Box<dyn Action>, Box<dyn Action>); 6] = [
+        let open_close: [OpenClose; 6] = [
             ("extrude", Box::new(actions::Extrude), Box::new(actions::Cancel)),
             ("section view", Box::new(actions::SectionView), Box::new(actions::Cancel)),
             ("shortcuts", Box::new(actions::ToggleShortcutHelp), Box::new(actions::ToggleShortcutHelp)),
